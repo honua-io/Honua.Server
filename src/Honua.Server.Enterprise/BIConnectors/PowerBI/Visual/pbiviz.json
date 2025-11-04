@@ -1,0 +1,27 @@
+{
+  "visual": {
+    "name": "HonuaKeplerMap",
+    "displayName": "Honua Kepler.gl Map",
+    "guid": "HonuaKeplerMapVisual4A3B2C1D",
+    "visualClassName": "Visual",
+    "version": "1.0.0",
+    "description": "Advanced geospatial visualization using Kepler.gl for Honua data",
+    "supportUrl": "https://docs.honua.io/powerbi/kepler-visual",
+    "gitHubUrl": "https://github.com/HonuaIO/powerbi-kepler-visual"
+  },
+  "apiVersion": "5.3.0",
+  "author": {
+    "name": "HonuaIO",
+    "email": "support@honua.io"
+  },
+  "assets": {
+    "icon": "assets/icon.png"
+  },
+  "externalJS": [
+    "node_modules/kepler.gl/umd/keplergl.min.js"
+  ],
+  "style": "style/visual.less",
+  "capabilities": "capabilities.json",
+  "dependencies": null,
+  "stringResources": []
+}

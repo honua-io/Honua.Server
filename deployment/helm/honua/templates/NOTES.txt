@@ -1,0 +1,155 @@
+🎉 Honua Build Orchestration Platform has been deployed!
+
+═══════════════════════════════════════════════════════════════════
+
+🚀 DEPLOYMENT INFORMATION
+
+Release Name: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+Chart Version: {{ .Chart.Version }}
+App Version: {{ .Chart.AppVersion }}
+
+═══════════════════════════════════════════════════════════════════
+
+📋 DEPLOYED COMPONENTS
+
+{{- if .Values.api.enabled }}
+✓ API Server (Honua.Server.Host)
+  - Replicas: {{ .Values.api.replicaCount }}
+  {{- if .Values.api.autoscaling.enabled }}
+  - Autoscaling: {{ .Values.api.autoscaling.minReplicas }} - {{ .Values.api.autoscaling.maxReplicas }} replicas
+  {{- end }}
+{{- end }}
+
+{{- if .Values.intake.enabled }}
+✓ Intake Service (Honua.Server.Intake)
+  - Replicas: {{ .Values.intake.replicaCount }}
+  {{- if .Values.intake.autoscaling.enabled }}
+  - Autoscaling: {{ .Values.intake.autoscaling.minReplicas }} - {{ .Values.intake.autoscaling.maxReplicas }} replicas
+  {{- end }}
+{{- end }}
+
+{{- if .Values.orchestrator.enabled }}
+✓ Build Orchestrator
+  - Replicas: {{ .Values.orchestrator.replicaCount }}
+  {{- if .Values.orchestrator.autoscaling.enabled }}
+  - Autoscaling: {{ .Values.orchestrator.autoscaling.minReplicas }} - {{ .Values.orchestrator.autoscaling.maxReplicas }} replicas
+  {{- end }}
+{{- end }}
+
+{{- if .Values.postgresql.enabled }}
+✓ PostgreSQL Database
+{{- end }}
+
+{{- if .Values.redis.enabled }}
+✓ Redis Cache
+{{- end }}
+
+═══════════════════════════════════════════════════════════════════
+
+🌐 ACCESS INFORMATION
+
+{{- if .Values.ingress.enabled }}
+Your application is accessible at:
+
+{{- range .Values.ingress.hosts }}
+  - https://{{ .host }}
+{{- end }}
+
+{{- if .Values.ingress.tls }}
+🔒 TLS is enabled
+{{- else }}
+⚠️  TLS is NOT enabled (not recommended for production)
+{{- end }}
+
+{{- else }}
+
+To access your application, run:
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "honua.fullname" . }}-api 8080:8080
+
+Then access the API at: http://localhost:8080
+
+{{- end }}
+
+═══════════════════════════════════════════════════════════════════
+
+📊 MONITORING
+
+{{- if .Values.prometheus.enabled }}
+✓ Prometheus is enabled
+  Access Prometheus:
+  {{- if .Values.ingress.enabled }}
+  - https://prometheus.{{ (index .Values.ingress.hosts 0).host | replace "api." "" }}
+  {{- else }}
+  - kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "honua.fullname" . }}-prometheus 9090:9090
+    Then open: http://localhost:9090
+  {{- end }}
+{{- end }}
+
+{{- if .Values.grafana.enabled }}
+✓ Grafana is enabled
+  Access Grafana:
+  {{- if .Values.ingress.enabled }}
+  - https://grafana.{{ (index .Values.ingress.hosts 0).host | replace "api." "" }}
+  {{- else }}
+  - kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "honua.fullname" . }}-grafana 3000:3000
+    Then open: http://localhost:3000
+  {{- end }}
+  Default credentials: admin / {{ .Values.grafana.adminPassword }}
+{{- end }}
+
+═══════════════════════════════════════════════════════════════════
+
+🔍 USEFUL COMMANDS
+
+Check pod status:
+  kubectl get pods -n {{ .Release.Namespace }}
+
+View API logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=api -f
+
+View Intake logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=intake -f
+
+View Orchestrator logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=orchestrator -f
+
+Check services:
+  kubectl get svc -n {{ .Release.Namespace }}
+
+Check ingress:
+  kubectl get ingress -n {{ .Release.Namespace }}
+
+═══════════════════════════════════════════════════════════════════
+
+⚠️  IMPORTANT SECURITY NOTES
+
+{{- if eq .Values.config.aspnetcore.environment "Production" }}
+
+1. Update all default passwords in secrets
+2. Configure TLS certificates for ingress
+3. Review and update network policies
+4. Configure proper RBAC permissions
+5. Enable audit logging
+6. Set up backup strategies for PostgreSQL
+7. Configure monitoring alerts
+
+{{- else }}
+
+⚠️  Running in {{ .Values.config.aspnetcore.environment }} mode
+   Do NOT use these settings in production!
+
+{{- end }}
+
+═══════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTATION
+
+For more information, visit:
+  - GitHub: {{ .Chart.Home }}
+  - Documentation: https://docs.honua.io
+
+═══════════════════════════════════════════════════════════════════
+
+Need help? Contact: {{ (index .Chart.Maintainers 0).email }}

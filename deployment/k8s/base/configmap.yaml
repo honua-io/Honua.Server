@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: honua-config
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua
+    app.kubernetes.io/component: configuration
+data:
+  # Server configuration
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+
+  # Logging
+  Serilog__MinimumLevel__Default: "Information"
+  Serilog__MinimumLevel__Override__Microsoft: "Warning"
+  Serilog__MinimumLevel__Override__System: "Warning"
+
+  # Pagination defaults
+  honua__pagination__defaultLimit: "10"
+  honua__pagination__maxLimit: "1000"
+
+  # API Versioning
+  honua__apiVersioning__defaultVersion: "1.0"
+  honua__apiVersioning__assumeDefaultVersionWhenUnspecified: "true"
+  honua__apiVersioning__reportApiVersions: "true"
+  honua__apiVersioning__versioningMethod: "UrlSegment"
+
+  # Authentication
+  honua__authentication__mode: "Local"
+  honua__authentication__enforce: "true"
+  honua__authentication__quickStart__enabled: "false"
+
+  # OData
+  honua__odata__enabled: "true"
+  honua__odata__allowWrites: "false"
+  honua__odata__defaultPageSize: "100"
+  honua__odata__maxPageSize: "1000"
+
+  # Resilience
+  Resilience__Hedging__Enabled: "true"
+  Resilience__Hedging__MaxHedgedAttempts: "2"
+  Resilience__Hedging__DelayMilliseconds: "50"
+  Resilience__Hedging__TimeoutSeconds: "5"
+
+  # Observability
+  observability__logging__jsonConsole: "true"
+  observability__logging__includeScopes: "true"
+  observability__metrics__enabled: "true"
+  observability__metrics__endpoint: "/metrics"
+  observability__metrics__usePrometheus: "true"
+
+  # Token Revocation
+  TokenRevocation__CleanupInterval: "01:00:00"
+  TokenRevocation__EnableAutoCleanup: "true"
+  TokenRevocation__FailClosedOnRedisError: "true"
+
+  # GitOps
+  GitOps__Enabled: "false"
+  GitOps__DryRun: "false"
+  GitOps__Watcher__PollIntervalSeconds: "30"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+data:
+  init.sql: |
+    -- Create database if not exists
+    SELECT 'CREATE DATABASE honua' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'honua')\gexec
+
+    -- Create extensions
+    \c honua
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;

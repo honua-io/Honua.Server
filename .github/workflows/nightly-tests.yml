@@ -1,0 +1,363 @@
+name: Nightly Comprehensive Tests
+
+# Comprehensive test suite running all test categories:
+# - Unit tests (all)
+# - Integration tests (all, including slow)
+# - E2E tests
+# - Performance/slow tests
+# - Docker tests
+# - Protocol conformance suites
+#
+# Runs daily at 2 AM UTC or on manual trigger
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      include_stress_tests:
+        description: 'Include stress tests'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  SOLUTION_FILE: 'Honua.sln'
+
+jobs:
+  comprehensive-tests:
+    name: Comprehensive Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run all unit tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Unit" \
+          --logger "trx;LogFileName=nightly-unit-test-results.trx" \
+          --logger "console;verbosity=normal" \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults
+
+    - name: Run all integration tests (including slow)
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Integration" \
+          --logger "trx;LogFileName=nightly-integration-test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory ./TestResults
+
+    - name: Run E2E tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=E2E" \
+          --logger "trx;LogFileName=nightly-e2e-test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory ./TestResults
+
+    - name: Run performance and slow tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Performance|Speed=Slow" \
+          --logger "trx;LogFileName=nightly-performance-test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory ./TestResults
+
+    - name: Run Docker integration tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Docker" \
+          --logger "trx;LogFileName=nightly-docker-test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory ./TestResults
+
+    - name: Generate code coverage report
+      run: |
+        dotnet tool install -g dotnet-reportgenerator-globaltool
+        reportgenerator \
+          -reports:**/coverage.cobertura.xml \
+          -targetdir:coverage-report \
+          -reporttypes:Html;Cobertura
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nightly-test-results
+        path: |
+          **/TestResults/*.trx
+          coverage-report/**
+        retention-days: 30
+
+    - name: Publish test results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Nightly Test Results
+        path: '**/*.trx'
+        reporter: dotnet-trx
+        fail-on-error: false
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        files: ./coverage-report/Cobertura.xml
+        fail_ci_if_error: false
+
+  memory-leak-tests:
+    name: Memory Leak Detection
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Restore and build
+      run: |
+        dotnet restore ${{ env.SOLUTION_FILE }}
+        dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run memory leak tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=MemoryLeak" \
+          --logger "trx;LogFileName=memory-leak-test-results.trx" \
+          --logger "console;verbosity=normal" \
+          --results-directory ./TestResults
+
+    - name: Upload memory test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: memory-leak-test-results
+        path: |
+          **/TestResults/*.trx
+
+  performance-benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: comprehensive-tests
+    timeout-minutes: 30
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Restore and build
+      run: |
+        dotnet restore ${{ env.SOLUTION_FILE }}
+        dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run benchmarks
+      run: |
+        cd benchmarks/Honua.Benchmarks
+        dotnet run --configuration Release --no-build -- \
+          --exporters json \
+          --filter '*' \
+          --memory
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: benchmark-results
+        path: |
+          benchmarks/Honua.Benchmarks/BenchmarkDotNet.Artifacts/**/*.json
+          benchmarks/Honua.Benchmarks/BenchmarkDotNet.Artifacts/**/*.html
+        retention-days: 90
+
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      if: github.event_name == 'schedule'
+      with:
+        name: OGC Operations Benchmarks
+        tool: 'benchmarkdotnet'
+        output-file-path: benchmarks/Honua.Benchmarks/BenchmarkDotNet.Artifacts/results/Honua.Benchmarks-report-full-compressed.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        alert-threshold: '150%'
+        comment-on-alert: true
+        fail-on-alert: false
+
+  protocol-conformance:
+    name: Protocol Conformance Suites
+    runs-on: ubuntu-latest
+    needs: comprehensive-tests
+    timeout-minutes: 90
+    env:
+      HONUA_BASE_URL: http://localhost:5000
+      WFS_CAPABILITIES_URL: http://localhost:5000/wfs?service=WFS&request=GetCapabilities&version=2.0.0
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Prepare sample dataset
+      run: |
+        ./scripts/fetch-ogc-sample-data.sh \
+          --skip-apply \
+          --database data/sqlite/ogc-conformance.db \
+          --metadata samples/ogc/metadata.json
+
+        python3 <<'PYTHON'
+        import json
+        from pathlib import Path
+
+        metadata_path = Path('data/sqlite/ogc-conformance-metadata.json')
+        data = json.loads(metadata_path.read_text())
+
+        for service in data.get('services', []):
+            ogc = service.setdefault('ogc', {})
+            ogc.setdefault('collectionsEnabled', True)
+            ogc.setdefault('itemLimit', 1000)
+
+        for layer in data.get('layers', []):
+            layer.setdefault('fields', [])
+            if not any(f.get('name') == 'globalId' for f in layer['fields']):
+                layer['fields'].append({
+                    'name': 'globalId',
+                    'dataType': 'string',
+                    'nullable': True
+                })
+
+            layer['editing'] = {
+                'capabilities': {
+                    'allowAdd': True,
+                    'allowUpdate': True,
+                    'allowDelete': True,
+                    'requireAuthentication': False,
+                    'allowedRoles': []
+                },
+                'constraints': {
+                    'immutableFields': ['road_id'],
+                    'requiredFields': ['name'],
+                    'defaultValues': {
+                        'status': 'planned'
+                    }
+                }
+            }
+
+        metadata_path.write_text(json.dumps(data, indent=2))
+        PYTHON
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Publish Honua host
+      run: dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj --configuration Release --output publish/host
+
+    - name: Launch Honua host
+      run: |
+        ASPNETCORE_ENVIRONMENT=Production \
+        HONUA__METADATA__PROVIDER=json \
+        HONUA__METADATA__PATH=$(pwd)/data/sqlite/ogc-conformance-metadata.json \
+        HONUA__AUTHENTICATION__MODE=QuickStart \
+        nohup dotnet publish/host/Honua.Server.Host.dll --urls http://0.0.0.0:5000 > honua-server.log 2>&1 &
+        echo $! > honua-server.pid
+
+    - name: Wait for Honua readiness
+      run: |
+        for attempt in {1..40}; do
+          if curl -sf http://localhost:5000/healthz/ready >/dev/null; then
+            exit 0
+          fi
+          sleep 3
+        done
+        echo "Honua host did not report ready state" >&2
+        cat honua-server.log || true
+        exit 1
+
+    - name: Prime dataset endpoints
+      run: |
+        curl -sf http://localhost:5000/ogc/collections > /tmp/collections.json
+        curl -sf http://localhost:5000/wfs?service=WFS\&request=GetCapabilities\&version=2.0.0 > /tmp/wfs-capabilities.xml
+
+    - name: Generate sample KML
+      run: |
+        mkdir -p qa-report/artifacts
+        curl -sf "http://localhost:5000/ogc/collections/roads::roads-primary/items?f=kml" > qa-report/artifacts/roads.kml
+
+    - name: Run WFS conformance suite
+      run: ./scripts/run-wfs-conformance.sh
+
+    - name: Run KML conformance suite
+      run: ./scripts/run-kml-conformance.sh qa-report/artifacts/roads.kml
+
+    - name: Upload conformance reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: protocol-conformance-artifacts
+        path: |
+          qa-report/**
+          honua-server.log
+
+    - name: Shutdown Honua host
+      if: always()
+      run: |
+        if [ -f honua-server.pid ]; then
+          kill $(cat honua-server.pid) || true
+        fi

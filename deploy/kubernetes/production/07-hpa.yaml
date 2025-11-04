@@ -1,0 +1,181 @@
+---
+# Horizontal Pod Autoscaler for Honua Server
+# This HPA configuration automatically scales the Honua deployment based on CPU and memory utilization
+#
+# Requirements met:
+# - CPU target: 70%
+# - Memory target: 80%
+# - Min replicas: 2
+# - Max replicas: 10
+# - Immediate scale-up (0s stabilization)
+# - Conservative scale-down (300s stabilization)
+#
+# Documentation: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+# Metrics Server required: https://github.com/kubernetes-sigs/metrics-server
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: honua-server
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-server
+    app.kubernetes.io/instance: honua
+    app.kubernetes.io/component: autoscaling
+    environment: production
+  annotations:
+    description: "Auto-scales Honua Server based on CPU and memory utilization"
+    scaling.policy: "aggressive-scaleup-conservative-scaledown"
+
+spec:
+  # Target Deployment
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: honua-server
+
+  # Replica Limits
+  minReplicas: 2
+  maxReplicas: 10
+
+  # Scaling Metrics
+  metrics:
+  # CPU-based scaling (70% target)
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+
+  # Memory-based scaling (80% target)
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+  # Scaling Behavior Configuration
+  behavior:
+    # Scale Down Behavior - Conservative
+    scaleDown:
+      # Wait 5 minutes before scaling down to avoid flapping
+      stabilizationWindowSeconds: 300
+      policies:
+      # Scale down by max 50% of current pods every 60 seconds
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      # Or scale down by max 2 pods every 60 seconds
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      # Use the policy that results in slower scale down (more conservative)
+      selectPolicy: Min
+
+    # Scale Up Behavior - Aggressive
+    scaleUp:
+      # Scale up immediately when needed (no stabilization)
+      stabilizationWindowSeconds: 0
+      policies:
+      # Scale up by max 100% of current pods every 30 seconds
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      # Or scale up by max 4 pods every 30 seconds
+      - type: Pods
+        value: 4
+        periodSeconds: 30
+      # Use the policy that results in faster scale up (more aggressive)
+      selectPolicy: Max
+
+---
+# Optional: Custom Metrics HPA Configuration
+# Uncomment and configure if using custom metrics (e.g., Prometheus adapter)
+# Requires metrics server and custom metrics API
+
+# apiVersion: autoscaling/v2
+# kind: HorizontalPodAutoscaler
+# metadata:
+#   name: honua-server-custom
+#   namespace: honua
+#   labels:
+#     app.kubernetes.io/name: honua-server
+#     app.kubernetes.io/instance: honua
+#     app.kubernetes.io/component: autoscaling-custom
+#     environment: production
+#
+# spec:
+#   scaleTargetRef:
+#     apiVersion: apps/v1
+#     kind: Deployment
+#     name: honua-server
+#
+#   minReplicas: 2
+#   maxReplicas: 20
+#
+#   metrics:
+#   # CPU and Memory (same as above)
+#   - type: Resource
+#     resource:
+#       name: cpu
+#       target:
+#         type: Utilization
+#         averageUtilization: 70
+#   - type: Resource
+#     resource:
+#       name: memory
+#       target:
+#         type: Utilization
+#         averageUtilization: 80
+#
+#   # Custom Metric: HTTP Request Rate
+#   - type: Pods
+#     pods:
+#       metric:
+#         name: http_requests_per_second
+#       target:
+#         type: AverageValue
+#         averageValue: "1000"
+#
+#   # Custom Metric: Tile Processing Queue Length
+#   - type: Pods
+#     pods:
+#       metric:
+#         name: tile_processing_queue_length
+#       target:
+#         type: AverageValue
+#         averageValue: "50"
+#
+#   # Custom Metric: Database Connection Pool Usage
+#   - type: Pods
+#     pods:
+#       metric:
+#         name: database_connection_pool_utilization
+#       target:
+#         type: AverageValue
+#         averageValue: "0.75"
+#
+#   behavior:
+#     scaleDown:
+#       stabilizationWindowSeconds: 300
+#       policies:
+#       - type: Percent
+#         value: 50
+#         periodSeconds: 60
+#       - type: Pods
+#         value: 2
+#         periodSeconds: 60
+#       selectPolicy: Min
+#
+#     scaleUp:
+#       stabilizationWindowSeconds: 0
+#       policies:
+#       - type: Percent
+#         value: 100
+#         periodSeconds: 30
+#       - type: Pods
+#         value: 6
+#         periodSeconds: 30
+#       selectPolicy: Max

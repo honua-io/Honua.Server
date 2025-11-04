@@ -1,0 +1,112 @@
+@page "/catalog/{serviceId}/{layerId}"
+@using System.Linq
+@model Honua.Server.Host.Pages.Catalog.DetailModel
+@{
+    ViewData["Title"] = Model.Record.Title;
+    var spatial = Model.Record.SpatialExtent;
+    var temporal = Model.Record.TemporalExtent;
+}
+
+<article class="catalog-detail">
+    <header>
+        <p class="breadcrumb"><a href="/catalog">Catalog</a> › <a href="/catalog?group=@Uri.EscapeDataString(Model.Record.GroupId)">@Model.Record.GroupTitle</a> › @Model.Record.Title</p>
+        <h1>@Model.Record.Title</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.Record.Summary))
+        {
+            <p class="summary">@Model.Record.Summary</p>
+        }
+    </header>
+
+    <section class="metadata">
+        <h2>Metadata</h2>
+        <dl>
+            <dt>Group</dt>
+            <dd>@Model.Record.GroupTitle (@Model.Record.GroupId)</dd>
+            <dt>Service</dt>
+            <dd>@Model.Record.ServiceTitle</dd>
+            <dt>Layer</dt>
+            <dd>@Model.Record.LayerId</dd>
+            <dt>Geometry</dt>
+            <dd>@Model.Layer?.Layer.GeometryType</dd>
+            @if (Model.Record.Keywords.Count > 0)
+            {
+                <dt>Keywords</dt>
+                <dd>@string.Join(", ", Model.Record.Keywords)</dd>
+            }
+            @if (Model.Record.Themes.Count > 0)
+            {
+                <dt>Themes</dt>
+                <dd>@string.Join(", ", Model.Record.Themes)</dd>
+            }
+        </dl>
+    </section>
+
+    @if (spatial is not null)
+    {
+        <section class="extent">
+            <h2>Spatial Extent</h2>
+            <p>
+                BBOX: @string.Join(", ", spatial.Bbox.FirstOrDefault() ?? System.Array.Empty<double>())
+                @if (!string.IsNullOrWhiteSpace(spatial.Crs))
+                {
+                    <span>(@spatial.Crs)</span>
+                }
+            </p>
+        </section>
+    }
+
+    @if (temporal is not null && (temporal.Start is not null || temporal.End is not null))
+    {
+        <section class="temporal">
+            <h2>Temporal Extent</h2>
+            <p>Start: @(temporal.Start?.ToString("o") ?? "…")<br />End: @(temporal.End?.ToString("o") ?? "…")</p>
+        </section>
+    }
+
+    @if (Model.Record.Links.Count > 0)
+    {
+        <section class="links">
+            <h2>Links</h2>
+            <ul>
+                @foreach (var link in Model.Record.Links)
+                {
+                    <li>
+                        <a href="@link.Href">@(!string.IsNullOrWhiteSpace(link.Title) ? link.Title : link.Href)</a>
+                        @if (!string.IsNullOrWhiteSpace(link.Rel))
+                        {
+                            <span class="link-rel">(@link.Rel)</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    @if (Model.Layer?.Contacts.Count > 0)
+    {
+        <section class="contacts">
+            <h2>Contacts</h2>
+            <ul>
+                @foreach (var contact in Model.Layer.Contacts)
+                {
+                    <li>
+                        <strong>@contact.Name</strong>
+                        @if (!string.IsNullOrWhiteSpace(contact.Organization))
+                        {
+                            <span>@contact.Organization</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(contact.Email))
+                        {
+                            <span>@contact.Email</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</article>
+
+
+
+
+

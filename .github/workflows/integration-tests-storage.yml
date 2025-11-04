@@ -1,0 +1,368 @@
+name: Integration Tests with Cloud Storage Emulators
+
+on:
+  push:
+    branches: [ master, main, dev ]
+  pull_request:
+    branches: [ master, main, dev ]
+  workflow_dispatch:
+    inputs:
+      run_integration_only:
+        description: 'Run only integration tests (skip unit tests)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  SOLUTION_FILE: 'Honua.sln'
+  DOCKER_COMPOSE_FILE: 'tests/Honua.Server.Core.Tests/docker-compose.storage-emulators.yml'
+
+jobs:
+  # Fast unit tests (excluding integration tests)
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_integration_only != 'true'
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install GDAL dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+      - name: Build solution
+        run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+      - name: Run unit tests (exclude integration tests)
+        run: |
+          dotnet test ${{ env.SOLUTION_FILE }} \
+            --configuration Release \
+            --no-build \
+            --filter "FullyQualifiedName!~IntegrationTests" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            --logger "trx;LogFileName=unit-test-results.trx" \
+            --logger "console;verbosity=normal" \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - name: Upload unit test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.opencover.xml
+          retention-days: 7
+
+      - name: Publish unit test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Unit Test Results
+          path: 'TestResults/**/*.trx'
+          reporter: dotnet-trx
+          fail-on-error: false
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./TestResults/**/coverage.opencover.xml
+          flags: unittests
+          name: unit-test-coverage
+          fail_ci_if_error: false
+
+  # Integration tests with cloud storage emulators
+  integration-tests:
+    name: Integration Tests (Cloud Storage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install GDAL dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Start cloud storage emulators
+        run: |
+          cd tests/Honua.Server.Core.Tests
+          docker-compose -f docker-compose.storage-emulators.yml up -d
+          docker-compose -f docker-compose.storage-emulators.yml ps
+
+      - name: Wait for LocalStack (S3) to be healthy
+        run: |
+          echo "Waiting for LocalStack to be ready..."
+          timeout 120 bash -c '
+            until curl -sf http://localhost:4566/_localstack/health | grep -q "\"s3\":.*\"running\""; do
+              echo "LocalStack not ready yet..."
+              sleep 3
+            done
+          '
+          echo "LocalStack is ready!"
+          curl -s http://localhost:4566/_localstack/health | jq .
+
+      - name: Wait for Azurite (Azure Blob) to be healthy
+        run: |
+          echo "Waiting for Azurite to be ready..."
+          timeout 120 bash -c '
+            until curl -sf http://localhost:10000/devstoreaccount1?comp=list > /dev/null; do
+              echo "Azurite not ready yet..."
+              sleep 3
+            done
+          '
+          echo "Azurite is ready!"
+          curl -sf http://localhost:10000/devstoreaccount1?comp=list
+
+      - name: Wait for GCS emulator to be healthy
+        run: |
+          echo "Waiting for GCS emulator to be ready..."
+          timeout 120 bash -c '
+            until curl -sf http://localhost:4443/storage/v1/b > /dev/null; do
+              echo "GCS emulator not ready yet..."
+              sleep 3
+            done
+          '
+          echo "GCS emulator is ready!"
+          curl -s http://localhost:4443/storage/v1/b | jq .
+
+      - name: Verify all emulators are healthy
+        run: |
+          echo "=== Emulator Health Check Summary ==="
+          echo "LocalStack (S3): $(curl -sf http://localhost:4566/_localstack/health && echo '✓ OK' || echo '✗ FAIL')"
+          echo "Azurite (Azure): $(curl -sf http://localhost:10000/devstoreaccount1?comp=list && echo '✓ OK' || echo '✗ FAIL')"
+          echo "GCS Emulator: $(curl -sf http://localhost:4443/storage/v1/b && echo '✓ OK' || echo '✗ FAIL')"
+          echo "======================================"
+
+      - name: Show emulator container status
+        if: always()
+        run: |
+          cd tests/Honua.Server.Core.Tests
+          docker-compose -f docker-compose.storage-emulators.yml ps
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+      - name: Build solution
+        run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+      - name: Run integration tests
+        run: |
+          dotnet test ${{ env.SOLUTION_FILE }} \
+            --configuration Release \
+            --no-build \
+            --filter "FullyQualifiedName~IntegrationTests" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults \
+            --logger "trx;LogFileName=integration-test-results.trx" \
+            --logger "console;verbosity=detailed" \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: |
+            TestResults/**/*.trx
+            TestResults/**/coverage.opencover.xml
+          retention-days: 7
+
+      - name: Publish integration test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Integration Test Results
+          path: 'TestResults/**/*.trx'
+          reporter: dotnet-trx
+          fail-on-error: false
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./TestResults/**/coverage.opencover.xml
+          flags: integrationtests
+          name: integration-test-coverage
+          fail_ci_if_error: false
+
+      - name: Show emulator logs on failure
+        if: failure()
+        run: |
+          echo "=== LocalStack Logs ==="
+          docker logs honua-storage-test-localstack || true
+          echo ""
+          echo "=== Azurite Logs ==="
+          docker logs honua-storage-test-azurite || true
+          echo ""
+          echo "=== GCS Emulator Logs ==="
+          docker logs honua-storage-test-gcs || true
+
+      - name: Cleanup - Stop and remove emulators
+        if: always()
+        run: |
+          cd tests/Honua.Server.Core.Tests
+          docker-compose -f docker-compose.storage-emulators.yml down -v
+          docker-compose -f docker-compose.storage-emulators.yml ps
+
+  # Test summary job
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: always()
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*test-results*"
+          merge-multiple: true
+
+      - name: Publish combined test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Combined Test Results
+          path: '**/*.trx'
+          reporter: dotnet-trx
+          fail-on-error: true
+
+      - name: Code Coverage Summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        if: always()
+        with:
+          filename: '**/coverage.opencover.xml'
+          badge: true
+          format: markdown
+          output: both
+          thresholds: '60 80'
+
+      - name: Add Coverage PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request'
+        with:
+          recreate: true
+          path: code-coverage-results.md
+
+  # Verify SBOM attestations on container images
+  verify-sbom:
+    name: Verify SBOM Attestations
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    permissions:
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run SBOM verification script
+        run: |
+          chmod +x ./scripts/verify-sbom.sh
+          ./scripts/verify-sbom.sh "${{ github.ref_name }}"
+        continue-on-error: true
+
+      - name: Upload SBOM verification results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom-verification-results
+          path: |
+            sbom-*.json
+            provenance-*.json
+            *-results.txt
+            sbom-verification-report.txt
+          retention-days: 30
+
+      - name: Comment PR with SBOM verification
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## SBOM Verification Results\n\n';
+
+            try {
+              const report = fs.readFileSync('sbom-verification-report.txt', 'utf8');
+              comment += '```\n' + report + '\n```\n';
+            } catch (e) {
+              comment += 'SBOM verification report not available.\n';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # All tests passed gate
+  all-tests-passed:
+    name: All Tests Passed
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+            echo "::error::Unit tests failed or were skipped"
+            exit 1
+          fi
+          if [ "${{ needs.integration-tests.result }}" != "success" ]; then
+            echo "::error::Integration tests failed"
+            exit 1
+          fi
+          echo "::notice::All tests passed successfully!"

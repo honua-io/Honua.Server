@@ -1,0 +1,35 @@
+<!-- Copyright (c) 2025 HonuaIO -->
+<!-- Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. -->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Honua.Server.Core\Honua.Server.Core.csproj" />
+    <ProjectReference Include="..\Honua.Server.Core.Cloud\Honua.Server.Core.Cloud.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- GDAL - Geospatial Data Abstraction Library (Raster DATA SOURCES only) -->
+    <PackageReference Include="MaxRev.Gdal.Core" Version="3.11.3.339" />
+    <PackageReference Include="MaxRev.Gdal.WindowsRuntime.Minimal" Version="3.11.3.339" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <PackageReference Include="MaxRev.Gdal.LinuxRuntime.Minimal" Version="3.11.3.339" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
+    <PackageReference Include="MaxRev.Gdal.OSXRuntime.Minimal" Version="3.11.3.339" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
+
+    <!-- Raster File Formats -->
+    <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.660" />
+
+    <!-- Data Formats -->
+    <PackageReference Include="ParquetSharp" Version="21.0.0" />
+    <PackageReference Include="Apache.Arrow" Version="22.1.0" />
+
+    <!-- Git Operations -->
+    <PackageReference Include="LibGit2Sharp" Version="0.30.0" />
+  </ItemGroup>
+</Project>

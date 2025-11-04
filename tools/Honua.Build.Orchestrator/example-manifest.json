@@ -1,0 +1,145 @@
+{
+  "id": "honua-gis-prod",
+  "version": "1.0.0",
+  "name": "Honua GIS Production Deployment",
+  "description": "Production-ready GIS server with advanced analytics and enterprise features",
+  "repositories": [
+    {
+      "name": "honua-server",
+      "url": "https://github.com/honua-io/honua-server.git",
+      "ref": "main",
+      "access": "public",
+      "projects": [
+        "src/Honua.Server.Core/Honua.Server.Core.csproj",
+        "src/Honua.Server.Host/Honua.Server.Host.csproj"
+      ]
+    },
+    {
+      "name": "honua-analytics",
+      "url": "https://github.com/honua-io/honua-analytics.git",
+      "ref": "v2.1.0",
+      "access": "private",
+      "credentials": "HONUA_ANALYTICS_PAT",
+      "projects": [
+        "src/Honua.Analytics/Honua.Analytics.csproj"
+      ]
+    }
+  ],
+  "modules": [
+    "Honua.Server.Core",
+    "Honua.Server.Host",
+    "Honua.Analytics"
+  ],
+  "targets": [
+    {
+      "id": "aws-graviton3-prod",
+      "provider": "aws",
+      "compute": "graviton3",
+      "architecture": "linux-arm64",
+      "tier": "production",
+      "optimizations": {
+        "pgo": true,
+        "dynamicPgo": true,
+        "tieredCompilation": true,
+        "vectorization": "neon",
+        "readyToRun": true,
+        "trim": true,
+        "optimizationPreference": "speed"
+      },
+      "registry": {
+        "url": "123456789.dkr.ecr.us-east-1.amazonaws.com",
+        "repository": "honua-gis",
+        "tagStrategy": "manifest-hash",
+        "tags": ["latest", "production"],
+        "credentialsVariable": "AWS_ECR_CREDENTIALS"
+      }
+    },
+    {
+      "id": "azure-ampere-prod",
+      "provider": "azure",
+      "compute": "ampere",
+      "architecture": "linux-arm64",
+      "tier": "production",
+      "optimizations": {
+        "pgo": true,
+        "dynamicPgo": true,
+        "vectorization": "neon",
+        "trim": true,
+        "optimizationPreference": "speed"
+      },
+      "registry": {
+        "url": "honua.azurecr.io",
+        "repository": "honua-gis",
+        "tagStrategy": "semantic-version",
+        "tags": ["latest"],
+        "credentialsVariable": "AZURE_ACR_CREDENTIALS"
+      }
+    },
+    {
+      "id": "gcp-tau-t2a-prod",
+      "provider": "gcp",
+      "compute": "tau-t2a",
+      "architecture": "linux-arm64",
+      "tier": "production",
+      "optimizations": {
+        "pgo": true,
+        "vectorization": "neon",
+        "trim": true,
+        "optimizationPreference": "balanced"
+      },
+      "registry": {
+        "url": "gcr.io/honua-project",
+        "repository": "honua-gis",
+        "tagStrategy": "manifest-hash",
+        "credentialsVariable": "GCP_GCR_CREDENTIALS"
+      }
+    },
+    {
+      "id": "x86-compatibility",
+      "provider": "on-premises",
+      "compute": "x86_64",
+      "architecture": "linux-x64",
+      "tier": "compatibility",
+      "optimizations": {
+        "pgo": true,
+        "vectorization": "avx2",
+        "trim": true,
+        "optimizationPreference": "speed"
+      }
+    }
+  ],
+  "deployment": {
+    "environment": "production",
+    "region": "us-east-1",
+    "enableCache": true,
+    "cacheBackend": "redis",
+    "cacheConnection": "redis://build-cache.honua.io:6379",
+    "parallelism": 4,
+    "resources": {
+      "cpuLimit": 8.0,
+      "memoryLimit": 16.0,
+      "diskLimit": 100.0,
+      "timeout": 90
+    },
+    "costEstimate": {
+      "buildCost": 2.50,
+      "storageCost": 15.00,
+      "bandwidthCost": 5.00,
+      "currency": "USD"
+    }
+  },
+  "optimizations": {
+    "pgo": true,
+    "dynamicPgo": true,
+    "tieredCompilation": true,
+    "readyToRun": true,
+    "trim": true,
+    "optimizationPreference": "speed"
+  },
+  "properties": {
+    "EnableMetrics": "true",
+    "EnableTracing": "true",
+    "Version": "1.0.0"
+  },
+  "createdAt": "2025-10-29T00:00:00Z"
+}

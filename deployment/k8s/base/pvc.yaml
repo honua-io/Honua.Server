@@ -1,0 +1,90 @@
+# Persistent Volume Claims for data storage
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+  # For production, use a faster storage class:
+  # storageClassName: ssd
+  # storageClassName: gp3 (AWS)
+  # storageClassName: managed-premium (Azure)
+  # storageClassName: pd-ssd (GCP)
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: honua-logs
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua
+    app.kubernetes.io/component: logging
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: build-workspace
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-orchestrator
+    app.kubernetes.io/component: build
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: build-cache
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-orchestrator
+    app.kubernetes.io/component: build-cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard

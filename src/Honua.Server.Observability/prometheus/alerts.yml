@@ -1,0 +1,218 @@
+groups:
+  - name: honua_build_queue
+    interval: 30s
+    rules:
+      - alert: HighBuildQueueDepth
+        expr: builds_in_queue > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: build_queue
+        annotations:
+          summary: "High build queue depth detected"
+          description: "Build queue depth is {{ $value }} (threshold: 100). System may be experiencing performance issues."
+
+      - alert: CriticalBuildQueueDepth
+        expr: builds_in_queue > 500
+        for: 2m
+        labels:
+          severity: critical
+          component: build_queue
+        annotations:
+          summary: "Critical build queue depth detected"
+          description: "Build queue depth is {{ $value }} (threshold: 500). Immediate attention required."
+
+      - alert: HighBuildFailureRate
+        expr: |
+          rate(build_failure_total[5m]) /
+          (rate(build_success_total[5m]) + rate(build_failure_total[5m])) > 0.20
+        for: 10m
+        labels:
+          severity: warning
+          component: build_queue
+        annotations:
+          summary: "High build failure rate detected"
+          description: "Build failure rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: NoBuildActivity
+        expr: |
+          rate(builds_enqueued_total[10m]) == 0 AND
+          hour() >= 8 AND hour() <= 20
+        for: 30m
+        labels:
+          severity: warning
+          component: build_queue
+        annotations:
+          summary: "No build activity detected"
+          description: "No builds have been enqueued in the last 30 minutes during business hours."
+
+  - name: honua_cache
+    interval: 30s
+    rules:
+      - alert: LowCacheHitRate
+        expr: |
+          rate(cache_lookups_total{result="hit"}[10m]) /
+          rate(cache_lookups_total[10m]) < 0.50
+        for: 15m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate detected"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 50%). Cache may need tuning."
+
+      - alert: HighCacheEvictionRate
+        expr: rate(cache_evictions_total[5m]) > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High cache eviction rate detected"
+          description: "Cache evictions are occurring at {{ $value }} per second. Consider increasing cache size."
+
+  - name: honua_license
+    interval: 60s
+    rules:
+      - alert: LicenseExpiringSoon
+        expr: |
+          (license_quota_usage_percent > 90) OR
+          (active_licenses_total == 0)
+        for: 5m
+        labels:
+          severity: warning
+          component: license
+        annotations:
+          summary: "License quota or expiration issue"
+          description: "License for {{ $labels.customer_id }} quota {{ $labels.quota_type }} is at {{ $value }}% or no active licenses."
+
+      - alert: QuotaExceeded
+        expr: rate(quota_exceeded_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: license
+        annotations:
+          summary: "Quota exceeded events detected"
+          description: "Customer {{ $labels.customer_id }} has exceeded quota {{ $labels.quota_type }}."
+
+  - name: honua_registry
+    interval: 30s
+    rules:
+      - alert: RegistryProvisioningFailures
+        expr: |
+          rate(registry_provisioning_total{result="failure"}[10m]) /
+          rate(registry_provisioning_total[10m]) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: registry
+        annotations:
+          summary: "High registry provisioning failure rate"
+          description: "Registry provisioning failure rate for {{ $labels.provider }} is {{ $value | humanizePercentage }}."
+
+      - alert: HighRegistryErrorRate
+        expr: rate(registry_errors_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: registry
+        annotations:
+          summary: "High registry error rate"
+          description: "Registry {{ $labels.provider }} is experiencing {{ $value }} errors per second."
+
+      - alert: NoActiveRegistries
+        expr: sum(active_registries_total) == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: registry
+        annotations:
+          summary: "No active registries available"
+          description: "No active container registries are available. Build system cannot function."
+
+  - name: honua_http
+    interval: 30s
+    rules:
+      - alert: HighHTTPErrorRate
+        expr: |
+          rate(http_requests_total{status_class="5xx"}[5m]) /
+          rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: http
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "HTTP 5xx error rate is {{ $value | humanizePercentage }} for {{ $labels.method }} {{ $labels.path }}."
+
+      - alert: HighHTTPLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path)
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: http
+        annotations:
+          summary: "High HTTP request latency"
+          description: "95th percentile latency for {{ $labels.path }} is {{ $value }}s (threshold: 5s)."
+
+  - name: honua_intake
+    interval: 30s
+    rules:
+      - alert: HighConversationErrorRate
+        expr: |
+          rate(conversation_errors_total[10m]) /
+          (rate(conversations_completed_total[10m]) + rate(conversation_errors_total[10m])) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: intake
+        annotations:
+          summary: "High AI conversation error rate"
+          description: "Conversation error rate is {{ $value | humanizePercentage }} for model {{ $labels.model }}."
+
+      - alert: HighAICost
+        expr: rate(ai_cost_usd_total[1h]) * 24 > 100
+        for: 30m
+        labels:
+          severity: warning
+          component: intake
+        annotations:
+          summary: "High AI cost detected"
+          description: "Projected daily AI cost is ${{ $value }} (threshold: $100/day)."
+
+      - alert: StuckConversations
+        expr: active_conversations > 10
+        for: 30m
+        labels:
+          severity: warning
+          component: intake
+        annotations:
+          summary: "High number of active conversations"
+          description: "{{ $value }} conversations have been active for more than 30 minutes."
+
+  - name: honua_system
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 4
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Process is using {{ $value }}GB of memory (threshold: 4GB)."
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "Process CPU usage is {{ $value | humanizePercentage }}."

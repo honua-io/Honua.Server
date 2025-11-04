@@ -1,0 +1,248 @@
+# Test Scenario 02: Modify Existing Layer
+#
+# This scenario tests the GitOps workflow when modifying properties
+# of an existing layer (non-breaking changes).
+
+scenario:
+  id: "02-modify-layer"
+  name: "Modify Existing Layer Properties"
+  description: "Update title, description, and field aliases of an existing layer"
+  risk_level: "low"
+  environment: "development"
+
+objectives:
+  - Test detection of layer modification
+  - Verify reconciliation handles property updates
+  - Confirm non-breaking changes are applied smoothly
+  - Validate updated metadata is accessible
+
+steps:
+  - step: 1
+    action: "Navigate to test repository"
+    command: "cd /tmp/honua-gitops-test-repo"
+
+  - step: 2
+    action: "Edit metadata.json to modify layer"
+    command: "vim environments/development/metadata.json"
+    note: "Apply the modifications shown in the 'modifications' section"
+
+  - step: 3
+    action: "Commit the change"
+    commands:
+      - "git add environments/development/metadata.json"
+      - "git commit -m 'Update sample-points layer metadata'"
+
+  - step: 4
+    action: "Monitor GitWatcher logs"
+    expected_time: "10-15 seconds"
+    expected_log: "Detected new commit"
+
+  - step: 5
+    action: "Verify reconciliation succeeds"
+    expected_log: "Successfully completed reconciliation"
+
+  - step: 6
+    action: "Validate changes are reflected"
+    command: "cat /tmp/honua-gitops-test-repo/reconciled/development/metadata.json | jq '.services[0].layers[0].title'"
+    expected_output: "Updated Sample Points"
+
+modifications:
+  description: "Apply these changes to the 'sample-points' layer"
+  changes:
+    - property: "title"
+      from: "Sample Points"
+      to: "Updated Sample Points"
+      breaking: false
+
+    - property: "description"
+      from: "Sample point layer for testing"
+      to: "Updated sample point layer for comprehensive testing"
+      breaking: false
+
+    - property: "fields[1].alias"
+      from: "Name"
+      to: "Point Name"
+      breaking: false
+
+  complete_modified_layer: |
+    {
+      "id": "sample-points",
+      "title": "Updated Sample Points",
+      "description": "Updated sample point layer for comprehensive testing",
+      "datasource": "test-postgis",
+      "table": "public.sample_points",
+      "geometryColumn": "geom",
+      "geometryType": "Point",
+      "srid": 4326,
+      "fields": [
+        {
+          "name": "id",
+          "type": "integer",
+          "alias": "ID"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "alias": "Point Name"
+        },
+        {
+          "name": "category",
+          "type": "string",
+          "alias": "Category"
+        }
+      ]
+    }
+
+expected_behavior:
+  - event: "Change detection"
+    timing: "Within poll interval"
+    log_pattern: "Detected new commit"
+    details: "GitWatcher identifies the metadata.json modification"
+
+  - event: "File comparison"
+    timing: "During reconciliation"
+    log_pattern: "Found 1 relevant files for environment 'development'"
+    details: "Reconciler identifies which files changed"
+
+  - event: "Non-breaking assessment"
+    timing: "During reconciliation"
+    expected: "No breaking change flags raised"
+    details: "System recognizes changes are non-breaking"
+
+  - event: "Metadata application"
+    timing: "During reconciliation"
+    log_pattern: "Applying 'metadata' configuration"
+    details: "Updated metadata is applied to the registry"
+
+  - event: "Successful completion"
+    timing: "End of process"
+    log_pattern: "Successfully completed reconciliation"
+    details: "No errors or warnings generated"
+
+validation:
+  checks:
+    - type: "log"
+      description: "Verify successful reconciliation"
+      command: "grep -i 'successfully completed reconciliation' logs/honua-*.log | tail -1"
+      expected_contains: "development"
+
+    - type: "content"
+      description: "Verify title was updated"
+      command: "cat /tmp/honua-gitops-test-repo/reconciled/development/metadata.json | jq -r '.services[0].layers[0].title'"
+      expected_output: "Updated Sample Points"
+
+    - type: "content"
+      description: "Verify description was updated"
+      command: "cat /tmp/honua-gitops-test-repo/reconciled/development/metadata.json | jq -r '.services[0].layers[0].description'"
+      expected_contains: "comprehensive testing"
+
+    - type: "content"
+      description: "Verify field alias was updated"
+      command: "cat /tmp/honua-gitops-test-repo/reconciled/development/metadata.json | jq -r '.services[0].layers[0].fields[1].alias'"
+      expected_output: "Point Name"
+
+    - type: "state"
+      description: "Verify deployment completed successfully"
+      command: "cat /tmp/honua-gitops-state/deployments/*.json | jq -r '.State' | tail -1"
+      expected_output: "Completed"
+
+    - type: "risk"
+      description: "Verify no high-risk flags"
+      command: "cat /tmp/honua-gitops-state/deployments/*.json | jq -r '.Plan.HasBreakingChanges' | tail -1"
+      expected_output: "false"
+
+breaking_vs_non_breaking:
+  non_breaking_changes:
+    - "Layer title changes"
+    - "Layer description changes"
+    - "Field alias changes"
+    - "Adding new optional fields"
+    - "Metadata annotations"
+    - "Display properties"
+
+  breaking_changes:
+    - "Geometry type changes (Point -> Polygon)"
+    - "SRID changes (4326 -> 3857)"
+    - "Table name changes"
+    - "Geometry column name changes"
+    - "Removing required fields"
+    - "Field type changes (string -> integer)"
+
+troubleshooting:
+  issues:
+    - symptom: "Modification not detected"
+      possible_causes:
+        - "Changes not committed"
+        - "Committed to wrong branch"
+        - "GitWatcher watching different environment"
+      solutions:
+        - "Verify commit with: git log -1"
+        - "Check branch: git branch"
+        - "Verify watcher config points to development"
+
+    - symptom: "Changes applied but not reflected in API"
+      possible_causes:
+        - "Metadata registry not reloaded"
+        - "Caching issues"
+        - "API pointing to different metadata source"
+      solutions:
+        - "Check for 'reloaded metadata registry' in logs"
+        - "Restart Honua server if needed"
+        - "Clear any metadata caches"
+
+    - symptom: "Unexpected breaking change warning"
+      possible_causes:
+        - "Modified more than intended"
+        - "Syntax error causing schema mismatch"
+      solutions:
+        - "Review git diff to see exact changes"
+        - "Validate JSON structure"
+        - "Compare against original layer definition"
+
+examples:
+  safe_modifications:
+    - name: "Update display properties"
+      changes:
+        - "title: Make more descriptive"
+        - "description: Add details"
+        - "abstract: Expand information"
+
+    - name: "Enhance field metadata"
+      changes:
+        - "alias: User-friendly names"
+        - "Add field descriptions"
+        - "Add field constraints"
+
+    - name: "Add new optional fields"
+      changes:
+        - "Add new fields to end of array"
+        - "Ensure fields are optional"
+        - "Don't modify existing field order"
+
+  risky_modifications:
+    - name: "Schema changes"
+      warning: "Requires careful planning and testing"
+      changes:
+        - "geometryType change"
+        - "srid change"
+        - "table or column renames"
+      recommendation: "Test in development first, use scenario 04 for production"
+
+notes:
+  - "Non-breaking changes don't require approval even in production"
+  - "Multiple properties can be modified in a single commit"
+  - "Changes are atomic - either all apply or none apply"
+  - "Reconciliation preserves other layers in the service"
+  - "Field order is preserved unless explicitly changed"
+
+related_scenarios:
+  - "01-add-layer.yaml - Add layer before modifying"
+  - "04-breaking-change.yaml - Test breaking modifications"
+
+success_criteria:
+  - "Change detected within poll interval"
+  - "Reconciliation completes without errors"
+  - "No breaking change warnings"
+  - "Updated properties reflected in reconciled metadata"
+  - "Deployment state is Completed"
+  - "No rollback triggered"

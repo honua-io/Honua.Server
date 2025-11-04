@@ -1,0 +1,284 @@
+# Test Scenario 03: Delete a Layer
+#
+# This scenario tests the GitOps workflow when removing a layer
+# from a service configuration.
+
+scenario:
+  id: "03-delete-layer"
+  name: "Remove Layer from Service"
+  description: "Delete a layer by removing it from the metadata configuration"
+  risk_level: "medium"
+  environment: "development"
+  prerequisite: "Run scenario 01 first to add the facilities layer"
+
+objectives:
+  - Test layer removal detection
+  - Verify reconciliation handles deletions correctly
+  - Confirm removed layer no longer appears in metadata
+  - Validate deployment plan shows removal
+
+steps:
+  - step: 1
+    action: "Verify layer exists (prerequisite check)"
+    command: "cat /tmp/honua-gitops-test-repo/environments/development/metadata.json | jq '.services[0].layers | length'"
+    expected_output: "2 or more"
+    note: "If only 1 layer exists, run scenario 01 first"
+
+  - step: 2
+    action: "Navigate to test repository"
+    command: "cd /tmp/honua-gitops-test-repo"
+
+  - step: 3
+    action: "Edit metadata.json to remove layer"
+    command: "vim environments/development/metadata.json"
+    note: "Remove the 'facilities' layer from the layers array"
+
+  - step: 4
+    action: "Commit the deletion"
+    commands:
+      - "git add environments/development/metadata.json"
+      - "git commit -m 'Remove facilities layer - no longer needed'"
+
+  - step: 5
+    action: "Wait for detection"
+    expected_time: "10-15 seconds"
+    expected_log: "Detected new commit"
+
+  - step: 6
+    action: "Verify reconciliation"
+    expected_log: "Successfully completed reconciliation"
+
+  - step: 7
+    action: "Validate layer is removed"
+    command: "cat /tmp/honua-gitops-test-repo/reconciled/development/metadata.json | jq '.services[0].layers | length'"
+    expected_output: "1"
+
+removal_instructions:
+  description: "How to properly remove a layer"
+  steps:
+    - "Open environments/development/metadata.json"
+    - "Locate the layer object in the 'layers' array"
+    - "Remove the entire layer object"
+    - "Ensure proper JSON syntax (no trailing commas)"
+    - "Save the file"
+
+  example_before: |
+    "layers": [
+      {
+        "id": "sample-points",
+        "title": "Sample Points",
+        ...
+      },
+      {
+        "id": "facilities",
+        "title": "Facilities",
+        ...
+      }
+    ]
+
+  example_after: |
+    "layers": [
+      {
+        "id": "sample-points",
+        "title": "Sample Points",
+        ...
+      }
+    ]
+
+  common_mistakes:
+    - mistake: "Leaving trailing comma after last layer"
+      example: |
+        "layers": [
+          {
+            "id": "sample-points",
+            ...
+          },
+        ]
+      correct: |
+        "layers": [
+          {
+            "id": "sample-points",
+            ...
+          }
+        ]
+
+    - mistake: "Removing layer but keeping datasource reference"
+      impact: "Orphaned datasource (benign but untidy)"
+      recommendation: "Remove unused datasources in a separate commit"
+
+expected_behavior:
+  - event: "Deletion detected"
+    timing: "Within poll interval"
+    log_pattern: "Detected new commit"
+    details: "GitWatcher identifies metadata.json change"
+
+  - event: "Resource removal identified"
+    timing: "During reconciliation"
+    expected: "Deployment plan shows resource removal"
+    details: "Plan.Removed array contains the deleted layer"
+
+  - event: "Reconciliation processes removal"
+    timing: "During application"
+    log_pattern: "Applying 'metadata' configuration"
+    details: "MetadataRegistry updated without removed layer"
+
+  - event: "Successful completion"
+    timing: "End of process"
+    log_pattern: "Successfully completed reconciliation"
+    details: "Layer no longer accessible in metadata"
+
+validation:
+  checks:
+    - type: "log"
+      description: "Verify reconciliation succeeded"
+      command: "grep 'Successfully completed reconciliation' logs/honua-*.log | tail -1"
+      expected_contains: "development"
+
+    - type: "count"
+      description: "Verify layer count decreased"
+      command: "cat /tmp/honua-gitops-test-repo/reconciled/development/metadata.json | jq '.services[0].layers | length'"
+      expected_output: "1"
+
+    - type: "content"
+      description: "Verify specific layer is gone"
+      command: "cat /tmp/honua-gitops-test-repo/reconciled/development/metadata.json | jq '.services[0].layers[] | select(.id == \"facilities\")'"
+      expected_output: ""  # Empty - layer not found
+
+    - type: "state"
+      description: "Verify deployment completed"
+      command: "cat /tmp/honua-gitops-state/deployments/*.json | jq -r '.State' | tail -1"
+      expected_output: "Completed"
+
+    - type: "plan"
+      description: "Verify removal was tracked in deployment plan"
+      command: "cat /tmp/honua-gitops-state/deployments/*.json | jq '.Plan.Removed | length' | tail -1"
+      expected_output: "1 or more"
+
+risk_considerations:
+  low_risk_removals:
+    - "Removing unused/deprecated layers"
+    - "Removing test layers in development"
+    - "Removing layers with no active clients"
+
+  medium_risk_removals:
+    - "Removing layers in staging"
+    - "Removing layers with unknown usage"
+    - "Removing recently added layers"
+
+  high_risk_removals:
+    - "Removing production layers"
+    - "Removing layers with known active clients"
+    - "Removing layers that other layers depend on"
+
+  mitigation_strategies:
+    - "Check layer usage before removal"
+    - "Communicate removal to stakeholders"
+    - "Remove from development first, test thoroughly"
+    - "Use gradual rollout (dev -> staging -> production)"
+    - "Keep layer in Git history for easy restoration"
+
+rollback_procedure:
+  description: "How to restore a deleted layer if needed"
+  steps:
+    - step: 1
+      action: "Find the commit that removed the layer"
+      command: "git log --oneline --all -- environments/development/metadata.json"
+
+    - step: 2
+      action: "View the layer definition before removal"
+      command: "git show HEAD~1:environments/development/metadata.json"
+
+    - step: 3
+      action: "Revert the removal commit"
+      command: "git revert HEAD"
+      note: "This creates a new commit that undoes the removal"
+
+    - step: 4
+      action: "Alternatively, cherry-pick the layer back"
+      commands:
+        - "Edit metadata.json manually"
+        - "Copy layer definition from previous commit"
+        - "git add environments/development/metadata.json"
+        - "git commit -m 'Restore facilities layer'"
+
+troubleshooting:
+  issues:
+    - symptom: "JSON parse error after deletion"
+      possible_causes:
+        - "Trailing comma after last layer"
+        - "Missing comma between remaining layers"
+        - "Unbalanced brackets"
+      solutions:
+        - "Validate JSON: cat metadata.json | jq '.'"
+        - "Check for syntax errors around deletion point"
+        - "Compare with previous commit to identify issue"
+
+    - symptom: "Layer still appears in metadata"
+      possible_causes:
+        - "Metadata registry not reloaded"
+        - "Cached metadata"
+        - "Wrong file edited"
+      solutions:
+        - "Check reconciled metadata file"
+        - "Verify correct environment file was modified"
+        - "Check for 'reloaded metadata registry' in logs"
+
+    - symptom: "Other layers disappeared"
+      possible_causes:
+        - "Accidentally deleted more than intended"
+        - "Invalid JSON causing parse failure"
+      solutions:
+        - "Review git diff: git diff HEAD~1"
+        - "Immediately revert: git revert HEAD"
+        - "Fix and recommit"
+
+advanced_scenarios:
+  conditional_removal:
+    description: "Remove layer only if certain conditions are met"
+    approach:
+      - "Use deployment policies to require approval"
+      - "Implement pre-deployment validation hooks"
+      - "Check layer usage metrics before proceeding"
+
+  bulk_removal:
+    description: "Remove multiple layers at once"
+    approach:
+      - "Remove all layers in single commit for atomicity"
+      - "Document reason for each removal in commit message"
+      - "Test in development environment first"
+
+  cascade_removal:
+    description: "Remove layer and associated datasources"
+    approach:
+      - "First commit: Remove layer from metadata.json"
+      - "Verify first commit reconciles successfully"
+      - "Second commit: Remove datasource from datasources.json"
+      - "Keeps changes atomic and traceable"
+
+notes:
+  - "Layer removal is permanent in Git (but can be restored from history)"
+  - "Removed layers immediately unavailable after reconciliation"
+  - "Deployment plan tracks removals in Plan.Removed array"
+  - "Consider deprecation period before removal in production"
+  - "Document removal reason in commit message"
+
+related_scenarios:
+  - "01-add-layer.yaml - Add the layer that will be removed"
+  - "04-breaking-change.yaml - Removal in production (may require approval)"
+
+best_practices:
+  - "Always test removal in development first"
+  - "Document why layer is being removed"
+  - "Check for dependencies on the layer"
+  - "Communicate removal to team and stakeholders"
+  - "Keep detailed commit messages for audit trail"
+  - "Consider deprecation warning period in production"
+
+success_criteria:
+  - "Deletion detected within poll interval"
+  - "Reconciliation completes without errors"
+  - "Layer count decreases by expected amount"
+  - "Removed layer not present in reconciled metadata"
+  - "Deployment plan correctly shows removal"
+  - "No other layers affected"
+  - "Valid JSON maintained"

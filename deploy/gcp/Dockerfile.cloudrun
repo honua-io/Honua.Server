@@ -1,0 +1,84 @@
+# Multi-stage build for Google Cloud Run optimization
+# Stage 1: Build
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
+WORKDIR /src
+
+# Copy solution and project files
+COPY *.sln ./
+COPY src/Honua.Server.Host/*.csproj ./src/Honua.Server.Host/
+COPY src/Honua.Server.Core/*.csproj ./src/Honua.Server.Core/
+COPY src/Honua.Cli.AI/*.csproj ./src/Honua.Cli.AI/
+COPY src/Honua.Cli.AI.Secrets/*.csproj ./src/Honua.Cli.AI.Secrets/
+
+# Restore dependencies
+RUN dotnet restore src/Honua.Server.Host/Honua.Server.Host.csproj
+
+# Copy source code
+COPY src/ ./src/
+
+# Build and publish
+RUN dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
+    -c Release \
+    -o /app/publish \
+    --no-restore \
+    -p:PublishSingleFile=false \
+    -p:PublishReadyToRun=true \
+    -p:PublishReadyToRunShowWarnings=true \
+    -p:PublishTrimmed=true \
+    -p:TrimMode=partial
+
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
+
+# Install dependencies for GDAL and health checks
+RUN apk add --no-cache \
+    gdal \
+    proj \
+    geos \
+    sqlite \
+    postgresql-client \
+    curl \
+    ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup -g 1000 honua && \
+    adduser -D -u 1000 -G honua honua
+
+WORKDIR /app
+
+# Copy published app
+COPY --from=build --chown=honua:honua /app/publish .
+
+# Configure GDAL
+ENV GDAL_DATA=/usr/share/gdal
+ENV PROJ_LIB=/usr/share/proj
+ENV CPL_TMPDIR=/tmp
+ENV GDAL_CACHEMAX=512
+
+# Configure ASP.NET Core
+ENV ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_URLS=http://+:8080 \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    DOTNET_TieredPGO=1 \
+    DOTNET_ReadyToRun=1
+
+# Google Cloud specific
+ENV PORT=8080
+ENV K_SERVICE=honua-api
+ENV K_REVISION=honua-api-00001
+ENV K_CONFIGURATION=honua-api
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Switch to non-root user
+USER honua
+
+# Expose port (Cloud Run uses PORT env var)
+EXPOSE 8080
+
+# Use exec form to ensure proper signal handling
+ENTRYPOINT ["dotnet", "Honua.Server.Host.dll"]

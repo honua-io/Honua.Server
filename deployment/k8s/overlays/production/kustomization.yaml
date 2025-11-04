@@ -1,0 +1,212 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: honua-prod
+
+bases:
+  - ../../base
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+  app.kubernetes.io/environment: production
+
+commonAnnotations:
+  monitoring: "enabled"
+  backup: "enabled"
+
+patches:
+  # Production replicas
+  - target:
+      kind: Deployment
+      name: honua-api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 5
+
+  - target:
+      kind: Deployment
+      name: honua-intake
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  - target:
+      kind: Deployment
+      name: honua-orchestrator
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  # Production resource limits
+  - target:
+      kind: Deployment
+      name: honua-api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+
+  - target:
+      kind: Deployment
+      name: honua-intake
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+
+  - target:
+      kind: Deployment
+      name: honua-orchestrator
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+
+  # Production autoscaling with aggressive scaling
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: honua-api-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 5
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+      - op: replace
+        path: /spec/metrics/0/resource/target/averageUtilization
+        value: 60
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: honua-intake-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 12
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: honua-orchestrator-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
+
+  # Update ingress hosts for production
+  - target:
+      kind: Ingress
+      name: honua-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: api.honua.io
+      - op: replace
+        path: /spec/rules/1/host
+        value: intake.honua.io
+      - op: replace
+        path: /spec/tls/0/hosts
+        value:
+          - api.honua.io
+          - intake.honua.io
+      - op: replace
+        path: /spec/tls/0/secretName
+        value: honua-prod-tls
+
+  # Add pod anti-affinity for high availability
+  - target:
+      kind: Deployment
+      labelSelector: "app.kubernetes.io/name=honua"
+    patch: |-
+      - op: add
+        path: /spec/template/spec/affinity
+        value:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: honua
+                topologyKey: kubernetes.io/hostname
+
+  # Increase PVC sizes for production
+  - target:
+      kind: PersistentVolumeClaim
+      name: postgres-data
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 200Gi
+      - op: replace
+        path: /spec/storageClassName
+        value: fast-ssd
+
+  - target:
+      kind: PersistentVolumeClaim
+      name: build-workspace
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 500Gi
+      - op: replace
+        path: /spec/storageClassName
+        value: fast-ssd
+
+  - target:
+      kind: PersistentVolumeClaim
+      name: build-cache
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 200Gi
+      - op: replace
+        path: /spec/storageClassName
+        value: fast-ssd
+
+configMapGenerator:
+  - name: honua-config
+    behavior: merge
+    literals:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - honua__authentication__enforce=true
+      - observability__metrics__enabled=true
+
+images:
+  - name: honua/server-host
+    newTag: v1.0.0
+  - name: honua/server-intake
+    newTag: v1.0.0
+  - name: honua/build-orchestrator
+    newTag: v1.0.0
+
+# Add Pod Disruption Budgets for production
+patchesStrategicMerge:
+  - pdb.yaml

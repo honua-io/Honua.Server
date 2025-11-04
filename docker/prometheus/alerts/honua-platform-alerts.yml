@@ -1,0 +1,321 @@
+groups:
+  - name: honua_api_alerts
+    interval: 30s
+    rules:
+      - alert: HighAPIErrorRate
+        expr: |
+          (sum(rate(honua_api_errors{job="honua"}[5m])) / sum(rate(honua_api_requests{job="honua"}[5m]))) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          dashboard: "https://grafana/d/honua-api-metrics"
+
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(honua_api_request_latency_bucket{job="honua"}[5m])) by (le)) > 2000
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API latency detected"
+          description: "API p95 latency is {{ $value | humanizeDuration }} (threshold: 2s)"
+          dashboard: "https://grafana/d/honua-api-metrics"
+
+      - alert: APILatencyCritical
+        expr: |
+          histogram_quantile(0.99, sum(rate(honua_api_request_latency_bucket{job="honua"}[5m])) by (le)) > 5000
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Critical API latency detected"
+          description: "API p99 latency is {{ $value | humanizeDuration }} (threshold: 5s)"
+          dashboard: "https://grafana/d/honua-api-metrics"
+
+  - name: honua_process_framework_alerts
+    interval: 30s
+    rules:
+      - alert: ProcessFrameworkHighFailureRate
+        expr: |
+          (sum(rate(process_failed{job="honua-ai"}[5m])) / (sum(rate(process_completed{job="honua-ai"}[5m])) + sum(rate(process_failed{job="honua-ai"}[5m])))) > 0.2
+        for: 10m
+        labels:
+          severity: critical
+          component: process-framework
+        annotations:
+          summary: "High process failure rate"
+          description: "Process failure rate is {{ $value | humanizePercentage }} (threshold: 20%)"
+          dashboard: "https://grafana/d/honua-process-framework"
+
+      - alert: ProcessExecutionSlow
+        expr: |
+          histogram_quantile(0.95, sum(rate(process_execution_duration_bucket{job="honua-ai"}[5m])) by (le, workflow_type)) > 60000
+        for: 15m
+        labels:
+          severity: warning
+          component: process-framework
+        annotations:
+          summary: "Slow process execution detected"
+          description: "Process {{ $labels.workflow_type }} p95 execution time is {{ $value | humanizeDuration }} (threshold: 60s)"
+          dashboard: "https://grafana/d/honua-process-framework"
+
+      - alert: TooManyActiveProcesses
+        expr: |
+          sum(process_active_count{job="honua-ai"}) > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: process-framework
+        annotations:
+          summary: "Too many active processes"
+          description: "Currently {{ $value }} active processes (threshold: 50)"
+          dashboard: "https://grafana/d/honua-process-framework"
+
+      - alert: ProcessStepFailuresHigh
+        expr: |
+          sum(rate(process_step_failed{job="honua-ai"}[5m])) by (step_name) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: process-framework
+        annotations:
+          summary: "High step failure rate"
+          description: "Step {{ $labels.step_name }} is failing at {{ $value }} failures/sec"
+          dashboard: "https://grafana/d/honua-process-framework"
+
+  - name: honua_circuit_breaker_alerts
+    interval: 30s
+    rules:
+      - alert: CircuitBreakerOpen
+        expr: |
+          increase(honua_circuit_breaker_state_changes{state="open"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: resilience
+        annotations:
+          summary: "Circuit breaker opened for {{ $labels.service }}"
+          description: "Circuit breaker for {{ $labels.service }} has opened, indicating service failures"
+          dashboard: "https://grafana/d/honua-circuit-breaker"
+
+      - alert: HighCircuitBreakerFailureRate
+        expr: |
+          sum(rate(honua_circuit_breaker_failures{job="honua"}[5m])) by (service) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: resilience
+        annotations:
+          summary: "High failure rate for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} is experiencing {{ $value }} failures/sec"
+          dashboard: "https://grafana/d/honua-circuit-breaker"
+
+      - alert: CircuitBreakerFlapping
+        expr: |
+          sum(increase(honua_circuit_breaker_state_changes{job="honua"}[10m])) by (service) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: resilience
+        annotations:
+          summary: "Circuit breaker flapping for {{ $labels.service }}"
+          description: "Circuit breaker for {{ $labels.service }} has changed state {{ $value }} times in 10 minutes"
+          dashboard: "https://grafana/d/honua-circuit-breaker"
+
+  - name: honua_cache_alerts
+    interval: 30s
+    rules:
+      - alert: LowCacheHitRate
+        expr: |
+          (sum(rate(honua_raster_cache_hits{job="honua"}[5m])) / (sum(rate(honua_raster_cache_hits{job="honua"}[5m])) + sum(rate(honua_raster_cache_misses{job="honua"}[5m])))) * 100 < 70
+        for: 15m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 70%)"
+          dashboard: "https://grafana/d/honua-cache-metrics"
+
+      - alert: HighRenderLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(honua_raster_render_latency_ms_bucket{job="honua"}[5m])) by (le)) > 500
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "High raster render latency"
+          description: "Render p95 latency is {{ $value }}ms (threshold: 500ms)"
+          dashboard: "https://grafana/d/honua-cache-metrics"
+
+      - alert: PreseedJobFailures
+        expr: |
+          sum(rate(honua_raster_preseed_jobs_failed{job="honua"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Preseed jobs are failing"
+          description: "Preseed job failure rate is {{ $value }} failures/sec"
+          dashboard: "https://grafana/d/honua-cache-metrics"
+
+  - name: honua_redis_alerts
+    interval: 30s
+    rules:
+      - alert: RedisDown
+        expr: |
+          redis_up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance {{ $labels.instance }} is not responding"
+          dashboard: "https://grafana/d/honua-redis"
+
+      - alert: RedisHighMemoryUsage
+        expr: |
+          (redis_memory_used_bytes{job="redis"} / redis_memory_max_bytes{job="redis"}) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} (threshold: 90%)"
+          dashboard: "https://grafana/d/honua-redis"
+
+      - alert: RedisHighEvictionRate
+        expr: |
+          rate(redis_evicted_keys_total{job="redis"}[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "High Redis key eviction rate"
+          description: "Redis is evicting {{ $value }} keys/sec (threshold: 100/sec)"
+          dashboard: "https://grafana/d/honua-redis"
+
+      - alert: RedisConnectionsSaturated
+        expr: |
+          redis_connected_clients{job="redis"} > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis connections near limit"
+          description: "Redis has {{ $value }} connected clients (threshold: 1000)"
+          dashboard: "https://grafana/d/honua-redis"
+
+  - name: honua_llm_alerts
+    interval: 30s
+    rules:
+      - alert: LLMRateLimitHit
+        expr: |
+          increase(llm_rate_limit_hits_total{job="honua-ai"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "LLM rate limit hit for {{ $labels.provider }}"
+          description: "Provider {{ $labels.provider }} rate limit hit {{ $value }} times in 5 minutes"
+          dashboard: "https://grafana/d/honua-llm-providers"
+
+      - alert: LLMHighErrorRate
+        expr: |
+          (sum(rate(llm_errors_total{job="honua-ai"}[5m])) / sum(rate(llm_requests_total{job="honua-ai"}[5m]))) * 100 > 10
+        for: 10m
+        labels:
+          severity: critical
+          component: llm
+        annotations:
+          summary: "High LLM error rate"
+          description: "LLM error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+          dashboard: "https://grafana/d/honua-llm-providers"
+
+      - alert: LLMSlowResponses
+        expr: |
+          histogram_quantile(0.95, sum(rate(llm_request_duration_seconds_bucket{job="honua-ai"}[5m])) by (le, provider)) > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "Slow LLM responses from {{ $labels.provider }}"
+          description: "Provider {{ $labels.provider }} p95 latency is {{ $value }}s (threshold: 10s)"
+          dashboard: "https://grafana/d/honua-llm-providers"
+
+  - name: honua_system_alerts
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: |
+          up{job=~"honua.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} is not responding"
+          dashboard: "https://grafana/d/honua-platform-overview"
+
+      - alert: HighMemoryUsage
+        expr: |
+          (process_resident_memory_bytes{job=~"honua.*"} / 4294967296) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage for {{ $labels.job }}"
+          description: "Service {{ $labels.job }} memory usage is {{ $value | humanizePercentage }} (threshold: 90%)"
+          dashboard: "https://grafana/d/honua-platform-overview"
+
+      - alert: HighCPUUsage
+        expr: |
+          rate(process_cpu_seconds_total{job=~"honua.*"}[5m]) * 100 > 80
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage for {{ $labels.job }}"
+          description: "Service {{ $labels.job }} CPU usage is {{ $value }}% (threshold: 80%)"
+          dashboard: "https://grafana/d/honua-platform-overview"
+
+      - alert: PostgresConnectionPoolSaturation
+        expr: |
+          postgres_pool_connections_active{job="honua"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Postgres connection pool near limit"
+          description: "Active connections: {{ $value }} (threshold: 80)"
+          dashboard: "https://grafana/d/honua-platform-overview"
+
+      - alert: HighDiskUsage
+        expr: |
+          (node_filesystem_avail_bytes{job="node",mountpoint="/"} / node_filesystem_size_bytes{job="node",mountpoint="/"}) * 100 < 10
+        for: 10m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical disk space"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+          dashboard: "https://grafana/d/honua-platform-overview"

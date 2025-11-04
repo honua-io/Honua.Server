@@ -1,0 +1,96 @@
+@page "/catalog"
+@model Honua.Server.Host.Pages.Catalog.IndexModel
+@{
+    ViewData["Title"] = "Catalog";
+}
+
+<section class="catalog-search">
+    <form method="get" class="search-form">
+        <input type="text" name="q" value="@Model.Query" placeholder="Search datasets" />
+        <input type="text" name="group" value="@Model.GroupId" placeholder="Filter by group" />
+        <button type="submit">Search</button>
+        @if (!string.IsNullOrWhiteSpace(Model.Query) || !string.IsNullOrWhiteSpace(Model.GroupId))
+        {
+            <a class="reset" href="/catalog">Reset</a>
+        }
+    </form>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.Query) || !string.IsNullOrWhiteSpace(Model.GroupId))
+{
+    <section class="catalog-results">
+        <h2>Results (@Model.Records.Count)</h2>
+        @if (Model.Records.Count == 0)
+        {
+            <p>No datasets matched the current filters.</p>
+        }
+        else
+        {
+            <ul class="record-list">
+                @foreach (var record in Model.Records)
+                {
+                    <li class="record-item">
+                        <h3><a href="/catalog/@record.ServiceId/@record.LayerId">@record.Title</a></h3>
+                        <p class="record-summary">@record.Summary</p>
+                        <dl class="record-meta">
+                            <dt>Group</dt>
+                            <dd>@record.GroupTitle (@record.GroupId)</dd>
+                            <dt>Service</dt>
+                            <dd>@record.ServiceTitle</dd>
+                            @if (record.Keywords.Count > 0)
+                            {
+                                <dt>Keywords</dt>
+                                <dd>@string.Join(", ", record.Keywords)</dd>
+                            }
+                        </dl>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}
+else
+{
+    <section class="catalog-groups">
+        @foreach (var group in Model.Groups)
+        {
+            <article class="catalog-group">
+                <header>
+                    <h2 id="group-@group.Id">@group.Title</h2>
+                </header>
+                @if (group.Services.Count == 0)
+                {
+                    <p>No services published in this group.</p>
+                }
+                else
+                {
+                    <ul class="service-list">
+                        @foreach (var service in group.Services)
+                        {
+                            <li class="service-item">
+                                <h3>@service.Service.Title</h3>
+                                @if (!string.IsNullOrWhiteSpace(service.Summary))
+                                {
+                                    <p>@service.Summary</p>
+                                }
+                                <ul class="layer-list">
+                                    @foreach (var layer in service.Layers)
+                                    {
+                                        <li class="layer-item">
+                                            <a href="/catalog/@service.Service.Id/@layer.Layer.Id">@layer.Layer.Title</a>
+                                            @if (!string.IsNullOrWhiteSpace(layer.Summary))
+                                            {
+                                                <span class="layer-summary">@layer.Summary</span>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                            </li>
+                        }
+                    </ul>
+                }
+            </article>
+        }
+    </section>
+}
+

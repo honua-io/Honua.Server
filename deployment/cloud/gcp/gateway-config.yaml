@@ -1,0 +1,244 @@
+# GCP GKE Specific Configuration for YARP Gateway
+# Apply these configurations when deploying YARP Gateway to Google Kubernetes Engine
+
+---
+# GCP Load Balancer for YARP Gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: honua-gateway
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+  annotations:
+    # GCP Load Balancer Type
+    cloud.google.com/load-balancer-type: "External"
+    networking.gke.io/load-balancer-type: "External"
+
+    # Backend configuration
+    cloud.google.com/backend-config: '{"default": "honua-gateway-backend-config"}'
+
+    # NEG (Network Endpoint Groups) for better load balancing
+    cloud.google.com/neg: '{"ingress": true}'
+
+    # Connection draining timeout
+    cloud.google.com/connection-draining-timeout: "30"
+
+    # Session affinity
+    cloud.google.com/app-protocols: '{"http":"HTTP","https":"HTTPS"}'
+
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local  # Preserve source IP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+
+  selector:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+
+---
+# BackendConfig for GCP Load Balancer
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: honua-gateway-backend-config
+  namespace: honua
+spec:
+  # Health check configuration
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 10
+    healthyThreshold: 2
+    unhealthyThreshold: 2
+    type: HTTP
+    requestPath: /health/live
+    port: 8080
+
+  # Connection draining
+  connectionDraining:
+    drainingTimeoutSec: 30
+
+  # Session affinity
+  sessionAffinity:
+    affinityType: "CLIENT_IP"
+    affinityCookieTtlSec: 10800
+
+  # Timeout
+  timeoutSec: 600
+
+  # Cloud CDN (optional)
+  # cdn:
+  #   enabled: true
+  #   cachePolicy:
+  #     includeHost: true
+  #     includeProtocol: true
+  #     includeQueryString: false
+
+  # Cloud Armor Security Policy (DDoS protection, WAF)
+  securityPolicy:
+    name: "honua-gateway-security-policy"
+
+  # IAP (Identity-Aware Proxy) - optional
+  # iap:
+  #   enabled: true
+  #   oauthclientCredentials:
+  #     secretName: oauth-client-secret
+
+  # Logging
+  logging:
+    enable: true
+    sampleRate: 1.0
+
+---
+# Google Cloud Armor Security Policy
+apiVersion: cloud.google.com/v1beta1
+kind: BackendConfig
+metadata:
+  name: honua-gateway-security
+  namespace: honua
+spec:
+  securityPolicy:
+    name: "honua-gateway-armor-policy"
+
+# Note: Cloud Armor policies must be created via gcloud or Console
+# Example gcloud commands:
+#
+# gcloud compute security-policies create honua-gateway-armor-policy \
+#     --description "Security policy for Honua Gateway"
+#
+# # Add rate limiting rule
+# gcloud compute security-policies rules create 1000 \
+#     --security-policy honua-gateway-armor-policy \
+#     --expression "true" \
+#     --action "rate-based-ban" \
+#     --rate-limit-threshold-count 100 \
+#     --rate-limit-threshold-interval-sec 60 \
+#     --ban-duration-sec 600
+#
+# # Add geographic restriction (example)
+# gcloud compute security-policies rules create 2000 \
+#     --security-policy honua-gateway-armor-policy \
+#     --expression "origin.region_code == 'CN'" \
+#     --action "deny-403"
+
+---
+# ManagedCertificate for Google-managed SSL certificates
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: honua-gateway-cert
+  namespace: honua
+spec:
+  domains:
+    - api.honua.io
+    - intake.honua.io
+    - orchestrator.honua.io
+    - prometheus.honua.io
+    - grafana.honua.io
+
+---
+# Service Account with Workload Identity
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: honua-gateway
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+  annotations:
+    iam.gke.io/gcp-service-account: honua-gateway@PROJECT_ID.iam.gserviceaccount.com
+
+# Create GCP service account and bind it:
+# gcloud iam service-accounts create honua-gateway \
+#     --display-name "Honua Gateway Service Account"
+#
+# gcloud projects add-iam-policy-binding PROJECT_ID \
+#     --member "serviceAccount:honua-gateway@PROJECT_ID.iam.gserviceaccount.com" \
+#     --role "roles/logging.logWriter"
+#
+# gcloud projects add-iam-policy-binding PROJECT_ID \
+#     --member "serviceAccount:honua-gateway@PROJECT_ID.iam.gserviceaccount.com" \
+#     --role "roles/monitoring.metricWriter"
+#
+# gcloud iam service-accounts add-iam-policy-binding \
+#     honua-gateway@PROJECT_ID.iam.gserviceaccount.com \
+#     --role roles/iam.workloadIdentityUser \
+#     --member "serviceAccount:PROJECT_ID.svc.id.goog[honua/honua-gateway]"
+
+---
+# Network Policy for GKE
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: honua-gateway-network-policy
+  namespace: honua
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: honua-gateway
+      app.kubernetes.io/component: gateway
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow incoming traffic from GCP Load Balancer health checks
+    - from:
+        - ipBlock:
+            cidr: 35.191.0.0/16  # GCP health check ranges
+        - ipBlock:
+            cidr: 130.211.0.0/22  # GCP health check ranges
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow traffic from within cluster
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 8081
+
+  egress:
+    # Allow outbound to backend services
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: honua
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # Allow HTTPS for external services
+    - ports:
+        - protocol: TCP
+          port: 443

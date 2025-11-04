@@ -1,0 +1,181 @@
+name: Performance Monitoring
+
+on:
+  schedule:
+    # Run weekly on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      benchmark_duration:
+        description: 'Benchmark duration in minutes'
+        required: false
+        default: '30'
+        type: string
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  performance-benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Install performance tools
+      run: |
+        dotnet tool install -g dotnet-trace
+        dotnet tool install -g dotnet-counters
+        dotnet tool install -g BenchmarkDotNet.Tool
+
+    - name: Restore and build
+      run: |
+        dotnet restore Honua.sln
+        dotnet build Honua.sln --configuration Release --no-restore
+
+    - name: Run performance benchmarks
+      run: |
+        if [ -d "tests/Honua.PerformanceBenchmarks" ]; then
+          dotnet test tests/Honua.PerformanceBenchmarks/Honua.PerformanceBenchmarks.csproj \
+            --configuration Release \
+            --no-build \
+            --filter "TestCategory=Performance" \
+            --logger "trx;LogFileName=performance-benchmark-results.trx" \
+            --logger "console;verbosity=detailed" || echo "Performance tests failed or not found"
+        else
+          echo "No performance benchmark tests found, skipping..."
+        fi
+      continue-on-error: true
+
+    - name: Run spatial operation benchmarks
+      run: |
+        if [ -d "benchmarks/Honua.Benchmarks" ]; then
+          dotnet run --project benchmarks/Honua.Benchmarks/Honua.Benchmarks.csproj \
+            --configuration Release \
+            --no-build || echo "Benchmarks failed or not found"
+        else
+          echo "No spatial benchmarks found, skipping..."
+        fi
+      continue-on-error: true
+
+    - name: Run memory usage tests
+      run: |
+        dotnet test tests/Honua.Server.Core.Tests/Honua.Server.Core.Tests.csproj \
+          --configuration Release \
+          --no-build \
+          --filter "TestCategory=Memory" \
+          --logger "trx;LogFileName=memory-usage-results.trx" \
+          --logger "console;verbosity=detailed" || echo "Memory tests not found, skipping..."
+      continue-on-error: true
+
+    - name: Generate performance report
+      run: |
+        echo "# Performance Test Report - $(date)" > performance-report.md
+        echo "" >> performance-report.md
+        echo "## Test Results Summary" >> performance-report.md
+        echo "- Benchmark Duration: ${{ github.event.inputs.benchmark_duration || '30' }} minutes" >> performance-report.md
+        echo "- Test Environment: Ubuntu Latest" >> performance-report.md
+        echo "- .NET Version: ${{ env.DOTNET_VERSION }}" >> performance-report.md
+        echo "" >> performance-report.md
+        echo "## Benchmark Results" >> performance-report.md
+        echo "Detailed results are available in the uploaded artifacts." >> performance-report.md
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-monitoring-results
+        path: |
+          **/TestResults/*.trx
+          performance-report.md
+        retention-days: 90
+
+    - name: Create performance issue if failures detected
+      if: failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: 'Performance Regression Detected',
+            body: `
+            ## Performance Issue Alert
+
+            The weekly performance monitoring has detected potential regressions.
+
+            **Details:**
+            - Workflow: ${context.workflow}
+            - Run ID: ${context.runId}
+            - Commit: ${context.sha}
+
+            **Next Steps:**
+            1. Review the performance test results in the workflow artifacts
+            2. Investigate any significant performance degradations
+            3. Consider optimization improvements if needed
+
+            This issue was automatically created by the performance monitoring workflow.
+            `,
+            labels: ['performance', 'automated-issue']
+          })
+
+  stress-tests:
+    name: Stress Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 240
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Restore and build
+      run: |
+        dotnet restore Honua.sln
+        dotnet build Honua.sln --configuration Release --no-restore
+
+    - name: Run stress tests
+      run: |
+        if [ -d "tests/Honua.PerformanceBenchmarks" ]; then
+          dotnet test tests/Honua.PerformanceBenchmarks/Honua.PerformanceBenchmarks.csproj \
+            --configuration Release \
+            --no-build \
+            --filter "TestCategory=Stress" \
+            --logger "trx;LogFileName=stress-test-results.trx" \
+            --logger "console;verbosity=detailed" || echo "Stress tests failed or not found"
+        else
+          echo "No stress tests found, skipping..."
+        fi
+      continue-on-error: true
+
+    - name: Upload stress test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: stress-test-results
+        path: |
+          **/TestResults/*.trx
+        retention-days: 30

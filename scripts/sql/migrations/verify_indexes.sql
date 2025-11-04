@@ -1,0 +1,277 @@
+-- Index Verification Queries for All Database Providers
+-- Purpose: Verify that performance indexes from migration 008 are in place
+-- Run these queries after applying migration to confirm successful creation
+
+-- ========================================
+-- PostgreSQL Verification Queries
+-- ========================================
+
+-- PostgreSQL: Check if all indexes exist
+-- SELECT
+--     schemaname,
+--     tablename,
+--     indexname,
+--     indexdef
+-- FROM pg_indexes
+-- WHERE indexname IN (
+--     'idx_alert_history_fingerprint_datetime',
+--     'idx_alert_history_severity_timestamp',
+--     'idx_alert_history_status_timestamp',
+--     'idx_alert_history_environment',
+--     'idx_stac_collections_service_layer',
+--     'idx_stac_collections_data_source',
+--     'idx_stac_items_spatial_temporal_gist',
+--     'idx_stac_items_bbox_datetime',
+--     'idx_stac_items_collection_raster'
+-- )
+-- ORDER BY tablename, indexname;
+
+-- PostgreSQL: Check index sizes
+-- SELECT
+--     schemaname || '.' || tablename AS table,
+--     indexname,
+--     pg_size_pretty(pg_relation_size(indexrelid)) AS index_size,
+--     idx_scan AS times_used,
+--     idx_tup_read AS tuples_read
+-- FROM pg_stat_user_indexes
+-- WHERE indexname LIKE 'idx_%_fingerprint_%'
+--    OR indexname LIKE 'idx_stac_%_spatial_%'
+--    OR indexname LIKE 'idx_stac_%_service_%'
+-- ORDER BY pg_relation_size(indexrelid) DESC;
+
+-- PostgreSQL: Verify query plan uses new indexes
+-- EXPLAIN (ANALYZE, BUFFERS)
+-- SELECT * FROM alert_history
+-- WHERE fingerprint = 'test-fingerprint'
+-- ORDER BY timestamp DESC
+-- LIMIT 10;
+-- Expected: Index Scan using idx_alert_history_fingerprint_datetime
+
+-- ========================================
+-- SQL Server Verification Queries
+-- ========================================
+
+-- SQL Server: Check if all indexes exist
+-- SELECT
+--     OBJECT_SCHEMA_NAME(i.object_id) AS schema_name,
+--     OBJECT_NAME(i.object_id) AS table_name,
+--     i.name AS index_name,
+--     i.type_desc AS index_type,
+--     i.is_unique,
+--     i.filter_definition
+-- FROM sys.indexes i
+-- WHERE i.name IN (
+--     'idx_alert_history_fingerprint_datetime',
+--     'idx_alert_history_severity_timestamp',
+--     'idx_alert_history_status_timestamp',
+--     'idx_alert_history_environment',
+--     'idx_stac_collections_service_layer',
+--     'idx_stac_collections_data_source',
+--     'idx_stac_items_bbox_datetime',
+--     'idx_stac_items_collection_raster',
+--     'sidx_stac_items_geometry_spatial'
+-- )
+-- ORDER BY table_name, index_name;
+
+-- SQL Server: Check index sizes and usage
+-- SELECT
+--     OBJECT_SCHEMA_NAME(i.object_id) + '.' + OBJECT_NAME(i.object_id) AS table_name,
+--     i.name AS index_name,
+--     CAST(SUM(ps.used_page_count) * 8.0 / 1024 AS DECIMAL(10, 2)) AS size_mb,
+--     us.user_seeks,
+--     us.user_scans,
+--     us.user_lookups,
+--     us.last_user_seek,
+--     us.last_user_scan
+-- FROM sys.indexes i
+-- INNER JOIN sys.dm_db_partition_stats ps ON i.object_id = ps.object_id AND i.index_id = ps.index_id
+-- LEFT JOIN sys.dm_db_index_usage_stats us ON i.object_id = us.object_id AND i.index_id = us.index_id AND us.database_id = DB_ID()
+-- WHERE i.name IN (
+--     'idx_alert_history_fingerprint_datetime',
+--     'idx_alert_history_severity_timestamp',
+--     'idx_stac_collections_service_layer',
+--     'idx_stac_items_bbox_datetime'
+-- )
+-- GROUP BY i.object_id, i.index_id, i.name, us.user_seeks, us.user_scans, us.user_lookups, us.last_user_seek, us.last_user_scan
+-- ORDER BY size_mb DESC;
+
+-- SQL Server: Verify query plan uses new indexes
+-- SET STATISTICS IO ON;
+-- SELECT * FROM alert_history
+-- WHERE fingerprint = 'test-fingerprint'
+-- ORDER BY timestamp DESC;
+-- Expected: Index Seek on idx_alert_history_fingerprint_datetime
+
+-- ========================================
+-- MySQL Verification Queries
+-- ========================================
+
+-- MySQL: Check if all indexes exist
+-- SELECT
+--     table_schema,
+--     table_name,
+--     index_name,
+--     GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns,
+--     index_type,
+--     non_unique
+-- FROM information_schema.statistics
+-- WHERE table_schema = DATABASE()
+--   AND index_name IN (
+--     'idx_alert_history_fingerprint_datetime',
+--     'idx_alert_history_severity_timestamp',
+--     'idx_alert_history_status_timestamp',
+--     'idx_alert_history_environment',
+--     'idx_stac_collections_service_layer',
+--     'idx_stac_collections_data_source',
+--     'idx_stac_items_bbox_datetime',
+--     'idx_stac_items_collection_raster',
+--     'idx_stac_items_datetime_desc',
+--     'sidx_stac_items_geometry'
+-- )
+-- GROUP BY table_schema, table_name, index_name, index_type, non_unique
+-- ORDER BY table_name, index_name;
+
+-- MySQL: Check index sizes (requires MySQL 8.0+)
+-- SELECT
+--     table_schema,
+--     table_name,
+--     index_name,
+--     ROUND(stat_value * @@innodb_page_size / 1024 / 1024, 2) AS size_mb
+-- FROM mysql.innodb_index_stats
+-- WHERE stat_name = 'size'
+--   AND table_schema = DATABASE()
+--   AND index_name IN (
+--     'idx_alert_history_fingerprint_datetime',
+--     'idx_stac_collections_service_layer',
+--     'idx_stac_items_bbox_datetime'
+-- )
+-- ORDER BY stat_value DESC;
+
+-- MySQL: Monitor index usage (requires performance_schema enabled)
+-- SELECT
+--     object_schema,
+--     object_name,
+--     index_name,
+--     count_read,
+--     count_fetch,
+--     SUM(count_read + count_fetch) AS total_access
+-- FROM performance_schema.table_io_waits_summary_by_index_usage
+-- WHERE object_schema = DATABASE()
+--   AND index_name IN (
+--     'idx_alert_history_fingerprint_datetime',
+--     'idx_stac_collections_service_layer',
+--     'idx_stac_items_bbox_datetime'
+-- )
+-- GROUP BY object_schema, object_name, index_name, count_read, count_fetch
+-- ORDER BY total_access DESC;
+
+-- MySQL: Verify query plan uses new indexes
+-- EXPLAIN FORMAT=JSON
+-- SELECT * FROM alert_history
+-- WHERE fingerprint = 'test-fingerprint'
+-- ORDER BY timestamp DESC
+-- LIMIT 10;
+-- Expected: "index": "idx_alert_history_fingerprint_datetime"
+
+-- ========================================
+-- SQLite Verification Queries
+-- ========================================
+
+-- SQLite: Check if all indexes exist
+-- SELECT
+--     name AS index_name,
+--     tbl_name AS table_name,
+--     sql AS index_definition
+-- FROM sqlite_master
+-- WHERE type = 'index'
+--   AND name IN (
+--     'idx_alert_history_fingerprint_timestamp',
+--     'idx_alert_history_severity_timestamp',
+--     'idx_alert_history_status_timestamp',
+--     'idx_alert_history_environment_timestamp',
+--     'idx_stac_collections_service_layer',
+--     'idx_stac_collections_data_source',
+--     'idx_stac_collections_updated_at',
+--     'idx_stac_items_bbox_datetime',
+--     'idx_stac_items_collection_raster',
+--     'idx_stac_items_datetime_desc',
+--     'idx_stac_items_collection_updated'
+-- )
+-- ORDER BY tbl_name, name;
+
+-- SQLite: Count indexes per table
+-- SELECT
+--     m.name AS table_name,
+--     COUNT(i.name) AS index_count,
+--     GROUP_CONCAT(i.name, ', ') AS index_names
+-- FROM sqlite_master m
+-- LEFT JOIN sqlite_master i ON i.type = 'index' AND i.tbl_name = m.name
+-- WHERE m.type = 'table'
+--   AND m.name IN ('alert_history', 'stac_collections', 'stac_items')
+-- GROUP BY m.name
+-- ORDER BY m.name;
+
+-- SQLite: Check database size
+-- SELECT
+--     (SELECT COUNT(*) FROM sqlite_master WHERE type='index') AS total_indexes,
+--     page_count * page_size / 1024.0 / 1024.0 AS database_size_mb
+-- FROM pragma_page_count(), pragma_page_size();
+
+-- SQLite: Verify query plan uses new indexes
+-- EXPLAIN QUERY PLAN
+-- SELECT * FROM alert_history
+-- WHERE fingerprint = 'test-fingerprint'
+-- ORDER BY timestamp DESC
+-- LIMIT 10;
+-- Expected: SEARCH TABLE alert_history USING INDEX idx_alert_history_fingerprint_timestamp
+
+-- ========================================
+-- Cross-Database Index Count Summary
+-- ========================================
+
+-- Expected index counts per table after migration:
+--
+-- alert_history:
+--   - idx_alert_history_fingerprint (existing)
+--   - idx_alert_history_timestamp (existing)
+--   - idx_alert_history_severity_timestamp (existing in Postgres schema)
+--   - idx_alert_history_fingerprint_datetime (NEW - migration 008)
+--   - idx_alert_history_status_timestamp (NEW - migration 008)
+--   - idx_alert_history_environment (NEW - migration 008)
+--   Total NEW indexes: 3
+--
+-- stac_collections:
+--   - Primary key (existing)
+--   - idx_stac_collections_service_layer (NEW - migration 008)
+--   - idx_stac_collections_data_source (NEW - migration 008)
+--   Total NEW indexes: 2
+--
+-- stac_items:
+--   - Primary key (existing)
+--   - idx_stac_items_collection (existing)
+--   - Various temporal indexes (existing from 002_temporal_indexes.sql)
+--   - idx_stac_items_spatial_temporal_gist (NEW - migration 008, PostgreSQL only)
+--   - idx_stac_items_bbox_datetime (NEW - migration 008)
+--   - idx_stac_items_collection_raster (NEW - migration 008)
+--   Total NEW indexes: 3 (2 for non-PostgreSQL)
+
+-- ========================================
+-- Performance Baseline Queries
+-- ========================================
+
+-- Run these queries BEFORE and AFTER migration to measure improvement:
+
+-- Query 1: Alert fingerprint lookup
+-- SELECT COUNT(*) FROM alert_history WHERE fingerprint = 'example-fp';
+
+-- Query 2: Alert severity filtering
+-- SELECT COUNT(*) FROM alert_history WHERE severity = 'critical' AND timestamp > NOW() - INTERVAL '1 day';
+
+-- Query 3: STAC service/layer filtering
+-- SELECT COUNT(*) FROM stac_collections WHERE service_id = 'service-1' AND layer_id = 'layer-1';
+
+-- Query 4: STAC spatiotemporal query
+-- SELECT COUNT(*) FROM stac_items WHERE collection_id = 'collection-1' AND datetime > NOW() - INTERVAL '7 days';
+
+-- Measure execution time for each query and compare before/after
+-- Expected improvement: 25-70% reduction in execution time

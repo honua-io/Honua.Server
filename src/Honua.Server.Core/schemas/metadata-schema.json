@@ -1,0 +1,505 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://honua.dev/schemas/metadata.schema.json",
+  "title": "Honua Metadata",
+  "type": "object",
+  "required": ["catalog", "folders", "services", "layers", "dataSources"],
+  "$defs": {
+    "link": {
+      "type": "object",
+      "required": ["href"],
+      "properties": {
+        "href": { "type": "string", "minLength": 1 },
+        "rel": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" }
+      }
+    },
+    "extent": {
+      "type": "object",
+      "properties": {
+        "bbox": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "minItems": 4,
+                "items": { "type": "number" }
+              }
+            },
+            {
+              "type": "array",
+              "minItems": 4,
+              "items": { "type": "number" }
+            }
+          ]
+        },
+        "crs": { "type": "string" },
+        "temporal": {
+          "type": "object",
+          "properties": {
+            "interval": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "prefixItems": [
+                  { "type": ["string", "null" ] },
+                  { "type": ["string", "null" ] }
+                ],
+                "items": false
+              }
+            },
+            "trs": { "type": "string" }
+          }
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "properties": {
+        "maxRecordCount": { "type": "integer", "minimum": 1 },
+        "supportedParameters": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "autoFilter": {
+          "type": "object",
+          "properties": {
+            "cql": { "type": "string" }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "table": { "type": "string" },
+        "geometryColumn": { "type": "string" },
+        "primaryKey": { "type": "string" },
+        "temporalColumn": { "type": "string" },
+        "srid": { "type": "integer" }
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "alias": { "type": "string" },
+        "type": { "type": "string" },
+        "storageType": { "type": "string" },
+        "nullable": { "type": "boolean" },
+        "editable": { "type": "boolean" },
+        "maxLength": { "type": "integer", "minimum": 1 },
+        "precision": { "type": "integer", "minimum": 0 },
+        "scale": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ogcService": {
+      "type": "object",
+      "properties": {
+        "collectionsEnabled": { "type": "boolean", "default": false, "description": "Enable OGC API Features for this service" },
+        "wfsEnabled": { "type": "boolean", "default": false, "description": "Enable WFS for this service" },
+        "wmsEnabled": { "type": "boolean", "default": false, "description": "Enable WMS for this service" },
+        "wmtsEnabled": { "type": "boolean", "default": false, "description": "Enable WMTS for this service" },
+        "cswEnabled": { "type": "boolean", "default": false, "description": "Enable CSW for this service" },
+        "wcsEnabled": { "type": "boolean", "default": false, "description": "Enable WCS for this service (raster only)" },
+        "itemLimit": { "type": "integer", "minimum": 1 },
+        "defaultCrs": { "type": "string" },
+        "additionalCrs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "conformanceClasses": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "storedQueries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title", "layerId", "filterCql"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "title": { "type": "string", "minLength": 1 },
+              "abstract": { "type": "string" },
+              "layerId": { "type": "string", "minLength": 1 },
+              "filterCql": { "type": "string", "minLength": 1 },
+              "parameters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "type", "title"],
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1 },
+                    "type": { "type": "string", "minLength": 1 },
+                    "title": { "type": "string", "minLength": 1 },
+                    "abstract": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "catalog": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/link" }
+        },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "folders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "order": { "type": "integer" }
+        }
+      }
+    },
+    "dataSources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "provider", "connectionString"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "provider": { "type": "string", "minLength": 1 },
+          "connectionString": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "folderId", "serviceType", "dataSourceId"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "folderId": { "type": "string", "minLength": 1 },
+          "serviceType": { "type": "string", "minLength": 1 },
+          "dataSourceId": { "type": "string", "minLength": 1 },
+          "enabled": { "type": "boolean" },
+          "description": { "type": "string" },
+          "keywords": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "links": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/link" }
+          },
+          "ogc": { "$ref": "#/$defs/ogcService" },
+          "esri": { "type": "object" }
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "serviceId", "geometryType", "idField", "geometryField"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "serviceId": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "geometryType": { "type": "string", "minLength": 1 },
+          "idField": { "type": "string", "minLength": 1 },
+          "displayField": { "type": "string" },
+          "geometryField": { "type": "string", "minLength": 1 },
+          "crs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "keywords": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "links": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/link" }
+          },
+          "extent": { "$ref": "#/$defs/extent" },
+          "query": { "$ref": "#/$defs/query" },
+          "storage": { "$ref": "#/$defs/storage" },
+          "fields": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/field" }
+          },
+          "itemType": { "type": "string" },
+          "iso19115": { "$ref": "#/$defs/iso19115Metadata" },
+          "stac": { "$ref": "#/$defs/stacMetadata" }
+        }
+      }
+    },
+    "rasterDatasets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "stac": { "$ref": "#/$defs/stacMetadata" }
+        }
+      }
+    },
+    "iso19115Metadata": {
+      "type": "object",
+      "properties": {
+        "metadataIdentifier": { "type": "string" },
+        "metadataStandard": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string" }
+          }
+        },
+        "metadataContact": { "$ref": "#/$defs/iso19115Contact" },
+        "dateInfo": {
+          "type": "object",
+          "properties": {
+            "creation": { "type": "string", "format": "date-time" },
+            "publication": { "type": "string", "format": "date-time" },
+            "revision": { "type": "string", "format": "date-time" }
+          }
+        },
+        "spatialRepresentationType": {
+          "type": "string",
+          "enum": ["vector", "grid", "tin", "textTable", "stereoModel", "video"]
+        },
+        "spatialResolution": {
+          "type": "object",
+          "properties": {
+            "equivalentScale": { "type": "integer" },
+            "distance": { "type": "number" }
+          }
+        },
+        "language": { "type": "string" },
+        "characterSet": { "type": "string" },
+        "topicCategory": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "farming", "biota", "boundaries", "climatologyMeteorologyAtmosphere",
+              "economy", "elevation", "environment", "geoscientificInformation",
+              "health", "imageryBaseMapsEarthCover", "intelligenceMilitary",
+              "inlandWaters", "location", "oceans", "planningCadastre",
+              "society", "structure", "transportation", "utilitiesCommunication"
+            ]
+          }
+        },
+        "resourceConstraints": {
+          "type": "object",
+          "properties": {
+            "useLimitation": { "type": "array", "items": { "type": "string" } },
+            "accessConstraints": { "type": "array", "items": { "type": "string" } },
+            "useConstraints": { "type": "array", "items": { "type": "string" } },
+            "otherConstraints": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "lineage": {
+          "type": "object",
+          "properties": {
+            "statement": { "type": "string" },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": { "type": "string" },
+                  "scaleDenominator": { "type": "integer" }
+                }
+              }
+            },
+            "processSteps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["description"],
+                "properties": {
+                  "description": { "type": "string" },
+                  "dateTime": { "type": "string", "format": "date-time" }
+                }
+              }
+            }
+          }
+        },
+        "dataQualityInfo": {
+          "type": "object",
+          "properties": {
+            "scope": { "type": "string" },
+            "positionalAccuracy": {
+              "type": "object",
+              "properties": {
+                "value": { "type": "number" },
+                "unit": { "type": "string" },
+                "evaluationMethod": { "type": "string" }
+              }
+            },
+            "completeness": { "type": "string" },
+            "logicalConsistency": { "type": "string" }
+          }
+        },
+        "maintenanceInfo": {
+          "type": "object",
+          "properties": {
+            "maintenanceFrequency": {
+              "type": "string",
+              "enum": ["continual", "daily", "weekly", "fortnightly", "monthly", "quarterly", "biannually", "annually", "asNeeded", "irregular", "notPlanned", "unknown"]
+            },
+            "nextUpdate": { "type": "string", "format": "date-time" },
+            "updateScope": { "type": "string" }
+          }
+        },
+        "distributionInfo": {
+          "type": "object",
+          "properties": {
+            "distributor": {
+              "type": "object",
+              "properties": {
+                "organisationName": { "type": "string" },
+                "contactInfo": { "$ref": "#/$defs/iso19115ContactInfo" }
+              }
+            },
+            "distributionFormats": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "version": { "type": "string" }
+                }
+              }
+            },
+            "transferOptions": {
+              "type": "object",
+              "properties": {
+                "onlineResource": { "type": "string" }
+              }
+            }
+          }
+        },
+        "referenceSystemInfo": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "codeSpace": { "type": "string" },
+            "version": { "type": "string" }
+          }
+        }
+      }
+    },
+    "iso19115Contact": {
+      "type": "object",
+      "properties": {
+        "organisationName": { "type": "string" },
+        "individualName": { "type": "string" },
+        "contactInfo": { "$ref": "#/$defs/iso19115ContactInfo" },
+        "role": { "type": "string" }
+      }
+    },
+    "iso19115ContactInfo": {
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": {
+          "type": "object",
+          "properties": {
+            "deliveryPoint": { "type": "string" },
+            "city": { "type": "string" },
+            "administrativeArea": { "type": "string" },
+            "postalCode": { "type": "string" },
+            "country": { "type": "string" }
+          }
+        },
+        "onlineResource": { "type": "string" }
+      }
+    },
+    "stacMetadata": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "collectionId": { "type": "string" },
+        "license": { "type": "string" },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "roles": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "url": { "type": "string" }
+            }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/stacAsset" }
+        },
+        "itemAssets": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/stacAsset" }
+        },
+        "summaries": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "stacExtensions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "itemIdTemplate": { "type": "string" },
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "stacAsset": {
+      "type": "object",
+      "required": ["title", "type"],
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" },
+        "roles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "href": { "type": "string" },
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

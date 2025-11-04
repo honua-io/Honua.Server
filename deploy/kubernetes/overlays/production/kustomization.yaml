@@ -1,0 +1,31 @@
+# Production overlay for Honua NetworkPolicies
+#
+# This overlay adds production-specific configurations:
+# - Stricter egress rules
+# - IP range restrictions (example)
+# - Additional monitoring
+#
+# Deploy with:
+#   kubectl apply -k deploy/kubernetes/overlays/production/
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: honua
+
+# Reference base configuration
+bases:
+  - ../../base
+
+# Override namespace labels for production
+patchesStrategicMerge:
+  - namespace-patch.yaml
+
+commonLabels:
+  environment: production
+  security.policy: network-restricted
+  compliance: pci-dss
+
+commonAnnotations:
+  documentation: "See deploy/kubernetes/base/NETWORK_ARCHITECTURE.md"
+  security.reviewed: "2025-10-18"

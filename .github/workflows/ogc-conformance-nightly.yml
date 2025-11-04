@@ -1,0 +1,217 @@
+name: OGC Conformance Tests (Nightly)
+
+on:
+  schedule:
+    # Run every night at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      test_suites:
+        description: 'Test suites to run (comma-separated: ogc-features,wfs,wms,kml or "all")'
+        required: false
+        default: 'all'
+
+permissions:
+  contents: read
+  issues: write  # For creating issues on failure
+
+jobs:
+  conformance-tests:
+    name: Run OGC Conformance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - name: 'OGC API Features'
+            filter: 'OgcApiFeatures_PassesConformance'
+            enabled: true
+          - name: 'WFS 2.0'
+            filter: 'WfsService_PassesConformance'
+            enabled: true
+          - name: 'WMS 1.3'
+            filter: 'WmsService_PassesConformance'
+            enabled: true
+          - name: 'KML 2.2'
+            filter: 'KmlExport_PassesConformance'
+            enabled: false  # Requires KML export implementation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build Honua
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Start Honua Server
+        run: |
+          export HONUA__METADATA__PROVIDER=json
+          export HONUA__METADATA__PATH=${{ github.workspace }}/samples/ogc/metadata.json
+          export HONUA__AUTHENTICATION__MODE=QuickStart
+          export HONUA__AUTHENTICATION__ENFORCE=false
+
+          dotnet run --project src/Honua.Server.Host \
+            --no-build \
+            --configuration Release \
+            --urls http://0.0.0.0:5555 \
+            > /tmp/honua-server.log 2>&1 &
+
+          echo $! > /tmp/honua.pid
+
+          # Wait for server to be ready
+          for i in {1..30}; do
+            if curl -f http://localhost:5555/ogc > /dev/null 2>&1; then
+              echo "Honua server is ready"
+              exit 0
+            fi
+            echo "Waiting for server... ($i/30)"
+            sleep 2
+          done
+
+          echo "Server failed to start"
+          cat /tmp/honua-server.log
+          exit 1
+
+      - name: Run ${{ matrix.suite.name }} Conformance Tests
+        if: matrix.suite.enabled
+        env:
+          HONUA_RUN_OGC_CONFORMANCE: 'true'
+          HONUA_TEST_BASE_URL: 'http://localhost:5555'
+        run: |
+          dotnet test tests/Honua.Server.Core.Tests \
+            --no-build \
+            --configuration Release \
+            --filter "FullyQualifiedName~${{ matrix.suite.filter }}" \
+            --logger "console;verbosity=detailed" \
+            --logger "trx;LogFileName=conformance-${{ matrix.suite.name }}.trx" \
+            --results-directory ./test-results
+
+      - name: Stop Honua Server
+        if: always()
+        run: |
+          if [ -f /tmp/honua.pid ]; then
+            kill $(cat /tmp/honua.pid) || true
+          fi
+          pkill -f "dotnet.*Honua.Server.Host" || true
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-results-${{ matrix.suite.name }}
+          path: |
+            ./test-results/
+            ./qa-report/
+          retention-days: 30
+
+      - name: Upload Honua Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: honua-logs-${{ matrix.suite.name }}
+          path: /tmp/honua-server.log
+          retention-days: 7
+
+  report:
+    name: Generate Conformance Report
+    runs-on: ubuntu-latest
+    needs: conformance-tests
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: ./all-results
+
+      - name: Generate Summary Report
+        run: |
+          cat > conformance-summary.md <<'EOF'
+          # OGC Conformance Test Results
+
+          **Date:** $(date -u +"%Y-%m-%d %H:%M UTC")
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+
+          ## Test Results
+
+          | Test Suite | Status | Details |
+          |------------|--------|---------|
+          EOF
+
+          # Parse TRX files and add results
+          find ./all-results -name "*.trx" -type f | while read trx; do
+            suite=$(basename $(dirname "$trx"))
+            echo "| $suite | ⏳ Pending | [View Results](./all-results/$suite) |" >> conformance-summary.md
+          done
+
+          cat conformance-summary.md
+
+      - name: Upload Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-summary
+          path: conformance-summary.md
+          retention-days: 90
+
+      - name: Create Issue on Failure
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `OGC Conformance Tests Failed - ${date}`,
+              body: `Nightly OGC conformance tests failed.
+
+              **Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+              **Commit:** ${context.sha}
+
+              Please review the test results and logs.`,
+              labels: ['conformance', 'automated-test', 'bug']
+            });
+
+  # Optional: Badge generation for README
+  badge:
+    name: Update Conformance Badge
+    runs-on: ubuntu-latest
+    needs: conformance-tests
+    if: always() && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Badge
+        run: |
+          if [ "${{ needs.conformance-tests.result }}" == "success" ]; then
+            echo "![OGC Conformance](https://img.shields.io/badge/OGC%20Conformance-Passing-brightgreen)" > .github/badges/ogc-conformance.md
+          else
+            echo "![OGC Conformance](https://img.shields.io/badge/OGC%20Conformance-Failing-red)" > .github/badges/ogc-conformance.md
+          fi
+
+      - name: Commit Badge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/badges/ogc-conformance.md || true
+          git commit -m "Update OGC conformance badge [skip ci]" || true
+          git push || true

@@ -1,0 +1,185 @@
+# Loki Configuration for Honua Process Framework
+# Centralized log aggregation with 30-day retention
+# Optimized for structured logging and efficient querying
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: info
+  log_format: logfmt
+
+# Distributor configuration
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+# Ingester configuration
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+
+  # Chunk configuration
+  chunk_idle_period: 5m       # How long chunks are held before flushing
+  chunk_block_size: 262144    # 256KB chunks
+  chunk_retain_period: 30s    # Time to retain chunks in memory after flushing
+  max_chunk_age: 1h          # Maximum age before forcing chunk flush
+
+  # Flushing configuration
+  flush_check_period: 30s
+  flush_op_timeout: 10s
+
+  # WAL (Write-Ahead Log) configuration for durability
+  wal:
+    enabled: true
+    dir: /loki/wal
+    replay_memory_ceiling: 1GB
+
+# Schema configuration
+schema_config:
+  configs:
+    - from: 2024-10-01
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v12
+      index:
+        prefix: index_
+        period: 24h
+
+# Storage configuration
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/boltdb-shipper-active
+    cache_location: /loki/boltdb-shipper-cache
+    cache_ttl: 24h
+    shared_store: filesystem
+
+  filesystem:
+    directory: /loki/chunks
+
+  # Index cache configuration
+  index_queries_cache_config:
+    memcached:
+      batch_size: 256
+      parallelism: 10
+    memcached_client:
+      consistent_hash: true
+      max_idle_conns: 16
+      timeout: 500ms
+      update_interval: 1m
+
+# Compactor configuration for log retention
+compactor:
+  working_directory: /loki/compactor
+  shared_store: filesystem
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
+# Limits configuration
+limits_config:
+  # Retention policy: 30 days
+  retention_period: 720h  # 30 days
+
+  # Ingestion limits
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h  # 7 days
+  creation_grace_period: 10m
+
+  # Per-stream limits
+  ingestion_rate_mb: 10        # 10MB/s per stream
+  ingestion_burst_size_mb: 20  # 20MB burst per stream
+  max_streams_per_user: 10000
+  max_line_size: 256kb
+  max_entries_limit_per_query: 10000
+
+  # Query limits
+  max_query_length: 721h      # Slightly more than retention period
+  max_query_parallelism: 32
+  max_query_series: 1000
+  max_cache_freshness_per_query: 10m
+
+  # Cardinality limits
+  max_label_name_length: 1024
+  max_label_value_length: 2048
+  max_label_names_per_series: 30
+
+  # Split queries by interval
+  split_queries_by_interval: 15m
+
+  # Per-tenant overrides
+  per_tenant_override_config: /etc/loki/overrides.yaml
+
+# Chunk cache configuration
+chunk_store_config:
+  max_look_back_period: 720h  # Match retention period
+  chunk_cache_config:
+    memcached:
+      batch_size: 256
+      parallelism: 10
+    memcached_client:
+      consistent_hash: true
+      max_idle_conns: 16
+      timeout: 500ms
+      update_interval: 1m
+
+# Query range configuration
+query_range:
+  align_queries_with_step: true
+  max_retries: 5
+  cache_results: true
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 500
+        ttl: 24h
+
+# Query frontend configuration
+frontend:
+  max_outstanding_per_tenant: 256
+  compress_responses: true
+  log_queries_longer_than: 10s
+
+# Query scheduler configuration
+query_scheduler:
+  max_outstanding_requests_per_tenant: 256
+
+# Table manager configuration
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 720h  # 30 days
+
+# Ruler configuration for alerting
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
+  alertmanager_url: http://alertmanager:9093
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
+  enable_alertmanager_v2: true
+
+# Analytics configuration
+analytics:
+  reporting_enabled: false
+
+# Memberlist configuration (for multi-instance setup)
+memberlist:
+  node_name: loki-1
+  bind_port: 7946
+  join_members:
+    - loki-1:7946

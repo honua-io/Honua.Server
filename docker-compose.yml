@@ -1,0 +1,242 @@
+# Docker Compose configuration for Honua Server
+# Provides a complete local development and testing environment
+#
+# Usage:
+#   docker compose up           # Start all services
+#   docker compose up -d        # Start in detached mode
+#   docker compose down         # Stop and remove containers
+#   docker compose down -v      # Stop and remove volumes (clean slate)
+#   docker compose logs -f      # Follow logs
+#   docker compose ps           # List running services
+
+services:
+  # PostgreSQL with PostGIS
+  # Primary database for geospatial data and metadata
+  postgres:
+    image: postgis/postgis:17-3.5-alpine
+    container_name: honua-postgres
+    environment:
+      POSTGRES_DB: honua
+      POSTGRES_USER: honua
+      POSTGRES_PASSWORD: honua_dev_password
+      # Performance tuning for development
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_WORK_MEM: 16MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - honua-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U honua -d honua"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Redis for caching and distributed locking
+  redis:
+    image: redis:7-alpine
+    container_name: honua-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - honua-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Honua Server (Full variant with all features)
+  honua-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    container_name: honua-server
+    ports:
+      - "8080:8080"
+    environment:
+      # ASP.NET Core
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+
+      # Database connection
+      ConnectionStrings__DefaultConnection: "Host=postgres;Database=honua;Username=honua;Password=honua_dev_password;Include Error Detail=true"
+
+      # Metadata configuration
+      HONUA__METADATA__PROVIDER: json
+      HONUA__METADATA__Path: /data/metadata.json
+
+      # Cache configuration (disabled for testing - Redis connection issues)
+      HONUA__CACHE__PROVIDER: memory
+      # HONUA__CACHE__REDIS__CONNECTIONSTRING: "redis:6379,abortConnect=false"
+
+      # Authentication (local for development)
+      HONUA__AUTHENTICATION__MODE: Local
+      HONUA__AUTHENTICATION__JWT__SECRET: dev-jwt-secret-change-in-production
+
+      # Logging
+      Serilog__MinimumLevel__Default: Information
+      Serilog__MinimumLevel__Override__Microsoft.AspNetCore: Warning
+      Serilog__MinimumLevel__Override__Honua: Debug
+
+      # Performance tuning
+      DOTNET_TieredPGO: "1"
+      DOTNET_ReadyToRun: "1"
+      DOTNET_TieredCompilation: "1"
+
+      # Globalization support (disable invariant mode)
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "false"
+
+      # Development settings
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+      HONUA__DEVELOPMENT__EnableSwagger: "true"
+      HONUA__DEVELOPMENT__EnableDetailedErrors: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - honua-network
+    volumes:
+      # Mount local data directory for testing
+      - ./data:/data:ro
+      # Mount logs directory
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz/live"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Honua Server Lite (serverless-optimized, vector-only)
+  # Uncomment to run Lite variant instead of Full
+  # honua-server-lite:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.lite
+  #     args:
+  #       VERSION: dev
+  #   container_name: honua-server-lite
+  #   ports:
+  #     - "8081:8080"
+  #   environment:
+  #     ASPNETCORE_ENVIRONMENT: Development
+  #     ASPNETCORE_URLS: http://+:8080
+  #     ConnectionStrings__DefaultConnection: "Host=postgres;Database=honua;Username=honua;Password=honua_dev_password"
+  #     HONUA__METADATA__PROVIDER: postgres
+  #     HONUA__CACHE__PROVIDER: redis
+  #     HONUA__CACHE__REDIS__CONNECTIONSTRING: "redis:6379"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - honua-network
+  #   restart: unless-stopped
+
+  # Seq for structured logging (optional)
+  # Provides a web UI for browsing logs
+  seq:
+    image: datalust/seq:2024
+    container_name: honua-seq
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "5341:80"  # Web UI
+    volumes:
+      - seq_data:/data
+    networks:
+      - honua-network
+    profiles:
+      - observability
+    restart: unless-stopped
+
+  # Jaeger for distributed tracing (optional)
+  jaeger:
+    image: jaegertracing/all-in-one:1.58
+    container_name: honua-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    networks:
+      - honua-network
+    profiles:
+      - observability
+    restart: unless-stopped
+
+  # Prometheus for metrics (optional)
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: honua-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - honua-network
+    profiles:
+      - observability
+    restart: unless-stopped
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: honua-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - honua-network
+    profiles:
+      - observability
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  seq_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  honua-network:
+    driver: bridge
+    name: honua-network

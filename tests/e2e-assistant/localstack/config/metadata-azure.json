@@ -1,0 +1,49 @@
+{
+  "catalog": {
+    "id": "honua-ogc-sample",
+    "title": "Honua OGC Sample Catalog",
+    "description": "Sample metadata for OGC API Features development",
+    "version": "2025.09"
+  },
+  "folders": [
+    {
+      "id": "transportation",
+      "title": "Transportation",
+      "order": 10
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "sqlite-primary",
+      "provider": "sqlite",
+      "connectionString": "Data Source=../samples/ogc/ogc-sample.db;Mode=ReadOnly"
+    }
+  ],
+  "services": [
+    {
+      "id": "roads",
+      "title": "Road Centerlines",
+      "folderId": "transportation",
+      "serviceType": "feature",
+      "dataSourceId": "sqlite-primary",
+      "enabled": true
+    }
+  ],
+  "layers": [
+    {
+      "id": "roads-primary",
+      "serviceId": "roads",
+      "title": "Primary Roads",
+      "geometryType": "Point",
+      "idField": "road_id",
+      "displayField": "name",
+      "geometryField": "geom",
+      "crs": ["EPSG:4326", "EPSG:3857"],
+      "storage": {
+        "table": "roads_primary",
+        "geometryColumn": "geom",
+        "primaryKey": "road_id"
+      }
+    }
+  ]
+}

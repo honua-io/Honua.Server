@@ -1,0 +1,60 @@
+apiVersion: honua.io/v1
+kind: ServiceCollection
+metadata:
+  name: honua-development
+  environment: development
+
+services:
+  - name: parcels
+    title: Property Parcels (Development)
+    description: Development environment for property parcels
+
+    layers:
+      - name: parcels
+        title: Property Parcels
+        datasource: postgis-dev
+        table: parcels
+        geometryColumn: geom
+        idColumn: parcel_id
+
+        # Development: shorter cache for faster testing
+        caching:
+          enabled: true
+          ttl: 60  # 1 minute
+
+        properties:
+          - name: parcel_id
+            type: string
+          - name: address
+            type: string
+          - name: owner_name
+            type: string
+          - name: zoning_type
+            type: string
+          - name: area_sqft
+            type: number
+
+  - name: roads
+    title: Roads (Development)
+    description: Development environment for roads
+
+    layers:
+      - name: roads
+        title: Roads
+        datasource: postgis-dev
+        table: roads
+        geometryColumn: geom
+        idColumn: road_id
+
+        # Development: aggressive caching for performance testing
+        caching:
+          enabled: true
+          ttl: 120  # 2 minutes
+
+        properties:
+          - name: road_id
+            type: string
+          - name: name
+            type: string
+          - name: road_type
+            type: string

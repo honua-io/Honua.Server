@@ -1,0 +1,135 @@
+groups:
+  # Pre-aggregate common queries for dashboard performance
+  - name: honua_recording_rules
+    interval: 30s
+    rules:
+      # Request rate by protocol
+      - record: honua:api_requests:rate5m
+        expr: sum(rate(honua_api_requests_total{job="honua"}[5m])) by (api_protocol, service_id)
+
+      # Overall request rate
+      - record: honua:api_requests:rate5m:sum
+        expr: sum(rate(honua_api_requests_total{job="honua"}[5m]))
+
+      # Error rate by protocol
+      - record: honua:api_errors:rate5m
+        expr: sum(rate(honua_api_errors_total{job="honua"}[5m])) by (api_protocol, error_type, error_category)
+
+      # Overall error rate
+      - record: honua:api_errors:rate5m:sum
+        expr: sum(rate(honua_api_errors_total{job="honua"}[5m]))
+
+      # Error percentage
+      - record: honua:api_errors:ratio5m
+        expr: |
+          sum(rate(honua_api_errors_total{job="honua"}[5m]))
+          /
+          sum(rate(honua_api_requests_total{job="honua"}[5m]))
+
+      # Latency percentiles
+      - record: honua:api_latency:p50
+        expr: histogram_quantile(0.50, sum(rate(honua_api_request_duration_ms_bucket{job="honua"}[5m])) by (le, api_protocol))
+
+      - record: honua:api_latency:p95
+        expr: histogram_quantile(0.95, sum(rate(honua_api_request_duration_ms_bucket{job="honua"}[5m])) by (le, api_protocol))
+
+      - record: honua:api_latency:p99
+        expr: histogram_quantile(0.99, sum(rate(honua_api_request_duration_ms_bucket{job="honua"}[5m])) by (le, api_protocol))
+
+      - record: honua:api_latency:p999
+        expr: histogram_quantile(0.999, sum(rate(honua_api_request_duration_ms_bucket{job="honua"}[5m])) by (le, api_protocol))
+
+      # Raster cache hit rate
+      - record: honua:raster_cache:hit_rate5m
+        expr: |
+          sum(rate(honua_raster_cache_hits_total{job="honua"}[5m]))
+          /
+          (
+            sum(rate(honua_raster_cache_hits_total{job="honua"}[5m]))
+            +
+            sum(rate(honua_raster_cache_misses_total{job="honua"}[5m]))
+          )
+
+      # Raster render latency percentiles
+      - record: honua:raster_render:p95
+        expr: histogram_quantile(0.95, sum(rate(honua_raster_render_latency_ms_bucket{job="honua"}[5m])) by (le, source))
+
+      # HTTP request latency percentiles (for error rate dashboard)
+      - record: honua:http_latency:p50
+        expr: histogram_quantile(0.50, sum(rate(honua_http_request_duration_milliseconds_bucket{job="honua"}[5m])) by (le, http_method, http_endpoint))
+
+      - record: honua:http_latency:p95
+        expr: histogram_quantile(0.95, sum(rate(honua_http_request_duration_milliseconds_bucket{job="honua"}[5m])) by (le, http_method, http_endpoint))
+
+      - record: honua:http_latency:p99
+        expr: histogram_quantile(0.99, sum(rate(honua_http_request_duration_milliseconds_bucket{job="honua"}[5m])) by (le, http_method, http_endpoint))
+
+      - record: honua:http_latency:p999
+        expr: histogram_quantile(0.999, sum(rate(honua_http_request_duration_milliseconds_bucket{job="honua"}[5m])) by (le, http_method, http_endpoint))
+
+      # Slow request rates
+      - record: honua:http_slow_requests:rate5m
+        expr: sum(rate(honua_http_slow_requests_total{job="honua"}[5m])) by (latency_threshold, http_method, http_endpoint)
+
+      # Error rate by status code class
+      - record: honua:http_errors:rate5m_by_class
+        expr: sum(rate(honua_http_errors_total{job="honua"}[5m])) by (http_status_class, http_method, http_endpoint)
+
+      # Features returned rate
+      - record: honua:api_features:rate5m
+        expr: sum(rate(honua_api_features_returned_total{job="honua"}[5m])) by (api_protocol, service_id)
+
+  # SLO calculations (30-day rolling window)
+  - name: honua_slo_rules
+    interval: 5m
+    rules:
+      # 30-day availability SLO
+      - record: honua:slo:availability:30d
+        expr: |
+          1 - (
+            sum(rate(honua_api_errors_total{job="honua"}[30d]))
+            /
+            sum(rate(honua_api_requests_total{job="honua"}[30d]))
+          )
+
+      # 30-day latency SLO (P95)
+      - record: honua:slo:latency_p95:30d
+        expr: histogram_quantile(0.95, sum(rate(honua_api_request_duration_ms_bucket{job="honua"}[30d])) by (le))
+
+      # 7-day availability SLO (for trending)
+      - record: honua:slo:availability:7d
+        expr: |
+          1 - (
+            sum(rate(honua_api_errors_total{job="honua"}[7d]))
+            /
+            sum(rate(honua_api_requests_total{job="honua"}[7d]))
+          )
+
+      # Error budget consumption (30d, assuming 99.9% SLO = 0.1% error budget)
+      - record: honua:slo:error_budget_consumed:30d
+        expr: |
+          (
+            sum(rate(honua_api_errors_total{job="honua"}[30d]))
+            /
+            sum(rate(honua_api_requests_total{job="honua"}[30d]))
+          ) / 0.001
+
+  # Resource utilization aggregations
+  - name: honua_resource_rules
+    interval: 30s
+    rules:
+      # Memory usage in GB
+      - record: honua:memory:usage_gb
+        expr: process_resident_memory_bytes{job="honua"} / (1024 * 1024 * 1024)
+
+      # CPU utilization percentage
+      - record: honua:cpu:usage_percent
+        expr: rate(process_cpu_seconds_total{job="honua"}[5m]) * 100
+
+      # GC pause time rate
+      - record: honua:gc:pause_time:rate5m
+        expr: rate(dotnet_gc_pause_time_seconds{job="honua"}[5m])
+
+      # Thread pool queue length
+      - record: honua:threadpool:queue_length
+        expr: dotnet_threadpool_queue_length{job="honua"}

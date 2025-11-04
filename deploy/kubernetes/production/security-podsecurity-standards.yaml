@@ -1,0 +1,143 @@
+---
+# Pod Security Standards Configuration for Kubernetes 1.25+
+# This file documents the Pod Security Standards configuration
+# The actual enforcement is done via namespace labels
+#
+# To apply Pod Security Standards, update the namespace with these labels:
+# kubectl label namespace honua pod-security.kubernetes.io/enforce=restricted
+# kubectl label namespace honua pod-security.kubernetes.io/audit=restricted
+# kubectl label namespace honua pod-security.kubernetes.io/warn=restricted
+#
+# Reference: https://kubernetes.io/docs/concepts/security/pod-security-standards/
+
+# RESTRICTED STANDARD REQUIREMENTS
+# =================================
+# The restricted policy is heavily restricted and follows current Pod hardening best practices.
+#
+# Required configurations:
+# 1. Disallow privilege escalation
+# 2. Run as non-root user
+# 3. Drop all capabilities
+# 4. Use seccomp profile (RuntimeDefault or Localhost)
+# 5. Read-only root filesystem (recommended)
+
+---
+# Example Namespace with Pod Security Standards
+# This demonstrates how to configure Pod Security Standards at the namespace level
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: honua-example
+  labels:
+    name: honua
+    environment: production
+    # Pod Security Standards enforcement
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    description: "Example namespace with Pod Security Standards enforced"
+
+---
+# Example of a compliant pod spec under restricted standard
+# This is a reference example - the actual deployment should follow this pattern
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: honua-server-example
+  namespace: honua
+  labels:
+    app: honua-server
+spec:
+  # Pod-level security context
+  securityContext:
+    runAsNonRoot: true          # Required
+    runAsUser: 1000            # Required (any non-root UID)
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:            # Required
+      type: RuntimeDefault
+
+  containers:
+  - name: honua-server
+    image: honuaio/honua-server:latest
+
+    # Container-level security context
+    securityContext:
+      runAsNonRoot: true              # Required
+      runAsUser: 1000                # Required
+      allowPrivilegeEscalation: false # Required
+      readOnlyRootFilesystem: true   # Recommended
+      capabilities:                   # Required
+        drop:
+          - ALL
+        add:
+          - NET_BIND_SERVICE
+      seccompProfile:                 # Required
+        type: RuntimeDefault
+
+    volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+
+  volumes:
+  - name: tmp
+    emptyDir: {}
+
+---
+# Pod Security Standards Comparison
+# ==================================
+#
+# PRIVILEGED (least restrictive)
+# - No restrictions
+# - Allows known privilege escalations
+#
+# BASELINE (minimally restrictive)
+# - Prevents known privilege escalations
+# - Allows default (minimally specified) Pod configuration
+#
+# RESTRICTED (most restrictive) - RECOMMENDED
+# - Heavily restricted
+# - Follows current Pod hardening best practices
+#
+# Honua uses RESTRICTED standard for maximum security
+
+---
+# Migration Guide from PodSecurityPolicy to Pod Security Standards
+# ================================================================
+#
+# If migrating from K8s < 1.25 with PodSecurityPolicy:
+#
+# 1. Update namespace with Pod Security labels
+# 2. Test with 'warn' and 'audit' modes first
+# 3. Once validated, set 'enforce' mode
+# 4. Remove PodSecurityPolicy resources
+#
+# Namespace label modes:
+# - enforce: Policy violations will cause pod rejection
+# - audit: Policy violations will trigger audit annotations
+# - warn: Policy violations will return user-facing warning
+#
+# Each mode can be set to different levels independently:
+# pod-security.kubernetes.io/enforce: restricted
+# pod-security.kubernetes.io/audit: restricted
+# pod-security.kubernetes.io/warn: restricted
+
+---
+# Verification Commands
+# ====================
+#
+# Check namespace Pod Security configuration:
+# kubectl get namespace honua -o yaml | grep pod-security
+#
+# Test pod against current policy (dry-run):
+# kubectl apply -f pod.yaml --dry-run=server
+#
+# View audit logs for violations:
+# kubectl get events -n honua --field-selector reason=FailedCreate
+#
+# Check pod security context:
+# kubectl get pod <pod-name> -n honua -o jsonpath='{.spec.securityContext}'
+# kubectl get pod <pod-name> -n honua -o jsonpath='{.spec.containers[*].securityContext}'

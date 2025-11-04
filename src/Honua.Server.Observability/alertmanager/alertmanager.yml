@@ -1,0 +1,76 @@
+global:
+  resolve_timeout: 5m
+  # Slack webhook URL (configure this)
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+
+# Route alerts to different receivers based on labels
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+  routes:
+    # Critical alerts go to PagerDuty
+    - match:
+        severity: critical
+      receiver: 'pagerduty'
+      continue: true
+
+    # Warning alerts go to Slack
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      continue: false
+
+    # Build queue alerts
+    - match:
+        component: build_queue
+      receiver: 'slack-build-queue'
+      continue: false
+
+    # License alerts
+    - match:
+        component: license
+      receiver: 'slack-license'
+      continue: false
+
+receivers:
+  - name: 'default'
+    # Configure your default notification channel
+    # webhook_configs:
+    #   - url: 'http://your-webhook-endpoint'
+
+  - name: 'slack-warnings'
+    # slack_configs:
+    #   - channel: '#honua-alerts'
+    #     title: 'Honua Warning Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+    #     send_resolved: true
+
+  - name: 'slack-build-queue'
+    # slack_configs:
+    #   - channel: '#honua-build-queue'
+    #     title: 'Honua Build Queue Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+    #     send_resolved: true
+
+  - name: 'slack-license'
+    # slack_configs:
+    #   - channel: '#honua-license'
+    #     title: 'Honua License Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+    #     send_resolved: true
+
+  - name: 'pagerduty'
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+    #     description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+
+# Inhibition rules (prevent certain alerts from firing when others are active)
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']

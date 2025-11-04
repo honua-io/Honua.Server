@@ -1,0 +1,63 @@
+version: "3.9"
+
+# Docker Compose configuration for Python integration testing
+# Lightweight setup using SQLite with prebuilt test data
+#
+# Usage:
+#   docker-compose -f docker-compose.test.yml up --build
+#   python -m pytest tests/python/ -v
+
+services:
+  # Honua Server for Integration Testing
+  # Uses SQLite with prebuilt sample data for fast startup
+  honua-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: test
+    container_name: honua-integration-test
+    environment:
+      # ASP.NET Core
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+
+      # Use SQLite for lightweight testing
+      HONUA__METADATA__PROVIDER: json
+      HONUA__METADATA__PATH: /data/test-metadata.json
+
+      # Authentication - No auth for testing
+      HONUA__AUTHENTICATION__MODE: Local
+      HONUA__AUTHENTICATION__ENFORCE: "false"
+      HONUA__AUTHENTICATION__QUICKSTART__ENABLED: "true"
+
+      # Disable features that require external dependencies
+      HONUA__CACHE__PROVIDER: memory
+
+      # Logging
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+      Logging__LogLevel__Honua: Debug
+
+      # Performance
+      DOTNET_TieredPGO: "1"
+      DOTNET_ReadyToRun: "1"
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount test data
+      - ./tests/TestData:/data:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    networks:
+      - honua-test-network
+    restart: unless-stopped
+
+networks:
+  honua-test-network:
+    driver: bridge
+    name: honua-test-network

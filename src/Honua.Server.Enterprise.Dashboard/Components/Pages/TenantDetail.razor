@@ -1,0 +1,284 @@
+@page "/tenant/{TenantId}"
+@rendermode InteractiveServer
+@inject ITenantUsageAnalyticsService AnalyticsService
+@inject NavigationManager Navigation
+
+<PageTitle>@TenantId - Honua Enterprise Admin</PageTitle>
+
+@if (tenant == null)
+{
+    <p><em>Loading tenant details...</em></p>
+}
+else
+{
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/tenants">Tenants</a></li>
+            <li class="breadcrumb-item active">@TenantId</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>@tenant.OrganizationName</h1>
+        <span class="badge bg-@GetStatusColor(tenant) fs-5">@tenant.SubscriptionStatus</span>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Tenant Information</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Tenant ID:</dt>
+                        <dd class="col-sm-8"><code>@tenant.TenantId</code></dd>
+
+                        <dt class="col-sm-4">Organization:</dt>
+                        <dd class="col-sm-8">@tenant.OrganizationName</dd>
+
+                        <dt class="col-sm-4">Contact Name:</dt>
+                        <dd class="col-sm-8">@tenant.ContactName</dd>
+
+                        <dt class="col-sm-4">Contact Email:</dt>
+                        <dd class="col-sm-8">@tenant.ContactEmail</dd>
+
+                        <dt class="col-sm-4">Tier:</dt>
+                        <dd class="col-sm-8"><span class="badge bg-secondary">@tenant.Tier</span></dd>
+
+                        <dt class="col-sm-4">Status:</dt>
+                        <dd class="col-sm-8">@tenant.SubscriptionStatus</dd>
+
+                        @if (tenant.TrialExpiresAt.HasValue)
+                        {
+                            <dt class="col-sm-4">Trial Expires:</dt>
+                            <dd class="col-sm-8">@tenant.TrialExpiresAt.Value.ToString("yyyy-MM-dd HH:mm")</dd>
+                        }
+
+                        <dt class="col-sm-4">Created:</dt>
+                        <dd class="col-sm-8">@tenant.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+
+                        <dt class="col-sm-4">Tenant URL:</dt>
+                        <dd class="col-sm-8">
+                            <a href="https://@(tenant.TenantId).honua.io" target="_blank">
+                                https://@(tenant.TenantId).honua.io
+                            </a>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Current Month Usage</h5>
+                    <dl class="row">
+                        <dt class="col-sm-6">API Requests:</dt>
+                        <dd class="col-sm-6 text-end">@FormatNumber(tenant.ApiRequests)</dd>
+
+                        <dt class="col-sm-6">API Errors:</dt>
+                        <dd class="col-sm-6 text-end">@tenant.ApiErrors (@tenant.ErrorRate.ToString("F2")%)</dd>
+
+                        <dt class="col-sm-6">Storage Used:</dt>
+                        <dd class="col-sm-6 text-end">@FormatBytes(tenant.StorageBytes)</dd>
+
+                        <dt class="col-sm-6">Datasets:</dt>
+                        <dd class="col-sm-6 text-end">@tenant.DatasetCount</dd>
+
+                        <dt class="col-sm-6">Raster Processing:</dt>
+                        <dd class="col-sm-6 text-end">@tenant.RasterProcessingMinutes min</dd>
+
+                        <dt class="col-sm-6">Vector Requests:</dt>
+                        <dd class="col-sm-6 text-end">@FormatNumber(tenant.VectorProcessingRequests)</dd>
+
+                        <dt class="col-sm-6">Builds:</dt>
+                        <dd class="col-sm-6 text-end">@tenant.Builds</dd>
+
+                        <dt class="col-sm-6">Export Requests:</dt>
+                        <dd class="col-sm-6 text-end">@tenant.ExportRequests (@FormatBytes(tenant.ExportSizeBytes))</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Quota Limits (@tenant.Tier)</h5>
+                    @{
+                        var quotas = GetQuotasForTier(tenant.Tier);
+                    }
+                    <dl class="row">
+                        <dt class="col-sm-6">API Requests/Month:</dt>
+                        <dd class="col-sm-6 text-end">
+                            @if (quotas.MaxApiRequestsPerMonth.HasValue)
+                            {
+                                @:@FormatNumber(tenant.ApiRequests) / @FormatNumber(quotas.MaxApiRequestsPerMonth.Value)
+                                <div class="progress mt-1">
+                                    <div class="progress-bar @GetProgressColor(tenant.ApiRequests, quotas.MaxApiRequestsPerMonth.Value)"
+                                         style="width: @GetPercentage(tenant.ApiRequests, quotas.MaxApiRequestsPerMonth.Value)%"></div>
+                                </div>
+                            }
+                            else
+                            {
+                                @:Unlimited
+                            }
+                        </dd>
+
+                        <dt class="col-sm-6">Storage:</dt>
+                        <dd class="col-sm-6 text-end">
+                            @if (quotas.MaxStorageBytes.HasValue)
+                            {
+                                @:@FormatBytes(tenant.StorageBytes) / @FormatBytes(quotas.MaxStorageBytes.Value)
+                                <div class="progress mt-1">
+                                    <div class="progress-bar @GetProgressColor(tenant.StorageBytes, quotas.MaxStorageBytes.Value)"
+                                         style="width: @GetPercentage(tenant.StorageBytes, quotas.MaxStorageBytes.Value)%"></div>
+                                </div>
+                            }
+                            else
+                            {
+                                @:Unlimited
+                            }
+                        </dd>
+
+                        <dt class="col-sm-6">Raster Processing:</dt>
+                        <dd class="col-sm-6 text-end">
+                            @if (quotas.MaxRasterProcessingMinutesPerMonth.HasValue)
+                            {
+                                @:@tenant.RasterProcessingMinutes / @quotas.MaxRasterProcessingMinutesPerMonth.Value min
+                                <div class="progress mt-1">
+                                    <div class="progress-bar @GetProgressColor(tenant.RasterProcessingMinutes, quotas.MaxRasterProcessingMinutesPerMonth.Value)"
+                                         style="width: @GetPercentage(tenant.RasterProcessingMinutes, quotas.MaxRasterProcessingMinutesPerMonth.Value)%"></div>
+                                </div>
+                            }
+                            else
+                            {
+                                @:Unlimited
+                            }
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Usage History (Last 6 Months)</h5>
+                    @if (usageHistory.Any())
+                    {
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th class="text-end">API Reqs</th>
+                                    <th class="text-end">Storage</th>
+                                    <th class="text-end">Builds</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var point in usageHistory.Take(6))
+                                {
+                                    <tr>
+                                        <td>@point.PeriodStart.ToString("MMM yyyy")</td>
+                                        <td class="text-end">@FormatNumber(point.ApiRequests)</td>
+                                        <td class="text-end">@FormatBytes(point.StorageBytes)</td>
+                                        <td class="text-end">@point.Builds</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No historical data available</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string TenantId { get; set; } = string.Empty;
+
+    private TenantDetailedUsage? tenant;
+    private List<UsageHistoryPoint> usageHistory = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        tenant = await AnalyticsService.GetTenantDetailedUsageAsync(TenantId);
+        if (tenant != null)
+        {
+            usageHistory = await AnalyticsService.GetTenantUsageHistoryAsync(TenantId);
+        }
+    }
+
+    private string GetStatusColor(TenantDetailedUsage t)
+    {
+        if (t.TrialExpiresAt.HasValue && t.TrialExpiresAt.Value < DateTimeOffset.UtcNow)
+            return "danger";
+        return t.SubscriptionStatus switch
+        {
+            "trial" => "info",
+            "active" => "success",
+            _ => "secondary"
+        };
+    }
+
+    private TenantQuotas GetQuotasForTier(string tier)
+    {
+        return tier.ToLower() switch
+        {
+            "trial" => TenantQuotas.Trial(),
+            "core" => TenantQuotas.Core(),
+            "pro" => TenantQuotas.Pro(),
+            "enterprise" => TenantQuotas.Enterprise(),
+            _ => TenantQuotas.Trial()
+        };
+    }
+
+    private double GetPercentage(long current, long max)
+    {
+        if (max == 0) return 0;
+        return Math.Min((double)current / max * 100, 100);
+    }
+
+    private string GetProgressColor(long current, long max)
+    {
+        var percentage = GetPercentage(current, max);
+        if (percentage >= 90) return "bg-danger";
+        if (percentage >= 75) return "bg-warning";
+        return "bg-success";
+    }
+
+    private string FormatNumber(long number)
+    {
+        if (number >= 1_000_000)
+            return $"{number / 1_000_000.0:F1}M";
+        if (number >= 1_000)
+            return $"{number / 1_000.0:F1}K";
+        return number.ToString();
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:F2} {sizes[order]}";
+    }
+}

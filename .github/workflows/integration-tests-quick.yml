@@ -1,0 +1,371 @@
+name: Quick Integration Tests (Fast Feedback)
+
+# This workflow runs a fast subset of integration tests for quick PR feedback.
+# It excludes slow/comprehensive tests and focuses on smoke tests and critical paths.
+#
+# Use Cases:
+# - Pull request checks (runs automatically)
+# - Quick validation before pushing
+# - Fast feedback loop during development
+#
+# For comprehensive testing, use the full integration-tests.yml workflow.
+
+on:
+  pull_request:
+    branches: [master, main, dev]
+  workflow_dispatch:
+
+env:
+  # .NET Configuration
+  DOTNET_VERSION: '9.0.x'
+
+  # Docker Configuration
+  POSTGRES_IMAGE: 'postgis/postgis:16-3.4'
+  QGIS_IMAGE: 'qgis/qgis:3.34'
+
+  # Test Configuration
+  HONUA_API_BASE_URL: 'http://honua-server:8080'
+  HONUA_QGIS_BASE_URL: 'http://honua-server:8080'
+  POSTGRES_DB: 'honua_quick_test'
+  POSTGRES_USER: 'honua_test'
+  POSTGRES_PASSWORD: 'test_pass_123'
+
+  # Default test layer/collection
+  HONUA_QGIS_WMS_LAYER: 'test-data:features'
+  HONUA_QGIS_COLLECTION_ID: 'test-data::features'
+
+jobs:
+  # =============================================================================
+  # Build Honua Server Docker Image
+  # =============================================================================
+  build-server:
+    name: Build Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Honua Server image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: honua-server:quick-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save Docker image
+        run: docker save honua-server:quick-test | gzip > honua-server.tar.gz
+
+      - name: Upload Docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: honua-server-image
+          path: honua-server.tar.gz
+          retention-days: 1
+
+  # =============================================================================
+  # Quick QGIS Smoke Tests
+  # =============================================================================
+  qgis-smoke-tests:
+    name: QGIS Smoke Tests
+    runs-on: ubuntu-latest
+    needs: build-server
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U honua_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+          --name postgres-server
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download server image
+        uses: actions/download-artifact@v4
+        with:
+          name: honua-server-image
+
+      - name: Load server image
+        run: docker load < honua-server.tar.gz
+
+      - name: Create network
+        run: |
+          docker network create test-network
+          docker network connect test-network postgres-server
+
+      - name: Start Honua server
+        run: |
+          docker run -d \
+            --name honua-server \
+            --network test-network \
+            -p 8080:8080 \
+            -e ASPNETCORE_ENVIRONMENT=Development \
+            -e ConnectionStrings__DefaultConnection="Host=postgres-server;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}" \
+            -e Honua__DataStore__Provider=PostgreSQL \
+            -e Honua__Security__RequireHttps=false \
+            --health-cmd="wget --no-verbose --tries=1 --spider http://localhost:8080/healthz/live || exit 1" \
+            --health-interval=5s \
+            --health-timeout=3s \
+            --health-retries=10 \
+            --health-start-period=20s \
+            honua-server:quick-test
+
+      - name: Wait for server health
+        run: |
+          timeout 120 bash -c 'until docker inspect --format="{{.State.Health.Status}}" honua-server | grep -q "healthy"; do sleep 3; done'
+          curl -f http://localhost:8080/healthz/live
+
+      - name: Run QGIS smoke tests (exclude @slow)
+        run: |
+          docker run --rm \
+            --network test-network \
+            -v ${{ github.workspace }}/tests/qgis:/tests \
+            -v ${{ github.workspace }}/test-results:/results \
+            -e HONUA_QGIS_BASE_URL=${{ env.HONUA_QGIS_BASE_URL }} \
+            -e HONUA_QGIS_WMS_LAYER=${{ env.HONUA_QGIS_WMS_LAYER }} \
+            -e HONUA_QGIS_COLLECTION_ID=${{ env.HONUA_QGIS_COLLECTION_ID }} \
+            -e QT_QPA_PLATFORM=offscreen \
+            -w /tests \
+            ${{ env.QGIS_IMAGE }} \
+            sh -c "
+              pip3 install -q -r requirements.txt
+              pytest -v \
+                -m 'not slow' \
+                --timeout=60 \
+                --tb=line \
+                --junit-xml=/results/qgis-quick.xml \
+                .
+            "
+
+      - name: Upload QGIS test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qgis-quick-results
+          path: test-results/
+          retention-days: 3
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: QGIS Quick Tests
+          path: test-results/qgis-quick.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop honua-server || true
+          docker rm honua-server || true
+
+  # =============================================================================
+  # Quick Python Smoke Tests
+  # =============================================================================
+  python-smoke-tests:
+    name: Python Smoke Tests
+    runs-on: ubuntu-latest
+    needs: build-server
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U honua_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+          --name postgres-server
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install GDAL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev python3-gdal
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r tests/python/requirements.txt
+
+      - name: Download server image
+        uses: actions/download-artifact@v4
+        with:
+          name: honua-server-image
+
+      - name: Load server image
+        run: docker load < honua-server.tar.gz
+
+      - name: Create network
+        run: |
+          docker network create test-network
+          docker network connect test-network postgres-server
+
+      - name: Start Honua server
+        run: |
+          docker run -d \
+            --name honua-server \
+            --network test-network \
+            -p 8080:8080 \
+            -e ASPNETCORE_ENVIRONMENT=Development \
+            -e ConnectionStrings__DefaultConnection="Host=postgres-server;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}" \
+            -e Honua__DataStore__Provider=PostgreSQL \
+            -e Honua__Security__RequireHttps=false \
+            --health-cmd="wget --no-verbose --tries=1 --spider http://localhost:8080/healthz/live || exit 1" \
+            --health-interval=5s \
+            --health-timeout=3s \
+            --health-retries=10 \
+            --health-start-period=20s \
+            honua-server:quick-test
+
+      - name: Wait for server health
+        run: |
+          timeout 120 bash -c 'until docker inspect --format="{{.State.Health.Status}}" honua-server | grep -q "healthy"; do sleep 3; done'
+          curl -f http://localhost:8080/healthz/live
+
+      - name: Run Python smoke tests (exclude @slow)
+        env:
+          HONUA_API_BASE_URL: 'http://localhost:8080'
+        run: |
+          cd tests/python
+          pytest -v \
+            -m 'not slow' \
+            --timeout=60 \
+            --tb=line \
+            --junit-xml=../../test-results/python-quick.xml \
+            .
+
+      - name: Upload Python test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-quick-results
+          path: test-results/
+          retention-days: 3
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Python Quick Tests
+          path: test-results/python-quick.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop honua-server || true
+          docker rm honua-server || true
+
+  # =============================================================================
+  # Quick Summary
+  # =============================================================================
+  quick-test-summary:
+    name: Quick Test Summary
+    runs-on: ubuntu-latest
+    needs: [qgis-smoke-tests, python-smoke-tests]
+    if: always()
+
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-quick-results'
+          merge-multiple: true
+
+      - name: Generate summary
+        run: |
+          cat << 'EOF' > summary.md
+          # Quick Integration Test Results
+
+          This is a fast subset of integration tests for quick feedback.
+          Tests marked with `@pytest.mark.slow` are excluded.
+
+          ## Results
+
+          | Test Suite | Status |
+          |------------|--------|
+          | QGIS Smoke Tests | ${{ needs.qgis-smoke-tests.result }} |
+          | Python Smoke Tests | ${{ needs.python-smoke-tests.result }} |
+
+          ## Next Steps
+
+          - ✅ If all tests pass: Your changes look good!
+          - ❌ If tests fail: Review the test output in the artifacts
+          - 🔍 For comprehensive testing: The full `integration-tests.yml` workflow runs on merge
+
+          ## Notes
+
+          - Quick tests run in ~10-15 minutes
+          - Full integration tests run in ~30-45 minutes
+          - Slow tests include: comprehensive WMS/WFS/WCS validation, large dataset tests
+
+          EOF
+          cat summary.md
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: quick-tests
+          path: summary.md
+
+  # =============================================================================
+  # Final Gate
+  # =============================================================================
+  all-quick-tests-passed:
+    name: All Quick Tests Passed
+    runs-on: ubuntu-latest
+    needs: [qgis-smoke-tests, python-smoke-tests]
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.qgis-smoke-tests.result }}" != "success" ] || [ "${{ needs.python-smoke-tests.result }}" != "success" ]; then
+            echo "::error::Quick integration tests failed!"
+            echo "QGIS: ${{ needs.qgis-smoke-tests.result }}"
+            echo "Python: ${{ needs.python-smoke-tests.result }}"
+            exit 1
+          fi
+          echo "::notice::All quick integration tests passed!"

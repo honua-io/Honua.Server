@@ -1,0 +1,16 @@
+{
+  "catalog": {
+    "id": "test"
+  },
+  "server": {
+    "cors": {
+      "enabled": true,
+      "allowedOrigins": ["*"],
+      "allowCredentials": true
+    }
+  },
+  "folders": [],
+  "dataSources": [],
+  "services": [],
+  "layers": []
+}

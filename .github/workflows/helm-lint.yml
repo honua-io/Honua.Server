@@ -1,0 +1,327 @@
+name: Helm Chart Validation
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/helm/**'
+      - '.github/workflows/helm-lint.yml'
+  push:
+    branches:
+      - dev
+      - main
+      - master
+    paths:
+      - 'deploy/helm/**'
+  workflow_dispatch:
+
+jobs:
+  lint-helm-charts:
+    name: Lint and Validate Helm Charts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install chart-testing
+        uses: helm/chart-testing-action@v2.6.1
+
+      - name: Install additional tools
+        run: |
+          # Install kubeval for Kubernetes manifest validation
+          wget https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
+          tar xf kubeval-linux-amd64.tar.gz
+          sudo mv kubeval /usr/local/bin/
+
+          # Install helm-docs
+          wget https://github.com/norwoodj/helm-docs/releases/download/v1.11.0/helm-docs_1.11.0_Linux_x86_64.tar.gz
+          tar xf helm-docs_1.11.0_Linux_x86_64.tar.gz
+          sudo mv helm-docs /usr/local/bin/
+
+          # Install helm plugins
+          helm plugin install https://github.com/quintush/helm-unittest
+          helm plugin install https://github.com/databus23/helm-diff
+
+      - name: List changed charts
+        id: list-changed
+        run: |
+          changed=$(ct list-changed --target-branch ${{ github.event.repository.default_branch }})
+          if [[ -n "$changed" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changed charts: $changed"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint Helm charts
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          ct lint --all \
+            --chart-dirs deploy/helm \
+            --validate-maintainers=false \
+            --check-version-increment=false
+
+      - name: Lint individual charts
+        run: |
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              echo "Linting $chart..."
+              helm lint "$chart" --strict
+            fi
+          done
+
+      - name: Template charts and validate
+        run: |
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+              echo "Templating $chart_name..."
+
+              # Template with different values files
+              for env in dev staging production; do
+                values_file="$chart/values-${env}.yaml"
+                if [ -f "$values_file" ]; then
+                  echo "  Testing with values-${env}.yaml..."
+
+                  helm template "$chart_name" "$chart" \
+                    --values "$values_file" \
+                    --output-dir "/tmp/helm-output-${chart_name}-${env}"
+
+                  # Validate with kubeval
+                  kubeval --strict --ignore-missing-schemas \
+                    "/tmp/helm-output-${chart_name}-${env}"/**/*.yaml || true
+                fi
+              done
+            fi
+          done
+
+      - name: Check for required files
+        run: |
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+              echo "Checking $chart_name..."
+
+              # Check for required files
+              required_files=(
+                "Chart.yaml"
+                "values.yaml"
+                "README.md"
+                "templates/_helpers.tpl"
+                "templates/deployment.yaml"
+                "templates/service.yaml"
+              )
+
+              for file in "${required_files[@]}"; do
+                if [ ! -f "$chart/$file" ]; then
+                  echo "  ⚠ Missing required file: $file"
+                fi
+              done
+
+              # Check for .helmignore
+              if [ ! -f "$chart/.helmignore" ]; then
+                echo "  ⚠ Missing .helmignore file"
+              fi
+            fi
+          done
+
+      - name: Validate Chart.yaml
+        run: |
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+              echo "Validating $chart_name Chart.yaml..."
+
+              # Check required fields
+              if ! grep -q "apiVersion:" "$chart/Chart.yaml"; then
+                echo "  ✗ Missing apiVersion"
+                exit 1
+              fi
+
+              if ! grep -q "name:" "$chart/Chart.yaml"; then
+                echo "  ✗ Missing name"
+                exit 1
+              fi
+
+              if ! grep -q "version:" "$chart/Chart.yaml"; then
+                echo "  ✗ Missing version"
+                exit 1
+              fi
+
+              if ! grep -q "appVersion:" "$chart/Chart.yaml"; then
+                echo "  ⚠ Missing appVersion (recommended)"
+              fi
+
+              if ! grep -q "description:" "$chart/Chart.yaml"; then
+                echo "  ⚠ Missing description"
+              fi
+
+              echo "  ✓ Chart.yaml is valid"
+            fi
+          done
+
+      - name: Check chart documentation
+        run: |
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+
+              # Generate documentation
+              helm-docs --chart-search-root="$chart"
+
+              # Check if README.md was updated
+              if git diff --exit-code "$chart/README.md"; then
+                echo "✓ $chart_name documentation is up to date"
+              else
+                echo "⚠ $chart_name documentation needs updating"
+                git diff "$chart/README.md"
+              fi
+            fi
+          done
+
+      - name: Run chart unit tests
+        run: |
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+
+              # Check if tests directory exists
+              if [ -d "$chart/tests" ]; then
+                echo "Running unit tests for $chart_name..."
+                helm unittest "$chart"
+              else
+                echo "⚠ No unit tests found for $chart_name"
+              fi
+            fi
+          done
+
+      - name: Dependency check
+        run: |
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+
+              # Check for dependencies
+              if [ -f "$chart/Chart.lock" ]; then
+                echo "Updating dependencies for $chart_name..."
+                helm dependency update "$chart"
+              fi
+
+              # Build dependencies
+              if [ -f "$chart/requirements.yaml" ] || grep -q "dependencies:" "$chart/Chart.yaml"; then
+                helm dependency build "$chart"
+              fi
+            fi
+          done
+
+      - name: Security scan Helm charts
+        run: |
+          # Install checkov for security scanning
+          pip install checkov
+
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+              echo "Security scanning $chart_name..."
+
+              # Template chart for scanning
+              helm template "$chart_name" "$chart" \
+                --output-dir "/tmp/helm-scan-$chart_name"
+
+              # Run checkov
+              checkov -d "/tmp/helm-scan-$chart_name" \
+                --framework kubernetes \
+                --quiet \
+                --compact || true
+            fi
+          done
+
+      - name: Package charts
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          mkdir -p /tmp/helm-packages
+
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+              echo "Packaging $chart_name..."
+
+              helm package "$chart" --destination /tmp/helm-packages
+            fi
+          done
+
+      - name: Upload packaged charts
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-charts
+          path: /tmp/helm-packages/*.tgz
+
+      - name: Test installation (dry-run)
+        run: |
+          # Setup kind cluster for testing
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+          # Create test cluster
+          kind create cluster --name helm-test
+
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+              echo "Testing installation of $chart_name..."
+
+              # Dry-run installation
+              helm install "$chart_name-test" "$chart" \
+                --dry-run \
+                --debug \
+                --create-namespace \
+                --namespace test-$chart_name || echo "Dry-run completed with warnings"
+            fi
+          done
+
+      - name: Chart diff (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+
+              # Show diff with base branch
+              git fetch origin ${{ github.base_ref }}
+
+              echo "Changes in $chart_name:"
+              git diff origin/${{ github.base_ref }} HEAD -- "$chart" || echo "No changes"
+            fi
+          done
+
+      - name: Generate chart summary
+        if: always()
+        run: |
+          echo "# Helm Chart Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for chart in deploy/helm/*/; do
+            if [ -f "$chart/Chart.yaml" ]; then
+              chart_name=$(basename "$chart")
+              version=$(grep "^version:" "$chart/Chart.yaml" | awk '{print $2}')
+              app_version=$(grep "^appVersion:" "$chart/Chart.yaml" | awk '{print $2}' || echo "N/A")
+
+              echo "## $chart_name" >> $GITHUB_STEP_SUMMARY
+              echo "- **Version:** $version" >> $GITHUB_STEP_SUMMARY
+              echo "- **App Version:** $app_version" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done

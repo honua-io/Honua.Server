@@ -1,0 +1,293 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: honua-server
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-server
+    app.kubernetes.io/instance: honua
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: honua
+    app.kubernetes.io/managed-by: kubectl
+    environment: production
+  annotations:
+    kubernetes.io/description: "Honua OGC-compliant geospatial data server"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: honua-server
+      app.kubernetes.io/instance: honua
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: honua-server
+        app.kubernetes.io/instance: honua
+        app.kubernetes.io/version: "1.0.0"
+        app.kubernetes.io/component: server
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        # Force pod restart on config/secret changes
+        checksum/config: "{{ checksum }}"
+        checksum/secret: "{{ checksum }}"
+    spec:
+      # Security Context - Pod Level
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Service Account
+      serviceAccountName: honua-server
+      automountServiceAccountToken: true
+
+      # DNS Configuration
+      dnsPolicy: ClusterFirst
+
+      # Termination Grace Period
+      terminationGracePeriodSeconds: 60
+
+      # Init Containers
+      initContainers:
+      - name: wait-for-database
+        image: busybox:1.36
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Waiting for PostgreSQL to be ready..."
+          until nc -z postgis-service 5432; do
+            echo "PostgreSQL is unavailable - sleeping"
+            sleep 2
+          done
+          echo "PostgreSQL is up - proceeding"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+      - name: wait-for-redis
+        image: busybox:1.36
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Waiting for Redis to be ready..."
+          until nc -z redis-service 6379; do
+            echo "Redis is unavailable - sleeping"
+            sleep 2
+          done
+          echo "Redis is up - proceeding"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+      # Application Containers
+      containers:
+      - name: honua-server
+        # IMPORTANT: Update this image reference with your actual registry and version
+        image: honuaio/honua-server:latest
+        imagePullPolicy: IfNotPresent
+
+        # Security Context - Container Level
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+
+        # Ports
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
+
+        # Environment Variables from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: honua-config
+
+        # Environment Variables from Secrets
+        env:
+        - name: HONUA__DATABASE__USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: honua-database-secret
+              key: username
+        - name: HONUA__DATABASE__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: honua-database-secret
+              key: password
+        - name: HONUA__DATABASE__CONNECTIONSTRING
+          valueFrom:
+            secretKeyRef:
+              name: honua-database-secret
+              key: connection-string
+        - name: HONUA__CACHE__REDIS__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: honua-redis-secret
+              key: password
+        - name: HONUA__AUTHENTICATION__LOCAL__SIGNINGKEY
+          valueFrom:
+            secretKeyRef:
+              name: honua-jwt-secret
+              key: signing-key
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: honua-storage-secret
+              key: aws-access-key-id
+              optional: true
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: honua-storage-secret
+              key: aws-secret-access-key
+              optional: true
+
+        # Resource Limits and Requests
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+            ephemeral-storage: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+            ephemeral-storage: 2Gi
+
+        # Liveness Probe
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+
+        # Readiness Probe
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+
+        # Startup Probe (for slow-starting applications)
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+
+        # Lifecycle Hooks
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+
+        # Volume Mounts
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: app-tmp
+          mountPath: /app/tmp
+        - name: cache
+          mountPath: /app/cache
+        - name: logs
+          mountPath: /app/logs
+
+      # Volumes
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: app-tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: cache
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: logs
+        emptyDir:
+          sizeLimit: 1Gi
+
+      # Affinity and Anti-Affinity
+      affinity:
+        # Pod Anti-Affinity - Prefer spreading pods across nodes
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - honua-server
+              topologyKey: kubernetes.io/hostname
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - honua-server
+              topologyKey: topology.kubernetes.io/zone
+
+      # Node Selector (optional - uncomment to use specific node pools)
+      # nodeSelector:
+      #   workload-type: application
+
+      # Tolerations (optional - uncomment if using taints)
+      # tolerations:
+      # - key: "app"
+      #   operator: "Equal"
+      #   value: "honua"
+      #   effect: "NoSchedule"

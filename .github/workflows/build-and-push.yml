@@ -1,0 +1,536 @@
+name: Build and Push Multi-Architecture Images
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      push_to_registries:
+        description: 'Push to container registries'
+        required: true
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  IMAGE_NAME: honua-server
+
+jobs:
+  build-metadata:
+    name: Generate Build Metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
+      created: ${{ steps.meta.outputs.created }}
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate semantic version
+        id: semver
+        uses: PaulHatch/semantic-version@v5.4.0
+        with:
+          tag_prefix: "v"
+          major_pattern: "(MAJOR)"
+          minor_pattern: "(MINOR)"
+          version_format: "${major}.${minor}.${patch}"
+          change_path: "src/"
+          bump_each_commit: false
+
+      - name: Generate metadata
+        id: meta
+        run: |
+          VERSION="${{ steps.semver.outputs.version }}"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+
+          # Generate tags for all registries
+          TAGS=""
+          for REGISTRY in "ghcr.io" "public.ecr.aws" "gcr.io" "azurecr.io"; do
+            case $REGISTRY in
+              "ghcr.io")
+                PREFIX="${REGISTRY}/${{ github.repository_owner }}/${IMAGE_NAME}"
+                ;;
+              "public.ecr.aws")
+                PREFIX="${REGISTRY}/${{ secrets.AWS_ECR_ALIAS }}/${IMAGE_NAME}"
+                ;;
+              "gcr.io")
+                PREFIX="${REGISTRY}/${{ secrets.GCP_PROJECT_ID }}/${IMAGE_NAME}"
+                ;;
+              "azurecr.io")
+                PREFIX="${{ secrets.AZURE_REGISTRY_NAME }}.${REGISTRY}/${IMAGE_NAME}"
+                ;;
+            esac
+
+            TAGS="${TAGS}${PREFIX}:${VERSION},"
+            TAGS="${TAGS}${PREFIX}:latest,"
+
+            if [[ "${{ github.ref }}" == refs/heads/dev ]]; then
+              TAGS="${TAGS}${PREFIX}:dev,"
+            elif [[ "${{ github.ref }}" == refs/heads/main ]] || [[ "${{ github.ref }}" == refs/heads/master ]]; then
+              TAGS="${TAGS}${PREFIX}:stable,"
+            fi
+          done
+
+          TAGS="${TAGS%,}"  # Remove trailing comma
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+
+          # Generate OCI labels
+          LABELS="org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          LABELS="${LABELS},org.opencontainers.image.version=${VERSION}"
+          LABELS="${LABELS},org.opencontainers.image.revision=${GITHUB_SHA}"
+          LABELS="${LABELS},org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}"
+          LABELS="${LABELS},org.opencontainers.image.title=Honua Server"
+          LABELS="${LABELS},org.opencontainers.image.description=Honua geospatial data platform server"
+          LABELS="${LABELS},org.opencontainers.image.vendor=${{ github.repository_owner }}"
+          echo "labels=${LABELS}" >> $GITHUB_OUTPUT
+
+  build-and-test:
+    name: Build and Test (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    needs: build-metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            platform: linux/amd64
+          - arch: arm64
+            runner: ubuntu-latest-arm64
+            platform: linux/arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore Honua.sln
+
+      - name: Build solution
+        run: |
+          dotnet build Honua.sln \
+            --configuration Release \
+            --no-restore \
+            /p:Version=${{ needs.build-metadata.outputs.version }} \
+            /p:AssemblyVersion=${{ needs.build-metadata.outputs.version }} \
+            /p:FileVersion=${{ needs.build-metadata.outputs.version }}
+
+      - name: Run unit tests
+        run: |
+          dotnet test Honua.sln \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage \
+            --logger "trx;LogFileName=test-results-${{ matrix.arch }}.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.arch }}
+          path: '**/test-results-*.trx'
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.arch }}
+          path: coverage/*/coverage.cobertura.xml
+
+  build-docker-images:
+    name: Build Docker Images (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    needs: [build-metadata, build-and-test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            platform: linux/amd64
+          - arch: arm64
+            runner: ubuntu-latest-arm64
+            platform: linux/arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: false
+          tags: ${{ env.IMAGE_NAME }}:${{ needs.build-metadata.outputs.version }}-${{ matrix.arch }}
+          labels: ${{ needs.build-metadata.outputs.labels }}
+          cache-from: type=gha,scope=build-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=build-${{ matrix.arch }}
+          outputs: type=docker,dest=/tmp/image-${{ matrix.arch }}.tar
+          build-args: |
+            VERSION=${{ needs.build-metadata.outputs.version }}
+            BUILD_DATE=${{ needs.build-metadata.outputs.created }}
+            VCS_REF=${{ needs.build-metadata.outputs.sha }}
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ matrix.arch }}
+          path: /tmp/image-${{ matrix.arch }}.tar
+          retention-days: 1
+
+  scan-images:
+    name: Security Scan (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: [build-metadata, build-docker-images]
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-${{ matrix.arch }}
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load --input /tmp/image-${{ matrix.arch }}.tar
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ needs.build-metadata.outputs.version }}-${{ matrix.arch }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.arch }}.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy results to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-${{ matrix.arch }}.sarif'
+          category: 'trivy-${{ matrix.arch }}'
+
+      - name: Run Grype vulnerability scanner
+        uses: anchore/scan-action@v3
+        with:
+          image: ${{ env.IMAGE_NAME }}:${{ needs.build-metadata.outputs.version }}-${{ matrix.arch }}
+          fail-build: true
+          severity-cutoff: high
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_NAME }}:${{ needs.build-metadata.outputs.version }}-${{ matrix.arch }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.arch }}.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.arch }}
+          path: sbom-${{ matrix.arch }}.spdx.json
+
+  push-to-registries:
+    name: Push to Container Registries
+    runs-on: ubuntu-latest
+    needs: [build-metadata, scan-images]
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.push_to_registries == 'true')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download amd64 image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-amd64
+          path: /tmp
+
+      - name: Download arm64 image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-arm64
+          path: /tmp
+
+      - name: Load Docker images
+        run: |
+          docker load --input /tmp/image-amd64.tar
+          docker load --input /tmp/image-arm64.tar
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to AWS ECR Public
+        if: vars.ENABLE_AWS_ECR == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: public.ecr.aws
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        env:
+          AWS_REGION: us-east-1
+
+      - name: Login to Google Container Registry
+        if: vars.ENABLE_GCP_GCR == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Login to Azure Container Registry
+        if: vars.ENABLE_AZURE_ACR == 'true'
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.AZURE_REGISTRY_NAME }}.azurecr.io
+          username: ${{ secrets.AZURE_REGISTRY_USERNAME }}
+          password: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+
+      - name: Push multi-arch manifest to GHCR
+        run: |
+          VERSION="${{ needs.build-metadata.outputs.version }}"
+          REPO="ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}"
+
+          # Tag images for manifest
+          docker tag ${IMAGE_NAME}:${VERSION}-amd64 ${REPO}:${VERSION}-amd64
+          docker tag ${IMAGE_NAME}:${VERSION}-arm64 ${REPO}:${VERSION}-arm64
+
+          # Push individual arch images
+          docker push ${REPO}:${VERSION}-amd64
+          docker push ${REPO}:${VERSION}-arm64
+
+          # Create and push manifest
+          docker manifest create ${REPO}:${VERSION} \
+            ${REPO}:${VERSION}-amd64 \
+            ${REPO}:${VERSION}-arm64
+          docker manifest push ${REPO}:${VERSION}
+
+          # Tag and push latest
+          docker manifest create ${REPO}:latest \
+            ${REPO}:${VERSION}-amd64 \
+            ${REPO}:${VERSION}-arm64
+          docker manifest push ${REPO}:latest
+
+      - name: Push to AWS ECR Public
+        if: vars.ENABLE_AWS_ECR == 'true'
+        run: |
+          VERSION="${{ needs.build-metadata.outputs.version }}"
+          REPO="public.ecr.aws/${{ secrets.AWS_ECR_ALIAS }}/${IMAGE_NAME}"
+
+          docker tag ${IMAGE_NAME}:${VERSION}-amd64 ${REPO}:${VERSION}-amd64
+          docker tag ${IMAGE_NAME}:${VERSION}-arm64 ${REPO}:${VERSION}-arm64
+
+          docker push ${REPO}:${VERSION}-amd64
+          docker push ${REPO}:${VERSION}-arm64
+
+          docker manifest create ${REPO}:${VERSION} \
+            ${REPO}:${VERSION}-amd64 \
+            ${REPO}:${VERSION}-arm64
+          docker manifest push ${REPO}:${VERSION}
+
+      - name: Push to Google Container Registry
+        if: vars.ENABLE_GCP_GCR == 'true'
+        run: |
+          VERSION="${{ needs.build-metadata.outputs.version }}"
+          REPO="gcr.io/${{ secrets.GCP_PROJECT_ID }}/${IMAGE_NAME}"
+
+          docker tag ${IMAGE_NAME}:${VERSION}-amd64 ${REPO}:${VERSION}-amd64
+          docker tag ${IMAGE_NAME}:${VERSION}-arm64 ${REPO}:${VERSION}-arm64
+
+          docker push ${REPO}:${VERSION}-amd64
+          docker push ${REPO}:${VERSION}-arm64
+
+          docker manifest create ${REPO}:${VERSION} \
+            ${REPO}:${VERSION}-amd64 \
+            ${REPO}:${VERSION}-arm64
+          docker manifest push ${REPO}:${VERSION}
+
+      - name: Push to Azure Container Registry
+        if: vars.ENABLE_AZURE_ACR == 'true'
+        run: |
+          VERSION="${{ needs.build-metadata.outputs.version }}"
+          REPO="${{ secrets.AZURE_REGISTRY_NAME }}.azurecr.io/${IMAGE_NAME}"
+
+          docker tag ${IMAGE_NAME}:${VERSION}-amd64 ${REPO}:${VERSION}-amd64
+          docker tag ${IMAGE_NAME}:${VERSION}-arm64 ${REPO}:${VERSION}-arm64
+
+          docker push ${REPO}:${VERSION}-amd64
+          docker push ${REPO}:${VERSION}-arm64
+
+          docker manifest create ${REPO}:${VERSION} \
+            ${REPO}:${VERSION}-amd64 \
+            ${REPO}:${VERSION}-arm64
+          docker manifest push ${REPO}:${VERSION}
+
+      - name: Sign container images with Cosign
+        if: vars.ENABLE_IMAGE_SIGNING == 'true'
+        uses: sigstore/cosign-installer@v3.3.0
+
+      - name: Sign images
+        if: vars.ENABLE_IMAGE_SIGNING == 'true'
+        run: |
+          VERSION="${{ needs.build-metadata.outputs.version }}"
+
+          # Sign GHCR image
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${VERSION}
+
+          # Sign other registries if enabled
+          if [[ "${{ vars.ENABLE_AWS_ECR }}" == "true" ]]; then
+            cosign sign --yes public.ecr.aws/${{ secrets.AWS_ECR_ALIAS }}/${IMAGE_NAME}:${VERSION}
+          fi
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-metadata, push-to-registries]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sbom-*
+          path: ./sboms
+          merge-multiple: true
+
+      - name: Generate release notes
+        id: release_notes
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          configuration: ".github/release-config.json"
+          failOnError: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ needs.build-metadata.outputs.version }}
+          body: ${{ steps.release_notes.outputs.changelog }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          files: |
+            sboms/sbom-*.spdx.json
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [build-metadata, push-to-registries]
+    if: always()
+    steps:
+      - name: Send Slack notification
+        if: vars.ENABLE_SLACK_NOTIFICATIONS == 'true'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "Build ${{ needs.push-to-registries.result == 'success' && 'succeeded' || 'failed' }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Honua Build ${{ needs.push-to-registries.result == 'success' && '✅' || '❌' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Version:*\n${{ needs.build-metadata.outputs.version }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n${{ needs.build-metadata.outputs.sha }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\n${{ needs.push-to-registries.result }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Send Teams notification
+        if: vars.ENABLE_TEAMS_NOTIFICATIONS == 'true' && failure()
+        uses: jdcargile/ms-teams-notification@v1.4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          ms-teams-webhook-uri: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          notification-summary: "Honua build failed for version ${{ needs.build-metadata.outputs.version }}"
+          notification-color: dc3545
+          timezone: America/Los_Angeles

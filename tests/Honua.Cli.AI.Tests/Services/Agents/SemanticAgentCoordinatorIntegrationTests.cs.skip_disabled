@@ -1,0 +1,455 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using FluentAssertions;
+using Honua.Cli.AI.Services.Agents;
+using Honua.Cli.AI.Services.VectorSearch;
+using Honua.Cli.AI.Tests.Mocks;
+using Honua.Cli.AI.Tests.TestFixtures;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel;
+using Moq;
+using Xunit;
+
+namespace Honua.Cli.AI.Tests.Services.Agents;
+
+[Collection("PostgreSQL")]
+public class SemanticAgentCoordinatorIntegrationTests : IAsyncLifetime
+{
+    private readonly PostgreSqlTestFixture _fixture;
+    private readonly MockLlmProvider _mockLlmProvider;
+    private readonly Mock<IPatternUsageTelemetry> _telemetryMock;
+    private readonly Mock<ILogger<SemanticAgentCoordinator>> _loggerMock;
+    private readonly Mock<ILogger<IntelligentAgentSelector>> _selectorLoggerMock;
+    private readonly Mock<ILogger<AgentCapabilityRegistry>> _registryLoggerMock;
+    private readonly IConfiguration _configuration;
+    private readonly Kernel _kernel;
+    private SemanticAgentCoordinator _sut = null!;
+
+    public SemanticAgentCoordinatorIntegrationTests(PostgreSqlTestFixture fixture)
+    {
+        _fixture = fixture;
+        _mockLlmProvider = new MockLlmProvider();
+        _telemetryMock = new Mock<IPatternUsageTelemetry>();
+        _loggerMock = new Mock<ILogger<SemanticAgentCoordinator>>();
+        _selectorLoggerMock = new Mock<ILogger<IntelligentAgentSelector>>();
+        _registryLoggerMock = new Mock<ILogger<AgentCapabilityRegistry>>();
+
+        var configBuilder = new ConfigurationBuilder();
+        configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:PostgreSQL"] = _fixture.ConnectionString,
+            ["AgentCapabilities:MinConfidenceThreshold"] = "0.7",
+            ["AgentCapabilities:MaxConcurrentAgents"] = "5"
+        });
+        _configuration = configBuilder.Build();
+
+        // Build Semantic Kernel
+        var builder = Kernel.CreateBuilder();
+        _kernel = builder.Build();
+    }
+
+    public Task InitializeAsync()
+    {
+        _fixture.ResetAsync().Wait();
+        SetupCoordinator();
+        return Task.CompletedTask;
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    private void SetupCoordinator(bool includeHistoryStore = true)
+    {
+        var agentOptions = new AgentCapabilityOptions
+        {
+            MinConfidenceThreshold = 0.7,
+            MaxConcurrentAgents = 5
+        };
+
+        var registry = new AgentCapabilityRegistry(
+            Options.Create(agentOptions),
+            _registryLoggerMock.Object);
+
+        var selector = new IntelligentAgentSelector(
+            _mockLlmProvider,
+            registry,
+            _selectorLoggerMock.Object);
+
+        IAgentHistoryStore? historyStore = null;
+        if (includeHistoryStore)
+        {
+            historyStore = new PostgresAgentHistoryStore(
+                _configuration,
+                new Mock<ILogger<PostgresAgentHistoryStore>>().Object);
+        }
+
+        _sut = new SemanticAgentCoordinator(
+            _mockLlmProvider,
+            _kernel,
+            selector,
+            _loggerMock.Object,
+            _telemetryMock.Object,
+            historyStore);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_CompleteFullWorkflow()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Help me deploy a new microservice",
+            Context = new Dictionary<string, string>
+            {
+                ["environment"] = "production",
+                ["service"] = "api-gateway"
+            },
+            RequireExplanation = true
+        };
+
+        // Setup mock responses
+        _mockLlmProvider.SetPatternResponse("analyze", JsonSerializer.Serialize(new
+        {
+            intent = "deployment",
+            confidence = 0.9,
+            entities = new[] { "microservice", "production" },
+            suggestedAgents = new[] { "DeploymentAgent", "ValidationAgent" }
+        }));
+
+        _mockLlmProvider.SetPatternResponse("select", JsonSerializer.Serialize(new
+        {
+            selectedAgent = "DeploymentAgent",
+            confidence = 0.85,
+            reasoning = "Best suited for deployment tasks"
+        }));
+
+        _mockLlmProvider.SetPatternResponse("execute", "Deployment plan created successfully");
+        _mockLlmProvider.SetPatternResponse("synthesize", "Your microservice deployment has been prepared.");
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+        result.Response.Should().Contain("deployment");
+        result.Steps.Should().NotBeEmpty();
+        result.NextSteps.Should().NotBeEmpty();
+
+        // Verify telemetry was recorded
+        _telemetryMock.Verify(t => t.RecordUsageAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<double?>(),
+            It.IsAny<string>(),
+            It.IsAny<int?>(),
+            It.IsAny<JsonDocument>(),
+            It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_HandleMultipleAgentSteps()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Analyze system performance and optimize database",
+            MaxSteps = 3
+        };
+
+        // Queue multiple agent responses
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            intent = "analysis",
+            confidence = 0.8,
+            suggestedAgents = new[] { "AnalysisAgent", "OptimizationAgent" }
+        }));
+
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "AnalysisAgent",
+            confidence = 0.85
+        }));
+
+        _mockLlmProvider.EnqueueResponse("Analysis complete: Found 3 bottlenecks");
+
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "OptimizationAgent",
+            confidence = 0.9
+        }));
+
+        _mockLlmProvider.EnqueueResponse("Optimizations applied successfully");
+
+        _mockLlmProvider.EnqueueResponse("Analysis and optimization completed. Database performance improved by 40%.");
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.Steps.Should().HaveCountGreaterOrEqualTo(2);
+        result.Steps.Should().Contain(s => s.AgentName.Contains("Analysis"));
+        result.Steps.Should().Contain(s => s.AgentName.Contains("Optimization"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_PersistToHistoryStore()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Test request for history",
+            SessionId = Guid.NewGuid().ToString()
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            intent = "test",
+            confidence = 0.95
+        }));
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+
+        // Verify history was persisted
+        var historyStore = new PostgresAgentHistoryStore(
+            _configuration,
+            new Mock<ILogger<PostgresAgentHistoryStore>>().Object);
+
+        var history = await historyStore.GetSessionHistoryAsync(request.SessionId!);
+        history.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_HandleAgentTimeout()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Long running task",
+            TimeoutSeconds = 1
+        };
+
+        // Simulate a long delay
+        _mockLlmProvider.SimulateDelay(TimeSpan.FromSeconds(5));
+
+        // Act
+        var act = () => _sut.ExecuteAsync(request);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_HandleAgentFailure()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Failing task"
+        };
+
+        _mockLlmProvider.SimulateFailure(new InvalidOperationException("LLM service unavailable"));
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Failed to analyze user intent");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_HandleCancellation()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Cancellable task"
+        };
+
+        _mockLlmProvider.SimulateDelay(TimeSpan.FromSeconds(1));
+
+        // Act
+        var task = _sut.ExecuteAsync(request, cts.Token);
+        cts.Cancel();
+
+        // Assert
+        await task.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_HandleLowConfidenceScenario()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Ambiguous request",
+            MinConfidenceThreshold = 0.8
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            intent = "unclear",
+            confidence = 0.5,
+            suggestedAgents = Array.Empty<string>()
+        }));
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Success.Should().BeTrue(); // Should still succeed but with low confidence handling
+        result.Response.Should().Contain("confidence");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_RespectMaxSteps()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Multi-step task",
+            MaxSteps = 2
+        };
+
+        // Queue more responses than max steps
+        for (int i = 0; i < 5; i++)
+        {
+            _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+            {
+                selectedAgent = $"Agent{i}",
+                confidence = 0.9
+            }));
+            _mockLlmProvider.EnqueueResponse($"Step {i} completed");
+        }
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Steps.Should().HaveCountLessOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_HandleConcurrentRequests()
+    {
+        // Arrange
+        var tasks = new List<Task<AgentCoordinatorResult>>();
+
+        for (int i = 0; i < 10; i++)
+        {
+            var request = new AgentCoordinatorRequest
+            {
+                UserRequest = $"Concurrent request {i}",
+                SessionId = Guid.NewGuid().ToString()
+            };
+
+            _mockLlmProvider.SetPatternResponse($"request {i}", JsonSerializer.Serialize(new
+            {
+                intent = $"task_{i}",
+                confidence = 0.85
+            }));
+
+            tasks.Add(_sut.ExecuteAsync(request));
+        }
+
+        // Act
+        var results = await Task.WhenAll(tasks);
+
+        // Assert
+        results.Should().HaveCount(10);
+        results.Should().OnlyContain(r => r.Success);
+        results.Select(r => r.SessionId).Distinct().Should().HaveCount(10);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_WorkWithoutHistoryStore()
+    {
+        // Arrange
+        SetupCoordinator(includeHistoryStore: false);
+
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Test without history"
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            intent = "test",
+            confidence = 0.9
+        }));
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.Response.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_IncludeExplanationWhenRequested()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Explain this task",
+            RequireExplanation = true
+        };
+
+        _mockLlmProvider.SetPatternResponse("analyze", JsonSerializer.Serialize(new
+        {
+            intent = "explanation",
+            confidence = 0.9,
+            explanation = "This task involves..."
+        }));
+
+        _mockLlmProvider.SetResponse("Detailed explanation provided");
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.Explanation.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Should_RecordMetrics()
+    {
+        // Arrange
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Metric tracking test"
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            intent = "test",
+            confidence = 0.9
+        }));
+
+        // Act
+        var result = await _sut.ExecuteAsync(request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+        result.TotalDurationMs.Should().BeGreaterThan(0);
+        result.Steps.Should().NotBeEmpty();
+        result.Steps.First().DurationMs.Should().BeGreaterThan(0);
+    }
+}

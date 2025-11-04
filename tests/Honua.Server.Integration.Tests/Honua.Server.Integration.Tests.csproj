@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="FluentAssertions" Version="8.6.0" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+
+    <!-- Testcontainers for Docker-based integration testing -->
+    <PackageReference Include="Testcontainers" Version="3.10.0" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="3.10.0" />
+
+    <!-- Database access -->
+    <PackageReference Include="Npgsql" Version="9.0.4" />
+    <PackageReference Include="Dapper" Version="2.1.66" />
+
+    <!-- Respawn for database cleanup -->
+    <PackageReference Include="Respawn" Version="6.2.1" />
+
+    <!-- Polly for resilience testing -->
+    <PackageReference Include="Polly" Version="8.5.0" />
+
+    <!-- Logging -->
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.1" />
+
+    <!-- Dependency Injection -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.10" />
+
+    <!-- ASP.NET Core Testing -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Honua.Server.Host/Honua.Server.Host.csproj" />
+    <ProjectReference Include="../../src/Honua.Server.Intake/Honua.Server.Intake.csproj" />
+    <ProjectReference Include="../../src/Honua.Server.Core/Honua.Server.Core.csproj" />
+    <ProjectReference Include="../../src/Honua.Server.Enterprise/Honua.Server.Enterprise.csproj" />
+    <ProjectReference Include="../../tools/Honua.Build.Orchestrator/Honua.Build.Orchestrator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

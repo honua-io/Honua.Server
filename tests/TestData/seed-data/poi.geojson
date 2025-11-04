@@ -1,0 +1,2703 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.6917, 35.6895]
+      },
+      "properties": {
+        "name": "Sukiyabashi Jiro",
+        "category": "restaurant",
+        "subcategory": "sushi",
+        "rating": 4.8,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "11:30-14:00,17:00-22:00",
+        "phone": "+81-3-3535-3600",
+        "website": "https://www.sushi-jiro.jp",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.7015, 35.6800]
+      },
+      "properties": {
+        "name": "Tokyo National Museum",
+        "category": "museum",
+        "subcategory": "art_history",
+        "rating": 4.6,
+        "reviews": 12453,
+        "price_level": 2,
+        "open_hours": "09:30-17:00",
+        "phone": "+81-50-5541-8600",
+        "website": "https://www.tnm.jp",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.7671, 35.6812]
+      },
+      "properties": {
+        "name": "Tokyo Skytree",
+        "category": "museum",
+        "subcategory": "observation",
+        "rating": 4.5,
+        "reviews": 45321,
+        "price_level": 3,
+        "open_hours": "08:00-22:00",
+        "phone": "+81-570-55-0634",
+        "website": "http://www.tokyo-skytree.jp",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.6503, 35.6764]
+      },
+      "properties": {
+        "name": "Park Hyatt Tokyo",
+        "category": "hotel",
+        "subcategory": "luxury",
+        "rating": 4.7,
+        "reviews": 8932,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+81-3-5322-1234",
+        "website": "https://www.hyatt.com/parkhyatt-tokyo",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.7038, 35.6582]
+      },
+      "properties": {
+        "name": "Tsukiji Fish Market",
+        "category": "shopping",
+        "subcategory": "market",
+        "rating": 4.4,
+        "reviews": 23145,
+        "price_level": 2,
+        "open_hours": "05:00-14:00",
+        "phone": "+81-3-3547-8011",
+        "website": null,
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.2090, 28.6139]
+      },
+      "properties": {
+        "name": "India Gate",
+        "category": "museum",
+        "subcategory": "memorial",
+        "rating": 4.5,
+        "reviews": 87654,
+        "price_level": 1,
+        "open_hours": "24/7",
+        "phone": null,
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.2273, 28.6562]
+      },
+      "properties": {
+        "name": "Red Fort",
+        "category": "museum",
+        "subcategory": "historical_site",
+        "rating": 4.3,
+        "reviews": 65432,
+        "price_level": 1,
+        "open_hours": "09:30-16:30",
+        "phone": "+91-11-2327-7705",
+        "website": "https://www.delhitourism.gov.in",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.2167, 28.6358]
+      },
+      "properties": {
+        "name": "Bukhara Restaurant",
+        "category": "restaurant",
+        "subcategory": "indian",
+        "rating": 4.6,
+        "reviews": 5643,
+        "price_level": 4,
+        "open_hours": "12:30-14:45,19:00-23:45",
+        "phone": "+91-11-2611-2233",
+        "website": "https://www.itchotels.com/bukhara",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.1950, 28.5562]
+      },
+      "properties": {
+        "name": "Fortis Hospital",
+        "category": "hospital",
+        "subcategory": "general",
+        "rating": 4.1,
+        "reviews": 2341,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+91-11-4277-6222",
+        "website": "https://www.fortishealthcare.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [77.2310, 28.5355]
+      },
+      "properties": {
+        "name": "Lotus Temple",
+        "category": "museum",
+        "subcategory": "religious",
+        "rating": 4.7,
+        "reviews": 94521,
+        "price_level": 1,
+        "open_hours": "09:00-17:30",
+        "phone": "+91-11-2644-4029",
+        "website": "https://www.bahaihouseofworship.in",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [121.4737, 31.2304]
+      },
+      "properties": {
+        "name": "Shanghai Tower",
+        "category": "museum",
+        "subcategory": "observation",
+        "rating": 4.6,
+        "reviews": 34521,
+        "price_level": 3,
+        "open_hours": "08:30-21:30",
+        "phone": "+86-21-2082-8888",
+        "website": "https://www.shanghaitower.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [121.4921, 31.2382]
+      },
+      "properties": {
+        "name": "The Bund",
+        "category": "park",
+        "subcategory": "waterfront",
+        "rating": 4.5,
+        "reviews": 76543,
+        "price_level": 1,
+        "open_hours": "24/7",
+        "phone": null,
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [121.4684, 31.2204]
+      },
+      "properties": {
+        "name": "Ultraviolet by Paul Pairet",
+        "category": "restaurant",
+        "subcategory": "fine_dining",
+        "rating": 4.9,
+        "reviews": 1234,
+        "price_level": 4,
+        "open_hours": "18:00-00:00",
+        "phone": "+86-21-6323-9898",
+        "website": "https://www.uvbypp.cc",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [121.5053, 31.2449]
+      },
+      "properties": {
+        "name": "Shanghai Pudong International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 4.2,
+        "reviews": 54321,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+86-21-9699-8999",
+        "website": "https://www.shanghaiairport.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [121.4580, 31.2127]
+      },
+      "properties": {
+        "name": "Huashan Hospital",
+        "category": "hospital",
+        "subcategory": "university",
+        "rating": 4.3,
+        "reviews": 3421,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+86-21-5288-8888",
+        "website": "https://www.huashan.org.cn",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-99.1332, 19.4326]
+      },
+      "properties": {
+        "name": "Pujol",
+        "category": "restaurant",
+        "subcategory": "mexican",
+        "rating": 4.8,
+        "reviews": 6543,
+        "price_level": 4,
+        "open_hours": "13:30-16:00,18:30-22:30",
+        "phone": "+52-55-5545-4111",
+        "website": "https://www.pujol.com.mx",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-99.1857, 19.4261]
+      },
+      "properties": {
+        "name": "Chapultepec Park",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.6,
+        "reviews": 54321,
+        "price_level": 1,
+        "open_hours": "05:00-19:00",
+        "phone": "+52-55-5553-6263",
+        "website": "https://www.chapultepec.df.gob.mx",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-99.1873, 19.4342]
+      },
+      "properties": {
+        "name": "National Museum of Anthropology",
+        "category": "museum",
+        "subcategory": "anthropology",
+        "rating": 4.8,
+        "reviews": 43210,
+        "price_level": 2,
+        "open_hours": "09:00-19:00",
+        "phone": "+52-55-5553-6266",
+        "website": "https://www.mna.inah.gob.mx",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-99.0721, 19.3987]
+      },
+      "properties": {
+        "name": "Benito Juárez International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.8,
+        "reviews": 87654,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+52-55-2482-2400",
+        "website": "https://www.aicm.com.mx",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-99.1559, 19.4285]
+      },
+      "properties": {
+        "name": "ABC Hospital",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.4,
+        "reviews": 2876,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+52-55-5230-8000",
+        "website": "https://www.abchospital.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-0.1278, 51.5074]
+      },
+      "properties": {
+        "name": "The Ledbury",
+        "category": "restaurant",
+        "subcategory": "fine_dining",
+        "rating": 4.7,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "12:00-14:00,18:30-21:30",
+        "phone": "+44-20-7792-9090",
+        "website": "https://www.theledbury.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-0.1189, 51.5007]
+      },
+      "properties": {
+        "name": "The Savoy",
+        "category": "hotel",
+        "subcategory": "luxury",
+        "rating": 4.8,
+        "reviews": 12543,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+44-20-7836-4343",
+        "website": "https://www.fairmont.com/savoy-london",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-0.1275, 51.5074]
+      },
+      "properties": {
+        "name": "British Museum",
+        "category": "museum",
+        "subcategory": "history",
+        "rating": 4.7,
+        "reviews": 165432,
+        "price_level": 1,
+        "open_hours": "10:00-17:00",
+        "phone": "+44-20-7323-8299",
+        "website": "https://www.britishmuseum.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-0.1469, 51.5014]
+      },
+      "properties": {
+        "name": "Hyde Park",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.6,
+        "reviews": 87654,
+        "price_level": 1,
+        "open_hours": "05:00-00:00",
+        "phone": "+44-30-0061-2000",
+        "website": "https://www.royalparks.org.uk/parks/hyde-park",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-0.4543, 51.4700]
+      },
+      "properties": {
+        "name": "Heathrow Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.9,
+        "reviews": 234567,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+44-844-335-1801",
+        "website": "https://www.heathrow.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.0060, 40.7128]
+      },
+      "properties": {
+        "name": "Le Bernardin",
+        "category": "restaurant",
+        "subcategory": "seafood",
+        "rating": 4.7,
+        "reviews": 8765,
+        "price_level": 4,
+        "open_hours": "12:00-14:30,17:15-22:30",
+        "phone": "+1-212-554-1515",
+        "website": "https://www.le-bernardin.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.9712, 40.7831]
+      },
+      "properties": {
+        "name": "The Metropolitan Museum of Art",
+        "category": "museum",
+        "subcategory": "art",
+        "rating": 4.8,
+        "reviews": 254321,
+        "price_level": 3,
+        "open_hours": "10:00-17:00",
+        "phone": "+1-212-535-7710",
+        "website": "https://www.metmuseum.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.9787, 40.7614]
+      },
+      "properties": {
+        "name": "Central Park",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.8,
+        "reviews": 543210,
+        "price_level": 1,
+        "open_hours": "06:00-01:00",
+        "phone": "+1-212-310-6600",
+        "website": "https://www.centralparknyc.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.9442, 40.6782]
+      },
+      "properties": {
+        "name": "Brooklyn Museum",
+        "category": "museum",
+        "subcategory": "art",
+        "rating": 4.6,
+        "reviews": 34521,
+        "price_level": 2,
+        "open_hours": "11:00-18:00",
+        "phone": "+1-718-638-5000",
+        "website": "https://www.brooklynmuseum.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.7781, 40.6413]
+      },
+      "properties": {
+        "name": "JFK International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.7,
+        "reviews": 345678,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+1-718-244-4444",
+        "website": "https://www.jfkairport.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [2.3522, 48.8566]
+      },
+      "properties": {
+        "name": "L'Arpège",
+        "category": "restaurant",
+        "subcategory": "vegetarian",
+        "rating": 4.6,
+        "reviews": 4321,
+        "price_level": 4,
+        "open_hours": "12:15-14:00,19:30-22:00",
+        "phone": "+33-1-4705-0906",
+        "website": "https://www.alain-passard.com",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [2.2945, 48.8584]
+      },
+      "properties": {
+        "name": "Eiffel Tower",
+        "category": "museum",
+        "subcategory": "landmark",
+        "rating": 4.6,
+        "reviews": 876543,
+        "price_level": 3,
+        "open_hours": "09:30-23:45",
+        "phone": "+33-892-70-12-39",
+        "website": "https://www.toureiffel.paris",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [2.3364, 48.8606]
+      },
+      "properties": {
+        "name": "Louvre Museum",
+        "category": "museum",
+        "subcategory": "art",
+        "rating": 4.7,
+        "reviews": 654321,
+        "price_level": 2,
+        "open_hours": "09:00-18:00",
+        "phone": "+33-1-4020-5317",
+        "website": "https://www.louvre.fr",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [2.3483, 48.8534]
+      },
+      "properties": {
+        "name": "Hôtel Plaza Athénée",
+        "category": "hotel",
+        "subcategory": "luxury",
+        "rating": 4.7,
+        "reviews": 9876,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+33-1-5367-6665",
+        "website": "https://www.dorchestercollection.com/paris",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [2.5479, 49.0097]
+      },
+      "properties": {
+        "name": "Charles de Gaulle Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.8,
+        "reviews": 456789,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+33-1-7036-3950",
+        "website": "https://www.parisaeroport.fr",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6173, 55.7558]
+      },
+      "properties": {
+        "name": "Белуга (Beluga)",
+        "category": "restaurant",
+        "subcategory": "russian",
+        "rating": 4.5,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "12:00-00:00",
+        "phone": "+7-495-645-3944",
+        "website": "https://www.ginza.ru/msk/restaurant/beluga",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6156, 55.7520]
+      },
+      "properties": {
+        "name": "Red Square",
+        "category": "park",
+        "subcategory": "plaza",
+        "rating": 4.8,
+        "reviews": 234567,
+        "price_level": 1,
+        "open_hours": "24/7",
+        "phone": null,
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6183, 55.7520]
+      },
+      "properties": {
+        "name": "State Historical Museum",
+        "category": "museum",
+        "subcategory": "history",
+        "rating": 4.7,
+        "reviews": 54321,
+        "price_level": 2,
+        "open_hours": "10:00-18:00",
+        "phone": "+7-495-692-4019",
+        "website": "https://www.shm.ru",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.6528, 55.7558]
+      },
+      "properties": {
+        "name": "Four Seasons Moscow",
+        "category": "hotel",
+        "subcategory": "luxury",
+        "rating": 4.8,
+        "reviews": 7654,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+7-495-531-5050",
+        "website": "https://www.fourseasons.com/moscow",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [37.4146, 55.9726]
+      },
+      "properties": {
+        "name": "Sheremetyevo Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.9,
+        "reviews": 123456,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+7-495-578-6565",
+        "website": "https://www.svo.aero",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [151.2093, -33.8688]
+      },
+      "properties": {
+        "name": "Quay",
+        "category": "restaurant",
+        "subcategory": "fine_dining",
+        "rating": 4.7,
+        "reviews": 5432,
+        "price_level": 4,
+        "open_hours": "12:00-14:30,18:00-22:00",
+        "phone": "+61-2-9251-5600",
+        "website": "https://www.quay.com.au",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [151.2153, -33.8568]
+      },
+      "properties": {
+        "name": "Sydney Opera House",
+        "category": "museum",
+        "subcategory": "performing_arts",
+        "rating": 4.8,
+        "reviews": 198765,
+        "price_level": 3,
+        "open_hours": "09:00-17:00",
+        "phone": "+61-2-9250-7111",
+        "website": "https://www.sydneyoperahouse.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [151.2099, -33.8523]
+      },
+      "properties": {
+        "name": "Royal Botanic Garden",
+        "category": "park",
+        "subcategory": "botanical_garden",
+        "rating": 4.7,
+        "reviews": 65432,
+        "price_level": 1,
+        "open_hours": "07:00-18:30",
+        "phone": "+61-2-9231-8111",
+        "website": "https://www.botanicgardens.org.au",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [151.1772, -33.9399]
+      },
+      "properties": {
+        "name": "Sydney Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.8,
+        "reviews": 234567,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+61-2-9667-9111",
+        "website": "https://www.sydneyairport.com.au",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [151.2120, -33.8785]
+      },
+      "properties": {
+        "name": "St Vincent's Hospital",
+        "category": "hospital",
+        "subcategory": "teaching",
+        "rating": 4.2,
+        "reviews": 4321,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+61-2-8382-1111",
+        "website": "https://www.svha.org.au",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-46.6333, -23.5505]
+      },
+      "properties": {
+        "name": "D.O.M.",
+        "category": "restaurant",
+        "subcategory": "brazilian",
+        "rating": 4.6,
+        "reviews": 4321,
+        "price_level": 4,
+        "open_hours": "12:00-15:00,19:00-00:00",
+        "phone": "+55-11-3088-0761",
+        "website": "https://www.domrestaurante.com.br",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-46.6565, -23.5613]
+      },
+      "properties": {
+        "name": "Ibirapuera Park",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.7,
+        "reviews": 123456,
+        "price_level": 1,
+        "open_hours": "05:00-00:00",
+        "phone": "+55-11-5574-5045",
+        "website": "https://www.parqueibirapuera.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-46.6394, -23.5475]
+      },
+      "properties": {
+        "name": "São Paulo Museum of Art",
+        "category": "museum",
+        "subcategory": "art",
+        "rating": 4.6,
+        "reviews": 87654,
+        "price_level": 2,
+        "open_hours": "10:00-18:00",
+        "phone": "+55-11-3149-5959",
+        "website": "https://www.masp.org.br",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-46.4778, -23.4356]
+      },
+      "properties": {
+        "name": "São Paulo/Guarulhos Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.7,
+        "reviews": 234567,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+55-11-2445-2945",
+        "website": "https://www.gru.com.br",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-46.6456, -23.5629]
+      },
+      "properties": {
+        "name": "Hospital Sírio-Libanês",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.5,
+        "reviews": 5432,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+55-11-3394-5000",
+        "website": "https://www.hospitalsiriolibanes.org.br",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.4241, -33.9249]
+      },
+      "properties": {
+        "name": "The Test Kitchen",
+        "category": "restaurant",
+        "subcategory": "fusion",
+        "rating": 4.7,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "12:00-14:30,18:30-22:30",
+        "phone": "+27-21-447-2337",
+        "website": "https://www.thetestkitchen.co.za",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.4233, -33.9258]
+      },
+      "properties": {
+        "name": "Table Mountain",
+        "category": "park",
+        "subcategory": "nature_reserve",
+        "rating": 4.8,
+        "reviews": 234567,
+        "price_level": 3,
+        "open_hours": "08:00-18:00",
+        "phone": "+27-21-424-8181",
+        "website": "https://www.tablemountain.net",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.4194, -33.9067]
+      },
+      "properties": {
+        "name": "V&A Waterfront",
+        "category": "shopping",
+        "subcategory": "mall",
+        "rating": 4.6,
+        "reviews": 123456,
+        "price_level": 3,
+        "open_hours": "09:00-21:00",
+        "phone": "+27-21-408-7600",
+        "website": "https://www.waterfront.co.za",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.6017, -33.9715]
+      },
+      "properties": {
+        "name": "Cape Town International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 4.0,
+        "reviews": 76543,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+27-21-937-1200",
+        "website": "https://www.airports.co.za",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.4610, -33.9356]
+      },
+      "properties": {
+        "name": "Groote Schuur Hospital",
+        "category": "hospital",
+        "subcategory": "teaching",
+        "rating": 3.9,
+        "reviews": 2341,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+27-21-404-9111",
+        "website": "https://www.westerncape.gov.za",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [31.2357, 30.0444]
+      },
+      "properties": {
+        "name": "Sequoia",
+        "category": "restaurant",
+        "subcategory": "mediterranean",
+        "rating": 4.4,
+        "reviews": 2341,
+        "price_level": 3,
+        "open_hours": "12:00-00:00",
+        "phone": "+20-2-3854-9222",
+        "website": "https://www.sequoiaegypt.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [31.1342, 29.9792]
+      },
+      "properties": {
+        "name": "Pyramids of Giza",
+        "category": "museum",
+        "subcategory": "archaeological",
+        "rating": 4.6,
+        "reviews": 543210,
+        "price_level": 2,
+        "open_hours": "08:00-17:00",
+        "phone": "+20-2-3383-8823",
+        "website": null,
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [31.2621, 30.0626]
+      },
+      "properties": {
+        "name": "Egyptian Museum",
+        "category": "museum",
+        "subcategory": "archaeology",
+        "rating": 4.5,
+        "reviews": 234567,
+        "price_level": 2,
+        "open_hours": "09:00-17:00",
+        "phone": "+20-2-2579-6974",
+        "website": "https://www.egyptianmuseum.gov.eg",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [31.2859, 30.1219]
+      },
+      "properties": {
+        "name": "Cairo International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.5,
+        "reviews": 123456,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+20-2-2265-5000",
+        "website": "https://www.cairo-airport.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [31.2357, 30.0594]
+      },
+      "properties": {
+        "name": "Al-Qasr Al-Aini Hospital",
+        "category": "hospital",
+        "subcategory": "university",
+        "rating": 3.7,
+        "reviews": 1234,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+20-2-2364-6301",
+        "website": null,
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [55.2708, 25.2048]
+      },
+      "properties": {
+        "name": "Zuma",
+        "category": "restaurant",
+        "subcategory": "japanese",
+        "rating": 4.6,
+        "reviews": 5432,
+        "price_level": 4,
+        "open_hours": "12:00-15:00,18:00-23:00",
+        "phone": "+971-4-425-5660",
+        "website": "https://www.zumarestaurant.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [55.2744, 25.1972]
+      },
+      "properties": {
+        "name": "Burj Khalifa",
+        "category": "museum",
+        "subcategory": "observation",
+        "rating": 4.7,
+        "reviews": 345678,
+        "price_level": 3,
+        "open_hours": "08:30-23:00",
+        "phone": "+971-4-888-8888",
+        "website": "https://www.burjkhalifa.ae",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [55.1413, 25.0943]
+      },
+      "properties": {
+        "name": "Dubai Mall",
+        "category": "shopping",
+        "subcategory": "mall",
+        "rating": 4.7,
+        "reviews": 234567,
+        "price_level": 3,
+        "open_hours": "10:00-00:00",
+        "phone": "+971-4-362-7500",
+        "website": "https://www.thedubaimall.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [55.3644, 25.2532]
+      },
+      "properties": {
+        "name": "Dubai International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 4.2,
+        "reviews": 456789,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+971-4-224-5555",
+        "website": "https://www.dubaiairports.ae",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [55.3170, 25.2677]
+      },
+      "properties": {
+        "name": "American Hospital Dubai",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.3,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+971-4-336-7777",
+        "website": "https://www.ahdubai.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [103.8198, 1.3521]
+      },
+      "properties": {
+        "name": "Odette",
+        "category": "restaurant",
+        "subcategory": "french",
+        "rating": 4.7,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "12:00-14:30,18:30-22:30",
+        "phone": "+65-6385-0498",
+        "website": "https://www.odetterestaurant.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [103.8630, 1.2838]
+      },
+      "properties": {
+        "name": "Gardens by the Bay",
+        "category": "park",
+        "subcategory": "nature_park",
+        "rating": 4.7,
+        "reviews": 234567,
+        "price_level": 2,
+        "open_hours": "05:00-02:00",
+        "phone": "+65-6420-6848",
+        "website": "https://www.gardensbythebay.com.sg",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [103.8198, 1.2897]
+      },
+      "properties": {
+        "name": "Marina Bay Sands",
+        "category": "hotel",
+        "subcategory": "resort",
+        "rating": 4.5,
+        "reviews": 123456,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+65-6688-8868",
+        "website": "https://www.marinabaysands.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [103.9915, 1.3644]
+      },
+      "properties": {
+        "name": "Changi Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 4.8,
+        "reviews": 876543,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+65-6595-6868",
+        "website": "https://www.changiairport.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [103.8352, 1.2789]
+      },
+      "properties": {
+        "name": "Singapore General Hospital",
+        "category": "hospital",
+        "subcategory": "public",
+        "rating": 4.2,
+        "reviews": 4321,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+65-6222-3322",
+        "website": "https://www.sgh.com.sg",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [100.5018, 13.7563]
+      },
+      "properties": {
+        "name": "Gaggan Anand",
+        "category": "restaurant",
+        "subcategory": "progressive_indian",
+        "rating": 4.8,
+        "reviews": 6543,
+        "price_level": 4,
+        "open_hours": "18:00-00:00",
+        "phone": "+66-2-652-1700",
+        "website": "https://www.gaggan.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [100.4912, 13.7469]
+      },
+      "properties": {
+        "name": "Grand Palace",
+        "category": "museum",
+        "subcategory": "historical_site",
+        "rating": 4.6,
+        "reviews": 345678,
+        "price_level": 2,
+        "open_hours": "08:30-15:30",
+        "phone": "+66-2-623-5500",
+        "website": null,
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [100.5437, 13.7367]
+      },
+      "properties": {
+        "name": "Lumphini Park",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.5,
+        "reviews": 43210,
+        "price_level": 1,
+        "open_hours": "04:30-21:00",
+        "phone": "+66-2-252-7006",
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [100.7501, 13.6900]
+      },
+      "properties": {
+        "name": "Suvarnabhumi Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 4.0,
+        "reviews": 234567,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+66-2-132-1888",
+        "website": "https://www.suvarnabhumiairport.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [100.5299, 13.7462]
+      },
+      "properties": {
+        "name": "Bumrungrad Hospital",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.5,
+        "reviews": 7654,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+66-2-066-8888",
+        "website": "https://www.bumrungrad.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.8456, -6.2088]
+      },
+      "properties": {
+        "name": "AMUZ Gourmet",
+        "category": "restaurant",
+        "subcategory": "french",
+        "rating": 4.5,
+        "reviews": 2341,
+        "price_level": 4,
+        "open_hours": "12:00-14:30,18:00-22:30",
+        "phone": "+62-21-2553-5705",
+        "website": "https://www.amuzgourmet.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.8270, -6.1751]
+      },
+      "properties": {
+        "name": "National Monument",
+        "category": "museum",
+        "subcategory": "memorial",
+        "rating": 4.3,
+        "reviews": 123456,
+        "price_level": 1,
+        "open_hours": "08:00-22:00",
+        "phone": "+62-21-382-0325",
+        "website": null,
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.7942, -6.1229]
+      },
+      "properties": {
+        "name": "Ancol Beach",
+        "category": "park",
+        "subcategory": "beach",
+        "rating": 4.1,
+        "reviews": 54321,
+        "price_level": 2,
+        "open_hours": "06:00-18:00",
+        "phone": "+62-21-640-0002",
+        "website": "https://www.ancol.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.6558, -6.1256]
+      },
+      "properties": {
+        "name": "Soekarno-Hatta Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.8,
+        "reviews": 234567,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+62-21-550-5179",
+        "website": "https://www.soekarnohatta-airport.co.id",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.8317, -6.2615]
+      },
+      "properties": {
+        "name": "Siloam Hospitals",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.2,
+        "reviews": 3421,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+62-21-750-0088",
+        "website": "https://www.siloamhospitals.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9780, 37.5665]
+      },
+      "properties": {
+        "name": "Jungsik",
+        "category": "restaurant",
+        "subcategory": "korean_fine_dining",
+        "rating": 4.6,
+        "reviews": 4321,
+        "price_level": 4,
+        "open_hours": "12:00-14:30,18:00-22:00",
+        "phone": "+82-2-517-4654",
+        "website": "https://www.jungsik.kr",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9770, 37.5797]
+      },
+      "properties": {
+        "name": "Gyeongbokgung Palace",
+        "category": "museum",
+        "subcategory": "historical_site",
+        "rating": 4.6,
+        "reviews": 234567,
+        "price_level": 1,
+        "open_hours": "09:00-18:00",
+        "phone": "+82-2-3700-3900",
+        "website": "https://www.royalpalace.go.kr",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0051, 37.5119]
+      },
+      "properties": {
+        "name": "Lotte World Tower",
+        "category": "museum",
+        "subcategory": "observation",
+        "rating": 4.5,
+        "reviews": 87654,
+        "price_level": 3,
+        "open_hours": "10:30-22:00",
+        "phone": "+82-1661-2000",
+        "website": "https://www.lwt.co.kr",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.4506, 37.4691]
+      },
+      "properties": {
+        "name": "Incheon International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 4.7,
+        "reviews": 543210,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+82-1577-2600",
+        "website": "https://www.airport.kr",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0854, 37.5048]
+      },
+      "properties": {
+        "name": "Samsung Medical Center",
+        "category": "hospital",
+        "subcategory": "university",
+        "rating": 4.4,
+        "reviews": 5432,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+82-2-3410-2114",
+        "website": "https://www.samsunghospital.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-118.2437, 34.0522]
+      },
+      "properties": {
+        "name": "Providence",
+        "category": "restaurant",
+        "subcategory": "seafood",
+        "rating": 4.7,
+        "reviews": 4321,
+        "price_level": 4,
+        "open_hours": "18:00-22:00",
+        "phone": "+1-323-460-4170",
+        "website": "https://www.providencela.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-118.4912, 34.0195]
+      },
+      "properties": {
+        "name": "Getty Center",
+        "category": "museum",
+        "subcategory": "art",
+        "rating": 4.7,
+        "reviews": 123456,
+        "price_level": 1,
+        "open_hours": "10:00-17:30",
+        "phone": "+1-310-440-7300",
+        "website": "https://www.getty.edu",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-118.3009, 34.1184]
+      },
+      "properties": {
+        "name": "Griffith Observatory",
+        "category": "museum",
+        "subcategory": "observatory",
+        "rating": 4.7,
+        "reviews": 234567,
+        "price_level": 1,
+        "open_hours": "12:00-22:00",
+        "phone": "+1-213-473-0800",
+        "website": "https://www.griffithobservatory.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-118.4085, 33.9425]
+      },
+      "properties": {
+        "name": "Los Angeles International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.6,
+        "reviews": 456789,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+1-855-463-5252",
+        "website": "https://www.flylax.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-118.2453, 34.0689]
+      },
+      "properties": {
+        "name": "Cedars-Sinai Medical Center",
+        "category": "hospital",
+        "subcategory": "teaching",
+        "rating": 4.3,
+        "reviews": 7654,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+1-310-423-3277",
+        "website": "https://www.cedars-sinai.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-87.6298, 41.8781]
+      },
+      "properties": {
+        "name": "Alinea",
+        "category": "restaurant",
+        "subcategory": "molecular_gastronomy",
+        "rating": 4.9,
+        "reviews": 5432,
+        "price_level": 4,
+        "open_hours": "17:00-21:00",
+        "phone": "+1-312-867-0110",
+        "website": "https://www.alinearestaurant.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-87.6243, 41.8796]
+      },
+      "properties": {
+        "name": "Art Institute of Chicago",
+        "category": "museum",
+        "subcategory": "art",
+        "rating": 4.8,
+        "reviews": 234567,
+        "price_level": 3,
+        "open_hours": "10:30-17:00",
+        "phone": "+1-312-443-3600",
+        "website": "https://www.artic.edu",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-87.6278, 41.8827]
+      },
+      "properties": {
+        "name": "Millennium Park",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.7,
+        "reviews": 345678,
+        "price_level": 1,
+        "open_hours": "06:00-23:00",
+        "phone": "+1-312-742-1168",
+        "website": "https://www.millenniumpark.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-87.9073, 41.9742]
+      },
+      "properties": {
+        "name": "O'Hare International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.7,
+        "reviews": 543210,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+1-800-832-6352",
+        "website": "https://www.flychicago.com/ohare",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-87.6119, 41.8955]
+      },
+      "properties": {
+        "name": "Northwestern Memorial Hospital",
+        "category": "hospital",
+        "subcategory": "teaching",
+        "rating": 4.4,
+        "reviews": 6543,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+1-312-926-2000",
+        "website": "https://www.nm.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-79.3832, 43.6532]
+      },
+      "properties": {
+        "name": "Alo Restaurant",
+        "category": "restaurant",
+        "subcategory": "french",
+        "rating": 4.8,
+        "reviews": 4321,
+        "price_level": 4,
+        "open_hours": "17:30-22:00",
+        "phone": "+1-416-260-2222",
+        "website": "https://www.alorestaurant.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-79.3957, 43.6426]
+      },
+      "properties": {
+        "name": "CN Tower",
+        "category": "museum",
+        "subcategory": "observation",
+        "rating": 4.5,
+        "reviews": 234567,
+        "price_level": 3,
+        "open_hours": "09:00-22:30",
+        "phone": "+1-416-868-6937",
+        "website": "https://www.cntower.ca",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-79.3949, 43.6677]
+      },
+      "properties": {
+        "name": "Royal Ontario Museum",
+        "category": "museum",
+        "subcategory": "natural_history",
+        "rating": 4.6,
+        "reviews": 123456,
+        "price_level": 2,
+        "open_hours": "10:00-17:30",
+        "phone": "+1-416-586-8000",
+        "website": "https://www.rom.on.ca",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-79.6306, 43.6772]
+      },
+      "properties": {
+        "name": "Toronto Pearson Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.8,
+        "reviews": 345678,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+1-416-247-7678",
+        "website": "https://www.torontopearson.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-79.3882, 43.6566]
+      },
+      "properties": {
+        "name": "Toronto General Hospital",
+        "category": "hospital",
+        "subcategory": "teaching",
+        "rating": 4.3,
+        "reviews": 5432,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+1-416-340-4800",
+        "website": "https://www.uhn.ca/TorontoGeneral",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [12.4964, 41.9028]
+      },
+      "properties": {
+        "name": "La Pergola",
+        "category": "restaurant",
+        "subcategory": "italian_fine_dining",
+        "rating": 4.8,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "19:30-23:00",
+        "phone": "+39-06-3509-2152",
+        "website": "https://www.romecavalieri.com/la-pergola",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [12.4922, 41.8902]
+      },
+      "properties": {
+        "name": "Colosseum",
+        "category": "museum",
+        "subcategory": "historical_site",
+        "rating": 4.6,
+        "reviews": 654321,
+        "price_level": 2,
+        "open_hours": "08:30-19:15",
+        "phone": "+39-06-3996-7700",
+        "website": "https://www.parcocolosseo.it",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [12.4534, 41.9009]
+      },
+      "properties": {
+        "name": "Vatican Museums",
+        "category": "museum",
+        "subcategory": "art_religious",
+        "rating": 4.7,
+        "reviews": 543210,
+        "price_level": 3,
+        "open_hours": "09:00-18:00",
+        "phone": "+39-06-6988-4676",
+        "website": "https://www.museivaticani.va",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [12.2389, 41.8003]
+      },
+      "properties": {
+        "name": "Fiumicino Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.7,
+        "reviews": 234567,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+39-06-65951",
+        "website": "https://www.adr.it/fiumicino",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [12.5113, 41.9028]
+      },
+      "properties": {
+        "name": "Policlinico Umberto I",
+        "category": "hospital",
+        "subcategory": "university",
+        "rating": 3.8,
+        "reviews": 2341,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+39-06-4997-1",
+        "website": "https://www.policlinicoumberto1.it",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.4050, 52.5200]
+      },
+      "properties": {
+        "name": "Nobelhart & Schmutzig",
+        "category": "restaurant",
+        "subcategory": "german_contemporary",
+        "rating": 4.6,
+        "reviews": 2341,
+        "price_level": 4,
+        "open_hours": "18:30-22:00",
+        "phone": "+49-30-2594-0610",
+        "website": "https://www.nobelhartundschmutzig.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.3777, 52.5163]
+      },
+      "properties": {
+        "name": "Brandenburg Gate",
+        "category": "museum",
+        "subcategory": "historical_site",
+        "rating": 4.6,
+        "reviews": 234567,
+        "price_level": 1,
+        "open_hours": "24/7",
+        "phone": null,
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.3978, 52.5163]
+      },
+      "properties": {
+        "name": "Museum Island",
+        "category": "museum",
+        "subcategory": "art_history",
+        "rating": 4.7,
+        "reviews": 123456,
+        "price_level": 2,
+        "open_hours": "10:00-18:00",
+        "phone": "+49-30-266-42-42-42",
+        "website": "https://www.museumsinsel-berlin.de",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.5033, 52.3667]
+      },
+      "properties": {
+        "name": "Berlin Brandenburg Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.6,
+        "reviews": 123456,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+49-30-609-11-50",
+        "website": "https://www.berlin-airport.de",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [13.3762, 52.5310]
+      },
+      "properties": {
+        "name": "Charité Hospital",
+        "category": "hospital",
+        "subcategory": "university",
+        "rating": 4.2,
+        "reviews": 3421,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+49-30-450-50",
+        "website": "https://www.charite.de",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-3.7038, 40.4168]
+      },
+      "properties": {
+        "name": "DiverXO",
+        "category": "restaurant",
+        "subcategory": "avant_garde",
+        "rating": 4.7,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "13:30-15:00,20:30-22:30",
+        "phone": "+34-915-70-07-66",
+        "website": "https://www.diverxo.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-3.7133, 40.4150]
+      },
+      "properties": {
+        "name": "Prado Museum",
+        "category": "museum",
+        "subcategory": "art",
+        "rating": 4.7,
+        "reviews": 234567,
+        "price_level": 2,
+        "open_hours": "10:00-20:00",
+        "phone": "+34-913-30-28-00",
+        "website": "https://www.museodelprado.es",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-3.6836, 40.4192]
+      },
+      "properties": {
+        "name": "Retiro Park",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.7,
+        "reviews": 123456,
+        "price_level": 1,
+        "open_hours": "06:00-00:00",
+        "phone": "+34-914-00-87-40",
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-3.5673, 40.4719]
+      },
+      "properties": {
+        "name": "Adolfo Suárez Madrid-Barajas Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.8,
+        "reviews": 234567,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+34-913-21-10-00",
+        "website": "https://www.aena.es",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-3.7075, 40.4521]
+      },
+      "properties": {
+        "name": "Hospital Universitario La Paz",
+        "category": "hospital",
+        "subcategory": "university",
+        "rating": 4.0,
+        "reviews": 2341,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+34-917-27-70-00",
+        "website": "https://www.madrid.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [174.7633, -36.8485]
+      },
+      "properties": {
+        "name": "The French Café",
+        "category": "restaurant",
+        "subcategory": "french",
+        "rating": 4.6,
+        "reviews": 1234,
+        "price_level": 4,
+        "open_hours": "12:00-14:30,18:00-22:00",
+        "phone": "+64-9-377-1911",
+        "website": "https://www.thefrenchcafe.co.nz",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [174.7633, -36.8406]
+      },
+      "properties": {
+        "name": "Sky Tower",
+        "category": "museum",
+        "subcategory": "observation",
+        "rating": 4.4,
+        "reviews": 54321,
+        "price_level": 3,
+        "open_hours": "08:30-22:30",
+        "phone": "+64-9-363-6000",
+        "website": "https://www.skycityauckland.co.nz",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [174.7833, -36.8485]
+      },
+      "properties": {
+        "name": "Auckland Domain",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.6,
+        "reviews": 34210,
+        "price_level": 1,
+        "open_hours": "24/7",
+        "phone": "+64-9-301-0101",
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [174.7850, -37.0082]
+      },
+      "properties": {
+        "name": "Auckland Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 4.1,
+        "reviews": 87654,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+64-9-275-0789",
+        "website": "https://www.aucklandairport.co.nz",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [174.7693, -36.8598]
+      },
+      "properties": {
+        "name": "Auckland City Hospital",
+        "category": "hospital",
+        "subcategory": "public",
+        "rating": 4.0,
+        "reviews": 2341,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+64-9-367-0000",
+        "website": "https://www.adhb.health.nz",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-58.3816, -34.6037]
+      },
+      "properties": {
+        "name": "Don Julio",
+        "category": "restaurant",
+        "subcategory": "steakhouse",
+        "rating": 4.8,
+        "reviews": 6543,
+        "price_level": 3,
+        "open_hours": "12:00-16:00,19:00-01:00",
+        "phone": "+54-11-4831-9564",
+        "website": "https://www.parrilladonjulio.com",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-58.3736, -34.6037]
+      },
+      "properties": {
+        "name": "Teatro Colón",
+        "category": "museum",
+        "subcategory": "performing_arts",
+        "rating": 4.8,
+        "reviews": 43210,
+        "price_level": 2,
+        "open_hours": "09:00-17:00",
+        "phone": "+54-11-4378-7100",
+        "website": "https://www.teatrocolon.org.ar",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-58.4173, -34.5797]
+      },
+      "properties": {
+        "name": "Parque 3 de Febrero",
+        "category": "park",
+        "subcategory": "urban_park",
+        "rating": 4.6,
+        "reviews": 54321,
+        "price_level": 1,
+        "open_hours": "24/7",
+        "phone": null,
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-58.5358, -34.8222]
+      },
+      "properties": {
+        "name": "Ezeiza International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.5,
+        "reviews": 123456,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+54-11-5480-6111",
+        "website": "https://www.aa2000.com.ar",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-58.3952, -34.6091]
+      },
+      "properties": {
+        "name": "Hospital Alemán",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.3,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+54-11-4827-7000",
+        "website": "https://www.hospitalaleman.org.ar",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-70.6693, -33.4489]
+      },
+      "properties": {
+        "name": "Boragó",
+        "category": "restaurant",
+        "subcategory": "chilean_fine_dining",
+        "rating": 4.7,
+        "reviews": 2341,
+        "price_level": 4,
+        "open_hours": "19:30-00:00",
+        "phone": "+56-2-2953-8893",
+        "website": "https://www.borago.cl",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-70.6483, -33.4569]
+      },
+      "properties": {
+        "name": "Cerro San Cristóbal",
+        "category": "park",
+        "subcategory": "nature_park",
+        "rating": 4.6,
+        "reviews": 87654,
+        "price_level": 2,
+        "open_hours": "08:30-20:00",
+        "phone": "+56-2-2730-1331",
+        "website": null,
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-70.7929, -33.3930]
+      },
+      "properties": {
+        "name": "Santiago International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 4.0,
+        "reviews": 123456,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+56-2-2690-1752",
+        "website": "https://www.nuevopudahuel.cl",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-70.6104, -33.4195]
+      },
+      "properties": {
+        "name": "Clínica Alemana",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.4,
+        "reviews": 4321,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+56-2-2210-1111",
+        "website": "https://www.alemana.cl",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8583, 21.3099]
+      },
+      "properties": {
+        "name": "La Mer at Halekulani",
+        "category": "restaurant",
+        "subcategory": "french_hawaiian",
+        "rating": 4.7,
+        "reviews": 2341,
+        "price_level": 4,
+        "open_hours": "17:30-21:00",
+        "phone": "+1-808-923-2311",
+        "website": "https://www.halekulani.com/dining/la-mer",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.9249, 21.4389]
+      },
+      "properties": {
+        "name": "Pearl Harbor",
+        "category": "museum",
+        "subcategory": "historical_site",
+        "rating": 4.8,
+        "reviews": 234567,
+        "price_level": 1,
+        "open_hours": "07:00-17:00",
+        "phone": "+1-808-422-3399",
+        "website": "https://www.nps.gov/valr",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8167, 21.2777]
+      },
+      "properties": {
+        "name": "Diamond Head",
+        "category": "park",
+        "subcategory": "nature_reserve",
+        "rating": 4.6,
+        "reviews": 123456,
+        "price_level": 1,
+        "open_hours": "06:00-18:00",
+        "phone": "+1-808-587-0300",
+        "website": "https://www.dlnr.hawaii.gov",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.9249, 21.3187]
+      },
+      "properties": {
+        "name": "Daniel K. Inouye International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.9,
+        "reviews": 123456,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+1-808-836-6411",
+        "website": "https://www.airports.hawaii.gov",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-157.8476, 21.3294]
+      },
+      "properties": {
+        "name": "The Queen's Medical Center",
+        "category": "hospital",
+        "subcategory": "teaching",
+        "rating": 4.1,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+1-808-538-9011",
+        "website": "https://www.queens.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [28.0473, -26.2041]
+      },
+      "properties": {
+        "name": "The Saxon Hotel",
+        "category": "hotel",
+        "subcategory": "luxury",
+        "rating": 4.8,
+        "reviews": 3421,
+        "price_level": 4,
+        "open_hours": "24/7",
+        "phone": "+27-11-292-6000",
+        "website": "https://www.saxon.co.za",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [28.0436, -26.2023]
+      },
+      "properties": {
+        "name": "Apartheid Museum",
+        "category": "museum",
+        "subcategory": "history",
+        "rating": 4.7,
+        "reviews": 43210,
+        "price_level": 2,
+        "open_hours": "09:00-17:00",
+        "phone": "+27-11-309-4700",
+        "website": "https://www.apartheidmuseum.org",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [28.2459, -25.7313]
+      },
+      "properties": {
+        "name": "O.R. Tambo International Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 3.8,
+        "reviews": 234567,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+27-11-921-6262",
+        "website": "https://www.airports.co.za",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [28.1297, -26.1808]
+      },
+      "properties": {
+        "name": "Netcare Milpark Hospital",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.2,
+        "reviews": 2341,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+27-11-480-5600",
+        "website": "https://www.netcare.co.za",
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [3.3792, 6.5244]
+      },
+      "properties": {
+        "name": "Nok by Alara",
+        "category": "restaurant",
+        "subcategory": "nigerian_contemporary",
+        "rating": 4.5,
+        "reviews": 1234,
+        "price_level": 3,
+        "open_hours": "12:00-22:00",
+        "phone": "+234-1-461-1111",
+        "website": null,
+        "wheelchair_accessible": true
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [3.3958, 6.4550]
+      },
+      "properties": {
+        "name": "Lekki Conservation Centre",
+        "category": "park",
+        "subcategory": "nature_reserve",
+        "rating": 4.3,
+        "reviews": 12345,
+        "price_level": 2,
+        "open_hours": "08:30-18:00",
+        "phone": "+234-1-295-2138",
+        "website": "https://www.ncfnigeria.org",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [3.3211, 6.5774]
+      },
+      "properties": {
+        "name": "Murtala Muhammed Airport",
+        "category": "airport",
+        "subcategory": "international",
+        "rating": 2.9,
+        "reviews": 54321,
+        "price_level": 2,
+        "open_hours": "24/7",
+        "phone": "+234-1-279-3600",
+        "website": "https://www.faan.gov.ng",
+        "wheelchair_accessible": false
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [3.3671, 6.4665]
+      },
+      "properties": {
+        "name": "Eko Hospital",
+        "category": "hospital",
+        "subcategory": "private",
+        "rating": 4.0,
+        "reviews": 1234,
+        "price_level": 3,
+        "open_hours": "24/7",
+        "phone": "+234-1-271-0627",
+        "website": "https://www.ekohospital.com",
+        "wheelchair_accessible": true
+      }
+    }
+  ]
+}

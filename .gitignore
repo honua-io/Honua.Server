@@ -1,0 +1,103 @@
+# Build artifacts
+bin/
+obj/
+**/bin/
+**/obj/
+
+# VS build
+*.user
+*.rsuser
+*.suo
+*.cache
+*.pdb
+*.mdb
+*.dbmdl
+*.opendb
+*.ldf
+*.mdf
+
+# Visual Studio
+.vs/
+*.VC.db
+*.VC.VC.opendb
+
+# Visual Studio Code
+.vscode/
+.history/
+
+# Rider
+.idea/
+*.sln.iml
+
+# NuGet
+*.nupkg
+packages/
+.nuget/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Logs
+*.log
+
+# Coverage / test results
+TestResults/
+TestResults*/
+*.coverage
+*.coveragexml
+
+# Publish
+publish/
+**/PublishProfiles/
+
+# Misc
+_ReSharper*/
+*.orig
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# Keep marketing content tracked
+!marketing/**
+data/auth/
+
+**/data/auth/
+src/Honua.Server.Host/data/
+tests/python/.venv/
+tests/python/__pycache__/
+
+# Secrets and credentials - NEVER commit these files
+*.secrets.json
+*secrets*.json
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.template
+*.pfx
+*.p12
+*.key
+*.pem
+credentials.*
+*credentials*.json
+!credentials.example.json
+appsettings.Development.json
+appsettings.*.Development.json
+appsettings.Local.json
+appsettings.Production.json
+!appsettings.Production.Security.json
+!appsettings.Example.json
+
+# Cloud provider credentials
+.aws/credentials
+.azure/credentials
+gcp-key.json
+service-account*.json
+!service-account.example.json
+
+# SSH keys
+id_rsa
+id_rsa.pub
+*.ppk

@@ -1,0 +1,131 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: honua-server
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-server
+    app.kubernetes.io/instance: honua
+    app.kubernetes.io/component: monitoring
+    environment: production
+    prometheus: main
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: honua-server
+      app.kubernetes.io/instance: honua
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    scheme: http
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+    - sourceLabels: [__meta_kubernetes_pod_node_name]
+      targetLabel: node
+    - sourceLabels: [__meta_kubernetes_namespace]
+      targetLabel: namespace
+  namespaceSelector:
+    matchNames:
+    - honua
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: honua-server-alerts
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-server
+    app.kubernetes.io/instance: honua
+    app.kubernetes.io/component: alerting
+    environment: production
+    prometheus: main
+spec:
+  groups:
+  - name: honua-server
+    interval: 30s
+    rules:
+    # High Error Rate
+    - alert: HonuaHighErrorRate
+      expr: |
+        (sum(rate(http_requests_total{job="honua-server",status=~"5.."}[5m])) by (namespace, pod)
+        /
+        sum(rate(http_requests_total{job="honua-server"}[5m])) by (namespace, pod))
+        > 0.05
+      for: 5m
+      labels:
+        severity: warning
+        component: honua-server
+      annotations:
+        summary: "High error rate detected for Honua server"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has error rate of {{ $value | humanizePercentage }}"
+
+    # High Response Time
+    - alert: HonuaHighResponseTime
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(http_request_duration_seconds_bucket{job="honua-server"}[5m])) by (le, namespace, pod)
+        ) > 2
+      for: 5m
+      labels:
+        severity: warning
+        component: honua-server
+      annotations:
+        summary: "High response time detected for Honua server"
+        description: "Pod {{ $labels.pod }} has P95 response time of {{ $value }}s"
+
+    # Pod Down
+    - alert: HonuaPodDown
+      expr: |
+        kube_deployment_status_replicas_available{deployment="honua-server"} < 2
+      for: 5m
+      labels:
+        severity: critical
+        component: honua-server
+      annotations:
+        summary: "Honua server has insufficient replicas"
+        description: "Only {{ $value }} replicas are available (minimum: 2)"
+
+    # High Memory Usage
+    - alert: HonuaHighMemoryUsage
+      expr: |
+        (container_memory_usage_bytes{pod=~"honua-server-.*"}
+        /
+        container_spec_memory_limit_bytes{pod=~"honua-server-.*"})
+        > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        component: honua-server
+      annotations:
+        summary: "High memory usage detected for Honua server"
+        description: "Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of memory limit"
+
+    # High CPU Usage
+    - alert: HonuaHighCPUUsage
+      expr: |
+        (rate(container_cpu_usage_seconds_total{pod=~"honua-server-.*"}[5m])
+        /
+        container_spec_cpu_quota{pod=~"honua-server-.*"} * 100000)
+        > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        component: honua-server
+      annotations:
+        summary: "High CPU usage detected for Honua server"
+        description: "Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of CPU limit"
+
+    # Pod Restart Loop
+    - alert: HonuaPodRestartLoop
+      expr: |
+        rate(kube_pod_container_status_restarts_total{pod=~"honua-server-.*"}[15m]) > 0.1
+      for: 5m
+      labels:
+        severity: critical
+        component: honua-server
+      annotations:
+        summary: "Honua server pod is in restart loop"
+        description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes"

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Exception Messages -->
+  <data name="FeatureNotFound" xml:space="preserve">
+    <value>Feature '{0}' was not found.</value>
+    <comment>Error message when a feature is not found. {0} is the feature ID.</comment>
+  </data>
+  <data name="FeatureNotFoundInLayer" xml:space="preserve">
+    <value>Feature '{0}' was not found in layer '{1}'.</value>
+    <comment>Error message when a feature is not found in a specific layer. {0} is feature ID, {1} is layer ID.</comment>
+  </data>
+  <data name="LayerNotFound" xml:space="preserve">
+    <value>The requested layer was not found.</value>
+    <comment>Error message when a layer is not found.</comment>
+  </data>
+  <data name="LayerNotFoundWithId" xml:space="preserve">
+    <value>Layer '{0}' was not found.</value>
+    <comment>Error message when a specific layer is not found. {0} is the layer ID.</comment>
+  </data>
+  <data name="CollectionNotFound" xml:space="preserve">
+    <value>Collection '{0}' was not found.</value>
+    <comment>Error message when a collection is not found. {0} is the collection ID.</comment>
+  </data>
+  <data name="ServiceUnavailable" xml:space="preserve">
+    <value>The service is temporarily unavailable. Please try again later.</value>
+    <comment>Error message when the service is unavailable.</comment>
+  </data>
+  <data name="InvalidParameters" xml:space="preserve">
+    <value>The request contains invalid parameters.</value>
+    <comment>Error message for invalid request parameters.</comment>
+  </data>
+  <data name="InvalidGeometry" xml:space="preserve">
+    <value>The geometry provided is invalid.</value>
+    <comment>Error message for invalid geometry.</comment>
+  </data>
+  <data name="InvalidBoundingBox" xml:space="preserve">
+    <value>The bounding box '{0}' is invalid.</value>
+    <comment>Error message for invalid bounding box. {0} is the bounding box value.</comment>
+  </data>
+  <data name="InvalidCrs" xml:space="preserve">
+    <value>The coordinate reference system '{0}' is not supported.</value>
+    <comment>Error message for unsupported CRS. {0} is the CRS identifier.</comment>
+  </data>
+  <data name="InvalidFormat" xml:space="preserve">
+    <value>The format '{0}' is not supported.</value>
+    <comment>Error message for unsupported format. {0} is the format name.</comment>
+  </data>
+  <data name="DataStoreError" xml:space="preserve">
+    <value>An error occurred while accessing the data store.</value>
+    <comment>Error message for data store errors.</comment>
+  </data>
+  <data name="CacheError" xml:space="preserve">
+    <value>An error occurred while accessing the cache.</value>
+    <comment>Error message for cache errors.</comment>
+  </data>
+  <data name="MetadataError" xml:space="preserve">
+    <value>An error occurred while accessing metadata.</value>
+    <comment>Error message for metadata errors.</comment>
+  </data>
+  <data name="QueryError" xml:space="preserve">
+    <value>An error occurred while executing the query.</value>
+    <comment>Error message for query execution errors.</comment>
+  </data>
+  <data name="RasterError" xml:space="preserve">
+    <value>An error occurred while processing raster data.</value>
+    <comment>Error message for raster processing errors.</comment>
+  </data>
+  <data name="SerializationError" xml:space="preserve">
+    <value>An error occurred while serializing the response.</value>
+    <comment>Error message for serialization errors.</comment>
+  </data>
+  <data name="UnauthorizedAccess" xml:space="preserve">
+    <value>You do not have permission to access this resource.</value>
+    <comment>Error message for unauthorized access.</comment>
+  </data>
+  <data name="Forbidden" xml:space="preserve">
+    <value>Access to this resource is forbidden.</value>
+    <comment>Error message for forbidden access.</comment>
+  </data>
+  <data name="TooManyRequests" xml:space="preserve">
+    <value>Too many requests. Please try again later.</value>
+    <comment>Error message for rate limiting.</comment>
+  </data>
+  <data name="InternalServerError" xml:space="preserve">
+    <value>An internal server error occurred.</value>
+    <comment>Generic internal server error message.</comment>
+  </data>
+  <data name="NotImplemented" xml:space="preserve">
+    <value>This feature is not implemented.</value>
+    <comment>Error message for not implemented features.</comment>
+  </data>
+  <data name="BadRequest" xml:space="preserve">
+    <value>The request is malformed or invalid.</value>
+    <comment>Error message for bad requests.</comment>
+  </data>
+  <data name="MethodNotAllowed" xml:space="preserve">
+    <value>The HTTP method '{0}' is not allowed for this resource.</value>
+    <comment>Error message for method not allowed. {0} is the HTTP method.</comment>
+  </data>
+  <data name="UnsupportedMediaType" xml:space="preserve">
+    <value>The media type '{0}' is not supported.</value>
+    <comment>Error message for unsupported media type. {0} is the media type.</comment>
+  </data>
+  <data name="ConflictError" xml:space="preserve">
+    <value>The request conflicts with the current state of the resource.</value>
+    <comment>Error message for conflict errors.</comment>
+  </data>
+  <data name="GoneError" xml:space="preserve">
+    <value>The requested resource is no longer available.</value>
+    <comment>Error message for resources that are gone.</comment>
+  </data>
+  <data name="PreconditionFailed" xml:space="preserve">
+    <value>Precondition failed for this request.</value>
+    <comment>Error message for failed preconditions.</comment>
+  </data>
+  <data name="PayloadTooLarge" xml:space="preserve">
+    <value>The request payload is too large.</value>
+    <comment>Error message for payload too large.</comment>
+  </data>
+  <data name="UriTooLong" xml:space="preserve">
+    <value>The request URI is too long.</value>
+    <comment>Error message for URI too long.</comment>
+  </data>
+
+  <!-- Validation Messages -->
+  <data name="RequiredParameter" xml:space="preserve">
+    <value>The parameter '{0}' is required.</value>
+    <comment>Validation error for required parameter. {0} is the parameter name.</comment>
+  </data>
+  <data name="InvalidParameterValue" xml:space="preserve">
+    <value>The value for parameter '{0}' is invalid.</value>
+    <comment>Validation error for invalid parameter value. {0} is the parameter name.</comment>
+  </data>
+  <data name="ParameterOutOfRange" xml:space="preserve">
+    <value>The parameter '{0}' is out of range. Expected between {1} and {2}.</value>
+    <comment>Validation error for out of range parameter. {0} is parameter name, {1} is min, {2} is max.</comment>
+  </data>
+
+  <!-- OGC API Messages -->
+  <data name="CollectionsTitle" xml:space="preserve">
+    <value>Feature Collections</value>
+    <comment>Title for collections endpoint.</comment>
+  </data>
+  <data name="CollectionsDescription" xml:space="preserve">
+    <value>Access to data collections available in this API.</value>
+    <comment>Description for collections endpoint.</comment>
+  </data>
+  <data name="ConformanceTitle" xml:space="preserve">
+    <value>Conformance Declaration</value>
+    <comment>Title for conformance endpoint.</comment>
+  </data>
+  <data name="ConformanceDescription" xml:space="preserve">
+    <value>Information about the specifications and standards this API conforms to.</value>
+    <comment>Description for conformance endpoint.</comment>
+  </data>
+</root>

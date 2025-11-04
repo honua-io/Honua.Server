@@ -1,0 +1,187 @@
+@page "/tenants"
+@rendermode InteractiveServer
+@inject ITenantUsageAnalyticsService AnalyticsService
+
+<PageTitle>Tenants - Honua Enterprise Admin</PageTitle>
+
+<h1>All Tenants</h1>
+
+@if (tenants == null)
+{
+    <p><em>Loading tenants...</em></p>
+}
+else
+{
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <input type="text" class="form-control" placeholder="Search by tenant ID or organization..."
+                   @bind="searchText" @bind:event="oninput" @onkeyup="FilterTenants" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @onchange="OnStatusFilterChanged">
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="trial">Trial</option>
+                <option value="expired">Expired Trial</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select class="form-select" @onchange="OnTierFilterChanged">
+                <option value="">All Tiers</option>
+                <option value="trial">Trial</option>
+                <option value="core">Core</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+            </select>
+        </div>
+    </div>
+
+    <p>Showing @filteredTenants.Count of @allTenants.Count tenants</p>
+
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Tenant ID</th>
+                <th>Organization</th>
+                <th>Email</th>
+                <th>Tier</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>API Requests</th>
+                <th>Storage</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var tenant in filteredTenants)
+            {
+                <tr>
+                    <td>
+                        <a href="/tenant/@tenant.TenantId" class="fw-bold">@tenant.TenantId</a>
+                    </td>
+                    <td>@tenant.OrganizationName</td>
+                    <td>@tenant.ContactEmail</td>
+                    <td>
+                        <span class="badge bg-secondary text-uppercase">@tenant.Tier</span>
+                    </td>
+                    <td>
+                        @if (tenant.IsTrialExpired)
+                        {
+                            <span class="badge bg-danger">Trial Expired</span>
+                        }
+                        else if (tenant.SubscriptionStatus == "trial")
+                        {
+                            <span class="badge bg-info">Trial - expires @tenant.TrialExpiresAt?.ToString("MMM dd")</span>
+                        }
+                        else if (tenant.SubscriptionStatus == "active")
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">@tenant.SubscriptionStatus</span>
+                        }
+                    </td>
+                    <td>@tenant.CreatedAt.ToString("yyyy-MM-dd")</td>
+                    <td class="text-end">@FormatNumber(tenant.ApiRequestsThisMonth)</td>
+                    <td class="text-end">@FormatBytes(tenant.StorageBytes)</td>
+                    <td>
+                        <a href="/tenant/@tenant.TenantId" class="btn btn-sm btn-outline-primary">View Details</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<TenantSummary>? tenants;
+    private List<TenantSummary> allTenants = new();
+    private List<TenantSummary> filteredTenants = new();
+    private string searchText = string.Empty;
+    private string statusFilter = string.Empty;
+    private string tierFilter = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        tenants = await AnalyticsService.GetActiveTenantSummariesAsync();
+        allTenants = tenants;
+        filteredTenants = tenants;
+    }
+
+    private void FilterTenants()
+    {
+        filteredTenants = allTenants
+            .Where(t =>
+            {
+                // Search filter
+                if (!string.IsNullOrWhiteSpace(searchText))
+                {
+                    var search = searchText.ToLower();
+                    if (!t.TenantId.ToLower().Contains(search) &&
+                        !t.OrganizationName.ToLower().Contains(search) &&
+                        !(t.ContactEmail?.ToLower().Contains(search) ?? false))
+                    {
+                        return false;
+                    }
+                }
+
+                // Status filter
+                if (!string.IsNullOrWhiteSpace(statusFilter))
+                {
+                    if (statusFilter == "expired" && !t.IsTrialExpired)
+                        return false;
+                    if (statusFilter != "expired" && t.SubscriptionStatus != statusFilter)
+                        return false;
+                }
+
+                // Tier filter
+                if (!string.IsNullOrWhiteSpace(tierFilter) && t.Tier != tierFilter)
+                {
+                    return false;
+                }
+
+                return true;
+            })
+            .ToList();
+    }
+
+    private void OnStatusFilterChanged(ChangeEventArgs e)
+    {
+        statusFilter = e.Value?.ToString() ?? string.Empty;
+        FilterTenants();
+    }
+
+    private void OnTierFilterChanged(ChangeEventArgs e)
+    {
+        tierFilter = e.Value?.ToString() ?? string.Empty;
+        FilterTenants();
+    }
+
+    private string FormatNumber(long number)
+    {
+        if (number >= 1_000_000)
+            return $"{number / 1_000_000.0:F1}M";
+        if (number >= 1_000)
+            return $"{number / 1_000.0:F1}K";
+        return number.ToString();
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:F2} {sizes[order]}";
+    }
+}

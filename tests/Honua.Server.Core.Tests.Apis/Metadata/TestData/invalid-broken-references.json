@@ -1,0 +1,25 @@
+{
+  "catalog": {
+    "id": "test"
+  },
+  "folders": [
+    {
+      "id": "folder1"
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "db1",
+      "provider": "postgis",
+      "connectionString": "test"
+    }
+  ],
+  "services": [
+    {
+      "id": "service1",
+      "folderId": "nonexistent-folder",
+      "dataSourceId": "db1"
+    }
+  ],
+  "layers": []
+}

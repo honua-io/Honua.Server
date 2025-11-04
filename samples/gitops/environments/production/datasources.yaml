@@ -1,0 +1,22 @@
+apiVersion: honua.io/v1
+kind: DatasourceConfiguration
+metadata:
+  name: datasources-production
+  environment: production
+
+datasources:
+  postgis-prod:
+    type: postgis
+    connectionString: "Host=prod-db.example.com;Port=5432;Database=honua_prod;Username=honua;Password=${DB_PASSWORD};SslMode=Require"
+    pooling:
+      enabled: true
+      minPoolSize: 10
+      maxPoolSize: 100
+
+    # Production: enable connection health checks
+    healthCheck:
+      enabled: true
+      intervalSeconds: 30
+
+    # Production: command timeout
+    commandTimeout: 30

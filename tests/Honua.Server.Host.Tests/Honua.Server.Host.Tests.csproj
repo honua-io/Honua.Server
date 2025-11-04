@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="6.0.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="9.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.9" />
+    <PackageReference Include="FluentAssertions" Version="8.6.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" Version="9.1.0" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="Testcontainers.Redis" Version="4.2.0" />
+    <PackageReference Include="WireMock.Net" Version="1.5.40" />
+    <PackageReference Include="FsCheck.Xunit" Version="2.16.6" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Honua.Server.Host\Honua.Server.Host.csproj" />
+    <ProjectReference Include="..\..\src\Honua.Server.Core\Honua.Server.Core.csproj" />
+    <ProjectReference Include="..\Honua.Server.Core.Tests\Honua.Server.Core.Tests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Validation\**\*.cs" />
+    <Compile Remove="Wfs\**\*.cs" />
+    <Compile Remove="VectorTiles\**\*.cs" />
+    <Compile Remove="Health\**\*.cs" />
+    <Compile Remove="Admin\**\*.cs" />
+    <Compile Remove="Security\**\*.cs" />
+    <Compile Remove="Resilience\**\*.cs" />
+    <Compile Remove="Stac\**\*.cs" />
+    <Compile Remove="Print\**\*.cs" />
+    <Compile Remove="OpenApi\**\*.cs" />
+    <Compile Remove="Ogc\**\*.cs" />
+    <Compile Remove="Observability\**\*.cs" />
+    <Compile Remove="Collections\**\*.cs" />
+    <Compile Remove="ExceptionHandlers\**\*.cs" />
+    <Compile Remove="Authentication\**\*.cs" />
+    <Compile Remove="Middleware\**\*.cs" />
+    <Compile Remove="Admin\**\*.cs" />
+    <Compile Remove="Security\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Security/SecurityPolicyMiddlewareTests.cs" />
+    <Compile Include="Security/AuthenticationSecurityTests.cs" />
+    <Compile Include="Security/AuthorizationSecurityTests.cs" />
+    <Compile Include="Security/InputValidationSecurityTests.cs" />
+    <Compile Include="Security/RateLimitingSecurityTests.cs" />
+    <Compile Include="Security/ApiSecurityTests.cs" />
+    <Compile Include="ExceptionHandlers/CorrelationIdInExceptionHandlersTests.cs" />
+  </ItemGroup>
+</Project>

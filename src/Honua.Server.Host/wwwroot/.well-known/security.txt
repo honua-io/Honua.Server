@@ -1,0 +1,27 @@
+Contact: mailto:security@honua.io
+Expires: 2026-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://honua.io/.well-known/security.txt
+
+# Security Policy
+#
+# If you've discovered a security vulnerability in Honua, please report it
+# responsibly by emailing security@honua.io
+#
+# Please include:
+# - Description of the vulnerability
+# - Steps to reproduce
+# - Potential impact
+# - Your contact information (optional)
+#
+# We will respond within 48 hours and work with you to understand and
+# address the issue promptly.
+#
+# We kindly ask that you:
+# - Allow us reasonable time to address the issue before public disclosure
+# - Do not exploit the vulnerability beyond what is necessary to demonstrate it
+# - Do not access or modify data that doesn't belong to you
+#
+# Thank you for helping keep Honua secure!
+
+Acknowledgments: https://honua.io/security/hall-of-fame

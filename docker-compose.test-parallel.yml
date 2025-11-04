@@ -1,0 +1,60 @@
+version: "3.9"
+
+# Docker Compose configuration for parallel integration testing
+# Optimized for running Python and QGIS tests concurrently
+#
+# Features:
+# - Uses cached Honua image with preloaded test data
+# - Fast startup (no build time, no data loading time)
+# - Shared container for all Python/QGIS tests
+# - Health checks for reliable test execution
+#
+# Usage:
+#   docker-compose -f docker-compose.test-parallel.yml up -d
+#   pytest tests/python/ -n 5 -v
+#   pytest tests/qgis/ -n 5 -v
+#   docker-compose -f docker-compose.test-parallel.yml down
+
+services:
+  # Honua Server with preloaded test data
+  # This image is built once and cached with all test data
+  honua-test-cached:
+    image: honua:test-cached
+    container_name: honua-test-cached
+    build:
+      context: .
+      dockerfile: Dockerfile.test-cached
+    environment:
+      # Override environment variables if needed
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      HONUA__METADATA__PROVIDER: json
+      HONUA__METADATA__PATH: /data/test-metadata.json
+      HONUA__AUTHENTICATION__MODE: Local
+      HONUA__AUTHENTICATION__ENFORCE: "false"
+      HONUA__CACHE__PROVIDER: memory
+
+      # Performance tuning
+      DOTNET_TieredPGO: "1"
+      DOTNET_ReadyToRun: "1"
+
+      # Logging
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+      Logging__LogLevel__Honua: Debug
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    networks:
+      - honua-test-network
+    restart: unless-stopped
+
+networks:
+  honua-test-network:
+    driver: bridge
+    name: honua-test-network

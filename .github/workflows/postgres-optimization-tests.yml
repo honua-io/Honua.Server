@@ -1,0 +1,272 @@
+name: PostgreSQL Optimization Tests
+
+# This workflow tests the optimized PostgreSQL functions that provide 5-10x performance improvements
+# by pushing query complexity from C# to the database.
+
+on:
+  push:
+    branches: [ master, main, develop, dev ]
+    paths:
+      - 'src/Honua.Server.Core/Data/Migrations/014_PostgresOptimizations.sql'
+      - 'src/Honua.Server.Core/Data/Postgres/PostgresFunctionRepository.cs'
+      - 'src/Honua.Server.Core/Data/Postgres/OptimizedPostgresFeatureOperations.cs'
+      - 'tests/Honua.Server.Core.Tests/Data/Postgres/PostgresFunctionRepositoryTests.cs'
+      - 'tests/Honua.Server.Core.Tests/Data/Postgres/OptimizedPostgresFeatureOperationsTests.cs'
+      - 'tests/Honua.Server.Integration.Tests/Data/PostgresOptimizationsIntegrationTests.cs'
+      - '.github/workflows/postgres-optimization-tests.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'src/Honua.Server.Core/Data/Migrations/014_PostgresOptimizations.sql'
+      - 'src/Honua.Server.Core/Data/Postgres/**'
+      - 'tests/**/*PostgresOptimization*'
+      - '.github/workflows/postgres-optimization-tests.yml'
+  workflow_dispatch:
+    inputs:
+      run_benchmarks:
+        description: 'Run performance benchmarks'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  # Unit tests - No database required
+  unit-tests:
+    name: Unit Tests (Mock Database)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Run unit tests
+        run: |
+          dotnet test tests/Honua.Server.Core.Tests/Honua.Server.Core.Tests.csproj \
+            --configuration Release \
+            --filter "FullyQualifiedName~PostgresFunctionRepository|FullyQualifiedName~OptimizedPostgresFeatureOperations" \
+            --logger "console;verbosity=normal" \
+            --collect:"XPlat Code Coverage" \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: '**/coverage.opencover.xml'
+          flags: postgres-optimization-unit-tests
+          name: postgres-optimization-unit-coverage
+
+  # Integration tests - Real PostgreSQL database
+  integration-tests:
+    name: Integration Tests (Real Database)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_DB: honua_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+          POSTGRES_INITDB_ARGS: "-E UTF8"
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d honua_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Wait for PostgreSQL
+        run: |
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in {1..30}; do
+            if pg_isready -h localhost -p 5432 -U postgres -d honua_test; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "Attempt $i/30: PostgreSQL not ready yet..."
+            sleep 2
+          done
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run migration to create optimized functions
+        run: |
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_test \
+            -f src/Honua.Server.Core/Data/Migrations/014_PostgresOptimizations.sql
+
+      - name: Verify functions were created
+        run: |
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_test -c \
+            "SELECT COUNT(*) FROM pg_proc WHERE proname LIKE 'honua_%';"
+
+      - name: Load test data
+        run: |
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_test \
+            -f tests/Honua.Server.Integration.Tests/Data/TestData_PostgresOptimizations.sql
+
+      - name: Verify test data was loaded
+        run: |
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_test -c \
+            "SELECT schemaname, tablename, n_live_tup FROM pg_stat_user_tables WHERE schemaname = 'test_optimizations';"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Run integration tests
+        env:
+          TEST_DATABASE_URL: "Host=localhost;Database=honua_test;Username=postgres;Password=test"
+        run: |
+          dotnet test tests/Honua.Server.Integration.Tests/Honua.Server.Integration.Tests.csproj \
+            --configuration Release \
+            --filter "Category=PostgresOptimizations" \
+            --logger "console;verbosity=normal" \
+            --collect:"XPlat Code Coverage" \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: '**/coverage.opencover.xml'
+          flags: postgres-optimization-integration-tests
+          name: postgres-optimization-integration-coverage
+
+      - name: Run diagnostic queries on failure
+        if: failure()
+        run: |
+          echo "=== Database Status ==="
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_test -c "\dt test_optimizations.*"
+
+          echo "=== Function List ==="
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_test -c \
+            "SELECT proname, prosrc FROM pg_proc WHERE proname LIKE 'honua_%';"
+
+          echo "=== Recent Logs ==="
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_test -c \
+            "SELECT * FROM pg_stat_activity WHERE datname = 'honua_test';"
+
+  # Performance benchmarks - Only run on demand or for main branch
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_benchmarks == 'true' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_DB: honua_benchmark
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d honua_benchmark"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Setup benchmark database
+        run: |
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_benchmark \
+            -f src/Honua.Server.Core/Data/Migrations/014_PostgresOptimizations.sql
+
+      - name: Load benchmark test data
+        run: |
+          PGPASSWORD=test psql -h localhost -U postgres -d honua_benchmark \
+            -f tests/Honua.Server.Integration.Tests/Data/TestData_PostgresOptimizations.sql
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Run benchmarks
+        env:
+          BENCHMARK_DATABASE_URL: "Host=localhost;Database=honua_benchmark;Username=postgres;Password=test"
+        run: |
+          cd tests/Honua.Server.Benchmarks
+          dotnet run -c Release --filter "*PostgresOptimization*" --exporters json markdown html
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            tests/Honua.Server.Benchmarks/BenchmarkDotNet.Artifacts/results/*
+          retention-days: 30
+
+      - name: Comment PR with benchmark results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const resultsPath = 'tests/Honua.Server.Benchmarks/BenchmarkDotNet.Artifacts/results/PostgresOptimizationBenchmarks-report-github.md';
+
+            if (fs.existsSync(resultsPath)) {
+              const results = fs.readFileSync(resultsPath, 'utf8');
+
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '## PostgreSQL Optimization Benchmark Results\n\n' + results
+              });
+            }
+
+  # Summary job
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          echo "Unit Tests: ${{ needs.unit-tests.result }}"
+          echo "Integration Tests: ${{ needs.integration-tests.result }}"
+
+          if [ "${{ needs.unit-tests.result }}" != "success" ] || [ "${{ needs.integration-tests.result }}" != "success" ]; then
+            echo "❌ Some tests failed!"
+            exit 1
+          else
+            echo "✅ All tests passed!"
+          fi

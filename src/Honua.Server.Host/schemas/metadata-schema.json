@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://honua.dev/schemas/metadata.schema.json",
+  "title": "Honua Metadata",
+  "type": "object",
+  "required": ["catalog", "folders", "services", "layers", "dataSources"],
+  "properties": {
+    "server": {
+      "type": "object",
+      "description": "Server-level configuration for CORS, security, and runtime behavior",
+      "properties": {
+        "cors": {
+          "type": "object",
+          "description": "Cross-Origin Resource Sharing (CORS) configuration for SPA access",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable or disable CORS. Must be explicitly enabled for cross-origin requests."
+            },
+            "allowedOrigins": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of allowed origins (e.g., 'https://app.example.com'). Supports wildcards: 'https://*.example.com' for subdomain matching. Use ['*'] to allow all origins (NOT recommended for production).",
+              "examples": [
+                ["https://app.example.com", "https://staging.example.com"],
+                ["https://*.example.com"],
+                ["http://localhost:3000", "http://localhost:5173"]
+              ]
+            },
+            "allowedMethods": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+              "description": "Allowed HTTP methods for cross-origin requests"
+            },
+            "allowedHeaders": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": ["Content-Type", "Authorization", "X-Requested-With"],
+              "description": "Allowed request headers that can be sent in cross-origin requests"
+            },
+            "exposedHeaders": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Response headers that JavaScript can access. Useful for pagination (X-Total-Count), rate limiting (X-Rate-Limit), etc.",
+              "examples": [["X-Total-Count", "X-Page-Size", "X-Page-Number"]]
+            },
+            "allowCredentials": {
+              "type": "boolean",
+              "default": true,
+              "description": "Allow credentials (cookies, Authorization headers) to be sent. Requires specific origins (cannot use '*')."
+            },
+            "maxAge": {
+              "type": "integer",
+              "default": 3600,
+              "description": "Preflight cache duration in seconds. Reduces OPTIONS preflight requests. Recommended: 3600 (1 hour)."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "catalog": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "publisher": { "type": "string" },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "themeCategories": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "links": { "$ref": "#/definitions/linkArray" },
+        "contact": { "$ref": "#/definitions/contact" },
+        "license": { "$ref": "#/definitions/license" },
+        "extents": { "$ref": "#/definitions/extent" }
+      },
+      "additionalProperties": false
+    },
+    "folders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "order": { "type": "integer" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "dataSources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "provider", "connectionString"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "provider": { "type": "string", "minLength": 1 },
+          "connectionString": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "folderId", "serviceType", "dataSourceId"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "folderId": { "type": "string", "minLength": 1 },
+          "serviceType": { "type": "string", "minLength": 1 },
+          "dataSourceId": { "type": "string", "minLength": 1 },
+          "enabled": { "type": "boolean" },
+          "description": { "type": "string" },
+          "keywords": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "links": { "$ref": "#/definitions/linkArray" },
+          "catalog": { "$ref": "#/definitions/catalogEntry" },
+          "ogc": { "type": "object" },
+          "esri": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "serviceId", "geometryType", "idField", "geometryField"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "serviceId": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "geometryType": { "type": "string", "minLength": 1 },
+          "idField": { "type": "string", "minLength": 1 },
+          "displayField": { "type": "string" },
+          "geometryField": { "type": "string", "minLength": 1 },
+          "crs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "extent": { "$ref": "#/definitions/extent" },
+          "keywords": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "links": { "$ref": "#/definitions/linkArray" },
+          "catalog": { "$ref": "#/definitions/catalogEntry" },
+          "query": { "type": "object" },
+          "storage": { "type": "object" },
+          "fields": {
+            "type": "array",
+            "items": { "type": "object" }
+          },
+          "itemType": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "definitions": {
+    "link": {
+      "type": "object",
+      "required": ["href"],
+      "properties": {
+        "href": { "type": "string", "minLength": 1 },
+        "rel": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "linkArray": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/link" }
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "organization": { "type": "string" },
+        "phone": { "type": "string" },
+        "url": { "type": "string" },
+        "role": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "license": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "extent": {
+      "type": "object",
+      "properties": {
+        "spatial": {
+          "type": "object",
+          "properties": {
+            "bbox": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 4,
+                "maxItems": 6
+              }
+            },
+            "crs": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "temporal": {
+          "type": "object",
+          "properties": {
+            "interval": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": [
+                  { "type": ["string", "null"] },
+                  { "type": ["string", "null"] }
+                ],
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "trs": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "catalogEntry": {
+      "type": "object",
+      "properties": {
+        "summary": { "type": "string" },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "themes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "contacts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/contact" }
+        },
+        "links": { "$ref": "#/definitions/linkArray" },
+        "thumbnail": { "type": "string" },
+        "ordering": { "type": "integer" },
+        "spatialExtent": {
+          "type": "object",
+          "properties": {
+            "bbox": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 4,
+                "maxItems": 6
+              }
+            },
+            "crs": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "temporalExtent": {
+          "type": "object",
+          "properties": {
+            "start": { "type": ["string", "null"] },
+            "end": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

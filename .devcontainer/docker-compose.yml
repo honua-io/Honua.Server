@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  honua-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../..:/workspaces/HonuaCore:cached
+      - honua-cache:/home/vscode/.cache
+      - honua-nuget:/home/vscode/.nuget
+    environment:
+      - GDAL_DATA=/usr/share/gdal
+      - PROJ_LIB=/usr/share/proj
+      - HONUA_ENCRYPT_KEY=${HONUA_ENCRYPT_KEY:-development-key-do-not-use-in-production}
+      - ConnectionStrings__SqlServer=Server=sqlserver;Database=Honua;User Id=sa;Password=${SQL_SERVER_PASSWORD:-DevPassword123!};TrustServerCertificate=true;
+      - ConnectionStrings__PostgreSQL=Host=postgres;Database=honua;Username=postgres;Password=${POSTGRES_PASSWORD:-DevPassword123!}
+      - ConnectionStrings__MySQL=Server=mysql;Database=honua;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD:-DevPassword123!};
+    depends_on:
+      - sqlserver
+      - postgres
+      - mysql
+      - redis
+    networks:
+      - honua-network
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${SQL_SERVER_PASSWORD:-DevPassword123!}
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+      - ./init-scripts/sqlserver:/docker-entrypoint-initdb.d
+    networks:
+      - honua-network
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      - POSTGRES_DB=honua
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-DevPassword123!}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts/postgres:/docker-entrypoint-initdb.d
+    networks:
+      - honua-network
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-DevPassword123!}
+      - MYSQL_DATABASE=honua
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-scripts/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - honua-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - honua-network
+
+volumes:
+  honua-cache:
+  honua-nuget:
+  sqlserver-data:
+  postgres-data:
+  mysql-data:
+  redis-data:
+
+networks:
+  honua-network:
+    driver: bridge

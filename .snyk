@@ -1,0 +1,32 @@
+# Snyk (https://snyk.io) policy file
+
+# Ignore known issues that are acceptable for this project
+# Format: snyk ignore --id=VULNERABILITY_ID
+
+version: v1.25.0
+
+# Language settings
+language-settings:
+  dotnet:
+    enabled: true
+    target-file: '*.csproj'
+
+# Exclude paths from scanning
+exclude:
+  global:
+    - tests/**
+    - benchmarks/**
+    - tools/**
+    - '**/bin/**'
+    - '**/obj/**'
+
+# Patch settings
+patch: {}
+
+# Ignore rules (add as needed)
+ignore: {}
+  # Example: Ignore a specific vulnerability
+  # SNYK-DOTNET-SYSTEMTEXTJSON-12345:
+  #   - '*':
+  #       reason: 'False positive - not exploitable in our use case'
+  #       expires: '2025-12-31T23:59:59.000Z'

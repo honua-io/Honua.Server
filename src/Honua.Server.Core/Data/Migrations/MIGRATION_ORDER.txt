@@ -1,0 +1,156 @@
+================================================================================
+MIGRATION APPLICATION ORDER - HonuaIO Database Schema
+================================================================================
+
+CRITICAL: Apply migrations in this exact order. Do NOT skip any migration.
+
+Prerequisites:
+- PostgreSQL 15+ installed
+- Database created
+- Application user configured with appropriate permissions
+
+================================================================================
+CORE SCHEMA (001-006) - Foundation
+================================================================================
+
+1. 001_InitialSchema.sql
+   - Creates: customers, licenses, registry_credentials, build_cache_registry, build_access_log
+   - Extensions: pgcrypto, uuid-ossp
+   - Duration: ~5 seconds
+   - FIXED: FK constraint conflict, added FK index for first_built_by_customer
+
+2. 002_BuildQueue.sql
+   - Creates: build_queue, build_results, build_artifacts, build_events, build_metrics
+   - Views: active_builds, build_performance_summary, customer_build_usage
+   - Duration: ~3 seconds
+
+3. 003_IntakeSystem.sql
+   - Creates: build_manifests, conversations, conversation_messages, conversation_intents, requirement_extractions
+   - Views: active_conversations, conversation_performance_summary, intent_analytics, extraction_accuracy
+   - Duration: ~4 seconds
+
+4. 004_Indexes.sql
+   - Creates: Performance indexes for all core tables
+   - Duration: ~10 seconds
+
+5. 005_Functions.sql
+   - Creates: Triggers, stored procedures, cleanup functions
+   - Duration: ~5 seconds
+
+6. 006_TenantUsageTracking.sql
+   - Creates: tenant_usage, tenant_usage_events, tenant_quota_overrides
+   - Functions: Usage tracking and quota enforcement
+   - Duration: ~3 seconds
+   - FIXED: Added FK indexes for tenant_id columns
+
+================================================================================
+ENTERPRISE FEATURES (007-012)
+================================================================================
+
+7. 007_OptimisticLocking.sql
+   - Creates: Row versioning support for concurrency control
+   - Function: honua_increment_row_version()
+   - Duration: ~2 seconds
+
+8. 008_DataVersioning.sql
+   - Creates: collections_versioned, version_changes, merge_conflicts, merge_operations
+   - Functions: Version management, merge detection
+   - Views: collections_current, version_history_summary
+   - Duration: ~5 seconds
+
+9. 009_SoftDelete.sql
+   - Creates: deletion_audit_log
+   - Functions: soft_delete_entity(), restore_soft_deleted_entity(), hard_delete_entity()
+   - Duration: ~3 seconds
+   - FIXED: SQL injection prevention with whitelist validation
+   - FIXED: Removed references to non-existent tables (commented out with templates)
+
+10. 010_SamlSso.sql
+    - Creates: saml_identity_providers, saml_sessions, saml_user_mappings
+    - Function: cleanup_expired_saml_sessions()
+    - Duration: ~3 seconds
+    - FIXED: Changed tenant_id UUID to customer_id VARCHAR(100)
+    - FIXED: Added FK indexes for all relationships
+
+11. 011_AuditLog.sql
+    - Creates: audit_events, audit_events_archive
+    - Functions: Archive, purge, statistics
+    - Views: recent_high_risk_events, failed_auth_attempts, admin_actions_audit
+    - Duration: ~5 seconds
+    - FIXED: Changed tenant_id UUID to customer_id VARCHAR(100)
+    - FIXED: Audit trigger set to ENABLE ALWAYS (tamper-proof)
+
+12. 012_Geoprocessing.sql
+    - Creates: process_runs, process_catalog
+    - Functions: Dequeue, statistics, cleanup
+    - Views: active_process_runs, recent_process_completions, failed_process_runs, tier_usage_summary
+    - Duration: ~5 seconds
+    - FIXED: Changed tenant_id UUID to customer_id VARCHAR(100)
+
+================================================================================
+SECURITY & OPTIMIZATION (013, 030)
+================================================================================
+
+13. 013_RowLevelSecurity.sql
+    - Enables: RLS on all multi-tenant tables
+    - Policies: Tenant isolation based on current_setting('app.current_tenant')
+    - Functions: set_current_tenant(), get_current_tenant(), clear_current_tenant(), validate_rls_policies()
+    - Duration: ~3 seconds
+    - NEW: Comprehensive RLS implementation for defense-in-depth
+
+14. 030_KeysetPaginationIndexes.sql
+    - Creates: Composite indexes for cursor-based pagination
+    - Performance: O(1) pagination vs O(N) with OFFSET
+    - Duration: ~10 seconds
+    - Note: Version 030 to allow 014-029 for future additions
+
+================================================================================
+VERIFICATION
+================================================================================
+
+After all migrations:
+
+1. Verify migration history:
+   SELECT version, name, applied_at FROM schema_migrations ORDER BY version;
+
+2. Validate RLS policies:
+   SELECT * FROM validate_rls_policies();
+
+3. Check index creation:
+   SELECT schemaname, tablename, indexname 
+   FROM pg_indexes 
+   WHERE schemaname = 'public' 
+   ORDER BY tablename, indexname;
+
+4. Test RLS:
+   SELECT set_current_tenant('system');
+   SELECT COUNT(*) FROM build_queue;
+   SELECT clear_current_tenant();
+   SELECT COUNT(*) FROM build_queue;
+
+5. Test audit immutability:
+   -- Should fail:
+   UPDATE audit_events SET description = 'test' WHERE id = (SELECT id FROM audit_events LIMIT 1);
+
+================================================================================
+ROLLBACK (if needed)
+================================================================================
+
+Drop migrations in REVERSE order:
+
+030, 013, 012, 011, 010, 009, 008, 007, 006, 005, 004, 003, 002, 001
+
+WARNING: This will delete ALL data. Only use in development/testing.
+
+================================================================================
+PRODUCTION DEPLOYMENT
+================================================================================
+
+1. Backup database before migration
+2. Apply migrations during maintenance window
+3. Monitor for errors in schema_migrations table
+4. Validate RLS policies are working
+5. Test application with different tenants
+6. Monitor query performance with RLS enabled
+
+Total Duration: ~60-90 seconds for all migrations

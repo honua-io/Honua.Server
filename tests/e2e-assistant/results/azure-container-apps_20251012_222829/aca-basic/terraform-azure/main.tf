@@ -1,0 +1,1 @@
+Generated Terraform configuration at /home/mike/projects/HonuaIO/terraform-azure/main.tf

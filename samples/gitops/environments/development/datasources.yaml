@@ -1,0 +1,14 @@
+apiVersion: honua.io/v1
+kind: DatasourceConfiguration
+metadata:
+  name: datasources-development
+  environment: development
+
+datasources:
+  postgis-dev:
+    type: postgis
+    connectionString: "Host=localhost;Port=5432;Database=honua_dev;Username=honua;Password=${DB_PASSWORD}"
+    pooling:
+      enabled: true
+      minPoolSize: 2
+      maxPoolSize: 10

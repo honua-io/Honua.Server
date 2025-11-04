@@ -1,0 +1,180 @@
+---
+# PodSecurityPolicy for Kubernetes < 1.25
+# Note: PodSecurityPolicy is deprecated in K8s 1.21+ and removed in 1.25+
+# This file is provided for backward compatibility
+# For K8s 1.25+, use Pod Security Standards (PSS) configured in namespace labels
+
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: honua-restricted
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+    description: "Restricted PSP for Honua Server - follows security best practices"
+spec:
+  # Prevent privileged containers
+  privileged: false
+
+  # Prevent privilege escalation
+  allowPrivilegeEscalation: false
+  defaultAllowPrivilegeEscalation: false
+
+  # Required to prevent escalations to root
+  requiredDropCapabilities:
+    - ALL
+
+  # Allow only NET_BIND_SERVICE capability
+  allowedCapabilities:
+    - NET_BIND_SERVICE
+
+  # Run as non-root
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+
+  # Require specific user ID
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+
+  # Configure supplemental groups
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+
+  # Configure fsGroup
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+
+  # Read-only root filesystem
+  readOnlyRootFilesystem: true
+
+  # Allowed volume types
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+
+  # Disallow host namespaces
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+
+  # Allowed host paths (none)
+  allowedHostPaths: []
+
+  # SELinux context
+  seLinux:
+    rule: 'RunAsAny'
+
+  # Allowed proc mount types
+  allowedProcMountTypes:
+    - Default
+
+  # Disallow unsafe sysctls
+  allowedUnsafeSysctls: []
+  forbiddenSysctls:
+    - '*'
+
+---
+# ClusterRole to use the PodSecurityPolicy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: honua-restricted-psp
+  labels:
+    app: honua
+    environment: production
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - honua-restricted
+
+---
+# ClusterRoleBinding for Honua ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: honua-restricted-psp
+  labels:
+    app: honua
+    environment: production
+roleRef:
+  kind: ClusterRole
+  name: honua-restricted-psp
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: honua-server
+  namespace: honua
+
+---
+# Less restrictive PSP for database components (if needed)
+# Database requires specific configurations that may not work with restricted PSP
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: honua-database
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    description: "PSP for Honua database components with necessary permissions"
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+
+  requiredDropCapabilities:
+    - ALL
+
+  allowedCapabilities:
+    - CHOWN
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+
+  runAsUser:
+    rule: 'RunAsAny'
+
+  runAsGroup:
+    rule: 'RunAsAny'
+
+  supplementalGroups:
+    rule: 'RunAsAny'
+
+  fsGroup:
+    rule: 'RunAsAny'
+
+  readOnlyRootFilesystem: false
+
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+
+  seLinux:
+    rule: 'RunAsAny'
+
+  allowedProcMountTypes:
+    - Default

@@ -1,0 +1,53 @@
+# Honua YARP Gateway ServiceMonitor
+# Prometheus metrics scraping configuration
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: honua-gateway
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: honua
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: honua-gateway
+      app.kubernetes.io/component: gateway-metrics
+
+  namespaceSelector:
+    matchNames:
+      - honua
+
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - targetLabel: job
+          replacement: honua-gateway
+
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'yarp_.*'
+          action: keep
+        - sourceLabels: [__name__]
+          regex: 'aspnetcore_.*'
+          action: keep
+        - sourceLabels: [__name__]
+          regex: 'http_.*'
+          action: keep
+        - sourceLabels: [__name__]
+          regex: 'process_.*'
+          action: keep

@@ -1,0 +1,23 @@
+{
+  "manifest-version": "1.0",
+  "id": "honua-ogc-features",
+  "name": "Honua Geospatial Data",
+  "version": "1.0.0",
+  "author": "HonuaIO",
+  "description": "Connect to Honua geospatial server via OGC Features API and STAC catalogs",
+  "tableau-version": {
+    "min": "2022.3"
+  },
+  "permissions": [
+    "full-data"
+  ],
+  "authentication": {
+    "type": "custom",
+    "required": true
+  },
+  "connector-class": "honua_connector",
+  "window-size": {
+    "width": 800,
+    "height": 600
+  }
+}

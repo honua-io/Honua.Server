@@ -1,0 +1,163 @@
+name: OGC Conformance Tests (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'ogc-features'
+          - 'wfs'
+          - 'wms'
+          - 'kml'
+      metadata_file:
+        description: 'Metadata file to use (relative to repo root)'
+        required: false
+        default: 'samples/ogc/metadata.json'
+      honua_port:
+        description: 'Port for Honua server'
+        required: false
+        default: '5555'
+
+permissions:
+  contents: read
+
+jobs:
+  run-conformance-tests:
+    name: Run ${{ inputs.test_suite }} Conformance Test(s)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Verify metadata file exists
+        run: |
+          if [ ! -f "${{ inputs.metadata_file }}" ]; then
+            echo "ERROR: Metadata file not found: ${{ inputs.metadata_file }}"
+            exit 1
+          fi
+          echo "Using metadata file: ${{ inputs.metadata_file }}"
+
+      - name: Start Honua Server
+        run: |
+          export HONUA__METADATA__PROVIDER=json
+          export HONUA__METADATA__PATH=${{ github.workspace }}/${{ inputs.metadata_file }}
+          export HONUA__AUTHENTICATION__MODE=QuickStart
+          export HONUA__AUTHENTICATION__ENFORCE=false
+
+          dotnet run --project src/Honua.Server.Host \
+            --no-build \
+            --configuration Release \
+            --urls http://0.0.0.0:${{ inputs.honua_port }} \
+            > /tmp/honua-server.log 2>&1 &
+
+          echo $! > /tmp/honua.pid
+          echo "Started Honua server with PID: $(cat /tmp/honua.pid)"
+
+          # Wait for server
+          for i in {1..30}; do
+            if curl -f http://localhost:${{ inputs.honua_port }}/ogc > /dev/null 2>&1; then
+              echo "✓ Honua server is ready"
+              exit 0
+            fi
+            echo "Waiting for server... ($i/30)"
+            sleep 2
+          done
+
+          echo "ERROR: Server failed to start"
+          cat /tmp/honua-server.log
+          exit 1
+
+      - name: Determine test filter
+        id: filter
+        run: |
+          case "${{ inputs.test_suite }}" in
+            all)
+              echo "filter=FullyQualifiedName~OgcConformanceTests" >> $GITHUB_OUTPUT
+              ;;
+            ogc-features)
+              echo "filter=FullyQualifiedName~OgcApiFeatures_PassesConformance" >> $GITHUB_OUTPUT
+              ;;
+            wfs)
+              echo "filter=FullyQualifiedName~WfsService_PassesConformance" >> $GITHUB_OUTPUT
+              ;;
+            wms)
+              echo "filter=FullyQualifiedName~WmsService_PassesConformance" >> $GITHUB_OUTPUT
+              ;;
+            kml)
+              echo "filter=FullyQualifiedName~KmlExport_PassesConformance" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Run Conformance Tests
+        env:
+          HONUA_RUN_OGC_CONFORMANCE: 'true'
+          HONUA_TEST_BASE_URL: 'http://localhost:${{ inputs.honua_port }}'
+        run: |
+          dotnet test tests/Honua.Server.Core.Tests \
+            --no-build \
+            --configuration Release \
+            --filter "${{ steps.filter.outputs.filter }}" \
+            --logger "console;verbosity=detailed" \
+            --logger "trx;LogFileName=conformance-results.trx" \
+            --logger "html;LogFileName=conformance-results.html" \
+            --results-directory ./test-results
+
+      - name: Display Test Summary
+        if: always()
+        run: |
+          echo "## OGC Conformance Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Test Suite:** ${{ inputs.test_suite }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Metadata:** ${{ inputs.metadata_file }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -d "qa-report" ]; then
+            echo "### Generated Reports:" >> $GITHUB_STEP_SUMMARY
+            find qa-report -type f | while read file; do
+              echo "- \`$file\`" >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+
+      - name: Stop Honua Server
+        if: always()
+        run: |
+          if [ -f /tmp/honua.pid ]; then
+            kill $(cat /tmp/honua.pid) 2>/dev/null || true
+          fi
+          pkill -f "dotnet.*Honua.Server.Host" || true
+          echo "Honua server stopped"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-results-${{ inputs.test_suite }}-${{ github.run_number }}
+          path: |
+            ./test-results/
+            ./qa-report/
+          retention-days: 30
+
+      - name: Upload Server Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: honua-server-logs-${{ github.run_number }}
+          path: /tmp/honua-server.log
+          retention-days: 7

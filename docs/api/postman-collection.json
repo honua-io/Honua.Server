@@ -1,0 +1,296 @@
+{
+  "info": {
+    "name": "Honua Build Orchestrator API",
+    "description": "Complete API collection for the Honua Build Orchestrator - AI-powered geospatial server build and deployment platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.honua.io",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_id",
+      "value": "cust_abc123",
+      "type": "string"
+    },
+    {
+      "key": "conversation_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "build_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Intake API",
+      "item": [
+        {
+          "name": "Start Conversation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('conversation_id', response.conversationId);",
+                  "    pm.test('Conversation ID saved', () => {",
+                  "        pm.expect(response.conversationId).to.be.a('string');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"{{customer_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/intake/start",
+              "host": ["{{base_url}}"],
+              "path": ["api", "intake", "start"]
+            },
+            "description": "Start a new AI conversation for build configuration"
+          },
+          "response": []
+        },
+        {
+          "name": "Send Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Message processed successfully', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const response = pm.response.json();",
+                  "pm.test('Response contains message', () => {",
+                  "    pm.expect(response).to.have.property('message');",
+                  "});",
+                  "",
+                  "if (response.intakeComplete) {",
+                  "    console.log('Intake complete! Requirements:', JSON.stringify(response.requirements, null, 2));",
+                  "    console.log('Estimated cost: $' + response.estimatedMonthlyCost + '/month');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversationId\": \"{{conversation_id}}\",\n  \"message\": \"I need to deploy an ESRI-compatible server on AWS with PostgreSQL for about 100 concurrent users\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/intake/message",
+              "host": ["{{base_url}}"],
+              "path": ["api", "intake", "message"]
+            },
+            "description": "Send a message to continue the AI conversation"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Conversation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/intake/conversations/{{conversation_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "intake", "conversations", "{{conversation_id}}"]
+            },
+            "description": "Retrieve complete conversation history"
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Build",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.buildId) {",
+                  "        pm.collectionVariables.set('build_id', response.buildId);",
+                  "        console.log('Build ID:', response.buildId);",
+                  "        console.log('Registry:', response.registryResult.credential.registryUrl);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversationId\": \"{{conversation_id}}\",\n  \"customerId\": \"{{customer_id}}\",\n  \"buildName\": \"production-geospatial-server\",\n  \"tags\": [\"production\", \"aws\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/intake/build",
+              "host": ["{{base_url}}"],
+              "path": ["api", "intake", "build"]
+            },
+            "description": "Trigger a container build from completed intake"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Build Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const response = pm.response.json();",
+                  "console.log(`Status: ${response.status} (${response.progress}%)`);",
+                  "console.log(`Stage: ${response.currentStage}`);",
+                  "",
+                  "if (response.status === 'completed') {",
+                  "    console.log('Build completed!');",
+                  "    console.log('Image:', response.imageReference);",
+                  "} else if (response.status === 'failed') {",
+                  "    console.error('Build failed:', response.errorMessage);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/intake/builds/{{build_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "intake", "builds", "{{build_id}}", "status"]
+            },
+            "description": "Get real-time build status and progress"
+          },
+          "response": []
+        }
+      ],
+      "description": "AI-guided build configuration endpoints"
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get JWT Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('jwt_token', response.accessToken);",
+                  "    console.log('JWT token saved to collection variables');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"your-email@example.com\",\n  \"password\": \"your-password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/token",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "token"]
+            },
+            "description": "Obtain JWT token for API authentication"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"your-refresh-token\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Refresh expired JWT token"
+          },
+          "response": []
+        }
+      ],
+      "description": "Authentication endpoints"
+    }
+  ]
+}

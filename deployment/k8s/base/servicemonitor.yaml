@@ -1,0 +1,138 @@
+# ServiceMonitor for Prometheus Operator
+# Enables automatic service discovery and scraping
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: honua-api-monitor
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua
+    app.kubernetes.io/component: api
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: honua
+      app.kubernetes.io/component: api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: honua-intake-monitor
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua
+    app.kubernetes.io/component: intake
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: honua
+      app.kubernetes.io/component: intake
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+
+---
+# PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: honua-alerts
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: honua.api
+      interval: 30s
+      rules:
+        - alert: HonuaAPIDown
+          expr: up{job="honua-api"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Honua API is down"
+            description: "Honua API has been down for more than 5 minutes"
+
+        - alert: HonuaAPIHighLatency
+          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="honua-api"}[5m])) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Honua API high latency"
+            description: "95th percentile latency is above 1s"
+
+        - alert: HonuaAPIHighErrorRate
+          expr: rate(http_requests_total{job="honua-api",status=~"5.."}[5m]) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Honua API high error rate"
+            description: "Error rate is above 5%"
+
+        - alert: HonuaAPIPodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{namespace="honua",pod=~"honua-api-.*"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Honua API pod crash looping"
+            description: "Pod {{ $labels.pod }} is crash looping"
+
+    - name: honua.database
+      interval: 30s
+      rules:
+        - alert: PostgreSQLDown
+          expr: up{job="postgres"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL is down"
+            description: "PostgreSQL database has been down for more than 5 minutes"
+
+        - alert: PostgreSQLHighConnections
+          expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL high connection usage"
+            description: "Connection usage is above 80%"
+
+    - name: honua.cache
+      interval: 30s
+      rules:
+        - alert: RedisDown
+          expr: up{job="redis"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Redis is down"
+            description: "Redis cache has been down for more than 5 minutes"
+
+        - alert: RedisHighMemoryUsage
+          expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Redis high memory usage"
+            description: "Memory usage is above 90%"

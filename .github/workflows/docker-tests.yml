@@ -1,0 +1,130 @@
+name: Docker Container Tests
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Dockerfile.test'
+      - 'docker-compose.test.yml'
+      - '.dockerignore'
+  pull_request:
+    paths:
+      - 'Dockerfile.test'
+      - 'docker-compose.test.yml'
+      - '.dockerignore'
+
+jobs:
+  docker-unit-tests:
+    name: Docker Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test Docker image
+      run: |
+        if [ -f "Dockerfile.test" ]; then
+          docker build -f Dockerfile.test -t honua-tests:latest .
+        else
+          echo "Dockerfile.test not found, skipping..."
+          exit 1
+        fi
+
+    - name: Create test results directory
+      run: mkdir -p test-results
+
+    - name: Run unit tests in Docker
+      run: |
+        docker run --rm \
+          -v "$(pwd)/test-results:/app/test-results" \
+          honua-tests:latest \
+          dotnet test --configuration Release --no-build \
+          --filter "TestCategory=Unit&TestCategory!=Infrastructure&TestCategory!=LongRunning" \
+          --logger "trx;LogFileName=/app/test-results/docker-unit-test-results.trx" \
+          --logger "console;verbosity=normal"
+      continue-on-error: true
+
+    - name: Upload Docker test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: docker-unit-test-results
+        path: test-results/
+
+  docker-integration-tests:
+    name: Docker Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'docker-tests')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test Docker image
+      run: |
+        if [ -f "Dockerfile.test" ]; then
+          docker build -f Dockerfile.test -t honua-tests:latest .
+        else
+          echo "Dockerfile.test not found, skipping..."
+          exit 1
+        fi
+
+    - name: Create test results directory
+      run: mkdir -p test-results
+
+    - name: Run integration tests in Docker using docker-compose
+      run: |
+        if [ -f "docker-compose.test.yml" ]; then
+          docker-compose -f docker-compose.test.yml up --abort-on-container-exit honua-tests
+        else
+          echo "docker-compose.test.yml not found, skipping..."
+        fi
+      continue-on-error: true
+
+    - name: Upload Docker integration test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: docker-integration-test-results
+        path: test-results/
+
+  docker-image-security:
+    name: Docker Image Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build test Docker image
+      run: |
+        if [ -f "Dockerfile.test" ]; then
+          docker build -f Dockerfile.test -t honua-tests:latest .
+        else
+          echo "Dockerfile.test not found, skipping..."
+          exit 1
+        fi
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      continue-on-error: true
+      with:
+        image-ref: 'honua-tests:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

@@ -1,0 +1,36 @@
+{
+    "name": "Honua Development",
+    "dockerComposeFile": ["docker-compose.yml"],
+    "service": "honua-dev",
+    "workspaceFolder": "/workspaces/HonuaCore",
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "features": {
+        "ghcr.io/devcontainers/features/dotnet:2": {
+            "version": "9.0",
+            "installUsingApt": true
+        },
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-dotnettools.csharp",
+                "ms-dotnettools.vscode-dotnet-runtime",
+                "ms-vscode.test-adapter-converter",
+                "ms-vscode.powershell",
+                "EditorConfig.EditorConfig",
+                "streetsidesoftware.code-spell-checker"
+            ],
+            "settings": {
+                "dotnet.defaultSolution": "Honua.sln",
+                "omnisharp.enableEditorConfigSupport": true,
+                "omnisharp.enableRoslynAnalyzers": true
+            }
+        }
+    },
+    "remoteUser": "vscode",
+    "mounts": [
+        "source=${localWorkspaceFolder}/.devcontainer/gdal-data,target=/usr/share/gdal,type=bind,consistency=cached"
+    ]
+}

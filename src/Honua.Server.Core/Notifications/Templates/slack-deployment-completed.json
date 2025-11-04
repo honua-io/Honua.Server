@@ -1,0 +1,30 @@
+{
+  "text": "Deployment completed successfully for *{{environment}}*",
+  "attachments": [
+    {
+      "color": "#36A64F",
+      "blocks": [
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": ":tada: *Deployment Completed*\n*Environment:* {{environment}}\n*Commit:* `{{commit}}`\n*Duration:* {{duration}}"
+          }
+        },
+        {
+          "type": "context",
+          "elements": [
+            {
+              "type": "mrkdwn",
+              "text": "Deployment ID: `{{deploymentId}}`"
+            },
+            {
+              "type": "mrkdwn",
+              "text": "Completed: {{completedAt}}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

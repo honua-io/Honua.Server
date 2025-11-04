@@ -1,0 +1,9 @@
+{
+  "name": "honua-carto-toolkit-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@carto/toolkit": "^0.0.1-rc.1"
+  }
+}

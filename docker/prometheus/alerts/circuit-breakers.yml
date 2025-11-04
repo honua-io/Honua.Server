@@ -1,0 +1,102 @@
+groups:
+  - name: circuit_breakers
+    rules:
+      # Alert when a circuit breaker is open for more than 5 minutes
+      - alert: CircuitBreakerOpen
+        expr: honua_circuit_breaker_state == 1
+        for: 5m
+        labels:
+          severity: warning
+          component: resilience
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Circuit breaker open for {{ $labels.service }}"
+          description: |
+            Circuit breaker for {{ $labels.service }} has been open for more than 5 minutes.
+            This indicates persistent failures communicating with the external service.
+            Current state: Open (1)
+
+            **Troubleshooting steps:**
+            1. Check service health: Verify {{ $labels.service }} is accessible
+            2. Check network connectivity: Run network diagnostics
+            3. Check credentials: Ensure authentication is valid
+            4. Review logs: Check for specific error patterns
+            5. Check service quotas: Verify no rate limiting in effect
+
+      # Alert when a circuit breaker is opening frequently
+      - alert: FrequentCircuitBreaks
+        expr: rate(honua_circuit_breaker_breaks_total[1h]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: resilience
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Frequent circuit breaks for {{ $labels.service }}"
+          description: |
+            Circuit breaker for {{ $labels.service }} is breaking more than 6 times per hour.
+            This indicates intermittent failures or instability with the external service.
+            Break rate: {{ $value | humanize }} per second
+
+            **Possible causes:**
+            1. Network instability
+            2. Service degradation
+            3. Rate limiting or throttling
+            4. Timeout configuration too aggressive
+            5. Resource exhaustion
+
+      # Alert when multiple circuits are open simultaneously
+      - alert: MultipleCircuitBreakersOpen
+        expr: count(honua_circuit_breaker_state == 1) >= 2
+        for: 5m
+        labels:
+          severity: critical
+          component: resilience
+        annotations:
+          summary: "Multiple circuit breakers open"
+          description: |
+            {{ $value }} circuit breakers are currently open.
+            This indicates widespread issues with external service connectivity.
+
+            **Immediate actions:**
+            1. Check network infrastructure
+            2. Review firewall rules
+            3. Verify DNS resolution
+            4. Check load balancer health
+            5. Consider failover procedures
+
+      # Alert when circuit transitions are happening too frequently (flapping)
+      - alert: CircuitBreakerFlapping
+        expr: rate(honua_circuit_breaker_state_transitions_total[10m]) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          component: resilience
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Circuit breaker flapping for {{ $labels.service }}"
+          description: |
+            Circuit breaker for {{ $labels.service }} is transitioning states frequently (flapping).
+            Transition rate: {{ $value | humanize }} per second
+            From: {{ $labels.from_state }} -> To: {{ $labels.to_state }}
+
+            **Possible causes:**
+            1. Service is borderline stable
+            2. Health check timeout too short
+            3. Load balancer issues
+            4. Intermittent network problems
+            5. Circuit breaker configuration needs tuning
+
+      # Info alert when circuit closes after being open
+      - alert: CircuitBreakerRecovered
+        expr: increase(honua_circuit_breaker_closures_total[5m]) > 0
+        labels:
+          severity: info
+          component: resilience
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Circuit breaker recovered for {{ $labels.service }}"
+          description: |
+            Circuit breaker for {{ $labels.service }} has closed successfully.
+            The service has recovered and is healthy again.
+            Closures in last 5m: {{ $value }}

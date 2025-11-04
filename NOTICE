@@ -1,0 +1,52 @@
+HonuaIO
+Copyright (c) 2025 HonuaIO
+
+This product includes software developed by HonuaIO and third-party contributors.
+
+Licensed under the Elastic License 2.0. See LICENSE file for full terms.
+
+================================================================================
+
+This software includes or depends upon the following third-party components:
+
+NetTopologySuite - BSD-3-Clause License
+  Copyright (c) 2006-2024 NetTopologySuite Team
+  Geometry operations and spatial algorithms
+  https://github.com/NetTopologySuite/NetTopologySuite
+
+Dapper - Apache 2.0 License
+  Copyright (c) 2024 DapperLib
+  High-performance micro-ORM
+  https://github.com/DapperLib/Dapper
+
+Polly - BSD-3-Clause License
+  Copyright (c) 2015-2024, App vNext
+  Resilience and transient-fault-handling library
+  https://github.com/App-vNext/Polly
+
+Serilog - Apache 2.0 License
+  Copyright (c) 2013-2024 Serilog Contributors
+  Structured logging library
+  https://serilog.net/
+
+GDAL (Geospatial Data Abstraction Library) - X/MIT License
+  Copyright (c) 1998-2024 Frank Warmerdam, Even Rouault, and others
+  Translator library for raster and vector geospatial data formats
+  https://gdal.org/
+
+MaxRev.Gdal.Core - MIT License
+  Copyright (c) 2019 MaxRev
+  GDAL bindings for .NET
+  https://github.com/MaxRev-Dev/gdal.netcore
+
+Microsoft.SemanticKernel - MIT License
+  Copyright (c) Microsoft Corporation
+  AI orchestration SDK
+  https://github.com/microsoft/semantic-kernel
+
+Oracle.ManagedDataAccess.Core - Oracle Free Use Terms and Conditions
+  Copyright (c) Oracle Corporation
+  Oracle Data Provider for .NET
+  https://www.oracle.com/database/technologies/appdev/dotnet/odp.html
+
+See THIRD-PARTY-LICENSES.md for a complete list of all dependencies and their licenses.

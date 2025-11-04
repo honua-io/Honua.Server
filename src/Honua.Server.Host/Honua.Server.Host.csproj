@@ -1,0 +1,124 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\Honua.Server.Core\Honua.Server.Core.csproj" />
+    <ProjectReference Include="..\Honua.Server.Core.Raster\Honua.Server.Core.Raster.csproj" />
+    <ProjectReference Include="..\Honua.Server.Core.Cloud\Honua.Server.Core.Cloud.csproj" />
+    <ProjectReference Include="..\Honua.Server.Enterprise\Honua.Server.Enterprise.csproj" />
+    <ProjectReference Include="..\Honua.Server.Observability\Honua.Server.Observability.csproj" />
+  </ItemGroup>
+
+  <!-- Optional OData support - only included when EnableOData=true -->
+  <ItemGroup Condition="'$(EnableOData)' == 'true'">
+    <ProjectReference Include="..\Honua.Server.Core.OData\Honua.Server.Core.OData.csproj" />
+  </ItemGroup>
+
+  <!-- Exclude OData files from compilation when OData is disabled -->
+  <ItemGroup Condition="'$(EnableOData)' == 'false'">
+    <Compile Remove="OData\**\*.cs" />
+    <Compile Remove="Hosting\ODataInitializationHostedService.cs" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+
+    <!-- Optional Features: Set to 'true' to enable, 'false' to disable -->
+    <!-- OData is enabled by default but can be disabled for reduced binary size and better AOT compatibility -->
+    <EnableOData Condition="'$(EnableOData)' == ''">true</EnableOData>
+  </PropertyGroup>
+
+  <!-- Define compilation symbols based on feature flags -->
+  <PropertyGroup Condition="'$(EnableOData)' == 'true'">
+    <DefineConstants>$(DefineConstants);ENABLE_ODATA</DefineConstants>
+  </PropertyGroup>
+
+  <!-- ReadyToRun Configuration for 30-50% faster startup -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- Enable ReadyToRun compilation for ahead-of-time native code generation -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+
+    <!-- Disable trimming when OData is enabled (incompatible with reflection-heavy libraries) -->
+    <PublishTrimmed Condition="'$(EnableOData)' == 'true'">false</PublishTrimmed>
+    <!-- Enable trimming when OData is disabled for smaller binaries -->
+    <PublishTrimmed Condition="'$(EnableOData)' == 'false'">true</PublishTrimmed>
+
+    <!-- Disable single file - incompatible with GDAL native binaries -->
+    <PublishSingleFile>false</PublishSingleFile>
+
+    <!-- Enable tiered compilation for optimal performance -->
+    <TieredCompilation>true</TieredCompilation>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+
+    <!-- Server GC for better throughput under load -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Honua.Server.Core.Tests" />
+    <InternalsVisibleTo Include="Honua.Server.Core.Tests.Apis" />
+    <InternalsVisibleTo Include="Honua.Server.Core.Tests.OgcProtocols" />
+    <InternalsVisibleTo Include="Honua.Server.Host.Tests" />
+    <InternalsVisibleTo Include="Honua.Server.Integration.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+    <!-- OData now comes from Core.OData module -->
+    <PackageReference Include="Microsoft.Extensions.Localization" Version="9.0.0" />
+    <PackageReference Include="NetTopologySuite.IO.VectorTiles" Version="1.1.0" />
+    <PackageReference Include="NetTopologySuite.IO.VectorTiles.Mapbox" Version="1.1.0" />
+    <PackageReference Include="Polly" Version="8.5.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NetTopologySuite" Version="2.6.0" />
+    <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="4.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.12.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.12.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.12.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.12.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.12.0-beta.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.12.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.12.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Structured Logging with Serilog -->
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="9.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Optional: Redis distributed caching -->
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.10" />
+    <!-- Optional: API Versioning -->
+    <PackageReference Include="Asp.Versioning.Mvc" Version="8.1.0" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Health Checks -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.9" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.InMemory.Storage" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.MySql" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Sqlite" Version="9.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
+  </ItemGroup>
+</Project>
+
+

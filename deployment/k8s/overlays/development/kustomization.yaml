@@ -1,0 +1,89 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: honua-dev
+
+bases:
+  - ../../base
+
+namePrefix: dev-
+
+commonLabels:
+  environment: development
+  app.kubernetes.io/environment: development
+
+patches:
+  # Reduce replicas for development
+  - target:
+      kind: Deployment
+      name: honua-api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  - target:
+      kind: Deployment
+      name: honua-intake
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  - target:
+      kind: Deployment
+      name: honua-orchestrator
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  # Reduce resource limits for development
+  - target:
+      kind: Deployment
+      labelSelector: "app.kubernetes.io/name=honua"
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+  # Disable autoscaling in development
+  - target:
+      kind: HorizontalPodAutoscaler
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+
+  # Use NodePort for easy local access
+  - target:
+      kind: Service
+      name: honua-api
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: NodePort
+
+configMapGenerator:
+  - name: honua-config
+    behavior: merge
+    literals:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - honua__authentication__quickStart__enabled=true
+
+images:
+  - name: honua/server-host
+    newTag: dev-latest
+  - name: honua/server-intake
+    newTag: dev-latest
+  - name: honua/build-orchestrator
+    newTag: dev-latest

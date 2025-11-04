@@ -1,0 +1,56 @@
+# Prometheus configuration for Honua Server monitoring
+# Scrapes metrics from ASP.NET Core Prometheus exporter
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+  external_labels:
+    cluster: 'honua-local'
+    environment: 'development'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - 'alertmanager:9093'
+
+# Rule files for alerting (optional)
+# rule_files:
+#   - "alerts/*.yml"
+
+scrape_configs:
+  # Honua Server metrics
+  - job_name: 'honua-server'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['honua-server:8080']
+        labels:
+          service: 'honua-server'
+          variant: 'full'
+
+  # Honua Server Lite metrics (if running)
+  # - job_name: 'honua-server-lite'
+  #   metrics_path: '/metrics'
+  #   static_configs:
+  #     - targets: ['honua-server-lite:8080']
+  #       labels:
+  #         service: 'honua-server-lite'
+  #         variant: 'lite'
+
+  # PostgreSQL metrics (requires postgres_exporter)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Redis metrics (requires redis_exporter)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

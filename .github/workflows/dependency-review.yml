@@ -1,0 +1,32 @@
+# Dependency Review workflow for pull requests
+name: "Dependency Review"
+
+on: 
+  pull_request:
+    branches: [ "master", "dev" ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        continue-on-error: false
+        with:
+          # Fail on critical vulnerabilities
+          fail-on-severity: critical
+          # Comment on PRs with vulnerability details
+          comment-summary-in-pr: always
+          # Retry configuration
+          retry-on-snapshot-warnings: true
+          # Deny list for licenses (optional)
+          # deny-licenses: GPL-3.0, AGPL-3.0

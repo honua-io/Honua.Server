@@ -1,0 +1,188 @@
+# Honua YARP Gateway ConfigMap
+# YARP route and cluster configuration
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: honua-gateway-config
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: honua
+data:
+  appsettings.Production.json: |
+    {
+      "ServiceName": "honua-gateway",
+      "ServiceVersion": "1.0.0",
+
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning",
+          "Yarp": "Information"
+        }
+      },
+
+      "ReverseProxy": {
+        "Routes": {
+          "api-route": {
+            "ClusterId": "api-cluster",
+            "Match": {
+              "Hosts": ["api.honua.example.com", "api.honua.io"],
+              "Path": "{**catch-all}"
+            },
+            "Transforms": [
+              {
+                "RequestHeaderOriginalHost": "true"
+              }
+            ],
+            "RateLimiterPolicy": "per-ip"
+          },
+          "intake-route": {
+            "ClusterId": "intake-cluster",
+            "Match": {
+              "Hosts": ["intake.honua.example.com", "intake.honua.io"],
+              "Path": "{**catch-all}"
+            },
+            "Transforms": [
+              {
+                "RequestHeaderOriginalHost": "true"
+              }
+            ],
+            "RateLimiterPolicy": "per-ip"
+          },
+          "orchestrator-route": {
+            "ClusterId": "orchestrator-cluster",
+            "Match": {
+              "Hosts": ["orchestrator.honua.example.com", "orchestrator.honua.io"],
+              "Path": "{**catch-all}"
+            },
+            "Transforms": [
+              {
+                "RequestHeaderOriginalHost": "true"
+              }
+            ],
+            "RateLimiterPolicy": "per-ip"
+          },
+          "prometheus-route": {
+            "ClusterId": "prometheus-cluster",
+            "Match": {
+              "Hosts": ["prometheus.honua.example.com", "prometheus.honua.io"],
+              "Path": "{**catch-all}"
+            }
+          },
+          "grafana-route": {
+            "ClusterId": "grafana-cluster",
+            "Match": {
+              "Hosts": ["grafana.honua.example.com", "grafana.honua.io"],
+              "Path": "{**catch-all}"
+            }
+          }
+        },
+
+        "Clusters": {
+          "api-cluster": {
+            "Destinations": {
+              "api-primary": {
+                "Address": "http://honua-api.honua.svc.cluster.local:8080"
+              }
+            },
+            "HealthCheck": {
+              "Active": {
+                "Enabled": true,
+                "Interval": "00:00:30",
+                "Timeout": "00:00:10",
+                "Policy": "ConsecutiveFailures",
+                "Path": "/health/ready"
+              },
+              "Passive": {
+                "Enabled": true,
+                "Policy": "TransportFailureRate",
+                "ReactivationPeriod": "00:01:00"
+              }
+            },
+            "HttpRequest": {
+              "Timeout": "00:10:00"
+            },
+            "LoadBalancingPolicy": "RoundRobin"
+          },
+
+          "intake-cluster": {
+            "Destinations": {
+              "intake-primary": {
+                "Address": "http://honua-intake.honua.svc.cluster.local:8080"
+              }
+            },
+            "HealthCheck": {
+              "Active": {
+                "Enabled": true,
+                "Interval": "00:00:30",
+                "Timeout": "00:00:10",
+                "Policy": "ConsecutiveFailures",
+                "Path": "/health/ready"
+              },
+              "Passive": {
+                "Enabled": true,
+                "Policy": "TransportFailureRate",
+                "ReactivationPeriod": "00:01:00"
+              }
+            },
+            "HttpRequest": {
+              "Timeout": "00:10:00"
+            },
+            "LoadBalancingPolicy": "RoundRobin"
+          },
+
+          "orchestrator-cluster": {
+            "Destinations": {
+              "orchestrator-primary": {
+                "Address": "http://honua-orchestrator.honua.svc.cluster.local:8080"
+              }
+            },
+            "HealthCheck": {
+              "Active": {
+                "Enabled": true,
+                "Interval": "00:00:30",
+                "Timeout": "00:00:10",
+                "Policy": "ConsecutiveFailures",
+                "Path": "/health/ready"
+              },
+              "Passive": {
+                "Enabled": true,
+                "Policy": "TransportFailureRate",
+                "ReactivationPeriod": "00:01:00"
+              }
+            },
+            "HttpRequest": {
+              "Timeout": "00:10:00"
+            },
+            "LoadBalancingPolicy": "RoundRobin"
+          },
+
+          "prometheus-cluster": {
+            "Destinations": {
+              "prometheus-primary": {
+                "Address": "http://prometheus.honua.svc.cluster.local:9090"
+              }
+            },
+            "HttpRequest": {
+              "Timeout": "00:05:00"
+            },
+            "LoadBalancingPolicy": "RoundRobin"
+          },
+
+          "grafana-cluster": {
+            "Destinations": {
+              "grafana-primary": {
+                "Address": "http://grafana.honua.svc.cluster.local:3000"
+              }
+            },
+            "HttpRequest": {
+              "Timeout": "00:05:00"
+            },
+            "LoadBalancingPolicy": "RoundRobin"
+          }
+        }
+      }
+    }

@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  .runsettings - Test execution configuration for dotnet test
+
+  This file configures how tests run when using:
+    dotnet test
+    dotnet test --settings tests/.runsettings
+
+  Features:
+  - Parallel test execution (4 workers)
+  - Test result formats (TRX, HTML)
+  - Environment variables for test configuration
+  - Code coverage settings
+
+  Usage:
+    # Automatic (placed in tests/ directory)
+    dotnet test
+
+    # Explicit
+    dotnet test --settings tests/.runsettings
+
+    # With coverage
+    dotnet test --collect:"XPlat Code Coverage" --settings tests/.runsettings
+-->
+<RunSettings>
+  <!-- General Run Configuration -->
+  <RunConfiguration>
+    <!-- Maximum number of cores to use for parallel execution -->
+    <!-- Set to 0 to use all available cores -->
+    <!-- Set to 4 for conservative parallel execution to avoid Docker resource issues -->
+    <MaxCpuCount>4</MaxCpuCount>
+
+    <!-- Results Directory -->
+    <ResultsDirectory>./TestResults</ResultsDirectory>
+
+    <!-- Target platform (x64, x86, ARM) -->
+    <TargetPlatform>x64</TargetPlatform>
+
+    <!-- Target framework -->
+    <TargetFrameworkVersion>net9.0</TargetFrameworkVersion>
+
+    <!-- Batch tests for better performance -->
+    <BatchSize>10</BatchSize>
+
+    <!-- Timeout for each test (milliseconds) -->
+    <TestSessionTimeout>600000</TestSessionTimeout>
+
+    <!-- Treat test adapter errors as warnings -->
+    <TreatTestAdapterErrorsAsWarnings>false</TreatTestAdapterErrorsAsWarnings>
+
+    <!-- Disable AppDomain for xUnit -->
+    <DisableAppDomain>true</DisableAppDomain>
+  </RunConfiguration>
+
+  <!-- xUnit Runner Configuration -->
+  <!-- This section is read by xUnit test adapter -->
+  <xUnit>
+    <!-- Parallel execution settings -->
+    <MaxParallelThreads>4</MaxParallelThreads>
+    <ParallelizeAssemblies>true</ParallelizeAssemblies>
+    <ParallelizeTestCollections>true</ParallelizeTestCollections>
+
+    <!-- Diagnostics -->
+    <DiagnosticMessages>false</DiagnosticMessages>
+    <InternalDiagnosticMessages>false</InternalDiagnosticMessages>
+
+    <!-- Test display -->
+    <MethodDisplay>ClassAndMethod</MethodDisplay>
+    <MethodDisplayOptions>All</MethodDisplayOptions>
+
+    <!-- Test execution -->
+    <PreEnumerateTheories>true</PreEnumerateTheories>
+    <ShadowCopy>false</ShadowCopy>
+    <AppDomain>Denied</AppDomain>
+    <StopOnFail>false</StopOnFail>
+
+    <!-- Long-running test threshold (seconds) -->
+    <LongRunningTestSeconds>60</LongRunningTestSeconds>
+  </xUnit>
+
+  <!-- Test Environment Variables -->
+  <TestRunParameters>
+    <!-- Honua Test Configuration -->
+    <Parameter name="ASPNETCORE_ENVIRONMENT" value="Test" />
+    <Parameter name="HONUA_ALLOW_QUICKSTART" value="true" />
+    <Parameter name="honua__authentication__allowQuickStart" value="true" />
+
+    <!-- Database Configuration -->
+    <Parameter name="ConnectionStrings__DefaultConnection" value="Host=localhost;Database=honua_test;Username=postgres;Password=postgres" />
+
+    <!-- Test Optimization -->
+    <Parameter name="DOTNET_CLI_TELEMETRY_OPTOUT" value="1" />
+    <Parameter name="DOTNET_SKIP_FIRST_TIME_EXPERIENCE" value="1" />
+
+    <!-- Test Execution -->
+    <Parameter name="MaxParallelThreads" value="4" />
+  </TestRunParameters>
+
+  <!-- Logger Configuration -->
+  <LoggerRunSettings>
+    <Loggers>
+      <!-- Console logger with minimal verbosity -->
+      <Logger friendlyName="console" enabled="true">
+        <Configuration>
+          <Verbosity>normal</Verbosity>
+        </Configuration>
+      </Logger>
+
+      <!-- TRX logger for Visual Studio / Azure DevOps -->
+      <Logger friendlyName="trx" enabled="true" />
+
+      <!-- HTML logger for human-readable reports -->
+      <Logger friendlyName="html" enabled="true" />
+    </Loggers>
+  </LoggerRunSettings>
+
+  <!-- Data Collection Configuration (Code Coverage) -->
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <!-- Exclude test projects from coverage -->
+          <Exclude>[*.Tests]*,[*.Benchmarks]*</Exclude>
+
+          <!-- Exclude generated code -->
+          <ExcludeByFile>**/Migrations/*.cs,**/*.Designer.cs,**/*.g.cs</ExcludeByFile>
+
+          <!-- Output format -->
+          <Format>cobertura,opencover,json</Format>
+
+          <!-- Single hit -->
+          <SingleHit>false</SingleHit>
+
+          <!-- Include test assemblies -->
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+
+  <!-- MSTest Configuration (if using MSTest) -->
+  <MSTest>
+    <Parallelize>
+      <Workers>4</Workers>
+      <Scope>MethodLevel</Scope>
+    </Parallelize>
+    <AssemblyInitializeTimeout>120000</AssemblyInitializeTimeout>
+    <ClassInitializeTimeout>60000</ClassInitializeTimeout>
+    <TestTimeout>60000</TestTimeout>
+    <TreatDiscoveryWarningsAsErrors>false</TreatDiscoveryWarningsAsErrors>
+  </MSTest>
+</RunSettings>

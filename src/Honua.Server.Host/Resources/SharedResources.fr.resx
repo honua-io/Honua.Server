@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Exception Messages -->
+  <data name="FeatureNotFound" xml:space="preserve">
+    <value>L'entité '{0}' est introuvable.</value>
+    <comment>Message d'erreur lorsqu'une entité est introuvable. {0} est l'ID de l'entité.</comment>
+  </data>
+  <data name="FeatureNotFoundInLayer" xml:space="preserve">
+    <value>L'entité '{0}' est introuvable dans la couche '{1}'.</value>
+    <comment>Message d'erreur lorsqu'une entité est introuvable dans une couche spécifique. {0} est l'ID de l'entité, {1} est l'ID de la couche.</comment>
+  </data>
+  <data name="LayerNotFound" xml:space="preserve">
+    <value>La couche demandée est introuvable.</value>
+    <comment>Message d'erreur lorsqu'une couche est introuvable.</comment>
+  </data>
+  <data name="LayerNotFoundWithId" xml:space="preserve">
+    <value>La couche '{0}' est introuvable.</value>
+    <comment>Message d'erreur lorsqu'une couche spécifique est introuvable. {0} est l'ID de la couche.</comment>
+  </data>
+  <data name="CollectionNotFound" xml:space="preserve">
+    <value>La collection '{0}' est introuvable.</value>
+    <comment>Message d'erreur lorsqu'une collection est introuvable. {0} est l'ID de la collection.</comment>
+  </data>
+  <data name="ServiceUnavailable" xml:space="preserve">
+    <value>Le service est temporairement indisponible. Veuillez réessayer ultérieurement.</value>
+    <comment>Message d'erreur lorsque le service est indisponible.</comment>
+  </data>
+  <data name="InvalidParameters" xml:space="preserve">
+    <value>La requête contient des paramètres non valides.</value>
+    <comment>Message d'erreur pour des paramètres de requête non valides.</comment>
+  </data>
+  <data name="InvalidGeometry" xml:space="preserve">
+    <value>La géométrie fournie n'est pas valide.</value>
+    <comment>Message d'erreur pour une géométrie non valide.</comment>
+  </data>
+  <data name="InvalidBoundingBox" xml:space="preserve">
+    <value>La boîte englobante '{0}' n'est pas valide.</value>
+    <comment>Message d'erreur pour une boîte englobante non valide. {0} est la valeur de la boîte englobante.</comment>
+  </data>
+  <data name="InvalidCrs" xml:space="preserve">
+    <value>Le système de référence de coordonnées '{0}' n'est pas pris en charge.</value>
+    <comment>Message d'erreur pour un système de coordonnées non pris en charge. {0} est l'identifiant du système de coordonnées.</comment>
+  </data>
+  <data name="InvalidFormat" xml:space="preserve">
+    <value>Le format '{0}' n'est pas pris en charge.</value>
+    <comment>Message d'erreur pour un format non pris en charge. {0} est le nom du format.</comment>
+  </data>
+  <data name="DataStoreError" xml:space="preserve">
+    <value>Une erreur s'est produite lors de l'accès au stockage de données.</value>
+    <comment>Message d'erreur pour les erreurs de stockage de données.</comment>
+  </data>
+  <data name="CacheError" xml:space="preserve">
+    <value>Une erreur s'est produite lors de l'accès au cache.</value>
+    <comment>Message d'erreur pour les erreurs de cache.</comment>
+  </data>
+  <data name="MetadataError" xml:space="preserve">
+    <value>Une erreur s'est produite lors de l'accès aux métadonnées.</value>
+    <comment>Message d'erreur pour les erreurs de métadonnées.</comment>
+  </data>
+  <data name="QueryError" xml:space="preserve">
+    <value>Une erreur s'est produite lors de l'exécution de la requête.</value>
+    <comment>Message d'erreur pour les erreurs d'exécution de requête.</comment>
+  </data>
+  <data name="RasterError" xml:space="preserve">
+    <value>Une erreur s'est produite lors du traitement des données matricielles.</value>
+    <comment>Message d'erreur pour les erreurs de traitement des données raster.</comment>
+  </data>
+  <data name="SerializationError" xml:space="preserve">
+    <value>Une erreur s'est produite lors de la sérialisation de la réponse.</value>
+    <comment>Message d'erreur pour les erreurs de sérialisation.</comment>
+  </data>
+  <data name="UnauthorizedAccess" xml:space="preserve">
+    <value>Vous n'avez pas l'autorisation d'accéder à cette ressource.</value>
+    <comment>Message d'erreur pour un accès non autorisé.</comment>
+  </data>
+  <data name="Forbidden" xml:space="preserve">
+    <value>L'accès à cette ressource est interdit.</value>
+    <comment>Message d'erreur pour un accès interdit.</comment>
+  </data>
+  <data name="TooManyRequests" xml:space="preserve">
+    <value>Trop de requêtes. Veuillez réessayer ultérieurement.</value>
+    <comment>Message d'erreur pour la limitation du taux de requêtes.</comment>
+  </data>
+  <data name="InternalServerError" xml:space="preserve">
+    <value>Une erreur interne du serveur s'est produite.</value>
+    <comment>Message générique d'erreur interne du serveur.</comment>
+  </data>
+  <data name="NotImplemented" xml:space="preserve">
+    <value>Cette fonctionnalité n'est pas implémentée.</value>
+    <comment>Message d'erreur pour les fonctionnalités non implémentées.</comment>
+  </data>
+  <data name="BadRequest" xml:space="preserve">
+    <value>La requête est mal formée ou non valide.</value>
+    <comment>Message d'erreur pour les requêtes incorrectes.</comment>
+  </data>
+  <data name="MethodNotAllowed" xml:space="preserve">
+    <value>La méthode HTTP '{0}' n'est pas autorisée pour cette ressource.</value>
+    <comment>Message d'erreur pour méthode non autorisée. {0} est la méthode HTTP.</comment>
+  </data>
+  <data name="UnsupportedMediaType" xml:space="preserve">
+    <value>Le type de média '{0}' n'est pas pris en charge.</value>
+    <comment>Message d'erreur pour un type de média non pris en charge. {0} est le type de média.</comment>
+  </data>
+  <data name="ConflictError" xml:space="preserve">
+    <value>La requête est en conflit avec l'état actuel de la ressource.</value>
+    <comment>Message d'erreur pour les erreurs de conflit.</comment>
+  </data>
+  <data name="GoneError" xml:space="preserve">
+    <value>La ressource demandée n'est plus disponible.</value>
+    <comment>Message d'erreur pour les ressources qui ne sont plus disponibles.</comment>
+  </data>
+  <data name="PreconditionFailed" xml:space="preserve">
+    <value>La précondition a échoué pour cette requête.</value>
+    <comment>Message d'erreur pour les préconditions échouées.</comment>
+  </data>
+  <data name="PayloadTooLarge" xml:space="preserve">
+    <value>La charge utile de la requête est trop volumineuse.</value>
+    <comment>Message d'erreur pour une charge utile trop volumineuse.</comment>
+  </data>
+  <data name="UriTooLong" xml:space="preserve">
+    <value>L'URI de la requête est trop long.</value>
+    <comment>Message d'erreur pour un URI trop long.</comment>
+  </data>
+
+  <!-- Validation Messages -->
+  <data name="RequiredParameter" xml:space="preserve">
+    <value>Le paramètre '{0}' est obligatoire.</value>
+    <comment>Erreur de validation pour un paramètre obligatoire. {0} est le nom du paramètre.</comment>
+  </data>
+  <data name="InvalidParameterValue" xml:space="preserve">
+    <value>La valeur du paramètre '{0}' n'est pas valide.</value>
+    <comment>Erreur de validation pour une valeur de paramètre non valide. {0} est le nom du paramètre.</comment>
+  </data>
+  <data name="ParameterOutOfRange" xml:space="preserve">
+    <value>Le paramètre '{0}' est hors limites. Attendu entre {1} et {2}.</value>
+    <comment>Erreur de validation pour un paramètre hors limites. {0} est le nom du paramètre, {1} est le minimum, {2} est le maximum.</comment>
+  </data>
+
+  <!-- OGC API Messages -->
+  <data name="CollectionsTitle" xml:space="preserve">
+    <value>Collections d'entités</value>
+    <comment>Titre pour le point de terminaison des collections.</comment>
+  </data>
+  <data name="CollectionsDescription" xml:space="preserve">
+    <value>Accès aux collections de données disponibles dans cette API.</value>
+    <comment>Description pour le point de terminaison des collections.</comment>
+  </data>
+  <data name="ConformanceTitle" xml:space="preserve">
+    <value>Déclaration de conformité</value>
+    <comment>Titre pour le point de terminaison de conformité.</comment>
+  </data>
+  <data name="ConformanceDescription" xml:space="preserve">
+    <value>Informations sur les spécifications et normes auxquelles cette API se conforme.</value>
+    <comment>Description pour le point de terminaison de conformité.</comment>
+  </data>
+</root>

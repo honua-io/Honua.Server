@@ -1,0 +1,176 @@
+---
+# Honua Server Network Policy
+# This policy controls ingress and egress traffic for the main Honua application server.
+#
+# Allowed Ingress:
+# - From Ingress Controller (for external HTTP/HTTPS traffic)
+# - From pods within namespace (for health checks, metrics)
+#
+# Allowed Egress:
+# - To PostgreSQL/PostGIS database (port 5432)
+# - To Redis cache (port 6379)
+# - To DNS (port 53)
+# - To external APIs (HTTPS port 443)
+# - To external HTTP sources (port 80, 443 for raster data, weather APIs, etc.)
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: honua-server
+  namespace: honua
+  labels:
+    app: honua-server
+    component: network-policy
+    policy-type: application
+  annotations:
+    description: "Network policy for Honua Server application pods"
+    security.policy: "least-privilege"
+    priority: "10"
+
+spec:
+  # Target Honua Server pods
+  podSelector:
+    matchLabels:
+      app: honua-server
+
+  policyTypes:
+  - Ingress
+  - Egress
+
+  # ============================================================
+  # INGRESS RULES
+  # ============================================================
+  ingress:
+  # Rule 1: Allow traffic from Ingress Controller
+  # This allows external HTTP/HTTPS traffic to reach the application
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    # Alternative: Allow from any ingress controller namespace
+    - namespaceSelector:
+        matchLabels:
+          ingress-controller: "true"
+    ports:
+    - protocol: TCP
+      port: 8080
+
+  # Rule 2: Allow traffic from other Honua Server pods (for inter-pod communication)
+  # Useful for health checks, metrics scraping, and service mesh
+  - from:
+    - podSelector:
+        matchLabels:
+          app: honua-server
+    ports:
+    - protocol: TCP
+      port: 8080
+
+  # Rule 3: Allow traffic from monitoring/metrics scraper (Prometheus)
+  # This allows metrics collection from the /metrics endpoint
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+      podSelector:
+        matchLabels:
+          app: prometheus
+    # Alternative: Allow from any monitoring namespace
+    - namespaceSelector:
+        matchLabels:
+          monitoring: "true"
+    ports:
+    - protocol: TCP
+      port: 8080
+
+  # ============================================================
+  # EGRESS RULES
+  # ============================================================
+  egress:
+  # Rule 1: Allow DNS lookups
+  # Required for resolving service names and external domains
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+  # Rule 2: Allow traffic to PostgreSQL/PostGIS database
+  # Required for database operations
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgis
+    ports:
+    - protocol: TCP
+      port: 5432
+
+  # Rule 3: Allow traffic to Redis cache
+  # Required for caching operations
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+
+  # Rule 4: Allow HTTPS to external APIs
+  # Required for:
+  # - Azure Blob Storage (cloud storage)
+  # - AWS S3 (cloud storage)
+  # - GCS (cloud storage)
+  # - Weather data APIs
+  # - External raster data sources
+  # - OIDC authentication providers
+  # - AI/LLM APIs (OpenAI, Azure OpenAI, Anthropic)
+  # - Observability (OTLP, Prometheus remote write)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+
+  # Rule 5: Allow HTTP to external APIs
+  # Required for:
+  # - HTTP-based external raster sources
+  # - Legacy APIs
+  # Note: Consider removing this in production if all external APIs support HTTPS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 80
+
+  # Rule 6: Allow traffic to OpenTelemetry Collector (if deployed)
+  # Required for distributed tracing
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: observability
+      podSelector:
+        matchLabels:
+          app: otel-collector
+    ports:
+    - protocol: TCP
+      port: 4317  # OTLP gRPC
+    - protocol: TCP
+      port: 4318  # OTLP HTTP
+
+  # Rule 7: Allow traffic to other Honua Server pods (for health checks)
+  - to:
+    - podSelector:
+        matchLabels:
+          app: honua-server
+    ports:
+    - protocol: TCP
+      port: 8080

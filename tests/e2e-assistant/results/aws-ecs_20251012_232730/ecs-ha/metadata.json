@@ -1,0 +1,53 @@
+{
+  "catalog": {
+    "id": "honua-catalog",
+    "title": "Honua GIS Catalog",
+    "description": "Geospatial data services powered by Honua - development environment",
+    "version": "2025.10",
+    "keywords": [
+      "gis",
+      "ogc",
+      "features",
+      "tiles",
+      "development"
+    ]
+  },
+  "folders": [
+    {
+      "id": "default",
+      "title": "Default Services",
+      "order": 10
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "primary",
+      "provider": "sqlite",
+      "connectionString": "Data Source=data/honua.db"
+    }
+  ],
+  "services": [
+    {
+      "id": "sample-features",
+      "title": "Sample Feature Service",
+      "folderId": "default",
+      "serviceType": "feature",
+      "dataSourceId": "primary",
+      "enabled": true,
+      "description": "Sample OGC API Features service - configure layers via Honua CLI",
+      "keywords": [
+        "sample",
+        "features",
+        "ogc"
+      ],
+      "ogc": {
+        "collectionsEnabled": true,
+        "itemLimit": 1000,
+        "defaultCrs": "EPSG:4326",
+        "additionalCrs": [
+          "EPSG:3857"
+        ]
+      }
+    }
+  ]
+}

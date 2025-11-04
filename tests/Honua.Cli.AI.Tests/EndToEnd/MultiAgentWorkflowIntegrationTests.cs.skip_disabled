@@ -1,0 +1,473 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using FluentAssertions;
+using Honua.Cli.AI.Services.Agents;
+using Honua.Cli.AI.Services.VectorSearch;
+using Honua.Cli.AI.Tests.Mocks;
+using Honua.Cli.AI.Tests.TestFixtures;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.SemanticKernel;
+using Moq;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace Honua.Cli.AI.Tests.EndToEnd;
+
+[Collection("PostgreSQL")]
+public class MultiAgentWorkflowIntegrationTests : IAsyncLifetime
+{
+    private readonly PostgreSqlTestFixture _fixture;
+    private readonly ITestOutputHelper _output;
+    private readonly ServiceProvider _serviceProvider;
+    private readonly MockLlmProvider _mockLlmProvider;
+
+    public MultiAgentWorkflowIntegrationTests(PostgreSqlTestFixture fixture, ITestOutputHelper output)
+    {
+        _fixture = fixture;
+        _output = output;
+
+        // Build service provider with all dependencies
+        var services = new ServiceCollection();
+
+        // Configuration
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:PostgreSQL"] = _fixture.ConnectionString,
+                ["AgentCapabilities:MinConfidenceThreshold"] = "0.7",
+                ["AgentCapabilities:MaxConcurrentAgents"] = "5",
+                ["AgentCapabilities:DefaultTimeoutSeconds"] = "30"
+            })
+            .Build();
+        services.AddSingleton<IConfiguration>(configuration);
+
+        // Logging
+        services.AddLogging(builder =>
+        {
+            builder.AddDebug();
+            builder.SetMinimumLevel(LogLevel.Debug);
+        });
+
+        // Mock LLM Provider
+        _mockLlmProvider = new MockLlmProvider();
+        services.AddSingleton<ILlmProvider>(_mockLlmProvider);
+
+        // Agent Services
+        services.Configure<AgentCapabilityOptions>(configuration.GetSection("AgentCapabilities"));
+        services.AddSingleton<AgentCapabilityRegistry>();
+        services.AddSingleton<IntelligentAgentSelector>();
+        services.AddSingleton<IAgentCritic, PlanSafetyCritic>();
+        services.AddSingleton<IAgentHistoryStore, PostgresAgentHistoryStore>();
+
+        // Telemetry
+        services.AddSingleton<IPatternUsageTelemetry, PostgresPatternUsageTelemetry>();
+
+        // Semantic Kernel
+        var kernelBuilder = Kernel.CreateBuilder();
+        services.AddSingleton(kernelBuilder.Build());
+
+        // Agent Coordinator
+        services.AddSingleton<IAgentCoordinator, SemanticAgentCoordinator>();
+
+        _serviceProvider = services.BuildServiceProvider();
+    }
+
+    public Task InitializeAsync() => _fixture.ResetAsync();
+
+    public Task DisposeAsync()
+    {
+        _serviceProvider?.Dispose();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task CompleteWorkflow_Should_ExecuteEndToEnd()
+    {
+        // Arrange
+        var coordinator = _serviceProvider.GetRequiredService<IAgentCoordinator>();
+
+        // Setup mock responses for complete workflow
+        SetupCompleteWorkflowResponses();
+
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Deploy a new microservice to production with monitoring",
+            SessionId = Guid.NewGuid().ToString(),
+            Context = new Dictionary<string, string>
+            {
+                ["environment"] = "production",
+                ["service"] = "user-service",
+                ["version"] = "2.0.0"
+            },
+            RequireExplanation = true,
+            MaxSteps = 5
+        };
+
+        // Act
+        var result = await coordinator.ExecuteAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+        result.Response.Should().NotBeNullOrWhiteSpace();
+        result.Steps.Should().NotBeEmpty();
+        result.SessionId.Should().Be(request.SessionId);
+        result.TotalDurationMs.Should().BeGreaterThan(0);
+
+        // Verify history was persisted
+        var historyStore = _serviceProvider.GetRequiredService<IAgentHistoryStore>();
+        var history = await historyStore.GetSessionHistoryAsync(request.SessionId);
+        history.Should().NotBeEmpty();
+
+        // Verify telemetry was recorded
+        var telemetry = _serviceProvider.GetRequiredService<IPatternUsageTelemetry>();
+        // Telemetry should have been called (mock verification would go here)
+
+        _output.WriteLine($"Workflow completed with {result.Steps.Count} steps in {result.TotalDurationMs}ms");
+    }
+
+    [Fact]
+    public async Task CompleteWorkflow_Should_HandleFailureAndRetry()
+    {
+        // Arrange
+        var coordinator = _serviceProvider.GetRequiredService<IAgentCoordinator>();
+
+        // Setup responses with failure then success
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            intent = "deployment",
+            confidence = 0.9
+        }));
+
+        // First agent fails
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "DeploymentAgent",
+            confidence = 0.85
+        }));
+        _mockLlmProvider.SimulateFailure(new InvalidOperationException("Deployment failed"), afterNCalls: 2);
+
+        // Retry with different agent
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "FallbackDeploymentAgent",
+            confidence = 0.75
+        }));
+        _mockLlmProvider.EnqueueResponse("Deployment completed with fallback strategy");
+        _mockLlmProvider.EnqueueResponse("Successfully deployed using alternative method");
+
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Deploy service with automatic retry",
+            SessionId = Guid.NewGuid().ToString()
+        };
+
+        // Act
+        var result = await coordinator.ExecuteAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        // The coordinator should handle the failure and potentially succeed with fallback
+        result.Steps.Should().NotBeEmpty();
+
+        _output.WriteLine($"Handled failure and completed with {result.Steps.Count} steps");
+    }
+
+    [Fact]
+    public async Task CompleteWorkflow_Should_ExecuteConcurrentAgents()
+    {
+        // Arrange
+        var coordinator = _serviceProvider.GetRequiredService<IAgentCoordinator>();
+
+        SetupConcurrentAgentResponses();
+
+        var tasks = new List<Task<AgentCoordinatorResult>>();
+
+        // Create multiple concurrent requests
+        for (int i = 0; i < 5; i++)
+        {
+            var request = new AgentCoordinatorRequest
+            {
+                UserRequest = $"Concurrent task {i}",
+                SessionId = Guid.NewGuid().ToString(),
+                TimeoutSeconds = 30
+            };
+
+            tasks.Add(coordinator.ExecuteAsync(request));
+        }
+
+        // Act
+        var results = await Task.WhenAll(tasks);
+
+        // Assert
+        results.Should().HaveCount(5);
+        results.Should().OnlyContain(r => r.Success);
+        results.Select(r => r.SessionId).Distinct().Should().HaveCount(5);
+
+        // Verify all sessions were persisted
+        var historyStore = _serviceProvider.GetRequiredService<IAgentHistoryStore>();
+        foreach (var result in results)
+        {
+            var history = await historyStore.GetSessionHistoryAsync(result.SessionId);
+            history.Should().NotBeEmpty();
+        }
+
+        _output.WriteLine($"Completed {results.Length} concurrent workflows");
+    }
+
+    [Fact]
+    public async Task CompleteWorkflow_Should_ApplyCriticFeedback()
+    {
+        // Arrange
+        var coordinator = _serviceProvider.GetRequiredService<IAgentCoordinator>();
+        var critic = _serviceProvider.GetRequiredService<IAgentCritic>();
+
+        SetupWorkflowWithCriticResponses();
+
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Execute plan with critic validation",
+            SessionId = Guid.NewGuid().ToString()
+        };
+
+        // Act
+        var result = await coordinator.ExecuteAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+
+        // Verify critic was invoked
+        var requestSnapshot = new ConsultantRequestSnapshot(
+            request.UserRequest,
+            false,
+            "normal");
+
+        var criticFeedback = await critic.EvaluateAsync(requestSnapshot, result, CancellationToken.None);
+        criticFeedback.Should().NotBeNull();
+
+        // If no steps were recorded, critic should warn
+        if (result.Steps.Count == 0)
+        {
+            criticFeedback.Should().Contain(warning => warning.Contains("No agent steps were recorded"));
+        }
+
+        _output.WriteLine($"Critic provided {criticFeedback.Count} feedback items");
+    }
+
+    [Fact]
+    public async Task CompleteWorkflow_Should_HandleTimeouts()
+    {
+        // Arrange
+        var coordinator = _serviceProvider.GetRequiredService<IAgentCoordinator>();
+
+        // Simulate slow responses
+        _mockLlmProvider.SimulateDelay(TimeSpan.FromSeconds(5));
+
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Task with timeout",
+            SessionId = Guid.NewGuid().ToString(),
+            TimeoutSeconds = 2 // Short timeout
+        };
+
+        // Act
+        var act = () => coordinator.ExecuteAsync(request);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+
+        _output.WriteLine("Workflow correctly timed out after 2 seconds");
+    }
+
+    [Fact]
+    public async Task CompleteWorkflow_Should_GenerateSessionSummary()
+    {
+        // Arrange
+        var coordinator = _serviceProvider.GetRequiredService<IAgentCoordinator>();
+        var historyStore = _serviceProvider.GetRequiredService<IAgentHistoryStore>();
+
+        SetupCompleteWorkflowResponses();
+
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Complete task with session summary",
+            SessionId = Guid.NewGuid().ToString(),
+            MaxSteps = 3
+        };
+
+        // Act
+        var result = await coordinator.ExecuteAsync(request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+
+        // Wait a bit for async history persistence
+        await Task.Delay(100);
+
+        // Verify session summary was created
+        var summaries = await historyStore.GetSessionSummariesAsync(limit: 10);
+        var summary = summaries.FirstOrDefault(s => s.SessionId == request.SessionId);
+
+        if (summary != null)
+        {
+            summary.InitialRequest.Should().Contain("Complete task");
+            summary.InteractionCount.Should().BeGreaterThan(0);
+            summary.TotalDurationMs.Should().BeGreaterThan(0);
+            summary.AgentsUsed.Should().NotBeEmpty();
+        }
+
+        _output.WriteLine($"Session summary created with {summary?.InteractionCount ?? 0} interactions");
+    }
+
+    [Fact]
+    public async Task CompleteWorkflow_Should_HandleLargeContext()
+    {
+        // Arrange
+        var coordinator = _serviceProvider.GetRequiredService<IAgentCoordinator>();
+
+        var largeContext = new Dictionary<string, string>();
+        for (int i = 0; i < 100; i++)
+        {
+            largeContext[$"param_{i}"] = new string('x', 100); // 100 chars each
+        }
+
+        SetupCompleteWorkflowResponses();
+
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Process with large context",
+            SessionId = Guid.NewGuid().ToString(),
+            Context = largeContext
+        };
+
+        // Act
+        var result = await coordinator.ExecuteAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+
+        _output.WriteLine($"Handled large context with {largeContext.Count} parameters");
+    }
+
+    [Fact]
+    public async Task CompleteWorkflow_Should_RespectMaxStepsLimit()
+    {
+        // Arrange
+        var coordinator = _serviceProvider.GetRequiredService<IAgentCoordinator>();
+
+        // Setup many potential steps
+        for (int i = 0; i < 10; i++)
+        {
+            _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+            {
+                selectedAgent = $"Agent{i}",
+                confidence = 0.8
+            }));
+            _mockLlmProvider.EnqueueResponse($"Step {i} completed");
+        }
+
+        var request = new AgentCoordinatorRequest
+        {
+            UserRequest = "Multi-step task",
+            SessionId = Guid.NewGuid().ToString(),
+            MaxSteps = 3 // Limit to 3 steps
+        };
+
+        // Act
+        var result = await coordinator.ExecuteAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Steps.Should().HaveCountLessOrEqualTo(3);
+
+        _output.WriteLine($"Correctly limited execution to {result.Steps.Count} steps");
+    }
+
+    private void SetupCompleteWorkflowResponses()
+    {
+        _mockLlmProvider.Reset();
+
+        // Intent analysis
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            intent = "deployment",
+            confidence = 0.9,
+            entities = new[] { "microservice", "production", "monitoring" },
+            suggestedAgents = new[] { "DeploymentAgent", "MonitoringAgent" }
+        }));
+
+        // Agent selection
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "DeploymentAgent",
+            confidence = 0.85,
+            reasoning = "Best suited for production deployment"
+        }));
+
+        // Agent execution
+        _mockLlmProvider.EnqueueResponse("Deployment initiated successfully");
+
+        // Monitoring agent selection
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "MonitoringAgent",
+            confidence = 0.9,
+            reasoning = "Setting up monitoring"
+        }));
+
+        // Monitoring execution
+        _mockLlmProvider.EnqueueResponse("Monitoring configured");
+
+        // Final synthesis
+        _mockLlmProvider.EnqueueResponse("Microservice successfully deployed to production with monitoring enabled");
+    }
+
+    private void SetupConcurrentAgentResponses()
+    {
+        _mockLlmProvider.Reset();
+
+        // Setup pattern responses for concurrent execution
+        _mockLlmProvider.SetPatternResponse("analyze", JsonSerializer.Serialize(new
+        {
+            intent = "concurrent_task",
+            confidence = 0.85
+        }));
+
+        _mockLlmProvider.SetPatternResponse("select", JsonSerializer.Serialize(new
+        {
+            selectedAgent = "ConcurrentAgent",
+            confidence = 0.8
+        }));
+
+        _mockLlmProvider.SetPatternResponse("execute", "Task completed successfully");
+        _mockLlmProvider.SetPatternResponse("synthesize", "Concurrent execution completed");
+    }
+
+    private void SetupWorkflowWithCriticResponses()
+    {
+        _mockLlmProvider.Reset();
+
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            intent = "validation_task",
+            confidence = 0.85
+        }));
+
+        _mockLlmProvider.EnqueueResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "ValidationAgent",
+            confidence = 0.9
+        }));
+
+        _mockLlmProvider.EnqueueResponse("Validation completed");
+        _mockLlmProvider.EnqueueResponse("Task completed with critic validation");
+    }
+}

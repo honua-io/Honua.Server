@@ -1,0 +1,246 @@
+# ============================================================================
+# HonuaIO Multi-Region Deployment Configuration
+# ============================================================================
+# Copy this file to terraform.tfvars and customize for your deployment
+#
+# Example configurations:
+#   - Development: Single region with minimal resources
+#   - Production: Multi-region with full HA and DR
+# ============================================================================
+
+# ============================================================================
+# Cloud Provider (choose one)
+# ============================================================================
+cloud_provider = "aws"  # Options: aws, azure, gcp
+
+# ============================================================================
+# Region Configuration
+# ============================================================================
+
+# AWS Regions
+primary_region = "us-east-1"  # N. Virginia (Primary)
+dr_region      = "us-west-2"  # Oregon (DR)
+
+# Azure Regions
+# primary_region = "eastus"    # East US (Primary)
+# dr_region      = "westus2"   # West US 2 (DR)
+
+# GCP Regions
+# primary_region = "us-east1"  # South Carolina (Primary)
+# dr_region      = "us-west1"  # Oregon (DR)
+
+# ============================================================================
+# Environment
+# ============================================================================
+environment  = "prod"  # Options: dev, staging, prod
+project_name = "honua"
+
+# ============================================================================
+# Compute Configuration
+# ============================================================================
+
+# Primary region - full capacity
+primary_instance_count = 3
+primary_instance_type  = "c6i.2xlarge"  # AWS: 8 vCPU, 16 GB RAM
+# primary_instance_type  = "Standard_D4s_v5"  # Azure: 4 vCPU, 16 GB RAM
+# primary_instance_type  = "n2-standard-4"     # GCP: 4 vCPU, 16 GB RAM
+
+# DR region - scaled down (scaled up during failover)
+dr_instance_count = 1
+dr_instance_type  = "c6i.xlarge"  # AWS: 4 vCPU, 8 GB RAM
+# dr_instance_type  = "Standard_D2s_v5"  # Azure: 2 vCPU, 8 GB RAM
+# dr_instance_type  = "n2-standard-2"     # GCP: 2 vCPU, 8 GB RAM
+
+# Container configuration
+container_image = "honuaio/honua-server:latest"
+container_port  = 8080
+cpu_limit      = "2.0"   # vCPUs
+memory_limit   = "4.0"   # GB
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+
+# Primary database - production capacity
+primary_db_instance_class = "db.r6g.xlarge"  # AWS: 4 vCPU, 32 GB RAM
+# primary_db_instance_class = "GP_Standard_D4s_v3"  # Azure: 4 vCPU, 16 GB RAM
+# primary_db_instance_class = "db-custom-4-16384"   # GCP: 4 vCPU, 16 GB RAM
+
+# DR database - can be smaller
+dr_db_instance_class = "db.r6g.large"  # AWS: 2 vCPU, 16 GB RAM
+# dr_db_instance_class = "GP_Standard_D2s_v3"  # Azure: 2 vCPU, 8 GB RAM
+# dr_db_instance_class = "db-custom-2-8192"    # GCP: 2 vCPU, 8 GB RAM
+
+db_engine_version         = "15"
+db_storage_size          = 100  # GB
+db_backup_retention_days = 30
+
+# Database credentials (use environment variables or secrets manager)
+db_admin_username = "honuaadmin"
+db_admin_password = "CHANGE_ME_USE_SECRETS_MANAGER"  # DO NOT commit real password!
+
+# ============================================================================
+# Replication Configuration
+# ============================================================================
+enable_db_replication      = true
+enable_storage_replication = true
+enable_redis_replication   = true
+
+replication_lag_alert_threshold = 60  # seconds
+
+# ============================================================================
+# Load Balancer and DNS Configuration
+# ============================================================================
+enable_global_lb          = true
+failover_routing_policy   = "latency"  # Options: latency, geolocation, weighted, failover
+
+# Health checks
+health_check_interval  = 30   # seconds
+health_check_timeout   = 10   # seconds
+health_check_threshold = 3    # consecutive failures
+health_check_path     = "/health"
+
+# DNS (optional - comment out if not using custom domain)
+# domain_name      = "example.com"
+# subdomain        = "api"
+# create_dns_zone  = false
+# dns_zone_id      = "Z1234567890ABC"  # Existing hosted zone ID
+# dns_ttl          = 60
+
+# ============================================================================
+# Security Configuration
+# ============================================================================
+enable_waf               = true
+enable_ddos_protection   = true
+enable_vpc_endpoints     = true
+enable_encryption_in_transit = true
+tls_version             = "1.3"
+
+# Network access (restrict in production!)
+allowed_cidr_blocks = ["0.0.0.0/0"]  # Allow all - CHANGE FOR PRODUCTION
+# allowed_cidr_blocks = ["10.0.0.0/8", "172.16.0.0/12"]  # Private networks only
+
+# ============================================================================
+# Monitoring and Alerting
+# ============================================================================
+enable_monitoring = true
+enable_logging   = true
+enable_tracing   = true
+log_retention_days = 30
+
+# Alert destinations
+alert_email = "ops@example.com"
+# alert_slack_webhook  = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+# alert_pagerduty_key  = "your-pagerduty-integration-key"
+
+# ============================================================================
+# Auto-Scaling Configuration
+# ============================================================================
+enable_auto_scaling    = true
+min_instances          = 1
+max_instances          = 10
+target_cpu_utilization = 70  # percentage
+
+# Cost optimization
+enable_spot_instances = false  # Enable for dev/staging to save costs
+
+# ============================================================================
+# Storage Configuration
+# ============================================================================
+storage_replication_enabled = true
+storage_tier               = "standard"  # Options: standard, infrequent_access, glacier
+storage_encryption_enabled = true
+
+# ============================================================================
+# Cache Configuration
+# ============================================================================
+enable_redis_cache = true
+redis_instance_type = "cache.r6g.large"  # AWS
+# redis_instance_type = "Standard"        # Azure (with redis_capacity = "C2")
+# redis_instance_type = "STANDARD_HA"     # GCP
+
+# ============================================================================
+# CDN Configuration
+# ============================================================================
+enable_cdn = true
+
+# ============================================================================
+# Disaster Recovery Settings
+# ============================================================================
+enable_automated_backups     = true
+backup_retention_days        = 30
+enable_point_in_time_recovery = true
+
+# Recovery objectives
+rto_minutes = 15  # Recovery Time Objective
+rpo_seconds = 60  # Recovery Point Objective
+
+# ============================================================================
+# Maintenance
+# ============================================================================
+maintenance_window = "sun:02:00-sun:04:00"  # UTC
+
+# ============================================================================
+# Compliance
+# ============================================================================
+enable_audit_logging   = true
+compliance_framework   = "soc2"  # Options: hipaa, pci, soc2, gdpr, none
+# data_residency_region = "us-east-1"  # For strict data residency
+
+# ============================================================================
+# Tags
+# ============================================================================
+tags = {
+  CostCenter  = "Engineering"
+  Owner       = "Platform Team"
+  Compliance  = "SOC2"
+  Environment = "Production"
+  Backup      = "Required"
+}
+
+# ============================================================================
+# Example Configurations by Use Case
+# ============================================================================
+
+# --- Development Environment ---
+# cloud_provider            = "aws"
+# primary_region            = "us-east-2"
+# dr_region                 = "us-west-2"
+# environment               = "dev"
+# primary_instance_count    = 1
+# dr_instance_count         = 1
+# primary_instance_type     = "t3.medium"
+# dr_instance_type          = "t3.small"
+# primary_db_instance_class = "db.t4g.micro"
+# dr_db_instance_class      = "db.t4g.micro"
+# enable_db_replication     = false
+# enable_storage_replication = false
+# enable_auto_scaling       = false
+# enable_waf                = false
+# enable_cdn                = false
+# db_backup_retention_days  = 7
+
+# --- Staging Environment ---
+# cloud_provider            = "aws"
+# primary_region            = "us-east-1"
+# dr_region                 = "us-west-2"
+# environment               = "staging"
+# primary_instance_count    = 2
+# dr_instance_count         = 1
+# primary_instance_type     = "c6i.large"
+# dr_instance_type          = "c6i.large"
+# primary_db_instance_class = "db.r6g.large"
+# dr_db_instance_class      = "db.r6g.large"
+# enable_db_replication     = true
+# enable_storage_replication = true
+# enable_auto_scaling       = true
+# enable_waf                = true
+# enable_cdn                = true
+# db_backup_retention_days  = 14
+
+# --- Production Environment (High Availability) ---
+# (See main configuration above)
+
+# --- Production Environment (Multi-Cloud) ---
+# For multi-cloud deployments, deploy separate stacks per cloud
+# and use DNS-based global load balancing

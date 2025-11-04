@@ -1,0 +1,35 @@
+# ============================================================================
+# Azure Secret Rotation - Terraform Variables Example
+# ============================================================================
+# Copy this file to terraform.tfvars and fill in your values
+# ============================================================================
+
+# Azure Configuration
+location    = "eastus"
+environment = "prod"
+project_name = "honua"
+
+# Rotation Configuration
+rotation_days = 90 # Rotate secrets every 90 days
+
+# Notification Configuration
+notification_email       = "security@your-domain.com"
+notification_webhook_url = "https://your-org.webhook.office.com/webhookb2/..." # Teams webhook
+
+# PostgreSQL Configuration
+postgres_host            = "honua-db.postgres.database.azure.com"
+postgres_port            = 5432
+postgres_database        = "honua"
+postgres_master_username = "honuaadmin"
+postgres_master_password = "YourSuperSecureMasterPassword123!"
+postgres_app_username    = "honua_app"
+
+# API Configuration
+api_endpoint = "your-api.honua.io"
+
+# Optional: Additional Tags
+tags = {
+  CostCenter = "Engineering"
+  Owner      = "Platform Team"
+  Compliance = "SOC2"
+}

@@ -1,0 +1,39 @@
+# Kustomization file for base manifests
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: honua
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - pvc.yaml
+  - services.yaml
+  - deployment-host.yaml
+  - deployment-intake.yaml
+  - deployment-orchestrator.yaml
+  - statefulset-postgres.yaml
+  - statefulset-redis.yaml
+  - hpa.yaml
+  - networkpolicy.yaml
+  - gateway/
+  - servicemonitor.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: honua-platform
+  app.kubernetes.io/managed-by: kustomize
+
+images:
+  - name: honua/gateway
+    newName: honua/gateway
+    newTag: latest
+  - name: honua/server-host
+    newName: honua/server-host
+    newTag: latest
+  - name: honua/server-intake
+    newName: honua/server-intake
+    newTag: latest
+  - name: honua/build-orchestrator
+    newName: honua/build-orchestrator
+    newTag: latest

@@ -1,0 +1,56 @@
+# ============================================================================
+# Terraform Backend Configuration - AWS CloudFront CDN
+# ============================================================================
+# This file configures remote state storage with state locking for the AWS
+# CloudFront CDN deployment.
+#
+# Prerequisites:
+#   1. Deploy state backend infrastructure:
+#      cd ../state-backend/aws && terraform apply
+#   2. Copy this file: cp backend.tf.example backend.tf
+#   3. Update values below with outputs from state backend deployment
+#   4. Run: terraform init -migrate-state
+#
+# State locking is automatic with DynamoDB - no additional configuration needed!
+# ============================================================================
+
+terraform {
+  backend "s3" {
+    # S3 bucket for state storage
+    bucket = "honua-terraform-state-123456789012-us-east-1"
+
+    # Path to state file within bucket
+    # Use a unique path for each deployment
+    key = "aws/cloudfront-cdn/terraform.tfstate"
+
+    # AWS region where state bucket is located
+    region = "us-east-1"
+
+    # Enable server-side encryption
+    encrypt = true
+
+    # DynamoDB table for state locking
+    # Terraform will automatically acquire/release locks during operations
+    dynamodb_table = "honua-terraform-locks"
+
+    # Optional: Use KMS encryption (requires KMS key)
+    # kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+
+    # Optional: Enable workspace support
+    # workspace_key_prefix = "workspaces"
+  }
+}
+
+# ============================================================================
+# State Locking Behavior
+# ============================================================================
+# When you run terraform plan/apply/destroy:
+#   1. Terraform attempts to acquire a lock in DynamoDB
+#   2. If lock is already held, operation fails with "state locked" error
+#   3. Lock is automatically released when operation completes
+#   4. Lock includes information about who/when/why it was acquired
+#
+# Manual lock management (if needed):
+#   - Force unlock: terraform force-unlock <lock-id>
+#   - View lock info: Check DynamoDB table "honua-terraform-locks"
+# ============================================================================

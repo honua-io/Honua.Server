@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: honua-server
+  namespace: honua
+  labels:
+    app: honua-server
+    environment: development
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: honua-server
+  template:
+    metadata:
+      labels:
+        app: honua-server
+        environment: development
+    spec:
+      containers:
+      - name: honua-server
+        image: honuaio/honua-server:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: development
+
+
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5

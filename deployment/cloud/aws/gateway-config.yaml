@@ -1,0 +1,188 @@
+# AWS EKS Specific Configuration for YARP Gateway
+# Apply these configurations when deploying YARP Gateway to Amazon EKS
+
+---
+# AWS Network Load Balancer for YARP Gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: honua-gateway
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+  annotations:
+    # AWS Network Load Balancer
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+
+    # SSL/TLS termination at load balancer (optional - YARP can also handle TLS)
+    # Uncomment and set your ACM certificate ARN
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:us-west-2:ACCOUNT_ID:certificate/CERT_ID"
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: "ELBSecurityPolicy-TLS13-1-2-2021-06"
+
+    # Access logging to S3
+    service.beta.kubernetes.io/aws-load-balancer-access-log-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-name: "honua-gateway-logs"
+    service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-prefix: "gateway"
+
+    # Connection settings
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "3600"
+
+    # Target group attributes
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: |
+      deregistration_delay.timeout_seconds=30,
+      stickiness.enabled=true,
+      stickiness.type=source_ip,
+      preserve_client_ip.enabled=true
+
+    # Health check settings
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8080"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health/live"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "30"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "2"
+
+    # Tags for AWS resources
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: |
+      Environment=production,
+      Application=honua,
+      Component=gateway,
+      ManagedBy=kubernetes
+
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local  # Preserve source IP
+  loadBalancerSourceRanges:
+    # Restrict to specific IP ranges if needed
+    # - 0.0.0.0/0  # Allow all (default)
+
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+
+  selector:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+
+---
+# IAM Role for Service Account (IRSA) - Gateway Service
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: honua-gateway
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/HonuaGatewayRole
+
+---
+# IAM Policy for Gateway (create this role in AWS IAM)
+# Attach policies for:
+# - CloudWatch Logs (for logging)
+# - X-Ray (for distributed tracing)
+# - Secrets Manager (for configuration)
+# - Parameter Store (for dynamic configuration)
+#
+# Example IAM Policy Document:
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "logs:CreateLogGroup",
+#         "logs:CreateLogStream",
+#         "logs:PutLogEvents"
+#       ],
+#       "Resource": "arn:aws:logs:*:*:*"
+#     },
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "xray:PutTraceSegments",
+#         "xray:PutTelemetryRecords"
+#       ],
+#       "Resource": "*"
+#     },
+#     {
+#       "Effect": "Allow",
+#       "Action": [
+#         "secretsmanager:GetSecretValue"
+#       ],
+#       "Resource": "arn:aws:secretsmanager:*:*:secret:honua/*"
+#     }
+#   ]
+# }
+
+---
+# Network Policy for AWS VPC CNI
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: honua-gateway-network-policy
+  namespace: honua
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: honua-gateway
+      app.kubernetes.io/component: gateway
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow incoming traffic from load balancer
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 8081
+
+  egress:
+    # Allow outbound to backend services
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: honua
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # Allow HTTPS for external services
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443

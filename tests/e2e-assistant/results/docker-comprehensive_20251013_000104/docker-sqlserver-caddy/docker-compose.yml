@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  honua:
+    image: honuaio/honuaserver:latest
+    container_name: honua-server
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=development
+    volumes:
+      - ./metadata.json:/app/metadata.json:ro
+      - ./appsettings.json:/app/appsettings.json:ro
+    networks:
+      - honua-network
+
+networks:
+  honua-network:
+    driver: bridge

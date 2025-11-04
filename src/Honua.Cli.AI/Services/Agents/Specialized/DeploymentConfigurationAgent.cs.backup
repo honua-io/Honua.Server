@@ -1,0 +1,4239 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Honua.Cli.AI.Services.Agents;
+using Honua.Cli.AI.Services.AI;
+using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
+
+namespace Honua.Cli.AI.Services.Agents.Specialized;
+
+/// <summary>
+/// Specialized agent for deployment configuration, metadata management, and GitOps workflows.
+/// Uses LLM inference to dynamically understand deployment requirements and generate configurations.
+/// </summary>
+public sealed class DeploymentConfigurationAgent
+{
+    private readonly Kernel _kernel;
+    private readonly ILlmProvider? _llmProvider;
+    private readonly ILogger<DeploymentConfigurationAgent> _logger;
+
+    public DeploymentConfigurationAgent(Kernel kernel, ILlmProvider? llmProvider = null, ILogger<DeploymentConfigurationAgent>? logger = null)
+    {
+        _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
+        _llmProvider = llmProvider;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DeploymentConfigurationAgent>.Instance;
+    }
+
+    /// <summary>
+    /// Processes a deployment configuration request by analyzing requirements and generating configuration.
+    /// </summary>
+    public async Task<AgentStepResult> ProcessAsync(
+        string request,
+        AgentExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var startTime = DateTime.UtcNow;
+
+        try
+        {
+            // Analyze deployment requirements
+            var analysis = await AnalyzeDeploymentRequirementsAsync(request, context, cancellationToken);
+
+            // Generate deployment configuration based on analysis
+            var configuration = await GenerateDeploymentConfigurationAsync(analysis, context, cancellationToken);
+
+            // Validate configuration
+            var validation = await ValidateConfigurationAsync(configuration, context, cancellationToken);
+
+            if (!validation.IsValid)
+            {
+                return new AgentStepResult
+                {
+                    AgentName = "DeploymentConfiguration",
+                    Action = "ProcessDeploymentRequest",
+                    Success = false,
+                    Message = $"Configuration validation failed: {validation.ErrorMessage}",
+                    Duration = DateTime.UtcNow - startTime
+                };
+            }
+
+            // Save configuration to workspace (even in dry-run mode, so tests can validate the generated files)
+            await SaveConfigurationAsync(configuration, context, cancellationToken);
+
+            // Generate Honua metadata and runtime configuration
+            await GenerateHonuaConfigurationAsync(analysis, context, cancellationToken);
+
+            var message = context.DryRun
+                ? $"Generated deployment configuration (dry-run): {configuration.Summary}. Saved to {context.WorkspacePath}"
+                : $"Applied deployment configuration: {configuration.Summary}. Saved to {context.WorkspacePath}";
+
+            return new AgentStepResult
+            {
+                AgentName = "DeploymentConfiguration",
+                Action = "ProcessDeploymentRequest",
+                Success = true,
+                Message = message,
+                Duration = DateTime.UtcNow - startTime
+            };
+        }
+        catch (Exception ex)
+        {
+            return new AgentStepResult
+            {
+                AgentName = "DeploymentConfiguration",
+                Action = "ProcessDeploymentRequest",
+                Success = false,
+                Message = $"Error processing deployment request: {ex.Message}",
+                Duration = DateTime.UtcNow - startTime
+            };
+        }
+    }
+
+    [KernelFunction, Description("Analyzes deployment requirements from user request using LLM inference")]
+    public async Task<DeploymentAnalysis> AnalyzeDeploymentRequirementsAsync(
+        [Description("User's deployment request")] string request,
+        AgentExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogDebug("AnalyzeDeploymentRequirementsAsync called with request: {Request}", request);
+        _logger.LogDebug("LLM provider is available: {IsAvailable}", _llmProvider != null);
+
+        if (_llmProvider != null)
+        {
+            // Use LLM to intelligently analyze the deployment request
+            var analysisPrompt = $$"""
+                Analyze this deployment request and extract structured information:
+
+                Request: "{{request}}"
+
+                Respond with JSON containing:
+                {
+                  "deploymentType": "DockerCompose|Kubernetes|TerraformAWS|TerraformAzure",
+                  "targetEnvironment": "development|staging|production",
+                  "requiredServices": ["service1", "service2", ...],
+                  "infrastructureNeeds": {
+                    "needsDatabase": true|false,
+                    "databaseType": "postgis|postgresql|mysql|sqlserver|mongodb|null",
+                    "needsCache": true|false,
+                    "cacheType": "redis|memcached|null",
+                    "needsLoadBalancer": true|false,
+                    "needsMessageQueue": true|false,
+                    "needsObservability": true|false,
+                    "observabilityStack": "prometheus-grafana|aspire-dashboard|victoriam etrics|null"
+                  }
+                }
+
+                Services to consider: honua-server (always), postgis, mysql, sqlserver, redis, nginx, rabbitmq, kafka, prometheus, grafana, aspire-dashboard, victoriametrics
+                Database types: postgis (PostgreSQL with PostGIS), mysql (MySQL), sqlserver (Microsoft SQL Server)
+                Cache types: redis, memcached
+                Observability stacks: prometheus-grafana (full stack), aspire-dashboard (dev/testing), victoriametrics (lightweight)
+                Deployment types: DockerCompose for "docker compose", Kubernetes for "k8s/kubernetes", TerraformAWS for "aws/terraform", TerraformAzure for "azure/terraform"
+
+                Return ONLY valid JSON, no markdown formatting.
+                """;
+
+            var llmRequest = new LlmRequest
+            {
+                UserPrompt = analysisPrompt,
+                Temperature = 0.1,  // Low temperature for consistent structured output
+                MaxTokens = 500
+            };
+
+            var llmResponse = await _llmProvider.CompleteAsync(llmRequest, cancellationToken);
+
+            if (llmResponse.Success)
+            {
+                try
+                {
+                    var cleanJson = llmResponse.Content.Trim();
+                    _logger.LogDebug("LLM Response: {Response}", cleanJson.Substring(0, Math.Min(500, cleanJson.Length)));
+                    // Remove markdown code blocks if present
+                    if (cleanJson.StartsWith("```json"))
+                        cleanJson = cleanJson.Substring(7);
+                    if (cleanJson.StartsWith("```"))
+                        cleanJson = cleanJson.Substring(3);
+                    if (cleanJson.EndsWith("```"))
+                        cleanJson = cleanJson.Substring(0, cleanJson.Length - 3);
+                    cleanJson = cleanJson.Trim();
+
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var llmAnalysis = JsonSerializer.Deserialize<LlmDeploymentAnalysis>(cleanJson, options);
+
+                    if (llmAnalysis != null && llmAnalysis.InfrastructureNeeds != null)
+                    {
+                        _logger.LogDebug("Deserialized RequiredServices: {RequiredServices}", string.Join(", ", llmAnalysis.RequiredServices ?? new List<string>()));
+
+                        // Use TryParse instead of Parse for safer enum parsing
+                        if (!Enum.TryParse<DeploymentType>(llmAnalysis.DeploymentType, true, out var deploymentType))
+                        {
+                            deploymentType = DeploymentType.DockerCompose; // Default fallback
+                        }
+
+                        var requiredServices = new List<string>(llmAnalysis.RequiredServices ?? new List<string>());
+
+                        // Ensure database type is in RequiredServices if needed
+                        if (llmAnalysis.InfrastructureNeeds.NeedsDatabase && !string.IsNullOrEmpty(llmAnalysis.InfrastructureNeeds.DatabaseType))
+                        {
+                            var dbType = llmAnalysis.InfrastructureNeeds.DatabaseType.ToLowerInvariant();
+                            if (!requiredServices.Contains(dbType, StringComparer.OrdinalIgnoreCase))
+                            {
+                                requiredServices.Add(dbType);
+                                _logger.LogDebug("Added database type '{DatabaseType}' to RequiredServices", dbType);
+                            }
+                        }
+
+                        // Ensure cache type is in RequiredServices if needed
+                        if (llmAnalysis.InfrastructureNeeds.NeedsCache && !string.IsNullOrEmpty(llmAnalysis.InfrastructureNeeds.CacheType))
+                        {
+                            var cacheType = llmAnalysis.InfrastructureNeeds.CacheType.ToLowerInvariant();
+                            if (!requiredServices.Contains(cacheType, StringComparer.OrdinalIgnoreCase))
+                            {
+                                requiredServices.Add(cacheType);
+                                _logger.LogDebug("Added cache type '{CacheType}' to RequiredServices", cacheType);
+                            }
+                        }
+
+                        // Ensure load balancer service is in RequiredServices if needed
+                        if (llmAnalysis.InfrastructureNeeds.NeedsLoadBalancer)
+                        {
+                            // Check if nginx or traefik was mentioned in the original request
+                            var lbService = request.ToLowerInvariant().Contains("traefik") ? "traefik" :
+                                          request.ToLowerInvariant().Contains("caddy") ? "caddy" :
+                                          "nginx"; // default to nginx
+
+                            if (!requiredServices.Contains(lbService, StringComparer.OrdinalIgnoreCase))
+                            {
+                                requiredServices.Add(lbService);
+                                _logger.LogDebug("Added load balancer '{LoadBalancer}' to RequiredServices", lbService);
+                            }
+                        }
+
+                        // Detect storage needs from request (blob storage, CDN, Front Door)
+                        if (request.ToLowerInvariant().Contains("blob") ||
+                            request.ToLowerInvariant().Contains("storage") ||
+                            request.ToLowerInvariant().Contains("cdn") ||
+                            request.ToLowerInvariant().Contains("front door"))
+                        {
+                            if (!requiredServices.Contains("blob storage", StringComparer.OrdinalIgnoreCase))
+                            {
+                                requiredServices.Add("blob storage");
+                                _logger.LogDebug("Added 'blob storage' to RequiredServices from request");
+                            }
+                        }
+
+                        // Detect monitoring needs from request (Application Insights, monitoring, observability)
+                        if (request.ToLowerInvariant().Contains("application insights") ||
+                            request.ToLowerInvariant().Contains("app insights") ||
+                            request.ToLowerInvariant().Contains("insights") ||
+                            request.ToLowerInvariant().Contains("monitoring") ||
+                            request.ToLowerInvariant().Contains("observability"))
+                        {
+                            if (!requiredServices.Contains("application insights", StringComparer.OrdinalIgnoreCase))
+                            {
+                                requiredServices.Add("application insights");
+                                _logger.LogDebug("Added 'application insights' to RequiredServices from request");
+                            }
+                        }
+
+                        // Detect managed identity needs from request
+                        if (request.ToLowerInvariant().Contains("managed identity") ||
+                            request.ToLowerInvariant().Contains("identity") ||
+                            request.ToLowerInvariant().Contains("rbac"))
+                        {
+                            if (!requiredServices.Contains("managed identity", StringComparer.OrdinalIgnoreCase))
+                            {
+                                requiredServices.Add("managed identity");
+                                _logger.LogDebug("Added 'managed identity' to RequiredServices from request");
+                            }
+                        }
+
+                        var analysis = new DeploymentAnalysis
+                        {
+                            DeploymentType = deploymentType,
+                            TargetEnvironment = llmAnalysis.TargetEnvironment ?? "development",
+                            RequiredServices = requiredServices,
+                            InfrastructureNeeds = new InfrastructureRequirements
+                            {
+                                NeedsDatabase = llmAnalysis.InfrastructureNeeds.NeedsDatabase,
+                                DatabaseType = llmAnalysis.InfrastructureNeeds.DatabaseType,
+                                NeedsCache = llmAnalysis.InfrastructureNeeds.NeedsCache,
+                                CacheType = llmAnalysis.InfrastructureNeeds.CacheType,
+                                NeedsLoadBalancer = llmAnalysis.InfrastructureNeeds.NeedsLoadBalancer,
+                                NeedsObservability = llmAnalysis.InfrastructureNeeds.NeedsObservability,
+                                ObservabilityStack = llmAnalysis.InfrastructureNeeds.ObservabilityStack
+                            },
+                            Port = ExtractPort(request)
+                        };
+
+                        _logger.LogDebug("Final RequiredServices in analysis: {RequiredServices}", string.Join(", ", analysis.RequiredServices));
+                        return analysis;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Fall through to hard-coded analysis
+                }
+            }
+        }
+
+        // Fallback to hard-coded analysis if LLM not available or failed
+        return new DeploymentAnalysis
+        {
+            DeploymentType = DetermineDeploymentType(request),
+            TargetEnvironment = DetermineEnvironment(request),
+            RequiredServices = ExtractServices(request),
+            InfrastructureNeeds = AnalyzeInfrastructure(request),
+            Port = ExtractPort(request)
+        };
+    }
+
+    [KernelFunction, Description("Generates deployment configuration (Docker Compose, K8s, Terraform, etc.)")]
+    public async Task<DeploymentConfiguration> GenerateDeploymentConfigurationAsync(
+        [Description("Analysis of deployment requirements")] DeploymentAnalysis analysis,
+        AgentExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        string configContent;
+        string configType;
+
+        switch (analysis.DeploymentType)
+        {
+            case DeploymentType.DockerCompose:
+                // Generate Docker Compose configuration
+                configType = "docker-compose.yml";
+                configContent = await GenerateDockerComposeAsync(analysis, context);
+                break;
+
+            case DeploymentType.Kubernetes:
+                // Generate Kubernetes manifests
+                configType = "kubernetes-manifests";
+                configContent = await GenerateKubernetesAsync(analysis, context);
+                break;
+
+            case DeploymentType.TerraformAWS:
+                // Generate Terraform for AWS
+                configType = "terraform-aws";
+                configContent = await GenerateTerraformAWSAsync(analysis, context);
+                break;
+
+            case DeploymentType.TerraformAzure:
+                // Generate Terraform for Azure
+                configType = "terraform-azure";
+                configContent = await GenerateTerraformAzureAsync(analysis, context);
+                break;
+
+            case DeploymentType.TerraformGCP:
+                // Generate Terraform for GCP
+                configType = "terraform-gcp";
+                configContent = await GenerateTerraformGCPAsync(analysis, context);
+                break;
+
+            case DeploymentType.AWSLambda:
+                // Generate Terraform for AWS Lambda serverless
+                configType = "terraform-aws-lambda";
+                configContent = await GenerateAWSLambdaAsync(analysis, context);
+                break;
+
+            case DeploymentType.AzureFunctions:
+                // Generate Terraform for Azure Functions serverless
+                configType = "terraform-azure-functions";
+                configContent = await GenerateAzureFunctionsAsync(analysis, context);
+                break;
+
+            case DeploymentType.GCPCloudFunctions:
+                // Generate Terraform for GCP Cloud Functions serverless
+                configType = "terraform-gcp-functions";
+                configContent = await GenerateGCPCloudFunctionsAsync(analysis, context);
+                break;
+
+            default:
+                throw new NotSupportedException($"Deployment type {analysis.DeploymentType} not supported");
+        }
+
+        return new DeploymentConfiguration
+        {
+            Type = configType,
+            Content = configContent,
+            Summary = $"{configType} for {analysis.TargetEnvironment} environment"
+        };
+    }
+
+    [KernelFunction, Description("Validates deployment configuration for correctness and best practices")]
+    public async Task<ValidationResult> ValidateConfigurationAsync(
+        [Description("Deployment configuration to validate")] DeploymentConfiguration configuration,
+        AgentExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        // Perform validation checks
+        var issues = new List<string>();
+
+        // Basic validation
+        if (string.IsNullOrWhiteSpace(configuration.Content))
+        {
+            issues.Add("Configuration content is empty");
+        }
+
+        // Type-specific validation
+        // In production, this would call additional validation functions
+
+        return await Task.FromResult(new ValidationResult
+        {
+            IsValid = issues.Count == 0,
+            ErrorMessage = issues.Count > 0 ? string.Join("; ", issues) : null
+        });
+    }
+
+    // Helper methods for deployment generation
+
+    private async Task<string> GenerateDockerComposeAsync(DeploymentAnalysis analysis, AgentExecutionContext context)
+    {
+        // Generate realistic Docker Compose configuration
+        _logger.LogDebug("Generating Docker Compose - RequiredServices count: {Count}", analysis.RequiredServices?.Count ?? 0);
+        _logger.LogDebug("Generating Docker Compose - RequiredServices: {RequiredServices}", string.Join(", ", analysis.RequiredServices ?? new List<string>()));
+
+        var hasPostgis = analysis.RequiredServices?.Any(s => s.Contains("postgis", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasMySQL = analysis.RequiredServices?.Any(s => s.Contains("mysql", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasSQLServer = analysis.RequiredServices?.Any(s => s.Contains("sql", StringComparison.OrdinalIgnoreCase) && s.Contains("server", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasRedis = analysis.RequiredServices?.Any(s => s.Contains("redis", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasNginx = analysis.RequiredServices?.Any(s => s.Contains("nginx", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasTraefik = analysis.RequiredServices?.Any(s => s.Contains("traefik", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasCaddy = analysis.RequiredServices?.Any(s => s.Contains("caddy", StringComparison.OrdinalIgnoreCase)) ?? false;
+
+        // Observability services
+        var hasPrometheus = analysis.RequiredServices?.Any(s => s.Contains("prometheus", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasGrafana = analysis.RequiredServices?.Any(s => s.Contains("grafana", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasAspireDashboard = analysis.RequiredServices?.Any(s => s.Contains("aspire", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var hasVictoriaMetrics = analysis.RequiredServices?.Any(s => s.Contains("victoria", StringComparison.OrdinalIgnoreCase)) ?? false;
+
+        // Auto-detect observability stack from infrastructure needs
+        var observabilityStack = analysis.InfrastructureNeeds?.ObservabilityStack?.ToLowerInvariant();
+        if (observabilityStack == "prometheus-grafana")
+        {
+            hasPrometheus = true;
+            hasGrafana = true;
+        }
+        else if (observabilityStack == "aspire-dashboard")
+        {
+            hasAspireDashboard = true;
+        }
+        else if (observabilityStack == "victoriametrics")
+        {
+            hasVictoriaMetrics = true;
+        }
+
+        _logger.LogDebug("Docker Compose service flags - Postgis: {HasPostgis}, MySQL: {HasMySQL}, SQLServer: {HasSQLServer}, Redis: {HasRedis}, Nginx: {HasNginx}",
+            hasPostgis, hasMySQL, hasSQLServer, hasRedis, hasNginx);
+
+        var builder = new System.Text.StringBuilder();
+        builder.AppendLine("version: '3.8'");
+        builder.AppendLine();
+        builder.AppendLine("services:");
+        builder.AppendLine("  honua:");
+        builder.AppendLine("    image: honuaio/honuaserver:latest");
+        builder.AppendLine("    container_name: honua-server");
+        builder.AppendLine("    ports:");
+        builder.AppendLine($"      - \"{analysis.Port}:8080\"");
+        builder.AppendLine("    environment:");
+        // Always use development for Docker Compose (local deployments with QuickStart auth)
+        builder.AppendLine("      - ASPNETCORE_ENVIRONMENT=development");
+
+        if (hasPostgis)
+        {
+            builder.AppendLine("      - HONUA__DATABASE__PROVIDER=postgis");
+            builder.AppendLine("      - HONUA__DATABASE__HOST=postgis");
+            builder.AppendLine("      - HONUA__DATABASE__PORT=5432");
+            builder.AppendLine("      - HONUA__DATABASE__DATABASE=honua");
+            builder.AppendLine("      - HONUA__DATABASE__USERNAME=honua");
+            builder.AppendLine("      - HONUA__DATABASE__PASSWORD=honua_password");
+        }
+        else if (hasMySQL)
+        {
+            builder.AppendLine("      - HONUA__DATABASE__PROVIDER=mysql");
+            builder.AppendLine("      - HONUA__DATABASE__HOST=mysql");
+            builder.AppendLine("      - HONUA__DATABASE__PORT=3306");
+            builder.AppendLine("      - HONUA__DATABASE__DATABASE=honua");
+            builder.AppendLine("      - HONUA__DATABASE__USERNAME=honua");
+            builder.AppendLine("      - HONUA__DATABASE__PASSWORD=honua_password");
+        }
+        else if (hasSQLServer)
+        {
+            builder.AppendLine("      - HONUA__DATABASE__PROVIDER=sqlserver");
+            builder.AppendLine("      - HONUA__DATABASE__HOST=sqlserver");
+            builder.AppendLine("      - HONUA__DATABASE__PORT=1433");
+            builder.AppendLine("      - HONUA__DATABASE__DATABASE=honua");
+            builder.AppendLine("      - HONUA__DATABASE__USERNAME=sa");
+            builder.AppendLine("      - HONUA__DATABASE__PASSWORD=YourStrong@Passw0rd");
+        }
+
+        if (hasRedis)
+        {
+            builder.AppendLine("      - HONUA__CACHE__PROVIDER=redis");
+            builder.AppendLine("      - HONUA__CACHE__REDIS__HOST=redis");
+            builder.AppendLine("      - HONUA__CACHE__REDIS__PORT=6379");
+        }
+
+        // Mount configuration files
+        builder.AppendLine("    volumes:");
+        builder.AppendLine("      - ./metadata.yaml:/app/metadata.yaml:ro");
+        builder.AppendLine("      - ./appsettings.json:/app/appsettings.json:ro");
+
+        // Only add depends_on if there are actual dependencies
+        var hasDependencies = hasPostgis || hasMySQL || hasSQLServer || hasRedis;
+        if (hasDependencies)
+        {
+            builder.AppendLine("    depends_on:");
+            if (hasPostgis)
+            {
+                builder.AppendLine("      - postgis");
+            }
+            if (hasMySQL)
+            {
+                builder.AppendLine("      - mysql");
+            }
+            if (hasSQLServer)
+            {
+                builder.AppendLine("      - sqlserver");
+            }
+            if (hasRedis)
+            {
+                builder.AppendLine("      - redis");
+            }
+        }
+
+        builder.AppendLine("    networks:");
+        builder.AppendLine("      - honua-network");
+
+        if (hasPostgis)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  postgis:");
+            builder.AppendLine("    image: postgis/postgis:16-3.4");
+            builder.AppendLine("    container_name: honua-postgis");
+            builder.AppendLine("    environment:");
+            builder.AppendLine("      - POSTGRES_DB=honua");
+            builder.AppendLine("      - POSTGRES_USER=honua");
+            builder.AppendLine("      - POSTGRES_PASSWORD=honua_password");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"5432:5432\"");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - postgis-data:/var/lib/postgresql/data");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasMySQL)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  mysql:");
+            builder.AppendLine("    image: mysql:8.0");
+            builder.AppendLine("    container_name: honua-mysql");
+            builder.AppendLine("    environment:");
+            builder.AppendLine("      - MYSQL_ROOT_PASSWORD=honua_root_pass");
+            builder.AppendLine("      - MYSQL_DATABASE=honua");
+            builder.AppendLine("      - MYSQL_USER=honua");
+            builder.AppendLine("      - MYSQL_PASSWORD=honua_password");
+            builder.AppendLine("    command: --default-authentication-plugin=mysql_native_password");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"3306:3306\"");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - mysql-data:/var/lib/mysql");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasSQLServer)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  sqlserver:");
+            builder.AppendLine("    image: mcr.microsoft.com/mssql/server:2022-latest");
+            builder.AppendLine("    container_name: honua-sqlserver");
+            builder.AppendLine("    environment:");
+            builder.AppendLine("      - ACCEPT_EULA=Y");
+            builder.AppendLine("      - MSSQL_SA_PASSWORD=YourStrong@Passw0rd");
+            builder.AppendLine("      - MSSQL_PID=Developer");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"1433:1433\"");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - sqlserver-data:/var/opt/mssql");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasRedis)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  redis:");
+            builder.AppendLine("    image: redis:7-alpine");
+            builder.AppendLine("    container_name: honua-redis");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"6379:6379\"");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - redis-data:/data");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasNginx)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  nginx:");
+            builder.AppendLine("    image: nginx:alpine");
+            builder.AppendLine("    container_name: honua-nginx");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"80:80\"");
+            builder.AppendLine("      - \"443:443\"");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - ./nginx.conf:/etc/nginx/nginx.conf:ro");
+            builder.AppendLine("    depends_on:");
+            builder.AppendLine("      - honua");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasTraefik)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  traefik:");
+            builder.AppendLine("    image: traefik:latest");
+            builder.AppendLine("    container_name: honua-traefik");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"80:80\"");
+            builder.AppendLine("      - \"443:443\"");
+            builder.AppendLine("      - \"8080:8080\"  # Traefik dashboard");
+            builder.AppendLine("    command:");
+            builder.AppendLine("      - --api.insecure=true");
+            builder.AppendLine("      - --providers.docker=true");
+            builder.AppendLine("      - --providers.docker.exposedbydefault=false");
+            builder.AppendLine("      - --entrypoints.web.address=:80");
+            builder.AppendLine("      - --entrypoints.websecure.address=:443");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - /var/run/docker.sock:/var/run/docker.sock:ro");
+            builder.AppendLine("    depends_on:");
+            builder.AppendLine("      - honua");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasCaddy)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  caddy:");
+            builder.AppendLine("    image: caddy:latest");
+            builder.AppendLine("    container_name: honua-caddy");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"80:80\"");
+            builder.AppendLine("      - \"443:443\"");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - ./Caddyfile:/etc/caddy/Caddyfile:ro");
+            builder.AppendLine("      - caddy-data:/data");
+            builder.AppendLine("      - caddy-config:/config");
+            builder.AppendLine("    depends_on:");
+            builder.AppendLine("      - honua");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        // Observability stack
+        if (hasPrometheus)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  prometheus:");
+            builder.AppendLine("    image: prom/prometheus:latest");
+            builder.AppendLine("    container_name: honua-prometheus");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"9090:9090\"");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro");
+            builder.AppendLine("      - prometheus-data:/prometheus");
+            builder.AppendLine("    command:");
+            builder.AppendLine("      - '--config.file=/etc/prometheus/prometheus.yml'");
+            builder.AppendLine("      - '--storage.tsdb.path=/prometheus'");
+            builder.AppendLine("    depends_on:");
+            builder.AppendLine("      - honua");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasGrafana)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  grafana:");
+            builder.AppendLine("    image: grafana/grafana:latest");
+            builder.AppendLine("    container_name: honua-grafana");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"3000:3000\"");
+            builder.AppendLine("    environment:");
+            builder.AppendLine("      - GF_SECURITY_ADMIN_PASSWORD=admin");
+            builder.AppendLine("      - GF_SERVER_ROOT_URL=http://localhost:3000");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - grafana-data:/var/lib/grafana");
+            if (hasPrometheus)
+            {
+                builder.AppendLine("    depends_on:");
+                builder.AppendLine("      - prometheus");
+            }
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasAspireDashboard)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  aspire-dashboard:");
+            builder.AppendLine("    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.5");
+            builder.AppendLine("    container_name: honua-aspire-dashboard");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"18888:18888\"");
+            builder.AppendLine("      - \"18889:18889\"");
+            builder.AppendLine("    environment:");
+            builder.AppendLine("      - DOTNET_DASHBOARD_OTLP_ENDPOINT_URL=http://0.0.0.0:18889");
+            builder.AppendLine("      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        if (hasVictoriaMetrics)
+        {
+            builder.AppendLine();
+            builder.AppendLine("  victoriametrics:");
+            builder.AppendLine("    image: victoriametrics/victoria-metrics:latest");
+            builder.AppendLine("    container_name: honua-victoriametrics");
+            builder.AppendLine("    ports:");
+            builder.AppendLine("      - \"8428:8428\"");
+            builder.AppendLine("    volumes:");
+            builder.AppendLine("      - victoriametrics-data:/victoria-metrics-data");
+            builder.AppendLine("    command:");
+            builder.AppendLine("      - '--storageDataPath=/victoria-metrics-data'");
+            builder.AppendLine("      - '--httpListenAddr=:8428'");
+            builder.AppendLine("    networks:");
+            builder.AppendLine("      - honua-network");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("networks:");
+        builder.AppendLine("  honua-network:");
+        builder.AppendLine("    driver: bridge");
+
+        builder.AppendLine();
+        builder.AppendLine("volumes:");
+        if (hasPostgis)
+        {
+            builder.AppendLine("  postgis-data:");
+        }
+        if (hasMySQL)
+        {
+            builder.AppendLine("  mysql-data:");
+        }
+        if (hasSQLServer)
+        {
+            builder.AppendLine("  sqlserver-data:");
+        }
+        if (hasRedis)
+        {
+            builder.AppendLine("  redis-data:");
+        }
+        if (hasPrometheus)
+        {
+            builder.AppendLine("  prometheus-data:");
+        }
+        if (hasGrafana)
+        {
+            builder.AppendLine("  grafana-data:");
+        }
+        if (hasVictoriaMetrics)
+        {
+            builder.AppendLine("  victoriametrics-data:");
+        }
+        if (hasCaddy)
+        {
+            builder.AppendLine("  caddy-data:");
+            builder.AppendLine("  caddy-config:");
+        }
+
+        var dockerCompose = builder.ToString();
+
+        // Clean up any YAML syntax issues
+        dockerCompose = CleanupDockerComposeYaml(dockerCompose);
+
+        return await Task.FromResult(dockerCompose);
+    }
+
+    private string CleanupDockerComposeYaml(string yaml)
+    {
+        // Remove empty volumes: sections (when no volumes are defined)
+        yaml = System.Text.RegularExpressions.Regex.Replace(
+            yaml,
+            @"^volumes:\s*$\n(?=\S|\Z)",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        // Remove trailing blank lines
+        yaml = yaml.TrimEnd() + "\n";
+
+        return yaml;
+    }
+
+    private async Task<string> GenerateKubernetesAsync(DeploymentAnalysis analysis, AgentExecutionContext context)
+    {
+        // Generate Kubernetes manifests directly
+        var k8sDir = context.WorkspacePath;
+        Directory.CreateDirectory(k8sDir);
+
+        var manifestFiles = new System.Text.StringBuilder();
+
+        // Generate namespace manifest
+        var namespaceContent = $@"apiVersion: v1
+kind: Namespace
+metadata:
+  name: honua
+  labels:
+    environment: {analysis.TargetEnvironment}
+";
+        var namespacePath = Path.Combine(k8sDir, "00-namespace.yaml");
+        await File.WriteAllTextAsync(namespacePath, namespaceContent.Trim());
+        manifestFiles.AppendLine($"Generated 00-namespace.yaml");
+
+        // Generate deployment manifest for Honua server
+        var deploymentContent = GenerateK8sDeployment(analysis);
+        var deploymentPath = Path.Combine(k8sDir, "01-deployment.yaml");
+        await File.WriteAllTextAsync(deploymentPath, deploymentContent.Trim());
+        manifestFiles.AppendLine($"Generated 01-deployment.yaml");
+
+        // Generate service manifest
+        var serviceContent = GenerateK8sService(analysis);
+        var servicePath = Path.Combine(k8sDir, "02-service.yaml");
+        await File.WriteAllTextAsync(servicePath, serviceContent.Trim());
+        manifestFiles.AppendLine($"Generated 02-service.yaml");
+
+        // Generate ConfigMap if needed
+        if (analysis.RequiredServices.Count > 1)
+        {
+            var configMapContent = GenerateK8sConfigMap(analysis);
+            var configMapPath = Path.Combine(k8sDir, "03-configmap.yaml");
+            await File.WriteAllTextAsync(configMapPath, configMapContent.Trim());
+            manifestFiles.AppendLine($"Generated 03-configmap.yaml");
+        }
+
+        // Generate database resources if needed
+        if (analysis.InfrastructureNeeds.NeedsDatabase)
+        {
+            var dbContent = GenerateK8sDatabase(analysis);
+            var dbPath = Path.Combine(k8sDir, "04-database.yaml");
+            await File.WriteAllTextAsync(dbPath, dbContent.Trim());
+            manifestFiles.AppendLine($"Generated 04-database.yaml");
+        }
+
+        // Generate Redis resources if needed
+        if (analysis.InfrastructureNeeds.NeedsCache)
+        {
+            var redisContent = GenerateK8sRedis(analysis);
+            var redisPath = Path.Combine(k8sDir, "05-redis.yaml");
+            await File.WriteAllTextAsync(redisPath, redisContent.Trim());
+            manifestFiles.AppendLine($"Generated 05-redis.yaml");
+        }
+
+        return manifestFiles.ToString();
+    }
+
+    private string GenerateK8sDeployment(DeploymentAnalysis analysis)
+    {
+        var hasDatabase = analysis.InfrastructureNeeds.NeedsDatabase ||
+                         analysis.RequiredServices.Any(s => s.Contains("postgis", StringComparison.OrdinalIgnoreCase));
+        var hasCache = analysis.InfrastructureNeeds.NeedsCache ||
+                      analysis.RequiredServices.Any(s => s.Contains("redis", StringComparison.OrdinalIgnoreCase));
+
+        return $@"apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: honua-server
+  namespace: honua
+  labels:
+    app: honua-server
+    environment: {analysis.TargetEnvironment}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: honua-server
+  template:
+    metadata:
+      labels:
+        app: honua-server
+        environment: {analysis.TargetEnvironment}
+    spec:
+      containers:
+      - name: honua-server
+        image: honuaio/honua-server:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: {analysis.TargetEnvironment}
+{(hasDatabase ? @"        - name: HONUA__DATABASE__HOST
+          value: postgis-service
+        - name: HONUA__DATABASE__PORT
+          value: ""5432""
+        - name: HONUA__DATABASE__DATABASE
+          value: honua
+        - name: HONUA__DATABASE__USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: username
+        - name: HONUA__DATABASE__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: password" : "")}
+{(hasCache ? @"        - name: HONUA__CACHE__PROVIDER
+          value: redis
+        - name: HONUA__CACHE__REDIS__HOST
+          value: redis-service
+        - name: HONUA__CACHE__REDIS__PORT
+          value: ""6379""" : "")}
+        resources:
+          requests:
+            memory: ""512Mi""
+            cpu: ""500m""
+          limits:
+            memory: ""1Gi""
+            cpu: ""1000m""
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5";
+    }
+
+    private string GenerateK8sService(DeploymentAnalysis analysis)
+    {
+        var needsLoadBalancer = analysis.InfrastructureNeeds.NeedsLoadBalancer ||
+                               analysis.TargetEnvironment == "production";
+
+        return $@"apiVersion: v1
+kind: Service
+metadata:
+  name: honua-service
+  namespace: honua
+  labels:
+    app: honua-server
+    environment: {analysis.TargetEnvironment}
+spec:
+  type: {(needsLoadBalancer ? "LoadBalancer" : "ClusterIP")}
+  selector:
+    app: honua-server
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP";
+    }
+
+    private string GenerateK8sConfigMap(DeploymentAnalysis analysis)
+    {
+        return $@"apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: honua-config
+  namespace: honua
+data:
+  environment: {analysis.TargetEnvironment}
+  services: {string.Join(",", analysis.RequiredServices)}";
+    }
+
+    private string GenerateK8sDatabase(DeploymentAnalysis analysis)
+    {
+        return @"apiVersion: v1
+kind: Secret
+metadata:
+  name: database-secret
+  namespace: honua
+type: Opaque
+stringData:
+  username: postgres
+  password: changeme123
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgis
+  namespace: honua
+spec:
+  serviceName: postgis-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgis
+  template:
+    metadata:
+      labels:
+        app: postgis
+    spec:
+      containers:
+      - name: postgis
+        image: postgis/postgis:16-3.4
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: honua
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: password
+        volumeMounts:
+        - name: postgis-storage
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: postgis-storage
+    spec:
+      accessModes: [""ReadWriteOnce""]
+      resources:
+        requests:
+          storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgis-service
+  namespace: honua
+spec:
+  selector:
+    app: postgis
+  ports:
+  - port: 5432
+    targetPort: 5432";
+    }
+
+    private string GenerateK8sRedis(DeploymentAnalysis analysis)
+    {
+        return @"apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: honua
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: ""256Mi""
+            cpu: ""100m""
+          limits:
+            memory: ""512Mi""
+            cpu: ""200m""
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: honua
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379";
+    }
+
+    private async Task<string> GenerateTerraformAWSAsync(DeploymentAnalysis analysis, AgentExecutionContext context)
+    {
+        // Always use inline generation - Terraform plugin not yet implemented
+        _logger.LogDebug("Generating AWS Terraform configuration");
+
+        var terraformContent = GenerateAWSTerraformContent(analysis);
+        var fileName = "main.tf";
+        var filePath = Path.Combine(context.WorkspacePath, "terraform-aws", fileName);
+
+        _logger.LogDebug("Will write Terraform to: {FilePath}", filePath);
+
+        // Create directory if it doesn't exist
+        var directory = Path.GetDirectoryName(filePath);
+        if (!Directory.Exists(directory))
+        {
+            _logger.LogDebug("Creating directory: {Directory}", directory);
+            Directory.CreateDirectory(directory!);
+        }
+
+        _logger.LogDebug("Writing {ByteCount} bytes to Terraform file", terraformContent.Length);
+        await File.WriteAllTextAsync(filePath, terraformContent.Trim());
+        _logger.LogDebug("Terraform file written successfully");
+
+        // Also copy to workspace root for compatibility with tests
+        var workspaceRootPath = Path.Combine(context.WorkspacePath, "main.tf");
+        await File.WriteAllTextAsync(workspaceRootPath, terraformContent.Trim());
+        _logger.LogDebug("Also copied to workspace root: {WorkspaceRootPath}", workspaceRootPath);
+
+        return terraformContent.Trim();
+    }
+
+    private string GenerateAWSTerraformContent(DeploymentAnalysis analysis)
+    {
+        var hasDatabase = analysis.InfrastructureNeeds.NeedsDatabase ||
+                         analysis.RequiredServices.Any(s => s.Contains("postgis", StringComparison.OrdinalIgnoreCase));
+        var hasCache = analysis.InfrastructureNeeds.NeedsCache ||
+                      analysis.RequiredServices.Any(s => s.Contains("redis", StringComparison.OrdinalIgnoreCase));
+
+        var tf = new System.Text.StringBuilder();
+        tf.AppendLine(@"terraform {
+  required_providers {
+    aws = {
+      source  = ""hashicorp/aws""
+      version = ""~> 5.0""
+    }
+  }
+}
+
+provider ""aws"" {
+  region = var.aws_region
+}
+
+variable ""aws_region"" {
+  description = ""AWS region""
+  default     = ""us-east-1""
+}
+
+variable ""environment"" {
+  description = ""Environment name""
+  default     = """ + analysis.TargetEnvironment + @"""
+}
+
+# VPC Configuration
+resource ""aws_vpc"" ""honua"" {
+  cidr_block           = ""10.0.0.0/16""
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name        = ""honua-vpc-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# Subnets
+resource ""aws_subnet"" ""public"" {
+  count                   = 2
+  vpc_id                  = aws_vpc.honua.id
+  cidr_block              = ""10.0.${count.index + 1}.0/24""
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name        = ""honua-public-subnet-${count.index + 1}""
+    Environment = var.environment
+  }
+}
+
+resource ""aws_subnet"" ""private"" {
+  count             = 2
+  vpc_id            = aws_vpc.honua.id
+  cidr_block        = ""10.0.${count.index + 10}.0/24""
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+
+  tags = {
+    Name        = ""honua-private-subnet-${count.index + 1}""
+    Environment = var.environment
+  }
+}
+
+# Internet Gateway
+resource ""aws_internet_gateway"" ""honua"" {
+  vpc_id = aws_vpc.honua.id
+
+  tags = {
+    Name        = ""honua-igw-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# ECS Cluster for Honua Server
+resource ""aws_ecs_cluster"" ""honua"" {
+  name = ""honua-cluster-${var.environment}""
+
+  setting {
+    name  = ""containerInsights""
+    value = ""enabled""
+  }
+}
+
+# Fargate Task Definition for Honua Server
+resource ""aws_ecs_task_definition"" ""honua_server"" {
+  family                   = ""honua-server""
+  network_mode             = ""awsvpc""
+  requires_compatibilities = [""FARGATE""]
+  cpu                      = ""1024""
+  memory                   = ""2048""
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  task_role_arn           = aws_iam_role.ecs_task.arn
+
+  container_definitions = jsonencode([{
+    name  = ""honua-server""
+    image = ""honuaio/honua-server:latest""
+
+    portMappings = [{
+      containerPort = 8080
+      hostPort      = 8080
+    }]
+
+    environment = [
+      {
+        name  = ""ASPNETCORE_ENVIRONMENT""
+        value = var.environment
+      }");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@",
+      {
+        name  = ""HONUA__DATABASE__HOST""
+        value = aws_db_instance.postgis.address
+      },
+      {
+        name  = ""HONUA__DATABASE__PORT""
+        value = ""5432""
+      },
+      {
+        name  = ""HONUA__DATABASE__DATABASE""
+        value = ""honua""
+      }");
+        }
+
+        if (hasCache)
+        {
+            tf.AppendLine(@",
+      {
+        name  = ""HONUA__CACHE__PROVIDER""
+        value = ""redis""
+      },
+      {
+        name  = ""HONUA__CACHE__REDIS__HOST""
+        value = aws_elasticache_cluster.redis.cache_nodes[0].address
+      }");
+        }
+
+        tf.AppendLine(@"    ]
+
+    logConfiguration = {
+      logDriver = ""awslogs""
+      options = {
+        ""awslogs-group""         = ""/ecs/honua-server""
+        ""awslogs-region""        = var.aws_region
+        ""awslogs-stream-prefix"" = ""ecs""
+      }
+    }
+  }])
+}
+
+# IAM Roles
+resource ""aws_iam_role"" ""ecs_execution"" {
+  name = ""honua-ecs-execution-role-${var.environment}""
+
+  assume_role_policy = jsonencode({
+    Version = ""2012-10-17""
+    Statement = [{
+      Action = ""sts:AssumeRole""
+      Effect = ""Allow""
+      Principal = {
+        Service = ""ecs-tasks.amazonaws.com""
+      }
+    }]
+  })
+}
+
+resource ""aws_iam_role"" ""ecs_task"" {
+  name = ""honua-ecs-task-role-${var.environment}""
+
+  assume_role_policy = jsonencode({
+    Version = ""2012-10-17""
+    Statement = [{
+      Action = ""sts:AssumeRole""
+      Effect = ""Allow""
+      Principal = {
+        Service = ""ecs-tasks.amazonaws.com""
+      }
+    }]
+  })
+}
+
+resource ""aws_iam_role_policy_attachment"" ""ecs_execution"" {
+  role       = aws_iam_role.ecs_execution.name
+  policy_arn = ""arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy""
+}");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@"
+# RDS PostgreSQL with PostGIS
+resource ""aws_db_subnet_group"" ""honua"" {
+  name       = ""honua-db-subnet-${var.environment}""
+  subnet_ids = aws_subnet.private[*].id
+
+  tags = {
+    Name        = ""Honua DB subnet group""
+    Environment = var.environment
+  }
+}
+
+resource ""aws_db_instance"" ""postgis"" {
+  identifier     = ""honua-postgis-${var.environment}""
+  engine         = ""postgres""
+  engine_version = ""15.4""
+  instance_class = ""db.t3.micro""
+
+  allocated_storage     = 20
+  max_allocated_storage = 100
+  storage_type          = ""gp3""
+  storage_encrypted     = true
+
+  db_name  = ""honua""
+  username = ""postgres""
+  password = random_password.db_password.result
+
+  vpc_security_group_ids = [aws_security_group.database.id]
+  db_subnet_group_name   = aws_db_subnet_group.honua.name
+
+  backup_retention_period = 7
+  backup_window          = ""03:00-04:00""
+  maintenance_window     = ""sun:04:00-sun:05:00""
+
+  skip_final_snapshot = var.environment != ""production""
+  deletion_protection = var.environment == ""production""
+
+  tags = {
+    Name        = ""honua-postgis-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+resource ""random_password"" ""db_password"" {
+  length  = 32
+  special = true
+}
+
+resource ""aws_security_group"" ""database"" {
+  name        = ""honua-db-sg-${var.environment}""
+  description = ""Security group for Honua RDS database""
+  vpc_id      = aws_vpc.honua.id
+
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = ""tcp""
+    security_groups = [aws_security_group.ecs_service.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = ""-1""
+    cidr_blocks = [""0.0.0.0/0""]
+  }
+
+  tags = {
+    Name        = ""honua-db-sg-${var.environment}""
+    Environment = var.environment
+  }
+}");
+        }
+
+        if (hasCache)
+        {
+            tf.AppendLine(@"
+# ElastiCache Redis
+resource ""aws_elasticache_subnet_group"" ""redis"" {
+  name       = ""honua-redis-subnet-${var.environment}""
+  subnet_ids = aws_subnet.private[*].id
+}
+
+resource ""aws_elasticache_cluster"" ""redis"" {
+  cluster_id           = ""honua-redis-${var.environment}""
+  engine              = ""redis""
+  engine_version      = ""7.0""
+  node_type           = ""cache.t3.micro""
+  num_cache_nodes     = 1
+  parameter_group_name = ""default.redis7""
+  port                = 6379
+
+  subnet_group_name = aws_elasticache_subnet_group.redis.name
+  security_group_ids = [aws_security_group.redis.id]
+
+  tags = {
+    Name        = ""honua-redis-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+resource ""aws_security_group"" ""redis"" {
+  name        = ""honua-redis-sg-${var.environment}""
+  description = ""Security group for Honua Redis cache""
+  vpc_id      = aws_vpc.honua.id
+
+  ingress {
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = ""tcp""
+    security_groups = [aws_security_group.ecs_service.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = ""-1""
+    cidr_blocks = [""0.0.0.0/0""]
+  }
+
+  tags = {
+    Name        = ""honua-redis-sg-${var.environment}""
+    Environment = var.environment
+  }
+}");
+        }
+
+        tf.AppendLine(@"
+# S3 Bucket for tile caching and static assets
+resource ""aws_s3_bucket"" ""honua_cache"" {
+  bucket = ""honua-cache-${var.environment}-${data.aws_caller_identity.current.account_id}""
+
+  tags = {
+    Name        = ""honua-cache-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+resource ""aws_s3_bucket_lifecycle_configuration"" ""honua_cache"" {
+  bucket = aws_s3_bucket.honua_cache.id
+
+  rule {
+    id     = ""expire-old-tiles""
+    status = ""Enabled""
+
+    expiration {
+      days = 30
+    }
+
+    filter {
+      prefix = ""tiles/""
+    }
+  }
+
+  rule {
+    id     = ""transition-to-ia""
+    status = ""Enabled""
+
+    transition {
+      days          = 90
+      storage_class = ""STANDARD_IA""
+    }
+
+    filter {
+      prefix = ""archive/""
+    }
+  }
+}
+
+resource ""aws_s3_bucket_public_access_block"" ""honua_cache"" {
+  bucket = aws_s3_bucket.honua_cache.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# CloudWatch Log Group
+resource ""aws_cloudwatch_log_group"" ""honua"" {
+  name              = ""/ecs/honua-server""
+  retention_in_days = 30
+
+  tags = {
+    Name        = ""honua-logs-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# Application Load Balancer
+resource ""aws_lb"" ""honua"" {
+  name               = ""honua-alb-${var.environment}""
+  internal           = false
+  load_balancer_type = ""application""
+  security_groups    = [aws_security_group.alb.id]
+  subnets           = aws_subnet.public[*].id
+
+  enable_deletion_protection = var.environment == ""production""
+  enable_http2              = true
+
+  tags = {
+    Name        = ""honua-alb-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+resource ""aws_lb_target_group"" ""honua"" {
+  name        = ""honua-tg-${var.environment}""
+  port        = 8080
+  protocol    = ""HTTP""
+  vpc_id      = aws_vpc.honua.id
+  target_type = ""ip""
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher            = ""200""
+    path               = ""/health""
+    port               = ""traffic-port""
+    protocol           = ""HTTP""
+    timeout            = 5
+    unhealthy_threshold = 3
+  }
+
+  deregistration_delay = 30
+
+  tags = {
+    Name        = ""honua-tg-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+resource ""aws_lb_listener"" ""honua"" {
+  load_balancer_arn = aws_lb.honua.arn
+  port              = ""80""
+  protocol          = ""HTTP""
+
+  default_action {
+    type             = ""forward""
+    target_group_arn = aws_lb_target_group.honua.arn
+  }
+}
+
+resource ""aws_security_group"" ""alb"" {
+  name        = ""honua-alb-sg-${var.environment}""
+  description = ""Security group for Honua ALB""
+  vpc_id      = aws_vpc.honua.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = ""tcp""
+    cidr_blocks = [""0.0.0.0/0""]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = ""tcp""
+    cidr_blocks = [""0.0.0.0/0""]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = ""-1""
+    cidr_blocks = [""0.0.0.0/0""]
+  }
+
+  tags = {
+    Name        = ""honua-alb-sg-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# ECS Service
+resource ""aws_ecs_service"" ""honua"" {
+  name            = ""honua-service-${var.environment}""
+  cluster         = aws_ecs_cluster.honua.id
+  task_definition = aws_ecs_task_definition.honua.arn
+  desired_count   = var.environment == ""production"" ? 2 : 1
+  launch_type     = ""FARGATE""
+
+  network_configuration {
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.ecs_service.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.honua.arn
+    container_name   = ""honua-server""
+    container_port   = 8080
+  }
+
+  depends_on = [aws_lb_listener.honua]
+
+  tags = {
+    Name        = ""honua-service-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# Auto-scaling for ECS Service
+resource ""aws_appautoscaling_target"" ""honua"" {
+  max_capacity       = 10
+  min_capacity       = 1
+  resource_id        = ""service/${aws_ecs_cluster.honua.name}/${aws_ecs_service.honua.name}""
+  scalable_dimension = ""ecs:service:DesiredCount""
+  service_namespace  = ""ecs""
+}
+
+resource ""aws_appautoscaling_policy"" ""honua_cpu"" {
+  name               = ""honua-cpu-autoscaling-${var.environment}""
+  policy_type        = ""TargetTrackingScaling""
+  resource_id        = aws_appautoscaling_target.honua.resource_id
+  scalable_dimension = aws_appautoscaling_target.honua.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.honua.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = ""ECSServiceAverageCPUUtilization""
+    }
+    target_value = 70.0
+  }
+}
+
+resource ""aws_appautoscaling_policy"" ""honua_memory"" {
+  name               = ""honua-memory-autoscaling-${var.environment}""
+  policy_type        = ""TargetTrackingScaling""
+  resource_id        = aws_appautoscaling_target.honua.resource_id
+  scalable_dimension = aws_appautoscaling_target.honua.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.honua.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = ""ECSServiceAverageMemoryUtilization""
+    }
+    target_value = 80.0
+  }
+}
+
+# Data source for current AWS account
+data ""aws_caller_identity"" ""current"" {}
+");
+
+        tf.AppendLine(@"
+# Security Group for ECS Service
+resource ""aws_security_group"" ""ecs_service"" {
+  name        = ""honua-ecs-sg-${var.environment}""
+  description = ""Security group for Honua ECS service""
+  vpc_id      = aws_vpc.honua.id
+
+  ingress {
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = ""tcp""
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = ""-1""
+    cidr_blocks = [""0.0.0.0/0""]
+  }
+
+  tags = {
+    Name        = ""honua-ecs-sg-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# Data sources
+data ""aws_availability_zones"" ""available"" {
+  state = ""available""
+}
+
+# Outputs
+output ""honua_server_url"" {
+  value = ""http://${aws_lb.honua.dns_name}""
+}");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@"
+output ""database_endpoint"" {
+  value = aws_db_instance.postgis.endpoint
+}
+
+output ""database_password"" {
+  value     = random_password.db_password.result
+  sensitive = true
+}");
+        }
+
+        return tf.ToString();
+    }
+
+    private async Task<string> GenerateTerraformAzureAsync(DeploymentAnalysis analysis, AgentExecutionContext context)
+    {
+        // Always use inline generation - Terraform plugin not yet implemented
+        _logger.LogDebug("Generating Azure Terraform configuration");
+
+        var terraformContent = GenerateAzureTerraformContent(analysis);
+        var fileName = "main.tf";
+        var filePath = Path.Combine(context.WorkspacePath, "terraform-azure", fileName);
+
+        _logger.LogDebug("Will write Terraform to: {FilePath}", filePath);
+
+        // Create directory if it doesn't exist
+        var directory = Path.GetDirectoryName(filePath);
+        if (!Directory.Exists(directory))
+        {
+            _logger.LogDebug("Creating directory: {Directory}", directory);
+            Directory.CreateDirectory(directory!);
+        }
+
+        _logger.LogDebug("Writing {ByteCount} bytes to Terraform file", terraformContent.Length);
+        await File.WriteAllTextAsync(filePath, terraformContent.Trim());
+        _logger.LogDebug("Terraform file written successfully");
+
+        // Also copy to workspace root for compatibility with tests
+        var workspaceRootPath = Path.Combine(context.WorkspacePath, "main.tf");
+        await File.WriteAllTextAsync(workspaceRootPath, terraformContent.Trim());
+        _logger.LogDebug("Also copied to workspace root: {WorkspaceRootPath}", workspaceRootPath);
+
+        return terraformContent.Trim();
+    }
+
+    private string GenerateAzureTerraformContent(DeploymentAnalysis analysis)
+    {
+        var hasDatabase = analysis.InfrastructureNeeds.NeedsDatabase ||
+                         analysis.RequiredServices.Any(s => s.Contains("postgis", StringComparison.OrdinalIgnoreCase));
+        var hasCache = analysis.InfrastructureNeeds.NeedsCache ||
+                      analysis.RequiredServices.Any(s => s.Contains("redis", StringComparison.OrdinalIgnoreCase));
+
+        // Detect storage needs
+        var hasStorage = analysis.RequiredServices.Any(s =>
+                            s.Contains("blob", StringComparison.OrdinalIgnoreCase) ||
+                            s.Contains("storage", StringComparison.OrdinalIgnoreCase) ||
+                            s.Contains("cdn", StringComparison.OrdinalIgnoreCase) ||
+                            s.Contains("front door", StringComparison.OrdinalIgnoreCase));
+
+        // Detect monitoring needs
+        var hasMonitoring = analysis.RequiredServices.Any(s =>
+                               s.Contains("insights", StringComparison.OrdinalIgnoreCase) ||
+                               s.Contains("monitoring", StringComparison.OrdinalIgnoreCase) ||
+                               s.Contains("application insights", StringComparison.OrdinalIgnoreCase) ||
+                               s.Contains("observability", StringComparison.OrdinalIgnoreCase));
+
+        // Detect managed identity needs
+        var hasManagedIdentity = analysis.RequiredServices.Any(s =>
+                                   s.Contains("managed identity", StringComparison.OrdinalIgnoreCase) ||
+                                   s.Contains("identity", StringComparison.OrdinalIgnoreCase) ||
+                                   s.Contains("rbac", StringComparison.OrdinalIgnoreCase));
+
+        var tf = new System.Text.StringBuilder();
+        tf.AppendLine(@"terraform {
+  required_providers {
+    azurerm = {
+      source  = ""hashicorp/azurerm""
+      version = ""~> 3.0""
+    }
+  }
+}
+
+provider ""azurerm"" {
+  features {}
+}
+
+variable ""location"" {
+  description = ""Azure region""
+  default     = ""East US""
+}
+
+variable ""environment"" {
+  description = ""Environment name""
+  default     = """ + analysis.TargetEnvironment + @"""
+}
+
+# Resource Group
+resource ""azurerm_resource_group"" ""honua"" {
+  name     = ""honua-rg-${var.environment}""
+  location = var.location
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+# Container Registry
+resource ""azurerm_container_registry"" ""honua"" {
+  name                = ""honuaacr${var.environment}""
+  resource_group_name = azurerm_resource_group.honua.name
+  location            = azurerm_resource_group.honua.location
+  sku                 = ""Basic""
+  admin_enabled       = true
+}
+
+# Container Apps Environment
+resource ""azurerm_log_analytics_workspace"" ""honua"" {
+  name                = ""honua-logs-${var.environment}""
+  location            = azurerm_resource_group.honua.location
+  resource_group_name = azurerm_resource_group.honua.name
+  sku                 = ""PerGB2018""
+  retention_in_days   = 30
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}");
+
+        if (hasMonitoring)
+        {
+            tf.AppendLine(@"
+# Application Insights
+resource ""azurerm_application_insights"" ""honua"" {
+  name                = ""honua-insights-${var.environment}""
+  location            = azurerm_resource_group.honua.location
+  resource_group_name = azurerm_resource_group.honua.name
+  workspace_id        = azurerm_log_analytics_workspace.honua.id
+  application_type    = ""web""
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}");
+        }
+
+        tf.AppendLine(@"
+resource ""azurerm_container_app_environment"" ""honua"" {
+  name                       = ""honua-env-${var.environment}""
+  location                   = azurerm_resource_group.honua.location
+  resource_group_name        = azurerm_resource_group.honua.name
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.honua.id
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+# Container App for Honua Server
+resource ""azurerm_container_app"" ""honua"" {
+  name                         = ""honua-server-${var.environment}""
+  container_app_environment_id = azurerm_container_app_environment.honua.id
+  resource_group_name          = azurerm_resource_group.honua.name
+  revision_mode                = ""Single""
+
+  template {
+    container {
+      name   = ""honua-server""
+      image  = ""honuaio/honuaserver:latest""
+      cpu    = 1.0
+      memory = ""2Gi""
+
+      env {
+        name  = ""ASPNETCORE_ENVIRONMENT""
+        value = var.environment
+      }");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@"
+      env {
+        name  = ""HONUA__DATABASE__HOST""
+        value = azurerm_postgresql_flexible_server.honua.fqdn
+      }
+
+      env {
+        name  = ""HONUA__DATABASE__PORT""
+        value = ""5432""
+      }
+
+      env {
+        name  = ""HONUA__DATABASE__DATABASE""
+        value = azurerm_postgresql_flexible_server_database.honua.name
+      }
+
+      env {
+        name  = ""HONUA__DATABASE__USERNAME""
+        value = azurerm_postgresql_flexible_server.honua.administrator_login
+      }
+
+      env {
+        name  = ""HONUA__DATABASE__PASSWORD""
+        value = azurerm_postgresql_flexible_server.honua.administrator_password
+        secret_name = ""db-password""
+      }");
+        }
+
+        if (hasCache)
+        {
+            tf.AppendLine(@"
+      env {
+        name  = ""HONUA__CACHE__PROVIDER""
+        value = ""redis""
+      }
+
+      env {
+        name  = ""HONUA__CACHE__REDIS__HOST""
+        value = azurerm_redis_cache.honua.hostname
+      }
+
+      env {
+        name  = ""HONUA__CACHE__REDIS__PORT""
+        value = ""6380""
+      }
+
+      env {
+        name  = ""HONUA__CACHE__REDIS__PASSWORD""
+        value = azurerm_redis_cache.honua.primary_access_key
+        secret_name = ""redis-password""
+      }");
+        }
+
+        tf.AppendLine(@"
+    }
+  }
+
+  ingress {
+    external_enabled = true
+    target_port      = 8080
+
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }");
+
+        if (hasManagedIdentity)
+        {
+            tf.AppendLine(@"
+  identity { type = ""SystemAssigned"" }");
+        }
+
+        tf.AppendLine(@"
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@"
+# PostgreSQL Flexible Server
+resource ""azurerm_postgresql_flexible_server"" ""honua"" {
+  name                   = ""honua-psql-${var.environment}""
+  resource_group_name    = azurerm_resource_group.honua.name
+  location               = azurerm_resource_group.honua.location
+  version                = ""15""
+  administrator_login    = ""postgres""
+  administrator_password = random_password.db_password.result
+  zone                   = ""1""
+
+  storage_mb = 32768
+  sku_name   = ""B_Standard_B1ms""
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+resource ""azurerm_postgresql_flexible_server_database"" ""honua"" {
+  name      = ""honua""
+  server_id = azurerm_postgresql_flexible_server.honua.id
+  charset   = ""UTF8""
+  collation = ""en_US.utf8""
+}
+
+resource ""azurerm_postgresql_flexible_server_firewall_rule"" ""allow_azure"" {
+  name             = ""allow-azure-services""
+  server_id        = azurerm_postgresql_flexible_server.honua.id
+  start_ip_address = ""0.0.0.0""
+  end_ip_address   = ""0.0.0.0""
+}
+
+resource ""random_password"" ""db_password"" {
+  length  = 32
+  special = true
+}");
+        }
+
+        if (hasCache)
+        {
+            tf.AppendLine(@"
+# Redis Cache
+resource ""azurerm_redis_cache"" ""honua"" {
+  name                = ""honua-redis-${var.environment}""
+  location            = azurerm_resource_group.honua.location
+  resource_group_name = azurerm_resource_group.honua.name
+  capacity            = 0
+  family              = ""C""
+  sku_name            = ""Basic""
+  enable_non_ssl_port = false
+
+  redis_configuration {
+    maxmemory_policy = ""allkeys-lru""
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}");
+        }
+
+        if (hasStorage)
+        {
+            tf.AppendLine(@"
+# Storage Account for Blob Storage
+resource ""azurerm_storage_account"" ""honua"" {
+  name                     = ""honuastorage${var.environment}""
+  resource_group_name      = azurerm_resource_group.honua.name
+  location                 = azurerm_resource_group.honua.location
+  account_tier             = ""Standard""
+  account_replication_type = ""LRS""
+
+  blob_properties {
+    delete_retention_policy {
+      days = 7
+    }
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+# Blob Container for tile caching
+resource ""azurerm_storage_container"" ""tiles"" {
+  name                  = ""tiles""
+  storage_account_name  = azurerm_storage_account.honua.name
+  container_access_type = ""private""
+}
+
+# CDN Profile
+resource ""azurerm_cdn_profile"" ""honua"" {
+  name                = ""honua-cdn-${var.environment}""
+  location            = azurerm_resource_group.honua.location
+  resource_group_name = azurerm_resource_group.honua.name
+  sku                 = ""Standard_Microsoft""
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+# CDN Endpoint
+resource ""azurerm_cdn_endpoint"" ""honua"" {
+  name                = ""honua-endpoint-${var.environment}""
+  profile_name        = azurerm_cdn_profile.honua.name
+  location            = azurerm_resource_group.honua.location
+  resource_group_name = azurerm_resource_group.honua.name
+
+  origin {
+    name      = ""honua-storage""
+    host_name = azurerm_storage_account.honua.primary_blob_host
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}");
+        }
+
+        tf.AppendLine(@"
+# Outputs
+output ""honua_server_url"" {
+  value = ""https://${azurerm_container_app.honua.latest_revision_fqdn}""
+  description = ""URL to access the Honua server""
+}");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@"
+output ""database_fqdn"" {
+  value = azurerm_postgresql_flexible_server.honua.fqdn
+}
+
+output ""database_password"" {
+  value     = random_password.db_password.result
+  sensitive = true
+}");
+        }
+
+        if (hasCache)
+        {
+            tf.AppendLine(@"
+output ""redis_hostname"" {
+  value = azurerm_redis_cache.honua.hostname
+}");
+        }
+
+        return tf.ToString();
+    }
+
+    private async Task<string> GenerateTerraformGCPAsync(DeploymentAnalysis analysis, AgentExecutionContext context)
+    {
+        // Always use inline generation - Terraform plugin not yet implemented
+        _logger.LogDebug("Generating GCP Terraform configuration");
+
+        var terraformContent = GenerateGCPTerraformContent(analysis);
+        var fileName = "main.tf";
+        var filePath = Path.Combine(context.WorkspacePath, "terraform-gcp", fileName);
+
+        _logger.LogDebug("Will write Terraform to: {FilePath}", filePath);
+
+        // Create directory if it doesn't exist
+        var directory = Path.GetDirectoryName(filePath);
+        if (!Directory.Exists(directory))
+        {
+            _logger.LogDebug("Creating directory: {Directory}", directory);
+            Directory.CreateDirectory(directory!);
+        }
+
+        _logger.LogDebug("Writing {ByteCount} bytes to Terraform file", terraformContent.Length);
+        await File.WriteAllTextAsync(filePath, terraformContent.Trim());
+        _logger.LogDebug("Terraform file written successfully");
+
+        // Also copy to workspace root for compatibility with tests
+        var workspaceRootPath = Path.Combine(context.WorkspacePath, "main.tf");
+        await File.WriteAllTextAsync(workspaceRootPath, terraformContent.Trim());
+        _logger.LogDebug("Also copied to workspace root: {WorkspaceRootPath}", workspaceRootPath);
+
+        return terraformContent.Trim();
+    }
+
+    private string GenerateGCPTerraformContent(DeploymentAnalysis analysis)
+    {
+        var hasDatabase = analysis.InfrastructureNeeds.NeedsDatabase ||
+                         analysis.RequiredServices.Any(s => s.Contains("postgis", StringComparison.OrdinalIgnoreCase));
+        var hasCache = analysis.InfrastructureNeeds.NeedsCache ||
+                      analysis.RequiredServices.Any(s => s.Contains("redis", StringComparison.OrdinalIgnoreCase));
+
+        var tf = new System.Text.StringBuilder();
+        tf.AppendLine(@"terraform {
+  required_providers {
+    google = {
+      source  = ""hashicorp/google""
+      version = ""~> 5.0""
+    }
+  }
+}
+
+provider ""google"" {
+  project = var.project_id
+  region  = var.region
+}
+
+variable ""project_id"" {
+  description = ""GCP project ID""
+  type        = string
+}
+
+variable ""region"" {
+  description = ""GCP region""
+  default     = ""us-central1""
+}
+
+variable ""zone"" {
+  description = ""GCP zone""
+  default     = ""us-central1-a""
+}
+
+variable ""environment"" {
+  description = ""Environment name""
+  default     = """ + analysis.TargetEnvironment + @"""
+}
+
+# Enable required APIs
+resource ""google_project_service"" ""cloud_run"" {
+  project = var.project_id
+  service = ""run.googleapis.com""
+}
+
+resource ""google_project_service"" ""sql_admin"" {
+  project = var.project_id
+  service = ""sqladmin.googleapis.com""
+}
+
+resource ""google_project_service"" ""redis"" {
+  project = var.project_id
+  service = ""redis.googleapis.com""
+}
+
+# Cloud Run Service for Honua Server
+resource ""google_cloud_run_service"" ""honua"" {
+  name     = ""honua-server-${var.environment}""
+  location = var.region
+
+  template {
+    spec {
+      containers {
+        image = ""honuaio/honua-server:latest""
+
+        resources {
+          limits = {
+            cpu    = ""1000m""
+            memory = ""2048Mi""
+          }
+        }
+
+        env {
+          name  = ""ASPNETCORE_ENVIRONMENT""
+          value = var.environment
+        }");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@"
+        env {
+          name  = ""HONUA__DATABASE__HOST""
+          value = google_sql_database_instance.postgis.private_ip_address
+        }
+
+        env {
+          name  = ""HONUA__DATABASE__PORT""
+          value = ""5432""
+        }
+
+        env {
+          name  = ""HONUA__DATABASE__DATABASE""
+          value = google_sql_database.honua.name
+        }
+
+        env {
+          name  = ""HONUA__DATABASE__USERNAME""
+          value = ""postgres""
+        }
+
+        env {
+          name  = ""HONUA__DATABASE__PASSWORD""
+          value = random_password.db_password.result
+        }");
+        }
+
+        if (hasCache)
+        {
+            tf.AppendLine(@"
+        env {
+          name  = ""HONUA__CACHE__PROVIDER""
+          value = ""redis""
+        }
+
+        env {
+          name  = ""HONUA__CACHE__REDIS__HOST""
+          value = google_redis_instance.cache.host
+        }
+
+        env {
+          name  = ""HONUA__CACHE__REDIS__PORT""
+          value = ""6379""
+        }");
+        }
+
+        tf.AppendLine(@"      }
+    }
+
+    metadata {
+      annotations = {
+        ""autoscaling.knative.dev/maxScale"" = ""10""
+        ""autoscaling.knative.dev/minScale"" = ""1""
+      }
+    }
+  }
+
+  traffic {
+    percent         = 100
+    latest_revision = true
+  }
+
+  depends_on = [
+    google_project_service.cloud_run
+  ]
+}
+
+# IAM Policy to allow public access
+resource ""google_cloud_run_service_iam_member"" ""public_access"" {
+  service  = google_cloud_run_service.honua.name
+  location = google_cloud_run_service.honua.location
+  role     = ""roles/run.invoker""
+  member   = ""allUsers""
+}");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@"
+# Cloud SQL PostgreSQL Instance
+resource ""google_sql_database_instance"" ""postgis"" {
+  name             = ""honua-postgis-${var.environment}""
+  database_version = ""POSTGRES_15""
+  region           = var.region
+
+  settings {
+    tier              = ""db-f1-micro""
+    availability_type = var.environment == ""production"" ? ""REGIONAL"" : ""ZONAL""
+
+    backup_configuration {
+      enabled                        = true
+      start_time                     = ""03:00""
+      point_in_time_recovery_enabled = var.environment == ""production""
+    }
+
+    database_flags {
+      name  = ""max_connections""
+      value = ""100""
+    }
+
+    ip_configuration {
+      ipv4_enabled    = true
+      private_network = google_compute_network.vpc.id
+
+      authorized_networks {
+        name  = ""allow-all""
+        value = ""0.0.0.0/0""
+      }
+    }
+  }
+
+  deletion_protection = var.environment == ""production""
+
+  depends_on = [
+    google_project_service.sql_admin,
+    google_service_networking_connection.private_vpc_connection
+  ]
+}
+
+resource ""google_sql_database"" ""honua"" {
+  name     = ""honua""
+  instance = google_sql_database_instance.postgis.name
+}
+
+resource ""google_sql_user"" ""postgres"" {
+  name     = ""postgres""
+  instance = google_sql_database_instance.postgis.name
+  password = random_password.db_password.result
+}
+
+resource ""random_password"" ""db_password"" {
+  length  = 32
+  special = true
+}
+
+# VPC for private database access
+resource ""google_compute_network"" ""vpc"" {
+  name                    = ""honua-vpc-${var.environment}""
+  auto_create_subnetworks = false
+}
+
+resource ""google_compute_global_address"" ""private_ip"" {
+  name          = ""honua-private-ip-${var.environment}""
+  purpose       = ""VPC_PEERING""
+  address_type  = ""INTERNAL""
+  prefix_length = 16
+  network       = google_compute_network.vpc.id
+}
+
+resource ""google_service_networking_connection"" ""private_vpc_connection"" {
+  network                 = google_compute_network.vpc.id
+  service                 = ""servicenetworking.googleapis.com""
+  reserved_peering_ranges = [google_compute_global_address.private_ip.name]
+}");
+        }
+
+        if (hasCache)
+        {
+            tf.AppendLine(@"
+# Cloud Memorystore Redis Instance
+resource ""google_redis_instance"" ""cache"" {
+  name           = ""honua-redis-${var.environment}""
+  tier           = ""BASIC""
+  memory_size_gb = 1
+  region         = var.region
+
+  redis_version = ""REDIS_7_0""
+  display_name  = ""Honua Redis Cache""
+
+  labels = {
+    environment = var.environment
+    application = ""honua""
+  }
+
+  depends_on = [
+    google_project_service.redis
+  ]
+}");
+        }
+
+        tf.AppendLine(@"
+# Storage Bucket for tile caching and static assets
+resource ""google_storage_bucket"" ""honua_cache"" {
+  name     = ""honua-cache-${var.project_id}-${var.environment}""
+  location = var.region
+
+  uniform_bucket_level_access = true
+
+  lifecycle_rule {
+    condition {
+      age = 30
+    }
+    action {
+      type = ""Delete""
+    }
+  }
+
+  lifecycle_rule {
+    condition {
+      age = 90
+    }
+    action {
+      type          = ""SetStorageClass""
+      storage_class = ""NEARLINE""
+    }
+  }
+
+  labels = {
+    environment = var.environment
+    application = ""honua""
+  }
+}
+
+# Service Account for Honua with least privilege
+resource ""google_service_account"" ""honua"" {
+  account_id   = ""honua-${var.environment}""
+  display_name = ""Honua GIS Server Service Account""
+  description  = ""Service account for Honua with least-privilege access""
+}
+
+# IAM binding for Cloud Run to use service account
+resource ""google_service_account_iam_member"" ""run_sa_user"" {
+  service_account_id = google_service_account.honua.name
+  role               = ""roles/iam.serviceAccountUser""
+  member             = ""serviceAccount:${google_service_account.honua.email}""
+}
+
+# Grant service account access to Cloud SQL
+resource ""google_project_iam_member"" ""cloudsql_client"" {
+  project = var.project_id
+  role    = ""roles/cloudsql.client""
+  member  = ""serviceAccount:${google_service_account.honua.email}""
+}
+
+# Grant service account access to Storage
+resource ""google_project_iam_member"" ""storage_object_admin"" {
+  project = var.project_id
+  role    = ""roles/storage.objectAdmin""
+  member  = ""serviceAccount:${google_service_account.honua.email}""
+}
+
+# Cloud Logging
+resource ""google_logging_project_sink"" ""honua_logs"" {
+  name        = ""honua-logs-${var.environment}""
+  destination = ""logging.googleapis.com/projects/${var.project_id}/locations/${var.region}/buckets/honua-logs""
+
+  filter = ""resource.type=cloud_run_revision AND resource.labels.service_name=~\\""honua-.*\\""""
+
+  unique_writer_identity = true
+}
+
+# Monitoring Alert Policy for high error rate
+resource ""google_monitoring_alert_policy"" ""high_error_rate"" {
+  display_name = ""Honua High Error Rate - ${var.environment}""
+  combiner     = ""OR""
+
+  conditions {
+    display_name = ""Error rate above 5%""
+
+    condition_threshold {
+      filter          = ""resource.type=\\""cloud_run_revision\\"" AND resource.labels.service_name=~\\""honua-.*\\"" AND metric.type=\\""run.googleapis.com/request_count\\"" AND metric.labels.response_code_class=\\""5xx\\""""
+      duration        = ""300s""
+      comparison      = ""COMPARISON_GT""
+      threshold_value = 0.05
+
+      aggregations {
+        alignment_period   = ""60s""
+        per_series_aligner = ""ALIGN_RATE""
+      }
+    }
+  }
+
+  notification_channels = []
+
+  alert_strategy {
+    auto_close = ""1800s""
+  }
+}
+
+# VPC Access Connector for private VPC connectivity
+resource ""google_vpc_access_connector"" ""honua"" {
+  name          = ""honua-vpc-connector-${var.environment}""
+  region        = var.region
+  network       = google_compute_network.vpc.name
+  ip_cidr_range = ""10.8.0.0/28""
+
+  min_throughput = 200
+  max_throughput = 300
+}
+
+# Load Balancer components for HA deployment
+resource ""google_compute_global_address"" ""honua_lb"" {
+  name = ""honua-lb-ip-${var.environment}""
+}
+
+resource ""google_compute_backend_service"" ""honua"" {
+  name          = ""honua-backend-${var.environment}""
+  protocol      = ""HTTP""
+  port_name     = ""http""
+  timeout_sec   = 30
+  health_checks = [google_compute_health_check.honua.id]
+
+  backend {
+    group = google_compute_region_network_endpoint_group.honua.id
+  }
+
+  log_config {
+    enable      = true
+    sample_rate = 1.0
+  }
+}
+
+resource ""google_compute_region_network_endpoint_group"" ""honua"" {
+  name                  = ""honua-neg-${var.environment}""
+  network_endpoint_type = ""SERVERLESS""
+  region                = var.region
+
+  cloud_run {
+    service = google_cloud_run_service.honua.name
+  }
+}
+
+resource ""google_compute_health_check"" ""honua"" {
+  name = ""honua-health-check-${var.environment}""
+
+  http_health_check {
+    port         = 8080
+    request_path = ""/health""
+  }
+
+  check_interval_sec  = 30
+  timeout_sec         = 10
+  healthy_threshold   = 2
+  unhealthy_threshold = 3
+}
+
+resource ""google_compute_url_map"" ""honua"" {
+  name            = ""honua-url-map-${var.environment}""
+  default_service = google_compute_backend_service.honua.id
+}
+
+resource ""google_compute_target_http_proxy"" ""honua"" {
+  name    = ""honua-http-proxy-${var.environment}""
+  url_map = google_compute_url_map.honua.id
+}
+
+resource ""google_compute_global_forwarding_rule"" ""honua"" {
+  name       = ""honua-forwarding-rule-${var.environment}""
+  target     = google_compute_target_http_proxy.honua.id
+  port_range = ""80""
+  ip_address = google_compute_global_address.honua_lb.address
+}
+");
+
+        tf.AppendLine(@"
+# Outputs
+output ""honua_server_url"" {
+  value = google_cloud_run_service.honua.status[0].url
+}");
+
+        if (hasDatabase)
+        {
+            tf.AppendLine(@"
+output ""database_ip"" {
+  value = google_sql_database_instance.postgis.private_ip_address
+}
+
+output ""database_password"" {
+  value     = random_password.db_password.result
+  sensitive = true
+}");
+        }
+
+        if (hasCache)
+        {
+            tf.AppendLine(@"
+output ""redis_host"" {
+  value = google_redis_instance.cache.host
+}");
+        }
+
+        return tf.ToString();
+    }
+
+    private async Task<string> GenerateGCPCloudFunctionsAsync(DeploymentAnalysis analysis, AgentExecutionContext context)
+    {
+        _logger.LogDebug("Generating GCP Cloud Functions Terraform configuration");
+
+        var terraformContent = GenerateGCPCloudFunctionsTerraformContent(analysis);
+        var fileName = "main.tf";
+        var filePath = Path.Combine(context.WorkspacePath, "terraform-gcp-functions", fileName);
+
+        _logger.LogDebug("Will write Terraform to: {FilePath}", filePath);
+
+        // Create directory if it doesn't exist
+        var directory = Path.GetDirectoryName(filePath);
+        if (!Directory.Exists(directory))
+        {
+            _logger.LogDebug("Creating directory: {Directory}", directory);
+            Directory.CreateDirectory(directory!);
+        }
+
+        _logger.LogDebug("Writing {ByteCount} bytes to Terraform file", terraformContent.Length);
+        await File.WriteAllTextAsync(filePath, terraformContent.Trim());
+        _logger.LogDebug("Terraform file written successfully");
+
+        // Also copy to workspace root for compatibility with tests
+        var workspaceRootPath = Path.Combine(context.WorkspacePath, "main.tf");
+        await File.WriteAllTextAsync(workspaceRootPath, terraformContent.Trim());
+        _logger.LogDebug("Also copied to workspace root: {WorkspaceRootPath}", workspaceRootPath);
+
+        return terraformContent.Trim();
+    }
+
+    private string GenerateGCPCloudFunctionsTerraformContent(DeploymentAnalysis analysis)
+    {
+        var tf = new System.Text.StringBuilder();
+
+        tf.AppendLine(@"terraform {
+  required_providers {
+    google = {
+      source  = ""hashicorp/google""
+      version = ""~> 5.0""
+    }
+  }
+}
+
+provider ""google"" {
+  project = var.project_id
+  region  = var.region
+}
+
+variable ""project_id"" {
+  description = ""GCP project ID""
+  type        = string
+}
+
+variable ""region"" {
+  description = ""GCP region""
+  default     = ""us-central1""
+}
+
+variable ""environment"" {
+  description = ""Environment name""
+  default     = """ + analysis.TargetEnvironment + @"""
+}
+
+# Enable required APIs
+resource ""google_project_service"" ""cloud_functions"" {
+  project = var.project_id
+  service = ""cloudfunctions.googleapis.com""
+}
+
+resource ""google_project_service"" ""cloud_build"" {
+  project = var.project_id
+  service = ""cloudbuild.googleapis.com""
+}
+
+resource ""google_project_service"" ""firestore"" {
+  project = var.project_id
+  service = ""firestore.googleapis.com""
+}
+
+resource ""google_project_service"" ""storage"" {
+  project = var.project_id
+  service = ""storage.googleapis.com""
+}
+
+# Service Account for Cloud Functions
+resource ""google_service_account"" ""honua_function"" {
+  account_id   = ""honua-function-${var.environment}""
+  display_name = ""Honua Cloud Functions Service Account""
+  description  = ""Service account for Honua Cloud Functions with least-privilege access""
+}
+
+# Grant service account access to Firestore
+resource ""google_project_iam_member"" ""firestore_user"" {
+  project = var.project_id
+  role    = ""roles/datastore.user""
+  member  = ""serviceAccount:${google_service_account.honua_function.email}""
+}
+
+# Grant service account access to Storage
+resource ""google_project_iam_member"" ""storage_object_admin"" {
+  project = var.project_id
+  role    = ""roles/storage.objectAdmin""
+  member  = ""serviceAccount:${google_service_account.honua_function.email}""
+}
+
+# Grant service account access to Cloud Logging
+resource ""google_project_iam_member"" ""log_writer"" {
+  project = var.project_id
+  role    = ""roles/logging.logWriter""
+  member  = ""serviceAccount:${google_service_account.honua_function.email}""
+}
+
+# Grant service account access to Cloud Monitoring
+resource ""google_project_iam_member"" ""monitoring_metric_writer"" {
+  project = var.project_id
+  role    = ""roles/monitoring.metricWriter""
+  member  = ""serviceAccount:${google_service_account.honua_function.email}""
+}
+
+# Storage Bucket for Cloud Function source code
+resource ""google_storage_bucket"" ""function_source"" {
+  name     = ""honua-function-source-${var.project_id}-${var.environment}""
+  location = var.region
+
+  uniform_bucket_level_access = true
+
+  labels = {
+    environment = var.environment
+    application = ""honua""
+  }
+}
+
+# Storage Bucket for tile caching
+resource ""google_storage_bucket"" ""tiles"" {
+  name     = ""honua-tiles-${var.project_id}-${var.environment}""
+  location = var.region
+
+  uniform_bucket_level_access = true
+
+  lifecycle_rule {
+    condition {
+      age = 30
+    }
+    action {
+      type = ""Delete""
+    }
+  }
+
+  lifecycle_rule {
+    condition {
+      age = 90
+    }
+    action {
+      type          = ""SetStorageClass""
+      storage_class = ""NEARLINE""
+    }
+  }
+
+  labels = {
+    environment = var.environment
+    application = ""honua""
+  }
+}
+
+# Firestore database for data persistence
+resource ""google_firestore_database"" ""honua"" {
+  project     = var.project_id
+  name        = ""(default)""
+  location_id = var.region
+  type        = ""FIRESTORE_NATIVE""
+
+  depends_on = [
+    google_project_service.firestore
+  ]
+}
+
+# Cloud Function (2nd gen) with container support
+resource ""google_cloudfunctions2_function"" ""honua"" {
+  name        = ""honua-server-${var.environment}""
+  location    = var.region
+  description = ""Honua GIS Server running on Cloud Functions""
+
+  build_config {
+    runtime     = ""dotnet8""
+    entry_point = ""HonuaServer""
+
+    source {
+      storage_source {
+        bucket = google_storage_bucket.function_source.name
+        object = ""honua-server-latest.zip""
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count    = 10
+    min_instance_count    = 1
+    available_memory      = ""2048Mi""
+    timeout_seconds       = 60
+    service_account_email = google_service_account.honua_function.email
+
+    environment_variables = {
+      ASPNETCORE_ENVIRONMENT = var.environment
+      HONUA__STORAGE__PROVIDER = ""gcs""
+      HONUA__STORAGE__GCS__BUCKET = google_storage_bucket.tiles.name
+      HONUA__STORAGE__GCS__PROJECT = var.project_id
+      HONUA__DATABASE__PROVIDER = ""firestore""
+      HONUA__DATABASE__FIRESTORE__PROJECT = var.project_id
+      HONUA__DATABASE__FIRESTORE__DATABASE = google_firestore_database.honua.name
+    }
+
+    ingress_settings = ""ALLOW_ALL""
+  }
+
+  depends_on = [
+    google_project_service.cloud_functions,
+    google_project_service.cloud_build
+  ]
+}
+
+# IAM binding to allow public invocation
+resource ""google_cloudfunctions2_function_iam_member"" ""public_access"" {
+  project        = google_cloudfunctions2_function.honua.project
+  location       = google_cloudfunctions2_function.honua.location
+  cloud_function = google_cloudfunctions2_function.honua.name
+  role           = ""roles/cloudfunctions.invoker""
+  member         = ""allUsers""
+}
+
+# Cloud Logging
+resource ""google_logging_project_sink"" ""honua_logs"" {
+  name        = ""honua-function-logs-${var.environment}""
+  destination = ""logging.googleapis.com/projects/${var.project_id}/locations/${var.region}/buckets/honua-function-logs""
+
+  filter = ""resource.type=cloud_function AND resource.labels.function_name=~\\""honua-.*\\""""
+
+  unique_writer_identity = true
+}
+
+# Monitoring Alert Policy for high error rate
+resource ""google_monitoring_alert_policy"" ""high_error_rate"" {
+  display_name = ""Honua Cloud Functions High Error Rate - ${var.environment}""
+  combiner     = ""OR""
+
+  conditions {
+    display_name = ""Error rate above 5%""
+
+    condition_threshold {
+      filter          = ""resource.type=\\""cloud_function\\"" AND resource.labels.function_name=~\\""honua-.*\\"" AND metric.type=\\""cloudfunctions.googleapis.com/function/execution_count\\"" AND metric.labels.status!=\\""ok\\""""
+      duration        = ""300s""
+      comparison      = ""COMPARISON_GT""
+      threshold_value = 0.05
+
+      aggregations {
+        alignment_period   = ""60s""
+        per_series_aligner = ""ALIGN_RATE""
+      }
+    }
+  }
+
+  notification_channels = []
+
+  alert_strategy {
+    auto_close = ""1800s""
+  }
+}
+
+# Monitoring Alert Policy for high latency
+resource ""google_monitoring_alert_policy"" ""high_latency"" {
+  display_name = ""Honua Cloud Functions High Latency - ${var.environment}""
+  combiner     = ""OR""
+
+  conditions {
+    display_name = ""Latency above 1 second""
+
+    condition_threshold {
+      filter          = ""resource.type=\\""cloud_function\\"" AND resource.labels.function_name=~\\""honua-.*\\"" AND metric.type=\\""cloudfunctions.googleapis.com/function/execution_times\\""""
+      duration        = ""300s""
+      comparison      = ""COMPARISON_GT""
+      threshold_value = 1000
+
+      aggregations {
+        alignment_period     = ""60s""
+        per_series_aligner   = ""ALIGN_DELTA""
+        cross_series_reducer = ""REDUCE_PERCENTILE_95""
+      }
+    }
+  }
+
+  notification_channels = []
+
+  alert_strategy {
+    auto_close = ""1800s""
+  }
+}
+
+# Outputs
+output ""honua_function_url"" {
+  value       = google_cloudfunctions2_function.honua.service_config[0].uri
+  description = ""URL of the Honua Cloud Function""
+}
+
+output ""tiles_bucket"" {
+  value       = google_storage_bucket.tiles.name
+  description = ""Name of the Cloud Storage bucket for tiles""
+}
+
+output ""firestore_database"" {
+  value       = google_firestore_database.honua.name
+  description = ""Name of the Firestore database""
+}
+
+output ""service_account_email"" {
+  value       = google_service_account.honua_function.email
+  description = ""Email of the service account used by Cloud Functions""
+}");
+
+        return tf.ToString();
+    }
+
+    private async Task<string> GenerateAWSLambdaAsync(DeploymentAnalysis analysis, AgentExecutionContext context)
+    {
+        // Always use inline generation - Terraform plugin not yet implemented
+        _logger.LogDebug("Generating AWS Lambda Terraform configuration");
+
+        var terraformContent = GenerateAWSLambdaTerraformContent(analysis);
+        var fileName = "main.tf";
+        var filePath = Path.Combine(context.WorkspacePath, "terraform-aws-lambda", fileName);
+
+        _logger.LogDebug("Will write Terraform to: {FilePath}", filePath);
+
+        // Create directory if it doesn't exist
+        var directory = Path.GetDirectoryName(filePath);
+        if (!Directory.Exists(directory))
+        {
+            _logger.LogDebug("Creating directory: {Directory}", directory);
+            Directory.CreateDirectory(directory!);
+        }
+
+        _logger.LogDebug("Writing {ByteCount} bytes to Terraform file", terraformContent.Length);
+        await File.WriteAllTextAsync(filePath, terraformContent.Trim());
+        _logger.LogDebug("Terraform file written successfully");
+
+        // Also copy to workspace root for compatibility with tests
+        var workspaceRootPath = Path.Combine(context.WorkspacePath, "main.tf");
+        await File.WriteAllTextAsync(workspaceRootPath, terraformContent.Trim());
+        _logger.LogDebug("Also copied to workspace root: {WorkspaceRootPath}", workspaceRootPath);
+
+        return terraformContent.Trim();
+    }
+
+    private string GenerateAWSLambdaTerraformContent(DeploymentAnalysis analysis)
+    {
+        var tf = new System.Text.StringBuilder();
+        tf.AppendLine(@"terraform {
+  required_providers {
+    aws = {
+      source  = ""hashicorp/aws""
+      version = ""~> 5.0""
+    }
+  }
+}
+
+provider ""aws"" {
+  region = var.aws_region
+}
+
+variable ""aws_region"" {
+  description = ""AWS region""
+  default     = ""us-east-1""
+}
+
+variable ""environment"" {
+  description = ""Environment name""
+  default     = """ + analysis.TargetEnvironment + @"""
+}
+
+# Lambda Execution Role
+resource ""aws_iam_role"" ""lambda_exec"" {
+  name = ""honua-lambda-exec-${var.environment}""
+
+  assume_role_policy = jsonencode({
+    Version = ""2012-10-17""
+    Statement = [{
+      Action = ""sts:AssumeRole""
+      Effect = ""Allow""
+      Principal = {
+        Service = ""lambda.amazonaws.com""
+      }
+    }]
+  })
+
+  tags = {
+    Name        = ""honua-lambda-exec-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# Lambda Policy for CloudWatch Logs
+resource ""aws_iam_role_policy_attachment"" ""lambda_logs"" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = ""arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole""
+}
+
+# Lambda Policy for DynamoDB Access
+resource ""aws_iam_role_policy"" ""lambda_dynamodb"" {
+  name = ""honua-lambda-dynamodb-${var.environment}""
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = ""2012-10-17""
+    Statement = [{
+      Effect = ""Allow""
+      Action = [
+        ""dynamodb:GetItem"",
+        ""dynamodb:PutItem"",
+        ""dynamodb:UpdateItem"",
+        ""dynamodb:DeleteItem"",
+        ""dynamodb:Query"",
+        ""dynamodb:Scan""
+      ]
+      Resource = aws_dynamodb_table.honua.arn
+    }]
+  })
+}
+
+# Lambda Policy for S3 Access
+resource ""aws_iam_role_policy"" ""lambda_s3"" {
+  name = ""honua-lambda-s3-${var.environment}""
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = ""2012-10-17""
+    Statement = [{
+      Effect = ""Allow""
+      Action = [
+        ""s3:GetObject"",
+        ""s3:PutObject"",
+        ""s3:DeleteObject"",
+        ""s3:ListBucket""
+      ]
+      Resource = [
+        aws_s3_bucket.honua_tiles.arn,
+        ""${aws_s3_bucket.honua_tiles.arn}/*""
+      ]
+    }]
+  })
+}
+
+# ECR Repository for Lambda Container Image
+resource ""aws_ecr_repository"" ""honua_lambda"" {
+  name                 = ""honua-lambda-${var.environment}""
+  image_tag_mutability = ""MUTABLE""
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name        = ""honua-lambda-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# Lambda Function with Container Image
+resource ""aws_lambda_function"" ""honua"" {
+  function_name = ""honua-server-${var.environment}""
+  role          = aws_iam_role.lambda_exec.arn
+  package_type  = ""Image""
+  image_uri     = ""${aws_ecr_repository.honua_lambda.repository_url}:latest""
+  timeout       = 30
+  memory_size   = 2048
+
+  environment {
+    variables = {
+      ASPNETCORE_ENVIRONMENT = var.environment
+      HONUA__DATABASE__TABLE = aws_dynamodb_table.honua.name
+      HONUA__STORAGE__BUCKET = aws_s3_bucket.honua_tiles.id
+      HONUA__STORAGE__REGION = var.aws_region
+    }
+  }
+
+  tags = {
+    Name        = ""honua-server-${var.environment}""
+    Environment = var.environment
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_logs,
+    aws_cloudwatch_log_group.lambda
+  ]
+}
+
+# CloudWatch Log Group
+resource ""aws_cloudwatch_log_group"" ""lambda"" {
+  name              = ""/aws/lambda/honua-server-${var.environment}""
+  retention_in_days = 14
+
+  tags = {
+    Name        = ""honua-lambda-logs-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# API Gateway HTTP API
+resource ""aws_apigatewayv2_api"" ""honua"" {
+  name          = ""honua-api-${var.environment}""
+  protocol_type = ""HTTP""
+
+  cors_configuration {
+    allow_origins = [""*""]
+    allow_methods = [""GET"", ""POST"", ""PUT"", ""DELETE"", ""OPTIONS""]
+    allow_headers = [""*""]
+    max_age_seconds = 3600
+  }
+
+  tags = {
+    Name        = ""honua-api-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# API Gateway Integration
+resource ""aws_apigatewayv2_integration"" ""honua"" {
+  api_id           = aws_apigatewayv2_api.honua.id
+  integration_type = ""AWS_PROXY""
+  integration_uri  = aws_lambda_function.honua.invoke_arn
+  payload_format_version = ""2.0""
+}
+
+# API Gateway Routes
+resource ""aws_apigatewayv2_route"" ""default"" {
+  api_id    = aws_apigatewayv2_api.honua.id
+  route_key = ""$default""
+  target    = ""integrations/${aws_apigatewayv2_integration.honua.id}""
+}
+
+# API Gateway Stage
+resource ""aws_apigatewayv2_stage"" ""default"" {
+  api_id      = aws_apigatewayv2_api.honua.id
+  name        = ""$default""
+  auto_deploy = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+    format = jsonencode({
+      requestId      = ""$context.requestId""
+      ip             = ""$context.identity.sourceIp""
+      requestTime    = ""$context.requestTime""
+      httpMethod     = ""$context.httpMethod""
+      routeKey       = ""$context.routeKey""
+      status         = ""$context.status""
+      protocol       = ""$context.protocol""
+      responseLength = ""$context.responseLength""
+    })
+  }
+
+  tags = {
+    Name        = ""honua-api-stage-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# CloudWatch Log Group for API Gateway
+resource ""aws_cloudwatch_log_group"" ""api_gateway"" {
+  name              = ""/aws/apigateway/honua-${var.environment}""
+  retention_in_days = 14
+
+  tags = {
+    Name        = ""honua-api-gateway-logs-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# Lambda Permission for API Gateway
+resource ""aws_lambda_permission"" ""api_gateway"" {
+  statement_id  = ""AllowAPIGatewayInvoke""
+  action        = ""lambda:InvokeFunction""
+  function_name = aws_lambda_function.honua.function_name
+  principal     = ""apigateway.amazonaws.com""
+  source_arn    = ""${aws_apigatewayv2_api.honua.execution_arn}/*/*""
+}
+
+# DynamoDB Table for Geospatial Data
+resource ""aws_dynamodb_table"" ""honua"" {
+  name           = ""honua-geodata-${var.environment}""
+  billing_mode   = ""PAY_PER_REQUEST""
+  hash_key       = ""id""
+  range_key      = ""timestamp""
+
+  attribute {
+    name = ""id""
+    type = ""S""
+  }
+
+  attribute {
+    name = ""timestamp""
+    type = ""N""
+  }
+
+  attribute {
+    name = ""layer""
+    type = ""S""
+  }
+
+  global_secondary_index {
+    name            = ""LayerIndex""
+    hash_key        = ""layer""
+    range_key       = ""timestamp""
+    projection_type = ""ALL""
+  }
+
+  ttl {
+    enabled        = true
+    attribute_name = ""ttl""
+  }
+
+  point_in_time_recovery {
+    enabled = var.environment == ""production"" ? true : false
+  }
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  tags = {
+    Name        = ""honua-geodata-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# S3 Bucket for Tile Storage
+resource ""aws_s3_bucket"" ""honua_tiles"" {
+  bucket = ""honua-tiles-${var.environment}-${data.aws_caller_identity.current.account_id}""
+
+  tags = {
+    Name        = ""honua-tiles-${var.environment}""
+    Environment = var.environment
+  }
+}
+
+# S3 Bucket Versioning
+resource ""aws_s3_bucket_versioning"" ""honua_tiles"" {
+  bucket = aws_s3_bucket.honua_tiles.id
+
+  versioning_configuration {
+    status = var.environment == ""production"" ? ""Enabled"" : ""Suspended""
+  }
+}
+
+# S3 Bucket Server-Side Encryption
+resource ""aws_s3_bucket_server_side_encryption_configuration"" ""honua_tiles"" {
+  bucket = aws_s3_bucket.honua_tiles.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = ""AES256""
+    }
+  }
+}
+
+# S3 Bucket Lifecycle Rule
+resource ""aws_s3_bucket_lifecycle_configuration"" ""honua_tiles"" {
+  bucket = aws_s3_bucket.honua_tiles.id
+
+  rule {
+    id     = ""expire-old-tiles""
+    status = ""Enabled""
+
+    expiration {
+      days = 90
+    }
+
+    transition {
+      days          = 30
+      storage_class = ""STANDARD_IA""
+    }
+
+    transition {
+      days          = 60
+      storage_class = ""GLACIER""
+    }
+  }
+}
+
+# S3 Bucket Public Access Block
+resource ""aws_s3_bucket_public_access_block"" ""honua_tiles"" {
+  bucket = aws_s3_bucket.honua_tiles.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+# S3 Bucket CORS Configuration
+resource ""aws_s3_bucket_cors_configuration"" ""honua_tiles"" {
+  bucket = aws_s3_bucket.honua_tiles.id
+
+  cors_rule {
+    allowed_headers = [""*""]
+    allowed_methods = [""GET"", ""HEAD""]
+    allowed_origins = [""*""]
+    max_age_seconds = 3600
+  }
+}
+
+# Data Source for Account ID
+data ""aws_caller_identity"" ""current"" {}
+
+# Outputs
+output ""api_endpoint"" {
+  description = ""API Gateway endpoint URL""
+  value       = aws_apigatewayv2_api.honua.api_endpoint
+}
+
+output ""lambda_function_name"" {
+  description = ""Lambda function name""
+  value       = aws_lambda_function.honua.function_name
+}
+
+output ""dynamodb_table_name"" {
+  description = ""DynamoDB table name""
+  value       = aws_dynamodb_table.honua.name
+}
+
+output ""s3_bucket_name"" {
+  description = ""S3 bucket name for tiles""
+  value       = aws_s3_bucket.honua_tiles.id
+}
+
+output ""ecr_repository_url"" {
+  description = ""ECR repository URL for Lambda container image""
+  value       = aws_ecr_repository.honua_lambda.repository_url
+}
+
+output ""cloudwatch_log_group"" {
+  description = ""CloudWatch log group for Lambda""
+  value       = aws_cloudwatch_log_group.lambda.name
+}");
+
+        return tf.ToString();
+    }
+
+    private async Task<string> GenerateAzureFunctionsAsync(DeploymentAnalysis analysis, AgentExecutionContext context)
+    {
+        // Always use inline generation - Terraform plugin not yet implemented
+        _logger.LogDebug("Generating Azure Functions Terraform configuration");
+
+        var terraformContent = GenerateAzureFunctionsTerraformContent(analysis);
+        var fileName = "main.tf";
+        var filePath = Path.Combine(context.WorkspacePath, "terraform-azure-functions", fileName);
+
+        _logger.LogDebug("Will write Terraform to: {FilePath}", filePath);
+
+        // Create directory if it doesn't exist
+        var directory = Path.GetDirectoryName(filePath);
+        if (!Directory.Exists(directory))
+        {
+            _logger.LogDebug("Creating directory: {Directory}", directory);
+            Directory.CreateDirectory(directory!);
+        }
+
+        _logger.LogDebug("Writing {ByteCount} bytes to Terraform file", terraformContent.Length);
+        await File.WriteAllTextAsync(filePath, terraformContent.Trim());
+        _logger.LogDebug("Terraform file written successfully");
+
+        // Also copy to workspace root for compatibility with tests
+        var workspaceRootPath = Path.Combine(context.WorkspacePath, "main.tf");
+        await File.WriteAllTextAsync(workspaceRootPath, terraformContent.Trim());
+        _logger.LogDebug("Also copied to workspace root: {WorkspaceRootPath}", workspaceRootPath);
+
+        return terraformContent.Trim();
+    }
+
+    private string GenerateAzureFunctionsTerraformContent(DeploymentAnalysis analysis)
+    {
+        var hasDatabase = analysis.InfrastructureNeeds.NeedsDatabase ||
+                         analysis.RequiredServices.Any(s => s.Contains("cosmos", StringComparison.OrdinalIgnoreCase) ||
+                                                            s.Contains("database", StringComparison.OrdinalIgnoreCase));
+
+        // Azure Functions typically use Cosmos DB for NoSQL scenarios
+        var hasCosmosDb = analysis.RequiredServices.Any(s => s.Contains("cosmos", StringComparison.OrdinalIgnoreCase)) || hasDatabase;
+
+        // Detect storage needs (always needed for Functions + blob storage for tiles)
+        // Storage is always required for Azure Functions
+
+        // Detect monitoring needs
+        var hasMonitoring = analysis.RequiredServices.Any(s =>
+                               s.Contains("insights", StringComparison.OrdinalIgnoreCase) ||
+                               s.Contains("monitoring", StringComparison.OrdinalIgnoreCase) ||
+                               s.Contains("application insights", StringComparison.OrdinalIgnoreCase) ||
+                               s.Contains("observability", StringComparison.OrdinalIgnoreCase)) || true; // Always include monitoring
+
+        var tf = new System.Text.StringBuilder();
+        tf.AppendLine(@"terraform {
+  required_providers {
+    azurerm = {
+      source  = ""hashicorp/azurerm""
+      version = ""~> 3.0""
+    }
+  }
+}
+
+provider ""azurerm"" {
+  features {}
+}
+
+variable ""location"" {
+  description = ""Azure region""
+  default     = ""East US""
+}
+
+variable ""environment"" {
+  description = ""Environment name""
+  default     = """ + analysis.TargetEnvironment + @"""
+}
+
+# Resource Group
+resource ""azurerm_resource_group"" ""honua"" {
+  name     = ""honua-functions-rg-${var.environment}""
+  location = var.location
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+    DeploymentType = ""azure-functions""
+  }
+}
+
+# Storage Account (required for Azure Functions)
+resource ""azurerm_storage_account"" ""honua_functions"" {
+  name                     = ""honuafunc${var.environment}""
+  resource_group_name      = azurerm_resource_group.honua.name
+  location                 = azurerm_resource_group.honua.location
+  account_tier             = ""Standard""
+  account_replication_type = ""LRS""
+
+  blob_properties {
+    delete_retention_policy {
+      days = 7
+    }
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+# Storage Account for Tiles (Blob Storage)
+resource ""azurerm_storage_account"" ""honua_tiles"" {
+  name                     = ""honuatiles${var.environment}""
+  resource_group_name      = azurerm_resource_group.honua.name
+  location                 = azurerm_resource_group.honua.location
+  account_tier             = ""Standard""
+  account_replication_type = ""LRS""
+
+  blob_properties {
+    delete_retention_policy {
+      days = 7
+    }
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+    Purpose = ""tile-storage""
+  }
+}
+
+# Blob Container for tiles
+resource ""azurerm_storage_container"" ""tiles"" {
+  name                  = ""tiles""
+  storage_account_name  = azurerm_storage_account.honua_tiles.name
+  container_access_type = ""private""
+}");
+
+        if (hasMonitoring)
+        {
+            tf.AppendLine(@"
+# Log Analytics Workspace
+resource ""azurerm_log_analytics_workspace"" ""honua"" {
+  name                = ""honua-functions-logs-${var.environment}""
+  location            = azurerm_resource_group.honua.location
+  resource_group_name = azurerm_resource_group.honua.name
+  sku                 = ""PerGB2018""
+  retention_in_days   = 30
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+# Application Insights
+resource ""azurerm_application_insights"" ""honua"" {
+  name                = ""honua-functions-insights-${var.environment}""
+  location            = azurerm_resource_group.honua.location
+  resource_group_name = azurerm_resource_group.honua.name
+  workspace_id        = azurerm_log_analytics_workspace.honua.id
+  application_type    = ""web""
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}");
+        }
+
+        // App Service Plan for Azure Functions (Premium for container support)
+        tf.AppendLine(@"
+# App Service Plan (Premium for container support and better performance)
+resource ""azurerm_service_plan"" ""honua"" {
+  name                = ""honua-functions-plan-${var.environment}""
+  resource_group_name = azurerm_resource_group.honua.name
+  location            = azurerm_resource_group.honua.location
+  os_type             = ""Linux""
+  sku_name            = ""EP1""  # Elastic Premium 1
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+# Azure Function App with Container Support
+resource ""azurerm_linux_function_app"" ""honua"" {
+  name                = ""honua-functions-${var.environment}""
+  resource_group_name = azurerm_resource_group.honua.name
+  location            = azurerm_resource_group.honua.location
+
+  service_plan_id            = azurerm_service_plan.honua.id
+  storage_account_name       = azurerm_storage_account.honua_functions.name
+  storage_account_access_key = azurerm_storage_account.honua_functions.primary_access_key
+
+  site_config {
+    always_on = true
+
+    application_stack {
+      docker {
+        registry_url = ""https://index.docker.io""
+        image_name   = ""honuaio/honuaserver""
+        image_tag    = ""latest""
+      }
+    }
+
+    cors {
+      allowed_origins = [""*""]
+    }
+  }
+
+  app_settings = {
+    ""FUNCTIONS_WORKER_RUNTIME""                   = ""dotnet-isolated""
+    ""ASPNETCORE_ENVIRONMENT""                     = var.environment
+    ""DOCKER_REGISTRY_SERVER_URL""                 = ""https://index.docker.io""
+    ""WEBSITES_ENABLE_APP_SERVICE_STORAGE""        = ""false""
+    ""HONUA__STORAGE__BLOB__CONNECTIONSTRING""     = azurerm_storage_account.honua_tiles.primary_connection_string
+    ""HONUA__STORAGE__BLOB__CONTAINER""            = azurerm_storage_container.tiles.name");
+
+        if (hasMonitoring)
+        {
+            tf.AppendLine(@"
+    ""APPINSIGHTS_INSTRUMENTATIONKEY""             = azurerm_application_insights.honua.instrumentation_key
+    ""APPLICATIONINSIGHTS_CONNECTION_STRING""      = azurerm_application_insights.honua.connection_string");
+        }
+
+        if (hasCosmosDb)
+        {
+            tf.AppendLine(@"
+    ""HONUA__DATABASE__COSMOSDB__ENDPOINT""        = azurerm_cosmosdb_account.honua.endpoint
+    ""HONUA__DATABASE__COSMOSDB__KEY""             = azurerm_cosmosdb_account.honua.primary_key
+    ""HONUA__DATABASE__COSMOSDB__DATABASE""        = azurerm_cosmosdb_sql_database.honua.name");
+        }
+
+        tf.AppendLine(@"
+  }
+
+  identity {
+    type = ""SystemAssigned""
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}");
+
+        if (hasCosmosDb)
+        {
+            tf.AppendLine(@"
+# Cosmos DB Account
+resource ""azurerm_cosmosdb_account"" ""honua"" {
+  name                = ""honua-cosmos-${var.environment}""
+  location            = azurerm_resource_group.honua.location
+  resource_group_name = azurerm_resource_group.honua.name
+  offer_type          = ""Standard""
+  kind                = ""GlobalDocumentDB""
+
+  consistency_policy {
+    consistency_level       = ""Session""
+    max_interval_in_seconds = 5
+    max_staleness_prefix    = 100
+  }
+
+  geo_location {
+    location          = azurerm_resource_group.honua.location
+    failover_priority = 0
+  }
+
+  capabilities {
+    name = ""EnableServerless""
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = ""honua""
+  }
+}
+
+# Cosmos DB SQL Database
+resource ""azurerm_cosmosdb_sql_database"" ""honua"" {
+  name                = ""honua""
+  resource_group_name = azurerm_resource_group.honua.name
+  account_name        = azurerm_cosmosdb_account.honua.name
+}
+
+# Cosmos DB SQL Container for GIS data
+resource ""azurerm_cosmosdb_sql_container"" ""gis_data"" {
+  name                  = ""gis_data""
+  resource_group_name   = azurerm_resource_group.honua.name
+  account_name          = azurerm_cosmosdb_account.honua.name
+  database_name         = azurerm_cosmosdb_sql_database.honua.name
+  partition_key_path    = ""/id""
+  partition_key_version = 1
+
+  indexing_policy {
+    indexing_mode = ""consistent""
+
+    included_path {
+      path = ""/*""
+    }
+
+    spatial_index {
+      path = ""/geometry/?""
+    }
+  }
+}
+
+# Cosmos DB SQL Container for layers
+resource ""azurerm_cosmosdb_sql_container"" ""layers"" {
+  name                  = ""layers""
+  resource_group_name   = azurerm_resource_group.honua.name
+  account_name          = azurerm_cosmosdb_account.honua.name
+  database_name         = azurerm_cosmosdb_sql_database.honua.name
+  partition_key_path    = ""/layerId""
+  partition_key_version = 1
+
+  indexing_policy {
+    indexing_mode = ""consistent""
+
+    included_path {
+      path = ""/*""
+    }
+  }
+}");
+        }
+
+        tf.AppendLine(@"
+# Outputs
+output ""function_app_url"" {
+  value       = ""https://${azurerm_linux_function_app.honua.default_hostname}""
+  description = ""URL to access the Honua Functions App""
+}
+
+output ""function_app_name"" {
+  value = azurerm_linux_function_app.honua.name
+}
+
+output ""storage_account_name"" {
+  value = azurerm_storage_account.honua_tiles.name
+}
+
+output ""tiles_container_url"" {
+  value = ""https://${azurerm_storage_account.honua_tiles.name}.blob.core.windows.net/${azurerm_storage_container.tiles.name}""
+}");
+
+        if (hasCosmosDb)
+        {
+            tf.AppendLine(@"
+output ""cosmosdb_endpoint"" {
+  value = azurerm_cosmosdb_account.honua.endpoint
+}
+
+output ""cosmosdb_database_name"" {
+  value = azurerm_cosmosdb_sql_database.honua.name
+}
+
+output ""cosmosdb_primary_key"" {
+  value     = azurerm_cosmosdb_account.honua.primary_key
+  sensitive = true
+}");
+        }
+
+        if (hasMonitoring)
+        {
+            tf.AppendLine(@"
+output ""application_insights_key"" {
+  value     = azurerm_application_insights.honua.instrumentation_key
+  sensitive = true
+}
+
+output ""application_insights_connection_string"" {
+  value     = azurerm_application_insights.honua.connection_string
+  sensitive = true
+}");
+        }
+
+        return tf.ToString();
+    }
+
+    // Helper methods for analysis
+
+    private DeploymentType DetermineDeploymentType(string request)
+    {
+        var lower = request.ToLowerInvariant();
+
+        // Explicit docker-compose request
+        if (lower.Contains("docker") && lower.Contains("compose"))
+            return DeploymentType.DockerCompose;
+
+        // Kubernetes deployments
+        if (lower.Contains("kubernetes") || lower.Contains("k8s") || lower.Contains("helm"))
+            return DeploymentType.Kubernetes;
+
+        // AWS cloud services (ECS, Fargate, etc.) - use Terraform
+        if (lower.Contains("aws") || lower.Contains("ecs") || lower.Contains("fargate") ||
+            lower.Contains("rds") || lower.Contains("elasticache") || lower.Contains("cloudwatch") ||
+            (lower.Contains("terraform") && lower.Contains("aws")))
+            return DeploymentType.TerraformAWS;
+
+        // Azure cloud services - use Terraform
+        if (lower.Contains("azure") || lower.Contains("container apps") || lower.Contains("aca") ||
+            lower.Contains("cosmos") || lower.Contains("app service") || lower.Contains("key vault") ||
+            (lower.Contains("terraform") && lower.Contains("azure")))
+            return DeploymentType.TerraformAzure;
+
+        // GCP cloud services - use Terraform
+        if (lower.Contains("gcp") || lower.Contains("google cloud") || lower.Contains("cloud run") ||
+            lower.Contains("cloud sql") || lower.Contains("cloud storage") || lower.Contains("secret manager") ||
+            (lower.Contains("terraform") && (lower.Contains("gcp") || lower.Contains("google"))))
+            return DeploymentType.TerraformGCP;
+
+        // Default to Docker Compose for local/simple deployments
+        return DeploymentType.DockerCompose;
+    }
+
+    private string DetermineEnvironment(string request)
+    {
+        var lower = request.ToLowerInvariant();
+
+        if (lower.Contains("production") || lower.Contains("prod"))
+            return "production";
+
+        if (lower.Contains("staging") || lower.Contains("stage"))
+            return "staging";
+
+        if (lower.Contains("development") || lower.Contains("dev"))
+            return "development";
+
+        return "development";
+    }
+
+    private List<string> ExtractServices(string request)
+    {
+        var services = new List<string>();
+        var lower = request.ToLowerInvariant();
+
+        // Always include Honua server
+        services.Add("honua-server");
+
+        if (lower.Contains("postgis") || lower.Contains("postgres"))
+            services.Add("postgis");
+
+        if (lower.Contains("mysql"))
+            services.Add("mysql");
+
+        if (lower.Contains("sql server") || lower.Contains("sqlserver"))
+            services.Add("sqlserver");
+
+        if (lower.Contains("redis"))
+            services.Add("redis");
+
+        if (lower.Contains("nginx"))
+            services.Add("nginx");
+
+        if (lower.Contains("traefik"))
+            services.Add("traefik");
+
+        if (lower.Contains("caddy"))
+            services.Add("caddy");
+
+        // Observability services
+        if (lower.Contains("prometheus"))
+            services.Add("prometheus");
+
+        if (lower.Contains("grafana"))
+            services.Add("grafana");
+
+        if (lower.Contains("aspire") && lower.Contains("dashboard"))
+            services.Add("aspire-dashboard");
+
+        if (lower.Contains("victoria"))
+            services.Add("victoriametrics");
+
+        // Azure-specific services
+        if (lower.Contains("blob") || lower.Contains("storage") || lower.Contains("cdn") || lower.Contains("front door"))
+            services.Add("blob storage");
+
+        if (lower.Contains("application insights") || lower.Contains("app insights") ||
+            lower.Contains("insights") || lower.Contains("monitoring") || lower.Contains("observability"))
+            services.Add("application insights");
+
+        if (lower.Contains("managed identity") || lower.Contains("identity") || lower.Contains("rbac"))
+            services.Add("managed identity");
+
+        return services;
+    }
+
+    private int ExtractPort(string request)
+    {
+        // Look for patterns like "port 18100", "use port 5000", "on port 8080"
+        var portMatch = System.Text.RegularExpressions.Regex.Match(
+            request,
+            @"(?:use\s+)?port\s+(\d+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (portMatch.Success && int.TryParse(portMatch.Groups[1].Value, out int port))
+        {
+            _logger.LogDebug("Extracted port {Port} from request", port);
+            return port;
+        }
+
+        // Default to 5000 if no port specified
+        _logger.LogDebug("No port specified in request, using default 5000");
+        return 5000;
+    }
+
+    private InfrastructureRequirements AnalyzeInfrastructure(string request)
+    {
+        var lower = request.ToLowerInvariant();
+        return new InfrastructureRequirements
+        {
+            NeedsDatabase = lower.Contains("database") || lower.Contains("postgis"),
+            NeedsCache = lower.Contains("redis") || lower.Contains("cache"),
+            NeedsLoadBalancer = lower.Contains("nginx") || lower.Contains("load balance"),
+            NeedsObservability = lower.Contains("metrics") || lower.Contains("observability") ||
+                                lower.Contains("prometheus") || lower.Contains("grafana") ||
+                                lower.Contains("aspire") || lower.Contains("monitoring"),
+            ObservabilityStack = DetermineObservabilityStack(request)
+        };
+    }
+
+    private string? DetermineObservabilityStack(string request)
+    {
+        var lower = request.ToLowerInvariant();
+
+        if (lower.Contains("aspire") && lower.Contains("dashboard"))
+            return "aspire-dashboard";
+
+        if (lower.Contains("victoria"))
+            return "victoriametrics";
+
+        if (lower.Contains("prometheus") && lower.Contains("grafana"))
+            return "prometheus-grafana";
+
+        if (lower.Contains("prometheus") || lower.Contains("grafana"))
+            return "prometheus-grafana";  // Default to full stack if either mentioned
+
+        return null;
+    }
+
+    private async Task SaveConfigurationAsync(
+        DeploymentConfiguration configuration,
+        AgentExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        // For kubernetes-manifests and terraform, files are already written by their respective generators
+        if (configuration.Type == "kubernetes-manifests" ||
+            configuration.Type == "terraform-aws" ||
+            configuration.Type == "terraform-azure" ||
+            configuration.Type == "terraform-gcp")
+        {
+            return;
+        }
+
+        string filePath = configuration.Type switch
+        {
+            "docker-compose.yml" => Path.Combine(context.WorkspacePath, "docker-compose.yml"),
+            _ => Path.Combine(context.WorkspacePath, configuration.Type)
+        };
+
+        // Ensure directory exists
+        var directory = Path.GetDirectoryName(filePath);
+        if (directory != null && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        // Save the configuration content
+        await File.WriteAllTextAsync(filePath, configuration.Content, cancellationToken);
+    }
+
+    /// <summary>
+    /// Generates complete Honua configuration including metadata.json and appsettings.json
+    /// </summary>
+    private async Task GenerateHonuaConfigurationAsync(
+        DeploymentAnalysis analysis,
+        AgentExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        var warnings = new List<string>();
+
+        // Generate metadata.yaml
+        var metadata = GenerateMetadataConfiguration(analysis, out var metadataWarnings);
+        warnings.AddRange(metadataWarnings);
+
+        var serializer = new SerializerBuilder()
+            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .Build();
+        var metadataYaml = serializer.Serialize(metadata);
+
+        var metadataPath = Path.Combine(context.WorkspacePath, "metadata.yaml");
+        await File.WriteAllTextAsync(metadataPath, metadataYaml, cancellationToken);
+
+        _logger.LogInformation("Generated metadata.yaml");
+
+        // Generate auxiliary configuration files for reverse proxies
+        if (analysis.RequiredServices?.Any(s => s.Contains("nginx", StringComparison.OrdinalIgnoreCase)) ?? false)
+        {
+            await GenerateNginxConfigAsync(context, cancellationToken);
+        }
+        if (analysis.RequiredServices?.Any(s => s.Contains("prometheus", StringComparison.OrdinalIgnoreCase)) ?? false)
+        {
+            await GeneratePrometheusConfigAsync(context, cancellationToken);
+        }
+
+        // Generate appsettings.json
+        var appSettings = GenerateAppSettingsConfiguration(analysis);
+        var appSettingsJson = JsonSerializer.Serialize(appSettings, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+
+        var appSettingsPath = Path.Combine(context.WorkspacePath, "appsettings.json");
+        await File.WriteAllTextAsync(appSettingsPath, appSettingsJson, cancellationToken);
+
+        _logger.LogInformation("Generated appsettings.json");
+
+        // Add authentication warning
+        if (analysis.TargetEnvironment == "production")
+        {
+            warnings.Add("⚠️  QuickStart authentication configured for ease of setup. For production use, configure OIDC or Local authentication with proper identity management.");
+        }
+
+        // Log security warnings
+        if (warnings.Count > 0)
+        {
+            _logger.LogWarning("SECURITY WARNINGS:");
+            foreach (var warning in warnings)
+            {
+                _logger.LogWarning("  - {Warning}", warning);
+            }
+        }
+    }
+
+    private object GenerateMetadataConfiguration(DeploymentAnalysis analysis, out List<string> warnings)
+    {
+        warnings = new List<string>();
+
+        // Determine database connection string based on deployment type
+        var dbType = analysis.InfrastructureNeeds?.DatabaseType?.ToLowerInvariant() ?? "sqlite";
+        string connectionString;
+        string provider;
+
+        if (dbType.Contains("postgis") || dbType.Contains("postgres"))
+        {
+            provider = "postgis";
+            connectionString = "Host=postgis;Port=5432;Database=honua;Username=honua;Password=honua_password";
+            warnings.Add("🔴 CRITICAL: Hardcoded database password. Use environment variables: ${HONUA_DB_PASSWORD}");
+        }
+        else if (dbType.Contains("mysql"))
+        {
+            provider = "mysql";
+            connectionString = "Server=mysql;Port=3306;Database=honua;User=honua;Password=honua_password";
+            warnings.Add("🔴 CRITICAL: Hardcoded database password. Use environment variables: ${HONUA_DB_PASSWORD}");
+        }
+        else if (dbType.Contains("sqlserver") || dbType.Contains("sql") && dbType.Contains("server"))
+        {
+            provider = "sqlserver";
+            connectionString = "Server=sqlserver,1433;Database=honua;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True";
+            warnings.Add("🔴 CRITICAL: Hardcoded database password. Use environment variables: ${HONUA_DB_PASSWORD}");
+            warnings.Add("⚠️  TrustServerCertificate=True disables certificate validation. Enable in production.");
+        }
+        else
+        {
+            provider = "sqlite";
+            connectionString = "Data Source=data/honua.db";
+        }
+
+        var metadata = new
+        {
+            catalog = new
+            {
+                id = "honua-catalog",
+                title = "Honua GIS Catalog",
+                description = $"Geospatial data services powered by Honua - {analysis.TargetEnvironment} environment",
+                version = DateTime.UtcNow.ToString("yyyy.MM"),
+                keywords = new[] { "gis", "ogc", "features", "tiles", analysis.TargetEnvironment }
+            },
+            folders = new[]
+            {
+                new
+                {
+                    id = "default",
+                    title = "Default Services",
+                    order = 10
+                }
+            },
+            dataSources = new[]
+            {
+                new
+                {
+                    id = "primary",
+                    provider = provider,
+                    connectionString = connectionString
+                }
+            },
+            services = new[]
+            {
+                new
+                {
+                    id = "sample-features",
+                    title = "Sample Feature Service",
+                    folderId = "default",
+                    serviceType = "feature",
+                    dataSourceId = "primary",
+                    enabled = true,
+                    description = "Sample OGC API Features service - configure layers via Honua CLI",
+                    keywords = new[] { "sample", "features", "ogc" },
+                    ogc = new
+                    {
+                        collectionsEnabled = true,
+                        itemLimit = 1000,
+                        defaultCrs = "EPSG:4326",
+                        additionalCrs = new[] { "EPSG:3857" }
+                    }
+                }
+            }
+        };
+
+        if (analysis.TargetEnvironment == "production")
+        {
+            warnings.Add("ℹ️  Production environment detected. Configure authentication via appsettings.json");
+            warnings.Add("ℹ️  Enable HTTPS and configure TLS certificates");
+            warnings.Add("ℹ️  Configure backup strategy for database and metadata");
+        }
+
+        return metadata;
+    }
+
+    private object GenerateAppSettingsConfiguration(DeploymentAnalysis analysis)
+    {
+        var logLevel = analysis.TargetEnvironment == "production" ? "Information" : "Debug";
+
+        // For production, use QuickStart auth as a reasonable default (user should configure proper auth)
+        // For development, also use QuickStart for ease of testing
+        var authMode = "QuickStart";
+
+        return new
+        {
+            logging = new
+            {
+                logLevel = new Dictionary<string, string>
+                {
+                    ["Default"] = logLevel,
+                    ["Microsoft.AspNetCore"] = "Warning",
+                    ["Honua"] = logLevel,
+                    ["Honua.Server.Core"] = logLevel
+                }
+            },
+            allowedHosts = "*",
+            honua = new
+            {
+                metadata = new
+                {
+                    provider = "yaml",
+                    path = "metadata.yaml"
+                },
+                authentication = new
+                {
+                    mode = authMode,
+                    allowQuickStart = true
+                },
+                odata = new
+                {
+                    enabled = true,
+                    allowWrites = analysis.TargetEnvironment != "production",
+                    defaultPageSize = 100,
+                    maxPageSize = 1000
+                },
+                services = new
+                {
+                    wfs = new { enabled = true },
+                    wms = new { enabled = true },
+                    wmts = new { enabled = true },
+                    csw = new { enabled = true },
+                    wcs = new { enabled = true },
+                    stac = new { enabled = true }
+                }
+            }
+        };
+    }
+
+    private async Task GenerateNginxConfigAsync(AgentExecutionContext context, CancellationToken cancellationToken)
+    {
+        var nginxConfig = @"events {
+    worker_connections 1024;
+}
+
+http {
+    upstream honua_backend {
+        server honua:8080;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        location / {
+            proxy_pass http://honua_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}";
+
+        var nginxPath = Path.Combine(context.WorkspacePath, "nginx.conf");
+        await File.WriteAllTextAsync(nginxPath, nginxConfig, cancellationToken);
+        _logger.LogInformation("Generated nginx.conf");
+    }
+
+    private async Task GeneratePrometheusConfigAsync(AgentExecutionContext context, CancellationToken cancellationToken)
+    {
+        var prometheusConfig = @"global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'honua'
+    static_configs:
+      - targets: ['honua:8080']";
+
+        var prometheusPath = Path.Combine(context.WorkspacePath, "prometheus.yml");
+        await File.WriteAllTextAsync(prometheusPath, prometheusConfig, cancellationToken);
+        _logger.LogInformation("Generated prometheus.yml");
+    }
+}
+
+// Supporting types
+
+public sealed class DeploymentAnalysis
+{
+    public DeploymentType DeploymentType { get; set; }
+    public string TargetEnvironment { get; set; } = "development";
+    public List<string> RequiredServices { get; set; } = new();
+    public InfrastructureRequirements InfrastructureNeeds { get; set; } = new();
+    public int Port { get; set; } = 5000; // Default port
+}
+
+public sealed class InfrastructureRequirements
+{
+    public bool NeedsDatabase { get; set; }
+    public string? DatabaseType { get; set; }
+    public bool NeedsCache { get; set; }
+    public string? CacheType { get; set; }
+    public bool NeedsLoadBalancer { get; set; }
+    public bool NeedsMessageQueue { get; set; }
+    public bool NeedsObservability { get; set; }
+    public string? ObservabilityStack { get; set; }
+}
+
+public enum DeploymentType
+{
+    DockerCompose,
+    Kubernetes,
+    TerraformAWS,
+    TerraformAzure,
+    TerraformGCP,
+    AWSLambda,
+    AzureFunctions,
+    GCPCloudFunctions
+}
+
+public sealed class DeploymentConfiguration
+{
+    public string Type { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+}
+
+public sealed class ValidationResult
+{
+    public bool IsValid { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+// LLM response DTOs for JSON deserialization
+file sealed class LlmDeploymentAnalysis
+{
+    public string DeploymentType { get; set; } = "DockerCompose";
+    public string TargetEnvironment { get; set; } = "development";
+    public List<string> RequiredServices { get; set; } = new();
+    public LlmInfrastructureNeeds InfrastructureNeeds { get; set; } = new();
+}
+
+file sealed class LlmInfrastructureNeeds
+{
+    public bool NeedsDatabase { get; set; }
+    public string? DatabaseType { get; set; }
+    public bool NeedsCache { get; set; }
+    public string? CacheType { get; set; }
+    public bool NeedsLoadBalancer { get; set; }
+    public bool NeedsMessageQueue { get; set; }
+    public bool NeedsObservability { get; set; }
+    public string? ObservabilityStack { get; set; }
+}

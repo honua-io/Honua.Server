@@ -1,0 +1,385 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using FluentAssertions;
+using Honua.Cli.AI.Services.Agents;
+using Honua.Cli.AI.Tests.Mocks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Moq;
+using Xunit;
+
+namespace Honua.Cli.AI.Tests.Services.Agents;
+
+public class IntelligentAgentSelectorTests
+{
+    private readonly MockLlmProvider _mockLlmProvider;
+    private readonly Mock<ILogger<IntelligentAgentSelector>> _loggerMock;
+    private readonly Mock<ILogger<AgentCapabilityRegistry>> _registryLoggerMock;
+    private readonly AgentCapabilityRegistry _registry;
+    private readonly IntelligentAgentSelector _sut;
+
+    public IntelligentAgentSelectorTests()
+    {
+        _mockLlmProvider = new MockLlmProvider();
+        _loggerMock = new Mock<ILogger<IntelligentAgentSelector>>();
+        _registryLoggerMock = new Mock<ILogger<AgentCapabilityRegistry>>();
+
+        var options = Options.Create(new AgentCapabilityOptions
+        {
+            MinConfidenceThreshold = 0.7,
+            MaxConcurrentAgents = 5,
+            DefaultTimeoutSeconds = 30
+        });
+
+        _registry = new AgentCapabilityRegistry(options, _registryLoggerMock.Object);
+        _sut = new IntelligentAgentSelector(_mockLlmProvider, _registry, _loggerMock.Object);
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_SelectCorrectAgent()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "deployment",
+            Confidence = 0.9,
+            RequiredCapabilities = new[] { "kubernetes", "docker" }
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "DeploymentAgent",
+            confidence = 0.95,
+            reasoning = "Best match for deployment with Kubernetes"
+        }));
+
+        // Act
+        var result = await _sut.SelectAgentAsync(intent, new Dictionary<string, string>());
+
+        // Assert
+        result.Should().NotBeNull();
+        result.AgentName.Should().Be("DeploymentAgent");
+        result.Confidence.Should().Be(0.95);
+        result.Reasoning.Should().Contain("Kubernetes");
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_FallbackToRegistry_WhenLlmFails()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "database",
+            Confidence = 0.8
+        };
+
+        _mockLlmProvider.SimulateFailure(new InvalidOperationException("LLM unavailable"));
+
+        // Act
+        var result = await _sut.SelectAgentAsync(intent, new Dictionary<string, string>());
+
+        // Assert
+        result.Should().NotBeNull();
+        result.AgentName.Should().NotBeNullOrWhiteSpace();
+        result.Confidence.Should().BeGreaterThan(0);
+
+        // Verify warning was logged
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((o, t) => o.ToString()!.Contains("Failed to select agent using LLM")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_RespectMinConfidenceThreshold()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "unknown",
+            Confidence = 0.3
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "GenericAgent",
+            confidence = 0.4,
+            reasoning = "Low confidence match"
+        }));
+
+        // Act
+        var result = await _sut.SelectAgentAsync(intent, new Dictionary<string, string>());
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Confidence.Should().BeLessThan(0.7);
+        // Should still return an agent but with low confidence
+        result.AgentName.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task SelectMultipleAgentsAsync_Should_ReturnMultipleAgents()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "complex_analysis",
+            Confidence = 0.85,
+            RequiredCapabilities = new[] { "data_analysis", "visualization", "reporting" }
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgents = new[]
+            {
+                new { name = "DataAnalysisAgent", confidence = 0.9 },
+                new { name = "VisualizationAgent", confidence = 0.85 },
+                new { name = "ReportingAgent", confidence = 0.8 }
+            }
+        }));
+
+        // Act
+        var results = await _sut.SelectMultipleAgentsAsync(intent, new Dictionary<string, string>(), maxAgents: 3);
+
+        // Assert
+        results.Should().HaveCount(3);
+        results.Should().BeInDescendingOrder(a => a.Confidence);
+        results.First().AgentName.Should().Be("DataAnalysisAgent");
+    }
+
+    [Fact]
+    public async Task SelectMultipleAgentsAsync_Should_RespectMaxAgents()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "multi_step",
+            Confidence = 0.9
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgents = new[]
+            {
+                new { name = "Agent1", confidence = 0.95 },
+                new { name = "Agent2", confidence = 0.9 },
+                new { name = "Agent3", confidence = 0.85 },
+                new { name = "Agent4", confidence = 0.8 },
+                new { name = "Agent5", confidence = 0.75 }
+            }
+        }));
+
+        // Act
+        var results = await _sut.SelectMultipleAgentsAsync(intent, new Dictionary<string, string>(), maxAgents: 2);
+
+        // Assert
+        results.Should().HaveCount(2);
+        results.Select(r => r.AgentName).Should().BeEquivalentTo(new[] { "Agent1", "Agent2" });
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_HandleMalformedLlmResponse()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "test",
+            Confidence = 0.8
+        };
+
+        _mockLlmProvider.SetResponse("Not a valid JSON response");
+
+        // Act
+        var result = await _sut.SelectAgentAsync(intent, new Dictionary<string, string>());
+
+        // Assert
+        result.Should().NotBeNull();
+        result.AgentName.Should().NotBeNullOrWhiteSpace(); // Should fallback to registry
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_UseContextInPrompt()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "deployment",
+            Confidence = 0.9
+        };
+
+        var context = new Dictionary<string, string>
+        {
+            ["environment"] = "production",
+            ["region"] = "us-west-2",
+            ["service"] = "api-gateway"
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "ProductionDeploymentAgent",
+            confidence = 0.95
+        }));
+
+        // Act
+        await _sut.SelectAgentAsync(intent, context);
+
+        // Assert
+        _mockLlmProvider.VerifyPromptContains("production");
+        _mockLlmProvider.VerifyPromptContains("us-west-2");
+        _mockLlmProvider.VerifyPromptContains("api-gateway");
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_HandleCancellation()
+    {
+        // Arrange
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var intent = new AgentIntent
+        {
+            TaskType = "test",
+            Confidence = 0.8
+        };
+
+        // Act
+        var act = () => _sut.SelectAgentAsync(intent, new Dictionary<string, string>(), cts.Token);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_CacheAgentSelection()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "database",
+            Confidence = 0.9,
+            RequiredCapabilities = new[] { "sql", "optimization" }
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "DatabaseAgent",
+            confidence = 0.9
+        }));
+
+        // Act - First call
+        var result1 = await _sut.SelectAgentAsync(intent, new Dictionary<string, string>());
+
+        // Act - Second call with same intent
+        var result2 = await _sut.SelectAgentAsync(intent, new Dictionary<string, string>());
+
+        // Assert
+        result1.AgentName.Should().Be(result2.AgentName);
+        _mockLlmProvider.CallCount.Should().Be(2); // No caching implemented yet, but test is ready
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_HandleSpecializedAgents()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "security_scan",
+            Confidence = 0.95,
+            RequiredCapabilities = new[] { "vulnerability_scanning", "compliance_check" }
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "SecurityAgent",
+            confidence = 0.98,
+            reasoning = "Specialized security agent for vulnerability scanning"
+        }));
+
+        // Act
+        var result = await _sut.SelectAgentAsync(intent, new Dictionary<string, string>());
+
+        // Assert
+        result.AgentName.Should().Be("SecurityAgent");
+        result.Confidence.Should().BeGreaterThan(0.95);
+        result.Reasoning.Should().Contain("security");
+    }
+
+    [Fact]
+    public void GetAvailableAgents_Should_ReturnAllRegisteredAgents()
+    {
+        // Act
+        var agents = _sut.GetAvailableAgents();
+
+        // Assert
+        agents.Should().NotBeNull();
+        agents.Should().Contain(a => a.Name == "DefaultAgent");
+        agents.Should().Contain(a => a.Name == "DataAgent");
+        agents.Should().Contain(a => a.Name == "DeploymentAgent");
+    }
+
+    [Fact]
+    public async Task SelectAgentAsync_Should_LogSelection()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "test",
+            Confidence = 0.8
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgent = "TestAgent",
+            confidence = 0.85
+        }));
+
+        // Act
+        await _sut.SelectAgentAsync(intent, new Dictionary<string, string>());
+
+        // Assert
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((o, t) => o.ToString()!.Contains("Selected agent")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SelectMultipleAgentsAsync_Should_FilterByConfidence()
+    {
+        // Arrange
+        var intent = new AgentIntent
+        {
+            TaskType = "complex",
+            Confidence = 0.85
+        };
+
+        _mockLlmProvider.SetResponse(JsonSerializer.Serialize(new
+        {
+            selectedAgents = new[]
+            {
+                new { name = "HighConfidenceAgent", confidence = 0.95 },
+                new { name = "MediumConfidenceAgent", confidence = 0.75 },
+                new { name = "LowConfidenceAgent", confidence = 0.5 } // Below threshold
+            }
+        }));
+
+        // Act
+        var results = await _sut.SelectMultipleAgentsAsync(intent, new Dictionary<string, string>());
+
+        // Assert
+        results.Should().HaveCount(2); // Low confidence agent should be filtered out
+        results.Should().NotContain(a => a.AgentName == "LowConfidenceAgent");
+    }
+}

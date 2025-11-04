@@ -1,0 +1,82 @@
+name: "Mutation Testing"
+
+on:
+  pull_request:
+    branches: [ "master", "dev" ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
+
+jobs:
+  mutation-test:
+    name: Run Mutation Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Install Stryker.NET
+      run: dotnet tool install --global dotnet-stryker
+
+    - name: Run mutation tests
+      run: dotnet stryker --config-file stryker-config.json --output ./mutation-report
+      continue-on-error: true
+      env:
+        STRYKER_DASHBOARD_API_KEY: ${{ secrets.STRYKER_DASHBOARD_API_KEY }}
+
+    - name: Upload mutation test report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mutation-report
+        path: ./mutation-report/
+
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request' && hashFiles('./mutation-report/mutation-report.json') != ''
+      uses: actions/github-script@v7
+      continue-on-error: true
+      with:
+        script: |
+          const fs = require('fs');
+          try {
+            const report = JSON.parse(fs.readFileSync('./mutation-report/mutation-report.json', 'utf8'));
+            const mutationScore = report.mutationScore;
+            const emoji = mutationScore >= 80 ? '✅' : mutationScore >= 60 ? '⚠️' : '❌';
+
+            const body = `## ${emoji} Mutation Testing Results
+
+            **Mutation Score:** ${mutationScore.toFixed(2)}%
+
+            - **Killed:** ${report.killed}
+            - **Survived:** ${report.survived}
+            - **Timeout:** ${report.timeout}
+            - **No Coverage:** ${report.noCoverage}
+
+            [View detailed report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+          } catch (error) {
+            console.error('Failed to parse mutation report or post comment:', error);
+            core.warning('Could not post mutation test results to PR');
+          }

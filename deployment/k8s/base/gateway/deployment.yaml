@@ -1,0 +1,206 @@
+# Honua YARP Gateway Deployment
+# API Gateway and Ingress Controller using YARP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: honua-gateway
+  namespace: honua
+  labels:
+    app.kubernetes.io/name: honua-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: honua
+    app.kubernetes.io/managed-by: kubectl
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: honua-gateway
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: honua-gateway
+        app.kubernetes.io/component: gateway
+        app.kubernetes.io/part-of: honua
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: honua-gateway
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Pod anti-affinity to spread across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - honua-gateway
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: gateway
+          image: honua/gateway:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            - name: metrics
+              containerPort: 8081
+              protocol: TCP
+
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080;https://+:8443"
+            - name: ASPNETCORE_HTTP_PORTS
+              value: "8080"
+            - name: ASPNETCORE_HTTPS_PORTS
+              value: "8443"
+
+            # Service discovery - Backend services
+            - name: BackendServices__api
+              value: "http://honua-api.honua.svc.cluster.local:8080"
+            - name: BackendServices__intake
+              value: "http://honua-intake.honua.svc.cluster.local:8080"
+            - name: BackendServices__orchestrator
+              value: "http://honua-orchestrator.honua.svc.cluster.local:8080"
+            - name: BackendServices__prometheus
+              value: "http://prometheus.honua.svc.cluster.local:9090"
+            - name: BackendServices__grafana
+              value: "http://grafana.honua.svc.cluster.local:3000"
+
+            # Redis connection for distributed rate limiting
+            - name: Redis__ConnectionString
+              valueFrom:
+                secretKeyRef:
+                  name: honua-secrets
+                  key: redis-connection-string
+                  optional: true
+
+            # OpenTelemetry
+            - name: OpenTelemetry__OtlpEndpoint
+              value: "http://jaeger-collector.honua.svc.cluster.local:4317"
+
+            # Rate limiting configuration
+            - name: RateLimiting__GlobalPermitLimit
+              value: "5000"
+            - name: RateLimiting__GlobalWindowSeconds
+              value: "60"
+            - name: RateLimiting__PerIpPermitLimit
+              value: "100"
+            - name: RateLimiting__PerIpWindowSeconds
+              value: "60"
+
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: logs
+              mountPath: /app/logs
+            - name: tmp
+              mountPath: /tmp
+            - name: aspnet-tmp
+              mountPath: /app/.aspnet
+            - name: certs
+              mountPath: /app/certs
+              readOnly: true
+            - name: wildcard-certs
+              mountPath: /app/certs/wildcard
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 30
+
+      volumes:
+        - name: config
+          configMap:
+            name: honua-gateway-config
+            optional: true
+        - name: logs
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: aspnet-tmp
+          emptyDir: {}
+        - name: certs
+          secret:
+            secretName: honua-tls-cert
+            optional: true
+        - name: wildcard-certs
+          secret:
+            secretName: honua-wildcard-tls
+            optional: true
+
+      terminationGracePeriodSeconds: 60
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always

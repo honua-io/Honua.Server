@@ -1,0 +1,112 @@
+---
+# PostgreSQL/PostGIS Network Policy
+# This policy controls access to the PostgreSQL database with PostGIS extensions.
+#
+# Allowed Ingress:
+# - From Honua Server pods only (port 5432)
+# - From backup pods (for database backups)
+# - From monitoring pods (for metrics collection)
+#
+# Allowed Egress:
+# - DNS lookups only
+# - No internet access (security best practice for databases)
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgis-database
+  namespace: honua
+  labels:
+    app: postgis
+    component: network-policy
+    policy-type: datastore
+  annotations:
+    description: "Network policy for PostgreSQL/PostGIS database"
+    security.policy: "database-isolation"
+    priority: "10"
+
+spec:
+  # Target PostgreSQL/PostGIS pods
+  podSelector:
+    matchLabels:
+      app: postgis
+
+  policyTypes:
+  - Ingress
+  - Egress
+
+  # ============================================================
+  # INGRESS RULES
+  # ============================================================
+  ingress:
+  # Rule 1: Allow connections from Honua Server pods
+  # This is the primary application database access
+  - from:
+    - podSelector:
+        matchLabels:
+          app: honua-server
+    ports:
+    - protocol: TCP
+      port: 5432
+
+  # Rule 2: Allow connections from database backup/maintenance pods
+  # Required for scheduled backups and maintenance tasks
+  - from:
+    - podSelector:
+        matchLabels:
+          app: database-backup
+    ports:
+    - protocol: TCP
+      port: 5432
+
+  # Rule 3: Allow connections from monitoring/metrics pods
+  # Required for database health monitoring and metrics collection
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+      podSelector:
+        matchLabels:
+          app: postgres-exporter
+    ports:
+    - protocol: TCP
+      port: 5432
+
+  # Rule 4: Allow connections from database migration jobs
+  # Required for schema migrations during deployments
+  - from:
+    - podSelector:
+        matchLabels:
+          job-type: database-migration
+    ports:
+    - protocol: TCP
+      port: 5432
+
+  # ============================================================
+  # EGRESS RULES
+  # ============================================================
+  egress:
+  # Rule 1: Allow DNS lookups only
+  # Databases should not need to make external connections
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+  # Rule 2: Allow connections to other PostgreSQL pods (for replication)
+  # Required for PostgreSQL streaming replication in HA setups
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgis
+    ports:
+    - protocol: TCP
+      port: 5432

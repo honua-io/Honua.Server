@@ -1,0 +1,389 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (leave empty for latest)'
+        required: false
+        type: string
+
+env:
+  ENVIRONMENT: dev
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  deploy-to-kubernetes:
+    name: Deploy to Kubernetes (${{ matrix.cloud }})
+    runs-on: ubuntu-latest
+    environment:
+      name: development-${{ matrix.cloud }}
+      url: https://dev-${{ matrix.cloud }}.honua.example.com
+    strategy:
+      fail-fast: false
+      matrix:
+        cloud: [aws, azure, gcp]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: image
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=dev" >> $GITHUB_OUTPUT
+          fi
+
+      # AWS EKS Deployment
+      - name: Configure AWS credentials
+        if: matrix.cloud == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig for EKS
+        if: matrix.cloud == 'aws'
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ secrets.AWS_REGION }} \
+            --name ${{ secrets.AWS_EKS_CLUSTER_NAME_DEV }}
+
+      # Azure AKS Deployment
+      - name: Azure Login
+        if: matrix.cloud == 'azure'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        if: matrix.cloud == 'azure'
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP_DEV }}
+          cluster-name: ${{ secrets.AZURE_AKS_CLUSTER_NAME_DEV }}
+
+      # GCP GKE Deployment
+      - name: Authenticate to Google Cloud
+        if: matrix.cloud == 'gcp'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Set up Cloud SDK
+        if: matrix.cloud == 'gcp'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        if: matrix.cloud == 'gcp'
+        run: |
+          gcloud container clusters get-credentials \
+            ${{ secrets.GCP_GKE_CLUSTER_NAME_DEV }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      # Common deployment steps
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Fetch secrets from cloud provider
+        id: secrets
+        run: |
+          case "${{ matrix.cloud }}" in
+            aws)
+              echo "Fetching secrets from AWS Secrets Manager"
+              DB_PASSWORD=$(aws secretsmanager get-secret-value \
+                --secret-id honua-dev-db-password \
+                --query SecretString --output text)
+              echo "::add-mask::$DB_PASSWORD"
+              echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
+              ;;
+            azure)
+              echo "Fetching secrets from Azure Key Vault"
+              DB_PASSWORD=$(az keyvault secret show \
+                --name honua-dev-db-password \
+                --vault-name ${{ secrets.AZURE_KEYVAULT_NAME_DEV }} \
+                --query value -o tsv)
+              echo "::add-mask::$DB_PASSWORD"
+              echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
+              ;;
+            gcp)
+              echo "Fetching secrets from GCP Secret Manager"
+              DB_PASSWORD=$(gcloud secrets versions access latest \
+                --secret="honua-dev-db-password" \
+                --project=${{ secrets.GCP_PROJECT_ID }})
+              echo "::add-mask::$DB_PASSWORD"
+              echo "db_password=$DB_PASSWORD" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace honua-dev --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create or update secrets
+        run: |
+          kubectl create secret generic honua-db-credentials \
+            --from-literal=password=${{ steps.secrets.outputs.db_password }} \
+            --namespace=honua-dev \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy database migrations
+        run: |
+          kubectl run honua-migrations-${{ github.run_number }} \
+            --image=ghcr.io/${{ github.repository_owner }}/honua-server:${{ steps.image.outputs.tag }} \
+            --namespace=honua-dev \
+            --restart=Never \
+            --command -- dotnet Honua.Server.Host.dll migrate \
+            --wait-for-condition=complete --timeout=300s
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install honua-server ./deploy/helm/honua-server \
+            --namespace honua-dev \
+            --set image.repository=ghcr.io/${{ github.repository_owner }}/honua-server \
+            --set image.tag=${{ steps.image.outputs.tag }} \
+            --set image.pullPolicy=Always \
+            --set environment=dev \
+            --set cloud.provider=${{ matrix.cloud }} \
+            --set ingress.enabled=true \
+            --set ingress.hosts[0].host=dev-${{ matrix.cloud }}.honua.example.com \
+            --set ingress.tls[0].secretName=honua-dev-tls \
+            --set ingress.tls[0].hosts[0]=dev-${{ matrix.cloud }}.honua.example.com \
+            --set autoscaling.enabled=false \
+            --set replicaCount=2 \
+            --set resources.requests.cpu=500m \
+            --set resources.requests.memory=512Mi \
+            --set resources.limits.cpu=1000m \
+            --set resources.limits.memory=1Gi \
+            --set postgresql.enabled=true \
+            --set postgresql.auth.existingSecret=honua-db-credentials \
+            --set redis.enabled=true \
+            --values ./deploy/helm/honua-server/values-dev.yaml \
+            --wait \
+            --timeout 10m
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/honua-server \
+            --namespace=honua-dev \
+            --timeout=5m
+
+          # Check pod health
+          kubectl wait --for=condition=ready pod \
+            --selector=app.kubernetes.io/name=honua-server \
+            --namespace=honua-dev \
+            --timeout=300s
+
+      - name: Run smoke tests
+        run: |
+          # Get the service endpoint
+          ENDPOINT="https://dev-${{ matrix.cloud }}.honua.example.com"
+
+          # Wait for endpoint to be ready
+          for i in {1..30}; do
+            if curl -sSf -o /dev/null "$ENDPOINT/healthz/ready"; then
+              echo "Endpoint is ready"
+              break
+            fi
+            echo "Waiting for endpoint... ($i/30)"
+            sleep 10
+          done
+
+          # Run health checks
+          curl -f "$ENDPOINT/healthz/live" || exit 1
+          curl -f "$ENDPOINT/healthz/ready" || exit 1
+
+          # Test API endpoint
+          curl -f "$ENDPOINT/api/v1/collections" || exit 1
+
+      - name: Get deployment info
+        if: always()
+        run: |
+          echo "=== Deployment Status ==="
+          kubectl get all -n honua-dev
+
+          echo "=== Recent Events ==="
+          kubectl get events -n honua-dev --sort-by='.lastTimestamp' | tail -20
+
+          echo "=== Pod Logs ==="
+          kubectl logs -n honua-dev -l app.kubernetes.io/name=honua-server --tail=50
+
+  deploy-to-cloud-run:
+    name: Deploy to GCP Cloud Run
+    runs-on: ubuntu-latest
+    if: vars.ENABLE_CLOUD_RUN == 'true'
+    environment:
+      name: development-cloudrun
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: honua-server-dev
+          region: ${{ secrets.GCP_REGION }}
+          image: ghcr.io/${{ github.repository_owner }}/honua-server:dev
+          flags: |
+            --platform=managed
+            --allow-unauthenticated
+            --port=8080
+            --cpu=2
+            --memory=2Gi
+            --min-instances=1
+            --max-instances=10
+            --concurrency=80
+          env_vars: |
+            ASPNETCORE_ENVIRONMENT=Development
+            CLOUD_PROVIDER=gcp
+          secrets: |
+            DATABASE_PASSWORD=honua-dev-db-password:latest
+            API_KEY=honua-dev-api-key:latest
+
+      - name: Run smoke tests
+        run: |
+          ENDPOINT="${{ steps.deploy.outputs.url }}"
+
+          # Health checks
+          curl -f "$ENDPOINT/healthz/live" || exit 1
+          curl -f "$ENDPOINT/healthz/ready" || exit 1
+
+          # API test
+          curl -f "$ENDPOINT/api/v1/collections" || exit 1
+
+  rollback-on-failure:
+    name: Rollback on Failure (${{ matrix.cloud }})
+    runs-on: ubuntu-latest
+    needs: deploy-to-kubernetes
+    if: failure()
+    strategy:
+      matrix:
+        cloud: [aws, azure, gcp]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup cloud authentication (same as deploy job)
+      - name: Configure AWS credentials
+        if: matrix.cloud == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig for EKS
+        if: matrix.cloud == 'aws'
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ secrets.AWS_REGION }} \
+            --name ${{ secrets.AWS_EKS_CLUSTER_NAME_DEV }}
+
+      - name: Azure Login
+        if: matrix.cloud == 'azure'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        if: matrix.cloud == 'azure'
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP_DEV }}
+          cluster-name: ${{ secrets.AZURE_AKS_CLUSTER_NAME_DEV }}
+
+      - name: Authenticate to Google Cloud
+        if: matrix.cloud == 'gcp'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Get GKE credentials
+        if: matrix.cloud == 'gcp'
+        run: |
+          gcloud container clusters get-credentials \
+            ${{ secrets.GCP_GKE_CLUSTER_NAME_DEV }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Rollback deployment
+        run: |
+          echo "Rolling back to previous version"
+          kubectl rollout undo deployment/honua-server \
+            --namespace=honua-dev
+
+          kubectl rollout status deployment/honua-server \
+            --namespace=honua-dev \
+            --timeout=5m
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-to-kubernetes, deploy-to-cloud-run]
+    if: always()
+    steps:
+      - name: Send Slack notification
+        if: vars.ENABLE_SLACK_NOTIFICATIONS == 'true'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "Development deployment ${{ needs.deploy-to-kubernetes.result == 'success' && 'succeeded' || 'failed' }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Dev Deployment ${{ needs.deploy-to-kubernetes.result == 'success' && '✅' || '❌' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\nDevelopment"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n${{ github.sha }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\n${{ needs.deploy-to-kubernetes.result }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

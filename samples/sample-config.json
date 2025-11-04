@@ -1,0 +1,8 @@
+{
+  "honua": {
+    "metadata": {
+      "provider": "json",
+      "path": "samples/metadata/sample-metadata.json"
+    }
+  }
+}

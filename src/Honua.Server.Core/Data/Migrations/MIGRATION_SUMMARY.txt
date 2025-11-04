@@ -1,0 +1,277 @@
+================================================================================
+HONUA BUILD ORCHESTRATOR - DATABASE MIGRATION SYSTEM
+================================================================================
+
+Created: 2025-10-29
+Location: src/Honua.Server.Core/Data/Migrations/
+
+================================================================================
+FILES CREATED
+================================================================================
+
+SQL Migration Files:
+  [1] 001_InitialSchema.sql       (324 lines) - Core tables
+  [2] 002_BuildQueue.sql          (360 lines) - Build queue system
+  [3] 003_IntakeSystem.sql        (389 lines) - AI intake system
+  [4] 004_Indexes.sql             (351 lines) - Performance indexes
+  [5] 005_Functions.sql           (628 lines) - Functions and triggers
+
+Application Code:
+  [6] MigrationRunner.cs          (419 lines) - Migration executor
+
+Scripts:
+  [7] apply-migrations.sh         (323 lines) - Bash deployment script
+
+Documentation:
+  [8] README.md                   (381 lines) - Comprehensive guide
+  [9] QUICK_START.md              (380 lines) - Quick reference
+  [10] MIGRATION_SUMMARY.txt      (this file)
+
+Total Lines: 3,555
+
+================================================================================
+DATABASE SCHEMA OVERVIEW
+================================================================================
+
+Tables Created: 17
+  - customers
+  - licenses
+  - registry_credentials
+  - build_cache_registry
+  - build_access_log
+  - build_queue
+  - build_results
+  - build_artifacts
+  - build_events
+  - build_metrics
+  - conversations
+  - conversation_messages
+  - conversation_intents
+  - build_manifests
+  - requirement_extractions
+  - schema_migrations (tracking table)
+
+Indexes: 70+
+  - Composite indexes for queue processing
+  - GIN indexes for JSONB and array searches
+  - Partial indexes for active records
+  - Time-series indexes for logs and events
+  - Covering indexes for dashboard queries
+
+Functions: 15
+  - Cache management (update_cache_stats, record_cache_access)
+  - Queue management (get_next_build_for_worker, update_build_progress)
+  - Cleanup (expire_old_conversations, revoke_expired_credentials)
+  - Analytics (get_cache_hit_rate, get_license_quota_usage)
+  - Maintenance (cleanup_old_build_logs, purge_soft_deleted_records)
+
+Views: 8
+  - active_builds
+  - build_performance_summary
+  - customer_build_usage
+  - active_conversations
+  - conversation_performance_summary
+  - intent_analytics
+  - extraction_accuracy
+  - (plus 1 from earlier schema)
+
+Triggers: 8
+  - Auto-update updated_at timestamps (6 tables)
+  - Cache statistics updates
+  - Conversation statistics updates
+
+================================================================================
+KEY FEATURES
+================================================================================
+
+Build Cache System:
+  ✓ Manifest hash-based deduplication
+  ✓ Multi-tenant cache sharing with tier enforcement
+  ✓ Cache hit tracking and statistics
+  ✓ Access logging for analytics
+
+License Management:
+  ✓ Tier-based feature flags (core/pro/enterprise/asp)
+  ✓ Monthly build quotas
+  ✓ Registry limits
+  ✓ Concurrent build limits
+  ✓ Trial license support
+  ✓ Automatic expiration handling
+
+Build Queue:
+  ✓ Priority-based ordering (1-10 scale)
+  ✓ Worker assignment with SKIP LOCKED
+  ✓ Real-time progress tracking
+  ✓ Timeout and retry logic
+  ✓ Build artifacts tracking (images, SBOMs, reports)
+  ✓ Time-series metrics
+
+AI Intake System:
+  ✓ Conversation management
+  ✓ Token usage tracking
+  ✓ Intent detection
+  ✓ Requirement extraction
+  ✓ Build manifest generation
+  ✓ User satisfaction scoring
+
+Security:
+  ✓ Encrypted license keys (AES-256)
+  ✓ Encrypted registry credentials
+  ✓ SHA-256 checksums for integrity
+  ✓ Soft delete support
+  ✓ Audit logging
+
+Performance:
+  ✓ Comprehensive indexing strategy
+  ✓ Partial indexes for active data
+  ✓ Covering indexes for common queries
+  ✓ GIN indexes for JSONB search
+  ✓ Prepared for partitioning (high-volume tables)
+
+================================================================================
+DEPLOYMENT OPTIONS
+================================================================================
+
+Option 1: Bash Script (Recommended)
+  $ cd src/Honua.Server.Core/Data/Migrations
+  $ ./apply-migrations.sh
+
+Option 2: C# MigrationRunner
+  var runner = new MigrationRunner(connectionString, logger);
+  var result = await runner.ApplyMigrationsAsync();
+
+Option 3: Manual psql
+  $ psql -h localhost -U postgres -d honua -f 001_InitialSchema.sql
+  $ psql -h localhost -U postgres -d honua -f 002_BuildQueue.sql
+  $ psql -h localhost -U postgres -d honua -f 003_IntakeSystem.sql
+  $ psql -h localhost -U postgres -d honua -f 004_Indexes.sql
+  $ psql -h localhost -U postgres -d honua -f 005_Functions.sql
+
+================================================================================
+QUICK VERIFICATION
+================================================================================
+
+After running migrations, verify with:
+
+  $ psql -h localhost -U postgres -d honua
+
+  -- Check applied migrations
+  SELECT version, name, applied_at 
+  FROM schema_migrations 
+  ORDER BY version;
+
+  -- Count tables
+  SELECT COUNT(*) FROM information_schema.tables 
+  WHERE table_schema = 'public';
+  -- Expected: 16 tables + 1 migrations table = 17
+
+  -- Count indexes
+  SELECT COUNT(*) FROM pg_indexes 
+  WHERE schemaname = 'public';
+  -- Expected: 70+
+
+  -- Count functions
+  SELECT COUNT(*) FROM pg_proc p
+  JOIN pg_namespace n ON p.pronamespace = n.oid
+  WHERE n.nspname = 'public' AND p.prokind = 'f';
+  -- Expected: 15+
+
+================================================================================
+MAINTENANCE SCHEDULE (Recommended)
+================================================================================
+
+Hourly:
+  - handle_build_timeouts() (detect and fail stuck builds)
+
+Every 6 hours:
+  - expire_old_conversations(24) (mark abandoned conversations)
+
+Daily:
+  - revoke_expired_credentials() (revoke invalid credentials after 7 days)
+  - expire_licenses() (mark expired licenses)
+
+Weekly:
+  - cleanup_old_build_logs(90) (truncate logs older than 90 days)
+  - VACUUM ANALYZE high-churn tables
+  - Check index bloat
+
+Monthly:
+  - purge_soft_deleted_records(30) (permanently delete after 30 days)
+  - Review and archive old build_access_log entries
+  - Review performance metrics and optimize queries
+
+================================================================================
+PREREQUISITES
+================================================================================
+
+✓ PostgreSQL 15 or later
+✓ Extensions: pgcrypto, uuid-ossp
+✓ Database user with DDL permissions
+✓ Sufficient disk space (estimate: 10GB for moderate usage)
+✓ .NET 8.0+ (for MigrationRunner.cs)
+✓ Bash (for apply-migrations.sh)
+
+================================================================================
+ESTIMATED DATABASE SIZE (6 months, 100 customers)
+================================================================================
+
+build_cache_registry:        ~500 MB    (10,000 cached builds)
+build_access_log:          ~2,000 MB    (1M access logs)
+build_queue:                 ~100 MB    (50,000 builds)
+build_results:               ~500 MB    (50,000 results with logs)
+build_events:              ~1,000 MB    (500,000 events)
+conversations:                ~50 MB    (10,000 conversations)
+conversation_messages:       ~200 MB    (100,000 messages)
+build_manifests:              ~50 MB    (10,000 manifests)
+Other tables:                ~100 MB
+Indexes:                   ~1,500 MB    (30-40% of data size)
+------------------------------------------------------------
+TOTAL:                     ~6,000 MB    (~6 GB)
+
+Note: Actual size depends on usage patterns. High-volume systems
+should consider partitioning build_access_log, build_events, and
+conversation_messages.
+
+================================================================================
+SUPPORT & TROUBLESHOOTING
+================================================================================
+
+Common Issues:
+
+1. Migration checksum mismatch
+   → Never modify applied migrations; create new migration instead
+
+2. Migration fails mid-execution
+   → Check error, fix SQL, delete from schema_migrations, re-run
+
+3. Slow queries
+   → Check EXPLAIN ANALYZE, review indexes, tune autovacuum
+
+4. High disk usage
+   → Run cleanup functions, archive old data, consider partitioning
+
+For detailed troubleshooting, see README.md section "Troubleshooting"
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. ✓ Review this summary
+2. ✓ Read QUICK_START.md for immediate usage
+3. ✓ Read README.md for comprehensive documentation
+4. ✓ Run apply-migrations.sh to deploy
+5. ✓ Set up monitoring queries
+6. ✓ Configure background jobs (pg_cron)
+7. ✓ Implement backup strategy
+8. ✓ Test application integration
+
+================================================================================
+LICENSE & ATTRIBUTION
+================================================================================
+
+Created for: Honua Build Orchestrator
+Database: PostgreSQL 15+
+Compatible: PostgreSQL 15, 16, 17
+License: (Your License Here)
+
+================================================================================

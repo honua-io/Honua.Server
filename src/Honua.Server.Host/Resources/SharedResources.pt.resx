@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Exception Messages -->
+  <data name="FeatureNotFound" xml:space="preserve">
+    <value>A feição '{0}' não foi encontrada.</value>
+    <comment>Mensagem de erro quando uma feição não é encontrada. {0} é o ID da feição.</comment>
+  </data>
+  <data name="FeatureNotFoundInLayer" xml:space="preserve">
+    <value>A feição '{0}' não foi encontrada na camada '{1}'.</value>
+    <comment>Mensagem de erro quando uma feição não é encontrada em uma camada específica. {0} é o ID da feição, {1} é o ID da camada.</comment>
+  </data>
+  <data name="LayerNotFound" xml:space="preserve">
+    <value>A camada solicitada não foi encontrada.</value>
+    <comment>Mensagem de erro quando uma camada não é encontrada.</comment>
+  </data>
+  <data name="LayerNotFoundWithId" xml:space="preserve">
+    <value>A camada '{0}' não foi encontrada.</value>
+    <comment>Mensagem de erro quando uma camada específica não é encontrada. {0} é o ID da camada.</comment>
+  </data>
+  <data name="CollectionNotFound" xml:space="preserve">
+    <value>A coleção '{0}' não foi encontrada.</value>
+    <comment>Mensagem de erro quando uma coleção não é encontrada. {0} é o ID da coleção.</comment>
+  </data>
+  <data name="ServiceUnavailable" xml:space="preserve">
+    <value>O serviço está temporariamente indisponível. Por favor, tente novamente mais tarde.</value>
+    <comment>Mensagem de erro quando o serviço está indisponível.</comment>
+  </data>
+  <data name="InvalidParameters" xml:space="preserve">
+    <value>A requisição contém parâmetros inválidos.</value>
+    <comment>Mensagem de erro para parâmetros de requisição inválidos.</comment>
+  </data>
+  <data name="InvalidGeometry" xml:space="preserve">
+    <value>A geometria fornecida é inválida.</value>
+    <comment>Mensagem de erro para geometria inválida.</comment>
+  </data>
+  <data name="InvalidBoundingBox" xml:space="preserve">
+    <value>A caixa delimitadora '{0}' é inválida.</value>
+    <comment>Mensagem de erro para caixa delimitadora inválida. {0} é o valor da caixa delimitadora.</comment>
+  </data>
+  <data name="InvalidCrs" xml:space="preserve">
+    <value>O sistema de referência de coordenadas '{0}' não é suportado.</value>
+    <comment>Mensagem de erro para SRC não suportado. {0} é o identificador do SRC.</comment>
+  </data>
+  <data name="InvalidFormat" xml:space="preserve">
+    <value>O formato '{0}' não é suportado.</value>
+    <comment>Mensagem de erro para formato não suportado. {0} é o nome do formato.</comment>
+  </data>
+  <data name="DataStoreError" xml:space="preserve">
+    <value>Ocorreu um erro ao acessar o armazenamento de dados.</value>
+    <comment>Mensagem de erro para erros de armazenamento de dados.</comment>
+  </data>
+  <data name="CacheError" xml:space="preserve">
+    <value>Ocorreu um erro ao acessar o cache.</value>
+    <comment>Mensagem de erro para erros de cache.</comment>
+  </data>
+  <data name="MetadataError" xml:space="preserve">
+    <value>Ocorreu um erro ao acessar os metadados.</value>
+    <comment>Mensagem de erro para erros de metadados.</comment>
+  </data>
+  <data name="QueryError" xml:space="preserve">
+    <value>Ocorreu um erro ao executar a consulta.</value>
+    <comment>Mensagem de erro para erros de execução de consulta.</comment>
+  </data>
+  <data name="RasterError" xml:space="preserve">
+    <value>Ocorreu um erro ao processar dados raster.</value>
+    <comment>Mensagem de erro para erros de processamento raster.</comment>
+  </data>
+  <data name="SerializationError" xml:space="preserve">
+    <value>Ocorreu um erro ao serializar a resposta.</value>
+    <comment>Mensagem de erro para erros de serialização.</comment>
+  </data>
+  <data name="UnauthorizedAccess" xml:space="preserve">
+    <value>Você não tem permissão para acessar este recurso.</value>
+    <comment>Mensagem de erro para acesso não autorizado.</comment>
+  </data>
+  <data name="Forbidden" xml:space="preserve">
+    <value>O acesso a este recurso é proibido.</value>
+    <comment>Mensagem de erro para acesso proibido.</comment>
+  </data>
+  <data name="TooManyRequests" xml:space="preserve">
+    <value>Muitas requisições. Por favor, tente novamente mais tarde.</value>
+    <comment>Mensagem de erro para limitação de taxa.</comment>
+  </data>
+  <data name="InternalServerError" xml:space="preserve">
+    <value>Ocorreu um erro interno do servidor.</value>
+    <comment>Mensagem genérica de erro interno do servidor.</comment>
+  </data>
+  <data name="NotImplemented" xml:space="preserve">
+    <value>Este recurso não está implementado.</value>
+    <comment>Mensagem de erro para recursos não implementados.</comment>
+  </data>
+  <data name="BadRequest" xml:space="preserve">
+    <value>A requisição está malformada ou inválida.</value>
+    <comment>Mensagem de erro para requisições ruins.</comment>
+  </data>
+  <data name="MethodNotAllowed" xml:space="preserve">
+    <value>O método HTTP '{0}' não é permitido para este recurso.</value>
+    <comment>Mensagem de erro para método não permitido. {0} é o método HTTP.</comment>
+  </data>
+  <data name="UnsupportedMediaType" xml:space="preserve">
+    <value>O tipo de mídia '{0}' não é suportado.</value>
+    <comment>Mensagem de erro para tipo de mídia não suportado. {0} é o tipo de mídia.</comment>
+  </data>
+  <data name="ConflictError" xml:space="preserve">
+    <value>A requisição conflita com o estado atual do recurso.</value>
+    <comment>Mensagem de erro para erros de conflito.</comment>
+  </data>
+  <data name="GoneError" xml:space="preserve">
+    <value>O recurso solicitado não está mais disponível.</value>
+    <comment>Mensagem de erro para recursos que não existem mais.</comment>
+  </data>
+  <data name="PreconditionFailed" xml:space="preserve">
+    <value>A pré-condição falhou para esta requisição.</value>
+    <comment>Mensagem de erro para falhas de pré-condição.</comment>
+  </data>
+  <data name="PayloadTooLarge" xml:space="preserve">
+    <value>A carga útil da requisição é muito grande.</value>
+    <comment>Mensagem de erro para carga útil muito grande.</comment>
+  </data>
+  <data name="UriTooLong" xml:space="preserve">
+    <value>O URI da requisição é muito longo.</value>
+    <comment>Mensagem de erro para URI muito longo.</comment>
+  </data>
+
+  <!-- Validation Messages -->
+  <data name="RequiredParameter" xml:space="preserve">
+    <value>O parâmetro '{0}' é obrigatório.</value>
+    <comment>Erro de validação para parâmetro obrigatório. {0} é o nome do parâmetro.</comment>
+  </data>
+  <data name="InvalidParameterValue" xml:space="preserve">
+    <value>O valor para o parâmetro '{0}' é inválido.</value>
+    <comment>Erro de validação para valor de parâmetro inválido. {0} é o nome do parâmetro.</comment>
+  </data>
+  <data name="ParameterOutOfRange" xml:space="preserve">
+    <value>O parâmetro '{0}' está fora do intervalo. Esperado entre {1} e {2}.</value>
+    <comment>Erro de validação para parâmetro fora do intervalo. {0} é o nome do parâmetro, {1} é o mínimo, {2} é o máximo.</comment>
+  </data>
+
+  <!-- OGC API Messages -->
+  <data name="CollectionsTitle" xml:space="preserve">
+    <value>Coleções de Feições</value>
+    <comment>Título para o endpoint de coleções.</comment>
+  </data>
+  <data name="CollectionsDescription" xml:space="preserve">
+    <value>Acesso às coleções de dados disponíveis nesta API.</value>
+    <comment>Descrição para o endpoint de coleções.</comment>
+  </data>
+  <data name="ConformanceTitle" xml:space="preserve">
+    <value>Declaração de Conformidade</value>
+    <comment>Título para o endpoint de conformidade.</comment>
+  </data>
+  <data name="ConformanceDescription" xml:space="preserve">
+    <value>Informações sobre as especificações e padrões aos quais esta API está em conformidade.</value>
+    <comment>Descrição para o endpoint de conformidade.</comment>
+  </data>
+</root>

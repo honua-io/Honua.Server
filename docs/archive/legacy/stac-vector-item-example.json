@@ -1,0 +1,124 @@
+{
+  "type": "Feature",
+  "stac_version": "1.0.0",
+  "id": "roads-overview",
+  "collection": "roads-collection",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-123.0, 37.0],
+        [-122.0, 37.0],
+        [-122.0, 38.0],
+        [-123.0, 38.0],
+        [-123.0, 37.0]
+      ]
+    ]
+  },
+  "bbox": [-123.0, 37.0, -122.0, 38.0],
+  "properties": {
+    "honua:serviceId": "transport",
+    "honua:layerId": "roads",
+    "honua:idField": "road_id",
+    "honua:geometryField": "geom",
+    "summary": "Road dataset",
+    "description": "City roads",
+    "encoding": "UTF-8",
+    "vector:geometry_types": ["LineString"],
+    "table:columns": [
+      {
+        "name": "road_id",
+        "type": "integer",
+        "description": "Road ID"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "description": "Road Name"
+      },
+      {
+        "name": "road_class",
+        "type": "string",
+        "description": "Road classification (highway, local, etc.)"
+      },
+      {
+        "name": "length",
+        "type": "number",
+        "description": "Length in meters"
+      },
+      {
+        "name": "surface_type",
+        "type": "string",
+        "description": "Surface material"
+      }
+    ]
+  },
+  "assets": {
+    "ogcapi": {
+      "href": "https://api.example.com/ogcapi/collections/roads-collection/items",
+      "type": "application/geo+json",
+      "title": "OGC API Features endpoint",
+      "description": "Access features via OGC API - Features standard",
+      "roles": ["data"]
+    },
+    "geojson": {
+      "href": "https://api.example.com/ogcapi/collections/roads-collection/items?f=json",
+      "type": "application/geo+json",
+      "title": "GeoJSON export",
+      "description": "Download all features as GeoJSON",
+      "roles": ["data"]
+    },
+    "flatgeobuf": {
+      "href": "https://api.example.com/ogcapi/collections/roads-collection/items?f=flatgeobuf",
+      "type": "application/flatgeobuf",
+      "title": "FlatGeobuf export",
+      "description": "Download all features as FlatGeobuf (optimized binary format)",
+      "roles": ["data"]
+    },
+    "geoparquet": {
+      "href": "https://api.example.com/ogcapi/collections/roads-collection/items?f=parquet",
+      "type": "application/vnd.apache.parquet",
+      "title": "GeoParquet export",
+      "description": "Download all features as GeoParquet (columnar format)",
+      "roles": ["data"]
+    },
+    "shapefile": {
+      "href": "https://api.example.com/ogcapi/collections/roads-collection/items?f=shp",
+      "type": "application/x-shapefile",
+      "title": "Shapefile export",
+      "description": "Download all features as ESRI Shapefile (ZIP archive)",
+      "roles": ["data"]
+    },
+    "geopackage": {
+      "href": "https://api.example.com/ogcapi/collections/roads-collection/items?f=gpkg",
+      "type": "application/geopackage+sqlite3",
+      "title": "GeoPackage export",
+      "description": "Download all features as GeoPackage",
+      "roles": ["data"]
+    },
+    "csv": {
+      "href": "https://api.example.com/ogcapi/collections/roads-collection/items?f=csv",
+      "type": "text/csv",
+      "title": "CSV export",
+      "description": "Download feature attributes as CSV (geometry as WKT)",
+      "roles": ["data"]
+    }
+  },
+  "links": [
+    {
+      "rel": "self",
+      "href": "https://api.example.com/stac/collections/roads-collection/items/roads-overview"
+    },
+    {
+      "rel": "parent",
+      "href": "https://api.example.com/stac/collections/roads-collection"
+    },
+    {
+      "rel": "collection",
+      "href": "https://api.example.com/stac/collections/roads-collection"
+    }
+  ],
+  "stac_extensions": [
+    "https://stac-extensions.github.io/table/v1.2.0/schema.json"
+  ]
+}

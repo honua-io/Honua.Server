@@ -1,0 +1,82 @@
+# Codecov Configuration
+# Documentation: https://docs.codecov.com/docs/codecov-yaml
+
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    wait_for_ci: yes
+
+coverage:
+  precision: 2
+  round: down
+  range: "50...90"
+
+  status:
+    project:
+      default:
+        target: 60%
+        threshold: 1%
+        base: auto
+        flags:
+          - unittests
+        if_ci_failed: error
+
+    patch:
+      default:
+        target: 60%
+        threshold: 5%
+        base: auto
+        if_ci_failed: error
+
+    changes:
+      default:
+        if_ci_failed: error
+
+  # Project-specific targets
+  # Note: These are configured as separate flags in CI
+  flags:
+    honua-server-core:
+      paths:
+        - src/Honua.Server.Core/
+      target: 65%
+      threshold: 2%
+    honua-server-host:
+      paths:
+        - src/Honua.Server.Host/
+      target: 60%
+      threshold: 2%
+    honua-cli-ai:
+      paths:
+        - src/Honua.Cli.AI/
+      target: 55%
+      threshold: 2%
+    honua-cli:
+      paths:
+        - src/Honua.Cli/
+      target: 50%
+      threshold: 2%
+
+# Ignored paths
+ignore:
+  - "tests/**/*"
+  - "benchmarks/**/*"
+  - "tools/**/*"
+  - "samples/**/*"
+  - "docs/**/*"
+  - "**/*.Designer.cs"
+  - "**/Migrations/**/*"
+  - "**/GlobalUsings.cs"
+  - "**/obj/**/*"
+  - "**/bin/**/*"
+
+# Comment on PRs
+comment:
+  layout: "reach,diff,flags,tree,footer"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: yes
+
+# GitHub Checks integration
+github_checks:
+  annotations: true

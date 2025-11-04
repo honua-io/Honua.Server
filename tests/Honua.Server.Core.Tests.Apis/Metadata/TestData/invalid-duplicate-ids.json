@@ -1,0 +1,18 @@
+{
+  "catalog": {
+    "id": "test"
+  },
+  "folders": [
+    {
+      "id": "duplicate",
+      "title": "First Folder"
+    },
+    {
+      "id": "duplicate",
+      "title": "Second Folder (duplicate)"
+    }
+  ],
+  "dataSources": [],
+  "services": [],
+  "layers": []
+}

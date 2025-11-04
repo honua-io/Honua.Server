@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  honua:
+    image: honuaio/honuaserver:latest
+    container_name: honua-server
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=development
+      - HONUA__DATABASE__PROVIDER=mysql
+      - HONUA__DATABASE__HOST=mysql
+      - HONUA__DATABASE__PORT=3306
+      - HONUA__DATABASE__DATABASE=honua
+      - HONUA__DATABASE__USERNAME=honua
+      - HONUA__DATABASE__PASSWORD=honua_password
+      - HONUA__CACHE__PROVIDER=redis
+      - HONUA__CACHE__REDIS__HOST=redis
+      - HONUA__CACHE__REDIS__PORT=6379
+    volumes:
+      - ./metadata.json:/app/metadata.json:ro
+      - ./appsettings.json:/app/appsettings.json:ro
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - honua-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: honua-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=honua_root_pass
+      - MYSQL_DATABASE=honua
+      - MYSQL_USER=honua
+      - MYSQL_PASSWORD=honua_password
+    command: --default-authentication-plugin=mysql_native_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - honua-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: honua-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - honua-network
+
+  traefik:
+    image: traefik:latest
+    container_name: honua-traefik
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - honua
+    networks:
+      - honua-network
+
+networks:
+  honua-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:

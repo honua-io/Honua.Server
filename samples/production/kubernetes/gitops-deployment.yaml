@@ -1,0 +1,495 @@
+# Kubernetes deployment manifests for Honua with GitOps
+# This provides a production-ready Kubernetes deployment example
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: honua-production
+  labels:
+    environment: production
+    app: honua
+
+---
+# ConfigMap for application settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: honua-config
+  namespace: honua-production
+data:
+  appsettings.Production.json: |
+    {
+      "GitOps": {
+        "RepositoryPath": "/var/honua/gitops-repo",
+        "StateDirectory": "/var/honua/deployments",
+        "Watcher": {
+          "Branch": "main",
+          "Environment": "production",
+          "PollIntervalSeconds": 60
+        },
+        "DeploymentPolicy": {
+          "RequiresApproval": true,
+          "ApprovalTimeout": "24:00:00",
+          "AutoRollback": true,
+          "MinimumRiskLevelForApproval": "Medium"
+        },
+        "DryRun": false,
+        "EnableMetrics": true,
+        "EnableTracing": true
+      },
+      "Serilog": {
+        "MinimumLevel": {
+          "Default": "Information",
+          "Override": {
+            "Honua.Server.Core.GitOps": "Information",
+            "Honua.Server.Core.Deployment": "Information"
+          }
+        },
+        "WriteTo": [
+          {
+            "Name": "Console"
+          }
+        ]
+      }
+    }
+
+---
+# Secret for Git credentials and database connection
+apiVersion: v1
+kind: Secret
+metadata:
+  name: honua-secrets
+  namespace: honua-production
+type: Opaque
+stringData:
+  # Git SSH private key (base64 encoded)
+  ssh-private-key: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    # REPLACE WITH YOUR ACTUAL SSH PRIVATE KEY
+    -----END OPENSSH PRIVATE KEY-----
+
+  # Database connection string
+  db-connection-string: "Host=postgres-service;Database=honua;Username=honua;Password=REPLACE_WITH_ACTUAL_PASSWORD"
+
+  # Git credentials for HTTPS (if not using SSH)
+  git-username: "git"
+  git-token: "REPLACE_WITH_ACTUAL_TOKEN"
+
+---
+# PersistentVolumeClaim for Git repository
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: honua-gitops-repo-pvc
+  namespace: honua-production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: fast-ssd  # Replace with your storage class
+
+---
+# PersistentVolumeClaim for deployment state
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: honua-deployments-pvc
+  namespace: honua-production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: fast-ssd
+
+---
+# PersistentVolumeClaim for approvals
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: honua-approvals-pvc
+  namespace: honua-production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: fast-ssd
+
+---
+# Init container to clone Git repository
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: honua-git-init
+  namespace: honua-production
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: git-clone
+          image: alpine/git:latest
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -d /var/honua/gitops-repo/.git ]; then
+                echo "Cloning repository..."
+                mkdir -p /root/.ssh
+                cp /secrets/ssh-private-key /root/.ssh/id_ed25519
+                chmod 600 /root/.ssh/id_ed25519
+                ssh-keyscan github.com >> /root/.ssh/known_hosts
+                git clone git@github.com:your-org/honua-config.git /var/honua/gitops-repo
+              else
+                echo "Repository already exists"
+              fi
+          volumeMounts:
+            - name: gitops-repo
+              mountPath: /var/honua/gitops-repo
+            - name: ssh-key
+              mountPath: /secrets
+              readOnly: true
+      volumes:
+        - name: gitops-repo
+          persistentVolumeClaim:
+            claimName: honua-gitops-repo-pvc
+        - name: ssh-key
+          secret:
+            secretName: honua-secrets
+            items:
+              - key: ssh-private-key
+                path: ssh-private-key
+
+---
+# Deployment for Honua server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: honua-server
+  namespace: honua-production
+  labels:
+    app: honua
+    component: server
+spec:
+  replicas: 2  # For high availability
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: honua
+      component: server
+  template:
+    metadata:
+      labels:
+        app: honua
+        component: server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: honua-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      initContainers:
+        # Set up SSH for Git
+        - name: setup-ssh
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /home/honua/.ssh
+              cp /secrets/ssh-private-key /home/honua/.ssh/id_ed25519
+              chmod 600 /home/honua/.ssh/id_ed25519
+              ssh-keyscan github.com >> /home/honua/.ssh/known_hosts 2>/dev/null
+          volumeMounts:
+            - name: ssh-config
+              mountPath: /home/honua/.ssh
+            - name: ssh-key
+              mountPath: /secrets
+              readOnly: true
+
+      containers:
+        - name: honua
+          image: honua/server:latest  # Replace with your actual image
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: ASPNETCORE_URLS
+              value: "http://+:5000"
+
+            # Git credentials
+            - name: GitOps__Credentials__Username
+              valueFrom:
+                secretKeyRef:
+                  name: honua-secrets
+                  key: git-username
+                  optional: true
+            - name: GitOps__Credentials__Password
+              valueFrom:
+                secretKeyRef:
+                  name: honua-secrets
+                  key: git-token
+                  optional: true
+
+            # Database connection
+            - name: DB_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: honua-secrets
+                  key: db-connection-string
+
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+
+          volumeMounts:
+            - name: config
+              mountPath: /app/appsettings.Production.json
+              subPath: appsettings.Production.json
+              readOnly: true
+            - name: gitops-repo
+              mountPath: /var/honua/gitops-repo
+              readOnly: true
+            - name: deployments
+              mountPath: /var/honua/deployments
+            - name: approvals
+              mountPath: /var/honua/approvals
+            - name: ssh-config
+              mountPath: /home/honua/.ssh
+              readOnly: true
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+
+      volumes:
+        - name: config
+          configMap:
+            name: honua-config
+        - name: gitops-repo
+          persistentVolumeClaim:
+            claimName: honua-gitops-repo-pvc
+        - name: deployments
+          persistentVolumeClaim:
+            claimName: honua-deployments-pvc
+        - name: approvals
+          persistentVolumeClaim:
+            claimName: honua-approvals-pvc
+        - name: ssh-key
+          secret:
+            secretName: honua-secrets
+            items:
+              - key: ssh-private-key
+                path: ssh-private-key
+            defaultMode: 0600
+        - name: ssh-config
+          emptyDir: {}
+
+---
+# Service for Honua
+apiVersion: v1
+kind: Service
+metadata:
+  name: honua-service
+  namespace: honua-production
+  labels:
+    app: honua
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: honua
+    component: server
+
+---
+# ServiceAccount for Honua
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: honua-sa
+  namespace: honua-production
+
+---
+# Ingress for external access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: honua-ingress
+  namespace: honua-production
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - honua.example.com
+      secretName: honua-tls
+  rules:
+    - host: honua.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: honua-service
+                port:
+                  name: http
+
+---
+# HorizontalPodAutoscaler for automatic scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: honua-hpa
+  namespace: honua-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: honua-server
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# PodDisruptionBudget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: honua-pdb
+  namespace: honua-production
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: honua
+      component: server
+
+---
+# NetworkPolicy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: honua-network-policy
+  namespace: honua-production
+spec:
+  podSelector:
+    matchLabels:
+      app: honua
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 5000
+    # Allow from Prometheus
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow database
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow Git (HTTPS and SSH)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 22

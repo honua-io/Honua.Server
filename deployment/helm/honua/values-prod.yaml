@@ -1,0 +1,256 @@
+# Production environment values
+# Full resources and redundancy
+
+# Production-specific settings
+api:
+  replicaCount: 5
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 4000m
+      memory: 4Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+
+  image:
+    pullPolicy: IfNotPresent
+
+  # Production affinity rules
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: honua
+              app.kubernetes.io/component: api
+          topologyKey: kubernetes.io/hostname
+
+intake:
+  replicaCount: 3
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 12
+
+  image:
+    pullPolicy: IfNotPresent
+
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: honua
+              app.kubernetes.io/component: intake
+          topologyKey: kubernetes.io/hostname
+
+orchestrator:
+  replicaCount: 3
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+
+  image:
+    pullPolicy: IfNotPresent
+
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: honua
+              app.kubernetes.io/component: orchestrator
+          topologyKey: kubernetes.io/hostname
+
+# PostgreSQL - Production resources with HA
+postgresql:
+  enabled: true
+
+  primary:
+    persistence:
+      enabled: true
+      size: 200Gi
+      storageClass: "fast-ssd"  # Use high-performance storage
+
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 4Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+
+  # Enable read replicas for production
+  readReplicas:
+    replicaCount: 2
+
+# Redis - Production resources with persistence
+redis:
+  enabled: true
+
+  master:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: "fast-ssd"
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+  # Enable Redis replicas for HA
+  replica:
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+# Ingress with full production settings
+ingress:
+  enabled: true
+  className: "nginx"
+
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+
+  hosts:
+    - host: api.honua.io
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api
+    - host: intake.honua.io
+      paths:
+        - path: /
+          pathType: Prefix
+          service: intake
+
+  tls:
+    - secretName: honua-prod-tls
+      hosts:
+        - api.honua.io
+        - intake.honua.io
+
+# Production PVCs with high-performance storage
+persistence:
+  logs:
+    enabled: true
+    size: 50Gi
+    storageClass: "fast-ssd"
+
+  buildWorkspace:
+    enabled: true
+    size: 500Gi
+    storageClass: "fast-ssd"
+
+  buildCache:
+    enabled: true
+    size: 200Gi
+    storageClass: "fast-ssd"
+
+# Production configuration
+config:
+  aspnetcore:
+    environment: Production
+
+  honua:
+    authentication:
+      quickStart:
+        enabled: false
+      enforce: true
+
+  observability:
+    metrics:
+      enabled: true
+
+# Enable strict network policies
+networkPolicy:
+  enabled: true
+
+# Enable full monitoring stack
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+
+grafana:
+  enabled: true
+  adminPassword: "CHANGEME_PROD_GRAFANA_PASSWORD"
+  persistence:
+    enabled: true
+    size: 10Gi
+
+# Production cloud provider settings
+cloudProvider:
+  type: "aws"  # Set to your cloud provider: aws, azure, or gcp
+
+  aws:
+    region: "us-west-2"
+    loadBalancer:
+      type: "nlb"
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    storage:
+      class: "gp3"
+
+# Resource quotas and limits
+resourceQuotas:
+  enabled: true
+  limits:
+    cpu: "100"
+    memory: "200Gi"
+  requests:
+    cpu: "50"
+    memory: "100Gi"
+
+# Pod Disruption Budgets for high availability
+podDisruptionBudget:
+  enabled: true
+  api:
+    minAvailable: 2
+  intake:
+    minAvailable: 1
+  orchestrator:
+    minAvailable: 1

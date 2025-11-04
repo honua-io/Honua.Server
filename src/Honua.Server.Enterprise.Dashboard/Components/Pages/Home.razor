@@ -1,0 +1,160 @@
+@page "/"
+@rendermode InteractiveServer
+@inject ITenantUsageAnalyticsService AnalyticsService
+
+<PageTitle>Dashboard - Honua Enterprise Admin</PageTitle>
+
+<h1>Enterprise Tenant Dashboard</h1>
+
+@if (overview == null)
+{
+    <p><em>Loading dashboard...</em></p>
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Active Tenants</h5>
+                    <h2>@overview.ActiveTenants</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Trial Tenants</h5>
+                    <h2>@overview.TrialTenants</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Expired Trials</h5>
+                    <h2>@overview.ExpiredTrials</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Tenants</h5>
+                    <h2>@overview.TotalTenants</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">API Requests (This Month)</h5>
+                    <h3>@FormatNumber(overview.TotalApiRequests)</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Storage Usage</h5>
+                    <h3>@FormatBytes(overview.TotalStorageBytes)</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Raster Processing</h5>
+                    <h3>@overview.TotalRasterMinutes min</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2>Recent Tenants</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Tenant ID</th>
+                <th>Organization</th>
+                <th>Tier</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>API Requests</th>
+                <th>Storage</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var tenant in tenants.Take(10))
+            {
+                <tr>
+                    <td><a href="/tenant/@tenant.TenantId">@tenant.TenantId</a></td>
+                    <td>@tenant.OrganizationName</td>
+                    <td><span class="badge bg-secondary">@tenant.Tier</span></td>
+                    <td>
+                        @if (tenant.IsTrialExpired)
+                        {
+                            <span class="badge bg-danger">Trial Expired</span>
+                        }
+                        else if (tenant.SubscriptionStatus == "trial")
+                        {
+                            <span class="badge bg-info">Trial</span>
+                        }
+                        else if (tenant.SubscriptionStatus == "active")
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">@tenant.SubscriptionStatus</span>
+                        }
+                    </td>
+                    <td>@tenant.CreatedAt.ToString("yyyy-MM-dd")</td>
+                    <td>@FormatNumber(tenant.ApiRequestsThisMonth)</td>
+                    <td>@FormatBytes(tenant.StorageBytes)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private DashboardOverview? overview;
+    private List<TenantSummary> tenants = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        overview = await AnalyticsService.GetDashboardOverviewAsync();
+        tenants = await AnalyticsService.GetActiveTenantSummariesAsync();
+    }
+
+    private string FormatNumber(long number)
+    {
+        if (number >= 1_000_000)
+            return $"{number / 1_000_000.0:F1}M";
+        if (number >= 1_000)
+            return $"{number / 1_000.0:F1}K";
+        return number.ToString();
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:F2} {sizes[order]}";
+    }
+}

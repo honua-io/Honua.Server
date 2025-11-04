@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Mensajes de Validación de Entrada -->
+  <data name="ParameterTooLong" xml:space="preserve">
+    <value>El parámetro '{0}' excede la longitud máxima de {1} caracteres (actual: {2}).</value>
+    <comment>Error de validación cuando el parámetro es demasiado largo. {0} es el nombre del parámetro, {1} es la longitud máxima, {2} es la longitud actual.</comment>
+  </data>
+  <data name="InvalidSqlPattern" xml:space="preserve">
+    <value>El parámetro '{0}' contiene patrones SQL potencialmente inseguros.</value>
+    <comment>Error de validación para patrones de inyección SQL. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="InvalidCharacters" xml:space="preserve">
+    <value>El parámetro '{0}' contiene caracteres inválidos.</value>
+    <comment>Error de validación para caracteres inválidos. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="InvalidXmlPattern" xml:space="preserve">
+    <value>El parámetro '{0}' contiene patrones XML potencialmente inseguros.</value>
+    <comment>Error de validación para patrones de inyección XML. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="InvalidPathTraversal" xml:space="preserve">
+    <value>El parámetro '{0}' contiene secuencias de recorrido de rutas.</value>
+    <comment>Error de validación para intentos de recorrido de rutas. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="InvalidScriptPattern" xml:space="preserve">
+    <value>El parámetro '{0}' contiene patrones de script potencialmente inseguros.</value>
+    <comment>Error de validación para patrones de inyección de scripts. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="StringRequired" xml:space="preserve">
+    <value>El parámetro '{0}' es obligatorio y no puede ser nulo o vacío.</value>
+    <comment>Error de validación para parámetro de cadena obligatorio. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="StringTooShort" xml:space="preserve">
+    <value>El parámetro '{0}' debe tener al menos {1} caracteres de longitud (actual: {2}).</value>
+    <comment>Error de validación cuando la cadena es demasiado corta. {0} es el nombre del parámetro, {1} es la longitud mínima, {2} es la longitud actual.</comment>
+  </data>
+  <data name="InvalidEmailFormat" xml:space="preserve">
+    <value>El parámetro '{0}' no es una dirección de correo electrónico válida.</value>
+    <comment>Error de validación para formato de correo electrónico inválido. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="InvalidUrlFormat" xml:space="preserve">
+    <value>El parámetro '{0}' no es una URL válida.</value>
+    <comment>Error de validación para formato de URL inválido. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="InvalidDateTimeFormat" xml:space="preserve">
+    <value>El parámetro '{0}' no es un formato de fecha/hora válido.</value>
+    <comment>Error de validación para formato de fecha/hora inválido. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="InvalidNumberFormat" xml:space="preserve">
+    <value>El parámetro '{0}' no es un número válido.</value>
+    <comment>Error de validación para formato de número inválido. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="NumberTooSmall" xml:space="preserve">
+    <value>El parámetro '{0}' debe ser al menos {1} (actual: {2}).</value>
+    <comment>Error de validación cuando el número es demasiado pequeño. {0} es el nombre del parámetro, {1} es el mínimo, {2} es el valor actual.</comment>
+  </data>
+  <data name="NumberTooLarge" xml:space="preserve">
+    <value>El parámetro '{0}' debe ser como máximo {1} (actual: {2}).</value>
+    <comment>Error de validación cuando el número es demasiado grande. {0} es el nombre del parámetro, {1} es el máximo, {2} es el valor actual.</comment>
+  </data>
+  <data name="InvalidEnumValue" xml:space="preserve">
+    <value>El parámetro '{0}' tiene un valor inválido. Los valores válidos son: {1}.</value>
+    <comment>Error de validación para valor de enumeración inválido. {0} es el nombre del parámetro, {1} es la lista de valores válidos.</comment>
+  </data>
+  <data name="InvalidGuidFormat" xml:space="preserve">
+    <value>El parámetro '{0}' no es un formato GUID válido.</value>
+    <comment>Error de validación para formato GUID inválido. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="InvalidRegexPattern" xml:space="preserve">
+    <value>El parámetro '{0}' no coincide con el patrón requerido.</value>
+    <comment>Error de validación cuando el valor no coincide con el patrón regex. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="CollectionEmpty" xml:space="preserve">
+    <value>El parámetro '{0}' debe contener al menos un elemento.</value>
+    <comment>Error de validación para colección vacía. {0} es el nombre del parámetro.</comment>
+  </data>
+  <data name="CollectionTooLarge" xml:space="preserve">
+    <value>El parámetro '{0}' contiene demasiados elementos. Máximo permitido: {1} (actual: {2}).</value>
+    <comment>Error de validación cuando la colección tiene demasiados elementos. {0} es el nombre del parámetro, {1} es el conteo máximo, {2} es el conteo actual.</comment>
+  </data>
+  <data name="DuplicateValue" xml:space="preserve">
+    <value>El parámetro '{0}' contiene valores duplicados. Todos los valores deben ser únicos.</value>
+    <comment>Error de validación para valores duplicados en la colección. {0} es el nombre del parámetro.</comment>
+  </data>
+
+  <!-- Mensajes de Validación de Geometría -->
+  <data name="GeometryInvalid" xml:space="preserve">
+    <value>La geometría es inválida: {0}</value>
+    <comment>Error de validación para geometría inválida. {0} es el error de validación específico.</comment>
+  </data>
+  <data name="GeometryTooComplex" xml:space="preserve">
+    <value>La geometría es demasiado compleja. Máximo de {0} vértices permitidos (actual: {1}).</value>
+    <comment>Error de validación cuando la geometría tiene demasiados vértices. {0} es el máximo de vértices, {1} es el conteo actual.</comment>
+  </data>
+  <data name="GeometrySelfIntersecting" xml:space="preserve">
+    <value>La geometría se auto-intersecta.</value>
+    <comment>Error de validación para geometría auto-intersectante.</comment>
+  </data>
+  <data name="GeometryNotClosed" xml:space="preserve">
+    <value>La geometría del polígono no está cerrada.</value>
+    <comment>Error de validación para polígono no cerrado.</comment>
+  </data>
+  <data name="InvalidCoordinates" xml:space="preserve">
+    <value>Las coordenadas son inválidas o están fuera de los límites.</value>
+    <comment>Error de validación para coordenadas inválidas.</comment>
+  </data>
+  <data name="CoordinateOutOfRange" xml:space="preserve">
+    <value>El valor de coordenada {0} está fuera de rango para {1}. Se esperaba entre {2} y {3}.</value>
+    <comment>Error de validación para coordenada fuera de rango. {0} es el valor, {1} es el tipo de coordenada (lat/lon), {2} es el mínimo, {3} es el máximo.</comment>
+  </data>
+</root>

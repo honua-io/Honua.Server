@@ -1,0 +1,68 @@
+{
+  "baselineVersion": "1.0.0",
+  "dateCreated": "2025-10-18",
+  "description": "OGC API Features Conformance Test Baseline - establishes minimum compliance requirements",
+  "requiredConformanceClasses": [
+    "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core",
+    "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson"
+  ],
+  "optionalConformanceClasses": [
+    "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/oas30",
+    "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/html",
+    "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/search",
+    "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/filter",
+    "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/filter-cql-text",
+    "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/filter-cql2-json",
+    "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/features-filter",
+    "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/spatial-operators",
+    "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/temporal-operators",
+    "http://www.opengis.net/spec/ogcapi-features-3/1.0/conf/crs",
+    "http://www.opengis.net/spec/ogcapi-tiles-1/1.0/conf/core"
+  ],
+  "requiredEndpoints": [
+    "/ogc",
+    "/ogc/conformance",
+    "/ogc/collections",
+    "/ogc/api"
+  ],
+  "requiredTests": {
+    "landingPage": {
+      "mustReturnJson": true,
+      "mustHaveSelfLink": true,
+      "mustHaveConformanceLink": true,
+      "mustHaveDataLink": true,
+      "mustHaveServiceDescLink": true
+    },
+    "conformance": {
+      "mustHaveConformsToArray": true,
+      "mustDeclareCore": true,
+      "mustDeclareGeoJson": true
+    },
+    "collections": {
+      "mustReturnCollectionsArray": true,
+      "mustHaveLinks": true,
+      "eachCollectionMustHaveId": true,
+      "eachCollectionMustHaveLinks": true
+    },
+    "features": {
+      "mustReturnFeatureCollection": true,
+      "mustReturnGeoJson": true,
+      "mustSupportLimit": true,
+      "mustSupportBbox": true,
+      "mustValidateBbox": true,
+      "mustValidateLimit": true
+    },
+    "errors": {
+      "must404ForMissingCollection": true,
+      "must400ForInvalidParams": true
+    }
+  },
+  "minimumTestsToPass": 30,
+  "failureThreshold": 0,
+  "notes": [
+    "All required conformance classes must be implemented",
+    "All required tests must pass to maintain OGC compliance",
+    "Optional features tracked for enhancement planning",
+    "Regression detected if any previously passing test fails"
+  ]
+}

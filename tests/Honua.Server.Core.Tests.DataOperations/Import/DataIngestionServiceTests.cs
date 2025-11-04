@@ -1,0 +1,363 @@
+﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Data;
+using Honua.Server.Core.Import;
+using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Raster.Import;
+using Honua.Server.Core.Results;
+using Honua.Server.Core.Stac;
+using Honua.Server.Core.Tests.Shared;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Xunit;
+
+namespace Honua.Server.Core.Tests.DataOperations.Import;
+
+[Trait("Category", "Unit")]
+public sealed class DataIngestionServiceTests : IAsyncDisposable
+{
+    private readonly StubDataStoreProvider _provider = new();
+    private readonly StubFeatureContextResolver _resolver;
+    private readonly StubStacSynchronizer _stacSynchronizer = new();
+    private readonly string _queueDirectory;
+    private readonly FileDataIngestionQueueStore _queueStore;
+    private readonly DataIngestionService _service;
+
+    public DataIngestionServiceTests()
+    {
+        _resolver = new StubFeatureContextResolver(_provider);
+        _queueDirectory = Path.Combine(Path.GetTempPath(), "honua-tests", "ingestion-queue", Guid.NewGuid().ToString("N"));
+        _queueStore = new FileDataIngestionQueueStore(_queueDirectory, NullLogger<FileDataIngestionQueueStore>.Instance);
+
+        var options = Options.Create(new DataIngestionOptions
+        {
+            UseBulkInsert = true,
+            UseTransactionalIngestion = true,
+            BatchSize = 1000,
+            ProgressReportInterval = 100,
+            TransactionTimeout = TimeSpan.FromMinutes(5)
+        });
+
+        _service = new DataIngestionService(_resolver, _stacSynchronizer, options, NullLogger<DataIngestionService>.Instance);
+        ((IHostedService)_service).StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    [Fact]
+    public async Task Enqueue_GeoJsonDataset_ImportsFeatures()
+    {
+        using var workspace = new TempWorkspace();
+        var datasetPath = Path.Combine(workspace.Path, "roads.geojson");
+        await File.WriteAllTextAsync(datasetPath, SampleGeoJson);
+
+        var request = new DataIngestionRequest(
+            ServiceId: "svc",
+            LayerId: "roads",
+            SourcePath: datasetPath,
+            WorkingDirectory: workspace.Path,
+            SourceFileName: "roads.geojson",
+            ContentType: "application/geo+json",
+            Overwrite: false);
+
+        var snapshot = await _service.EnqueueAsync(request, CancellationToken.None);
+
+        await WaitForCompletionAsync(snapshot.JobId, TimeSpan.FromSeconds(30));
+
+        Assert.Equal(2, _provider.Records.Count);
+
+        var ordered = _provider.Records
+            .OrderBy(record => record.Attributes.TryGetValue("id", out var value) ? value : null)
+            .ToList();
+
+        var first = ordered[0];
+        Assert.Equal("1", first.Attributes["id"]?.ToString());
+        Assert.Contains("Point", first.Attributes["geometry"]?.ToString());
+        Assert.Equal("Alpha", first.Attributes["name"]?.ToString());
+
+        Assert.False(Directory.Exists(workspace.Path));
+
+        Assert.Contains(_stacSynchronizer.Calls, call => call.ServiceId == "svc" && call.LayerId == "roads");
+
+        // Verify bulk insert was used (not individual inserts)
+        Assert.True(_provider.BulkInsertCallCount > 0, "BulkInsert should have been called");
+    }
+
+    private async Task WaitForCompletionAsync(Guid jobId, TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var snapshot = await _service.TryGetJobAsync(jobId, CancellationToken.None).ConfigureAwait(false);
+            if (snapshot is not null && snapshot.Status is DataIngestionJobStatus.Completed)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200));
+        }
+
+        throw new TimeoutException("Timed out waiting for ingestion job to complete.");
+    }
+
+    private sealed class StubStacSynchronizer : IRasterStacCatalogSynchronizer
+    {
+        public ConcurrentBag<(string ServiceId, string LayerId)> Calls { get; } = new();
+
+        public Task SynchronizeAllAsync(CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task SynchronizeDatasetsAsync(IEnumerable<string> datasetIds, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task SynchronizeServiceLayerAsync(string serviceId, string layerId, CancellationToken cancellationToken = default)
+        {
+            Calls.Add((serviceId, layerId));
+            return Task.CompletedTask;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await ((IHostedService)_service).StopAsync(CancellationToken.None);
+        if (Directory.Exists(_queueDirectory))
+        {
+            Directory.Delete(_queueDirectory, recursive: true);
+        }
+    }
+
+    private sealed class StubDataStoreProvider : IDataStoreProvider
+    {
+        public ConcurrentBag<FeatureRecord> Records { get; } = new();
+        public int BulkInsertCallCount { get; private set; }
+
+        public string Provider => "stub";
+
+        public IDataStoreCapabilities Capabilities => TestDataStoreCapabilities.Instance;
+
+        public Task<bool> DeleteAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, string featureId, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<FeatureRecord> CreateAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, FeatureRecord record, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
+        {
+            Records.Add(record);
+            return Task.FromResult(record);
+        }
+
+        public Task<FeatureRecord?> GetAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, string featureId, FeatureQuery? query, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<long> CountAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, FeatureQuery? query, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<FeatureRecord?> UpdateAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, string featureId, FeatureRecord record, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public IAsyncEnumerable<FeatureRecord> QueryAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, FeatureQuery? query, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public async Task<int> BulkInsertAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, IAsyncEnumerable<FeatureRecord> records, CancellationToken cancellationToken = default)
+        {
+            BulkInsertCallCount++;
+            var count = 0;
+            await foreach (var record in records.WithCancellation(cancellationToken))
+            {
+                Records.Add(record);
+                count++;
+            }
+            return count;
+        }
+
+        public Task<int> BulkUpdateAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, IAsyncEnumerable<KeyValuePair<string, FeatureRecord>> records, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<int> BulkDeleteAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, IAsyncEnumerable<string> featureIds, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<bool> SoftDeleteAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, string featureId, string? deletedBy, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<bool> RestoreAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, string featureId, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<bool> HardDeleteAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, string featureId, string? deletedBy, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<byte[]?> GenerateMvtTileAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, int zoom, int x, int y, string? datetime = null, CancellationToken cancellationToken = default)
+            => Task.FromResult<byte[]?>(null);
+
+        public Task<IReadOnlyList<StatisticsResult>> QueryStatisticsAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, IReadOnlyList<StatisticDefinition> statistics, IReadOnlyList<string>? groupByFields, FeatureQuery? filter, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<DistinctResult>> QueryDistinctAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, IReadOnlyList<string> fieldNames, FeatureQuery? filter, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<BoundingBox?> QueryExtentAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, FeatureQuery? filter, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IDataStoreTransaction?> BeginTransactionAsync(DataSourceDefinition dataSource, CancellationToken cancellationToken = default)
+            => Task.FromResult<IDataStoreTransaction?>(new StubDataStoreTransaction());
+
+        public Task TestConnectivityAsync(DataSourceDefinition dataSource, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class StubFeatureContextResolver : IFeatureContextResolver
+    {
+        private readonly StubDataStoreProvider _provider;
+        private readonly FeatureContext _context;
+
+        public StubFeatureContextResolver(StubDataStoreProvider provider)
+        {
+            _provider = provider;
+
+            var folder = new FolderDefinition
+            {
+                Id = "root",
+                Title = "Root"
+            };
+
+            var dataSource = new DataSourceDefinition
+            {
+                Id = "local",
+                Provider = provider.Provider,
+                ConnectionString = "stub"
+            };
+
+            var layer = new LayerDefinition
+            {
+                Id = "roads",
+                ServiceId = "svc",
+                Title = "Roads",
+                GeometryType = "Point",
+                IdField = "id",
+                GeometryField = "geometry",
+                Fields = new[]
+                {
+                    new FieldDefinition { Name = "id", StorageType = "integer", Nullable = false },
+                    new FieldDefinition { Name = "geometry", StorageType = "geometry", Nullable = true },
+                    new FieldDefinition { Name = "name", StorageType = "text", Nullable = true }
+                },
+                Storage = new LayerStorageDefinition
+                {
+                    Table = "roads",
+                    GeometryColumn = "geometry",
+                    PrimaryKey = "id",
+                    Srid = 4326
+                }
+            };
+
+            var service = new ServiceDefinition
+            {
+                Id = "svc",
+                Title = "Transport",
+                FolderId = "root",
+                ServiceType = "ogc",
+                DataSourceId = dataSource.Id,
+                Layers = new[] { layer }
+            };
+
+            var metadata = new MetadataSnapshot(
+                new CatalogDefinition { Id = "catalog", Title = "Catalog" },
+                new[] { folder },
+                new[] { dataSource },
+                new[] { service },
+                new[] { layer });
+
+            _context = new FeatureContext(metadata, service, layer, dataSource, provider);
+        }
+
+        public Task<FeatureContext> ResolveAsync(string serviceId, string layerId, CancellationToken cancellationToken = default)
+        {
+            if (!string.Equals(serviceId, _context.Service.Id, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(layerId, _context.Layer.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new KeyNotFoundException("Unknown layer.");
+            }
+
+            return Task.FromResult(_context);
+        }
+    }
+
+    private sealed class TempWorkspace : IDisposable
+    {
+        public TempWorkspace()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "honua-ingest-test", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path);
+        }
+
+        public string Path { get; }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+            {
+                Directory.Delete(Path, recursive: true);
+            }
+        }
+    }
+
+    private sealed class StubDataStoreTransaction : IDataStoreTransaction
+    {
+        private bool _committed;
+        private bool _rolledBack;
+
+        public bool IsCommitted => _committed;
+        public bool IsRolledBack => _rolledBack;
+
+        public Task CommitAsync(CancellationToken cancellationToken = default)
+        {
+            _committed = true;
+            return Task.CompletedTask;
+        }
+
+        public Task RollbackAsync(CancellationToken cancellationToken = default)
+        {
+            _rolledBack = true;
+            return Task.CompletedTask;
+        }
+
+        public object GetUnderlyingTransaction() => this;
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private const string SampleGeoJson = """
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [0.0, 0.0]
+      },
+      "properties": {
+        "id": 1,
+        "name": "Alpha"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [1.0, 1.0]
+      },
+      "properties": {
+        "id": 2,
+        "name": "Bravo"
+      }
+    }
+  ]
+}
+""";
+}

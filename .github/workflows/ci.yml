@@ -1,0 +1,957 @@
+name: Continuous Integration
+
+# Test Execution Strategy:
+# - PR Builds: Run only Unit tests (fast feedback, < 5 minutes)
+# - Main Branch: Run Unit + Integration tests (comprehensive validation)
+# - Nightly: All tests including E2E and slow tests (see nightly-tests.yml)
+#
+# Test Categories (via xUnit traits):
+# - Unit: Fast tests (<1s), no external dependencies
+# - Integration: Tests with external services (1-10s)
+# - E2E: End-to-end workflow tests (10s+)
+# - Slow: Performance/benchmark tests (30s+)
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main ]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  SOLUTION_FILE: 'Honua.sln'
+
+jobs:
+  # Build and basic validation
+  build:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: |
+          **/bin/Release/**
+          **/obj/Release/**
+        retention-days: 1
+
+  # Fast unit tests (excluding infrastructure-dependent tests)
+  unit-tests:
+    name: Unit Tests (Fast)
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-artifacts
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Run fast unit tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Unit" \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults \
+          --settings coverlet.runsettings \
+          --logger "trx;LogFileName=unit-test-results.trx" \
+          --logger "console;verbosity=normal"
+
+    - name: Install ReportGenerator
+      run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+    - name: Generate coverage report
+      run: |
+        reportgenerator \
+          -reports:"./TestResults/**/coverage.opencover.xml" \
+          -targetdir:"./CoverageReport" \
+          -reporttypes:"Html;JsonSummary;Badges;MarkdownSummaryGithub" \
+          -assemblyfilters:"-*.Tests;-*.Benchmarks;-DataSeeder;-ProcessFrameworkTest" \
+          -classfilters:"-*.Migrations.*;-*.DTO;-*.DTOs.*;-*.Models.Generated.*;-*.Contracts.*;-*GlobalUsings"
+
+    - name: Check coverage thresholds per project
+      run: |
+        # Install jq for JSON parsing
+        sudo apt-get update && sudo apt-get install -y jq bc
+
+        # Extract coverage from JSON summary
+        SUMMARY_FILE="./CoverageReport/Summary.json"
+
+        if [ ! -f "$SUMMARY_FILE" ]; then
+          echo "::error::Coverage summary file not found at $SUMMARY_FILE"
+          exit 1
+        fi
+
+        # Function to check project coverage
+        check_project_coverage() {
+          PROJECT_NAME=$1
+          THRESHOLD=$2
+
+          # Extract line coverage for the project
+          COVERAGE=$(jq -r ".coverage.assemblies[] | select(.name | contains(\"$PROJECT_NAME\")) | .linecoverage" "$SUMMARY_FILE" | head -1)
+
+          if [ -z "$COVERAGE" ] || [ "$COVERAGE" = "null" ]; then
+            echo "::warning::No coverage data found for $PROJECT_NAME"
+            return 0
+          fi
+
+          echo "Coverage for $PROJECT_NAME: $COVERAGE% (threshold: $THRESHOLD%)"
+
+          # Compare coverage to threshold
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::error::$PROJECT_NAME coverage $COVERAGE% is below threshold of $THRESHOLD%"
+            return 1
+          else
+            echo "::notice::$PROJECT_NAME coverage $COVERAGE% meets threshold of $THRESHOLD%"
+            return 0
+          fi
+        }
+
+        # Check thresholds for each project
+        EXIT_CODE=0
+
+        check_project_coverage "Honua.Server.Core" 65 || EXIT_CODE=1
+        check_project_coverage "Honua.Server.Host" 60 || EXIT_CODE=1
+        check_project_coverage "Honua.Cli.AI" 55 || EXIT_CODE=1
+        check_project_coverage "Honua.Cli" 50 || EXIT_CODE=1
+
+        # Calculate overall coverage
+        OVERALL_COVERAGE=$(jq -r '.coverage.linecoverage' "$SUMMARY_FILE")
+        echo "Overall project coverage: $OVERALL_COVERAGE%"
+
+        # Overall minimum threshold: 60%
+        OVERALL_THRESHOLD=60
+        if (( $(echo "$OVERALL_COVERAGE < $OVERALL_THRESHOLD" | bc -l) )); then
+          echo "::error::Overall coverage $OVERALL_COVERAGE% is below minimum threshold of $OVERALL_THRESHOLD%"
+          EXIT_CODE=1
+        else
+          echo "::notice::Overall coverage $OVERALL_COVERAGE% meets minimum threshold of $OVERALL_THRESHOLD%"
+        fi
+
+        exit $EXIT_CODE
+
+    - name: Upload coverage HTML report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report
+        path: ./CoverageReport/
+        retention-days: 30
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: unit-test-results
+        path: |
+          **/TestResults/*.trx
+          test-results/*.trx
+
+    - name: Upload coverage badges
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-badges
+        path: ./CoverageReport/badge_*.svg
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        files: ./TestResults/**/coverage.opencover.xml
+        flags: unittests
+        name: unit-test-coverage
+        fail_ci_if_error: false
+
+  # Infrastructure tests (run separately to handle dependencies)
+  infrastructure-tests:
+    name: Infrastructure Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-infrastructure-tests')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-artifacts
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Run infrastructure integration tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Integration&Speed!=Slow" \
+          --logger "trx;LogFileName=infrastructure-test-results.trx" \
+          --logger "console;verbosity=normal" \
+          --results-directory ./TestResults
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: infrastructure-test-results
+        path: |
+          **/TestResults/*.trx
+          test-results/*.trx
+
+  # Integration tests (only on main branches or when explicitly requested)
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-integration-tests')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-artifacts
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Run integration tests (including slow tests)
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Integration" \
+          --logger "trx;LogFileName=integration-test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory ./TestResults
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-results
+        path: |
+          **/TestResults/*.trx
+          test-results/*.trx
+
+  # OGC API Features Conformance Regression Tests (runs on every commit)
+  ogc-conformance-regression:
+    name: OGC Conformance Regression
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-artifacts
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Run OGC Conformance Regression Tests
+      run: |
+        dotnet test tests/Honua.Server.Host.Tests/Honua.Server.Host.Tests.csproj \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Conformance&Category=OGC" \
+          --logger "trx;LogFileName=ogc-conformance-regression.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory ./TestResults
+
+    - name: Generate Conformance Report
+      if: always()
+      run: |
+        cat > conformance-report.md <<'EOF'
+        # OGC API Features Conformance Test Results
+
+        **Date:** $(date -u +"%Y-%m-%d %H:%M UTC")
+        **Commit:** ${{ github.sha }}
+        **Branch:** ${{ github.ref_name }}
+        **Workflow:** ${{ github.workflow }}
+
+        ## Test Execution
+
+        - Test Suite: OGC Conformance Regression Tests
+        - Test Project: Honua.Server.Host.Tests
+        - Filter: Category=Conformance&Category=OGC
+
+        ## Conformance Classes Tested
+
+        ### Required (MUST Pass)
+        - ✅ Core (ogcapi-features-1/1.0/conf/core)
+        - ✅ GeoJSON (ogcapi-features-1/1.0/conf/geojson)
+
+        ### Optional (Tracked)
+        - OpenAPI 3.0 (ogcapi-features-1/1.0/conf/oas30)
+        - HTML (ogcapi-features-1/1.0/conf/html)
+        - CQL2 Filter (ogcapi-features-3/1.0/conf/filter)
+        - CRS Support (ogcapi-features-3/1.0/conf/crs)
+
+        ## Test Results
+
+        See detailed test results in the uploaded artifacts.
+
+        ## Baseline
+
+        Baseline conformance requirements are defined in:
+        `tests/Honua.Server.Host.Tests/Ogc/OgcConformanceBaseline.json`
+
+        ## References
+
+        - [OGC API - Features Specification](https://docs.ogc.org/is/17-069r4/17-069r4.html)
+        - [Conformance Documentation](tests/Honua.Server.Host.Tests/Ogc/README_OGC_CONFORMANCE.md)
+        EOF
+
+    - name: Upload Conformance Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ogc-conformance-report
+        path: conformance-report.md
+        retention-days: 90
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ogc-conformance-test-results
+        path: |
+          **/TestResults/*.trx
+          test-results/*.trx
+        retention-days: 30
+
+    - name: Check for Regression
+      if: always()
+      run: |
+        # Parse test results to check for failures
+        if [ -f ./TestResults/ogc-conformance-regression.trx ]; then
+          # Check if any tests failed
+          FAILED_TESTS=$(grep -c 'outcome="Failed"' ./TestResults/ogc-conformance-regression.trx || echo "0")
+
+          if [ "$FAILED_TESTS" -gt "0" ]; then
+            echo "::error::OGC Conformance Regression Detected: $FAILED_TESTS test(s) failed"
+            echo "::error::OGC compliance has regressed. Review test results and fix before merging."
+            exit 1
+          else
+            echo "::notice::All OGC conformance tests passed - compliance maintained"
+          fi
+        else
+          echo "::warning::Test results file not found - unable to verify conformance"
+        fi
+
+  wfs-conformance:
+    name: WFS Conformance
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop' || contains(github.event.pull_request.labels.*.name, 'run-ogc-conformance')
+    env:
+      HONUA_BASE_URL: http://localhost:5000
+      WFS_CAPABILITIES_URL: http://localhost:5000/wfs?service=WFS&request=GetCapabilities&version=2.0.0
+      DOTNET_VERSION: '9.0.x'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore Honua.sln
+
+    - name: Prepare WFS metadata
+      run: |
+        cp samples/ogc/metadata.json qa-wfs-metadata.json
+        python3 -c "
+        import json
+        from pathlib import Path
+
+        metadata_path = Path('qa-wfs-metadata.json')
+        data = json.loads(metadata_path.read_text())
+
+        for layer in data.get('layers', []):
+            fields = layer.setdefault('fields', [])
+            if not any(field.get('name') == 'globalId' for field in fields):
+                fields.append({
+                    'name': 'globalId',
+                    'dataType': 'string',
+                    'nullable': True
+                })
+
+            layer['editing'] = {
+                'capabilities': {
+                    'allowAdd': True,
+                    'allowUpdate': True,
+                    'allowDelete': True,
+                    'requireAuthentication': False,
+                    'allowedRoles': []
+                },
+                'constraints': {
+                    'immutableFields': ['road_id'],
+                    'requiredFields': ['name'],
+                    'defaultValues': {
+                        'status': 'planned'
+                    }
+                }
+            }
+
+        metadata_path.write_text(json.dumps(data, indent=2))
+        "
+
+    - name: Publish Honua host
+      run: dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj --configuration Release --output publish/host
+
+    - name: Launch Honua host
+      run: |
+        ASPNETCORE_ENVIRONMENT=Production \
+        HONUA_ALLOW_QUICKSTART=true \
+        HONUA__METADATA__PROVIDER=json \
+        HONUA__METADATA__PATH=$(pwd)/qa-wfs-metadata.json \
+        HONUA__AUTHENTICATION__MODE=QuickStart \
+        nohup dotnet publish/host/Honua.Server.Host.dll --urls http://0.0.0.0:5000 > honua-server.log 2>&1 &
+        echo $! > honua-server.pid
+
+    - name: Wait for Honua readiness
+      run: |
+        for attempt in {1..40}; do
+          if curl -sf http://localhost:5000/healthz/ready >/dev/null; then
+            exit 0
+          fi
+          sleep 3
+        done
+        echo "Honua host did not become ready" >&2
+        cat honua-server.log || true
+        exit 1
+
+    - name: Seed sample features
+      run: |
+        curl -sf "http://localhost:5000/wfs?service=WFS&request=GetFeature&typeNames=roads:roads-primary&resultType=hits" >/tmp/wfs-seed.xml
+
+    - name: Run WFS conformance suite
+      run: ./scripts/run-wfs-conformance.sh
+
+    - name: Upload conformance artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ci-wfs-conformance
+        path: |
+          qa-report/**
+          honua-server.log
+
+    - name: Shutdown Honua host
+      if: always()
+      run: |
+        if [ -f honua-server.pid ]; then
+          kill $(cat honua-server.pid) || true
+        fi
+
+  # Performance tests (only on main branches or when explicitly requested)
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'run-performance-tests')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install GDAL dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin libgdal-dev proj-bin proj-data libproj-dev
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-artifacts
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Run performance tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Performance|Speed=Slow" \
+          --logger "trx;LogFileName=performance-test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory ./TestResults
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-test-results
+        path: |
+          **/TestResults/*.trx
+          test-results/*.trx
+
+  # QGIS smoke coverage (ensures desktop workflows stay healthy)
+  qgis-smoke-tests:
+    name: QGIS Smoke Tests
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 30
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore Honua.sln
+
+    - name: Pull QGIS container image
+      run: docker pull qgis/qgis:3.34.6
+
+    - name: Run QGIS smoke tests
+      env:
+        QGIS_CONTAINER_IMAGE: qgis/qgis:3.34.6
+      run: |
+        set -euo pipefail
+        ./scripts/run-qgis-smoke.sh --container "$QGIS_CONTAINER_IMAGE"
+
+  # Test result summary
+  # Docker integration tests
+  docker-tests:
+    name: Docker Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 20
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Cache Docker layers for test image
+      uses: actions/cache@v4
+      with:
+        path: /tmp/.buildx-cache-test
+        key: ${{ runner.os }}-buildx-test-${{ hashFiles('Dockerfile.test', 'src/**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-test-
+
+    - name: Build honua-server:test Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.test
+        push: false
+        load: true
+        tags: honua-server:test
+        cache-from: type=local,src=/tmp/.buildx-cache-test
+        cache-to: type=local,dest=/tmp/.buildx-cache-test-new,mode=max
+
+    # Move cache to avoid growing cache size indefinitely
+    - name: Move cache
+      run: |
+        rm -rf /tmp/.buildx-cache-test
+        mv /tmp/.buildx-cache-test-new /tmp/.buildx-cache-test
+
+    - name: Verify test image was built
+      run: |
+        docker images | grep honua-server
+        docker inspect honua-server:test
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build test projects
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run Docker integration tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} \
+          --configuration Release \
+          --no-build \
+          --filter "Category=Docker" \
+          --logger "trx;LogFileName=docker-test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory ./TestResults
+
+    - name: Upload Docker test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: docker-test-results
+        path: |
+          TestResults/**/*.trx
+        retention-days: 7
+
+    - name: Show Docker container logs on failure
+      if: failure()
+      run: |
+        echo "=== Docker containers ==="
+        docker ps -a
+        echo ""
+        echo "=== Docker logs ==="
+        for container in $(docker ps -a --format '{{.Names}}'); do
+          echo "--- Logs for $container ---"
+          docker logs $container 2>&1 || true
+          echo ""
+        done
+
+    - name: Cleanup Docker containers
+      if: always()
+      run: |
+        docker ps -aq | xargs -r docker rm -f || true
+        docker images -q honua-server:test | xargs -r docker rmi -f || true
+
+  # Docker image build and scanning
+  docker-build:
+    name: Build & Scan Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      packages: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build production Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        load: true
+        tags: honua:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'honua:${{ github.sha }}'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+        exit-code: '1'  # Fail the build on HIGH/CRITICAL vulnerabilities
+
+    - name: Run Trivy vulnerability scanner (table format)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'honua:${{ github.sha }}'
+        format: 'table'
+        output: 'trivy-results.txt'
+        severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+
+    - name: Run Trivy vulnerability scanner (JSON format)
+      uses: aquasecurity/trivy-action@master
+      if: always()
+      with:
+        image-ref: 'honua:${{ github.sha }}'
+        format: 'json'
+        output: 'trivy-results.json'
+        severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+
+    - name: Upload Trivy results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+        category: 'container-image'
+
+    - name: Upload Trivy scan artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: trivy-scan-results
+        path: |
+          trivy-results.sarif
+          trivy-results.txt
+          trivy-results.json
+        retention-days: 30
+
+    - name: Generate vulnerability summary
+      if: always()
+      run: |
+        echo "## Container Image Vulnerability Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Image**: honua:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ -f trivy-results.txt ]; then
+          echo "### Vulnerability Summary" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat trivy-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Check for vulnerable packages
+      run: |
+        dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerable-packages.log
+        if grep -q "has the following vulnerable packages" vulnerable-packages.log; then
+          echo "::error::Vulnerable packages detected"
+          exit 1
+        fi
+
+    - name: Check for deprecated packages
+      run: |
+        dotnet list package --deprecated 2>&1 | tee deprecated-packages.log
+        if grep -q "has the following deprecated packages" deprecated-packages.log; then
+          echo "::warning::Deprecated packages detected"
+        fi
+
+    - name: CodeQL Analysis
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+        config-file: ./.github/codeql/codeql-config.yml
+
+    - name: Build for CodeQL
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:csharp"
+
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-scan-results
+        path: |
+          vulnerable-packages.log
+          deprecated-packages.log
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, infrastructure-tests, integration-tests, performance-tests, qgis-smoke-tests, docker-tests, security-scan, docker-build]
+    if: always()
+    steps:
+    - name: Download all test results
+      uses: actions/download-artifact@v4
+      with:
+        pattern: "*test-results*"
+        merge-multiple: true
+
+    - name: Publish test results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Test Results Summary
+        path: '**/*.trx'
+        reporter: dotnet-trx
+        fail-on-error: true
+
+    - name: Download coverage reports
+      uses: actions/download-artifact@v4
+      with:
+        pattern: "coverage-report"
+        merge-multiple: true
+
+    - name: Display coverage summary
+      if: always()
+      run: |
+        if [ -f ./Summary.json ]; then
+          echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract overall coverage
+          OVERALL_COVERAGE=$(jq -r '.coverage.linecoverage' ./Summary.json)
+          echo "**Overall Coverage**: $OVERALL_COVERAGE%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract per-project coverage
+          echo "### Project Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Project | Coverage | Threshold | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|----------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          check_and_display() {
+            PROJECT=$1
+            THRESHOLD=$2
+            COV=$(jq -r ".coverage.assemblies[] | select(.name | contains(\"$PROJECT\")) | .linecoverage" ./Summary.json | head -1)
+            if [ -z "$COV" ] || [ "$COV" = "null" ]; then
+              COV="N/A"
+              STATUS="⚠️ No data"
+            elif (( $(echo "$COV >= $THRESHOLD" | bc -l) )); then
+              STATUS="✅ Pass"
+            else
+              STATUS="❌ Fail"
+            fi
+            echo "| $PROJECT | $COV% | $THRESHOLD% | $STATUS |" >> $GITHUB_STEP_SUMMARY
+          }
+
+          check_and_display "Honua.Server.Core" 65
+          check_and_display "Honua.Server.Host" 60
+          check_and_display "Honua.Cli.AI" 55
+          check_and_display "Honua.Cli" 50
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Threshold**: 60%" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Add Coverage PR Comment
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request' && always()
+      with:
+        recreate: true
+        path: SummaryGithub.md

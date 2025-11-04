@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database with PostGIS for running optimization tests
+  postgres-test:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: honua-postgres-optimization-test
+    environment:
+      POSTGRES_DB: honua_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+      # Enable PostGIS automatically
+      POSTGIS_ENABLE_OUTDB_RASTERS: 1
+      POSTGIS_GDAL_ENABLED_DRIVERS: ENABLE_ALL
+    ports:
+      - "5433:5432"
+    volumes:
+      # Mount initialization script
+      - ./docker-init-postgres.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      # Mount migration scripts
+      - ../src/Honua.Server.Core/Data/Migrations:/docker-entrypoint-initdb.d/migrations:ro
+      # Mount test data scripts (if exists)
+      # - ./Honua.Server.Integration.Tests/Data:/docker-entrypoint-initdb.d/testdata:ro
+      # Persistent data volume (optional - comment out for fresh data each time)
+      # - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d honua_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - honua-test-network
+    # Resource limits for consistent benchmark results
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  # Optional: Redis for caching tests (if needed)
+  redis-test:
+    image: redis:7-alpine
+    container_name: honua-redis-test
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - honua-test-network
+
+  # Optional: pgAdmin for manual testing and inspection
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: honua-pgadmin-test
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@honua.io
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      - honua-test-network
+    profiles:
+      - debug
+
+networks:
+  honua-test-network:
+    driver: bridge
+
+volumes:
+  postgres-test-data:
+    driver: local

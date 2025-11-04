@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Exception Messages -->
+  <data name="FeatureNotFound" xml:space="preserve">
+    <value>地物'{0}'が見つかりませんでした。</value>
+    <comment>地物が見つからない場合のエラーメッセージ。{0}は地物IDです。</comment>
+  </data>
+  <data name="FeatureNotFoundInLayer" xml:space="preserve">
+    <value>地物'{0}'はレイヤ'{1}'内に見つかりませんでした。</value>
+    <comment>特定のレイヤ内で地物が見つからない場合のエラーメッセージ。{0}は地物ID、{1}はレイヤIDです。</comment>
+  </data>
+  <data name="LayerNotFound" xml:space="preserve">
+    <value>要求されたレイヤが見つかりませんでした。</value>
+    <comment>レイヤが見つからない場合のエラーメッセージ。</comment>
+  </data>
+  <data name="LayerNotFoundWithId" xml:space="preserve">
+    <value>レイヤ'{0}'が見つかりませんでした。</value>
+    <comment>特定のレイヤが見つからない場合のエラーメッセージ。{0}はレイヤIDです。</comment>
+  </data>
+  <data name="CollectionNotFound" xml:space="preserve">
+    <value>コレクション'{0}'が見つかりませんでした。</value>
+    <comment>コレクションが見つからない場合のエラーメッセージ。{0}はコレクションIDです。</comment>
+  </data>
+  <data name="ServiceUnavailable" xml:space="preserve">
+    <value>サービスは一時的に利用できません。後でもう一度お試しください。</value>
+    <comment>サービスが利用できない場合のエラーメッセージ。</comment>
+  </data>
+  <data name="InvalidParameters" xml:space="preserve">
+    <value>リクエストに無効なパラメータが含まれています。</value>
+    <comment>無効なリクエストパラメータのエラーメッセージ。</comment>
+  </data>
+  <data name="InvalidGeometry" xml:space="preserve">
+    <value>提供されたジオメトリが無効です。</value>
+    <comment>無効なジオメトリのエラーメッセージ。</comment>
+  </data>
+  <data name="InvalidBoundingBox" xml:space="preserve">
+    <value>バウンディングボックス'{0}'が無効です。</value>
+    <comment>無効なバウンディングボックスのエラーメッセージ。{0}はバウンディングボックスの値です。</comment>
+  </data>
+  <data name="InvalidCrs" xml:space="preserve">
+    <value>座標参照系'{0}'はサポートされていません。</value>
+    <comment>サポートされていない座標参照系のエラーメッセージ。{0}は座標参照系の識別子です。</comment>
+  </data>
+  <data name="InvalidFormat" xml:space="preserve">
+    <value>フォーマット'{0}'はサポートされていません。</value>
+    <comment>サポートされていないフォーマットのエラーメッセージ。{0}はフォーマット名です。</comment>
+  </data>
+  <data name="DataStoreError" xml:space="preserve">
+    <value>データストアへのアクセス中にエラーが発生しました。</value>
+    <comment>データストアエラーのエラーメッセージ。</comment>
+  </data>
+  <data name="CacheError" xml:space="preserve">
+    <value>キャッシュへのアクセス中にエラーが発生しました。</value>
+    <comment>キャッシュエラーのエラーメッセージ。</comment>
+  </data>
+  <data name="MetadataError" xml:space="preserve">
+    <value>メタデータへのアクセス中にエラーが発生しました。</value>
+    <comment>メタデータエラーのエラーメッセージ。</comment>
+  </data>
+  <data name="QueryError" xml:space="preserve">
+    <value>クエリの実行中にエラーが発生しました。</value>
+    <comment>クエリ実行エラーのエラーメッセージ。</comment>
+  </data>
+  <data name="RasterError" xml:space="preserve">
+    <value>ラスタデータの処理中にエラーが発生しました。</value>
+    <comment>ラスタ処理エラーのエラーメッセージ。</comment>
+  </data>
+  <data name="SerializationError" xml:space="preserve">
+    <value>レスポンスのシリアライズ中にエラーが発生しました。</value>
+    <comment>シリアライズエラーのエラーメッセージ。</comment>
+  </data>
+  <data name="UnauthorizedAccess" xml:space="preserve">
+    <value>このリソースにアクセスする権限がありません。</value>
+    <comment>未認証アクセスのエラーメッセージ。</comment>
+  </data>
+  <data name="Forbidden" xml:space="preserve">
+    <value>このリソースへのアクセスは禁止されています。</value>
+    <comment>アクセス禁止のエラーメッセージ。</comment>
+  </data>
+  <data name="TooManyRequests" xml:space="preserve">
+    <value>リクエストが多すぎます。後でもう一度お試しください。</value>
+    <comment>レート制限のエラーメッセージ。</comment>
+  </data>
+  <data name="InternalServerError" xml:space="preserve">
+    <value>内部サーバーエラーが発生しました。</value>
+    <comment>一般的な内部サーバーエラーメッセージ。</comment>
+  </data>
+  <data name="NotImplemented" xml:space="preserve">
+    <value>この機能は実装されていません。</value>
+    <comment>未実装機能のエラーメッセージ。</comment>
+  </data>
+  <data name="BadRequest" xml:space="preserve">
+    <value>リクエストが不正または無効です。</value>
+    <comment>不正なリクエストのエラーメッセージ。</comment>
+  </data>
+  <data name="MethodNotAllowed" xml:space="preserve">
+    <value>HTTPメソッド'{0}'はこのリソースでは許可されていません。</value>
+    <comment>許可されていないメソッドのエラーメッセージ。{0}はHTTPメソッドです。</comment>
+  </data>
+  <data name="UnsupportedMediaType" xml:space="preserve">
+    <value>メディアタイプ'{0}'はサポートされていません。</value>
+    <comment>サポートされていないメディアタイプのエラーメッセージ。{0}はメディアタイプです。</comment>
+  </data>
+  <data name="ConflictError" xml:space="preserve">
+    <value>リクエストがリソースの現在の状態と競合しています。</value>
+    <comment>競合エラーのエラーメッセージ。</comment>
+  </data>
+  <data name="GoneError" xml:space="preserve">
+    <value>要求されたリソースは利用できなくなりました。</value>
+    <comment>削除されたリソースのエラーメッセージ。</comment>
+  </data>
+  <data name="PreconditionFailed" xml:space="preserve">
+    <value>このリクエストの事前条件が満たされませんでした。</value>
+    <comment>事前条件失敗のエラーメッセージ。</comment>
+  </data>
+  <data name="PayloadTooLarge" xml:space="preserve">
+    <value>リクエストペイロードが大きすぎます。</value>
+    <comment>ペイロード過大のエラーメッセージ。</comment>
+  </data>
+  <data name="UriTooLong" xml:space="preserve">
+    <value>リクエストURIが長すぎます。</value>
+    <comment>URI長過大のエラーメッセージ。</comment>
+  </data>
+
+  <!-- Validation Messages -->
+  <data name="RequiredParameter" xml:space="preserve">
+    <value>パラメータ'{0}'は必須です。</value>
+    <comment>必須パラメータの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidParameterValue" xml:space="preserve">
+    <value>パラメータ'{0}'の値が無効です。</value>
+    <comment>無効なパラメータ値の検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="ParameterOutOfRange" xml:space="preserve">
+    <value>パラメータ'{0}'が範囲外です。{1}から{2}の間である必要があります。</value>
+    <comment>範囲外パラメータの検証エラー。{0}はパラメータ名、{1}は最小値、{2}は最大値です。</comment>
+  </data>
+
+  <!-- OGC API Messages -->
+  <data name="CollectionsTitle" xml:space="preserve">
+    <value>地物コレクション</value>
+    <comment>コレクションエンドポイントのタイトル。</comment>
+  </data>
+  <data name="CollectionsDescription" xml:space="preserve">
+    <value>このAPIで利用可能なデータコレクションへのアクセス。</value>
+    <comment>コレクションエンドポイントの説明。</comment>
+  </data>
+  <data name="ConformanceTitle" xml:space="preserve">
+    <value>準拠宣言</value>
+    <comment>準拠エンドポイントのタイトル。</comment>
+  </data>
+  <data name="ConformanceDescription" xml:space="preserve">
+    <value>このAPIが準拠する仕様および標準に関する情報。</value>
+    <comment>準拠エンドポイントの説明。</comment>
+  </data>
+</root>

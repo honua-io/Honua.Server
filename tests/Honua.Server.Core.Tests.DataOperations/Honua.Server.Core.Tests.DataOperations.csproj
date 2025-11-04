@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DataOperations-specific packages -->
+    <PackageReference Include="FlatGeobuf" Version="3.26.0" />
+    <PackageReference Include="Apache.Arrow" Version="22.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Honua.Server.Core.Tests.Shared\Honua.Server.Core.Tests.Shared.csproj" />
+    <ProjectReference Include="..\..\src\Honua.Server.Core\Honua.Server.Core.csproj" />
+    <ProjectReference Include="..\..\src\Honua.Server.Host\Honua.Server.Host.csproj" />
+  </ItemGroup>
+
+</Project>

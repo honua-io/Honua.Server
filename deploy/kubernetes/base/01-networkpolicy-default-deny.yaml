@@ -1,0 +1,36 @@
+---
+# Default Deny All Traffic
+# This NetworkPolicy implements a zero-trust security model by denying all ingress and egress traffic by default.
+# Specific traffic must be explicitly allowed by other NetworkPolicies.
+#
+# Security rationale:
+# - Prevents lateral movement between pods
+# - Requires explicit allow rules for all communication
+# - Follows principle of least privilege
+# - Protects against compromised pods
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: honua
+  labels:
+    app: honua
+    component: network-policy
+    policy-type: baseline
+  annotations:
+    description: "Default deny all ingress and egress traffic"
+    security.principle: "zero-trust"
+    priority: "1"
+
+spec:
+  # Apply to all pods in the namespace
+  podSelector: {}
+
+  # Policy types to enforce
+  policyTypes:
+  - Ingress
+  - Egress
+
+  # No ingress rules = deny all
+  # No egress rules = deny all

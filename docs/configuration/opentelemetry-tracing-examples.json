@@ -1,0 +1,187 @@
+{
+  "// Example 1: Console Exporter (Development)": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "console",
+        "SamplingStrategy": "always_on",
+        "RecordExceptionDetails": true,
+        "EnrichWithHttpDetails": true,
+        "EnrichWithDbStatements": true
+      }
+    }
+  },
+
+  "// Example 2: OTLP Exporter (Production with Tempo/Grafana)": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "otlp",
+        "OtlpEndpoint": "http://tempo:4317",
+        "OtlpProtocol": "grpc",
+        "SamplingStrategy": "parent_based",
+        "SamplingRatio": 0.1,
+        "RecordExceptionDetails": false,
+        "EnrichWithHttpDetails": true,
+        "EnrichWithDbStatements": false,
+        "TraceRedisCommands": false,
+        "ExcludedEndpoints": ["/health", "/metrics", "/ready", "/live"]
+      }
+    }
+  },
+
+  "// Example 3: Jaeger Exporter (Development/Testing)": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "jaeger",
+        "JaegerAgentHost": "localhost",
+        "JaegerAgentPort": 6831,
+        "SamplingStrategy": "always_on",
+        "RecordExceptionDetails": true,
+        "EnrichWithHttpDetails": true,
+        "EnrichWithDbStatements": true
+      }
+    }
+  },
+
+  "// Example 4: Multiple Exporters (Console + OTLP + Jaeger)": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "multiple",
+        "OtlpEndpoint": "http://tempo:4317",
+        "OtlpProtocol": "grpc",
+        "JaegerAgentHost": "jaeger",
+        "JaegerAgentPort": 6831,
+        "SamplingStrategy": "trace_id_ratio",
+        "SamplingRatio": 0.5,
+        "RecordExceptionDetails": true,
+        "EnrichWithHttpDetails": true,
+        "EnrichWithDbStatements": true
+      }
+    }
+  },
+
+  "// Example 5: Production with Trace ID Ratio Sampling": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "otlp",
+        "OtlpEndpoint": "https://otel-collector.example.com:4318",
+        "OtlpProtocol": "http/protobuf",
+        "SamplingStrategy": "trace_id_ratio",
+        "SamplingRatio": 0.05,
+        "MaxAttributesPerSpan": 256,
+        "MaxEventsPerSpan": 256,
+        "MaxLinksPerSpan": 128,
+        "RecordExceptionDetails": false,
+        "EnrichWithHttpDetails": true,
+        "EnrichWithDbStatements": false,
+        "TraceRedisCommands": false,
+        "ExcludedEndpoints": [
+          "/health",
+          "/health/live",
+          "/health/ready",
+          "/metrics",
+          "/favicon.ico"
+        ]
+      }
+    }
+  },
+
+  "// Example 6: High-Volume with Parent-Based Sampling": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "otlp",
+        "OtlpEndpoint": "http://otel-collector:4317",
+        "OtlpProtocol": "grpc",
+        "SamplingStrategy": "parent_based",
+        "SamplingRatio": 0.01,
+        "MaxAttributesPerSpan": 64,
+        "MaxEventsPerSpan": 32,
+        "MaxLinksPerSpan": 16,
+        "RecordExceptionDetails": false,
+        "EnrichWithHttpDetails": false,
+        "EnrichWithDbStatements": false,
+        "TraceRedisCommands": false
+      }
+    }
+  },
+
+  "// Example 7: Development with Full Details": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "console",
+        "SamplingStrategy": "always_on",
+        "MaxAttributesPerSpan": 512,
+        "MaxEventsPerSpan": 256,
+        "MaxLinksPerSpan": 128,
+        "RecordExceptionDetails": true,
+        "EnrichWithHttpDetails": true,
+        "EnrichWithDbStatements": true,
+        "TraceRedisCommands": true,
+        "Baggage": {
+          "environment": "development",
+          "team": "platform"
+        }
+      }
+    }
+  },
+
+  "// Example 8: Disabled Tracing": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": false
+      }
+    }
+  },
+
+  "// Example 9: Kubernetes with OpenTelemetry Operator": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "otlp",
+        "OtlpEndpoint": "http://otel-agent.observability.svc.cluster.local:4317",
+        "OtlpProtocol": "grpc",
+        "SamplingStrategy": "parent_based",
+        "SamplingRatio": 0.1,
+        "RecordExceptionDetails": true,
+        "EnrichWithHttpDetails": true,
+        "EnrichWithDbStatements": true,
+        "Baggage": {
+          "deployment.namespace": "honua-production",
+          "deployment.cluster": "us-west-2"
+        },
+        "ExcludedEndpoints": [
+          "/health",
+          "/health/live",
+          "/health/ready",
+          "/metrics"
+        ]
+      }
+    }
+  },
+
+  "// Example 10: AWS with X-Ray": {
+    "Observability": {
+      "Tracing": {
+        "Enabled": true,
+        "Exporter": "otlp",
+        "OtlpEndpoint": "http://localhost:4317",
+        "OtlpProtocol": "grpc",
+        "SamplingStrategy": "parent_based",
+        "SamplingRatio": 0.05,
+        "RecordExceptionDetails": true,
+        "EnrichWithHttpDetails": true,
+        "EnrichWithDbStatements": false,
+        "Baggage": {
+          "aws.region": "us-west-2",
+          "aws.account": "123456789012"
+        }
+      }
+    }
+  }
+}

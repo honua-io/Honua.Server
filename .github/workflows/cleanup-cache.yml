@@ -1,0 +1,126 @@
+name: Cleanup Build Caches
+
+on:
+  schedule:
+    # Run every Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: 'Maximum age of caches to keep (days)'
+        required: false
+        default: '7'
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup-caches:
+    name: Cleanup GitHub Actions Caches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cleanup old caches
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const maxAgeDays = parseInt('${{ github.event.inputs.max_age_days || '7' }}');
+            const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+
+            console.log(`Cleaning up caches older than ${maxAgeDays} days...`);
+
+            // Get all caches
+            const caches = await github.paginate(
+              github.rest.actions.getActionsCacheList,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              }
+            );
+
+            console.log(`Found ${caches.length} total caches`);
+
+            let deletedCount = 0;
+            let freedSpaceGB = 0;
+
+            for (const cache of caches) {
+              const cacheAge = now - new Date(cache.created_at).getTime();
+              const cacheAgeHours = Math.floor(cacheAge / (1000 * 60 * 60));
+              const cacheSizeGB = cache.size_in_bytes / (1024 * 1024 * 1024);
+
+              // Delete if older than max age
+              if (cacheAge > maxAgeMs) {
+                console.log(`Deleting cache: ${cache.key} (${cacheAgeHours}h old, ${cacheSizeGB.toFixed(2)} GB)`);
+
+                try {
+                  await github.rest.actions.deleteActionsCacheById({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    cache_id: cache.id
+                  });
+
+                  deletedCount++;
+                  freedSpaceGB += cacheSizeGB;
+                } catch (error) {
+                  console.error(`Failed to delete cache ${cache.key}: ${error.message}`);
+                }
+              }
+            }
+
+            console.log(`\nCleanup Summary:`);
+            console.log(`- Deleted ${deletedCount} caches`);
+            console.log(`- Freed ${freedSpaceGB.toFixed(2)} GB`);
+
+            // Set output for notification
+            core.setOutput('deleted_count', deletedCount);
+            core.setOutput('freed_space_gb', freedSpaceGB.toFixed(2));
+
+      - name: Cleanup Docker layer caches
+        run: |
+          echo "Cleaning up old Docker layer caches..."
+
+          # This would typically involve cleaning up cache keys
+          # that haven't been used recently
+
+      - name: Generate cleanup report
+        run: |
+          cat > cleanup-report.md <<'EOF'
+          # Cache Cleanup Report
+
+          **Date:** $(date)
+          **Max Age:** ${{ github.event.inputs.max_age_days || '7' }} days
+
+          ## Results
+          - **Caches Deleted:** ${{ steps.cleanup-caches.outputs.deleted_count }}
+          - **Space Freed:** ${{ steps.cleanup-caches.outputs.freed_space_gb }} GB
+
+          ## Next Cleanup
+          The next automatic cleanup will run on Sunday at 2 AM UTC.
+          EOF
+
+      - name: Send notification
+        if: vars.ENABLE_SLACK_NOTIFICATIONS == 'true'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "Cache cleanup completed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Cache Cleanup Report*\n• Deleted: ${{ steps.cleanup-caches.outputs.deleted_count }} caches\n• Freed: ${{ steps.cleanup-caches.outputs.freed_space_gb }} GB"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

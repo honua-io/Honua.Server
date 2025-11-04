@@ -1,0 +1,147 @@
+version: "3.9"
+
+# Full production-ready deployment with observability stack
+# Includes: Honua Server, PostgreSQL/PostGIS, Jaeger, Prometheus, Grafana
+
+services:
+  # PostgreSQL with PostGIS extension
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: honua-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-honua}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-honua_password}
+      POSTGRES_DB: ${POSTGRES_DB:-honua}
+      # Performance tuning
+      POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS:-256MB}
+      POSTGRES_EFFECTIVE_CACHE_SIZE: ${POSTGRES_EFFECTIVE_CACHE_SIZE:-1GB}
+      POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-100}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-honua}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - honua-network
+
+  # Honua Server
+  honua:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: honua-server
+    depends_on:
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+
+      # Database connection
+      ConnectionStrings__DefaultConnection: Server=postgres;Port=5432;Database=${POSTGRES_DB:-honua};User Id=${POSTGRES_USER:-honua};Password=${POSTGRES_PASSWORD:-honua_password};
+
+      # Observability
+      observability__metrics__enabled: "true"
+      observability__metrics__usePrometheus: "true"
+      observability__tracing__exporter: "otlp"
+      observability__tracing__otlpEndpoint: "http://jaeger:4317"
+
+      # Authentication - PRODUCTION SECURE CONFIGURATION
+      # WARNING: QuickStart mode is DISABLED for production deployments
+      # Configure proper authentication (Local or OIDC) via environment-specific config
+      honua__authentication__mode: "Local"
+      honua__authentication__enforce: "true"
+      honua__authentication__quickStart__enabled: "false"
+      # HONUA_ALLOW_QUICKSTART: "true"  # NEVER enable in production!
+
+      # Rate limiting
+      RateLimiting__PermitLimit: "100"
+      RateLimiting__Window: "00:01:00"
+
+    ports:
+      - "${HONUA_PORT:-5000}:8080"
+    volumes:
+      # Mount configuration and data directories
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - honua-network
+    restart: unless-stopped
+
+  # Jaeger - Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: honua-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    networks:
+      - honua-network
+    restart: unless-stopped
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: honua-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - honua-network
+    restart: unless-stopped
+
+  # Grafana - Metrics Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: honua-grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - honua-network
+    restart: unless-stopped
+
+networks:
+  honua-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

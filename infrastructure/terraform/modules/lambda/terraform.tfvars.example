@@ -1,0 +1,178 @@
+# Example Terraform Variables for AWS Lambda + ALB Deployment
+# Copy this file to terraform.tfvars and customize for your environment
+
+# ==================== Required Variables ====================
+environment         = "production"  # dev, staging, or production
+container_image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/honua:latest"
+
+# ==================== General Configuration ====================
+service_name          = "honua"
+aws_region            = "us-east-1"
+aspnetcore_environment = "Production"  # Development, Staging, or Production
+
+# ==================== Lambda Configuration ====================
+lambda_timeout          = 300    # seconds (max 900)
+lambda_memory_size      = 2048   # MB (128-10240)
+lambda_ephemeral_storage = 2048  # MB (512-10240)
+
+# Provisioned concurrency (keeps Lambda warm, additional cost)
+enable_lambda_autoscaling        = false
+lambda_min_provisioned_concurrency = 0
+lambda_max_provisioned_concurrency = 100
+
+# ==================== Lambda Function URL ====================
+# Simpler alternative to ALB for non-production or internal use
+create_function_url    = false
+function_url_auth_type = "NONE"  # NONE or AWS_IAM
+
+# ==================== VPC Configuration ====================
+create_vpc         = true
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# NAT Gateway for Lambda internet access (costs ~$32/month per AZ)
+# Set to false if Lambda doesn't need internet access
+enable_nat_gateway = true
+
+# Using existing VPC (if create_vpc = false)
+# vpc_id                    = "vpc-12345678"
+# lambda_subnet_ids         = ["subnet-private1", "subnet-private2"]
+# lambda_security_group_ids = ["sg-lambda"]
+
+# ==================== Database Configuration ====================
+create_database              = true
+database_name                = "honua"
+db_username                  = "honua"
+postgres_version             = "15.4"  # PostgreSQL version
+db_instance_class            = "db.t4g.small"  # db.t4g.micro, db.t4g.small, db.r6g.large, etc.
+db_allocated_storage         = 20    # GB
+db_max_allocated_storage     = 100   # GB (autoscaling limit)
+db_multi_az                  = false # true for production (HA)
+db_backup_retention_days     = 7
+db_enable_performance_insights = true
+db_deletion_protection       = true  # Prevent accidental deletion
+
+# Using existing database (if create_database = false)
+# database_subnet_ids = ["subnet-db1", "subnet-db2"]
+
+# ==================== ALB Configuration ====================
+create_alb             = true
+alb_deletion_protection = false  # true for production
+
+# SSL certificate from AWS Certificate Manager
+ssl_certificate_arn = ""  # "arn:aws:acm:us-east-1:123456789012:certificate/..."
+
+# ALB access logs (optional)
+alb_enable_access_logs = false
+alb_access_logs_bucket = ""  # "my-alb-logs-bucket"
+
+# Using existing subnets for ALB (if create_vpc = false)
+# alb_subnet_ids = ["subnet-public1", "subnet-public2"]
+
+# ==================== ECR Configuration ====================
+create_ecr_repository = false  # Set to true to create ECR repo
+
+# ==================== Security Configuration ====================
+# KMS key for encryption (optional, uses AWS managed keys if not specified)
+kms_key_arn = ""  # "arn:aws:kms:us-east-1:123456789012:key/..."
+
+# ==================== S3 Access ====================
+enable_s3_access = true
+s3_bucket_arns   = ["*"]  # Restrict to specific buckets in production
+# s3_bucket_arns = [
+#   "arn:aws:s3:::honua-raster-data",
+#   "arn:aws:s3:::honua-raster-data/*"
+# ]
+
+# ==================== Logging ====================
+log_retention_days = 7  # CloudWatch log retention
+
+# ==================== Application Configuration ====================
+cors_origins = [
+  "https://honua.example.com",
+  "https://app.honua.example.com",
+  # "http://localhost:3000",  # Add for local development
+]
+
+gdal_cache_max = "512"  # MB
+
+# Additional environment variables for the container
+additional_env_vars = {
+  # FEATURE_FLAG_NEW_RENDERER = "true"
+  # LOG_LEVEL                 = "Information"
+  # MAX_QUERY_EXTENT          = "1000000"
+}
+
+# ==================== Health Check ====================
+health_check_path = "/health"
+
+# ==================== Tags ====================
+tags = {
+  Team        = "Platform"
+  CostCenter  = "Engineering"
+  Application = "Honua"
+  Tier        = "Production"
+}
+
+# ==================== Cost Optimization Notes ====================
+#
+# For Development (Minimal Cost):
+# - create_alb = false
+# - create_function_url = true
+# - lambda_memory_size = 1024
+# - lambda_ephemeral_storage = 512
+# - db_instance_class = "db.t4g.micro"
+# - db_multi_az = false
+# - enable_nat_gateway = false (if no internet needed)
+# - db_deletion_protection = false
+# - log_retention_days = 3
+# Expected cost: ~$20-30/month
+#
+# For Staging:
+# - create_alb = true
+# - lambda_memory_size = 2048
+# - db_instance_class = "db.t4g.small"
+# - db_multi_az = false
+# - enable_nat_gateway = true
+# Expected cost: ~$70-100/month
+#
+# For Production:
+# - create_alb = true
+# - alb_deletion_protection = true
+# - lambda_memory_size = 4096
+# - enable_lambda_autoscaling = true
+# - lambda_min_provisioned_concurrency = 5
+# - db_instance_class = "db.r6g.xlarge"
+# - db_multi_az = true
+# - db_backup_retention_days = 30
+# - db_deletion_protection = true
+# - log_retention_days = 30
+# Expected cost: ~$200-500/month (low-medium traffic)
+# Expected cost: ~$1000-2000/month (high traffic with provisioned concurrency)
+#
+# To reduce NAT Gateway costs (~$32/month):
+# - Use VPC Endpoints for AWS services (S3, Secrets Manager, etc.)
+# - Or disable NAT if Lambda doesn't need internet access
+#
+# To reduce Lambda costs:
+# - Use CloudFront CDN to cache responses
+# - Optimize container image size
+# - Use appropriate memory allocation
+# - Avoid provisioned concurrency unless needed for latency
+
+# ==================== Deployment Commands ====================
+#
+# Initialize Terraform:
+#   terraform init
+#
+# Plan deployment:
+#   terraform plan -var-file=terraform.tfvars
+#
+# Apply deployment:
+#   terraform apply -var-file=terraform.tfvars
+#
+# Update Lambda function (after pushing new image to ECR):
+#   terraform apply -var-file=terraform.tfvars -var="container_image_uri=123456789012.dkr.ecr.us-east-1.amazonaws.com/honua:v1.2.3"
+#
+# Destroy infrastructure:
+#   terraform destroy -var-file=terraform.tfvars

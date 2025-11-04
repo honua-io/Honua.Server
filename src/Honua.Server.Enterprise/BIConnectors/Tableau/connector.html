@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honua Geospatial Data Connector</title>
+    <script src="https://connectors.tableau.com/libs/tableauwdc-3.0.0.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e8ed;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .info {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1565c0;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 4px;
+        }
+
+        .auth-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .auth-section h3 {
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Honua Geospatial Data</h1>
+        <p class="subtitle">Connect to OGC Features API and STAC Catalogs</p>
+
+        <div class="error" id="errorMsg"></div>
+
+        <div class="info">
+            This connector supports OGC Features API and STAC catalog endpoints from Honua geospatial server.
+        </div>
+
+        <form id="configForm">
+            <div class="form-group">
+                <label for="serverUrl">Server URL *</label>
+                <input
+                    type="url"
+                    id="serverUrl"
+                    placeholder="https://api.honua.io"
+                    required
+                />
+                <div class="help-text">Base URL of your Honua server</div>
+            </div>
+
+            <div class="form-group">
+                <label for="dataSource">Data Source *</label>
+                <select id="dataSource" required>
+                    <option value="">Select a data source...</option>
+                    <option value="ogc-features">OGC Features API</option>
+                    <option value="stac">STAC Catalog</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="collectionGroup" style="display: none;">
+                <label for="collectionId">Collection/Layer ID *</label>
+                <input
+                    type="text"
+                    id="collectionId"
+                    placeholder="e.g., world-cities or sentinel-2"
+                />
+                <div class="help-text">Specific collection or layer to query</div>
+            </div>
+
+            <div class="auth-section">
+                <h3>🔐 Authentication</h3>
+
+                <div class="form-group">
+                    <label for="authType">Authentication Type *</label>
+                    <select id="authType" required>
+                        <option value="none">None (Public API)</option>
+                        <option value="bearer">Bearer Token (JWT)</option>
+                        <option value="apikey">API Key</option>
+                        <option value="basic">Basic Auth</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="tokenGroup" style="display: none;">
+                    <label for="token">Token</label>
+                    <input
+                        type="password"
+                        id="token"
+                        placeholder="Enter your JWT token"
+                    />
+                </div>
+
+                <div class="form-group" id="apiKeyGroup" style="display: none;">
+                    <label for="apiKey">API Key</label>
+                    <input
+                        type="password"
+                        id="apiKey"
+                        placeholder="Enter your API key"
+                    />
+                </div>
+
+                <div class="form-group" id="usernameGroup" style="display: none;">
+                    <label for="username">Username</label>
+                    <input
+                        type="text"
+                        id="username"
+                        placeholder="Username"
+                    />
+                </div>
+
+                <div class="form-group" id="passwordGroup" style="display: none;">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        placeholder="Password"
+                    />
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">
+                Connect to Honua
+            </button>
+        </form>
+    </div>
+
+    <script src="connector.js"></script>
+</body>
+</html>

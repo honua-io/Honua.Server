@@ -1,0 +1,32 @@
+{
+  "id": "cloud-storage-emulators",
+  "version": "1.0.0",
+  "name": "Cloud Storage Emulators",
+  "description": "Adds LocalStack (S3), Azurite (Azure Blob), and fake-gcs-server (GCS) emulators for integration testing",
+  "documentationURL": "https://github.com/your-org/honua",
+  "options": {
+    "localstack": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable LocalStack (AWS S3) emulator"
+    },
+    "azurite": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable Azurite (Azure Blob Storage) emulator"
+    },
+    "gcs": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable fake-gcs-server (Google Cloud Storage) emulator"
+    }
+  },
+  "containerEnv": {
+    "LOCALSTACK_ENDPOINT": "http://localstack:4566",
+    "AZURITE_BLOB_ENDPOINT": "http://azurite:10000",
+    "GCS_EMULATOR_ENDPOINT": "http://gcs-emulator:4443",
+    "AWS_ACCESS_KEY_ID": "test",
+    "AWS_SECRET_ACCESS_KEY": "test",
+    "AWS_DEFAULT_REGION": "us-east-1"
+  }
+}

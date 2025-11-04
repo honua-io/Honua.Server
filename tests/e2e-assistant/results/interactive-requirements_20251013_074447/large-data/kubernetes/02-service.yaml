@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: honua-service
+  namespace: honua
+  labels:
+    app: honua-server
+    environment: development
+spec:
+  type: ClusterIP
+  selector:
+    app: honua-server
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP

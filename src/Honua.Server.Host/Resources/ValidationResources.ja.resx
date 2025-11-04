@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Input Validation Messages -->
+  <data name="ParameterTooLong" xml:space="preserve">
+    <value>パラメータ'{0}'が最大長{1}文字を超えています（実際: {2}）。</value>
+    <comment>パラメータが長すぎる場合の検証エラー。{0}はパラメータ名、{1}は最大長、{2}は実際の長さです。</comment>
+  </data>
+  <data name="InvalidSqlPattern" xml:space="preserve">
+    <value>パラメータ'{0}'に安全でない可能性のあるSQLパターンが含まれています。</value>
+    <comment>SQLインジェクションパターンの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidCharacters" xml:space="preserve">
+    <value>パラメータ'{0}'に無効な文字が含まれています。</value>
+    <comment>無効な文字の検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidXmlPattern" xml:space="preserve">
+    <value>パラメータ'{0}'に安全でない可能性のあるXMLパターンが含まれています。</value>
+    <comment>XMLインジェクションパターンの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidPathTraversal" xml:space="preserve">
+    <value>パラメータ'{0}'にパストラバーサルシーケンスが含まれています。</value>
+    <comment>パストラバーサル試行の検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidScriptPattern" xml:space="preserve">
+    <value>パラメータ'{0}'に安全でない可能性のあるスクリプトパターンが含まれています。</value>
+    <comment>スクリプトインジェクションパターンの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="StringRequired" xml:space="preserve">
+    <value>パラメータ'{0}'は必須であり、nullまたは空にすることはできません。</value>
+    <comment>必須文字列パラメータの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="StringTooShort" xml:space="preserve">
+    <value>パラメータ'{0}'は最低{1}文字である必要があります（実際: {2}）。</value>
+    <comment>文字列が短すぎる場合の検証エラー。{0}はパラメータ名、{1}は最小長、{2}は実際の長さです。</comment>
+  </data>
+  <data name="InvalidEmailFormat" xml:space="preserve">
+    <value>パラメータ'{0}'は有効なメールアドレスではありません。</value>
+    <comment>無効なメールフォーマットの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidUrlFormat" xml:space="preserve">
+    <value>パラメータ'{0}'は有効なURLではありません。</value>
+    <comment>無効なURLフォーマットの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidDateTimeFormat" xml:space="preserve">
+    <value>パラメータ'{0}'は有効な日付/時刻フォーマットではありません。</value>
+    <comment>無効な日時フォーマットの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidNumberFormat" xml:space="preserve">
+    <value>パラメータ'{0}'は有効な数値ではありません。</value>
+    <comment>無効な数値フォーマットの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="NumberTooSmall" xml:space="preserve">
+    <value>パラメータ'{0}'は最低{1}である必要があります（実際: {2}）。</value>
+    <comment>数値が小さすぎる場合の検証エラー。{0}はパラメータ名、{1}は最小値、{2}は実際の値です。</comment>
+  </data>
+  <data name="NumberTooLarge" xml:space="preserve">
+    <value>パラメータ'{0}'は最大{1}である必要があります（実際: {2}）。</value>
+    <comment>数値が大きすぎる場合の検証エラー。{0}はパラメータ名、{1}は最大値、{2}は実際の値です。</comment>
+  </data>
+  <data name="InvalidEnumValue" xml:space="preserve">
+    <value>パラメータ'{0}'の値が無効です。有効な値: {1}。</value>
+    <comment>無効な列挙値の検証エラー。{0}はパラメータ名、{1}は有効な値のリストです。</comment>
+  </data>
+  <data name="InvalidGuidFormat" xml:space="preserve">
+    <value>パラメータ'{0}'は有効なGUIDフォーマットではありません。</value>
+    <comment>無効なGUIDフォーマットの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="InvalidRegexPattern" xml:space="preserve">
+    <value>パラメータ'{0}'が必要なパターンと一致しません。</value>
+    <comment>値が正規表現パターンと一致しない場合の検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="CollectionEmpty" xml:space="preserve">
+    <value>パラメータ'{0}'には最低1つの項目が含まれている必要があります。</value>
+    <comment>空のコレクションの検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+  <data name="CollectionTooLarge" xml:space="preserve">
+    <value>パラメータ'{0}'に含まれる項目が多すぎます。最大許容数: {1}（実際: {2}）。</value>
+    <comment>コレクションに項目が多すぎる場合の検証エラー。{0}はパラメータ名、{1}は最大数、{2}は実際の数です。</comment>
+  </data>
+  <data name="DuplicateValue" xml:space="preserve">
+    <value>パラメータ'{0}'に重複した値が含まれています。すべての値は一意である必要があります。</value>
+    <comment>コレクション内の重複値の検証エラー。{0}はパラメータ名です。</comment>
+  </data>
+
+  <!-- Geometry Validation Messages -->
+  <data name="GeometryInvalid" xml:space="preserve">
+    <value>ジオメトリが無効です: {0}</value>
+    <comment>無効なジオメトリの検証エラー。{0}は具体的な検証エラーです。</comment>
+  </data>
+  <data name="GeometryTooComplex" xml:space="preserve">
+    <value>ジオメトリが複雑すぎます。最大{0}頂点まで許可されています（実際: {1}）。</value>
+    <comment>ジオメトリの頂点が多すぎる場合の検証エラー。{0}は最大頂点数、{1}は実際の数です。</comment>
+  </data>
+  <data name="GeometrySelfIntersecting" xml:space="preserve">
+    <value>ジオメトリが自己交差しています。</value>
+    <comment>自己交差するジオメトリの検証エラー。</comment>
+  </data>
+  <data name="GeometryNotClosed" xml:space="preserve">
+    <value>ポリゴンジオメトリが閉じていません。</value>
+    <comment>閉じていないポリゴンの検証エラー。</comment>
+  </data>
+  <data name="InvalidCoordinates" xml:space="preserve">
+    <value>座標が無効または範囲外です。</value>
+    <comment>無効な座標の検証エラー。</comment>
+  </data>
+  <data name="CoordinateOutOfRange" xml:space="preserve">
+    <value>座標値{0}は{1}の範囲外です。{2}から{3}の間である必要があります。</value>
+    <comment>座標が範囲外の場合の検証エラー。{0}は値、{1}は座標タイプ（緯度/経度）、{2}は最小値、{3}は最大値です。</comment>
+  </data>
+</root>

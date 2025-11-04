@@ -1,0 +1,20 @@
+{
+  "name": "Honua Build Orchestrator",
+  "url": "https://github.com/honua-io/honua",
+  "hook_attributes": {
+    "url": "https://build-orchestrator.honua.io/webhooks/github"
+  },
+  "redirect_url": "https://build-orchestrator.honua.io/auth/github/callback",
+  "callback_urls": [
+    "https://build-orchestrator.honua.io/auth/github/callback"
+  ],
+  "description": "GitHub App for Honua build orchestrator to access private repositories and manage container packages",
+  "public": false,
+  "default_events": [],
+  "default_permissions": {
+    "contents": "read",
+    "metadata": "read",
+    "packages": "write"
+  },
+  "request_oauth_on_install": true
+}

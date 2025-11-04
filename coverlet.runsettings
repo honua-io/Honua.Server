@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>opencover,cobertura</Format>
+          <Exclude>
+            <!-- Exclude test assemblies -->
+            [*Tests]*,
+            [*Benchmarks]*,
+            [DataSeeder]*,
+            [ProcessFrameworkTest]*,
+            <!-- Exclude generated code -->
+            [*]*.Migrations.*,
+            [*]*.DTO,
+            [*]*.DTOs.*,
+            [*]*.Models.Generated.*,
+            [*]*.Contracts.*,
+            [*]*GlobalUsings,
+            <!-- Exclude specific patterns -->
+            [*]*.Program,
+            [*]*.Startup,
+            [*]*AssemblyInfo
+          </Exclude>
+          <ExcludeByAttribute>
+            Obsolete,
+            GeneratedCodeAttribute,
+            CompilerGeneratedAttribute,
+            ExcludeFromCodeCoverageAttribute
+          </ExcludeByAttribute>
+          <ExcludeByFile>
+            <!-- Exclude auto-generated files -->
+            **/Migrations/**/*.cs,
+            **/*Designer.cs,
+            **/obj/**/*.cs,
+            **/GlobalUsings.g.cs
+          </ExcludeByFile>
+          <IncludeDirectory>
+            ../src/**
+          </IncludeDirectory>
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SkipAutoProps>true</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

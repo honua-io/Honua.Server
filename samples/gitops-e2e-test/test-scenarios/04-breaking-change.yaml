@@ -1,0 +1,421 @@
+# Test Scenario 04: Breaking Change Requiring Approval
+#
+# This scenario tests the GitOps workflow when making a breaking change
+# that should trigger the approval workflow (especially in production).
+
+scenario:
+  id: "04-breaking-change"
+  name: "Breaking Change with Approval Workflow"
+  description: "Make a breaking change (geometry type or SRID) and test approval process"
+  risk_level: "high"
+  environment: "production"
+  requires_approval: true
+
+objectives:
+  - Test detection of breaking changes
+  - Verify approval workflow is triggered
+  - Confirm deployment waits in PendingApproval state
+  - Test manual approval process
+  - Validate deployment proceeds after approval
+
+prerequisites:
+  - "Production environment configured with approval requirements"
+  - "Approval service enabled in Honua configuration"
+  - "Understanding of what constitutes a breaking change"
+
+breaking_changes:
+  definition: "Changes that affect data compatibility or client expectations"
+  examples:
+    - type: "Geometry Type Change"
+      from: "Point"
+      to: "Polygon"
+      impact: "Clients expecting points will fail"
+      severity: "High"
+
+    - type: "SRID Change"
+      from: 4326
+      to: 3857
+      impact: "Coordinate system mismatch"
+      severity: "High"
+
+    - type: "Table Name Change"
+      from: "public.locations"
+      to: "public.new_locations"
+      impact: "Queries will fail"
+      severity: "Critical"
+
+    - type: "Geometry Column Rename"
+      from: "geom"
+      to: "geometry"
+      impact: "Spatial queries will fail"
+      severity: "High"
+
+    - type: "Required Field Removal"
+      from: "Has 'status' field"
+      to: "Missing 'status' field"
+      impact: "Dependent clients will fail"
+      severity: "Medium"
+
+steps:
+  - step: 1
+    action: "Configure Honua for production environment"
+    note: "Edit appsettings.test.json or create production config"
+    changes:
+      - "Set Watcher.Environment to 'production'"
+      - "Verify GitOps.Enabled is true"
+      - "Ensure approval service is configured"
+
+  - step: 2
+    action: "Navigate to test repository"
+    command: "cd /tmp/honua-gitops-test-repo"
+
+  - step: 3
+    action: "Make a breaking change to production metadata"
+    command: "vim environments/production/metadata.json"
+    note: "Change geometry type from Point to Polygon (see example below)"
+
+  - step: 4
+    action: "Commit the breaking change"
+    commands:
+      - "git add environments/production/metadata.json"
+      - "git commit -m 'BREAKING: Change locations geometry to Polygon'"
+
+  - step: 5
+    action: "Wait for detection"
+    expected_time: "10-15 seconds"
+    expected_log: "Detected new commit"
+
+  - step: 6
+    action: "Verify breaking change is detected"
+    expected_log: "Breaking change detected" or "Approval required"
+
+  - step: 7
+    action: "Check deployment enters PendingApproval state"
+    command: "cat /tmp/honua-gitops-state/deployments/*.json | jq -r '.State' | tail -1"
+    expected_output: "PendingApproval"
+
+  - step: 8
+    action: "Review approval request"
+    command: "ls /tmp/honua-gitops-state/approvals/"
+    expected: "Approval file exists"
+
+  - step: 9
+    action: "Examine approval details"
+    command: "cat /tmp/honua-gitops-state/approvals/*.json | jq '.'"
+    expected_content:
+      - "deploymentId"
+      - "environment: production"
+      - "state: Pending"
+      - "plan with breaking changes"
+
+  - step: 10
+    action: "Manually approve (simulate approval)"
+    note: "In production, this would be via API or CLI"
+    manual_step: "Update approval JSON state to 'Approved'"
+
+  - step: 11
+    action: "Verify deployment proceeds"
+    expected: "Deployment transitions from PendingApproval to Applying"
+
+  - step: 12
+    action: "Confirm deployment completes"
+    expected_log: "Successfully completed reconciliation"
+
+breaking_change_example:
+  description: "Change geometry type from Point to Polygon"
+  before: |
+    {
+      "id": "locations",
+      "title": "Locations",
+      "description": "Production location data",
+      "datasource": "production-postgis",
+      "table": "public.locations",
+      "geometryColumn": "geom",
+      "geometryType": "Point",
+      "srid": 4326,
+      ...
+    }
+
+  after: |
+    {
+      "id": "locations",
+      "title": "Locations",
+      "description": "Production location data - now with boundaries",
+      "datasource": "production-postgis",
+      "table": "public.location_boundaries",
+      "geometryColumn": "geom",
+      "geometryType": "Polygon",
+      "srid": 4326,
+      ...
+    }
+
+  changes_made:
+    - "geometryType: Point → Polygon (BREAKING)"
+    - "table: locations → location_boundaries (BREAKING)"
+    - "description: Updated to reflect change"
+
+expected_behavior:
+  without_approval_service:
+    - event: "Breaking change detected"
+      log_pattern: "Breaking change in deployment plan"
+      action: "Logged but deployment may proceed (depending on policy)"
+
+    - event: "Risk assessment"
+      log_pattern: "RiskLevel: High or Critical"
+      action: "Deployment plan includes risk information"
+
+  with_approval_service:
+    - event: "Breaking change detected"
+      log_pattern: "Breaking change detected|Approval required"
+      action: "Deployment pauses"
+
+    - event: "Approval request created"
+      timing: "Immediately after detection"
+      action: "Approval record created in approvals directory"
+      file: "/tmp/honua-gitops-state/approvals/dep_*.json"
+
+    - event: "Deployment state transition"
+      from: "Pending"
+      to: "PendingApproval"
+      action: "Deployment waits for approval"
+
+    - event: "Notification (future)"
+      action: "Approvers notified (email, Slack, etc.)"
+      note: "Not yet implemented in current version"
+
+    - event: "Approval granted"
+      trigger: "Manual or automated approval"
+      action: "Approval state changes to Approved"
+
+    - event: "Deployment resumes"
+      from: "PendingApproval"
+      to: "Applying"
+      action: "Reconciliation proceeds with changes"
+
+    - event: "Completion"
+      final_state: "Completed"
+      action: "Breaking changes applied successfully"
+
+validation:
+  checks:
+    - type: "breaking_change_detection"
+      description: "Verify breaking change was identified"
+      command: "cat /tmp/honua-gitops-state/deployments/*.json | jq -r '.Plan.HasBreakingChanges' | tail -1"
+      expected_output: "true"
+
+    - type: "risk_level"
+      description: "Verify high risk level"
+      command: "cat /tmp/honua-gitops-state/deployments/*.json | jq -r '.Plan.RiskLevel' | tail -1"
+      expected_output: "High or Critical"
+
+    - type: "approval_required"
+      description: "Verify approval was required"
+      command: "ls /tmp/honua-gitops-state/approvals/ | wc -l"
+      expected: "1 or more approval files"
+
+    - type: "approval_state"
+      description: "Check approval is pending (before manual approval)"
+      command: "cat /tmp/honua-gitops-state/approvals/*.json | jq -r '.State' | tail -1"
+      expected_output: "Pending"
+
+    - type: "deployment_paused"
+      description: "Verify deployment is waiting"
+      command: "cat /tmp/honua-gitops-state/deployments/*.json | jq -r '.State' | tail -1"
+      expected_output: "PendingApproval"
+
+    - type: "log_verification"
+      description: "Check logs mention approval requirement"
+      command: "grep -i 'approval.*required' logs/honua-*.log | tail -1"
+      expected: "Log entry about approval requirement"
+
+approval_workflow:
+  manual_approval_simulation:
+    description: "How to manually approve for testing"
+    steps:
+      - "Locate approval file: ls /tmp/honua-gitops-state/approvals/"
+      - "Edit approval JSON: vim /tmp/honua-gitops-state/approvals/dep_*.json"
+      - "Change 'state' from 'Pending' to 'Approved'"
+      - "Set 'respondedAt' to current timestamp"
+      - "Set 'responder' to your username"
+      - "Save file"
+      - "Wait for next reconciliation cycle"
+
+  approval_file_structure:
+    example: |
+      {
+        "deploymentId": "dep_1234567890",
+        "environment": "production",
+        "state": "Approved",  // Changed from "Pending"
+        "requestedAt": "2025-10-23T10:30:00Z",
+        "respondedAt": "2025-10-23T10:35:00Z",  // Added
+        "responder": "admin",  // Added
+        "expiresAt": "2025-10-24T10:30:00Z",
+        "plan": {
+          "hasBreakingChanges": true,
+          "riskLevel": "High",
+          "modified": [
+            {
+              "type": "layer",
+              "name": "locations",
+              "isBreaking": true
+            }
+          ]
+        }
+      }
+
+  api_approval_process:
+    description: "How approval would work via API (when implemented)"
+    endpoints:
+      - endpoint: "POST /api/gitops/approvals/{deploymentId}/approve"
+        payload: |
+          {
+            "approver": "admin@honua.io",
+            "comments": "Reviewed and approved for deployment"
+          }
+
+      - endpoint: "POST /api/gitops/approvals/{deploymentId}/reject"
+        payload: |
+          {
+            "rejecter": "admin@honua.io",
+            "reason": "Breaking changes not adequately tested"
+          }
+
+      - endpoint: "GET /api/gitops/approvals/pending"
+        response: "List of deployments awaiting approval"
+
+rejection_workflow:
+  description: "Testing approval rejection"
+  steps:
+    - "Follow steps 1-9 from main scenario"
+    - "Instead of approving, change state to 'Rejected'"
+    - "Add 'reason' field with rejection explanation"
+    - "Verify deployment remains blocked"
+    - "Verify deployment state transitions to 'Rejected'"
+
+  expected_behavior_on_rejection:
+    - "Deployment does not proceed"
+    - "State remains 'Rejected' or transitions to 'Failed'"
+    - "Notification sent to requester (future)"
+    - "Commit remains in Git but is not applied"
+    - "System continues monitoring for new commits"
+
+troubleshooting:
+  issues:
+    - symptom: "Breaking change not detected"
+      possible_causes:
+        - "Change not actually breaking"
+        - "Breaking change detection not configured"
+        - "Wrong environment (development doesn't require approval)"
+      solutions:
+        - "Verify change type is on breaking changes list"
+        - "Check deployment policy configuration"
+        - "Ensure testing with production environment"
+
+    - symptom: "Approval not required despite breaking change"
+      possible_causes:
+        - "Approval service not registered"
+        - "Environment policy doesn't require approval"
+        - "DryRun mode enabled"
+      solutions:
+        - "Check GitOps configuration has approval service"
+        - "Verify production environment policy"
+        - "Ensure DryRun is false"
+
+    - symptom: "Deployment proceeds without approval"
+      possible_causes:
+        - "Approval service not properly integrated"
+        - "Reconciler not checking approval status"
+      solutions:
+        - "Check reconciler logs for approval checks"
+        - "Verify approval service is called"
+        - "Review code integration between components"
+
+    - symptom: "Approval file not created"
+      possible_causes:
+        - "State directory not writable"
+        - "Approval service initialization failed"
+      solutions:
+        - "Check file permissions on state directory"
+        - "Check Honua startup logs for errors"
+        - "Verify approvals subdirectory exists"
+
+deployment_policies:
+  development:
+    requiresApproval: false
+    reason: "Fast iteration, low risk"
+    breakingChangesAllowed: true
+
+  staging:
+    requiresApproval: false  # Or true for stricter control
+    minimumRiskLevelForApproval: "High"
+    reason: "Pre-production validation"
+    breakingChangesAllowed: true
+
+  production:
+    requiresApproval: true
+    minimumRiskLevelForApproval: "Medium"
+    reason: "Protect production data and clients"
+    breakingChangesRequireApproval: true
+    autoRollback: true
+
+notes:
+  - "Breaking changes should always be tested in development first"
+  - "Communicate breaking changes to all stakeholders"
+  - "Consider versioning strategy for breaking changes"
+  - "Document migration path for clients"
+  - "Plan for gradual rollout if possible"
+  - "Keep rollback plan ready"
+
+related_scenarios:
+  - "02-modify-layer.yaml - Compare with non-breaking changes"
+  - "Rollback scenario - Reverting breaking changes"
+
+best_practices:
+  planning:
+    - "Test breaking changes thoroughly in development"
+    - "Document all breaking changes clearly"
+    - "Communicate with affected teams/users"
+    - "Plan migration strategy"
+    - "Schedule during maintenance window if possible"
+
+  approval_process:
+    - "Require multiple approvers for critical changes"
+    - "Include technical review in approval"
+    - "Verify testing completion before approval"
+    - "Document approval reason"
+
+  deployment:
+    - "Deploy outside peak hours"
+    - "Monitor closely after deployment"
+    - "Be ready to rollback immediately"
+    - "Have communication plan for issues"
+
+  rollback:
+    - "Test rollback procedure before deployment"
+    - "Keep previous version accessible"
+    - "Document rollback steps clearly"
+    - "Automate rollback if possible"
+
+success_criteria:
+  detection_phase:
+    - "Breaking change correctly identified"
+    - "Risk level assessed as High or Critical"
+    - "Deployment plan includes breaking change details"
+
+  approval_phase:
+    - "Approval request created"
+    - "Deployment enters PendingApproval state"
+    - "Approval file contains correct information"
+    - "Deployment does not proceed without approval"
+
+  deployment_phase:
+    - "After approval, deployment proceeds"
+    - "Changes applied successfully"
+    - "Deployment completes without errors"
+    - "Final state is Completed"
+
+  overall:
+    - "Full workflow functions as expected"
+    - "Approval gate prevents unauthorized breaking changes"
+    - "System handles both approval and rejection correctly"
+    - "Audit trail maintained throughout process"

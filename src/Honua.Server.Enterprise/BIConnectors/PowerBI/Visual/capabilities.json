@@ -1,0 +1,168 @@
+{
+  "dataRoles": [
+    {
+      "displayName": "Latitude",
+      "name": "latitude",
+      "kind": "Measure"
+    },
+    {
+      "displayName": "Longitude",
+      "name": "longitude",
+      "kind": "Measure"
+    },
+    {
+      "displayName": "Category",
+      "name": "category",
+      "kind": "Grouping"
+    },
+    {
+      "displayName": "Size",
+      "name": "size",
+      "kind": "Measure"
+    },
+    {
+      "displayName": "Color",
+      "name": "color",
+      "kind": "Measure"
+    },
+    {
+      "displayName": "Tooltip",
+      "name": "tooltip",
+      "kind": "Measure"
+    },
+    {
+      "displayName": "Time",
+      "name": "time",
+      "kind": "Measure"
+    }
+  ],
+  "dataViewMappings": [
+    {
+      "table": {
+        "rows": {
+          "select": [
+            { "for": { "in": "latitude" } },
+            { "for": { "in": "longitude" } },
+            { "for": { "in": "category" } },
+            { "for": { "in": "size" } },
+            { "for": { "in": "color" } },
+            { "for": { "in": "tooltip" } },
+            { "for": { "in": "time" } }
+          ],
+          "dataReductionAlgorithm": {
+            "top": {
+              "count": 30000
+            }
+          }
+        }
+      }
+    }
+  ],
+  "objects": {
+    "mapSettings": {
+      "displayName": "Map Settings",
+      "properties": {
+        "mapStyle": {
+          "displayName": "Map Style",
+          "type": {
+            "enumeration": [
+              { "value": "dark", "displayName": "Dark" },
+              { "value": "light", "displayName": "Light" },
+              { "value": "muted", "displayName": "Muted" },
+              { "value": "satellite", "displayName": "Satellite" }
+            ]
+          }
+        },
+        "show3D": {
+          "displayName": "3D View",
+          "type": { "bool": true }
+        },
+        "showLegend": {
+          "displayName": "Show Legend",
+          "type": { "bool": true }
+        },
+        "showTooltip": {
+          "displayName": "Show Tooltip",
+          "type": { "bool": true }
+        }
+      }
+    },
+    "layerSettings": {
+      "displayName": "Layer Settings",
+      "properties": {
+        "layerType": {
+          "displayName": "Layer Type",
+          "type": {
+            "enumeration": [
+              { "value": "point", "displayName": "Point" },
+              { "value": "hexagon", "displayName": "Hexagon" },
+              { "value": "arc", "displayName": "Arc" },
+              { "value": "line", "displayName": "Line" },
+              { "value": "geojson", "displayName": "GeoJSON" },
+              { "value": "heatmap", "displayName": "Heatmap" },
+              { "value": "cluster", "displayName": "Cluster" }
+            ]
+          }
+        },
+        "pointRadius": {
+          "displayName": "Point Radius",
+          "type": { "numeric": true }
+        },
+        "opacity": {
+          "displayName": "Opacity",
+          "type": { "numeric": true }
+        },
+        "elevationScale": {
+          "displayName": "Elevation Scale",
+          "type": { "numeric": true }
+        }
+      }
+    },
+    "colorSettings": {
+      "displayName": "Color Settings",
+      "properties": {
+        "colorScale": {
+          "displayName": "Color Scale",
+          "type": {
+            "enumeration": [
+              { "value": "quantize", "displayName": "Quantize" },
+              { "value": "quantile", "displayName": "Quantile" },
+              { "value": "ordinal", "displayName": "Ordinal" }
+            ]
+          }
+        },
+        "colorRange": {
+          "displayName": "Color Range",
+          "type": {
+            "enumeration": [
+              { "value": "global.colorbrewer.YlGnBu.6", "displayName": "Blue-Green" },
+              { "value": "global.colorbrewer.YlOrRd.6", "displayName": "Yellow-Red" },
+              { "value": "global.colorbrewer.Viridis.6", "displayName": "Viridis" },
+              { "value": "global.uber.6", "displayName": "Uber" }
+            ]
+          }
+        }
+      }
+    },
+    "filterSettings": {
+      "displayName": "Filter Settings",
+      "properties": {
+        "enableTimeFilter": {
+          "displayName": "Enable Time Filter",
+          "type": { "bool": true }
+        },
+        "animationSpeed": {
+          "displayName": "Animation Speed",
+          "type": { "numeric": true }
+        }
+      }
+    }
+  },
+  "supportsHighlight": true,
+  "sorting": {
+    "default": {}
+  },
+  "drilldown": {
+    "roles": ["category"]
+  }
+}

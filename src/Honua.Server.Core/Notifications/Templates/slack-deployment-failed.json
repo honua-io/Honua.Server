@@ -1,0 +1,33 @@
+{
+  "text": "Deployment failed for *{{environment}}*",
+  "attachments": [
+    {
+      "color": "#FF0000",
+      "blocks": [
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": ":x: *Deployment Failed*\n*Environment:* {{environment}}\n*Commit:* `{{commit}}`\n*Duration:* {{duration}}"
+          }
+        },
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "*Error:*\n```{{error}}```"
+          }
+        },
+        {
+          "type": "context",
+          "elements": [
+            {
+              "type": "mrkdwn",
+              "text": "Deployment ID: `{{deploymentId}}`"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

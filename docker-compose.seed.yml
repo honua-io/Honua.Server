@@ -1,0 +1,165 @@
+version: "3.9"
+
+# Docker Compose configuration for a complete seeded Honua instance
+# This setup provides a fully functional Honua server with a PostgreSQL/PostGIS
+# database pre-populated with sample GIS data for testing and development.
+#
+# Usage:
+#   docker-compose -f docker-compose.seed.yml up
+#
+# Services:
+#   - postgres: PostGIS-enabled PostgreSQL database
+#   - honua-server: Honua GIS server application
+#   - seed-loader: One-time job that loads sample data into the database
+#
+# The seed-loader service will automatically populate the database with
+# test features, geometries, and metadata after the server is healthy.
+
+services:
+  # PostgreSQL with PostGIS extension
+  # Provides spatial database capabilities with geography/geometry types
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: honua-postgres-seed
+    environment:
+      # Database credentials (override via .env.seed file)
+      POSTGRES_USER: ${POSTGRES_USER:-honua}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-honua_seed_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-honua}
+
+      # Performance tuning for development
+      POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS:-128MB}
+      POSTGRES_EFFECTIVE_CACHE_SIZE: ${POSTGRES_EFFECTIVE_CACHE_SIZE:-512MB}
+      POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-50}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Named volume for persistent data storage
+      - postgres-seed-data:/var/lib/postgresql/data
+    healthcheck:
+      # Verify PostgreSQL is ready to accept connections
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-honua} -d ${POSTGRES_DB:-honua}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - honua-seed-network
+    restart: unless-stopped
+
+  # Honua Server
+  # Main GIS server providing OGC API, WFS, WMS, STAC, and GeoServices REST APIs
+  honua-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: honua-server-seed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # ASP.NET Core configuration
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+
+      # Database connection
+      # Uses PostgreSQL service name for Docker DNS resolution
+      ConnectionStrings__DefaultConnection: "Server=postgres;Port=5432;Database=${POSTGRES_DB:-honua};User Id=${POSTGRES_USER:-honua};Password=${POSTGRES_PASSWORD:-honua_seed_pass};Include Error Detail=true;"
+
+      # Server configuration
+      AppSettings__ServerType: postgres
+
+      # Logging configuration
+      Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
+      Logging__LogLevel__Microsoft.AspNetCore: ${LOG_LEVEL_ASPNETCORE:-Warning}
+      Logging__LogLevel__Honua: ${LOG_LEVEL_HONUA:-Information}
+
+      # Authentication - Development mode for easy testing
+      # WARNING: Do not use QuickStart mode in production!
+      honua__authentication__mode: ${AUTH_MODE:-Local}
+      honua__authentication__quickStart__enabled: ${QUICKSTART_ENABLED:-true}
+      honua__authentication__enforce: ${AUTH_ENFORCE:-false}
+
+      # Optional API key for authenticated requests
+      honua__apiKey: ${HONUA_API_KEY:-}
+
+      # Rate limiting (relaxed for development)
+      RateLimiting__PermitLimit: ${RATE_LIMIT:-1000}
+      RateLimiting__Window: "00:01:00"
+
+      # Observability (optional)
+      observability__metrics__enabled: ${METRICS_ENABLED:-true}
+      observability__tracing__enabled: ${TRACING_ENABLED:-false}
+    ports:
+      - "${HONUA_PORT:-8080}:8080"
+    volumes:
+      # Mount configuration directory (if needed)
+      - ${CONFIG_DIR:-./config}:/app/config:ro
+      # Mount data directory for attachments and cache
+      - honua-seed-data-dir:/app/data
+    healthcheck:
+      # Use ASP.NET Core readiness endpoint
+      # This checks database connectivity and application readiness
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - honua-seed-network
+    restart: unless-stopped
+
+  # Seed Loader
+  # One-time job that populates the database with sample GIS data
+  # This service runs the DataSeeder tool to create test features
+  seed-loader:
+    image: mcr.microsoft.com/dotnet/sdk:9.0
+    container_name: honua-seed-loader
+    working_dir: /app
+    depends_on:
+      honua-server:
+        condition: service_healthy
+    environment:
+      # Connection string for the seeder tool
+      POSTGRES_CONNECTION: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-honua};Username=${POSTGRES_USER:-honua};Password=${POSTGRES_PASSWORD:-honua_seed_pass};Include Error Detail=true;"
+    volumes:
+      # Mount the entire repository for access to the DataSeeder tool
+      - .:/app:ro
+    command: >
+      sh -c "
+        echo 'Waiting for Honua server to be fully ready...' &&
+        sleep 10 &&
+        echo 'Starting database seeding...' &&
+        cd /app &&
+        dotnet run --project tools/DataSeeder/DataSeeder.csproj --
+          --provider postgres
+          --postgres-connection \"Host=postgres;Port=5432;Database=${POSTGRES_DB:-honua};Username=${POSTGRES_USER:-honua};Password=${POSTGRES_PASSWORD:-honua_seed_pass}\" &&
+        echo 'Database seeding completed successfully!' &&
+        echo 'You can now access the Honua server at http://localhost:${HONUA_PORT:-8080}' &&
+        echo 'Sample endpoints:' &&
+        echo '  - OGC API Landing Page: http://localhost:${HONUA_PORT:-8080}/' &&
+        echo '  - Health Check: http://localhost:${HONUA_PORT:-8080}/health' &&
+        echo '  - WFS GetCapabilities: http://localhost:${HONUA_PORT:-8080}/wfs?service=WFS&request=GetCapabilities' &&
+        echo '  - STAC Catalog: http://localhost:${HONUA_PORT:-8080}/stac'
+      "
+    networks:
+      - honua-seed-network
+    restart: "no"  # Run once and exit
+
+# Named volumes for data persistence
+volumes:
+  # PostgreSQL data directory
+  postgres-seed-data:
+    driver: local
+    name: honua-postgres-seed-data
+
+  # Honua application data directory
+  honua-seed-data-dir:
+    driver: local
+    name: honua-seed-data-dir
+
+# Isolated network for all services
+networks:
+  honua-seed-network:
+    driver: bridge
+    name: honua-seed-network

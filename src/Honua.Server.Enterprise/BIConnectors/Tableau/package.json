@@ -1,0 +1,20 @@
+{
+  "name": "honua-tableau-connector",
+  "version": "1.0.0",
+  "description": "Tableau Web Data Connector for Honua Geospatial Server",
+  "main": "connector.html",
+  "scripts": {
+    "serve": "python -m http.server 8000",
+    "serve-node": "npx http-server -p 8000 -c-1"
+  },
+  "keywords": [
+    "tableau",
+    "wdc",
+    "geospatial",
+    "ogc",
+    "stac",
+    "honua"
+  ],
+  "author": "HonuaIO",
+  "license": "MIT"
+}

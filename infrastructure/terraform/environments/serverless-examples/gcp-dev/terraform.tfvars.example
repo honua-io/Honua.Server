@@ -1,0 +1,6 @@
+# GCP Development Environment Variables
+# Copy to terraform.tfvars and customize
+
+project_id      = "my-gcp-project-dev"
+region          = "us-central1"
+container_image = "gcr.io/my-gcp-project-dev/honua:dev"

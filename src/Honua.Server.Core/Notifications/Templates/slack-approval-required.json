@@ -1,0 +1,37 @@
+{
+  "text": "Approval required for deployment to *{{environment}}*",
+  "attachments": [
+    {
+      "color": "#FFA500",
+      "blocks": [
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": ":warning: *Approval Required*\n*Environment:* {{environment}}\n*Commit:* `{{commit}}`\n*Risk Level:* {{riskLevel}}"
+          }
+        },
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "*Changes:*\n:heavy_plus_sign: {{addedCount}} added\n:pencil2: {{modifiedCount}} modified\n:heavy_minus_sign: {{removedCount}} removed\n:floppy_disk: {{migrationCount}} migration(s)"
+          }
+        },
+        {
+          "type": "context",
+          "elements": [
+            {
+              "type": "mrkdwn",
+              "text": "Deployment ID: `{{deploymentId}}`"
+            },
+            {
+              "type": "mrkdwn",
+              "text": "Initiated by: {{initiatedBy}}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

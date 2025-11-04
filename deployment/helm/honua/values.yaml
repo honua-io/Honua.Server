@@ -1,0 +1,428 @@
+# Default values for Honua Build Orchestration Platform
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global settings
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: "standard"
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/part-of: honua-platform
+
+# Name overrides
+nameOverride: ""
+fullnameOverride: ""
+
+# Image configuration
+image:
+  registry: docker.io
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# API Server (Honua.Server.Host)
+api:
+  enabled: true
+  name: api
+
+  image:
+    repository: honua/server-host
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 3
+
+  service:
+    type: ClusterIP
+    port: 8080
+    metricsPort: 8081
+    annotations: {}
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    path: /health/ready
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  startupProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 12
+
+  podAnnotations: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Intake Service (Honua.Server.Intake)
+intake:
+  enabled: true
+  name: intake
+
+  image:
+    repository: honua/server-intake
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  service:
+    type: ClusterIP
+    port: 8080
+    metricsPort: 8081
+    annotations: {}
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  livenessProbe:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    path: /health/ready
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  podAnnotations: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Build Orchestrator
+orchestrator:
+  enabled: true
+  name: orchestrator
+
+  image:
+    repository: honua/build-orchestrator
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 85
+
+  podAnnotations: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# PostgreSQL Configuration
+postgresql:
+  enabled: true
+  auth:
+    username: honua
+    password: "CHANGEME_DATABASE_PASSWORD"
+    database: honua
+
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: ""
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+    initdb:
+      scripts:
+        init.sql: |
+          CREATE EXTENSION IF NOT EXISTS postgis;
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+          CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+  image:
+    registry: docker.io
+    repository: postgis/postgis
+    tag: "16-3.4-alpine"
+
+# Redis Configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "CHANGEME_REDIS_PASSWORD"
+
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+  replica:
+    replicaCount: 0
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+
+  hosts:
+    - host: api.honua.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api
+    - host: intake.honua.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: intake
+
+  tls:
+    - secretName: honua-tls-cert
+      hosts:
+        - api.honua.example.com
+        - intake.honua.example.com
+
+# Persistent Volume Claims
+persistence:
+  logs:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteMany
+
+  buildWorkspace:
+    enabled: true
+    size: 100Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteMany
+
+  buildCache:
+    enabled: true
+    size: 50Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteMany
+
+# Configuration
+config:
+  # Server configuration
+  aspnetcore:
+    environment: Production
+    urls: "http://+:8080"
+
+  # Honua configuration
+  honua:
+    pagination:
+      defaultLimit: 10
+      maxLimit: 1000
+
+    apiVersioning:
+      defaultVersion: "1.0"
+      assumeDefaultVersionWhenUnspecified: true
+      reportApiVersions: true
+      versioningMethod: "UrlSegment"
+
+    authentication:
+      mode: "Local"
+      enforce: true
+      quickStart:
+        enabled: false
+
+    odata:
+      enabled: true
+      allowWrites: false
+      defaultPageSize: 100
+      maxPageSize: 1000
+
+  # Observability
+  observability:
+    logging:
+      jsonConsole: true
+      includeScopes: true
+    metrics:
+      enabled: true
+      endpoint: "/metrics"
+      usePrometheus: true
+
+  # Resilience
+  resilience:
+    hedging:
+      enabled: true
+      maxHedgedAttempts: 2
+      delayMilliseconds: 50
+      timeoutSeconds: 5
+
+# Secrets (should be overridden in production)
+secrets:
+  # Database connection string
+  connectionStrings:
+    defaultConnection: "Host=honua-postgresql;Port=5432;Database=honua;Username=honua;Password=CHANGEME_DATABASE_PASSWORD"
+    redis: "honua-redis-master:6379,password=CHANGEME_REDIS_PASSWORD,abortConnect=false"
+
+  # JWT secret key
+  authentication:
+    jwtSecret: "CHANGEME_GENERATE_SECURE_JWT_SECRET_KEY_HERE_MINIMUM_32_CHARS"
+
+# Network Policies
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Prometheus monitoring
+prometheus:
+  enabled: false
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+
+# Grafana dashboards
+grafana:
+  enabled: false
+  adminPassword: "admin"
+  dashboards:
+    enabled: true
+
+# Cloud provider specific settings
+cloudProvider:
+  type: "generic"  # Options: aws, azure, gcp, generic
+
+  aws:
+    region: "us-west-2"
+    loadBalancer:
+      type: "nlb"
+    storage:
+      class: "gp3"
+
+  azure:
+    region: "westus2"
+    loadBalancer:
+      type: "internal"
+    storage:
+      class: "managed-premium"
+
+  gcp:
+    region: "us-central1"
+    loadBalancer:
+      type: "internal"
+    storage:
+      class: "pd-ssd"

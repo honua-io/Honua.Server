@@ -1,0 +1,88 @@
+# Copyright (c) 2025 HonuaIO
+# Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+
+# Lightweight serverless Dockerfile for Honua.Server.Host.Lite
+# Optimized for fast cold starts (<2s) and small size (<60MB)
+# No GDAL, No SkiaSharp, No Cloud SDKs - Vector geometry only
+# Perfect for: Cloud Run, AWS Lambda, Azure Container Apps
+
+# syntax=docker/dockerfile:1
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+WORKDIR /source
+
+# Copy NuGet config and project files for dependency caching
+COPY NuGet.Config* ./
+COPY src/Honua.Server.Core/Honua.Server.Core.csproj src/Honua.Server.Core/
+COPY src/Honua.Server.Core.OData/Honua.Server.Core.OData.csproj src/Honua.Server.Core.OData/
+COPY src/Honua.Server.Enterprise/Honua.Server.Enterprise.csproj src/Honua.Server.Enterprise/
+COPY src/Honua.Server.Observability/Honua.Server.Observability.csproj src/Honua.Server.Observability/
+COPY src/Honua.Server.Host.Lite/Honua.Server.Host.Lite.csproj src/Honua.Server.Host.Lite/
+
+# Restore dependencies
+RUN dotnet restore src/Honua.Server.Host.Lite/Honua.Server.Host.Lite.csproj
+
+# Copy all source code
+COPY . ./
+
+# Build and publish with ReadyToRun for fast startup
+RUN dotnet publish src/Honua.Server.Host.Lite/Honua.Server.Host.Lite.csproj \
+    --configuration Release \
+    --no-restore \
+    --output /app/publish \
+    /p:UseAppHost=false \
+    /p:PublishReadyToRun=true \
+    /p:PublishReadyToRunShowWarnings=true \
+    /p:PublishTrimmed=true \
+    /p:TrimMode=partial \
+    /p:InvariantGlobalization=false
+
+# Runtime stage - Alpine slim for minimal size
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
+WORKDIR /app
+
+# Install only essential runtime dependencies
+RUN apk add --no-cache \
+    icu-libs \
+    tzdata \
+    curl \
+    ca-certificates \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup -g 1000 honua && \
+    adduser -D -u 1000 -G honua honua
+
+# Copy published app
+COPY --from=build --chown=honua:honua /app/publish ./
+
+# Configure ASP.NET Core and optimize for cold start performance
+ENV ASPNETCORE_URLS=http://+:8080 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    DOTNET_USE_POLLING_FILE_WATCHER=true \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    # ReadyToRun compilation for faster startup
+    DOTNET_ReadyToRun=1 \
+    # Tiered PGO for improved JIT performance
+    DOTNET_TieredPGO=1 \
+    DOTNET_TC_QuickJitForLoops=1 \
+    DOTNET_TieredCompilation_QuickJit=1 \
+    # Workstation GC for faster startup (lower throughput but faster init)
+    DOTNET_gcServer=0 \
+    # Limit GC heap count for predictable memory usage
+    DOTNET_GCHeapCount=2 \
+    # Reduce thread pool startup time
+    DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=0
+
+EXPOSE 8080
+
+# Health check using ASP.NET Core health endpoint
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/healthz/live || exit 1
+
+# Switch to non-root user
+USER honua
+
+# Use exec form for proper signal handling
+ENTRYPOINT ["dotnet", "Honua.Server.Host.Lite.dll"]

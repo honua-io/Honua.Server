@@ -1,0 +1,344 @@
+# ============================================================================
+# Honua Azure Infrastructure Configuration Examples
+# ============================================================================
+# Copy this file to terraform.tfvars and customize for your environment
+#
+# cp terraform.tfvars.example terraform.tfvars
+#
+# IMPORTANT: Never commit terraform.tfvars to version control!
+# Add to .gitignore and use environment variables for sensitive values.
+# ============================================================================
+
+# Environment: dev, staging, or prod
+# This drives conditional resource configuration throughout the infrastructure
+environment = "dev"
+
+# Primary Azure region for all resources
+location = "eastus"
+
+# Administrator email for alerts and notifications
+admin_email = "admin@example.com"
+
+# PostgreSQL Configuration
+postgres_admin_username = "honuaadmin"
+# IMPORTANT: Use environment variables for sensitive values
+# export TF_VAR_postgres_admin_password="YourSecurePassword123!"
+postgres_admin_password = "ChangeMe123!SecurePassword"  # Change this or use env var!
+
+# ============================================================================
+# Environment-Specific Configuration Guide
+# ============================================================================
+
+# -----------------------------------------------------------------------------
+# PRODUCTION CONFIGURATION
+# -----------------------------------------------------------------------------
+# Recommended settings for production workloads:
+#
+# environment = "prod"
+# location = "eastus"
+# admin_email = "ops-team@honua.io"
+#
+# Infrastructure Behavior:
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ KEY VAULT (Production)                                                   │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ • Soft Delete: 90 days (maximum protection)                             │
+# │ • Purge Protection: ENABLED (irreversible - prevents permanent delete)  │
+# │ • Network Access: Restricted to VNets (manual configuration required)   │
+# │ • RBAC: Enabled                                                          │
+# │ • Cost: $0 (first 10,000 operations free)                               │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ POSTGRESQL (Production)                                                  │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ • SKU: GP_Standard_D2s_v3 (2 vCores, 8GB RAM)                           │
+# │ • Storage: 128 GB                                                        │
+# │ • Backup Retention: 35 days                                              │
+# │ • Geo-Redundant Backup: ENABLED                                          │
+# │ • High Availability: ZoneRedundant (zone 1 + zone 2)                    │
+# │ • Maintenance Window: Sunday 3:00 AM UTC                                 │
+# │ • Cost: ~$220/month                                                      │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ BACKUP STORAGE (Production)                                              │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ • Replication: GRS (Geo-redundant storage)                              │
+# │ • Soft Delete: 30 days retention                                         │
+# │ • Versioning: Enabled                                                    │
+# │ • Lifecycle: Hot (0-30d) → Cool (30-90d) → Archive (90d-7y)            │
+# │ • Cost: ~$50/month                                                       │
+# └─────────────────────────────────────────────────────────────────────────┘
+
+# -----------------------------------------------------------------------------
+# STAGING CONFIGURATION
+# -----------------------------------------------------------------------------
+# Recommended settings for staging environment:
+#
+# environment = "staging"
+# location = "eastus"
+# admin_email = "dev-team@honua.io"
+#
+# Infrastructure Behavior:
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ KEY VAULT (Staging)                                                      │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ • Soft Delete: 7 days (minimum)                                          │
+# │ • Purge Protection: DISABLED (allows cleanup and rapid iteration)       │
+# │ • Network Access: Allow all (easier testing)                            │
+# │ • RBAC: Enabled                                                          │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ POSTGRESQL (Staging)                                                     │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ • SKU: B_Standard_B1ms (1 vCore, 2GB RAM)                               │
+# │ • Storage: 32 GB                                                         │
+# │ • Backup Retention: 14 days                                              │
+# │ • Geo-Redundant Backup: DISABLED                                         │
+# │ • High Availability: DISABLED                                            │
+# │ • Cost: ~$14/month                                                       │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ BACKUP STORAGE (Staging)                                                 │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ • Replication: LRS (Locally redundant)                                  │
+# │ • Soft Delete: 7 days retention                                          │
+# │ • Versioning: Enabled                                                    │
+# │ • Cost: ~$20/month                                                       │
+# └─────────────────────────────────────────────────────────────────────────┘
+
+# -----------------------------------------------------------------------------
+# DEVELOPMENT CONFIGURATION
+# -----------------------------------------------------------------------------
+# Recommended settings for development environment:
+#
+# environment = "dev"
+# location = "eastus"
+# admin_email = "developer@honua.io"
+#
+# Infrastructure Behavior:
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ KEY VAULT (Development)                                                  │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ • Soft Delete: 7 days (minimum)                                          │
+# │ • Purge Protection: DISABLED (allows rapid cleanup)                     │
+# │ • Network Access: Allow all                                             │
+# │ • RBAC: Enabled                                                          │
+# │ • Best for: Testing, experimentation, quick iterations                  │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ POSTGRESQL (Development)                                                 │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │ • SKU: B_Standard_B1ms (1 vCore, 2GB RAM)                               │
+# │ • Storage: 32 GB                                                         │
+# │ • Backup Retention: 7 days (minimum)                                     │
+# │ • Geo-Redundant Backup: DISABLED                                         │
+# │ • High Availability: DISABLED                                            │
+# │ • Cost: ~$14/month                                                       │
+# └─────────────────────────────────────────────────────────────────────────┘
+
+# ============================================================================
+# Cost Comparison by Environment
+# ============================================================================
+#
+# PRODUCTION (~$650/month):
+# ├── Azure OpenAI: $300
+# ├── AI Search (Basic): $75
+# ├── PostgreSQL (GP_Standard_D2s_v3 + HA + GRS): $220
+# ├── Application Insights: $5
+# ├── Backup Storage (GRS): $50
+# ├── Key Vault: $0 (first 10k ops free)
+# └── Function App: $0 (consumption)
+#
+# STAGING (~$120/month):
+# ├── Azure OpenAI: $50
+# ├── AI Search (Basic): $75
+# ├── PostgreSQL (B_Standard_B1ms): $14
+# ├── Application Insights: $5
+# ├── Backup Storage (LRS): $20
+# ├── Key Vault: $0
+# └── Function App: $0
+#
+# DEVELOPMENT (~$90/month):
+# ├── Azure OpenAI: $20
+# ├── AI Search (Basic): $75
+# ├── PostgreSQL (B_Standard_B1ms): $14
+# ├── Application Insights: $5
+# ├── Backup Storage (LRS): $10
+# ├── Key Vault: $0
+# └── Function App: $0
+
+# ============================================================================
+# Key Vault Purge Protection - IMPORTANT WARNINGS
+# ============================================================================
+#
+# ⚠️  CRITICAL: Purge Protection is IRREVERSIBLE
+#
+# Once enabled on a Key Vault (in production), purge protection CANNOT be
+# disabled. This is by design to prevent accidental or malicious deletion of
+# critical secrets. Understand the implications:
+#
+# When Purge Protection is ENABLED (Production):
+# ┌────────────────────────────────────────────────────────────────────────┐
+# │ 1. Delete Key Vault → Enters soft-deleted state (90 days)             │
+# │ 2. During soft delete period:                                          │
+# │    ✓ Can recover Key Vault                                            │
+# │    ✗ CANNOT purge (permanent delete)                                  │
+# │    ✗ CANNOT reuse the same name for new Key Vault                     │
+# │    ⚠️  Still billed for the Key Vault                                 │
+# │ 3. After 90 days → Automatic permanent deletion                       │
+# └────────────────────────────────────────────────────────────────────────┘
+#
+# When Purge Protection is DISABLED (Dev/Staging):
+# ┌────────────────────────────────────────────────────────────────────────┐
+# │ 1. Delete Key Vault → Enters soft-deleted state (7 days)              │
+# │ 2. During soft delete period:                                          │
+# │    ✓ Can recover Key Vault                                            │
+# │    ✓ Can purge (immediate permanent delete)                           │
+# │    ✓ Can reuse the name immediately after purge                       │
+# │    ⚠️  Still billed until purged                                      │
+# │ 3. After 7 days → Automatic permanent deletion                        │
+# └────────────────────────────────────────────────────────────────────────┘
+#
+# Production Deployment Checklist:
+# □ Test all configurations in dev/staging first
+# □ Ensure Key Vault naming convention is finalized
+# □ Document Key Vault name for team reference
+# □ Understand 90-day soft delete retention period
+# □ Budget for resources during soft delete period
+# □ Set up monitoring alerts for Key Vault access
+# □ Configure backup procedures for secrets
+# □ Test recovery procedures before going live
+#
+# See documentation: docs/deployment/AZURE_KEY_VAULT_RECOVERY.md
+
+# ============================================================================
+# Security Best Practices
+# ============================================================================
+#
+# 1. NEVER commit terraform.tfvars to version control
+#    □ Add terraform.tfvars to .gitignore
+#    □ Add *.tfvars to .gitignore (except *.tfvars.example)
+#    □ Use environment variables for sensitive values
+#
+# 2. Use environment variables for secrets:
+#    export TF_VAR_postgres_admin_password="SecurePassword123!"
+#    terraform plan  # Will use environment variable
+#
+# 3. Store secrets in Azure Key Vault after provisioning:
+#    □ Terraform automatically stores secrets in Key Vault
+#    □ Applications reference via @Microsoft.KeyVault(SecretUri=...)
+#    □ Regular secret rotation (database passwords: every 90 days)
+#
+# 4. Enable Azure AD authentication for PostgreSQL (recommended):
+#    □ Reduces reliance on passwords
+#    □ Integrates with existing identity management
+#    □ Audit trail via Azure AD logs
+#
+# 5. Restrict network access in production:
+#    □ Key Vault: Configure VNet service endpoints
+#    □ PostgreSQL: Firewall rules for known IPs only
+#    □ Storage: Private endpoints recommended
+#    □ Use Azure Bastion for admin access
+
+# ============================================================================
+# Terraform Commands
+# ============================================================================
+#
+# Initialize Terraform (first time):
+#   terraform init
+#
+# Validate configuration:
+#   terraform validate
+#   terraform fmt -check
+#
+# Preview changes:
+#   terraform plan -var-file="terraform.tfvars"
+#   terraform plan -out=tfplan
+#
+# Apply configuration:
+#   terraform apply -var-file="terraform.tfvars"
+#   terraform apply tfplan
+#
+# Destroy infrastructure:
+#   terraform destroy -var-file="terraform.tfvars"
+#
+# Target specific resource:
+#   terraform apply -target=azurerm_key_vault.main
+#   terraform destroy -target=azurerm_postgresql_flexible_server.main
+#
+# View outputs:
+#   terraform output
+#   terraform output -json
+#   terraform output key_vault_uri
+#
+# Import existing resource:
+#   terraform import azurerm_key_vault.main /subscriptions/{sub-id}/resourceGroups/{rg}/providers/Microsoft.KeyVault/vaults/{name}
+
+# ============================================================================
+# Backup and Disaster Recovery
+# ============================================================================
+#
+# Automated backups are configured for all environments:
+#
+# Production:
+# □ Database: 35-day retention, geo-redundant, PITR enabled
+# □ Secrets: Daily backup to geo-redundant storage
+# □ Configs: Version controlled in Git
+# □ Recovery procedures: Documented in docs/deployment/
+#
+# Monthly DR Test Checklist:
+# □ Verify automated backups are running
+# □ Test database restore from backup
+# □ Test Key Vault secret recovery
+# □ Verify geo-redundant replication
+# □ Update recovery documentation
+# □ Train team on recovery procedures
+#
+# See documentation:
+# - docs/deployment/AZURE_BACKUP_POLICY.md
+# - docs/deployment/AZURE_KEY_VAULT_RECOVERY.md
+# - docs/rag/04-operations/backup-disaster-recovery.md
+
+# ============================================================================
+# Monitoring and Alerts
+# ============================================================================
+#
+# All critical resources have monitoring enabled:
+# □ Key Vault availability and access failures
+# □ Database storage usage and backup failures
+# □ Backup storage capacity warnings
+# □ Application Insights for telemetry
+#
+# Alert channels:
+# - Email: Configured via admin_email variable
+# - SMS: Configure in Azure Monitor Action Groups
+# - Webhook: Configure for Slack/Teams integration
+# - PagerDuty: Configure for on-call rotation
+#
+# Review metrics:
+# □ Weekly: Check alert trends and false positives
+# □ Monthly: Review capacity planning and growth
+# □ Quarterly: Update alert thresholds based on baseline
+
+# ============================================================================
+# Compliance and Governance
+# ============================================================================
+#
+# Production Configuration Meets:
+# ✓ GDPR: 30-day minimum backup retention (35 days configured)
+# ✓ SOC 2: Backup verification (automated daily)
+# ✓ HIPAA: Encryption at rest and in transit (enabled)
+# ✓ PCI DSS: Access control and auditing (RBAC enabled)
+#
+# Tagging Strategy:
+# All resources tagged with:
+# - Environment (dev/staging/prod)
+# - Project (HonuaIO)
+# - ManagedBy (Terraform)
+# - CostCenter (for billing)
+# - Additional tags per resource type

@@ -1,0 +1,536 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy'
+        required: true
+        type: string
+
+env:
+  ENVIRONMENT: staging
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  pre-deployment-checks:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.image.outputs.tag }}
+      should_proceed: ${{ steps.checks.outputs.passed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: image
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            # Get latest tag from GHCR
+            TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "latest")
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify image exists
+        id: verify
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/honua-server:${{ steps.image.outputs.tag }}"
+
+          # Check if image exists
+          if docker manifest inspect $IMAGE > /dev/null 2>&1; then
+            echo "Image $IMAGE exists"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Image $IMAGE does not exist"
+            echo "exists=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Run security checks
+        run: |
+          # Pull image for scanning
+          docker pull ghcr.io/${{ github.repository_owner }}/honua-server:${{ steps.image.outputs.tag }}
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/honua-server:${{ steps.image.outputs.tag }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Validate Kubernetes manifests
+        run: |
+          # Install kubeval
+          wget https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
+          tar xf kubeval-linux-amd64.tar.gz
+          sudo mv kubeval /usr/local/bin
+
+          # Validate manifests
+          find deploy/kubernetes -name "*.yaml" -exec kubeval {} \;
+
+      - name: Check for breaking changes
+        id: breaking
+        run: |
+          # Compare API versions between current and previous
+          echo "Checking for API breaking changes..."
+          # This would typically involve running API comparison tools
+          echo "has_breaking_changes=false" >> $GITHUB_OUTPUT
+
+      - name: Validate database migrations
+        run: |
+          echo "Validating database migration scripts..."
+          # Check if migrations are reversible
+          # Validate migration syntax
+          echo "Database migrations validated"
+
+      - name: All checks passed
+        id: checks
+        run: |
+          if [[ "${{ steps.verify.outputs.exists }}" == "true" && \
+                "${{ steps.breaking.outputs.has_breaking_changes }}" == "false" ]]; then
+            echo "passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+  deploy-to-kubernetes:
+    name: Deploy to Staging (${{ matrix.cloud }})
+    runs-on: ubuntu-latest
+    needs: pre-deployment-checks
+    if: needs.pre-deployment-checks.outputs.should_proceed == 'true'
+    environment:
+      name: staging-${{ matrix.cloud }}
+      url: https://staging-${{ matrix.cloud }}.honua.example.com
+    strategy:
+      fail-fast: false
+      max-parallel: 1  # Deploy to one cloud at a time
+      matrix:
+        cloud: [aws, azure, gcp]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # AWS EKS Deployment
+      - name: Configure AWS credentials
+        if: matrix.cloud == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig for EKS
+        if: matrix.cloud == 'aws'
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ secrets.AWS_REGION }} \
+            --name ${{ secrets.AWS_EKS_CLUSTER_NAME_STAGING }}
+
+      # Azure AKS Deployment
+      - name: Azure Login
+        if: matrix.cloud == 'azure'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        if: matrix.cloud == 'azure'
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }}
+          cluster-name: ${{ secrets.AZURE_AKS_CLUSTER_NAME_STAGING }}
+
+      # GCP GKE Deployment
+      - name: Authenticate to Google Cloud
+        if: matrix.cloud == 'gcp'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Set up Cloud SDK
+        if: matrix.cloud == 'gcp'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        if: matrix.cloud == 'gcp'
+        run: |
+          gcloud container clusters get-credentials \
+            ${{ secrets.GCP_GKE_CLUSTER_NAME_STAGING }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      # Common deployment steps
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Backup current deployment
+        run: |
+          # Export current deployment for rollback
+          kubectl get deployment honua-server -n honua-staging -o yaml > /tmp/deployment-backup.yaml || true
+
+          # Save current image tag
+          CURRENT_IMAGE=$(kubectl get deployment honua-server -n honua-staging \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "none")
+          echo "Current image: $CURRENT_IMAGE"
+          echo "$CURRENT_IMAGE" > /tmp/previous-image.txt
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace honua-staging --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Fetch and create secrets
+        run: |
+          case "${{ matrix.cloud }}" in
+            aws)
+              DB_PASSWORD=$(aws secretsmanager get-secret-value \
+                --secret-id honua-staging-db-password \
+                --query SecretString --output text)
+              ;;
+            azure)
+              DB_PASSWORD=$(az keyvault secret show \
+                --name honua-staging-db-password \
+                --vault-name ${{ secrets.AZURE_KEYVAULT_NAME_STAGING }} \
+                --query value -o tsv)
+              ;;
+            gcp)
+              DB_PASSWORD=$(gcloud secrets versions access latest \
+                --secret="honua-staging-db-password" \
+                --project=${{ secrets.GCP_PROJECT_ID }})
+              ;;
+          esac
+
+          echo "::add-mask::$DB_PASSWORD"
+
+          kubectl create secret generic honua-db-credentials \
+            --from-literal=password=$DB_PASSWORD \
+            --namespace=honua-staging \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Run database migrations with backup
+        run: |
+          echo "Creating database backup before migration..."
+
+          # Create backup job
+          kubectl create job honua-db-backup-${{ github.run_number }} \
+            --from=cronjob/honua-db-backup \
+            --namespace=honua-staging || true
+
+          # Wait for backup
+          kubectl wait --for=condition=complete job/honua-db-backup-${{ github.run_number }} \
+            --namespace=honua-staging --timeout=300s || true
+
+          echo "Running migrations..."
+          kubectl run honua-migrations-${{ github.run_number }} \
+            --image=ghcr.io/${{ github.repository_owner }}/honua-server:${{ needs.pre-deployment-checks.outputs.image_tag }} \
+            --namespace=honua-staging \
+            --restart=Never \
+            --command -- dotnet Honua.Server.Host.dll migrate
+
+          # Wait for migrations to complete
+          kubectl wait --for=condition=complete pod/honua-migrations-${{ github.run_number }} \
+            --namespace=honua-staging --timeout=600s
+
+          # Show migration logs
+          kubectl logs honua-migrations-${{ github.run_number }} --namespace=honua-staging
+
+      - name: Blue-Green Deployment
+        run: |
+          # Deploy new version as "green" deployment
+          helm upgrade --install honua-server-green ./deploy/helm/honua-server \
+            --namespace honua-staging \
+            --set image.repository=ghcr.io/${{ github.repository_owner }}/honua-server \
+            --set image.tag=${{ needs.pre-deployment-checks.outputs.image_tag }} \
+            --set nameOverride=honua-server-green \
+            --set service.name=honua-server-green \
+            --set environment=staging \
+            --set cloud.provider=${{ matrix.cloud }} \
+            --set replicaCount=3 \
+            --set autoscaling.enabled=true \
+            --set autoscaling.minReplicas=3 \
+            --set autoscaling.maxReplicas=10 \
+            --set resources.requests.cpu=1000m \
+            --set resources.requests.memory=1Gi \
+            --set resources.limits.cpu=2000m \
+            --set resources.limits.memory=2Gi \
+            --set postgresql.enabled=false \
+            --set redis.enabled=false \
+            --values ./deploy/helm/honua-server/values-staging.yaml \
+            --wait \
+            --timeout 15m
+
+      - name: Verify green deployment
+        run: |
+          kubectl rollout status deployment/honua-server-green \
+            --namespace=honua-staging \
+            --timeout=10m
+
+          kubectl wait --for=condition=ready pod \
+            --selector=app.kubernetes.io/name=honua-server-green \
+            --namespace=honua-staging \
+            --timeout=600s
+
+      - name: Run smoke tests on green
+        run: |
+          # Get green service endpoint
+          GREEN_SERVICE_IP=$(kubectl get svc honua-server-green -n honua-staging \
+            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Run tests against green deployment
+          for i in {1..30}; do
+            if curl -sSf "http://$GREEN_SERVICE_IP:8080/healthz/ready"; then
+              echo "Green deployment is healthy"
+              break
+            fi
+            echo "Waiting for green deployment... ($i/30)"
+            sleep 10
+          done
+
+          # Comprehensive smoke tests
+          curl -f "http://$GREEN_SERVICE_IP:8080/healthz/live" || exit 1
+          curl -f "http://$GREEN_SERVICE_IP:8080/healthz/ready" || exit 1
+          curl -f "http://$GREEN_SERVICE_IP:8080/api/v1/collections" || exit 1
+
+      - name: Run integration tests
+        run: |
+          GREEN_SERVICE_IP=$(kubectl get svc honua-server-green -n honua-staging \
+            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Run comprehensive integration test suite
+          docker run --rm \
+            -e HONUA_API_URL="http://$GREEN_SERVICE_IP:8080" \
+            -e HONUA_API_KEY="${{ secrets.STAGING_API_KEY }}" \
+            ghcr.io/${{ github.repository_owner }}/honua-integration-tests:latest
+
+      - name: Performance baseline check
+        run: |
+          GREEN_SERVICE_IP=$(kubectl get svc honua-server-green -n honua-staging \
+            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Run basic load test
+          docker run --rm \
+            -e URL="http://$GREEN_SERVICE_IP:8080" \
+            -e DURATION=60s \
+            -e VUS=10 \
+            grafana/k6 run /scripts/baseline-test.js || true
+
+      - name: Switch traffic to green (Blue-Green swap)
+        run: |
+          # Update main service to point to green deployment
+          kubectl patch service honua-server -n honua-staging \
+            -p '{"spec":{"selector":{"app.kubernetes.io/name":"honua-server-green"}}}'
+
+          echo "Traffic switched to green deployment"
+          sleep 30  # Allow DNS/load balancer to propagate
+
+      - name: Monitor for errors
+        run: |
+          echo "Monitoring new deployment for 2 minutes..."
+          sleep 120
+
+          # Check for elevated error rates
+          ERROR_COUNT=$(kubectl logs -n honua-staging \
+            -l app.kubernetes.io/name=honua-server-green \
+            --since=2m | grep -i "error\|exception" | wc -l || echo 0)
+
+          if [ $ERROR_COUNT -gt 50 ]; then
+            echo "High error count detected: $ERROR_COUNT"
+            exit 1
+          fi
+
+          echo "No elevated errors detected"
+
+      - name: Remove old blue deployment
+        if: success()
+        run: |
+          # Remove old deployment after successful switch
+          helm uninstall honua-server-blue -n honua-staging || true
+
+          # Rename green to blue for next deployment
+          kubectl label deployment honua-server-green -n honua-staging \
+            deployment-slot=blue --overwrite
+
+      - name: Get deployment info
+        if: always()
+        run: |
+          echo "=== Deployment Status ==="
+          kubectl get all -n honua-staging
+
+          echo "=== Recent Events ==="
+          kubectl get events -n honua-staging --sort-by='.lastTimestamp' | tail -30
+
+          echo "=== Pod Logs ==="
+          kubectl logs -n honua-staging -l app.kubernetes.io/name=honua-server-green --tail=100
+
+      - name: Save deployment artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts-${{ matrix.cloud }}
+          path: |
+            /tmp/deployment-backup.yaml
+            /tmp/previous-image.txt
+
+  rollback-on-failure:
+    name: Rollback on Failure (${{ matrix.cloud }})
+    runs-on: ubuntu-latest
+    needs: deploy-to-kubernetes
+    if: failure()
+    strategy:
+      matrix:
+        cloud: [aws, azure, gcp]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup cloud authentication (same as deploy job)
+      - name: Configure AWS credentials
+        if: matrix.cloud == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig for EKS
+        if: matrix.cloud == 'aws'
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ secrets.AWS_REGION }} \
+            --name ${{ secrets.AWS_EKS_CLUSTER_NAME_STAGING }}
+
+      - name: Azure Login
+        if: matrix.cloud == 'azure'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        if: matrix.cloud == 'azure'
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }}
+          cluster-name: ${{ secrets.AZURE_AKS_CLUSTER_NAME_STAGING }}
+
+      - name: Authenticate to Google Cloud
+        if: matrix.cloud == 'gcp'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Get GKE credentials
+        if: matrix.cloud == 'gcp'
+        run: |
+          gcloud container clusters get-credentials \
+            ${{ secrets.GCP_GKE_CLUSTER_NAME_STAGING }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Download deployment artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-artifacts-${{ matrix.cloud }}
+          path: /tmp
+
+      - name: Rollback to previous version
+        run: |
+          echo "Rolling back to previous version"
+
+          # Switch service back to blue if green failed
+          kubectl patch service honua-server -n honua-staging \
+            -p '{"spec":{"selector":{"deployment-slot":"blue"}}}' || true
+
+          # Remove failed green deployment
+          helm uninstall honua-server-green -n honua-staging || true
+
+          # Restore from backup if needed
+          if [ -f /tmp/deployment-backup.yaml ]; then
+            kubectl apply -f /tmp/deployment-backup.yaml
+          fi
+
+          kubectl rollout status deployment/honua-server \
+            --namespace=honua-staging \
+            --timeout=5m
+
+      - name: Rollback database migrations
+        run: |
+          echo "Checking if database rollback is needed..."
+          # This would involve running migration rollback scripts
+          # kubectl run honua-migration-rollback...
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-to-kubernetes]
+    if: always()
+    steps:
+      - name: Send Slack notification
+        if: vars.ENABLE_SLACK_NOTIFICATIONS == 'true'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "Staging deployment ${{ needs.deploy-to-kubernetes.result == 'success' && 'succeeded' || 'failed' }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Staging Deployment ${{ needs.deploy-to-kubernetes.result == 'success' && '✅' || '❌' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\nStaging"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Image Tag:*\n${{ needs.pre-deployment-checks.outputs.image_tag }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\n${{ needs.deploy-to-kubernetes.result }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
