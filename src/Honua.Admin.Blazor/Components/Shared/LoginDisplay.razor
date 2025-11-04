@@ -1,0 +1,37 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Honua.Admin.Blazor.Shared.Services
+@inject AuthenticationService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<AuthorizeView>
+    <Authorized>
+        <MudMenu Icon="@Icons.Material.Filled.AccountCircle"
+                 Color="Color.Inherit"
+                 AnchorOrigin="Origin.BottomRight"
+                 TransformOrigin="Origin.TopRight">
+            <MudText Class="px-4 py-2">
+                <MudText Typo="Typo.body2" Color="Color.Primary">@context.User.Identity?.Name</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @string.Join(", ", context.User.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value))
+                </MudText>
+            </MudText>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="HandleLogoutAsync">Sign Out</MudMenuItem>
+        </MudMenu>
+    </Authorized>
+    <NotAuthorized>
+        <MudIconButton Icon="@Icons.Material.Filled.Login"
+                       Color="Color.Inherit"
+                       Href="/login" />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private async Task HandleLogoutAsync()
+    {
+        await AuthService.LogoutAsync();
+        Snackbar.Add("Signed out successfully", Severity.Info);
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+}

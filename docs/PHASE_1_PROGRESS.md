@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
 **Last Updated:** 2025-11-04
-**Current Phase:** Phase 1.2 (Admin REST API Endpoints) - IN PROGRESS
+**Current Phase:** Phase 1.3 (Authentication & Authorization) - COMPLETE
 
 ---
 
@@ -37,7 +37,7 @@
 
 ---
 
-## 🔄 Phase 1.2 In Progress - Admin REST API Endpoints (Week 1-2)
+## ✅ Phase 1.2 Complete - Admin REST API Endpoints (Week 1-2)
 
 ### Completed Tasks
 
@@ -123,12 +123,67 @@
 
 ## 📋 Remaining Phase 1 Tasks
 
-### Phase 1.3 - Authentication & Authorization (Week 2)
-- [ ] Integrate existing Honua auth (OIDC, Local)
-- [ ] Create `BearerTokenDelegatingHandler` for HttpClient
-- [ ] Configure token refresh logic
-- [ ] Apply authorization policies to admin endpoints
-- [ ] Update Blazor UI to handle auth state
+## ✅ Phase 1.3 Complete - Authentication & Authorization (Week 2)
+
+### Completed Tasks
+
+**Authentication Models:**
+- ✅ `AuthModels.cs` - LoginRequest, TokenResponse, PasswordInfo, AuthError models
+- ✅ JSON serialization with System.Text.Json attributes
+
+**Authentication Services:**
+- ✅ `AuthenticationService.cs` - Login/logout, token management, JWT parsing
+- ✅ `AdminAuthenticationStateProvider.cs` - Custom auth state provider for Blazor
+- ✅ `BearerTokenHandler.cs` - HTTP delegating handler for adding bearer tokens to API calls
+
+**Login UI:**
+- ✅ `Login.razor` - Login page with username/password form
+- ✅ `LoginDisplay.razor` - User menu in app bar with logout
+- ✅ Updated `MainLayout.razor` to use LoginDisplay component
+- ✅ Updated `Routes.razor` with AuthorizeRouteView and redirect logic
+
+**Configuration:**
+- ✅ Updated `Program.cs` with authentication services
+  - AuthenticationCore and AuthorizationCore
+  - Custom AdminAuthenticationStateProvider
+  - BearerTokenHandler for AdminApi HttpClient
+  - Separate AuthApi HttpClient (no bearer token for login endpoint)
+- ✅ Updated `_Imports.razor` with authorization namespaces
+
+**Documentation:**
+- ✅ `ADMIN_UI_BOOTSTRAP.md` - Complete bootstrap guide
+  - QuickStart mode setup
+  - Local authentication setup
+  - OIDC authentication setup
+  - Security best practices
+  - Troubleshooting guide
+
+**Files Created:** 8 files, ~900 lines
+**Commit:** Pending
+
+### Technical Notes
+
+**Authentication Flow:**
+1. User enters credentials on `/login` page
+2. Blazor app POSTs to API server `/api/tokens/generate` (ArcGIS-compatible endpoint)
+3. API validates credentials via `LocalAuthenticationService`
+4. API returns JWT token with expiration
+5. Blazor stores token in `AdminAuthenticationStateProvider`
+6. `BearerTokenHandler` adds `Authorization: Bearer {token}` to all AdminApi HttpClient requests
+7. Admin API endpoints validate JWT and check roles
+
+**Bootstrap Process:**
+- For fresh installs, use `honua auth bootstrap` command
+- Creates initial admin user with `administrator` role
+- Supports Local mode (with generated or configured password) and OIDC mode
+- Bootstrap state tracked in auth database to prevent re-running
+
+**Security Features:**
+- Token-based authentication with configurable expiration
+- Password expiration warnings
+- HTTPS required for token requests
+- Separate HttpClients for auth vs API calls
+- Claims-based authorization (administrator, datapublisher, viewer roles)
 
 ### Phase 1.4 - UI State Services (Week 2)
 - ✅ Already completed in Phase 1.1

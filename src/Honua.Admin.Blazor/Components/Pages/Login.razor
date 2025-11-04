@@ -1,0 +1,163 @@
+@page "/login"
+@using Honua.Admin.Blazor.Shared.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationService AuthService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Login - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+    <MudPaper Elevation="4" Class="pa-8">
+        <MudStack Spacing="4">
+            <MudText Typo="Typo.h4" Align="Align.Center">Honua Admin</MudText>
+            <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                Sign in to manage your GIS services
+            </MudText>
+
+            <MudDivider />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+                    @_errorMessage
+                </MudAlert>
+            }
+
+            @if (!string.IsNullOrEmpty(_warningMessage))
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
+                    @_warningMessage
+                </MudAlert>
+            }
+
+            <MudTextField @bind-Value="_username"
+                          Label="Username"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          Disabled="_isLoggingIn"
+                          OnKeyUp="HandleKeyPress"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Person" />
+
+            <MudTextField @bind-Value="_password"
+                          Label="Password"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Password"
+                          Required="true"
+                          Disabled="_isLoggingIn"
+                          OnKeyUp="HandleKeyPress"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Lock" />
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       OnClick="HandleLoginAsync"
+                       Disabled="_isLoggingIn">
+                @if (_isLoggingIn)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Signing in...</span>
+                }
+                else
+                {
+                    <span>Sign In</span>
+                }
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudText Typo="Typo.caption" Align="Align.Center" Class="mt-4" Color="Color.Secondary">
+        Honua GIS Platform &copy; 2025 HonuaIO
+    </MudText>
+</MudContainer>
+
+@code {
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private string? _errorMessage;
+    private string? _warningMessage;
+    private bool _isLoggingIn;
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if already authenticated
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            // Already logged in, redirect to home or returnUrl
+            NavigateAfterLogin();
+        }
+    }
+
+    private async Task HandleLoginAsync()
+    {
+        _errorMessage = null;
+        _warningMessage = null;
+
+        if (string.IsNullOrWhiteSpace(_username))
+        {
+            _errorMessage = "Please enter your username.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_password))
+        {
+            _errorMessage = "Please enter your password.";
+            return;
+        }
+
+        _isLoggingIn = true;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(_username, _password);
+
+            if (result.Success)
+            {
+                _warningMessage = result.WarningMessage;
+
+                if (!string.IsNullOrEmpty(_warningMessage))
+                {
+                    Snackbar.Add(_warningMessage, Severity.Warning);
+                }
+
+                Snackbar.Add("Signed in successfully!", Severity.Success);
+
+                // Small delay to show success message
+                await Task.Delay(500);
+
+                NavigateAfterLogin();
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage ?? "Login failed. Please check your credentials.";
+                _password = string.Empty; // Clear password on failure
+            }
+        }
+        finally
+        {
+            _isLoggingIn = false;
+        }
+    }
+
+    private void NavigateAfterLogin()
+    {
+        var url = !string.IsNullOrWhiteSpace(ReturnUrl) ? ReturnUrl : "/";
+        Navigation.NavigateTo(url, forceLoad: true);
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !_isLoggingIn)
+        {
+            await HandleLoginAsync();
+        }
+    }
+}

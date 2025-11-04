@@ -3,6 +3,7 @@
 
 using Honua.Admin.Blazor.Components;
 using Honua.Admin.Blazor.Shared.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,30 @@ builder.Services.AddMudServices();
 // Add HttpContextAccessor for token access
 builder.Services.AddHttpContextAccessor();
 
+// Add authentication and authorization
+builder.Services.AddAuthenticationCore();
+builder.Services.AddAuthorizationCore();
+
+// Register custom authentication state provider
+builder.Services.AddScoped<AdminAuthenticationStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
+    sp.GetRequiredService<AdminAuthenticationStateProvider>());
+
+// Register authentication service
+builder.Services.AddScoped<AuthenticationService>();
+
+// Register bearer token handler for HttpClient
+builder.Services.AddTransient<BearerTokenHandler>();
+
+// Configure HttpClient for authentication endpoint (no bearer token)
+builder.Services.AddHttpClient("AuthApi", client =>
+{
+    var baseUrl = builder.Configuration["AdminApi:BaseUrl"] ?? "https://localhost:5001";
+    client.BaseAddress = new Uri(baseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+
 // Configure HttpClient for Admin API with bearer token
 builder.Services.AddHttpClient("AdminApi", client =>
 {
@@ -24,9 +49,8 @@ builder.Services.AddHttpClient("AdminApi", client =>
     client.BaseAddress = new Uri(baseUrl);
     client.DefaultRequestHeaders.Add("Accept", "application/json");
     client.Timeout = TimeSpan.FromSeconds(30);
-});
-// TODO: Add BearerTokenDelegatingHandler after auth setup
-// .AddHttpMessageHandler<BearerTokenDelegatingHandler>();
+})
+.AddHttpMessageHandler<BearerTokenHandler>();
 
 // Register pre-configured HttpClient for easier injection
 builder.Services.AddScoped(sp =>
@@ -39,10 +63,6 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<NavigationState>();
 builder.Services.AddScoped<EditorState>();
 builder.Services.AddScoped<NotificationService>();
-
-// TODO: Add authentication after auth setup
-// builder.Services.AddAuthentication(...)
-// builder.Services.AddAuthorization(...)
 
 var app = builder.Build();
 
@@ -57,9 +77,9 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-// TODO: Add after auth setup
-// app.UseAuthentication();
-// app.UseAuthorization();
+// Enable authentication and authorization
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
