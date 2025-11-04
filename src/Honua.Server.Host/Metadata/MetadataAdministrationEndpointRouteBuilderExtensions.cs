@@ -368,9 +368,12 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             }
             catch (InvalidDataException ex)
             {
-                return Results.UnprocessableEntity(new { error = ex.Message });
+                return Results.UnprocessableEntity(new { error = "Metadata schema validation failed.", details = validation.Errors });
             }
         });
+
+        // Map new CRUD endpoints for services, layers, and folders
+        group.MapAdminMetadataEndpoints();
 
         return group;
     }
