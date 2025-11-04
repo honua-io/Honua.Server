@@ -457,6 +457,28 @@ public partial class PostgresControlPlane : IControlPlane
         };
     }
 
+    public async Task<ProcessRun?> DequeueNextJobAsync(CancellationToken ct = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+
+        // Call stored procedure to atomically dequeue next job
+        const string sql = "SELECT * FROM dequeue_process_run()";
+
+        var row = await connection.QuerySingleOrDefaultAsync(sql);
+
+        if (row == null)
+        {
+            _logger.LogDebug("No pending jobs in queue");
+            return null;
+        }
+
+        _logger.LogInformation("Dequeued job {JobId} for process {ProcessId}", row.job_id, row.process_id);
+
+        // Fetch full ProcessRun details
+        var processRun = await GetJobStatusAsync(row.job_id, Guid.Parse(row.tenant_id), ct);
+        return processRun;
+    }
+
     public async Task RecordCompletionAsync(string jobId, ProcessResult result, ProcessExecutionTier tier, TimeSpan duration, CancellationToken ct = default)
     {
         await using var connection = new NpgsqlConnection(_connectionString);

@@ -1,0 +1,81 @@
+{
+  "id": "intersection",
+  "title": "Intersection",
+  "description": "Computes the geometric intersection between two sets of input geometries. Returns only the areas where the geometries overlap.",
+  "version": "1.0.0",
+  "keywords": ["intersection", "overlap", "clip", "overlay"],
+  "category": "vector",
+  "inputs": [
+    {
+      "id": "input_features_1",
+      "title": "First Input Features",
+      "description": "The first set of features to intersect",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "input_features_2",
+      "title": "Second Input Features",
+      "description": "The second set of features to intersect",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    }
+  ],
+  "parameters": [],
+  "outputs": [
+    {
+      "id": "intersection_features",
+      "title": "Intersection Features",
+      "description": "The resulting features representing the intersection",
+      "schema": {
+        "type": "string",
+        "contentMediaType": "application/geo+json"
+      }
+    }
+  ],
+  "outputFormats": ["application/geo+json", "application/json"],
+  "executionConfig": {
+    "preferredTier": "nts",
+    "allowedTiers": ["nts", "postgis", "cloud_batch"],
+    "estimatedDurationSeconds": 20,
+    "memoryLimitMB": 1024,
+    "cpuCores": 1
+  },
+  "links": [
+    {
+      "rel": "about",
+      "type": "text/html",
+      "title": "Intersection operation documentation",
+      "href": "https://docs.honua.io/processes/intersection"
+    }
+  ],
+  "metadata": {
+    "complexity": "medium",
+    "category": "geometry",
+    "tags": ["overlay", "analysis"]
+  }
+}

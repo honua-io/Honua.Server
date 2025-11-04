@@ -1,0 +1,62 @@
+{
+  "id": "dissolve",
+  "title": "Dissolve",
+  "description": "Dissolves geometries by merging overlapping or adjacent features into single geometries. Removes interior boundaries between touching features.",
+  "version": "1.0.0",
+  "keywords": ["dissolve", "merge", "aggregate", "union"],
+  "category": "vector",
+  "inputs": [
+    {
+      "id": "input_features",
+      "title": "Input Features",
+      "description": "The features to dissolve",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    }
+  ],
+  "parameters": [],
+  "outputs": [
+    {
+      "id": "dissolved_features",
+      "title": "Dissolved Features",
+      "description": "The resulting dissolved geometries",
+      "schema": {
+        "type": "string",
+        "contentMediaType": "application/geo+json"
+      }
+    }
+  ],
+  "outputFormats": ["application/geo+json", "application/json"],
+  "executionConfig": {
+    "preferredTier": "nts",
+    "allowedTiers": ["nts", "postgis", "cloud_batch"],
+    "estimatedDurationSeconds": 20,
+    "memoryLimitMB": 2048,
+    "cpuCores": 2
+  },
+  "links": [
+    {
+      "rel": "about",
+      "type": "text/html",
+      "title": "Dissolve operation documentation",
+      "href": "https://docs.honua.io/processes/dissolve"
+    }
+  ],
+  "metadata": {
+    "complexity": "medium",
+    "category": "geometry",
+    "tags": ["aggregation", "merge"]
+  }
+}

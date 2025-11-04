@@ -70,6 +70,14 @@ public interface IControlPlane
     /// <returns>Paginated list of process runs</returns>
     Task<ProcessRunQueryResult> QueryRunsAsync(ProcessRunQuery query, bool isSystemAdmin = false, CancellationToken ct = default);
 
+    /// <summary>
+    /// Dequeues the next pending job for execution (used by worker services)
+    /// Atomically selects and marks job as running
+    /// </summary>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Process run if available, null if queue is empty</returns>
+    Task<ProcessRun?> DequeueNextJobAsync(CancellationToken ct = default);
+
     // ==================== AUDITING ====================
     // Provenance, cost tracking, telemetry
 

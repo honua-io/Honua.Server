@@ -1,0 +1,81 @@
+{
+  "id": "difference",
+  "title": "Difference",
+  "description": "Computes the geometric difference by subtracting the second input from the first. Returns the parts of the first input that don't overlap with the second.",
+  "version": "1.0.0",
+  "keywords": ["difference", "subtract", "erase", "clip"],
+  "category": "vector",
+  "inputs": [
+    {
+      "id": "input_features",
+      "title": "Input Features",
+      "description": "The features to keep (these will have parts removed)",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "subtract_features",
+      "title": "Features to Subtract",
+      "description": "The features to subtract/remove from the input",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    }
+  ],
+  "parameters": [],
+  "outputs": [
+    {
+      "id": "difference_features",
+      "title": "Difference Features",
+      "description": "The resulting features after subtraction",
+      "schema": {
+        "type": "string",
+        "contentMediaType": "application/geo+json"
+      }
+    }
+  ],
+  "outputFormats": ["application/geo+json", "application/json"],
+  "executionConfig": {
+    "preferredTier": "nts",
+    "allowedTiers": ["nts", "postgis", "cloud_batch"],
+    "estimatedDurationSeconds": 15,
+    "memoryLimitMB": 1024,
+    "cpuCores": 1
+  },
+  "links": [
+    {
+      "rel": "about",
+      "type": "text/html",
+      "title": "Difference operation documentation",
+      "href": "https://docs.honua.io/processes/difference"
+    }
+  ],
+  "metadata": {
+    "complexity": "medium",
+    "category": "geometry",
+    "tags": ["erase", "analysis"]
+  }
+}
