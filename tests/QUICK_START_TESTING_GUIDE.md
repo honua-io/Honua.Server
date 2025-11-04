@@ -6,9 +6,71 @@
 
 - Docker Desktop installed and running
 - .NET 9.0 SDK installed
+- Python 3.9+ (for Python tests)
 - Bash shell (Git Bash on Windows, native on Linux/macOS)
 
+## 🚀 NEW: Shared Test Environment (Fastest Option)
+
+The shared test environment provides a **cached, pre-configured Honua Server** that significantly speeds up test execution.
+
+### Start Shared Environment
+
+```bash
+cd tests
+./start-shared-test-env.sh start
+```
+
+This starts:
+- **Honua Server** (SQLite backend) at `http://localhost:5100`
+- **PostgreSQL + PostGIS** at `localhost:5433`
+- **Redis** at `localhost:6380`
+- **Qdrant** at `localhost:6334`
+
+### Run All Tests (C# + Python)
+
+```bash
+# C# tests (uses shared environment automatically)
+dotnet test --filter "Category=Unit"
+
+# Python tests (auto-starts shared environment if needed)
+cd python
+pytest
+
+# Or run smoke tests only
+pytest -m smoke
+```
+
+### Benefits of Shared Environment
+
+- ⚡ **Fast startup**: <1 second (SQLite) vs 10-30s (PostgreSQL)
+- 🔄 **Reusable**: Start once, run tests multiple times
+- 🧪 **Consistent data**: All tests use same pre-populated dataset
+- 🌐 **Language-agnostic**: Works with C#, Python, and Node.js
+- 💾 **Cached**: Stays running between test sessions
+
+### Stop Shared Environment
+
+```bash
+./start-shared-test-env.sh stop
+```
+
 ## Quick Test Commands
+
+### 0. Using Shared Test Environment (RECOMMENDED)
+
+```bash
+# Start once
+./start-shared-test-env.sh start
+
+# Run C# tests
+dotnet test
+
+# Run Python tests
+cd python
+pytest -m integration
+
+# Keep environment running for next test session
+```
 
 ### 1. Run All Unit Tests (Fast, ~30 seconds)
 
