@@ -66,6 +66,7 @@ builder.Services.AddScoped<NotificationService>();
 
 // Register API clients
 builder.Services.AddScoped<ServiceApiClient>();
+builder.Services.AddScoped<LayerApiClient>();
 
 var app = builder.Build();
 
