@@ -1,0 +1,32 @@
+@page "/Error"
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Error</title>
+    <base href="/" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+</head>
+<body>
+    <MudThemeProvider />
+    <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4" Color="Color.Error" GutterBottom="true">
+                <MudIcon Icon="@Icons.Material.Filled.Error" /> Error
+            </MudText>
+            <MudText Typo="Typo.body1">
+                An error has occurred. Please try again or contact support if the problem persists.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" Href="/">
+                Return to Home
+            </MudButton>
+        </MudPaper>
+    </MudContainer>
+</body>
+</html>
+
+@code {
+    // Error page component
+}

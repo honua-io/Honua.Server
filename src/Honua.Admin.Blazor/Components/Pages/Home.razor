@@ -1,0 +1,127 @@
+@page "/"
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard - Honua Admin</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+<MudText Class="mb-4">Welcome to the Honua Admin UI</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4">@_serviceCount</MudText>
+            <MudText Typo="Typo.body1">Active Services</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Primary" Size="Size.Large" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4">@_layerCount</MudText>
+            <MudText Typo="Typo.body1">Total Layers</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Secondary" Size="Size.Large" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4">@_folderCount</MudText>
+            <MudText Typo="Typo.body1">Folders</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Tertiary" Size="Size.Large" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4">Active</MudText>
+            <MudText Typo="Typo.body1">System Status</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-6">
+    <MudItem xs="12">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">Quick Actions</MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/services/new">
+                    Create Service
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Upload" Href="/import">
+                    Import Data
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Folder" Href="/folders">
+                    Browse Folders
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-6">
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">Recent Activity</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Default">
+                No recent activity to display.
+            </MudText>
+            @* TODO: Add recent activity feed after audit log integration *@
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">Getting Started</MudText>
+            <MudList Clickable="true">
+                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/services">
+                    View your services
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/import">
+                    Import your first dataset
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/folders">
+                    Organize with folders
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int _serviceCount = 0;
+    private int _layerCount = 0;
+    private int _folderCount = 0;
+
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private NavigationState NavState { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Set breadcrumbs for home page
+        NavState.Reset();
+
+        // TODO: Load actual counts from API after endpoints are created
+        // For now, showing placeholder counts
+        await LoadDashboardDataAsync();
+    }
+
+    private async Task LoadDashboardDataAsync()
+    {
+        try
+        {
+            // TODO: Replace with actual API calls
+            // var response = await Http.GetFromJsonAsync<DashboardStats>("/admin/metadata/stats");
+            // _serviceCount = response.ServiceCount;
+            // _layerCount = response.LayerCount;
+            // _folderCount = response.FolderCount;
+
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            // TODO: Add proper error handling
+            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+        }
+    }
+}

@@ -1,0 +1,40 @@
+<MudNavMenu>
+    <MudText Typo="Typo.h6" Class="px-4 py-2">Navigation</MudText>
+    <MudDivider Class="mb-2" />
+
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+        Dashboard
+    </MudNavLink>
+
+    <MudNavLink Href="/services" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Layers">
+        Services
+    </MudNavLink>
+
+    <MudNavLink Href="/layers" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Map">
+        Layers
+    </MudNavLink>
+
+    <MudNavLink Href="/folders" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Folder">
+        Folders
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudNavLink Href="/import" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Upload">
+        Import Data
+    </MudNavLink>
+
+    <MudNavLink Href="/versions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">
+        Version History
+    </MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
+        Settings
+    </MudNavLink>
+</MudNavMenu>
+
+@code {
+    // Navigation menu component
+}

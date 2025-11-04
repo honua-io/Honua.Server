@@ -1,0 +1,55 @@
+/* Honua Admin UI Styles */
+
+html, body {
+    font-family: 'Roboto', sans-serif;
+}
+
+/* Loading indicator */
+.mud-progress-circular {
+    margin: 2rem auto;
+    display: block;
+}
+
+/* Service card hover effects */
+.service-card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.service-card:hover {
+    transform: translateY(-4px);
+}
+
+/* Breadcrumbs styling */
+.mud-breadcrumbs {
+    margin-bottom: 1rem;
+}
+
+/* Custom scrollbar for tables */
+.mud-table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.mud-table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.mud-table-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.mud-table-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Utility classes */
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mt-6 { margin-top: 1.5rem; }
+.mt-8 { margin-top: 2rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-6 { margin-bottom: 1.5rem; }
+.ml-3 { margin-left: 0.75rem; }
+.pa-4 { padding: 1rem; }
