@@ -64,6 +64,9 @@ builder.Services.AddScoped<NavigationState>();
 builder.Services.AddScoped<EditorState>();
 builder.Services.AddScoped<NotificationService>();
 
+// Register API clients
+builder.Services.AddScoped<ServiceApiClient>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline

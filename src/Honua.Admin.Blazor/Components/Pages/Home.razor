@@ -1,10 +1,20 @@
 @page "/"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize]
 @rendermode InteractiveServer
+@inject ServiceApiClient ServiceApi
+@inject NavigationState NavState
 
 <PageTitle>Dashboard - Honua Admin</PageTitle>
 
 <MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
 <MudText Class="mb-4">Welcome to the Honua Admin UI</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
 
 <MudGrid>
     <MudItem xs="12" sm="6" md="3">
@@ -92,36 +102,37 @@
     private int _serviceCount = 0;
     private int _layerCount = 0;
     private int _folderCount = 0;
-
-    [Inject] private HttpClient Http { get; set; } = default!;
-    [Inject] private NavigationState NavState { get; set; } = default!;
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
         // Set breadcrumbs for home page
         NavState.Reset();
 
-        // TODO: Load actual counts from API after endpoints are created
-        // For now, showing placeholder counts
         await LoadDashboardDataAsync();
     }
 
     private async Task LoadDashboardDataAsync()
     {
+        _loading = true;
+
         try
         {
-            // TODO: Replace with actual API calls
-            // var response = await Http.GetFromJsonAsync<DashboardStats>("/admin/metadata/stats");
-            // _serviceCount = response.ServiceCount;
-            // _layerCount = response.LayerCount;
-            // _folderCount = response.FolderCount;
-
-            await Task.CompletedTask;
+            var stats = await ServiceApi.GetDashboardStatsAsync();
+            if (stats != null)
+            {
+                _serviceCount = stats.ServiceCount;
+                _layerCount = stats.LayerCount;
+                _folderCount = stats.FolderCount;
+            }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            // TODO: Add proper error handling
-            Console.WriteLine($"Error loading dashboard: {ex.Message}");
+            // Silently fail - dashboard will show zeros
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 }
