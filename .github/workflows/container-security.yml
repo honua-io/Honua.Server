@@ -82,7 +82,7 @@ jobs:
         vuln-type: ${{ matrix.scan-type }}
 
     - name: Upload Trivy results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       if: always()
       with:
         sarif_file: 'trivy-${{ matrix.scan-type }}-results.sarif'
@@ -129,7 +129,7 @@ jobs:
         output: 'trivy-config-results.txt'
 
     - name: Upload Trivy config results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       if: always()
       with:
         sarif_file: 'trivy-config-results.sarif'
@@ -179,7 +179,7 @@ jobs:
         output-format: sarif
 
     - name: Upload Grype results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       if: always()
       with:
         sarif_file: ${{ steps.grype.outputs.sarif }}
@@ -228,7 +228,7 @@ jobs:
         sarif-file: docker-scout-results.sarif
 
     - name: Upload Docker Scout results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       if: github.event_name != 'pull_request' && always()
       with:
         sarif_file: docker-scout-results.sarif
