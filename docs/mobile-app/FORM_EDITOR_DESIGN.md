@@ -887,6 +887,330 @@ The form builder market is crowded with both general-purpose (Google Forms, Type
 
 ---
 
+---
+
+### Responsive Design: Adaptive Layouts
+
+The form editor adapts across **desktop, tablet, and mobile** devices to provide optimal editing experience at any screen size.
+
+#### Desktop View (> 1200px) - Three Panel Layout
+
+**Best For:** Primary form editing, complex forms
+**Layout:** Field Palette (250px) | Canvas (flexible) | Properties Panel (300px)
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  [Field Palette]  |    [Canvas]         |  [Properties Panel] │
+│     250px         |    Flexible         |       300px         │
+└────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### Tablet View (768px - 1200px) - Collapsible Panels
+
+**Best For:** Field edits, form review, moderate editing
+**Layout:** Collapsible sidebars with tabs
+
+**Portrait Mode:**
+```
+┌──────────────────────────────┐
+│  ☰ Palette  [Canvas]  ⚙️ Props │  ← Toggle buttons
+├──────────────────────────────┤
+│                              │
+│        Canvas Area           │
+│     (Full Width)             │
+│                              │
+│  ┌────────────────────────┐  │
+│  │ Asset ID               │  │
+│  │ [text field]           │  │
+│  └────────────────────────┘  │
+│                              │
+│  ┌────────────────────────┐  │
+│  │ Asset Type             │  │
+│  │ [dropdown]             │  │
+│  └────────────────────────┘  │
+│                              │
+│  [+ Add Field]               │
+│                              │
+└──────────────────────────────┘
+```
+
+**When Palette/Properties Open (Bottom Sheet):**
+```
+┌──────────────────────────────┐
+│        Canvas Area           │
+│     (Partially Visible)      │
+├──────────────────────────────┤
+│ ┌──────────────────────────┐ │  ← Bottom sheet (60% height)
+│ │ Field Palette         [X]│ │
+│ ├──────────────────────────┤ │
+│ │  [Text Field]            │ │
+│ │  [Number]                │ │
+│ │  [Date]                  │ │
+│ │  [Dropdown]              │ │
+│ │  [Photo]                 │ │
+│ │  ...                     │ │
+│ └──────────────────────────┘ │
+└──────────────────────────────┘
+```
+
+**Landscape Mode:**
+```
+┌────────────────────────────────────────────────────────┐
+│  ☰ [Toggle]  |     Canvas Area      | ⚙️ Props [Toggle] │
+│              |                      |                  │
+│  [Palette]   |  ┌────────────────┐  |  [Properties]    │
+│  (Drawer)    |  │ Asset ID       │  |  (Drawer)        │
+│              |  │ [text field]   │  |                  │
+│              |  └────────────────┘  |                  │
+│              |  [+ Add Field]      |                  │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### Mobile View (< 768px) - Single Panel + Modal/Bottom Sheets
+
+**Best For:** Quick edits, urgent changes, form review
+**Layout:** Full-screen canvas with modals for palette and properties
+
+```
+┌─────────────────────────┐
+│ ☰  Pole Inspection  ⚙️  │  ← Nav bar
+├─────────────────────────┤
+│                         │
+│  Canvas Area            │
+│  (Full Screen)          │
+│                         │
+│  ┌───────────────────┐  │
+│  │ Asset ID *        │  │  ← Field card
+│  │ [text field]      │  │
+│  │ [⚙️] [🗑️]          │  │
+│  └───────────────────┘  │
+│                         │
+│  ┌───────────────────┐  │
+│  │ Asset Type *      │  │
+│  │ [Utility Pole ▼]  │  │
+│  │ [⚙️] [🗑️]          │  │
+│  └───────────────────┘  │
+│                         │
+│  [+ Add Field]          │  ← Opens field palette
+│                         │
+├─────────────────────────┤
+│ [Save] [Preview] [Pub]  │  ← Action bar
+└─────────────────────────┘
+```
+
+**Field Palette (Full-Screen Modal):**
+```
+┌─────────────────────────┐
+│ ← Select Field Type     │
+├─────────────────────────┤
+│ [Search fields...]      │
+├─────────────────────────┤
+│  Basic Fields           │
+│  ─────────────          │
+│  📝 Text Field          │  ← Tap to add
+│  📄 Text Area           │
+│  🔢 Number              │
+│  📅 Date                │
+│  ...                    │
+│                         │
+│  Media Fields           │
+│  ─────────────          │
+│  📷 Photo               │
+│  🖊️ Signature            │
+│  ...                    │
+└─────────────────────────┘
+```
+
+**Field Properties (Bottom Sheet):**
+```
+┌─────────────────────────┐
+│        Canvas           │
+│     (Dimmed 50%)        │
+├─────────────────────────┤  ← Drag handle
+│ ═══ Field Properties    │
+├─────────────────────────┤
+│ Field Type: Text        │
+│                         │
+│ Label:                  │
+│ [Asset ID_________]     │
+│                         │
+│ ☑ Required field        │
+│ ☐ Read-only             │
+│                         │
+│ [Validation]  [Logic]   │  ← Tabs
+│                         │
+│ [Save]     [Cancel]     │
+└─────────────────────────┘
+```
+
+---
+
+### Responsive Behavior Summary
+
+| Screen Size | Layout | Palette | Properties | Canvas | Best Use |
+|-------------|--------|---------|------------|--------|----------|
+| **Desktop** (>1200px) | 3-panel | Always visible | Always visible | 50-60% width | Primary editing |
+| **Tablet Portrait** (768-1200px) | Canvas + toggles | Bottom sheet | Bottom sheet | Full width | Field editing, review |
+| **Tablet Landscape** (768-1200px) | Canvas + drawers | Left drawer | Right drawer | 60% width | Moderate editing |
+| **Mobile** (<768px) | Single panel | Full-screen modal | Bottom sheet | Full screen | Quick edits only |
+
+---
+
+### Interaction Patterns by Device
+
+#### Desktop (Mouse + Keyboard)
+- **Drag-and-drop:** Fields from palette to canvas
+- **Right-click:** Context menu (edit, delete, duplicate)
+- **Keyboard shortcuts:** Ctrl+S (save), Ctrl+Z (undo), Delete (remove field)
+- **Hover states:** Show field actions on hover
+
+#### Tablet (Touch)
+- **Long press:** Show context menu
+- **Tap and hold:** Drag to reorder fields
+- **Swipe:** Navigate between tabs (validation, logic, widget)
+- **Pinch to zoom:** Canvas zoom (useful for complex forms)
+- **Two-finger scroll:** Canvas navigation
+
+#### Mobile (Touch)
+- **Tap:** Select field, open properties
+- **Drag handles:** Explicit drag handles for reordering (⋮ icon)
+- **Bottom sheet:** Swipe up/down to expand/collapse properties
+- **Full-screen modals:** For palette and complex dialogs
+- **Fixed action bar:** Always visible save/preview/publish buttons
+
+---
+
+### Responsive UI Components
+
+#### Collapsible Field Palette (Tablet/Mobile)
+
+```tsx
+// Toggle button on tablet
+<Button
+  icon="☰"
+  onClick={() => setPaletteVisible(true)}
+  aria-label="Open field palette"
+/>
+
+// Bottom sheet on tablet (portrait)
+<BottomSheet
+  isOpen={paletteVisible}
+  height="60vh"
+  onClose={() => setPaletteVisible(false)}
+>
+  <FieldPalette onFieldSelect={handleFieldAdd} />
+</BottomSheet>
+
+// Full-screen modal on mobile
+<Modal
+  isOpen={paletteVisible}
+  fullScreen
+  onClose={() => setPaletteVisible(false)}
+>
+  <FieldPalette onFieldSelect={handleFieldAdd} />
+</Modal>
+```
+
+#### Responsive Field Actions
+
+**Desktop:** Always visible on hover
+```
+┌──────────────────────────────────┐
+│  Asset ID *                      │
+│  [text field]                    │
+│  [⋮ Move] [⚙️ Edit] [🗑️ Delete]   │  ← Always visible on hover
+└──────────────────────────────────┘
+```
+
+**Tablet:** Tap to show actions bar
+```
+┌──────────────────────────────────┐
+│  Asset ID *              [•••]   │  ← Tap for menu
+│  [text field]                    │
+└──────────────────────────────────┘
+```
+
+**Mobile:** Tap field card to open properties
+```
+┌──────────────────────────────────┐
+│  Asset ID *                      │  ← Entire card is tappable
+│  [text field]                    │
+│  Tap to edit                     │
+└──────────────────────────────────┘
+```
+
+---
+
+### Mobile-Specific Features
+
+#### 1. Simplified Field Palette
+- **Search-first:** Search bar at top for quick field finding
+- **Recent fields:** Show last 5 used field types
+- **Favorites:** Star frequently used fields
+- **Categorized accordion:** Collapsible categories (Basic, Advanced, Media)
+
+#### 2. Touch-Optimized Drag-and-Drop
+- **Large drag handles:** 48×48px minimum touch targets
+- **Haptic feedback:** Vibration on pick up, drop, reorder
+- **Visual feedback:** Shimmer/highlight drop zones
+- **Cancel zone:** Swipe far right to cancel drag
+
+#### 3. Streamlined Properties Panel
+- **Tabs instead of accordion:** Horizontal swipeable tabs
+- **Essential properties first:** Label, required, placeholder
+- **"Show advanced" toggle:** Hide complex features by default
+- **Inline editing:** Edit label directly in canvas preview
+
+#### 4. Offline-First Autosave
+- **Auto-save every 30 seconds** (via IndexedDB)
+- **Offline indicator:** Show sync status
+- **Conflict resolution:** If edited on multiple devices
+
+---
+
+### Accessibility Considerations
+
+#### Touch Target Sizes
+- **Minimum:** 44×44px (iOS), 48×48dp (Android)
+- **Recommended:** 56×56px for primary actions
+- **Spacing:** 8px minimum between touch targets
+
+#### Screen Reader Support
+- **ARIA labels:** All interactive elements
+- **Role annotations:** `role="button"`, `role="region"`
+- **Focus management:** Proper tab order
+- **Announcements:** "Field added", "Validation error added"
+
+#### Keyboard Navigation
+- **Tab order:** Logical flow through form editor
+- **Shortcuts:** Documented and customizable
+- **Focus indicators:** Visible focus rings
+- **Skip links:** Jump to canvas, palette, properties
+
+---
+
+### Performance Optimizations for Mobile
+
+#### Lazy Loading
+- **Field palette:** Load field types on-demand
+- **Preview rendering:** Only render visible fields
+- **Image optimization:** Compress uploaded icons
+
+#### Virtualization
+- **Canvas:** Virtualize long forms (render only visible fields)
+- **Field palette:** Virtual scrolling for 27+ field types
+
+#### Bundle Splitting
+- **Core editor:** ~200KB gzipped
+- **Field types:** Lazy load per type (~10KB each)
+- **Preview:** Separate bundle (~50KB)
+
+---
+
 ### Top Navigation Bar
 
 ```
