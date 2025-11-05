@@ -1,0 +1,300 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+<MudStack Spacing="2">
+    @if (ShowLabel && !string.IsNullOrEmpty(Label))
+    {
+        <MudText Typo="Typo.body2">@Label</MudText>
+    }
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        @* Color preview box *@
+        <MudPaper Elevation="1" Style="@GetPreviewStyle()" @onclick="ToggleColorPalette" Class="cursor-pointer">
+            <MudStack Style="width: 40px; height: 40px;" AlignItems="AlignItems.Center" Justify="Justify.Center">
+                @if (string.IsNullOrEmpty(Color))
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Circle" Color="MudColor.Default" Size="Size.Small" />
+                }
+            </MudStack>
+        </MudPaper>
+
+        @* Hex input field *@
+        <MudTextField @bind-Value="Color"
+                      Label="@(string.IsNullOrEmpty(Label) ? "Color" : null)"
+                      Placeholder="#RRGGBB or #RRGGBBAA"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Immediate="true"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.ColorLens"
+                      OnBlur="OnColorChanged"
+                      Style="flex: 1;" />
+
+        @if (ShowOpacity && !string.IsNullOrEmpty(Color) && Color.Length >= 7)
+        {
+            <MudSlider @bind-Value="_opacity"
+                       Min="0"
+                       Max="100"
+                       Step="1"
+                       ValueLabel="true"
+                       ValueLabelFormat="@($"{_opacity}%")"
+                       Color="MudColor.Primary"
+                       Style="width: 150px;"
+                       T="int"
+                       ValueChanged="OnOpacityChanged" />
+        }
+    </MudStack>
+
+    @* Color palette dropdown *@
+    @if (_showPalette)
+    {
+        <MudPaper Elevation="4" Class="pa-3" Style="max-width: 400px;">
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.subtitle2">Preset Colors</MudText>
+
+                @foreach (var category in GetPresetColorsByCategory())
+                {
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.caption" Color="MudColor.Secondary">@category.Key</MudText>
+                        <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                            @foreach (var preset in category.Value)
+                            {
+                                <MudTooltip Text="@preset.Name">
+                                    <MudPaper Elevation="1"
+                                              Style="@GetPresetStyle(preset.Hex)"
+                                              Class="cursor-pointer color-preset-box"
+                                              @onclick="@(() => SelectPresetColor(preset.Hex))">
+                                        <div style="width: 32px; height: 32px;"></div>
+                                    </MudPaper>
+                                </MudTooltip>
+                            }
+                        </MudStack>
+                    </MudStack>
+                }
+
+                @if (RecentColors.Any())
+                {
+                    <MudDivider />
+                    <MudText Typo="Typo.caption" Color="MudColor.Secondary">Recent Colors</MudText>
+                    <MudStack Row="true" Spacing="1">
+                        @foreach (var recent in RecentColors.Take(10))
+                        {
+                            <MudPaper Elevation="1"
+                                      Style="@GetPresetStyle(recent)"
+                                      Class="cursor-pointer color-preset-box"
+                                      @onclick="@(() => SelectPresetColor(recent))">
+                                <div style="width: 32px; height: 32px;"></div>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+            </MudStack>
+        </MudPaper>
+    }
+</MudStack>
+
+<style>
+    .cursor-pointer {
+        cursor: pointer;
+    }
+
+    .color-preset-box {
+        border: 2px solid transparent;
+        transition: border-color 0.2s;
+    }
+
+    .color-preset-box:hover {
+        border-color: var(--mud-palette-primary);
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string? Color { get; set; }
+
+    [Parameter]
+    public EventCallback<string> ColorChanged { get; set; }
+
+    [Parameter]
+    public string? Label { get; set; }
+
+    [Parameter]
+    public bool ShowLabel { get; set; } = true;
+
+    [Parameter]
+    public bool ShowOpacity { get; set; } = true;
+
+    [Parameter]
+    public List<string> RecentColors { get; set; } = new();
+
+    private bool _showPalette = false;
+    private int _opacity = 100;
+
+    protected override void OnParametersSet()
+    {
+        // Extract opacity from color if it has alpha channel
+        if (!string.IsNullOrEmpty(Color) && Color.Length == 9 && Color.StartsWith('#'))
+        {
+            var alphaHex = Color.Substring(7, 2);
+            if (int.TryParse(alphaHex, System.Globalization.NumberStyles.HexNumber, null, out var alpha))
+            {
+                _opacity = (int)(alpha / 255.0 * 100);
+            }
+        }
+    }
+
+    private void ToggleColorPalette()
+    {
+        _showPalette = !_showPalette;
+    }
+
+    private async Task SelectPresetColor(string color)
+    {
+        Color = color;
+        _showPalette = false;
+
+        // Add to recent colors if not already present
+        if (!RecentColors.Contains(color))
+        {
+            RecentColors.Insert(0, color);
+            if (RecentColors.Count > 20)
+                RecentColors.RemoveAt(RecentColors.Count - 1);
+        }
+
+        await ColorChanged.InvokeAsync(Color);
+    }
+
+    private async Task OnColorChanged()
+    {
+        // Validate and normalize color
+        if (!string.IsNullOrEmpty(Color))
+        {
+            Color = NormalizeColor(Color);
+            await ColorChanged.InvokeAsync(Color);
+        }
+    }
+
+    private async Task OnOpacityChanged(int opacity)
+    {
+        _opacity = opacity;
+
+        if (!string.IsNullOrEmpty(Color) && Color.Length >= 7)
+        {
+            // Convert opacity to alpha hex
+            var alpha = (int)(opacity / 100.0 * 255);
+            var alphaHex = alpha.ToString("X2");
+
+            // Update color with alpha
+            var baseColor = Color.Length == 9 ? Color.Substring(0, 7) : Color;
+            Color = $"{baseColor}{alphaHex}";
+
+            await ColorChanged.InvokeAsync(Color);
+        }
+    }
+
+    private string NormalizeColor(string color)
+    {
+        if (string.IsNullOrEmpty(color))
+            return color;
+
+        // Remove whitespace
+        color = color.Trim();
+
+        // Add # prefix if missing
+        if (!color.StartsWith('#'))
+            color = '#' + color;
+
+        // Convert to uppercase
+        color = color.ToUpperInvariant();
+
+        // Validate length (should be #RGB, #RRGGBB, or #RRGGBBAA)
+        if (color.Length != 4 && color.Length != 7 && color.Length != 9)
+            return color;
+
+        // Expand short format #RGB to #RRGGBB
+        if (color.Length == 4)
+        {
+            var r = color[1];
+            var g = color[2];
+            var b = color[3];
+            color = $"#{r}{r}{g}{g}{b}{b}";
+        }
+
+        return color;
+    }
+
+    private string GetPreviewStyle()
+    {
+        var bgColor = !string.IsNullOrEmpty(Color) ? Color : "#cccccc";
+        return $"background-color: {bgColor}; border: 1px solid #ccc; border-radius: 4px;";
+    }
+
+    private string GetPresetStyle(string color)
+    {
+        return $"background-color: {color}; border-radius: 4px;";
+    }
+
+    private Dictionary<string, List<PresetColor>> GetPresetColorsByCategory()
+    {
+        var presets = new Dictionary<string, List<PresetColor>>
+        {
+            ["Primary"] = new List<PresetColor>
+            {
+                new PresetColor { Name = "Blue", Hex = "#3388ff", Category = "Primary" },
+                new PresetColor { Name = "Red", Hex = "#ff3333", Category = "Primary" },
+                new PresetColor { Name = "Green", Hex = "#33cc33", Category = "Primary" },
+                new PresetColor { Name = "Yellow", Hex = "#ffcc00", Category = "Primary" },
+                new PresetColor { Name = "Orange", Hex = "#ff8800", Category = "Primary" },
+                new PresetColor { Name = "Purple", Hex = "#9933ff", Category = "Primary" }
+            },
+            ["Neutral"] = new List<PresetColor>
+            {
+                new PresetColor { Name = "Black", Hex = "#000000", Category = "Neutral" },
+                new PresetColor { Name = "Dark Gray", Hex = "#555555", Category = "Neutral" },
+                new PresetColor { Name = "Gray", Hex = "#888888", Category = "Neutral" },
+                new PresetColor { Name = "Light Gray", Hex = "#cccccc", Category = "Neutral" },
+                new PresetColor { Name = "White", Hex = "#ffffff", Category = "Neutral" }
+            },
+            ["Earth"] = new List<PresetColor>
+            {
+                new PresetColor { Name = "Forest Green", Hex = "#228B22", Category = "Earth" },
+                new PresetColor { Name = "Brown", Hex = "#8B4513", Category = "Earth" },
+                new PresetColor { Name = "Sand", Hex = "#F4A460", Category = "Earth" },
+                new PresetColor { Name = "Ocean Blue", Hex = "#006994", Category = "Earth" },
+                new PresetColor { Name = "Sky Blue", Hex = "#87CEEB", Category = "Earth" }
+            }
+        };
+
+        return presets;
+    }
+
+    private PresetColor[] GetPresetColors()
+    {
+        return new[]
+        {
+            // Primary colors
+            new PresetColor { Name = "Blue", Hex = "#3388ff", Category = "Primary" },
+            new PresetColor { Name = "Red", Hex = "#ff3333", Category = "Primary" },
+            new PresetColor { Name = "Green", Hex = "#33cc33", Category = "Primary" },
+            new PresetColor { Name = "Yellow", Hex = "#ffcc00", Category = "Primary" },
+            new PresetColor { Name = "Orange", Hex = "#ff8800", Category = "Primary" },
+            new PresetColor { Name = "Purple", Hex = "#9933ff", Category = "Primary" },
+            new PresetColor { Name = "Pink", Hex = "#ff66cc", Category = "Primary" },
+            new PresetColor { Name = "Cyan", Hex = "#00ccff", Category = "Primary" },
+
+            // Neutral colors
+            new PresetColor { Name = "Black", Hex = "#000000", Category = "Neutral" },
+            new PresetColor { Name = "Dark Gray", Hex = "#555555", Category = "Neutral" },
+            new PresetColor { Name = "Gray", Hex = "#888888", Category = "Neutral" },
+            new PresetColor { Name = "Light Gray", Hex = "#cccccc", Category = "Neutral" },
+            new PresetColor { Name = "White", Hex = "#ffffff", Category = "Neutral" },
+
+            // Earth tones (good for GIS)
+            new PresetColor { Name = "Forest Green", Hex = "#228B22", Category = "Earth" },
+            new PresetColor { Name = "Brown", Hex = "#8B4513", Category = "Earth" },
+            new PresetColor { Name = "Sand", Hex = "#F4A460", Category = "Earth" },
+            new PresetColor { Name = "Ocean Blue", Hex = "#006994", Category = "Earth" },
+            new PresetColor { Name = "Sky Blue", Hex = "#87CEEB", Category = "Earth" }
+        };
+    }
+}

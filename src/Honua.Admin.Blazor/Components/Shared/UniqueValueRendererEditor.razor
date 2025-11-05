@@ -1,0 +1,377 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
+@inject StyleApiClient StyleApiClient
+@inject ISnackbar Snackbar
+
+<MudStack Spacing="3">
+    <MudText Typo="Typo.h6">Unique Value Renderer</MudText>
+    <MudText Typo="Typo.body2" Color="MudColor.Secondary">
+        Display features with different symbols based on attribute values.
+    </MudText>
+
+    @if (Renderer != null)
+    {
+        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudTextField @bind-Value="Renderer.Field"
+                              Label="Classification Field"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.ViewColumn"
+                              Style="flex: 1;" />
+
+                <MudButton Variant="Variant.Filled"
+                           Color="MudColor.Primary"
+                           StartIcon="@Icons.Material.Filled.AutoAwesome"
+                           OnClick="AutoGenerateClasses"
+                           Disabled="_isGenerating || string.IsNullOrEmpty(LayerId) || string.IsNullOrEmpty(Renderer.Field)">
+                    Auto Generate
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        <MudDivider />
+
+        <MudStack Spacing="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.subtitle1">Classification Classes (@Renderer.UniqueValueInfos.Count)</MudText>
+                <MudButton Variant="Variant.Outlined"
+                           Color="MudColor.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Size="Size.Small"
+                           OnClick="AddClass">
+                    Add Class
+                </MudButton>
+            </MudStack>
+
+            @if (Renderer.UniqueValueInfos.Any())
+            {
+                @foreach (var (valueInfo, index) in Renderer.UniqueValueInfos.Select((v, i) => (v, i)))
+                {
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.subtitle2">Class @(index + 1)</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="MudColor.Error"
+                                               Size="Size.Small"
+                                               OnClick="@(() => RemoveClass(valueInfo))" />
+                            </MudStack>
+
+                            <MudTextField @bind-Value="valueInfo.Value"
+                                          Label="Value"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Required="true" />
+
+                            <MudTextField @bind-Value="valueInfo.Label"
+                                          Label="Label"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Required="true" />
+
+                            @if (valueInfo.Symbol is PointSymbol pointSymbol)
+                            {
+                                <ColorPicker Label="Color"
+                                             @bind-Color="pointSymbol.Color"
+                                             ColorChanged="OnRendererChanged"
+                                             ShowLabel="false"
+                                             RecentColors="RecentColors" />
+
+                                <MudSlider @bind-Value="pointSymbol.Size"
+                                           Min="2"
+                                           Max="30"
+                                           Step="1"
+                                           ValueLabel="true"
+                                           ValueLabelFormat="@($"{pointSymbol.Size}px")"
+                                           Color="MudColor.Primary"
+                                           T="double"
+                                           ValueChanged="OnRendererChanged">
+                                    <MudText Typo="Typo.caption">Size</MudText>
+                                </MudSlider>
+                            }
+                            else if (valueInfo.Symbol is LineSymbol lineSymbol)
+                            {
+                                <ColorPicker Label="Color"
+                                             @bind-Color="lineSymbol.Color"
+                                             ColorChanged="OnRendererChanged"
+                                             ShowLabel="false"
+                                             RecentColors="RecentColors" />
+
+                                <MudSlider @bind-Value="lineSymbol.Width"
+                                           Min="1"
+                                           Max="15"
+                                           Step="0.5"
+                                           ValueLabel="true"
+                                           ValueLabelFormat="@($"{lineSymbol.Width}px")"
+                                           Color="MudColor.Primary"
+                                           T="double"
+                                           ValueChanged="OnRendererChanged">
+                                    <MudText Typo="Typo.caption">Width</MudText>
+                                </MudSlider>
+                            }
+                            else if (valueInfo.Symbol is PolygonSymbol polygonSymbol)
+                            {
+                                <ColorPicker Label="Fill Color"
+                                             @bind-Color="polygonSymbol.FillColor"
+                                             ColorChanged="OnRendererChanged"
+                                             ShowLabel="false"
+                                             RecentColors="RecentColors" />
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
+            }
+            else
+            {
+                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Large" Color="MudColor.Secondary" />
+                        <MudText Typo="Typo.body1" Color="MudColor.Secondary">No classes defined</MudText>
+                        <MudText Typo="Typo.body2" Color="MudColor.Secondary" Align="Align.Center">
+                            Add classes manually or use "Auto Generate" to create classes from field values.
+                        </MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudStack>
+
+        <MudDivider />
+
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.subtitle2">Default Symbol</MudText>
+            <MudText Typo="Typo.caption" Color="MudColor.Secondary">
+                Used for values that don't match any class.
+            </MudText>
+
+            <MudTextField @bind-Value="Renderer.DefaultLabel"
+                          Label="Default Label"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense" />
+
+            @if (Renderer.DefaultSymbol != null)
+            {
+                @if (Renderer.DefaultSymbol is PointSymbol defaultPoint)
+                {
+                    <ColorPicker @bind-Color="defaultPoint.Color"
+                                 ColorChanged="OnRendererChanged"
+                                 ShowLabel="false"
+                                 RecentColors="RecentColors" />
+                }
+                else if (Renderer.DefaultSymbol is LineSymbol defaultLine)
+                {
+                    <ColorPicker @bind-Color="defaultLine.Color"
+                                 ColorChanged="OnRendererChanged"
+                                 ShowLabel="false"
+                                 RecentColors="RecentColors" />
+                }
+                else if (Renderer.DefaultSymbol is PolygonSymbol defaultPolygon)
+                {
+                    <ColorPicker @bind-Color="defaultPolygon.FillColor"
+                                 ColorChanged="OnRendererChanged"
+                                 ShowLabel="false"
+                                 RecentColors="RecentColors" />
+                }
+            }
+        </MudStack>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public UniqueValueRenderer? Renderer { get; set; }
+
+    [Parameter]
+    public EventCallback<UniqueValueRenderer> RendererChanged { get; set; }
+
+    [Parameter]
+    public string? LayerId { get; set; }
+
+    [Parameter]
+    public string GeometryType { get; set; } = "point";
+
+    [Parameter]
+    public List<string> RecentColors { get; set; } = new();
+
+    private bool _isGenerating = false;
+
+    private void AddClass()
+    {
+        if (Renderer == null) return;
+
+        var symbol = CreateSymbolForGeometryType();
+        var valueInfo = new UniqueValueInfo
+        {
+            Value = $"Value {Renderer.UniqueValueInfos.Count + 1}",
+            Label = $"Class {Renderer.UniqueValueInfos.Count + 1}",
+            Symbol = symbol
+        };
+
+        Renderer.UniqueValueInfos.Add(valueInfo);
+        OnRendererChanged();
+    }
+
+    private void RemoveClass(UniqueValueInfo valueInfo)
+    {
+        if (Renderer == null) return;
+
+        Renderer.UniqueValueInfos.Remove(valueInfo);
+        OnRendererChanged();
+    }
+
+    private async Task AutoGenerateClasses()
+    {
+        if (Renderer == null || string.IsNullOrEmpty(LayerId) || string.IsNullOrEmpty(Renderer.Field))
+            return;
+
+        _isGenerating = true;
+        try
+        {
+            // Fetch unique values from API
+            var uniqueValues = await StyleApiClient.GetUniqueFieldValuesAsync(LayerId, Renderer.Field, limit: 20);
+
+            if (!uniqueValues.Any())
+            {
+                Snackbar.Add("No unique values found for this field", Severity.Warning);
+                return;
+            }
+
+            // Clear existing classes
+            Renderer.UniqueValueInfos.Clear();
+
+            // Generate colors using a color ramp
+            var colors = GenerateColorRamp(uniqueValues.Count);
+
+            // Create classes for each unique value
+            for (int i = 0; i < uniqueValues.Count; i++)
+            {
+                var value = uniqueValues[i];
+                var symbol = CreateSymbolForGeometryType();
+                ApplyColorToSymbol(symbol, colors[i]);
+
+                var valueInfo = new UniqueValueInfo
+                {
+                    Value = value,
+                    Label = value,
+                    Symbol = symbol
+                };
+
+                Renderer.UniqueValueInfos.Add(valueInfo);
+            }
+
+            Snackbar.Add($"Generated {uniqueValues.Count} classes", Severity.Success);
+            await OnRendererChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to generate classes: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isGenerating = false;
+        }
+    }
+
+    private SymbolBase CreateSymbolForGeometryType()
+    {
+        return GeometryType.ToLowerInvariant() switch
+        {
+            "point" => new PointSymbol { Color = "#3388ff", Size = 8 },
+            "line" => new LineSymbol { Color = "#3388ff", Width = 2 },
+            "polygon" => new PolygonSymbol { FillColor = "#3388ff", FillOpacity = 0.6 },
+            _ => new PointSymbol()
+        };
+    }
+
+    private void ApplyColorToSymbol(SymbolBase symbol, string color)
+    {
+        switch (symbol)
+        {
+            case PointSymbol point:
+                point.Color = color;
+                break;
+            case LineSymbol line:
+                line.Color = color;
+                break;
+            case PolygonSymbol polygon:
+                polygon.FillColor = color;
+                polygon.OutlineColor = color;
+                break;
+        }
+    }
+
+    private List<string> GenerateColorRamp(int count)
+    {
+        // Generate visually distinct colors using HSL color space
+        var colors = new List<string>();
+        var hueStep = 360.0 / count;
+
+        for (int i = 0; i < count; i++)
+        {
+            var hue = (i * hueStep) % 360;
+            var rgb = HslToRgb(hue, 0.7, 0.5);
+            colors.Add($"#{rgb.r:X2}{rgb.g:X2}{rgb.b:X2}");
+        }
+
+        return colors;
+    }
+
+    private (byte r, byte g, byte b) HslToRgb(double h, double s, double l)
+    {
+        double c = (1 - Math.Abs(2 * l - 1)) * s;
+        double x = c * (1 - Math.Abs((h / 60) % 2 - 1));
+        double m = l - c / 2;
+
+        double r, g, b;
+        if (h < 60)
+        {
+            r = c; g = x; b = 0;
+        }
+        else if (h < 120)
+        {
+            r = x; g = c; b = 0;
+        }
+        else if (h < 180)
+        {
+            r = 0; g = c; b = x;
+        }
+        else if (h < 240)
+        {
+            r = 0; g = x; b = c;
+        }
+        else if (h < 300)
+        {
+            r = x; g = 0; b = c;
+        }
+        else
+        {
+            r = c; g = 0; b = x;
+        }
+
+        return (
+            (byte)((r + m) * 255),
+            (byte)((g + m) * 255),
+            (byte)((b + m) * 255)
+        );
+    }
+
+    private async Task OnRendererChanged()
+    {
+        if (Renderer != null)
+        {
+            await RendererChanged.InvokeAsync(Renderer);
+        }
+    }
+
+    private async Task OnRendererChanged<T>(T value)
+    {
+        if (Renderer != null)
+        {
+            await RendererChanged.InvokeAsync(Renderer);
+        }
+    }
+}

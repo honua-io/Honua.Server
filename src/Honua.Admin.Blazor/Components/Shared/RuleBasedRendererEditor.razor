@@ -1,0 +1,347 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudStack Spacing="3">
+    <MudText Typo="Typo.h6">Rule-Based Renderer</MudText>
+    <MudText Typo="Typo.body2" Color="MudColor.Secondary">
+        Display features with different symbols based on scale ranges and attribute filters.
+    </MudText>
+
+    @if (Renderer != null)
+    {
+        <MudStack Spacing="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.subtitle1">Render Rules (@Renderer.Rules.Count)</MudText>
+                <MudButton Variant="Variant.Outlined"
+                           Color="MudColor.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Size="Size.Small"
+                           OnClick="AddRule">
+                    Add Rule
+                </MudButton>
+            </MudStack>
+
+            @if (Renderer.Rules.Any())
+            {
+                @foreach (var (rule, index) in Renderer.Rules.Select((r, i) => (r, i)))
+                {
+                    <MudPaper Class="pa-3" Elevation="2">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.subtitle2">Rule @(index + 1)</MudText>
+                                <MudStack Row="true" Spacing="1">
+                                    @if (index > 0)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => MoveRuleUp(rule))" />
+                                    }
+                                    @if (index < Renderer.Rules.Count - 1)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => MoveRuleDown(rule))" />
+                                    }
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                   Color="MudColor.Error"
+                                                   Size="Size.Small"
+                                                   OnClick="@(() => RemoveRule(rule))" />
+                                </MudStack>
+                            </MudStack>
+
+                            <MudTextField @bind-Value="rule.Label"
+                                          Label="Rule Label"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Required="true" />
+
+                            <MudExpansionPanels>
+                                <MudExpansionPanel Text="Scale Range" IsInitiallyExpanded="true">
+                                    <MudStack Spacing="2">
+                                        <MudNumericField @bind-Value="rule.MinScale"
+                                                         Label="Minimum Scale (zoom out limit)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         T="double?"
+                                                         HideSpinButtons="true"
+                                                         Clearable="true"
+                                                         HelperText="Leave empty for no limit" />
+
+                                        <MudNumericField @bind-Value="rule.MaxScale"
+                                                         Label="Maximum Scale (zoom in limit)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         T="double?"
+                                                         HideSpinButtons="true"
+                                                         Clearable="true"
+                                                         HelperText="Leave empty for no limit" />
+
+                                        <MudAlert Severity="Severity.Info" Dense="true">
+                                            Scale: 1:1,000 = 1000, 1:10,000 = 10000, etc. Lower values = more zoomed in.
+                                        </MudAlert>
+                                    </MudStack>
+                                </MudExpansionPanel>
+
+                                <MudExpansionPanel Text="Attribute Filter (CQL)">
+                                    <MudStack Spacing="2">
+                                        <MudTextField @bind-Value="rule.Filter"
+                                                      Label="CQL Filter Expression"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Lines="3"
+                                                      Placeholder="e.g., population > 100000 AND state = 'CA'"
+                                                      HelperText="Common Query Language filter (optional)" />
+
+                                        <MudAlert Severity="Severity.Info" Dense="true">
+                                            Examples: <code>population > 50000</code>, <code>type = 'highway'</code>, <code>area BETWEEN 100 AND 1000</code>
+                                        </MudAlert>
+                                    </MudStack>
+                                </MudExpansionPanel>
+
+                                <MudExpansionPanel Text="Symbol" IsInitiallyExpanded="true">
+                                    <MudStack Spacing="2">
+                                        @if (rule.Symbol is PointSymbol pointSymbol)
+                                        {
+                                            <ColorPicker Label="Color"
+                                                         @bind-Color="pointSymbol.Color"
+                                                         ColorChanged="OnRendererChanged"
+                                                         RecentColors="RecentColors" />
+
+                                            <MudSlider @bind-Value="pointSymbol.Size"
+                                                       Min="2"
+                                                       Max="40"
+                                                       Step="1"
+                                                       ValueLabel="true"
+                                                       ValueLabelFormat="@($"{pointSymbol.Size}px")"
+                                                       Color="MudColor.Primary"
+                                                       T="double"
+                                                       ValueChanged="OnRendererChanged">
+                                                <MudText Typo="Typo.caption">Size</MudText>
+                                            </MudSlider>
+
+                                            <MudSelect @bind-Value="pointSymbol.Shape"
+                                                       Label="Shape"
+                                                       Variant="Variant.Outlined"
+                                                       Margin="Margin.Dense"
+                                                       T="string"
+                                                       ValueChanged="OnRendererChanged">
+                                                <MudSelectItem Value="@("circle")">Circle</MudSelectItem>
+                                                <MudSelectItem Value="@("square")">Square</MudSelectItem>
+                                                <MudSelectItem Value="@("triangle")">Triangle</MudSelectItem>
+                                                <MudSelectItem Value="@("star")">Star</MudSelectItem>
+                                            </MudSelect>
+                                        }
+                                        else if (rule.Symbol is LineSymbol lineSymbol)
+                                        {
+                                            <ColorPicker Label="Color"
+                                                         @bind-Color="lineSymbol.Color"
+                                                         ColorChanged="OnRendererChanged"
+                                                         RecentColors="RecentColors" />
+
+                                            <MudSlider @bind-Value="lineSymbol.Width"
+                                                       Min="1"
+                                                       Max="20"
+                                                       Step="0.5"
+                                                       ValueLabel="true"
+                                                       ValueLabelFormat="@($"{lineSymbol.Width}px")"
+                                                       Color="MudColor.Primary"
+                                                       T="double"
+                                                       ValueChanged="OnRendererChanged">
+                                                <MudText Typo="Typo.caption">Width</MudText>
+                                            </MudSlider>
+
+                                            <MudSelect @bind-Value="lineSymbol.Style"
+                                                       Label="Line Style"
+                                                       Variant="Variant.Outlined"
+                                                       Margin="Margin.Dense"
+                                                       T="string"
+                                                       ValueChanged="OnRendererChanged">
+                                                <MudSelectItem Value="@("solid")">Solid</MudSelectItem>
+                                                <MudSelectItem Value="@("dashed")">Dashed</MudSelectItem>
+                                                <MudSelectItem Value="@("dotted")">Dotted</MudSelectItem>
+                                            </MudSelect>
+                                        }
+                                        else if (rule.Symbol is PolygonSymbol polygonSymbol)
+                                        {
+                                            <ColorPicker Label="Fill Color"
+                                                         @bind-Color="polygonSymbol.FillColor"
+                                                         ColorChanged="OnRendererChanged"
+                                                         RecentColors="RecentColors" />
+
+                                            <MudSlider @bind-Value="polygonSymbol.FillOpacity"
+                                                       Min="0"
+                                                       Max="1"
+                                                       Step="0.1"
+                                                       ValueLabel="true"
+                                                       ValueLabelFormat="@($"{(int)(polygonSymbol.FillOpacity * 100)}%")"
+                                                       Color="MudColor.Primary"
+                                                       T="double"
+                                                       ValueChanged="OnRendererChanged">
+                                                <MudText Typo="Typo.caption">Fill Opacity</MudText>
+                                            </MudSlider>
+
+                                            <ColorPicker Label="Outline Color"
+                                                         @bind-Color="polygonSymbol.OutlineColor"
+                                                         ColorChanged="OnRendererChanged"
+                                                         RecentColors="RecentColors" />
+
+                                            <MudSlider @bind-Value="polygonSymbol.OutlineWidth"
+                                                       Min="0"
+                                                       Max="10"
+                                                       Step="0.5"
+                                                       ValueLabel="true"
+                                                       ValueLabelFormat="@($"{polygonSymbol.OutlineWidth}px")"
+                                                       Color="MudColor.Primary"
+                                                       T="double"
+                                                       ValueChanged="OnRendererChanged">
+                                                <MudText Typo="Typo.caption">Outline Width</MudText>
+                                            </MudSlider>
+                                        }
+                                    </MudStack>
+                                </MudExpansionPanel>
+                            </MudExpansionPanels>
+                        </MudStack>
+                    </MudPaper>
+                }
+            }
+            else
+            {
+                <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Rule" Size="Size.Large" Color="MudColor.Secondary" />
+                        <MudText Typo="Typo.body1" Color="MudColor.Secondary">No rules defined</MudText>
+                        <MudText Typo="Typo.body2" Color="MudColor.Secondary" Align="Align.Center">
+                            Add rules to control rendering based on scale and attributes.
+                        </MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudStack>
+
+        <MudDivider />
+
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.subtitle2">Default Symbol</MudText>
+            <MudText Typo="Typo.caption" Color="MudColor.Secondary">
+                Used when no rules match.
+            </MudText>
+
+            @if (Renderer.DefaultSymbol != null)
+            {
+                @if (Renderer.DefaultSymbol is PointSymbol defaultPoint)
+                {
+                    <ColorPicker @bind-Color="defaultPoint.Color"
+                                 ColorChanged="OnRendererChanged"
+                                 ShowLabel="false"
+                                 RecentColors="RecentColors" />
+                }
+                else if (Renderer.DefaultSymbol is LineSymbol defaultLine)
+                {
+                    <ColorPicker @bind-Color="defaultLine.Color"
+                                 ColorChanged="OnRendererChanged"
+                                 ShowLabel="false"
+                                 RecentColors="RecentColors" />
+                }
+                else if (Renderer.DefaultSymbol is PolygonSymbol defaultPolygon)
+                {
+                    <ColorPicker @bind-Color="defaultPolygon.FillColor"
+                                 ColorChanged="OnRendererChanged"
+                                 ShowLabel="false"
+                                 RecentColors="RecentColors" />
+                }
+            }
+        </MudStack>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public RuleBasedRenderer? Renderer { get; set; }
+
+    [Parameter]
+    public EventCallback<RuleBasedRenderer> RendererChanged { get; set; }
+
+    [Parameter]
+    public string GeometryType { get; set; } = "point";
+
+    [Parameter]
+    public List<string> RecentColors { get; set; } = new();
+
+    private void AddRule()
+    {
+        if (Renderer == null) return;
+
+        var symbol = CreateSymbolForGeometryType();
+        var rule = new RenderRule
+        {
+            Label = $"Rule {Renderer.Rules.Count + 1}",
+            Symbol = symbol
+        };
+
+        Renderer.Rules.Add(rule);
+        OnRendererChanged();
+    }
+
+    private void RemoveRule(RenderRule rule)
+    {
+        if (Renderer == null) return;
+
+        Renderer.Rules.Remove(rule);
+        OnRendererChanged();
+    }
+
+    private void MoveRuleUp(RenderRule rule)
+    {
+        if (Renderer == null) return;
+
+        var index = Renderer.Rules.IndexOf(rule);
+        if (index > 0)
+        {
+            Renderer.Rules.RemoveAt(index);
+            Renderer.Rules.Insert(index - 1, rule);
+            OnRendererChanged();
+        }
+    }
+
+    private void MoveRuleDown(RenderRule rule)
+    {
+        if (Renderer == null) return;
+
+        var index = Renderer.Rules.IndexOf(rule);
+        if (index < Renderer.Rules.Count - 1)
+        {
+            Renderer.Rules.RemoveAt(index);
+            Renderer.Rules.Insert(index + 1, rule);
+            OnRendererChanged();
+        }
+    }
+
+    private SymbolBase CreateSymbolForGeometryType()
+    {
+        return GeometryType.ToLowerInvariant() switch
+        {
+            "point" => new PointSymbol { Color = "#3388ff", Size = 8 },
+            "line" => new LineSymbol { Color = "#3388ff", Width = 2 },
+            "polygon" => new PolygonSymbol { FillColor = "#3388ff", FillOpacity = 0.6 },
+            _ => new PointSymbol()
+        };
+    }
+
+    private async Task OnRendererChanged()
+    {
+        if (Renderer != null)
+        {
+            await RendererChanged.InvokeAsync(Renderer);
+        }
+    }
+
+    private async Task OnRendererChanged<T>(T value)
+    {
+        if (Renderer != null)
+        {
+            await RendererChanged.InvokeAsync(Renderer);
+        }
+    }
+}

@@ -1,0 +1,215 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudStack Spacing="3">
+    <MudText Typo="Typo.h6">Simple Renderer</MudText>
+    <MudText Typo="Typo.body2" Color="MudColor.Secondary">
+        All features will be displayed with the same symbol.
+    </MudText>
+
+    @if (Renderer?.Symbol != null)
+    {
+        @if (Renderer.Symbol is PointSymbol pointSymbol)
+        {
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.subtitle1">Point Symbol</MudText>
+
+                    <ColorPicker Label="Fill Color"
+                                 @bind-Color="pointSymbol.Color"
+                                 ColorChanged="OnRendererChanged"
+                                 RecentColors="RecentColors" />
+
+                    <MudSlider @bind-Value="pointSymbol.Size"
+                               Min="2"
+                               Max="50"
+                               Step="1"
+                               ValueLabel="true"
+                               ValueLabelFormat="@($"{pointSymbol.Size}px")"
+                               Color="MudColor.Primary"
+                               T="double"
+                               ValueChanged="OnRendererChanged">
+                        <MudText Typo="Typo.body2">Size</MudText>
+                    </MudSlider>
+
+                    <MudSelect @bind-Value="pointSymbol.Shape"
+                               Label="Shape"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               T="string"
+                               ValueChanged="OnRendererChanged">
+                        <MudSelectItem Value="@("circle")">Circle</MudSelectItem>
+                        <MudSelectItem Value="@("square")">Square</MudSelectItem>
+                        <MudSelectItem Value="@("triangle")">Triangle</MudSelectItem>
+                        <MudSelectItem Value="@("star")">Star</MudSelectItem>
+                    </MudSelect>
+
+                    <MudDivider />
+
+                    <MudText Typo="Typo.subtitle2">Outline</MudText>
+
+                    <ColorPicker Label="Outline Color"
+                                 @bind-Color="pointSymbol.OutlineColor"
+                                 ColorChanged="OnRendererChanged"
+                                 RecentColors="RecentColors" />
+
+                    <MudSlider @bind-Value="pointSymbol.OutlineWidth"
+                               Min="0"
+                               Max="10"
+                               Step="0.5"
+                               ValueLabel="true"
+                               ValueLabelFormat="@($"{pointSymbol.OutlineWidth}px")"
+                               Color="MudColor.Primary"
+                               T="double"
+                               ValueChanged="OnRendererChanged">
+                        <MudText Typo="Typo.body2">Outline Width</MudText>
+                    </MudSlider>
+                </MudStack>
+            </MudPaper>
+        }
+        else if (Renderer.Symbol is LineSymbol lineSymbol)
+        {
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.subtitle1">Line Symbol</MudText>
+
+                    <ColorPicker Label="Line Color"
+                                 @bind-Color="lineSymbol.Color"
+                                 ColorChanged="OnRendererChanged"
+                                 RecentColors="RecentColors" />
+
+                    <MudSlider @bind-Value="lineSymbol.Width"
+                               Min="1"
+                               Max="20"
+                               Step="0.5"
+                               ValueLabel="true"
+                               ValueLabelFormat="@($"{lineSymbol.Width}px")"
+                               Color="MudColor.Primary"
+                               T="double"
+                               ValueChanged="OnRendererChanged">
+                        <MudText Typo="Typo.body2">Width</MudText>
+                    </MudSlider>
+
+                    <MudSelect @bind-Value="lineSymbol.Style"
+                               Label="Line Style"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               T="string"
+                               ValueChanged="OnRendererChanged">
+                        <MudSelectItem Value="@("solid")">Solid</MudSelectItem>
+                        <MudSelectItem Value="@("dashed")">Dashed</MudSelectItem>
+                        <MudSelectItem Value="@("dotted")">Dotted</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSelect @bind-Value="lineSymbol.Cap"
+                               Label="Line Cap"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               T="string"
+                               ValueChanged="OnRendererChanged">
+                        <MudSelectItem Value="@("round")">Round</MudSelectItem>
+                        <MudSelectItem Value="@("square")">Square</MudSelectItem>
+                        <MudSelectItem Value="@("butt")">Butt</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSelect @bind-Value="lineSymbol.Join"
+                               Label="Line Join"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               T="string"
+                               ValueChanged="OnRendererChanged">
+                        <MudSelectItem Value="@("round")">Round</MudSelectItem>
+                        <MudSelectItem Value="@("bevel")">Bevel</MudSelectItem>
+                        <MudSelectItem Value="@("miter")">Miter</MudSelectItem>
+                    </MudSelect>
+                </MudStack>
+            </MudPaper>
+        }
+        else if (Renderer.Symbol is PolygonSymbol polygonSymbol)
+        {
+            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.subtitle1">Polygon Symbol</MudText>
+
+                    <ColorPicker Label="Fill Color"
+                                 @bind-Color="polygonSymbol.FillColor"
+                                 ColorChanged="OnRendererChanged"
+                                 RecentColors="RecentColors" />
+
+                    <MudSlider @bind-Value="polygonSymbol.FillOpacity"
+                               Min="0"
+                               Max="1"
+                               Step="0.1"
+                               ValueLabel="true"
+                               ValueLabelFormat="@($"{(int)(polygonSymbol.FillOpacity * 100)}%")"
+                               Color="MudColor.Primary"
+                               T="double"
+                               ValueChanged="OnRendererChanged">
+                        <MudText Typo="Typo.body2">Fill Opacity</MudText>
+                    </MudSlider>
+
+                    <MudDivider />
+
+                    <MudText Typo="Typo.subtitle2">Outline</MudText>
+
+                    <ColorPicker Label="Outline Color"
+                                 @bind-Color="polygonSymbol.OutlineColor"
+                                 ColorChanged="OnRendererChanged"
+                                 RecentColors="RecentColors" />
+
+                    <MudSlider @bind-Value="polygonSymbol.OutlineWidth"
+                               Min="0"
+                               Max="10"
+                               Step="0.5"
+                               ValueLabel="true"
+                               ValueLabelFormat="@($"{polygonSymbol.OutlineWidth}px")"
+                               Color="MudColor.Primary"
+                               T="double"
+                               ValueChanged="OnRendererChanged">
+                        <MudText Typo="Typo.body2">Outline Width</MudText>
+                    </MudSlider>
+
+                    <MudSelect @bind-Value="polygonSymbol.OutlineStyle"
+                               Label="Outline Style"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               T="string"
+                               ValueChanged="OnRendererChanged">
+                        <MudSelectItem Value="@("solid")">Solid</MudSelectItem>
+                        <MudSelectItem Value="@("dashed")">Dashed</MudSelectItem>
+                        <MudSelectItem Value="@("dotted")">Dotted</MudSelectItem>
+                    </MudSelect>
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public SimpleRenderer? Renderer { get; set; }
+
+    [Parameter]
+    public EventCallback<SimpleRenderer> RendererChanged { get; set; }
+
+    [Parameter]
+    public List<string> RecentColors { get; set; } = new();
+
+    private async Task OnRendererChanged()
+    {
+        if (Renderer != null)
+        {
+            await RendererChanged.InvokeAsync(Renderer);
+        }
+    }
+
+    private async Task OnRendererChanged<T>(T value)
+    {
+        if (Renderer != null)
+        {
+            await RendererChanged.InvokeAsync(Renderer);
+        }
+    }
+}
