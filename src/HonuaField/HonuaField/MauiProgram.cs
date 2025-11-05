@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui;
+using HonuaField.Data;
 using HonuaField.Services;
 using HonuaField.ViewModels;
 using HonuaField.Views;
@@ -66,7 +67,7 @@ public static class MauiProgram
 	{
 		// Core Services
 		services.AddSingleton<INavigationService, NavigationService>();
-		services.AddSingleton<IDatabaseService, DatabaseService>();
+		services.AddSingleton<IDatabaseService, HonuaField.Data.DatabaseService>();
 		services.AddSingleton<IAuthenticationService, AuthenticationService>();
 		services.AddSingleton<ISettingsService, SettingsService>();
 		services.AddSingleton<IBiometricService, BiometricService>();

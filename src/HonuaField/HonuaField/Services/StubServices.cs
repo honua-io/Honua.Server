@@ -6,12 +6,10 @@ namespace HonuaField.Services;
 public interface IDatabaseService
 {
 	Task InitializeAsync();
+	HonuaField.Data.HonuaFieldDatabase GetDatabase();
 }
 
-public class DatabaseService : IDatabaseService
-{
-	public Task InitializeAsync() => Task.CompletedTask;
-}
+// DatabaseService implementation is now in Data/DatabaseService.cs
 
 public interface IApiClient
 {
