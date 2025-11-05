@@ -18,7 +18,7 @@ The only mobile GIS app that combines:
 - 🤖 **AI-powered data collection** at every step
 - 🥽 **Augmented Reality** for visualization and navigation
 - 📡 **True offline-first** architecture with edge computing
-- 🎨 **Modern native apps** (Swift, Kotlin) - not hybrid
+- 🎨 **Modern cross-platform apps** (.NET MAUI) with native performance
 - 💰 **Fair pricing** - enterprise features without enterprise prices
 
 ---
@@ -58,9 +58,10 @@ After comprehensive competitive analysis of Esri Field Maps, QField, Survey123, 
 - Robust sync with conflict resolution
 
 ✅ **Native Performance**
-- Swift/SwiftUI (iOS)
-- Kotlin/Jetpack Compose (Android)
-- 60 FPS map rendering
+- .NET MAUI with platform-native UI controls
+- C# + MAUI XAML (cross-platform)
+- SkiaSharp hardware-accelerated rendering
+- 30-60 FPS map rendering (Mapsui)
 - < 100ms response times
 
 ✅ **Fair Pricing**
