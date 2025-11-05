@@ -21,75 +21,97 @@
 
 ## Remaining Critical Issues to Address
 
-### 3. ⚠️ Missing Entity Handlers (HIGH - TODO)
-**Problem:** Service root advertises all 8 entity types, but only Things, Datastreams, and Observations have handler implementations. The other 5 entity sets return 404s.
+### 3. ✅ Missing Entity Handlers (HIGH - FIXED)
+**Problem:** Service root advertised all 8 entity types, but only Things, Datastreams, and Observations had handler implementations.
 
-**Missing Handlers:**
-- Locations (GET collection, GET by ID, POST, PATCH, DELETE)
-- HistoricalLocations (GET collection, GET by ID)
-- Sensors (GET collection, GET by ID, POST, PATCH, DELETE)
-- ObservedProperties (GET collection, GET by ID, POST, PATCH, DELETE)
-- FeaturesOfInterest (GET collection, GET by ID, POST, PATCH, DELETE)
+**Solution:**
+- Completed all repository implementations for 8 entity types
+- Created comprehensive SensorThingsHandlers.cs with full CRUD for all entities
+- Created SensorThingsEndpoints.cs registering all 8 entity types + navigation properties
+- All entities now have: GET collection, GET by ID, POST, PATCH, DELETE (except HistoricalLocations which is read-only)
 
-**Repository Status:** Interfaces exist but marked as `throw new NotImplementedException()`
+**Files Created:**
+- `Handlers/SensorThingsHandlers.cs` - 900+ lines with all entity handlers
+- `Extensions/SensorThingsEndpoints.cs` - Complete endpoint registration
+- `Query/QueryOptionsParser.cs` - OData query parameter parsing
 
-**Action Required:** Complete repository implementations + create API handlers for Phase 2
+**Entity Coverage:**
+- ✅ Things (full CRUD + navigation)
+- ✅ Locations (full CRUD + navigation)
+- ✅ HistoricalLocations (read-only, auto-created)
+- ✅ Sensors (full CRUD)
+- ✅ ObservedProperties (full CRUD)
+- ✅ Datastreams (full CRUD + navigation)
+- ✅ Observations (full CRUD + DataArray support)
+- ✅ FeaturesOfInterest (full CRUD)
 
-### 4. ⚠️ DataArray Non-Standard Endpoint (HIGH - TODO)
-**Problem:** DataArray extension exposed at custom `/CreateObservations` path. OGC spec requires POST to standard `/Observations` endpoint with dataArray payload detection, or `/Datastreams(<id>)/Observations`.
+### 4. ✅ DataArray Non-Standard Endpoint (HIGH - FIXED)
+**Problem:** DataArray extension was exposed at custom `/CreateObservations` path. OGC spec requires POST to standard `/Observations` endpoint with dataArray payload detection.
 
-**Current (Wrong):**
+**Solution:**
+- Removed custom `/CreateObservations` endpoint from endpoint registration
+- Implemented standards-compliant `CreateObservation` handler with automatic DataArray detection
+- Handler inspects request body for `dataArray` property using JsonElement
+- Routes to DataArray logic if detected, otherwise processes as single observation
+- Fully compliant with OGC SensorThings API v1.1 DataArray extension
+
+**Implementation (SensorThingsHandlers.cs:632-669):**
+```csharp
+public static async Task<IResult> CreateObservation(
+    HttpContext context,
+    ISensorThingsRepository repository,
+    JsonElement body,
+    CancellationToken ct = default)
+{
+    // Detect DataArray by checking for "dataArray" property
+    if (body.TryGetProperty("dataArray", out _))
+    {
+        var dataArrayRequest = JsonSerializer.Deserialize<DataArrayRequest>(body.GetRawText());
+        return await CreateObservationsDataArray(context, repository, dataArrayRequest, ct);
+    }
+
+    // Single observation creation
+    var observation = JsonSerializer.Deserialize<Observation>(body.GetRawText());
+    // ... validation and creation
+}
 ```
-POST /sta/v1.1/CreateObservations
-Content-Type: application/json
-{ "Datastream": {...}, "dataArray": [...] }
-```
 
-**Standards-Compliant (Correct):**
+**Standards-Compliant Usage:**
 ```
 POST /sta/v1.1/Observations
 Content-Type: application/json
-{ "Datastream": {...}, "dataArray": [...] }
-
-OR
-
-POST /sta/v1.1/Datastreams(123)/Observations
-Content-Type: application/json
-{ "dataArray": [...] }
+{ "Datastream": {"@iot.id": "123"}, "dataArray": [...], "components": [...] }
 ```
 
-**Action Required:**
-- Remove custom `/CreateObservations` endpoint
-- Update `Observations` POST handler to detect `dataArray` in request body
-- If present, route to `CreateObservationsDataArrayAsync()`
-- If not present, route to single `CreateObservationAsync()`
+## Implementation Status
 
-## Implementation Priority
+1. ✅ **Phase 2A (COMPLETED):** Repository entity implementations
+   - ✅ Location CRUD
+   - ✅ Sensor CRUD
+   - ✅ ObservedProperty CRUD
+   - ✅ Datastream CRUD
+   - ✅ FeatureOfInterest CRUD + GetOrCreate logic with geometry matching
 
-1. **Phase 2A (Next):** Complete remaining repository entity implementations
-   - Location CRUD
-   - Sensor CRUD
-   - ObservedProperty CRUD
-   - Datastream CRUD
-   - FeatureOfInterest CRUD + GetOrCreate logic
+2. ✅ **Phase 2B (COMPLETED):** API handlers for all entities
+   - ✅ Mapped all 8 entity type endpoints
+   - ✅ Implemented standard POST /Observations with dataArray detection
+   - ✅ Removed custom /CreateObservations endpoint
+   - ✅ All navigation properties mapped
 
-2. **Phase 2B:** Create API handlers for all entities
-   - Map all endpoints in endpoint registration
-   - Implement standard POST /Observations with dataArray detection
-   - Remove custom /CreateObservations endpoint
-
-3. **Phase 2C:** Deep insert support
-   - Parse nested entity creation in POST requests
+3. ⚠️ **Phase 2C (TODO):** Deep insert support
+   - Parse nested entity creation in POST requests (e.g., creating Thing with Locations in single request)
    - Transaction handling for atomic multi-entity creation
+   - Required for full OGC conformance
 
 ## Conformance Impact
 
 | Issue | Severity | Conformance Impact | Status |
 |-------|----------|-------------------|--------|
 | Hard-coded self_link | HIGH | Breaks deployments with custom BasePath | ✅ FIXED |
-| Missing entity handlers | HIGH | 404 errors on mandatory entity sets | ⚠️ TODO |
-| Non-standard DataArray | HIGH | Existing clients won't find endpoint | ⚠️ TODO |
+| Missing entity handlers | HIGH | 404 errors on mandatory entity sets | ✅ FIXED |
+| Non-standard DataArray | HIGH | Existing clients won't find endpoint | ✅ FIXED |
 | Trigger bug | HIGH | (Implementation correct, no issue) | ✅ OK |
+| Deep insert support | MEDIUM | Required for full conformance | ⚠️ TODO |
 
 ## Testing Recommendations
 
@@ -103,4 +125,5 @@ Once fixes complete:
 ---
 
 **Last Updated:** 2025-11-05
-**Reviewer:** User feedback incorporated
+**Status:** Phase 2A and 2B COMPLETE - All critical conformance issues resolved
+**Remaining:** Phase 2C (Deep insert) for full OGC conformance
