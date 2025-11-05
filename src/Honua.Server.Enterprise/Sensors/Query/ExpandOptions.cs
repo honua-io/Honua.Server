@@ -29,4 +29,20 @@ public sealed record ExpandOptions
     /// Allows filtering/ordering expanded collections.
     /// </summary>
     public Dictionary<string, QueryOptions>? CollectionOptions { get; init; }
+
+    /// <summary>
+    /// Parses an OData $expand query parameter string into ExpandOptions.
+    /// Supports comma-separated navigation properties (e.g., "Locations,Datastreams").
+    /// </summary>
+    public static ExpandOptions Parse(string expand)
+    {
+        if (string.IsNullOrWhiteSpace(expand))
+            return new ExpandOptions { Properties = Array.Empty<string>() };
+
+        var properties = expand.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .ToList();
+
+        return new ExpandOptions { Properties = properties };
+    }
 }

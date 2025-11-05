@@ -28,10 +28,7 @@ CREATE TABLE IF NOT EXISTS sta_things (
 
     -- Audit
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    -- Self-link for OGC navigation
-    self_link TEXT GENERATED ALWAYS AS ('/sta/v1.1/Things(' || id || ')') STORED
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sta_things_user_id ON sta_things(user_id);
@@ -52,9 +49,7 @@ CREATE TABLE IF NOT EXISTS sta_locations (
     properties JSONB,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    self_link TEXT GENERATED ALWAYS AS ('/sta/v1.1/Locations(' || id || ')') STORED
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sta_locations_geom ON sta_locations USING gist(location);
@@ -82,9 +77,7 @@ CREATE TABLE IF NOT EXISTS sta_historical_locations (
     thing_id UUID NOT NULL REFERENCES sta_things(id) ON DELETE CASCADE,
     time TIMESTAMPTZ NOT NULL,
 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    self_link TEXT GENERATED ALWAYS AS ('/sta/v1.1/HistoricalLocations(' || id || ')') STORED
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sta_hist_loc_thing_time ON sta_historical_locations(thing_id, time DESC);
@@ -110,9 +103,7 @@ CREATE TABLE IF NOT EXISTS sta_sensors (
     properties JSONB,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    self_link TEXT GENERATED ALWAYS AS ('/sta/v1.1/Sensors(' || id || ')') STORED
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sta_sensors_properties ON sta_sensors USING gin(properties);
@@ -130,9 +121,7 @@ CREATE TABLE IF NOT EXISTS sta_observed_properties (
     properties JSONB,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    self_link TEXT GENERATED ALWAYS AS ('/sta/v1.1/ObservedProperties(' || id || ')') STORED
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sta_obs_prop_definition ON sta_observed_properties(definition);
@@ -166,9 +155,7 @@ CREATE TABLE IF NOT EXISTS sta_datastreams (
     result_time_end TIMESTAMPTZ,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    self_link TEXT GENERATED ALWAYS AS ('/sta/v1.1/Datastreams(' || id || ')') STORED
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sta_datastreams_thing ON sta_datastreams(thing_id);
@@ -194,9 +181,7 @@ CREATE TABLE IF NOT EXISTS sta_features_of_interest (
     properties JSONB,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    self_link TEXT GENERATED ALWAYS AS ('/sta/v1.1/FeaturesOfInterest(' || id || ')') STORED
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sta_foi_geom ON sta_features_of_interest USING gist(feature);
@@ -227,8 +212,6 @@ CREATE TABLE IF NOT EXISTS sta_observations (
     sync_batch_id UUID,            -- For tracking offline sync batches
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-    self_link TEXT GENERATED ALWAYS AS ('/sta/v1.1/Observations(' || id || ')') STORED,
 
     PRIMARY KEY (id, phenomenon_time)
 ) PARTITION BY RANGE (phenomenon_time);
