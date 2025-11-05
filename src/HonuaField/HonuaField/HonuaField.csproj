@@ -106,7 +106,8 @@
 
 	<!-- Platform-specific dependencies -->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
-		<!-- Android-specific packages if needed -->
+		<!-- Biometric authentication for Android -->
+		<PackageReference Include="Xamarin.AndroidX.Biometric" Version="1.2.0-alpha05" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-ios'">

@@ -13,6 +13,7 @@ public partial class LoginViewModel : BaseViewModel
 	private readonly IAuthenticationService _authService;
 	private readonly INavigationService _navigationService;
 	private readonly ISettingsService _settingsService;
+	private readonly IBiometricService _biometricService;
 
 	[ObservableProperty]
 	private string _username = string.Empty;
@@ -35,11 +36,13 @@ public partial class LoginViewModel : BaseViewModel
 	public LoginViewModel(
 		IAuthenticationService authService,
 		INavigationService navigationService,
-		ISettingsService settingsService)
+		ISettingsService settingsService,
+		IBiometricService biometricService)
 	{
 		_authService = authService;
 		_navigationService = navigationService;
 		_settingsService = settingsService;
+		_biometricService = biometricService;
 
 		Title = "Sign In";
 	}
@@ -195,11 +198,18 @@ public partial class LoginViewModel : BaseViewModel
 		try
 		{
 			// Check if biometric authentication is available on this device
-			// This is a placeholder - actual implementation would check platform capabilities
-			IsBiometricsAvailable = false; // Will be implemented with platform-specific code
+			IsBiometricsAvailable = await _biometricService.IsBiometricAvailableAsync()
+			                        && await _biometricService.IsBiometricEnrolledAsync();
 
 			// Check if user has enabled biometrics
 			UseBiometrics = await _settingsService.GetAsync("use_biometrics", false);
+
+			// Log biometric type if available
+			if (IsBiometricsAvailable)
+			{
+				var biometricType = await _biometricService.GetBiometricTypeAsync();
+				System.Diagnostics.Debug.WriteLine($"Biometric type available: {biometricType}");
+			}
 		}
 		catch (Exception ex)
 		{
@@ -212,13 +222,31 @@ public partial class LoginViewModel : BaseViewModel
 	{
 		try
 		{
-			// TODO: Implement platform-specific biometric authentication
-			// For now, return false as placeholder
-			await Task.Delay(100); // Simulate biometric check
-			return false;
+			// Authenticate with platform-specific biometric service
+			var result = await _biometricService.AuthenticateAsync("Authenticate to access Honua Field");
+
+			if (!result.Success)
+			{
+				// Handle different error types
+				if (result.ErrorType == BiometricErrorType.UserCanceled)
+				{
+					System.Diagnostics.Debug.WriteLine("User canceled biometric authentication");
+				}
+				else if (result.ErrorType == BiometricErrorType.Locked)
+				{
+					await ShowAlertAsync("Locked", "Biometric authentication is locked. Please try again later.");
+				}
+				else if (!string.IsNullOrEmpty(result.ErrorMessage))
+				{
+					await ShowAlertAsync("Authentication Failed", result.ErrorMessage);
+				}
+			}
+
+			return result.Success;
 		}
-		catch
+		catch (Exception ex)
 		{
+			System.Diagnostics.Debug.WriteLine($"Error during biometric authentication: {ex.Message}");
 			return false;
 		}
 	}

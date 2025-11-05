@@ -69,6 +69,7 @@ public static class MauiProgram
 		services.AddSingleton<IDatabaseService, DatabaseService>();
 		services.AddSingleton<IAuthenticationService, AuthenticationService>();
 		services.AddSingleton<ISettingsService, SettingsService>();
+		services.AddSingleton<IBiometricService, BiometricService>();
 
 		// API Services
 		services.AddSingleton<IApiClient, ApiClient>();
