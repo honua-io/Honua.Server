@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="HonuaField.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:HonuaField"
+    xmlns:views="clr-namespace:HonuaField.Views"
+    Shell.FlyoutBehavior="Disabled"
+    Title="Honua Field">
+
+    <!--
+        The overall app visual hierarchy is defined here, along with navigation behavior and routes.
+
+        https://learn.microsoft.com/dotnet/maui/fundamentals/shell/
+    -->
+
+    <!-- Authentication Pages (No TabBar) -->
+    <ShellContent
+        x:Name="LoginShellContent"
+        Title="Login"
+        ContentTemplate="{DataTemplate views:LoginPage}"
+        Route="Login"
+        Shell.NavBarIsVisible="False"
+        Shell.FlyoutBehavior="Disabled" />
+
+    <ShellContent
+        x:Name="OnboardingShellContent"
+        Title="Welcome"
+        ContentTemplate="{DataTemplate views:OnboardingPage}"
+        Route="Onboarding"
+        Shell.NavBarIsVisible="False"
+        Shell.FlyoutBehavior="Disabled" />
+
+    <!-- Main App (With TabBar) -->
+    <TabBar Route="Main">
+        <ShellContent
+            Title="Map"
+            ContentTemplate="{DataTemplate views:MapPage}"
+            Route="Map"
+            Icon="{FontImage Glyph='🗺️', FontFamily='OpenSansRegular', Size=30}" />
+
+        <ShellContent
+            Title="Features"
+            ContentTemplate="{DataTemplate views:FeatureListPage}"
+            Route="Features"
+            Icon="{FontImage Glyph='📍', FontFamily='OpenSansRegular', Size=30}" />
+
+        <ShellContent
+            Title="Sync"
+            ContentTemplate="{DataTemplate views:SyncPage}"
+            Route="Sync"
+            Icon="{FontImage Glyph='🔄', FontFamily='OpenSansRegular', Size=30}" />
+
+        <ShellContent
+            Title="Settings"
+            ContentTemplate="{DataTemplate views:SettingsPage}"
+            Route="Settings"
+            Icon="{FontImage Glyph='⚙️', FontFamily='OpenSansRegular', Size=30}" />
+    </TabBar>
+
+</Shell>
