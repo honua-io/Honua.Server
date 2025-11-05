@@ -193,6 +193,9 @@ internal static class EndpointExtensions
         // Map Admin UI SignalR hub for real-time updates
         app.MapHub<Honua.Server.Host.Admin.Hubs.MetadataChangeNotificationHub>("/admin/hub/metadata");
 
+        // Map GeoEvent SignalR hub for real-time geofence event streaming
+        app.MapHub<Honua.Server.Host.GeoEvent.GeoEventHub>("/hubs/geoevent");
+
         return app;
     }
 }

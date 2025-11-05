@@ -4,6 +4,7 @@
 using Honua.Server.Core.Extensions;
 using Honua.Server.Enterprise.Events;
 using Honua.Server.Host.Extensions;
+using Honua.Server.Host.GeoEvent;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -52,7 +53,10 @@ internal static class HonuaHostConfigurationExtensions
             ?? builder.Configuration.GetConnectionString("DefaultConnection");
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            builder.Services.AddGeoEventServices(connectionString);
+            builder.Services.AddGeoEventServices(connectionString, builder.Configuration);
+
+            // Register SignalR hub for real-time event streaming
+            builder.Services.AddSingleton<IGeoEventBroadcaster, SignalRGeoEventBroadcaster>();
         }
         else
         {
