@@ -789,38 +789,229 @@ Return only valid JSON matching the WorkflowDefinition schema.
 }
 ```
 
-### 4.4 Streaming Architecture
+### 4.4 Streaming Architecture (Detailed)
 
-**Kafka Integration:**
+**Note:** This section provides the architectural foundation for Phase 4 streaming capabilities.
+
+#### 4.4.1 Deployment Topology
+
+**Small Scale (MVP - Phase 4):**
+```
+┌─────────────────────────────────────────────────────┐
+│  Kafka Cluster (3 brokers)                         │
+│  - 3 partitions per topic                          │
+│  - Replication factor: 2                           │
+│  - Max throughput: ~500 features/sec               │
+│  - Retention: 7 days                               │
+└─────────────────────────────────────────────────────┘
+              ↓                    ↑
+┌─────────────────────────────────────────────────────┐
+│  Stream Processor Pool (2 instances)                │
+│  - .NET worker service                             │
+│  - Consumer group: geoetl-processors               │
+│  - Processing: 250 features/sec each               │
+│  - Memory: 2 GB each                               │
+│  - CPU: 2 cores each                               │
+└─────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────┐
+│  State Store (PostgreSQL + Redis)                  │
+│  - Offset tracking                                 │
+│  - Processor health                                │
+│  - Metrics aggregation                             │
+└─────────────────────────────────────────────────────┘
+```
+
+**Production Scale (Future):**
+- Kafka: 5-9 brokers, 12-24 partitions, RF=3
+- Stream Processors: Auto-scaling 5-50 instances
+- Target: 5000+ features/sec
+- High availability: Multi-AZ deployment
+
+#### 4.4.2 Throughput Modeling
+
+**Single Partition Performance:**
+
+| Operation Type | Throughput (features/sec) | Latency (p95) | Notes |
+|----------------|--------------------------|---------------|-------|
+| Pass-through (no transform) | 1000 | 10ms | Baseline |
+| Attribute filter | 800 | 15ms | Simple predicate |
+| Geometry validation | 500 | 25ms | NetTopologySuite |
+| Buffer (simple) | 200 | 80ms | Small geometries |
+| Spatial join (cached) | 100 | 150ms | In-memory lookup |
+| PostGIS operation | 50 | 300ms | Database round-trip |
+
+**Scaling Formula:**
+- Throughput = (Partitions × Single-partition throughput) × Processor efficiency
+- Processor efficiency ≈ 0.7-0.8 (accounting for coordination overhead)
+- Example: 3 partitions × 200 features/sec × 0.75 = **450 features/sec**
+
+**Phase 4 MVP Target (Realistic):**
+- **300-500 features/sec** sustained for simple transformations
+- **p95 latency <200ms** for non-spatial operations
+- **Uptime 99% (not 99.9%)** - allows 7.2 hours/month downtime for Phase 4
+
+#### 4.4.3 State Management
+
+**Offset Tracking:**
+- Kafka consumer group handles partition offset commits
+- Commit interval: Every 5 seconds or 1000 messages
+- PostgreSQL backup of committed offsets (disaster recovery)
+
+**Processor State:**
+```csharp
+public class StreamProcessorState
+{
+    public Guid ProcessorId { get; set; }
+    public Guid WorkflowId { get; set; }
+    public string Status { get; set; } // starting, running, paused, stopped
+    public DateTime StartedAt { get; set; }
+    public DateTime LastHeartbeat { get; set; }
+
+    // Kafka state
+    public string ConsumerGroup { get; set; }
+    public Dictionary<int, long> PartitionOffsets { get; set; }
+
+    // Metrics
+    public long FeaturesProcessed { get; set; }
+    public long ErrorCount { get; set; }
+    public double AvgLatencyMs { get; set; }
+}
+```
+
+**Health Checks:**
+- Heartbeat every 10 seconds to PostgreSQL
+- Dead processor detection: No heartbeat for 30 seconds
+- Auto-restart with offset recovery
+
+#### 4.4.4 Error Handling & Resilience
+
+**Failure Modes:**
+
+1. **Transient Processing Error:**
+   - Retry 3 times with exponential backoff
+   - If still fails, write to dead-letter topic
+   - Continue with next message
+
+2. **Kafka Broker Failure:**
+   - Consumer library handles reconnection
+   - Processing pauses until broker recovers
+   - Max pause: 5 minutes before alerting
+
+3. **Processor Crash:**
+   - Another processor in consumer group takes over partition
+   - Reprocessing from last committed offset (at-least-once semantics)
+   - Duplicate detection using feature ID + timestamp
+
+4. **Schema Evolution:**
+   - Validate message schema on consume
+   - Log schema mismatches
+   - Option to auto-adapt or reject
+
+**Dead Letter Queue:**
+```csharp
+public class DeadLetterMessage
+{
+    public string OriginalTopic { get; set; }
+    public int OriginalPartition { get; set; }
+    public long OriginalOffset { get; set; }
+    public GeoJsonFeature OriginalMessage { get; set; }
+    public string ErrorType { get; set; }
+    public string ErrorMessage { get; set; }
+    public int RetryCount { get; set; }
+    public DateTime FirstAttemptAt { get; set; }
+    public DateTime LastAttemptAt { get; set; }
+}
+```
+
+#### 4.4.5 Kafka Integration (Code)
 
 ```csharp
 public interface IStreamProcessor
 {
     Task StartAsync(WorkflowDefinition workflow, CancellationToken cancellationToken);
     Task StopAsync();
+    Task PauseAsync();
+    Task ResumeAsync();
     Task<StreamProcessorStatus> GetStatusAsync();
+    Task<StreamMetrics> GetMetricsAsync();
 }
 
 public class GeoKafkaStreamProcessor : IStreamProcessor
 {
     private readonly IConsumer<string, GeoJsonFeature> _consumer;
     private readonly IProducer<string, GeoJsonFeature> _producer;
+    private readonly IProducer<string, DeadLetterMessage> _dlqProducer;
     private readonly IGeoprocessingService _geoprocessingService;
+    private readonly ILogger<GeoKafkaStreamProcessor> _logger;
+    private readonly StreamProcessorState _state;
+
+    private const int MaxRetries = 3;
+    private const int CommitIntervalMs = 5000;
 
     public async Task StartAsync(WorkflowDefinition workflow, CancellationToken cancellationToken)
     {
-        // Subscribe to input topics
+        var config = new ConsumerConfig
+        {
+            BootstrapServers = _kafkaConfig.Brokers,
+            GroupId = $"geoetl-{workflow.Id}",
+            AutoOffsetReset = AutoOffsetReset.Earliest,
+            EnableAutoCommit = false, // Manual commit for exactly-once
+            MaxPollIntervalMs = 300000, // 5 minutes
+            SessionTimeoutMs = 30000
+        };
+
         _consumer.Subscribe(workflow.Source.Topics);
+        var lastCommit = DateTime.UtcNow;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var result = _consumer.Consume(cancellationToken);
-            var feature = result.Message.Value;
+            try
+            {
+                var consumeResult = _consumer.Consume(TimeSpan.FromSeconds(1));
+                if (consumeResult == null) continue;
 
-            // Execute workflow operations
+                var feature = consumeResult.Message.Value;
+
+                // Execute workflow with retry logic
+                var success = await TryExecuteWorkflowAsync(
+                    feature,
+                    workflow,
+                    MaxRetries,
+                    cancellationToken
+                );
+
+                if (success)
+                {
+                    _state.FeaturesProcessed++;
+                }
+
+                // Commit offsets periodically
+                if ((DateTime.UtcNow - lastCommit).TotalMilliseconds > CommitIntervalMs)
+                {
+                    _consumer.Commit(consumeResult);
+                    await UpdateStateAsync();
+                    lastCommit = DateTime.UtcNow;
+                }
+            }
+            catch (ConsumeException ex)
+            {
+                _logger.LogError(ex, "Kafka consume error");
+                await Task.Delay(1000, cancellationToken); // Back off
+            }
+        }
+    }
+
+    private async Task<bool> TryExecuteWorkflowAsync(
+        GeoJsonFeature feature,
+        WorkflowDefinition workflow,
+        int retriesLeft,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
             var transformedFeature = await ExecuteWorkflowAsync(feature, workflow);
 
-            // Produce to output topic
             await _producer.ProduceAsync(
                 workflow.Sink.Topic,
                 new Message<string, GeoJsonFeature>
@@ -830,40 +1021,117 @@ public class GeoKafkaStreamProcessor : IStreamProcessor
                 },
                 cancellationToken
             );
+
+            return true;
+        }
+        catch (Exception ex) when (retriesLeft > 0)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, MaxRetries - retriesLeft)));
+            return await TryExecuteWorkflowAsync(feature, workflow, retriesLeft - 1, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Final failure - send to DLQ
+            await SendToDeadLetterQueueAsync(feature, ex);
+            _state.ErrorCount++;
+            return false;
         }
     }
 }
 ```
 
-**GeoMesa Integration:**
+#### 4.4.6 GeoMesa Integration (Optional - Phase 4+)
+
+**Note:** GeoMesa integration is aspirational for Phase 4 and may be deferred.
 
 ```csharp
 public class GeoMesaService
 {
-    private readonly string _connectionString;
+    // GeoMesa provides spatial indexing on Kafka streams
+    // Enables spatial queries without materializing all data
 
-    public async Task IndexStreamAsync(string topicName, string featureTypeName)
+    public async Task EnableSpatialIndexAsync(string topicName)
     {
         // Configure GeoMesa Kafka DataStore
-        var config = new Dictionary<string, string>
-        {
-            ["kafka.brokers"] = "localhost:9092",
-            ["kafka.zookeepers"] = "localhost:2181",
-            ["kafka.topic.partitions"] = "4",
-            ["kafka.topic.replication"] = "1"
-        };
-
-        // GeoMesa handles spatial indexing of Kafka stream
-        // Enables spatial queries on streaming data
+        // This is a research spike - implementation TBD
     }
 
-    public async Task<List<Feature>> SpatialQueryStreamAsync(Envelope bbox, TimeRange timeRange)
+    public async Task<List<Feature>> SpatialQueryStreamAsync(Envelope bbox)
     {
-        // Query streaming data with spatial and temporal filters
-        // Returns features from Kafka topic matching criteria
+        // Query streaming data with spatial filter
+        // Returns recent features matching bbox
+        // Implementation complexity: HIGH
     }
 }
 ```
+
+#### 4.4.7 Load Testing Plan
+
+**Phase 4 Acceptance Criteria:**
+
+1. **Load Test 1: Sustained Throughput**
+   - Input: 500 features/sec for 1 hour
+   - Workflow: Simple attribute filter
+   - Expected: All messages processed, p95 latency <100ms, 0 dead letters
+
+2. **Load Test 2: Burst Handling**
+   - Input: 2000 features/sec for 5 minutes, then 100 features/sec
+   - Expected: Consumer lag recovers within 10 minutes
+
+3. **Load Test 3: Spatial Operations**
+   - Input: 200 features/sec
+   - Workflow: Buffer 100m
+   - Expected: p95 latency <200ms
+
+4. **Failure Test 1: Processor Restart**
+   - Kill processor mid-stream
+   - Expected: Another processor takes over within 30 seconds
+   - Expected: No message loss (at-least-once delivery)
+
+5. **Failure Test 2: Kafka Broker Failure**
+   - Stop one Kafka broker
+   - Expected: Processing continues with degraded performance
+   - Expected: Full recovery when broker returns
+
+**Test Environment:**
+- Kafka: 3 brokers, 3 partitions
+- Processors: 2 instances
+- Test data: Synthetic GeoJSON features (realistic geometries)
+- Duration: 8 hours continuous operation
+
+#### 4.4.8 Monitoring & Observability
+
+**Key Metrics:**
+- Features per second (by processor, by partition)
+- Processing latency (p50, p95, p99)
+- Consumer lag (messages behind)
+- Error rate and types
+- Dead letter queue size
+- Processor health and uptime
+
+**Dashboards:**
+- Real-time throughput graph
+- Latency distribution histogram
+- Consumer lag by partition
+- Error rate alerts
+- Processor status table
+
+**Alerts:**
+- Consumer lag >10,000 messages
+- Error rate >5%
+- No heartbeat for 30 seconds
+- Dead letter queue >1000 messages
+
+---
+
+**Phase 4 Streaming Conclusion:**
+
+The above architecture provides a realistic foundation for Phase 4. The targets have been adjusted:
+- ~~1000+ features/sec~~ → **300-500 features/sec** (simple operations)
+- ~~Sub-100ms latency~~ → **p95 <200ms** (more realistic)
+- ~~99.9% uptime~~ → **99% uptime** (allows for iteration)
+
+GeoMesa integration is marked as optional/aspirational to reduce Phase 4 risk.
 
 ---
 
@@ -1035,42 +1303,101 @@ public class GeoMesaService
 ### Phase 1: Foundation (Months 1-3)
 
 **Goals:**
-- Core workflow engine
+- Core workflow engine (MVP)
 - Basic visual designer
-- Integration with existing geoprocessing
+- **Limited** integration with existing geoprocessing (prioritized subset)
 - Support for common data formats
 
 **Deliverables:**
-- Workflow definition schema and engine
-- Web-based canvas with basic nodes
+- Workflow definition schema and engine (JSON-based)
+- Web-based canvas with basic node types:
+  - File upload/download nodes
+  - PostgreSQL/PostGIS connector nodes
+  - Basic transformation nodes (attribute operations)
 - GeoprocessingNode wrapping IGeoprocessingService
-- File upload/download nodes
-- PostgreSQL/PostGIS connector nodes
+- **Initial geoprocessing operations (3 only):**
+  - Buffer (most commonly used)
+  - Intersection (core spatial operation)
+  - Union (frequently requested)
 - Basic format support (GeoJSON, GeoPackage, Shapefile via GDAL)
+- DAG validation and execution
+- Simple progress tracking
 
 **Success Metrics:**
-- Execute simple 3-node workflows
+- Execute simple 3-5 node workflows end-to-end
 - Process 10K features in <30 seconds
-- Integrate with all existing geoprocessing operations
+- Successfully integrate 3 prioritized geoprocessing operations
+- Validate workflow DAGs before execution
+- Handle basic error scenarios gracefully
 
-### Phase 2: AI & Intelligence (Months 4-6)
+**Deferred to Phase 1.5 (see Migration Plan below):**
+- Remaining geoprocessing operations (Difference, Simplify, ConvexHull, Dissolve)
+- Custom parameter UIs for complex operations
+- Long-running job management
+- Advanced error recovery
+
+### Phase 2: AI Research & Smart Features (Months 4-6)
 
 **Goals:**
-- Natural language workflow creation
-- Intelligent data quality
-- Schema mapping assistance
+- Explore AI-powered workflow assistance (research phase)
+- Add intelligent data quality capabilities
+- Implement template-based workflow creation (non-AI fallback)
 
-**Deliverables:**
-- LLM service integration (OpenAI/Anthropic)
-- AI chat interface in designer
-- Workflow generation from natural language
-- AI-powered data quality node
-- Schema mapping suggestions
+**Research Spikes:**
 
-**Success Metrics:**
-- Generate correct workflows from natural language 80%+ of time
-- Detect and fix 90%+ of common data quality issues
-- Reduce schema mapping time by 70%
+1. **AI Workflow Generation (4 weeks)**
+   - Evaluate LLM providers (OpenAI, Anthropic, Azure OpenAI)
+   - Build proof-of-concept with 10 common workflow patterns
+   - Create evaluation dataset (50 test cases with ground truth workflows)
+   - Measure accuracy, precision, and execution success rate
+   - **Decision criteria:** If ≥70% of generated workflows are executable without errors, proceed to production; otherwise, fallback to template library
+
+2. **Training Data Acquisition (2 weeks)**
+   - Collect workflow examples from internal use cases
+   - Curate 100+ workflow templates across common patterns
+   - Document natural language descriptions for each
+   - Build evaluation harness for ongoing measurement
+
+3. **Schema Mapping Assistant (2 weeks)**
+   - Prototype semantic field matching using LLM
+   - Test with 20 real-world schema pairs
+   - Measure accuracy vs. manual mapping
+   - **Decision criteria:** If semantic matching shows ≥60% precision, invest further; otherwise, use rule-based fuzzy matching
+
+**Concrete Deliverables:**
+
+- **Template Library (non-AI path):** 25+ pre-built workflow templates
+  - Data conversion workflows (10+)
+  - Spatial analysis workflows (10+)
+  - Data quality workflows (5+)
+  - Searchable, parameterizable, one-click instantiation
+
+- **Rule-Based Data Quality:** Deterministic validation (no AI required)
+  - Geometry validation (topology, validity)
+  - Completeness checks (required fields)
+  - Range validation (numeric bounds, date ranges)
+  - Pattern matching (regex for attributes)
+
+- **AI Assistant (if research successful):**
+  - LLM service abstraction (ILLMService)
+  - Chat interface in designer
+  - Workflow generation with confidence scores
+  - User review/approval workflow
+  - Fallback to template search if confidence <0.7
+
+**Success Metrics (Research Phase):**
+- Complete evaluation of 3 LLM providers with documented results
+- Build evaluation dataset with 50+ annotated examples
+- Achieve 70% executable workflow generation rate (research target)
+- 100% of data quality rules implemented and tested
+- Template library covers 80% of common use cases
+- User can always fallback to manual design if AI fails
+
+**Risk Mitigation:**
+- AI features are **additive**, not required for core functionality
+- Template library provides immediate value without AI
+- Rule-based data quality works without LLM
+- Clear metrics for go/no-go decisions on AI investment
 
 ### Phase 3: Cloud-Native & Formats (Months 7-9)
 
@@ -1092,24 +1419,52 @@ public class GeoMesaService
 - GeoParquet files 10x smaller than GeoJSON
 - Support all major cloud storage providers
 
-### Phase 4: Streaming (Months 10-12)
+### Phase 4: Streaming MVP (Months 10-12)
 
 **Goals:**
-- Real-time data pipelines
+- Real-time data pipelines (basic)
 - Kafka integration
 - Live monitoring
 
-**Deliverables:**
-- Kafka source/sink nodes
-- Streaming workflow executor
-- GeoMesa integration
-- SensorThings API streaming
-- Real-time metrics dashboard
+**Prerequisites:**
+- Read section 4.4 "Streaming Architecture (Detailed)" for full technical foundation
+- Complete Phases 1-3 successfully
+- Kafka cluster provisioned and tested
 
-**Success Metrics:**
-- Process 1000+ features/second
-- Sub-100ms latency for simple operations
-- 99.9% uptime for streaming processors
+**Deliverables:**
+
+- **Kafka Infrastructure (Month 10):**
+  - Kafka cluster: 3 brokers, 3 partitions, RF=2
+  - Topic management API
+  - Consumer group management
+  - Offset monitoring
+
+- **Stream Processor (Month 11):**
+  - Kafka source/sink nodes in workflow designer
+  - Basic streaming workflow executor (see 4.4.5)
+  - Support for simple transformations (attribute filters, validation)
+  - Dead letter queue for failed messages
+  - State management (PostgreSQL + Redis)
+
+- **Monitoring & Operations (Month 12):**
+  - Real-time metrics dashboard (throughput, latency, lag)
+  - Processor health monitoring
+  - Basic alerting (lag, errors, downtime)
+  - Load testing harness (see 4.4.7)
+
+**Success Metrics (Adjusted for MVP):**
+- **Throughput:** 300-500 features/sec sustained for simple transformations
+- **Latency:** p95 <200ms for non-spatial operations
+- **Uptime:** 99% availability (allows 7.2 hours/month downtime for iteration)
+- **Load Tests:** Pass 3/5 tests from section 4.4.7
+- **Error Handling:** <1% message loss, all failures go to DLQ
+
+**Explicitly Out of Scope for Phase 4:**
+- GeoMesa spatial indexing (deferred to Phase 4+)
+- Complex spatial operations in streaming (buffer, intersection, etc.)
+- Multi-region deployment
+- Auto-scaling processors
+- SensorThings API streaming (deferred)
 
 ### Phase 5: Enterprise & Scale (Months 13-15)
 
@@ -1150,6 +1505,255 @@ public class GeoMesaService
 - 100+ community workflows published
 - 50% of workflows created from templates
 - Active community engagement
+
+### Phase 1.5: Geoprocessing Migration (Months 4-6, parallel with Phase 2)
+
+**Goal:** Complete integration of remaining geoprocessing operations
+
+**Approach:**
+- Incremental migration of remaining operations
+- Address heterogeneous parameter UIs
+- Build abstraction layer for complex operations
+
+**Deliverables:**
+
+**Month 4:**
+- Difference operation integration
+- Simplify operation integration
+- Generic parameter UI framework for simple operations
+
+**Month 5:**
+- ConvexHull operation integration
+- Dissolve operation integration
+- Custom parameter UI components for complex operations
+- Long-running job progress tracking
+
+**Month 6:**
+- Any remaining custom operations from geoprocessing catalog
+- Batch operation support (run same operation on multiple inputs)
+- Advanced error recovery and retry logic
+- Documentation for all integrated operations
+
+**Success Metrics:**
+- 100% of existing geoprocessing operations integrated
+- Custom parameter UIs for all complex operations
+- Long-running jobs (>5 min) handled gracefully
+- <5% error rate on complex operations
+
+---
+
+## 7.7 Geoprocessing Migration Plan
+
+### 7.7.1 Current Geoprocessing Catalog Analysis
+
+**Assumption:** The existing geoprocessing catalog contains dozens of operations with heterogeneous characteristics.
+
+**Categorization by Complexity:**
+
+**Tier 1 - Simple (Phase 1):**
+- Buffer - Single distance parameter, well-defined
+- Intersection - Two input geometries, boolean result
+- Union - Two input geometries, merged result
+
+**Tier 2 - Moderate (Phase 1.5, Month 4-5):**
+- Difference - Two inputs, clear semantics
+- Simplify - Tolerance parameter, straightforward
+- ConvexHull - Single input, deterministic output
+- Dissolve - Group-by field, aggregation logic
+
+**Tier 3 - Complex (Phase 1.5, Month 6):**
+- Operations with custom UIs (e.g., multi-step wizards)
+- Operations requiring external data sources
+- Operations with conditional logic based on data characteristics
+- Operations with complex validation rules
+
+### 7.7.2 Migration Strategy
+
+**Step 1: Create GeoprocessingNode Abstraction (Phase 1)**
+
+```csharp
+public abstract class GeoprocessingNodeBase : IWorkflowNode
+{
+    protected readonly IGeoprocessingService _geoprocessingService;
+
+    public abstract string OperationName { get; }
+    public abstract ParameterDefinition[] Parameters { get; }
+
+    public async Task<NodeResult> ExecuteAsync(NodeContext context)
+    {
+        // 1. Map workflow parameters to geoprocessing job parameters
+        var jobParams = MapParameters(context.Parameters);
+
+        // 2. Validate using existing IGeoprocessingService
+        var validationResult = await _geoprocessingService.ValidateJobAsync(
+            OperationName,
+            jobParams,
+            context.CancellationToken
+        );
+
+        if (!validationResult.IsValid)
+        {
+            return NodeResult.Failure(validationResult.Errors);
+        }
+
+        // 3. Execute job
+        var jobResult = await _geoprocessingService.ExecuteJobAsync(
+            OperationName,
+            jobParams,
+            context.ProgressCallback,
+            context.CancellationToken
+        );
+
+        // 4. Return result
+        return NodeResult.Success(jobResult.Output);
+    }
+
+    protected abstract Dictionary<string, object> MapParameters(
+        Dictionary<string, object> workflowParams
+    );
+}
+```
+
+**Step 2: Generate Node Implementations Automatically (Phase 1.5)**
+
+```csharp
+public class GeoprocessingNodeGenerator
+{
+    // Reflect over IGeoprocessingOperation implementations
+    // Generate node classes automatically
+    // Emit parameter UIs based on operation metadata
+
+    public List<Type> GenerateNodesForAllOperations()
+    {
+        var operationTypes = Assembly
+            .GetAssembly(typeof(IGeoprocessingOperation))
+            .GetTypes()
+            .Where(t => typeof(IGeoprocessingOperation).IsAssignableFrom(t));
+
+        var nodeTypes = new List<Type>();
+
+        foreach (var opType in operationTypes)
+        {
+            var nodeType = GenerateNodeType(opType);
+            nodeTypes.Add(nodeType);
+        }
+
+        return nodeTypes;
+    }
+}
+```
+
+**Step 3: Handle Complex Parameter UIs (Phase 1.5, Month 5-6)**
+
+For operations with complex UIs, create custom React components:
+
+```typescript
+// Simple operation - auto-generated UI
+interface BufferNodeParams {
+  distance: number;
+  unit: 'meters' | 'feet' | 'kilometers';
+}
+
+// Complex operation - custom UI component
+interface DissolveNodeParams {
+  groupByFields: string[];
+  aggregations: {
+    field: string;
+    operation: 'sum' | 'avg' | 'min' | 'max' | 'count';
+  }[];
+  preserveHoles: boolean;
+}
+
+// Custom React component for Dissolve
+export const DissolveNodeEditor: React.FC<NodeEditorProps> = ({ params, onChange }) => {
+  // Custom UI with field selector, aggregation builder, etc.
+};
+```
+
+**Step 4: Progressive Rollout**
+
+- **Week 1-2:** Buffer, Intersection, Union (Phase 1)
+- **Week 3-4:** Test with real workflows, gather feedback
+- **Month 4:** Difference, Simplify (Phase 1.5)
+- **Month 5:** ConvexHull, Dissolve (Phase 1.5)
+- **Month 6:** Remaining operations, custom UIs (Phase 1.5)
+
+### 7.7.3 Handling Long-Running Jobs
+
+**Challenge:** Some geoprocessing operations may run for >30 minutes
+
+**Solution:**
+
+```csharp
+public class LongRunningGeoprocessingNode : GeoprocessingNodeBase
+{
+    public override async Task<NodeResult> ExecuteAsync(NodeContext context)
+    {
+        // 1. Start job asynchronously
+        var jobId = await _geoprocessingService.SubmitJobAsync(
+            OperationName,
+            MapParameters(context.Parameters)
+        );
+
+        // 2. Store job ID in workflow run state
+        context.WorkflowRun.State["geoprocessing_job_id"] = jobId;
+
+        // 3. Poll for completion (with timeout)
+        var timeout = TimeSpan.FromMinutes(30);
+        var startTime = DateTime.UtcNow;
+
+        while (DateTime.UtcNow - startTime < timeout)
+        {
+            var status = await _geoprocessingService.GetJobStatusAsync(jobId);
+
+            if (status.IsCompleted)
+            {
+                return NodeResult.Success(status.Result);
+            }
+            else if (status.IsFailed)
+            {
+                return NodeResult.Failure(status.ErrorMessage);
+            }
+
+            // Report progress
+            context.ProgressCallback?.Report(new NodeProgress
+            {
+                Percentage = status.ProgressPercentage,
+                Message = status.ProgressMessage
+            });
+
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        }
+
+        return NodeResult.Failure("Operation timed out");
+    }
+}
+```
+
+### 7.7.4 Migration Risks & Mitigations
+
+**Risk 1: Existing operations have undocumented behavior**
+- Mitigation: Interview developers, document behavior, add tests
+
+**Risk 2: Some operations have complex state management**
+- Mitigation: Encapsulate state in IGeoprocessingService, don't expose to workflow engine
+
+**Risk 3: Parameter validation may be inconsistent across operations**
+- Mitigation: Standardize validation interface, centralize validation logic
+
+**Risk 4: Performance characteristics vary widely**
+- Mitigation: Use existing resource estimation, show estimates in UI before execution
+
+### 7.7.5 Acceptance Criteria for Migration Completion
+
+- [ ] All existing geoprocessing operations callable from workflow designer
+- [ ] Parameter UIs generated or custom-built for all operations
+- [ ] Validation works for all operations (leveraging existing validation)
+- [ ] Long-running operations (>5 min) show progress
+- [ ] Error messages are helpful and actionable
+- [ ] Documentation exists for each operation
+- [ ] Integration tests pass for all operations
+- [ ] Performance is equivalent to direct IGeoprocessingService usage
 
 ---
 
@@ -1492,32 +2096,130 @@ public class GeoMesaService
 
 ## 14. Open Questions & Future Considerations
 
-### 14.1 Technical Decisions Needed
+### 14.1 Critical Questions for Stakeholder Review
+
+**Q1: What portion of the existing geoprocessing catalog is required for the MVP canvas integration?**
+
+**Answer:** Based on Phase 1 planning:
+- **Minimum Viable:** 3 operations (Buffer, Intersection, Union) - most commonly used
+- **Preferred for MVP:** Add 4 more in Phase 1.5 (Difference, Simplify, ConvexHull, Dissolve)
+- **Full catalog:** Complete migration in Month 6 (Phase 1.5)
+
+**Decision needed:**
+- Can we ship Phase 1 with only 3 operations, or do stakeholders require more for initial release?
+- Are there specific operations that must be included for customer commitments?
+- What is the priority order for remaining operations?
+
+**Action:** Product team to audit existing usage analytics and customer contracts to determine minimum required operation set.
+
+---
+
+**Q2: How will we acquire and evaluate the labeled data needed to train and measure the NL workflow generator?**
+
+**Answer:** Phase 2 research approach (see section 7, Phase 2):
+
+**Data Acquisition Strategy:**
+
+1. **Internal Sources (Week 1-2):**
+   - Mine workflow definitions from internal testing and demos
+   - Interview team members for common patterns
+   - Document existing customer use cases
+   - Target: 50+ workflow examples with natural language descriptions
+
+2. **Synthetic Generation (Week 3-4):**
+   - Create variations of common patterns programmatically
+   - Use GPT-4 to generate paraphrases of descriptions
+   - Target: 100+ total examples
+
+3. **Community Contributions (Ongoing):**
+   - Invite early beta users to contribute workflows
+   - Crowdsource descriptions for existing workflows
+   - Gamify contributions (leaderboard, badges)
+   - Target: 200+ examples by end of Phase 2
+
+**Evaluation Protocol:**
+
+1. **Automated Evaluation:**
+   - Split data: 70% training, 30% test set
+   - Metrics: Execution success rate, structural similarity, parameter correctness
+   - Baseline: Random workflow generation (expect ~5% success)
+   - Target: 70% success rate on test set
+
+2. **Human Evaluation:**
+   - 3 evaluators review 50 generated workflows
+   - Rate: Correctness (1-5), Efficiency (1-5), Understandability (1-5)
+   - Inter-rater agreement measured
+   - Target: Average rating ≥3.5/5
+
+3. **Production Monitoring:**
+   - Track user acceptance rate of AI suggestions
+   - Measure edit distance between AI-generated and final workflow
+   - Collect user feedback ("Was this helpful?")
+   - Target: 60%+ acceptance rate
+
+**Decision Criteria for AI Investment:**
+- If evaluation shows ≥70% executable workflows AND ≥60% user acceptance: Proceed to production
+- If 50-70%: Iterate on prompts and examples for 1 more month
+- If <50%: Defer AI features, focus on template library instead
+
+**Fallback Path:**
+- Template library already provides value without AI (25+ curated workflows)
+- Visual designer works regardless of AI success
+- AI features are **additive**, not blocking for product launch
+
+**Action:** Assign research lead to implement evaluation harness and data collection process in Phase 2, Month 1.
+
+---
+
+**Q3: How do we ensure streaming architecture is realistic for Phase 4?**
+
+**Answer:** See section 4.4 "Streaming Architecture (Detailed)" for full technical foundation.
+
+**Key adjustments made:**
+- Reduced throughput target: ~~1000+~~ → 300-500 features/sec
+- Realistic latency: ~~<100ms~~ → p95 <200ms
+- Achievable uptime: ~~99.9%~~ → 99% (allows iteration)
+- GeoMesa marked as optional/aspirational
+- Added detailed deployment topology, throughput modeling, and load test plan
+
+**Action:** Conduct 2-week architecture spike in Month 9 (before Phase 4) to validate:
+- Kafka cluster sizing
+- .NET Kafka client performance with geospatial data
+- Realistic throughput for simple transformations
+- Go/no-go decision before committing to Phase 4
+
+---
+
+### 14.2 Technical Decisions Needed
 
 1. **LLM Provider:**
    - OpenAI GPT-4 (expensive, best quality)
    - Anthropic Claude (balanced)
    - Azure OpenAI (enterprise compliance)
    - Self-hosted (Llama 3, Mistral) - cost-effective but requires ML infrastructure
+   - **Recommendation:** Start with OpenAI GPT-4 for research, evaluate cost/quality tradeoff
 
 2. **Frontend Canvas Library:**
    - React Flow (proven, large community)
    - Xyflow (React Flow v11, modern)
    - Custom canvas (full control, more work)
+   - **Recommendation:** Xyflow (modern, actively maintained)
 
 3. **Workflow Definition Format:**
    - Custom JSON schema
    - Apache Airflow DAG format (compatibility)
    - Common Workflow Language (CWL) - standards-based
    - Hybrid approach
+   - **Recommendation:** Custom JSON schema with CWL export option for interoperability
 
 4. **Streaming Technology:**
    - Apache Kafka (industry standard)
    - AWS Kinesis (AWS-native)
    - Azure Event Hubs (Azure-native)
    - Multi-provider support
+   - **Recommendation:** Start with Kafka (industry standard), add cloud-native options later
 
-### 14.2 Future Enhancements
+### 14.3 Future Enhancements
 
 1. **Machine Learning Integration**
    - Train ML models on geospatial data
