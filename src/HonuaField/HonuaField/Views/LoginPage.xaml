@@ -1,10 +1,160 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:HonuaField.ViewModels"
              x:Class="HonuaField.Views.LoginPage"
-             Title="Login">
-    <VerticalStackLayout Spacing="25" Padding="30" VerticalOptions="Center">
-        <Label Text="Login Page" FontSize="32" HorizontalOptions="Center" />
-        <Label Text="Coming soon in Sprint 2+" HorizontalOptions="Center" />
-    </VerticalStackLayout>
+             x:DataType="viewmodels:LoginViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource BackgroundPrimary}">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="32" Spacing="24" VerticalOptions="Center">
+
+            <!-- Logo Placeholder -->
+            <BoxView Color="{StaticResource PrimaryBlue}"
+                     HeightRequest="80"
+                     WidthRequest="80"
+                     CornerRadius="40"
+                     HorizontalOptions="Center"
+                     Margin="0,0,0,16" />
+
+            <!-- Title -->
+            <Label Text="Welcome to Honua Field"
+                   Style="{StaticResource H1}"
+                   HorizontalOptions="Center" />
+
+            <Label Text="Sign in to continue"
+                   Style="{StaticResource BodyMedium}"
+                   TextColor="{StaticResource TextSecondary}"
+                   HorizontalOptions="Center"
+                   Margin="0,0,0,16" />
+
+            <!-- Username Entry -->
+            <Frame Style="{StaticResource CardFrame}"
+                   Padding="0"
+                   HasShadow="False">
+                <Entry Placeholder="Username or Email"
+                       Text="{Binding Username}"
+                       Style="{StaticResource DefaultEntry}"
+                       Keyboard="Email"
+                       ReturnType="Next"
+                       IsEnabled="{Binding IsNotBusy}" />
+            </Frame>
+
+            <!-- Password Entry -->
+            <Frame Style="{StaticResource CardFrame}"
+                   Padding="0"
+                   HasShadow="False">
+                <Entry Placeholder="Password"
+                       Text="{Binding Password}"
+                       IsPassword="True"
+                       Style="{StaticResource DefaultEntry}"
+                       ReturnType="Done"
+                       ReturnCommand="{Binding LoginCommand}"
+                       IsEnabled="{Binding IsNotBusy}" />
+            </Frame>
+
+            <!-- Remember Me & Biometrics -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <HorizontalStackLayout Grid.Column="0" Spacing="8">
+                    <CheckBox IsChecked="{Binding RememberMe}"
+                              VerticalOptions="Center"
+                              IsEnabled="{Binding IsNotBusy}" />
+                    <Label Text="Remember me"
+                           VerticalOptions="Center"
+                           Style="{StaticResource BodySmall}" />
+                </HorizontalStackLayout>
+
+                <HorizontalStackLayout Grid.Column="1"
+                                       Spacing="8"
+                                       HorizontalOptions="End"
+                                       IsVisible="{Binding IsBiometricsAvailable}">
+                    <CheckBox IsChecked="{Binding UseBiometrics}"
+                              VerticalOptions="Center"
+                              IsEnabled="{Binding IsNotBusy}" />
+                    <Label Text="Use biometrics"
+                           VerticalOptions="Center"
+                           Style="{StaticResource BodySmall}" />
+                </HorizontalStackLayout>
+            </Grid>
+
+            <!-- Error Message -->
+            <Label Text="{Binding ErrorMessage}"
+                   TextColor="{StaticResource ErrorRed}"
+                   Style="{StaticResource BodySmall}"
+                   IsVisible="{Binding ErrorMessage.Length}"
+                   HorizontalOptions="Center" />
+
+            <!-- Login Button -->
+            <Button Text="Sign In"
+                    Style="{StaticResource PrimaryButton}"
+                    Command="{Binding LoginCommand}"
+                    IsEnabled="{Binding IsNotBusy}"
+                    Margin="0,8,0,0" />
+
+            <!-- Biometric Login Button -->
+            <Button Text="🔐 Sign in with Biometrics"
+                    Style="{StaticResource SecondaryButton}"
+                    Command="{Binding LoginWithBiometricsCommand}"
+                    IsVisible="{Binding IsBiometricsAvailable}"
+                    IsEnabled="{Binding IsNotBusy}" />
+
+            <!-- Activity Indicator -->
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                              IsVisible="{Binding IsBusy}"
+                              Color="{StaticResource PrimaryBlue}"
+                              HeightRequest="40"
+                              WidthRequest="40"
+                              HorizontalOptions="Center" />
+
+            <!-- Forgot Password -->
+            <Label HorizontalOptions="Center"
+                   Margin="0,8,0,0">
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="Forgot your password? "
+                              FontSize="12"
+                              TextColor="{StaticResource TextSecondary}" />
+                        <Span Text="Reset it"
+                              FontSize="12"
+                              TextColor="{StaticResource PrimaryBlue}"
+                              TextDecorations="Underline">
+                            <Span.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding ForgotPasswordCommand}" />
+                            </Span.GestureRecognizers>
+                        </Span>
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+
+            <!-- Server Settings -->
+            <Label HorizontalOptions="Center"
+                   Margin="0,16,0,0">
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="Server: "
+                              FontSize="12"
+                              TextColor="{StaticResource TextSecondary}" />
+                        <Span Text="{Binding ServerUrl}"
+                              FontSize="12"
+                              TextColor="{StaticResource PrimaryBlue}"
+                              TextDecorations="Underline">
+                            <Span.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding ShowServerSettingsCommand}" />
+                            </Span.GestureRecognizers>
+                        </Span>
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+
+            <!-- Version Info -->
+            <Label Text="Honua Field v1.0.0"
+                   FontSize="12"
+                   TextColor="{StaticResource Gray500}"
+                   HorizontalOptions="Center"
+                   Margin="0,24,0,0" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
 </ContentPage>

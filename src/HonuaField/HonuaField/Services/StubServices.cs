@@ -17,13 +17,11 @@ public interface IApiClient
 {
 	Task<T?> GetAsync<T>(string endpoint, string? accessToken = null);
 	Task<T?> PostAsync<T>(string endpoint, object data, string? accessToken = null);
+	Task<T?> PutAsync<T>(string endpoint, object data, string? accessToken = null);
+	Task<bool> DeleteAsync(string endpoint, string? accessToken = null);
 }
 
-public class ApiClient : IApiClient
-{
-	public Task<T?> GetAsync<T>(string endpoint, string? accessToken = null) => Task.FromResult(default(T));
-	public Task<T?> PostAsync<T>(string endpoint, object data, string? accessToken = null) => Task.FromResult(default(T));
-}
+// ApiClient implementation is now in ApiClient.cs
 
 public interface IFeaturesService { }
 public class FeaturesService : IFeaturesService { }
