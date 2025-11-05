@@ -11,13 +11,54 @@
 
 This design document outlines the implementation of the OGC SensorThings API v1.1 (Sensing profile) within Honua Server. The primary use case focuses on **mobile field app integration** for collecting sensor observations from devices in the field (GPS, environmental sensors, photos, measurements, etc.).
 
+### Namespace Organization
+
+**Primary Namespace:** `Honua.Server.Enterprise.Sensors`
+
+This feature is organized as an **Enterprise-tier capability** alongside other advanced features like Versioning, Multitenancy, and GitOps. The SensorThings implementation will reside in the `Honua.Server.Enterprise` project under the `Sensors` namespace.
+
+**Project Structure:**
+```
+src/
+└── Honua.Server.Enterprise/
+    └── Sensors/
+        ├── Models/              # Entity definitions (Thing, Datastream, Observation, etc.)
+        ├── Data/                # Repository interfaces and implementations
+        │   ├── ISensorThingsRepository.cs
+        │   └── Postgres/        # PostgreSQL-specific implementation
+        ├── Query/               # OData filter translation and query building
+        ├── Handlers/            # Minimal API endpoint handlers
+        ├── Services/            # Business logic (caching, metrics, health checks)
+        └── Extensions/          # DI registration and middleware
+```
+
+**Integration with Host:**
+
+The Enterprise.Sensors feature integrates with `Honua.Server.Host` through extension methods:
+
+```csharp
+// In Honua.Server.Host/Program.cs or Startup.cs
+using Honua.Server.Enterprise.Sensors.Extensions;
+using Honua.Server.Enterprise.Sensors.Handlers;
+
+// Register services
+builder.Services.AddSensorThings(builder.Configuration);
+builder.Services.AddSensorThingsAuthorization();
+
+// Register endpoints
+app.MapSensorThingsEndpoints(sensorThingsConfig);
+```
+
+This keeps the enterprise feature modular while allowing the Host to opt-in to SensorThings capabilities.
+
 ### Key Design Principles
 
 1. **Mobile-First Architecture** - Optimized for intermittent connectivity, batch operations, and efficient sync
 2. **Honua Pattern Consistency** - Follow existing metadata-driven, multi-database architecture
-3. **Standards Compliance** - Full OGC SensorThings API v1.1 conformance
-4. **Performance** - Leverage Dapper, Redis caching, and efficient bulk operations
-5. **Extensibility** - Support future tasking capabilities and MQTT streaming
+3. **Enterprise Feature** - Part of the Enterprise tier, requires licensing
+4. **Standards Compliance** - Full OGC SensorThings API v1.1 conformance
+5. **Performance** - Leverage Dapper, Redis caching, and efficient bulk operations
+6. **Extensibility** - Support future tasking capabilities and MQTT streaming
 
 ---
 
@@ -61,6 +102,8 @@ Following Honua's metadata-driven architecture, define SensorThings entities as 
 #### SensorThingsServiceDefinition
 
 ```csharp
+namespace Honua.Server.Enterprise.Sensors.Models;
+
 public sealed record SensorThingsServiceDefinition
 {
     public bool Enabled { get; init; } = false;
@@ -110,6 +153,8 @@ public sealed record SensorThingsStorageDefinition
 #### Thing Definition (Mobile Device/User)
 
 ```csharp
+namespace Honua.Server.Enterprise.Sensors.Models;
+
 public sealed record ThingDefinition
 {
     public string Id { get; init; } = default!;
@@ -129,6 +174,8 @@ public sealed record ThingDefinition
 #### Datastream Definition
 
 ```csharp
+namespace Honua.Server.Enterprise.Sensors.Models;
+
 public sealed record DatastreamDefinition
 {
     public string Id { get; init; } = default!;
@@ -159,6 +206,8 @@ public sealed record UnitOfMeasurement
 #### Observation Definition
 
 ```csharp
+namespace Honua.Server.Enterprise.Sensors.Models;
+
 public sealed record ObservationDefinition
 {
     public string Id { get; init; } = default!;
@@ -838,7 +887,9 @@ INCLUDE (name, observation_type);
 Following Honua's repository pattern:
 
 ```csharp
-// Core/SensorThings/ISensorThingsRepository.cs
+// Enterprise/Sensors/Data/ISensorThingsRepository.cs
+namespace Honua.Server.Enterprise.Sensors.Data;
+
 public interface ISensorThingsRepository
 {
     // Thing operations
@@ -869,7 +920,9 @@ public interface ISensorThingsRepository
     Task<IReadOnlyList<Thing>> GetThingsByUserAsync(string userId, CancellationToken ct = default);
 }
 
-// Core/SensorThings/Models/QueryOptions.cs
+// Enterprise/Sensors/Query/QueryOptions.cs
+namespace Honua.Server.Enterprise.Sensors.Query;
+
 public sealed record QueryOptions
 {
     public FilterExpression? Filter { get; init; }
@@ -912,7 +965,9 @@ public sealed record SyncResponse
 ### 5.2 Provider Implementation
 
 ```csharp
-// Core/SensorThings/Postgres/PostgresSensorThingsRepository.cs
+// Enterprise/Sensors/Data/Postgres/PostgresSensorThingsRepository.cs
+namespace Honua.Server.Enterprise.Sensors.Data.Postgres;
+
 public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 {
     private readonly IDbConnection _connection;
@@ -1028,7 +1083,9 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 Implement OData filter translation following Honua's existing `CqlFilterTranslator`:
 
 ```csharp
-// Core/SensorThings/Query/SensorThingsFilterTranslator.cs
+// Enterprise/Sensors/Query/SensorThingsFilterTranslator.cs
+namespace Honua.Server.Enterprise.Sensors.Query;
+
 public sealed class SensorThingsFilterTranslator
 {
     public (string Sql, DynamicParameters Parameters) Translate(
@@ -1105,8 +1162,12 @@ public sealed class SensorThingsFilterTranslator
 
 ### 6.1 Handler Registration
 
+Handlers will be defined in the Enterprise.Sensors project but registered in the Host:
+
 ```csharp
-// Host/Ogc/SensorThings/SensorThingsEndpoints.cs
+// Enterprise/Sensors/Handlers/SensorThingsEndpoints.cs
+namespace Honua.Server.Enterprise.Sensors.Handlers;
+
 public static class SensorThingsEndpoints
 {
     public static IEndpointRouteBuilder MapSensorThingsEndpoints(
@@ -1176,7 +1237,9 @@ public static class SensorThingsEndpoints
 ### 6.2 Handler Implementation
 
 ```csharp
-// Host/Ogc/SensorThings/SensorThingsHandlers.cs
+// Enterprise/Sensors/Handlers/SensorThingsHandlers.cs
+namespace Honua.Server.Enterprise.Sensors.Handlers;
+
 public static class SensorThingsHandlers
 {
     public static async Task<IResult> GetServiceRoot(
@@ -1320,7 +1383,9 @@ public static class SensorThingsHandlers
     }
 }
 
-// Core/SensorThings/Models/DataArrayRequest.cs
+// Enterprise/Sensors/Models/DataArrayRequest.cs
+namespace Honua.Server.Enterprise.Sensors.Models;
+
 public sealed record DataArrayRequest
 {
     [JsonPropertyName("Datastream")]
@@ -1451,7 +1516,9 @@ Benefits:
 Link SensorThings entities to Honua's existing auth system:
 
 ```csharp
-// Host/Extensions/SensorThingsAuthorizationExtensions.cs
+// Enterprise/Sensors/Extensions/SensorThingsAuthorizationExtensions.cs
+namespace Honua.Server.Enterprise.Sensors.Extensions;
+
 public static class SensorThingsAuthorizationExtensions
 {
     public static IServiceCollection AddSensorThingsAuthorization(
@@ -1573,7 +1640,9 @@ async function syncWithServer() {
 ### 8.1 Caching Strategy
 
 ```csharp
-// Core/SensorThings/SensorThingsCacheService.cs
+// Enterprise/Sensors/Services/SensorThingsCacheService.cs
+namespace Honua.Server.Enterprise.Sensors.Services;
+
 public sealed class SensorThingsCacheService
 {
     private readonly IDistributedCache _cache;
@@ -1620,7 +1689,9 @@ public sealed class SensorThingsCacheService
 Leverage Honua's existing `ConnectionPoolWarmupService`:
 
 ```csharp
-// Extensions/SensorThingsServiceExtensions.cs
+// Enterprise/Sensors/Extensions/SensorThingsServiceExtensions.cs
+namespace Honua.Server.Enterprise.Sensors.Extensions;
+
 public static IServiceCollection AddSensorThings(
     this IServiceCollection services,
     IConfiguration configuration)
@@ -1703,28 +1774,31 @@ public sealed class DatastreamExtentUpdateService : BackgroundService
 ### 9.1 Test Project Structure
 
 ```
-Honua.Server.Core.Tests.SensorThings/
-├── Unit/
-│   ├── FilterTranslatorTests.cs
-│   ├── DataArrayParserTests.cs
-│   └── EntityValidationTests.cs
-├── Integration/
-│   ├── ThingRepositoryTests.cs
-│   ├── ObservationRepositoryTests.cs
-│   └── BatchOperationTests.cs
-├── Api/
-│   ├── SensorThingsEndpointTests.cs
-│   ├── MobileWorkflowTests.cs
-│   └── AuthorizationTests.cs
-└── Performance/
-    ├── BulkInsertBenchmarks.cs
-    └── QueryPerformanceBenchmarks.cs
+tests/
+└── Honua.Server.Enterprise.Tests.Sensors/
+    ├── Unit/
+    │   ├── FilterTranslatorTests.cs
+    │   ├── DataArrayParserTests.cs
+    │   └── EntityValidationTests.cs
+    ├── Integration/
+    │   ├── ThingRepositoryTests.cs
+    │   ├── ObservationRepositoryTests.cs
+    │   └── BatchOperationTests.cs
+    ├── Api/
+    │   ├── SensorThingsEndpointTests.cs
+    │   ├── MobileWorkflowTests.cs
+    │   └── AuthorizationTests.cs
+    └── Performance/
+        ├── BulkInsertBenchmarks.cs
+        └── QueryPerformanceBenchmarks.cs
 ```
 
 ### 9.2 Sample Tests
 
 ```csharp
 // Integration/ObservationRepositoryTests.cs
+namespace Honua.Server.Enterprise.Tests.Sensors.Integration;
+
 public sealed class ObservationRepositoryTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
@@ -1802,6 +1876,8 @@ public sealed class ObservationRepositoryTests : IClassFixture<WebApplicationFac
 }
 
 // Api/MobileWorkflowTests.cs
+namespace Honua.Server.Enterprise.Tests.Sensors.Api;
+
 public sealed class MobileWorkflowTests : IClassFixture<WebApplicationFactory<Program>>
 {
     [Fact]
@@ -1932,7 +2008,9 @@ honua sensorthings migrate --from legacy-db
 Leverage Honua's OpenTelemetry integration:
 
 ```csharp
-// Add SensorThings-specific metrics
+// Enterprise/Sensors/Services/SensorThingsMetrics.cs
+namespace Honua.Server.Enterprise.Sensors.Services;
+
 public sealed class SensorThingsMetrics
 {
     private readonly Counter<long> _observationsCreated;
@@ -1965,6 +2043,9 @@ public sealed class SensorThingsMetrics
 
 **Health Check:**
 ```csharp
+// Enterprise/Sensors/Services/SensorThingsHealthCheck.cs
+namespace Honua.Server.Enterprise.Sensors.Services;
+
 public sealed class SensorThingsHealthCheck : IHealthCheck
 {
     private readonly ISensorThingsRepository _repository;
