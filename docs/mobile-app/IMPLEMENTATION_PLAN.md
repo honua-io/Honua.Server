@@ -171,24 +171,27 @@ This document provides a **detailed, actionable implementation plan** for buildi
 
 **Tasks:**
 - [ ] Create authentication service interface (`IAuthService`)
-- [ ] Implement OAuth 2.0 client credentials flow
+- [ ] Implement OAuth 2.0 Authorization Code flow with PKCE (for user authentication)
+  - PKCE (Proof Key for Code Exchange) prevents authorization code interception
+  - Standard for mobile apps per OAuth 2.0 best practices
 - [ ] Implement JWT token storage (Keychain/EncryptedSharedPreferences)
-- [ ] Create login screen UI
-- [ ] Implement token refresh logic
-- [ ] Add logout functionality
+- [ ] Create login screen UI (username/password form)
+- [ ] Implement token refresh logic (using refresh tokens)
+- [ ] Add logout functionality (revoke tokens)
 - [ ] Implement biometric authentication (Face ID/Touch ID)
 - [ ] Add authentication state management
 - [ ] Write unit tests for auth service
 
 **Deliverables:**
-- Users can log in with username/password
-- JWT tokens are securely stored
-- Token refresh works automatically
+- Users can log in with username/password via Authorization Code + PKCE flow
+- JWT access tokens and refresh tokens are securely stored
+- Token refresh works automatically (background refresh when expired)
 
 **Success Criteria:**
 - Login flow works on iOS and Android
 - Tokens persist across app restarts
 - Biometric auth works (optional)
+- PKCE challenge/verifier generated correctly
 
 ---
 
