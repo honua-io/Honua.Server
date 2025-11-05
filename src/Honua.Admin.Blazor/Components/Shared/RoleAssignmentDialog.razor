@@ -1,0 +1,109 @@
+@using Honua.Admin.Blazor.Shared.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body1">
+                Assign roles to user <b>@User?.Username</b>
+            </MudText>
+
+            <MudAlert Severity="Severity.Info">
+                Users can have multiple roles. Each role grants specific permissions.
+            </MudAlert>
+
+            @foreach (var role in RoleOptions.AvailableRoles)
+            {
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudStack Row="true" AlignItems="AlignItems.Center">
+                        <MudCheckBox @bind-Value="@_roleSelections[role.Name]"
+                                     Color="Color.Primary" />
+                        <MudStack Row="false" Spacing="1" Style="flex: 1">
+                            <MudText Typo="Typo.body1"><b>@role.DisplayName</b></MudText>
+                            <MudText Typo="Typo.body2">@role.Description</MudText>
+                            <MudStack Row="true" Spacing="1">
+                                <MudText Typo="Typo.caption">Permissions:</MudText>
+                                @foreach (var permission in role.Permissions)
+                                {
+                                    <MudChip Size="Size.Small" Variant="Variant.Text">@permission</MudChip>
+                                }
+                            </MudStack>
+                        </MudStack>
+                        <MudIcon Icon="@GetRoleIcon(role.Name)" Color="@GetRoleColor(role.Name)" />
+                    </MudStack>
+                </MudPaper>
+            }
+
+            @if (_roleSelections.Values.All(v => !v))
+            {
+                <MudAlert Severity="Severity.Warning">
+                    Warning: User will have no roles assigned. They will not be able to access any resources.
+                </MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Submit">
+            Update Roles
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public UserResponse? User { get; set; }
+
+    private Dictionary<string, bool> _roleSelections = new();
+
+    protected override void OnInitialized()
+    {
+        // Initialize role selections
+        foreach (var role in RoleOptions.AvailableRoles)
+        {
+            _roleSelections[role.Name] = User?.Roles.Contains(role.Name, StringComparer.OrdinalIgnoreCase) == true;
+        }
+    }
+
+    private void Submit()
+    {
+        var selectedRoles = _roleSelections
+            .Where(kvp => kvp.Value)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        MudDialog.Close(DialogResult.Ok(selectedRoles));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private string GetRoleIcon(string roleName)
+    {
+        return roleName.ToLowerInvariant() switch
+        {
+            "administrator" => Icons.Material.Filled.AdminPanelSettings,
+            "datapublisher" => Icons.Material.Filled.Publish,
+            "viewer" => Icons.Material.Filled.Visibility,
+            _ => Icons.Material.Filled.Person
+        };
+    }
+
+    private Color GetRoleColor(string roleName)
+    {
+        return roleName.ToLowerInvariant() switch
+        {
+            "administrator" => Color.Error,
+            "datapublisher" => Color.Warning,
+            "viewer" => Color.Info,
+            _ => Color.Default
+        };
+    }
+}

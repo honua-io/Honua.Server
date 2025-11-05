@@ -1,0 +1,184 @@
+@using Honua.Admin.Blazor.Shared.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (!IsEditMode)
+            {
+                <MudTextField @bind-Value="_username"
+                              Label="Username"
+                              Variant="Variant.Outlined"
+                              Required="true"
+                              HelperText="Unique username for login" />
+            }
+            else
+            {
+                <MudTextField Value="@User?.Username"
+                              Label="Username"
+                              Variant="Variant.Outlined"
+                              Disabled="true"
+                              HelperText="Username cannot be changed" />
+            }
+
+            <MudTextField @bind-Value="_displayName"
+                          Label="Display Name"
+                          Variant="Variant.Outlined"
+                          HelperText="Full name or display name" />
+
+            <MudTextField @bind-Value="_email"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email"
+                          HelperText="Email address for notifications" />
+
+            @if (!IsEditMode)
+            {
+                <MudTextField @bind-Value="_password"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Password"
+                              Required="true"
+                              HelperText="Initial password (must be at least 8 characters)" />
+
+                <MudTextField @bind-Value="_confirmPassword"
+                              Label="Confirm Password"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Password"
+                              Required="true"
+                              HelperText="Re-enter password to confirm" />
+            }
+
+            <MudSelect T="string"
+                       Label="Roles"
+                       MultiSelection="true"
+                       @bind-SelectedValues="_selectedRoles"
+                       Variant="Variant.Outlined"
+                       HelperText="Select one or more roles"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var role in RoleOptions.AvailableRoles)
+                {
+                    <MudSelectItem Value="@role.Name">
+                        <MudStack Row="false" Spacing="0">
+                            <MudText Typo="Typo.body2">@role.DisplayName</MudText>
+                            <MudText Typo="Typo.caption">@role.Description</MudText>
+                        </MudStack>
+                    </MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSwitch @bind-Value="_isEnabled"
+                       Label="Enabled"
+                       Color="Color.Success"
+                       HelperText="User can log in when enabled" />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Submit">
+            @(IsEditMode ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public bool IsEditMode { get; set; }
+
+    [Parameter]
+    public UserResponse? User { get; set; }
+
+    private string _username = string.Empty;
+    private string? _displayName;
+    private string? _email;
+    private string _password = string.Empty;
+    private string _confirmPassword = string.Empty;
+    private IEnumerable<string> _selectedRoles = new List<string>();
+    private bool _isEnabled = true;
+    private string? _errorMessage;
+
+    protected override void OnInitialized()
+    {
+        if (IsEditMode && User != null)
+        {
+            _username = User.Username;
+            _displayName = User.DisplayName;
+            _email = User.Email;
+            _selectedRoles = User.Roles.ToList();
+            _isEnabled = User.IsEnabled;
+        }
+    }
+
+    private void Submit()
+    {
+        _errorMessage = null;
+
+        if (!IsEditMode)
+        {
+            // Create mode validation
+            if (string.IsNullOrWhiteSpace(_username))
+            {
+                _errorMessage = "Username is required";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(_password))
+            {
+                _errorMessage = "Password is required";
+                return;
+            }
+
+            if (_password.Length < 8)
+            {
+                _errorMessage = "Password must be at least 8 characters";
+                return;
+            }
+
+            if (_password != _confirmPassword)
+            {
+                _errorMessage = "Passwords do not match";
+                return;
+            }
+
+            var request = new CreateUserRequest
+            {
+                Username = _username.Trim(),
+                Email = string.IsNullOrWhiteSpace(_email) ? null : _email.Trim(),
+                DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName.Trim(),
+                Password = _password,
+                Roles = _selectedRoles.ToList(),
+                IsEnabled = _isEnabled
+            };
+
+            MudDialog.Close(DialogResult.Ok(request));
+        }
+        else
+        {
+            // Edit mode
+            var request = new UpdateUserRequest
+            {
+                Email = string.IsNullOrWhiteSpace(_email) ? null : _email.Trim(),
+                DisplayName = string.IsNullOrWhiteSpace(_displayName) ? null : _displayName.Trim(),
+                Roles = _selectedRoles.ToList(),
+                IsEnabled = _isEnabled
+            };
+
+            MudDialog.Close(DialogResult.Ok(request));
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

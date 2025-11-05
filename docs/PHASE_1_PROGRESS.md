@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
 **Last Updated:** 2025-11-05
-**Current Phase:** Phase 2.6 (Caching Configuration UI) - COMPLETE
+**Current Phase:** Phase 2.7 (Security & Permissions UI) - COMPLETE
 
 ---
 
@@ -696,6 +696,169 @@
 - Long: 24 hours (static content)
 - VeryLong: 7 days (immutable content)
 - Permanent: 30 days (permanent content)
+
+---
+
+## ✅ Phase 2.7 Complete - Security & Permissions UI (Week 8)
+
+### Completed Tasks
+
+**User Models:**
+- ✅ `UserModels.cs` - User management and role data models
+  - UserResponse with 13 fields (username, display name, email, roles, status, etc.)
+  - CreateUserRequest (username, display name, email, password, roles)
+  - UpdateUserRequest (display name, email, roles, enabled)
+  - ChangePasswordRequest (new password for admin override)
+  - AssignRolesRequest (role assignment)
+  - UserListResponse (paginated user list)
+  - RoleInfo (role definitions with permissions and descriptions)
+  - UserStatistics (total, active, locked, disabled counts)
+  - RoleOptions with 3 predefined roles:
+    - Administrator: Full system access including user management
+    - DataPublisher: Read/write/import/export data operations
+    - Viewer: Read-only access to services and layers
+
+**User API Client:**
+- ✅ `UserApiClient.cs` - User management operations
+  - ListUsersAsync (get all users with pagination)
+  - GetUserAsync (get specific user by username)
+  - CreateUserAsync (create new user with roles)
+  - UpdateUserAsync (update user information)
+  - DeleteUserAsync (delete user account)
+  - ChangePasswordAsync (admin password reset without current password)
+  - AssignRolesAsync (modify user roles)
+  - EnableUserAsync (enable disabled user)
+  - DisableUserAsync (disable user account)
+  - UnlockUserAsync (unlock locked user)
+  - GetStatisticsAsync (get user statistics)
+
+**UI Pages:**
+- ✅ `UserManagement.razor` - Main user management page at `/users`
+  - User statistics dashboard with 4 cards (total, active, locked, disabled)
+  - User table with sortable columns:
+    - Username, Display Name, Email
+    - Roles (color-coded chips: Administrator=red, DataPublisher=orange, Viewer=blue)
+    - Status (Active/Locked/Disabled with color-coded chips)
+    - Last Login (relative time display)
+    - Failed Attempts counter
+  - Action menu per user (edit, manage roles, change password, enable/disable, unlock, delete)
+  - Create new user button
+  - Real-time statistics and user list loading
+
+**UI Components:**
+- ✅ `UserDialog.razor` - Create/edit user modal
+  - Create mode: username, display name, email, password, confirm password, roles, enabled toggle
+  - Edit mode: display name, email, roles, enabled toggle (username not editable)
+  - Password validation: minimum 8 characters
+  - Password confirmation match validation
+  - Multi-select roles (MudSelect with MultiSelection)
+  - Helper text and validation messages
+- ✅ `RoleAssignmentDialog.razor` - Role management modal
+  - Checkbox selection for each role
+  - Role descriptions and permission lists
+  - Role icons (Shield for Admin, Edit for DataPublisher, Visibility for Viewer)
+  - Warning when no roles selected
+  - Color-coded role names matching main UI
+- ✅ `ChangePasswordDialog.razor` - Password change modal
+  - Administrator can set new password without knowing current password
+  - New password input (minimum 8 characters)
+  - Confirm password input with match validation
+  - Helper text explaining admin override capability
+  - Password requirements display
+
+**Files Created:** 6 files, ~800 lines
+**Files Modified:** 2 files (Program.cs, NavMenu.razor)
+**Commit:** Pending
+
+**Technical Notes:**
+- Assumes backend endpoints at `/admin/users` (to be implemented)
+- Administrator role required for all user management operations
+- Password policy: minimum 8 characters (configurable in backend)
+- Multi-role support per user (can have multiple roles simultaneously)
+- Failed login tracking for security monitoring
+- Account locking mechanism for failed attempts
+- User status: Active (default), Locked (failed logins), Disabled (manual)
+- Last login timestamp tracking
+- Real-time user statistics dashboard
+
+**Features:**
+- **User Statistics:**
+  - Total users count
+  - Active users count
+  - Locked users count (due to failed login attempts)
+  - Disabled users count (manually disabled)
+- **User Management:**
+  - Create new users with username, email, display name, password, roles
+  - Edit user information (display name, email, roles, enabled status)
+  - Delete user accounts with confirmation
+  - View user details in table format
+- **Role Management:**
+  - Assign multiple roles per user
+  - Three predefined roles with different permission levels
+  - Role descriptions and permission lists
+  - Color-coded role chips for quick identification
+- **Password Management:**
+  - Administrator can reset user passwords without knowing current password
+  - Password validation (minimum 8 characters)
+  - Password confirmation match validation
+- **Account Management:**
+  - Enable/disable user accounts
+  - Unlock locked accounts (after failed login attempts)
+  - Track failed login attempts
+  - Last login timestamp display
+- **Security:**
+  - Authorization required (administrator role)
+  - Password policy enforcement
+  - Account locking after failed attempts
+  - Audit trail integration (user actions logged)
+
+**UI/UX Features:**
+- Color-coded role chips (Administrator=red, DataPublisher=orange, Viewer=blue)
+- Status chips with colors (Active=green, Locked=yellow, Disabled=red)
+- Relative time display for last login ("2 hours ago")
+- Action menu for per-user operations
+- Confirmation dialogs for destructive operations (delete)
+- Real-time statistics updates
+- Sortable user table columns
+- Failed attempts badge for security monitoring
+- Helper text and validation messages throughout
+
+**Role Definitions:**
+1. **Administrator Role:**
+   - Display Name: Administrator
+   - Description: Full system access including user management, configuration, and all data operations
+   - Permissions: all
+   - Color: Red
+   - Icon: Shield
+
+2. **DataPublisher Role:**
+   - Display Name: Data Publisher
+   - Description: Can import, publish, and manage geospatial data and services
+   - Permissions: read, write, import, export
+   - Color: Orange
+   - Icon: Edit
+
+3. **Viewer Role:**
+   - Display Name: Viewer
+   - Description: Read-only access to view services and layers
+   - Permissions: read
+   - Color: Blue
+   - Icon: Visibility
+
+**Backend Integration:**
+- API endpoints at `/admin/users` (to be implemented in backend)
+- Expected endpoints:
+  - GET /admin/users (list users)
+  - POST /admin/users (create user)
+  - GET /admin/users/{username} (get user)
+  - PUT /admin/users/{username} (update user)
+  - DELETE /admin/users/{username} (delete user)
+  - POST /admin/users/{username}/password (change password)
+  - POST /admin/users/{username}/roles (assign roles)
+  - POST /admin/users/{username}/enable (enable user)
+  - POST /admin/users/{username}/disable (disable user)
+  - POST /admin/users/{username}/unlock (unlock user)
+  - GET /admin/users/statistics (get statistics)
 
 ---
 
