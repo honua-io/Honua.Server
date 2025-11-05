@@ -1,0 +1,99 @@
+@using Honua.Admin.Blazor.Shared.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (IsCreate)
+            {
+                <MudTextField Label="Folder ID"
+                              @bind-Value="_folderId"
+                              Required="true"
+                              HelperText="Unique identifier for the folder (e.g., 'basemaps', 'imagery')"
+                              Variant="Variant.Filled"
+                              Immediate="true" />
+            }
+
+            <MudTextField Label="Title"
+                          @bind-Value="_title"
+                          HelperText="Display name for the folder"
+                          Variant="Variant.Filled"
+                          Immediate="true" />
+
+            <MudNumericField Label="Order"
+                             @bind-Value="_order"
+                             HelperText="Numeric order for folder sorting (optional)"
+                             Variant="Variant.Filled"
+                             Min="0" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!IsValid())">
+            @(IsCreate ? "Create" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string Title { get; set; } = "Folder";
+
+    [Parameter]
+    public bool IsCreate { get; set; } = true;
+
+    [Parameter]
+    public string? ExistingTitle { get; set; }
+
+    private string _folderId = string.Empty;
+    private string? _title;
+    private int? _order;
+
+    protected override void OnInitialized()
+    {
+        if (!IsCreate && ExistingTitle != null)
+        {
+            _title = ExistingTitle;
+        }
+    }
+
+    private bool IsValid()
+    {
+        if (IsCreate)
+        {
+            return !string.IsNullOrWhiteSpace(_folderId);
+        }
+        return true;
+    }
+
+    private void Submit()
+    {
+        if (IsCreate)
+        {
+            var request = new CreateFolderRequest
+            {
+                Id = _folderId.Trim(),
+                Title = string.IsNullOrWhiteSpace(_title) ? null : _title.Trim(),
+                Order = _order
+            };
+            MudDialog.Close(DialogResult.Ok(request));
+        }
+        else
+        {
+            var request = new UpdateFolderRequest
+            {
+                Title = string.IsNullOrWhiteSpace(_title) ? null : _title.Trim(),
+                Order = _order
+            };
+            MudDialog.Close(DialogResult.Ok(request));
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

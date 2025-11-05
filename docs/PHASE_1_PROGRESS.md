@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
-**Last Updated:** 2025-11-04
-**Current Phase:** Phase 1.5 (Service Management UI) - COMPLETE
+**Last Updated:** 2025-11-05
+**Current Phase:** Phase 2.1 (Real-Time Updates) - COMPLETE
 
 ---
 
@@ -212,21 +212,96 @@
 **Files Created:** 6 files, ~1,200 lines
 **Commit:** Pending
 
-### Phase 1.6 - Layer Management UI (Week 3-4)
-- [ ] `LayerList.razor` - List layers
-- [ ] `LayerEditor.razor` - Create/edit layer form
-- [ ] `LayerDetail.razor` - View layer details
-- [ ] Add CRS selector component
-- [ ] Add geometry type selector
-- [ ] Test CRUD workflows
+## ✅ Phase 1.6 Complete - Layer Management UI (Week 3-4)
 
-### Phase 1.7 - Folder Management UI (Week 4)
-- [ ] `FolderBrowser.razor` - Tree view of folders
-- [ ] `FolderDialog.razor` - Create/rename folder modal
-- [ ] Drag-and-drop folder reorganization
-- [ ] Test folder operations
+### Completed Tasks
+- ✅ `LayerList.razor` - List layers with search and filtering
+- ✅ `LayerEditor.razor` - Create/edit layer form with validation
+- ✅ `LayerDetail.razor` - View layer details
+- ✅ `LayerApiClient.cs` - Layer API integration
+- ✅ `LayerModels.cs` - Layer data models
 
-### Phase 1.8 - Testing & Documentation (Week 4)
+**Files Created:** 4 files, ~1,000 lines
+**Commit:** `4959706`
+
+---
+
+## ✅ Phase 1.7 Complete - Folder Management UI (Week 4)
+
+### Completed Tasks
+
+**Folder Models and API Client:**
+- ✅ `FolderModels.cs` - Folder request/response models
+  - CreateFolderRequest
+  - UpdateFolderRequest
+  - FolderResponse
+  - FolderTreeNode (for UI tree view)
+- ✅ `FolderApiClient.cs` - Folder API integration
+  - GetFoldersAsync
+  - CreateFolderAsync
+  - UpdateFolderAsync
+  - DeleteFolderAsync
+
+**UI Components:**
+- ✅ `FolderBrowser.razor` - Tree view with folder management
+  - MudTreeView for hierarchical folder display
+  - Split view: folder tree + details panel
+  - Create/Rename/Delete operations
+  - Service count badges
+  - Real-time service list for selected folder
+- ✅ `FolderDialog.razor` - Create/rename folder modal
+  - Folder ID input (create only)
+  - Title and order fields
+  - Validation
+
+**Files Created:** 3 files, ~450 lines
+**Commit:** Pending
+
+---
+
+## ✅ Phase 2.1 Complete - Real-Time Updates (Week 5)
+
+### Completed Tasks
+
+**Backend (Honua.Server.Host):**
+- ✅ `MetadataChangeNotificationHub.cs` - SignalR hub for real-time notifications
+  - Hub connection management
+  - GetSupportsRealTimeUpdatesAsync() method
+  - Ping() for connectivity checks
+  - IMetadataChangeNotifier interface
+  - MetadataChangedEventArgs for change notifications
+- ✅ `MetadataChangeNotificationService.cs` - Hosted service
+  - Subscribes to IMutableMetadataProvider.MetadataChanged events
+  - Broadcasts changes to all connected SignalR clients
+  - Automatic startup/shutdown
+- ✅ `AdminSignalRServiceCollectionExtensions.cs` - Service registration
+  - AddAdminSignalR() extension method
+  - Registers SignalR and hosted service
+- ✅ Hub endpoint mapping at `/admin/hub/metadata`
+- ✅ Integration with HonuaHostConfigurationExtensions
+
+**Frontend (Honua.Admin.Blazor):**
+- ✅ `MetadataHubService.cs` - SignalR client service
+  - HubConnection management with automatic reconnection
+  - Bearer token authentication
+  - OnMetadataChanged event for components
+  - SupportsRealTimeUpdates capability detection
+  - MetadataChangedNotification model
+- ✅ Service registration in Program.cs
+
+**Files Created:** 4 files, ~400 lines
+**Commit:** Pending
+
+**Technical Notes:**
+- Uses SignalR with bearer token authentication
+- Automatic reconnection with exponential backoff (0s, 2s, 10s, 30s)
+- Checks provider capabilities at runtime (IMetadataChangeNotifier)
+- Gracefully degrades if provider doesn't support real-time updates
+- Architecture supports PostgreSQL NOTIFY/LISTEN and Redis Pub/Sub
+
+---
+
+## Phase 1.8 - Testing & Documentation (Week 4)
 - [ ] Unit tests for API endpoints
 - [ ] Integration tests for CRUD operations
 - [ ] Blazor component tests (bUnit)

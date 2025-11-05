@@ -67,6 +67,10 @@ builder.Services.AddScoped<NotificationService>();
 // Register API clients
 builder.Services.AddScoped<ServiceApiClient>();
 builder.Services.AddScoped<LayerApiClient>();
+builder.Services.AddScoped<FolderApiClient>();
+
+// Register SignalR hub service for real-time updates
+builder.Services.AddScoped<MetadataHubService>();
 
 var app = builder.Build();
 

@@ -56,6 +56,9 @@ internal static class HonuaHostConfigurationExtensions
         var mvcBuilder = builder.Services.AddHonuaMvcServices();
         builder.Services.AddHonuaApiDocumentation(builder.Environment);
 
+        // Admin UI SignalR for real-time updates
+        builder.Services.AddAdminSignalR();
+
         // OData (conditional)
         var odataEnabled = builder.Configuration.GetValue<bool?>("honua:services:odata:enabled") ?? true;
         if (odataEnabled)
