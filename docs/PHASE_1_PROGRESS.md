@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
 **Last Updated:** 2025-11-05
-**Current Phase:** Phase 2.4 (Versioning UI) - COMPLETE
+**Current Phase:** Phase 2.5 (Audit Log Viewer) - COMPLETE
 
 ---
 
@@ -499,6 +499,98 @@
 - Restore any snapshot to roll back changes
 - Human-friendly time and size displays
 - Authorization required (administrator role)
+
+---
+
+## ✅ Phase 2.5 Complete - Audit Log Viewer (Week 7)
+
+### Completed Tasks
+
+**Audit Models:**
+- ✅ `AuditModels.cs` - Comprehensive audit log data models
+  - AuditEvent with 20+ fields (timestamp, user, action, resource, IP, risk score, etc.)
+  - AuditChanges for tracking before/after values
+  - AuditLogQuery with extensive filtering options
+  - AuditLogResult for paginated responses
+  - AuditLogStatistics for analytics
+  - AuditFilterOptions with predefined filter values
+
+**Audit Log API Client:**
+- ✅ `AuditLogApiClient.cs` - Audit log operations
+  - QueryAsync (search with filters and pagination)
+  - GetByIdAsync (retrieve specific event)
+  - GetStatisticsAsync (analytics for time period)
+  - ExportToCsvAsync (export filtered events to CSV)
+  - ExportToJsonAsync (export filtered events to JSON)
+  - ArchiveEventsAsync (archive old events)
+
+**UI Pages:**
+- ✅ `AuditLogViewer.razor` - Main audit log viewer page
+  - Searchable audit trail with real-time filtering
+  - Advanced filter panel with 9 filter criteria:
+    - Search text (description, user, IP)
+    - Category (authentication, authorization, data access, admin action, etc.)
+    - Action (login, create, update, delete, export, etc.)
+    - Resource Type (service, layer, folder, user, tenant, etc.)
+    - User identifier (username/email)
+    - Status (success/failed)
+    - Date range (start/end date)
+    - Risk score (minimum threshold)
+  - Paginated table with adjustable page size (25/50/100/200)
+  - Color-coded categories and status indicators
+  - Risk score badges for high-risk events
+  - Relative time display ("2 hours ago")
+  - Export to CSV/JSON with current filters applied
+  - View detailed event information
+
+**UI Components:**
+- ✅ `AuditEventDetailsDialog.razor` - Modal for viewing full event details
+  - Complete event metadata display
+  - Before/After changes visualization (color-coded)
+  - Additional metadata in formatted JSON
+  - All audit fields shown in organized table
+  - HTTP context information (method, path, status, duration)
+  - Session and trace ID for correlation
+
+**JavaScript:**
+- ✅ `app.js` - Client-side file download functionality
+  - downloadFile function for exporting CSV/JSON files
+
+**Files Created:** 5 files, ~750 lines
+**Files Modified:** 3 files (Program.cs, NavMenu.razor, App.razor)
+**Commit:** Pending
+
+**Technical Notes:**
+- Leverages existing `/api/admin/audit` API endpoints from Honua.Server.Enterprise
+- Multi-tenant isolation enforced at API level
+- Administrator role required for all operations
+- Comprehensive filtering with 9 different criteria
+- Client-side file download via JavaScript interop
+- Export respects current filter settings
+- Risk score highlighting for security monitoring
+- Session and trace ID support for distributed tracing
+
+**Features:**
+- View and search all audit events
+- Filter by user, category, action, resource type, date range, status, risk score
+- Paginated results with configurable page sizes
+- Export filtered results to CSV or JSON
+- View detailed event information with metadata
+- Track changes with before/after comparison
+- Color-coded categories for quick identification
+- Relative time display for better UX
+- High-risk event highlighting
+- Session correlation support
+
+**Security & Compliance:**
+- All administrative actions logged
+- Data modifications tracked with before/after
+- Authentication and authorization events captured
+- IP address and user agent tracking
+- Tamper-proof audit trail (write-only events)
+- Export capabilities for compliance reporting
+- Risk scoring for anomaly detection
+- Tenant isolation for multi-tenant deployments
 
 ---
 
