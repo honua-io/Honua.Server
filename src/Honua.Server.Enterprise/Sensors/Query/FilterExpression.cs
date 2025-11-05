@@ -6,6 +6,42 @@ namespace Honua.Server.Enterprise.Sensors.Query;
 public abstract record FilterExpression;
 
 /// <summary>
+/// Comparison operators for filter expressions.
+/// </summary>
+public enum ComparisonOperator
+{
+    /// <summary>
+    /// Equals (eq)
+    /// </summary>
+    Equals,
+
+    /// <summary>
+    /// Not equals (ne)
+    /// </summary>
+    NotEquals,
+
+    /// <summary>
+    /// Greater than (gt)
+    /// </summary>
+    GreaterThan,
+
+    /// <summary>
+    /// Greater than or equal (ge)
+    /// </summary>
+    GreaterThanOrEqual,
+
+    /// <summary>
+    /// Less than (lt)
+    /// </summary>
+    LessThan,
+
+    /// <summary>
+    /// Less than or equal (le)
+    /// </summary>
+    LessThanOrEqual
+}
+
+/// <summary>
 /// Represents a comparison expression (e.g., "result gt 20.0").
 /// </summary>
 public sealed record ComparisonExpression : FilterExpression
@@ -17,14 +53,13 @@ public sealed record ComparisonExpression : FilterExpression
 
     /// <summary>
     /// The comparison operator.
-    /// Values: "eq", "ne", "gt", "ge", "lt", "le"
     /// </summary>
-    public string Operator { get; init; } = default!;
+    public ComparisonOperator Operator { get; init; }
 
     /// <summary>
     /// The value to compare against.
     /// </summary>
-    public object Value { get; init; } = default!;
+    public object Value { get; init} = default!;
 }
 
 /// <summary>
