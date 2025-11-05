@@ -1,138 +1,282 @@
 @page "/"
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Components.Shared
+@using System.Timers
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject ServiceApiClient ServiceApi
+@inject DashboardApiClient DashboardApi
 @inject NavigationState NavState
+@inject ILogger<Home> Logger
+@implements IDisposable
 
 <PageTitle>Dashboard - Honua Admin</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
-<MudText Class="mb-4">Welcome to the Honua Admin UI</MudText>
+<MudStack Spacing="3">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+        <div>
+            <MudText Typo="Typo.h3">Dashboard</MudText>
+            <MudText Class="mt-1" Color="Color.Secondary">Monitor and manage your GIS services</MudText>
+        </div>
+        @if (_metrics != null && _refreshTimer != null)
+        {
+            <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.AutorenewOutlined" Variant="Variant.Text">
+                Auto-refresh
+            </MudChip>
+        }
+    </MudStack>
 
-@if (_loading)
-{
-    <MudProgressLinear Indeterminate="true" Class="mb-4" />
-}
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
 
-<MudGrid>
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h4">@_serviceCount</MudText>
-            <MudText Typo="Typo.body1">Active Services</MudText>
-            <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Primary" Size="Size.Large" Class="mt-2" />
-        </MudPaper>
-    </MudItem>
+    @* Overview Metrics *@
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.h4">@(_metrics?.Overview.TotalServices ?? 0)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Services</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                            @(_metrics?.Overview.EnabledServices ?? 0) enabled
+                        </MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Primary" Size="Size.Large" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
 
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h4">@_layerCount</MudText>
-            <MudText Typo="Typo.body1">Total Layers</MudText>
-            <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Secondary" Size="Size.Large" Class="mt-2" />
-        </MudPaper>
-    </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.h4">@(_metrics?.Overview.TotalLayers ?? 0)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Layers</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                            @(_metrics?.Overview.TotalFolders ?? 0) folders
+                        </MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Secondary" Size="Size.Large" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
 
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h4">@_folderCount</MudText>
-            <MudText Typo="Typo.body1">Folders</MudText>
-            <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Tertiary" Size="Size.Large" Class="mt-2" />
-        </MudPaper>
-    </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.h4">@FormatLargeNumber(_metrics?.Overview.TotalRequests24h ?? 0)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Requests (24h)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                            @(_metrics?.Performance.RequestsPerSecond.ToString("F1") ?? "0") req/s
+                        </MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Info" Size="Size.Large" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
 
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h4">Active</MudText>
-            <MudText Typo="Typo.body1">System Status</MudText>
-            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mt-2" />
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div>
+                        <MudText Typo="Typo.h4">@((_metrics?.Performance.CacheHitRate * 100).ToString("F0") ?? "0")%</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Cache Hit Rate</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                            @(_metrics?.Performance.AverageResponseTime.ToString("F0") ?? "0")ms avg
+                        </MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.Speed" Color="@GetCacheHitRateColor()" Size="Size.Large" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 
-<MudGrid Class="mt-6">
-    <MudItem xs="12">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h5" GutterBottom="true">Quick Actions</MudText>
-            <MudStack Row="true" Spacing="2">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/services/new">
-                    Create Service
-                </MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Upload" Href="/import">
-                    Import Data
-                </MudButton>
-                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Folder" Href="/folders">
-                    Browse Folders
-                </MudButton>
-            </MudStack>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+    @* Performance Metrics *@
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-4">Performance Metrics</MudText>
+                <MudGrid>
+                    <MudItem xs="6" sm="3">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                            <MudText Typo="Typo.h5">@(_metrics?.Performance.AverageResponseTime.ToString("F0") ?? "0")ms</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">Avg Response</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                            <MudText Typo="Typo.h5">@(_metrics?.Performance.P95ResponseTime.ToString("F0") ?? "0")ms</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">P95 Response</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                            <MudText Typo="Typo.h5">@(_metrics?.Performance.P99ResponseTime.ToString("F0") ?? "0")ms</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">P99 Response</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                            <MudText Typo="Typo.h5" Color="@GetErrorRateColor()">@((_metrics?.Performance.ErrorRate * 100).ToString("F2") ?? "0")%</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">Error Rate</MudText>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
 
-<MudGrid Class="mt-6">
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h5" GutterBottom="true">Recent Activity</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Default">
-                No recent activity to display.
-            </MudText>
-            @* TODO: Add recent activity feed after audit log integration *@
-        </MudPaper>
-    </MudItem>
+        <MudItem xs="12" md="4">
+            <HealthStatusCard Health="@_metrics?.HealthStatus" />
+        </MudItem>
+    </MudGrid>
 
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudText Typo="Typo.h5" GutterBottom="true">Getting Started</MudText>
-            <MudList Clickable="true">
-                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/services">
-                    View your services
-                </MudListItem>
-                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/import">
-                    Import your first dataset
-                </MudListItem>
-                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/folders">
-                    Organize with folders
-                </MudListItem>
-            </MudList>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+    @* Service Distribution and Activity Feed *@
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <ServiceDistributionChart Distribution="@_metrics?.ServiceDistribution" />
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <ActivityFeed Activities="@_metrics?.RecentActivity" MaxItems="10" />
+        </MudItem>
+    </MudGrid>
+
+    @* Quick Actions *@
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-3">Quick Actions</MudText>
+        <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/services/new">
+                Create Service
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Upload" Href="/import">
+                Import Data
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Folder" Href="/folders">
+                Browse Folders
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Security" Href="/audit">
+                View Audit Log
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Storage" Href="/cache">
+                Cache Settings
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+</MudStack>
 
 @code {
-    private int _serviceCount = 0;
-    private int _layerCount = 0;
-    private int _folderCount = 0;
+    private DashboardMetrics? _metrics;
     private bool _loading = true;
+    private Timer? _refreshTimer;
 
     protected override async Task OnInitializedAsync()
     {
-        // Set breadcrumbs for home page
         NavState.Reset();
+        await LoadDashboardMetricsAsync();
 
-        await LoadDashboardDataAsync();
+        // Auto-refresh every 30 seconds
+        _refreshTimer = new Timer(30000);
+        _refreshTimer.Elapsed += async (sender, e) => await RefreshMetricsAsync();
+        _refreshTimer.AutoReset = true;
+        _refreshTimer.Start();
     }
 
-    private async Task LoadDashboardDataAsync()
+    private async Task LoadDashboardMetricsAsync()
     {
         _loading = true;
 
         try
         {
-            var stats = await ServiceApi.GetDashboardStatsAsync();
-            if (stats != null)
+            var request = new DashboardMetricsRequest
             {
-                _serviceCount = stats.ServiceCount;
-                _layerCount = stats.LayerCount;
-                _folderCount = stats.FolderCount;
-            }
+                StartTime = DateTimeOffset.UtcNow.AddHours(-24),
+                EndTime = DateTimeOffset.UtcNow,
+                IncludeTimeSeries = true,
+                IncludeRecentActivity = true,
+                ActivityLimit = 20
+            };
+
+            _metrics = await DashboardApi.GetMetricsAsync(request);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Silently fail - dashboard will show zeros
+            Logger.LogError(ex, "Failed to load dashboard metrics");
+            // Create empty metrics to avoid null reference
+            _metrics = new DashboardMetrics();
         }
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task RefreshMetricsAsync()
+    {
+        try
+        {
+            var request = new DashboardMetricsRequest
+            {
+                StartTime = DateTimeOffset.UtcNow.AddHours(-24),
+                EndTime = DateTimeOffset.UtcNow,
+                IncludeTimeSeries = false, // Don't reload time series on refresh
+                IncludeRecentActivity = true,
+                ActivityLimit = 20
+            };
+
+            _metrics = await DashboardApi.GetMetricsAsync(request);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh dashboard metrics");
+        }
+    }
+
+    private string FormatLargeNumber(long number)
+    {
+        if (number >= 1_000_000)
+            return $"{number / 1_000_000.0:F1}M";
+        if (number >= 1_000)
+            return $"{number / 1_000.0:F1}K";
+        return number.ToString();
+    }
+
+    private Color GetCacheHitRateColor()
+    {
+        if (_metrics == null)
+            return Color.Default;
+
+        var hitRate = _metrics.Performance.CacheHitRate;
+        if (hitRate >= 0.8)
+            return Color.Success;
+        if (hitRate >= 0.5)
+            return Color.Warning;
+        return Color.Error;
+    }
+
+    private Color GetErrorRateColor()
+    {
+        if (_metrics == null)
+            return Color.Default;
+
+        var errorRate = _metrics.Performance.ErrorRate;
+        if (errorRate < 0.01)
+            return Color.Success;
+        if (errorRate < 0.05)
+            return Color.Warning;
+        return Color.Error;
+    }
+
+    public void Dispose()
+    {
+        if (_refreshTimer != null)
+        {
+            _refreshTimer.Stop();
+            _refreshTimer.Dispose();
+            _refreshTimer = null;
         }
     }
 }

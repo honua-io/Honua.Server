@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
 **Last Updated:** 2025-11-05
-**Current Phase:** Phase 2.7 (Security & Permissions UI) - COMPLETE
+**Current Phase:** Phase 3.3 (Monitoring Dashboard) - COMPLETE
 
 ---
 
@@ -859,6 +859,157 @@
   - POST /admin/users/{username}/disable (disable user)
   - POST /admin/users/{username}/unlock (unlock user)
   - GET /admin/users/statistics (get statistics)
+
+---
+
+## ✅ Phase 3.3 Complete - Monitoring Dashboard (Week 10)
+
+### Completed Tasks
+
+**Dashboard Models:**
+- ✅ `DashboardModels.cs` - Comprehensive monitoring data models
+  - DashboardMetrics (comprehensive metrics container)
+  - OverviewMetrics (services, layers, folders, requests)
+  - PerformanceMetrics (response times, cache hit rate, error rate, time series)
+  - ServiceDistribution (WMS, WFS, WMTS, OGC counts)
+  - ServiceUsageMetric (top services by request count)
+  - ActivityEntry (recent activity feed)
+  - HealthStatus (system component health)
+  - StorageMetrics (disk usage, datasets)
+  - TimeSeriesDataPoint (for charts)
+  - DashboardMetricsRequest (query parameters)
+
+**Dashboard API Client:**
+- ✅ `DashboardApiClient.cs` - Dashboard metrics API integration
+  - GetMetricsAsync (comprehensive dashboard metrics)
+  - GetOverviewAsync (quick overview metrics)
+  - GetPerformanceMetricsAsync (performance with time range)
+  - GetServiceDistributionAsync (service type distribution)
+  - GetTopServicesAsync (most used services)
+  - GetRecentActivityAsync (activity feed with limit)
+  - GetHealthStatusAsync (system health check)
+  - GetStorageMetricsAsync (storage usage)
+  - GetRequestTimeSeriesAsync (request rate over time)
+
+**UI Components:**
+- ✅ `ServiceDistributionChart.razor` - Service type distribution chart
+  - Visual breakdown of WMS, WFS, WMTS, OGC, Other services
+  - Progress bars with percentages
+  - Color-coded service types
+  - Total services count
+- ✅ `ActivityFeed.razor` - Recent activity timeline
+  - Timeline view of recent actions
+  - Color-coded by action type (create, update, delete, login)
+  - Relative time display ("2h ago", "Just now")
+  - Action icons and status indicators
+  - Failed action highlighting
+  - Configurable max items
+- ✅ `HealthStatusCard.razor` - System health status
+  - Overall health status (Healthy, Degraded, Unhealthy)
+  - Component-level health (Database, Cache, Storage, External Services)
+  - Response time per component
+  - Color-coded health indicators
+  - Last checked timestamp
+
+**Enhanced Home Dashboard:**
+- ✅ Updated `Home.razor` - Comprehensive monitoring dashboard
+  - 4 overview cards (Services, Layers, Requests 24h, Cache Hit Rate)
+  - Performance metrics panel (Avg, P95, P99 response times, Error rate)
+  - Health status card (system component monitoring)
+  - Service distribution chart
+  - Recent activity feed (timeline view)
+  - Quick actions panel (Create Service, Import Data, etc.)
+  - Auto-refresh every 30 seconds
+  - IDisposable timer cleanup
+  - Large number formatting (K, M suffixes)
+  - Color-coded metrics (cache hit rate, error rate)
+
+**Files Created:** 5 files, ~900 lines
+**Files Modified:** 2 files (Home.razor, Program.cs)
+**Commit:** Pending
+
+**Technical Notes:**
+- Assumes backend endpoints at `/admin/dashboard/*` (to be implemented)
+- Auto-refresh every 30 seconds for real-time monitoring
+- IDisposable pattern for proper timer cleanup
+- Comprehensive metrics covering performance, health, usage, and activity
+- Time series support for charting (future enhancement)
+- Color-coded health indicators (green/yellow/red)
+- Responsive grid layout for different screen sizes
+
+**Features:**
+- **Overview Metrics:**
+  - Total services (with enabled count)
+  - Total layers (with folder count)
+  - Requests in last 24 hours (with req/s)
+  - Cache hit rate (with avg response time)
+
+- **Performance Monitoring:**
+  - Average response time
+  - P95 response time (95th percentile)
+  - P99 response time (99th percentile)
+  - Error rate (color-coded: <1% green, <5% yellow, >5% red)
+
+- **System Health:**
+  - Overall health status
+  - Database health (with response time)
+  - Cache health (with response time)
+  - Storage health (with response time)
+  - External services health (with response time)
+
+- **Service Analytics:**
+  - Service distribution chart (by type)
+  - Progress bars showing percentage per type
+  - Color-coded service categories
+
+- **Activity Feed:**
+  - Timeline view of recent actions
+  - User attribution ("admin created layer1")
+  - Action icons (add, edit, delete, login, etc.)
+  - Relative timestamps
+  - Failed action highlighting
+  - Resource type indicators
+
+- **Quick Actions:**
+  - Create Service
+  - Import Data
+  - Browse Folders
+  - View Audit Log
+  - Cache Settings
+
+**UI/UX Features:**
+- Auto-refresh indicator (shows "Auto-refresh" chip)
+- Loading state with progress bar
+- Graceful error handling (empty metrics on error)
+- Responsive grid layout
+- Color-coded metrics based on thresholds
+- Large number formatting (1.5K, 2.3M)
+- Relative time formatting
+- Icon-based visual cues
+
+**Backend Integration Required:**
+Dashboard endpoints need to be implemented at:
+- GET /admin/dashboard/metrics
+- GET /admin/dashboard/overview
+- GET /admin/dashboard/performance
+- GET /admin/dashboard/service-distribution
+- GET /admin/dashboard/top-services
+- GET /admin/dashboard/recent-activity
+- GET /admin/dashboard/health
+- GET /admin/dashboard/storage
+- GET /admin/dashboard/timeseries/requests
+
+**Metrics Collected:**
+- Service counts (total, enabled, disabled, by type)
+- Layer counts
+- Folder counts
+- Request counts (24h, per second)
+- Response times (avg, p95, p99)
+- Cache hit rate
+- Error rate
+- System component health
+- Recent activity (last 20 actions)
+- Top services by usage
 
 ---
 

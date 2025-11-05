@@ -1,0 +1,152 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudPaper Elevation="2" Class="pa-4">
+    <MudStack Spacing="3">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h6">System Health</MudText>
+            @if (Health != null)
+            {
+                <MudChip Size="Size.Small" Color="@GetOverallHealthColor()" Variant="Variant.Filled">
+                    @Health.Overall
+                </MudChip>
+            }
+        </MudStack>
+
+        @if (Health == null)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+        }
+        else
+        {
+            <MudStack Spacing="2">
+                @* Database Health *@
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Database</MudText>
+                    </MudStack>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        @if (Health.Database.ResponseTime.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @Health.Database.ResponseTime.Value.ToString("F0")ms
+                            </MudText>
+                        }
+                        <MudChip Size="Size.Small" Color="@GetComponentHealthColor(Health.Database.Status)" Variant="Variant.Text">
+                            @Health.Database.Status
+                        </MudChip>
+                    </MudStack>
+                </MudStack>
+
+                @* Cache Health *@
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Memory" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Cache</MudText>
+                    </MudStack>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        @if (Health.Cache.ResponseTime.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @Health.Cache.ResponseTime.Value.ToString("F0")ms
+                            </MudText>
+                        }
+                        <MudChip Size="Size.Small" Color="@GetComponentHealthColor(Health.Cache.Status)" Variant="Variant.Text">
+                            @Health.Cache.Status
+                        </MudChip>
+                    </MudStack>
+                </MudStack>
+
+                @* Storage Health *@
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Cloud" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Storage</MudText>
+                    </MudStack>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        @if (Health.Storage.ResponseTime.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @Health.Storage.ResponseTime.Value.ToString("F0")ms
+                            </MudText>
+                        }
+                        <MudChip Size="Size.Small" Color="@GetComponentHealthColor(Health.Storage.Status)" Variant="Variant.Text">
+                            @Health.Storage.Status
+                        </MudChip>
+                    </MudStack>
+                </MudStack>
+
+                @* External Services Health *@
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.CloudSync" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">External Services</MudText>
+                    </MudStack>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        @if (Health.ExternalServices.ResponseTime.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @Health.ExternalServices.ResponseTime.Value.ToString("F0")ms
+                            </MudText>
+                        }
+                        <MudChip Size="Size.Small" Color="@GetComponentHealthColor(Health.ExternalServices.Status)" Variant="Variant.Text">
+                            @Health.ExternalServices.Status
+                        </MudChip>
+                    </MudStack>
+                </MudStack>
+            </MudStack>
+
+            <MudDivider />
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">
+                Last checked: @FormatRelativeTime(Health.LastChecked)
+            </MudText>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter]
+    public HealthStatus? Health { get; set; }
+
+    private Color GetOverallHealthColor()
+    {
+        if (Health == null)
+            return Color.Default;
+
+        return Health.Overall switch
+        {
+            "Healthy" => Color.Success,
+            "Degraded" => Color.Warning,
+            "Unhealthy" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private Color GetComponentHealthColor(string status)
+    {
+        return status switch
+        {
+            "Healthy" => Color.Success,
+            "Degraded" => Color.Warning,
+            "Unhealthy" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string FormatRelativeTime(DateTimeOffset timestamp)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var diff = now - timestamp;
+
+        if (diff.TotalMinutes < 1)
+            return "Just now";
+        if (diff.TotalMinutes < 60)
+            return $"{(int)diff.TotalMinutes} minutes ago";
+
+        return timestamp.ToString("g");
+    }
+}

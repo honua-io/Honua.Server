@@ -1,0 +1,132 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudPaper Elevation="2" Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-4">Recent Activity</MudText>
+
+    @if (Activities == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (!Activities.Any())
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center" Class="py-8">
+            No recent activity
+        </MudText>
+    }
+    else
+    {
+        <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
+            @foreach (var activity in Activities.Take(MaxItems))
+            {
+                <MudTimelineItem Color="@GetActivityColor(activity)" Size="Size.Small">
+                    <ItemOpposite>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @FormatRelativeTime(activity.Timestamp)
+                        </MudText>
+                    </ItemOpposite>
+                    <ItemContent>
+                        <MudStack Spacing="1">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@GetActionIcon(activity.Action)" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">
+                                    <strong>@activity.UserName</strong> @GetActionVerb(activity.Action)
+                                    <strong>@activity.ResourceName</strong>
+                                </MudText>
+                                @if (activity.Status == "failed")
+                                {
+                                    <MudChip Size="Size.Small" Color="Color.Error" Variant="Variant.Text">Failed</MudChip>
+                                }
+                            </MudStack>
+                            @if (!string.IsNullOrEmpty(activity.Description))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @activity.Description
+                                </MudText>
+                            }
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                @activity.ResourceType
+                            </MudText>
+                        </MudStack>
+                    </ItemContent>
+                </MudTimelineItem>
+            }
+        </MudTimeline>
+
+        @if (Activities.Count > MaxItems)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="mt-4">
+                And @(Activities.Count - MaxItems) more activities...
+            </MudText>
+        }
+    }
+</MudPaper>
+
+@code {
+    [Parameter]
+    public List<ActivityEntry>? Activities { get; set; }
+
+    [Parameter]
+    public int MaxItems { get; set; } = 10;
+
+    private Color GetActivityColor(ActivityEntry activity)
+    {
+        return activity.Status == "failed" ? Color.Error : activity.Action switch
+        {
+            "create" => Color.Success,
+            "update" => Color.Info,
+            "delete" => Color.Warning,
+            "login" => Color.Primary,
+            _ => Color.Default
+        };
+    }
+
+    private string GetActionIcon(string action)
+    {
+        return action switch
+        {
+            "create" => Icons.Material.Filled.Add,
+            "update" => Icons.Material.Filled.Edit,
+            "delete" => Icons.Material.Filled.Delete,
+            "login" => Icons.Material.Filled.Login,
+            "logout" => Icons.Material.Filled.Logout,
+            "export" => Icons.Material.Filled.Download,
+            "import" => Icons.Material.Filled.Upload,
+            _ => Icons.Material.Filled.Info
+        };
+    }
+
+    private string GetActionVerb(string action)
+    {
+        return action switch
+        {
+            "create" => "created",
+            "update" => "updated",
+            "delete" => "deleted",
+            "login" => "logged in to",
+            "logout" => "logged out from",
+            "export" => "exported",
+            "import" => "imported",
+            _ => action
+        };
+    }
+
+    private string FormatRelativeTime(DateTimeOffset timestamp)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var diff = now - timestamp;
+
+        if (diff.TotalMinutes < 1)
+            return "Just now";
+        if (diff.TotalMinutes < 60)
+            return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24)
+            return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7)
+            return $"{(int)diff.TotalDays}d ago";
+
+        return timestamp.ToString("MMM dd");
+    }
+}

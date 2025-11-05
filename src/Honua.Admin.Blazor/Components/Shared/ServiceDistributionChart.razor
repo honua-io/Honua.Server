@@ -1,0 +1,86 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudPaper Elevation="2" Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-4">Service Distribution</MudText>
+
+    @if (Distribution == null)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (TotalServices == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">No services configured</MudText>
+    }
+    else
+    {
+        <MudStack Spacing="3">
+            @* WMS Services *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Primary" Size="Size.Small" />
+                <MudText Typo="Typo.body2" Style="min-width: 80px;">WMS</MudText>
+                <MudProgressLinear Color="Color.Primary" Value="@GetPercentage(Distribution.WmsCount)" Size="Size.Small" Style="flex-grow: 1;" />
+                <MudText Typo="Typo.body2" Style="min-width: 60px; text-align: right;">@Distribution.WmsCount (@GetPercentage(Distribution.WmsCount).ToString("F1")%)</MudText>
+            </MudStack>
+
+            @* WFS Services *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Secondary" Size="Size.Small" />
+                <MudText Typo="Typo.body2" Style="min-width: 80px;">WFS</MudText>
+                <MudProgressLinear Color="Color.Secondary" Value="@GetPercentage(Distribution.WfsCount)" Size="Size.Small" Style="flex-grow: 1;" />
+                <MudText Typo="Typo.body2" Style="min-width: 60px; text-align: right;">@Distribution.WfsCount (@GetPercentage(Distribution.WfsCount).ToString("F1")%)</MudText>
+            </MudStack>
+
+            @* WMTS Services *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.GridOn" Color="Color.Tertiary" Size="Size.Small" />
+                <MudText Typo="Typo.body2" Style="min-width: 80px;">WMTS</MudText>
+                <MudProgressLinear Color="Color.Tertiary" Value="@GetPercentage(Distribution.WmtsCount)" Size="Size.Small" Style="flex-grow: 1;" />
+                <MudText Typo="Typo.body2" Style="min-width: 60px; text-align: right;">@Distribution.WmtsCount (@GetPercentage(Distribution.WmtsCount).ToString("F1")%)</MudText>
+            </MudStack>
+
+            @* OGC Services *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Public" Color="Color.Info" Size="Size.Small" />
+                <MudText Typo="Typo.body2" Style="min-width: 80px;">OGC</MudText>
+                <MudProgressLinear Color="Color.Info" Value="@GetPercentage(Distribution.OgcCount)" Size="Size.Small" Style="flex-grow: 1;" />
+                <MudText Typo="Typo.body2" Style="min-width: 60px; text-align: right;">@Distribution.OgcCount (@GetPercentage(Distribution.OgcCount).ToString("F1")%)</MudText>
+            </MudStack>
+
+            @if (Distribution.OtherCount > 0)
+            {
+                @* Other Services *@
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.MoreHoriz" Color="Color.Default" Size="Size.Small" />
+                    <MudText Typo="Typo.body2" Style="min-width: 80px;">Other</MudText>
+                    <MudProgressLinear Color="Color.Default" Value="@GetPercentage(Distribution.OtherCount)" Size="Size.Small" Style="flex-grow: 1;" />
+                    <MudText Typo="Typo.body2" Style="min-width: 60px; text-align: right;">@Distribution.OtherCount (@GetPercentage(Distribution.OtherCount).ToString("F1")%)</MudText>
+                </MudStack>
+            }
+        </MudStack>
+
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+            Total: @TotalServices services
+        </MudText>
+    }
+</MudPaper>
+
+@code {
+    [Parameter]
+    public ServiceDistribution? Distribution { get; set; }
+
+    private int TotalServices => Distribution == null ? 0 :
+        Distribution.WmsCount + Distribution.WfsCount + Distribution.WmtsCount +
+        Distribution.OgcCount + Distribution.OtherCount;
+
+    private double GetPercentage(int count)
+    {
+        if (TotalServices == 0)
+            return 0;
+
+        return (count / (double)TotalServices) * 100.0;
+    }
+}
