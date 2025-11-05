@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
 **Last Updated:** 2025-11-05
-**Current Phase:** Phase 2.1 (Real-Time Updates) - COMPLETE
+**Current Phase:** Phase 2.2 (Data Import Wizard) - COMPLETE
 
 ---
 
@@ -298,6 +298,63 @@
 - Checks provider capabilities at runtime (IMetadataChangeNotifier)
 - Gracefully degrades if provider doesn't support real-time updates
 - Architecture supports PostgreSQL NOTIFY/LISTEN and Redis Pub/Sub
+
+---
+
+## ✅ Phase 2.2 Complete - Data Import Wizard (Week 5-6)
+
+### Completed Tasks
+
+**Import Models:**
+- ✅ `ImportModels.cs` - Import data models
+  - CreateImportJobRequest
+  - ImportJobSnapshot (job status with progress tracking)
+  - PaginatedImportJobs
+  - ImportWizardState (wizard state management)
+  - SupportedFileTypes (file type definitions)
+
+**Import API Client:**
+- ✅ `ImportApiClient.cs` - Data import/ingestion operations
+  - CreateImportJobAsync (with file upload and progress tracking)
+  - GetImportJobAsync (get job status)
+  - ListImportJobsAsync (paginated job list)
+  - CancelImportJobAsync (cancel running jobs)
+
+**UI Pages:**
+- ✅ `DataImportWizard.razor` - Multi-step import wizard
+  - Step 1: Upload File (drag-drop, file validation, 500MB limit)
+  - Step 2: Configure Target (select service, create layer)
+  - Step 3: Review & Import (summary and job creation)
+  - File format validation (Shapefile, GeoJSON, GeoPackage, KML, GML, CSV)
+  - Progress tracking during upload
+  - Job creation with automatic redirect
+- ✅ `ImportJobsList.razor` - Import jobs monitoring page
+  - List all jobs with pagination
+  - Real-time status updates (auto-refresh every 5s)
+  - Job progress tracking (records processed/total)
+  - Cancel running jobs
+  - Error message display
+  - Status color coding (Completed, Running, Failed, etc.)
+
+**Files Created:** 4 files, ~650 lines
+**Commit:** Pending
+
+**Technical Notes:**
+- Leverages existing `/admin/ingestion` API endpoints
+- Supports file uploads up to 500MB
+- Multipart form-data file upload with IBrowserFile
+- Auto-refresh for active jobs (Running/Queued)
+- Graceful error handling and user feedback
+- Integrated with existing authentication (RequireDataPublisher)
+- Connected to Service and Layer management workflows
+
+**Supported File Formats:**
+- Shapefile (ZIP with .shp, .shx, .dbf)
+- GeoJSON (.geojson, .json)
+- GeoPackage (.gpkg)
+- KML/KMZ (.kml)
+- Geography Markup Language (.gml)
+- CSV with geometry (.csv)
 
 ---
 
