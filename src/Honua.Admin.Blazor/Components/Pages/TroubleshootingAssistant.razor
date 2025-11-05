@@ -1,0 +1,271 @@
+@page "/troubleshooting"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject AIAssistantApiClient AIClient
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Troubleshooting Assistant - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-6 mt-4">
+        <MudStack Spacing="3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Troubleshoot" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.h4">AI Troubleshooting Assistant</MudText>
+            </MudStack>
+
+            @if (!_aiAvailable)
+            {
+                <MudAlert Severity="Severity.Warning">
+                    AI Assistant is currently unavailable. Please check your configuration or contact support.
+                </MudAlert>
+            }
+            else if (!_hasResult)
+            {
+                <MudText Typo="Typo.body1" Color="Color.Secondary">
+                    Describe the problem you're experiencing, and our AI assistant will help diagnose it and suggest solutions.
+                </MudText>
+
+                <MudTextField @bind-Value="_problem"
+                              Label="What problem are you experiencing?"
+                              Lines="4"
+                              Variant="Variant.Outlined"
+                              HelperText="Describe the issue in detail"
+                              Disabled="@_analyzing" />
+
+                <MudTextField @bind-Value="_errorMessage"
+                              Label="Error Message (if any)"
+                              Lines="3"
+                              Variant="Variant.Outlined"
+                              HelperText="Copy and paste any error messages you see"
+                              Disabled="@_analyzing" />
+
+                <MudTextField @bind-Value="_attemptedAction"
+                              Label="What were you trying to do?"
+                              Variant="Variant.Outlined"
+                              HelperText="E.g., 'Creating a new WMS service'"
+                              Disabled="@_analyzing" />
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Search"
+                               OnClick="AnalyzeProblemAsync"
+                               Disabled="@(string.IsNullOrWhiteSpace(_problem) || _analyzing)">
+                        @if (_analyzing)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <text>Analyzing...</text>
+                        }
+                        else
+                        {
+                            <text>Get Help</text>
+                        }
+                    </MudButton>
+                </MudStack>
+            }
+            else if (_result != null)
+            {
+                @* Diagnosis *@
+                <MudAlert Severity="@GetSeverityForConfidence(_result.Confidence)">
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Diagnosis</MudText>
+                        <MudText Typo="Typo.body1">@_result.Diagnosis</MudText>
+                        <MudText Typo="Typo.caption">
+                            Confidence: @_result.Confidence%
+                        </MudText>
+                    </MudStack>
+                </MudAlert>
+
+                @* Solutions *@
+                @if (_result.Solutions.Any())
+                {
+                    <MudText Typo="Typo.h6">Suggested Solutions</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var (solution, index) in _result.Solutions.Select((s, i) => (s, i + 1)))
+                        {
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-3">
+                                <MudStack Spacing="2">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudChip Size="Size.Small" Color="@(index == 1 ? Color.Success : Color.Default)">
+                                                Solution @index
+                                            </MudChip>
+                                            <MudText Typo="Typo.subtitle2">@solution.Title</MudText>
+                                        </MudStack>
+                                        <MudChip Size="Size.Small" Color="@GetLikelihoodColor(solution.Likelihood)">
+                                            @solution.Likelihood% likely to fix
+                                        </MudChip>
+                                    </MudStack>
+
+                                    @if (solution.Steps.Any())
+                                    {
+                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">Steps:</MudText>
+                                        <MudList Dense="true">
+                                            @foreach (var (step, stepIndex) in solution.Steps.Select((s, i) => (s, i + 1)))
+                                            {
+                                                <MudListItem Icon="@Icons.Material.Filled.ChevronRight">
+                                                    <MudText Typo="Typo.body2">@stepIndex. @step</MudText>
+                                                </MudListItem>
+                                            }
+                                        </MudList>
+                                    }
+
+                                    @if (!string.IsNullOrEmpty(solution.ExpectedResult))
+                                    {
+                                        <MudAlert Severity="Severity.Info" Dense="true">
+                                            <strong>Expected Result:</strong> @solution.ExpectedResult
+                                        </MudAlert>
+                                    }
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+
+                @* Documentation Links *@
+                @if (_result.Documentation.Any())
+                {
+                    <MudDivider />
+                    <MudText Typo="Typo.h6">Related Documentation</MudText>
+
+                    <MudStack Spacing="1">
+                        @foreach (var doc in _result.Documentation)
+                        {
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">@doc.Title</MudText>
+                                        @if (!string.IsNullOrEmpty(doc.Description))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@doc.Description</MudText>
+                                        }
+                                    </MudStack>
+                                    <MudButton Size="Size.Small"
+                                               Variant="Variant.Outlined"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.OpenInNew"
+                                               Href="@doc.Url"
+                                               Target="_blank">
+                                        View
+                                    </MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+
+                @* Action Buttons *@
+                <MudStack Row="true" Spacing="2" Class="mt-2">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               OnClick="ResetForm">
+                        Try Another Problem
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.QuestionAnswer"
+                               OnClick="OpenChatAssistant">
+                        Chat with AI Assistant
+                    </MudButton>
+                </MudStack>
+            }
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Troubleshooting", href: null, disabled: true)
+    };
+
+    private bool _aiAvailable = false;
+    private bool _analyzing = false;
+    private bool _hasResult = false;
+
+    private string _problem = string.Empty;
+    private string _errorMessage = string.Empty;
+    private string _attemptedAction = string.Empty;
+
+    private TroubleshootResponse? _result;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _aiAvailable = await AIClient.IsAvailableAsync();
+    }
+
+    private async Task AnalyzeProblemAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_problem))
+        {
+            Snackbar.Add("Please describe the problem you're experiencing.", Severity.Warning);
+            return;
+        }
+
+        _analyzing = true;
+
+        try
+        {
+            var request = new TroubleshootRequest
+            {
+                Problem = _problem,
+                ErrorMessage = string.IsNullOrWhiteSpace(_errorMessage) ? null : _errorMessage,
+                AttemptedAction = string.IsNullOrWhiteSpace(_attemptedAction) ? null : _attemptedAction
+            };
+
+            _result = await AIClient.TroubleshootAsync(request);
+            _hasResult = true;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to analyze problem: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _analyzing = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        _hasResult = false;
+        _result = null;
+        _problem = string.Empty;
+        _errorMessage = string.Empty;
+        _attemptedAction = string.Empty;
+    }
+
+    private void OpenChatAssistant()
+    {
+        // TODO: Open AI chat dialog
+        Snackbar.Add("Chat assistant will open soon!", Severity.Info);
+    }
+
+    private Severity GetSeverityForConfidence(int confidence)
+    {
+        return confidence switch
+        {
+            >= 80 => Severity.Success,
+            >= 60 => Severity.Info,
+            >= 40 => Severity.Normal,
+            _ => Severity.Warning
+        };
+    }
+
+    private Color GetLikelihoodColor(int likelihood)
+    {
+        return likelihood switch
+        {
+            >= 80 => Color.Success,
+            >= 60 => Color.Info,
+            >= 40 => Color.Warning,
+            _ => Color.Default
+        };
+    }
+}

@@ -5,6 +5,7 @@
 @using Honua.Admin.Blazor.Shared.Models
 @inject LayerApiClient LayerApi
 @inject ServiceApiClient ServiceApi
+@inject AIAssistantApiClient AIClient
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -55,18 +56,44 @@
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_model.Title"
-                                  Label="Title"
-                                  Required="true"
-                                  HelperText="Display name for the layer"
-                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                    <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
+                        <MudTextField @bind-Value="_model.Title"
+                                      Label="Title"
+                                      Required="true"
+                                      HelperText="Display name for the layer"
+                                      Validation="@(new Func<string, string>(ValidateRequired))"
+                                      Style="flex: 1;" />
+                        @if (_aiAvailable)
+                        {
+                            <MudTooltip Text="Generate title with AI">
+                                <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
+                                               Color="Color.Success"
+                                               Size="Size.Small"
+                                               OnClick="GenerateTitleAsync"
+                                               Disabled="@_generatingTitle" />
+                            </MudTooltip>
+                        }
+                    </MudStack>
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_model.Description"
-                                  Label="Description"
-                                  Lines="3"
-                                  HelperText="Optional description of the layer" />
+                    <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                        <MudTextField @bind-Value="_model.Description"
+                                      Label="Description"
+                                      Lines="3"
+                                      HelperText="Optional description of the layer"
+                                      Style="flex: 1;" />
+                        @if (_aiAvailable)
+                        {
+                            <MudTooltip Text="Generate description with AI">
+                                <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
+                                               Color="Color.Success"
+                                               Size="Size.Small"
+                                               OnClick="GenerateDescriptionAsync"
+                                               Disabled="@_generatingDescription" />
+                            </MudTooltip>
+                        }
+                    </MudStack>
                 </MudItem>
 
                 <MudItem xs="12" md="6">
@@ -199,10 +226,16 @@
     private LayerEditorModel _model = new();
     private List<ServiceListItem> _services = new();
     private List<BreadcrumbItem> _breadcrumbs = new();
+    private bool _aiAvailable = false;
+    private bool _generatingTitle = false;
+    private bool _generatingDescription = false;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadServicesAsync();
+
+        // Check if AI is available
+        _aiAvailable = await AIClient.IsAvailableAsync();
 
         if (_isEditMode && !string.IsNullOrEmpty(Id))
         {
@@ -433,6 +466,104 @@
             new BreadcrumbItem("Layers", href: "/layers"),
             new BreadcrumbItem(_isEditMode ? $"Edit: {Id}" : "New Layer", href: null, disabled: true)
         };
+    }
+
+    private async Task GenerateTitleAsync()
+    {
+        _generatingTitle = true;
+        try
+        {
+            var context = new Dictionary<string, string>
+            {
+                ["geometryType"] = _model.GeometryType,
+                ["id"] = _model.Id
+            };
+
+            if (!string.IsNullOrEmpty(_model.Description))
+            {
+                context["description"] = _model.Description;
+            }
+
+            if (!string.IsNullOrEmpty(_model.ServiceId))
+            {
+                var service = _services.FirstOrDefault(s => s.Id == _model.ServiceId);
+                if (service != null)
+                {
+                    context["serviceName"] = service.Title;
+                }
+            }
+
+            var title = await AIClient.GenerateTitleAsync("layer", context);
+            if (!string.IsNullOrEmpty(title))
+            {
+                _model.Title = title;
+                Snackbar.Add("Title generated successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("AI couldn't generate a title. Please try again.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to generate title: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _generatingTitle = false;
+        }
+    }
+
+    private async Task GenerateDescriptionAsync()
+    {
+        _generatingDescription = true;
+        try
+        {
+            var context = new Dictionary<string, string>
+            {
+                ["geometryType"] = _model.GeometryType,
+                ["id"] = _model.Id
+            };
+
+            if (!string.IsNullOrEmpty(_model.Title))
+            {
+                context["title"] = _model.Title;
+            }
+
+            if (!string.IsNullOrEmpty(_model.ServiceId))
+            {
+                var service = _services.FirstOrDefault(s => s.Id == _model.ServiceId);
+                if (service != null)
+                {
+                    context["serviceName"] = service.Title;
+                }
+            }
+
+            var existingMetadata = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(_model.Title))
+            {
+                existingMetadata["title"] = _model.Title;
+            }
+
+            var description = await AIClient.GenerateAbstractAsync("layer", context, existingMetadata);
+            if (!string.IsNullOrEmpty(description))
+            {
+                _model.Description = description;
+                Snackbar.Add("Description generated successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("AI couldn't generate a description. Please try again.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to generate description: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _generatingDescription = false;
+        }
     }
 
     private string ValidateLayerId(string id)

@@ -3,6 +3,7 @@
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
 @inject ServiceApiClient ServiceApi
+@inject AIAssistantApiClient AIClient
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -53,18 +54,44 @@
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_model.Title"
-                                  Label="Title"
-                                  Required="true"
-                                  HelperText="Display name for the service"
-                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                    <MudStack Row="true" AlignItems="AlignItems.End" Spacing="2">
+                        <MudTextField @bind-Value="_model.Title"
+                                      Label="Title"
+                                      Required="true"
+                                      HelperText="Display name for the service"
+                                      Validation="@(new Func<string, string>(ValidateRequired))"
+                                      Style="flex: 1;" />
+                        @if (_aiAvailable)
+                        {
+                            <MudTooltip Text="Generate title with AI">
+                                <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
+                                               Color="Color.Success"
+                                               Size="Size.Small"
+                                               OnClick="GenerateTitleAsync"
+                                               Disabled="@_generatingTitle" />
+                            </MudTooltip>
+                        }
+                    </MudStack>
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_model.Description"
-                                  Label="Description"
-                                  Lines="3"
-                                  HelperText="Optional description of the service" />
+                    <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                        <MudTextField @bind-Value="_model.Description"
+                                      Label="Description"
+                                      Lines="3"
+                                      HelperText="Optional description of the service"
+                                      Style="flex: 1;" />
+                        @if (_aiAvailable)
+                        {
+                            <MudTooltip Text="Generate description with AI">
+                                <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome"
+                                               Color="Color.Success"
+                                               Size="Size.Small"
+                                               OnClick="GenerateDescriptionAsync"
+                                               Disabled="@_generatingDescription" />
+                            </MudTooltip>
+                        }
+                    </MudStack>
                 </MudItem>
 
                 <MudItem xs="12">
@@ -145,10 +172,16 @@
     private string? _errorMessage;
     private ServiceEditorModel _model = new();
     private List<BreadcrumbItem> _breadcrumbs = new();
+    private bool _aiAvailable = false;
+    private bool _generatingTitle = false;
+    private bool _generatingDescription = false;
 
     protected override async Task OnInitializedAsync()
     {
         UpdateBreadcrumbs();
+
+        // Check if AI is available
+        _aiAvailable = await AIClient.IsAvailableAsync();
 
         if (_isEditMode && !string.IsNullOrEmpty(Id))
         {
@@ -330,6 +363,88 @@
     private string ValidateRequired(string value)
     {
         return string.IsNullOrWhiteSpace(value) ? "This field is required" : string.Empty;
+    }
+
+    private async Task GenerateTitleAsync()
+    {
+        _generatingTitle = true;
+        try
+        {
+            var context = new Dictionary<string, string>
+            {
+                ["serviceType"] = _model.ServiceType,
+                ["id"] = _model.Id
+            };
+
+            if (!string.IsNullOrEmpty(_model.Description))
+            {
+                context["description"] = _model.Description;
+            }
+
+            var title = await AIClient.GenerateTitleAsync("service", context);
+            if (!string.IsNullOrEmpty(title))
+            {
+                _model.Title = title;
+                Snackbar.Add("Title generated successfully!", Severity.Success);
+                EditorState.MarkDirty("service-editor");
+            }
+            else
+            {
+                Snackbar.Add("AI couldn't generate a title. Please try again.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to generate title: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _generatingTitle = false;
+        }
+    }
+
+    private async Task GenerateDescriptionAsync()
+    {
+        _generatingDescription = true;
+        try
+        {
+            var context = new Dictionary<string, string>
+            {
+                ["serviceType"] = _model.ServiceType,
+                ["id"] = _model.Id
+            };
+
+            if (!string.IsNullOrEmpty(_model.Title))
+            {
+                context["title"] = _model.Title;
+            }
+
+            var existingMetadata = new Dictionary<string, string>();
+            if (!string.IsNullOrEmpty(_model.Title))
+            {
+                existingMetadata["title"] = _model.Title;
+            }
+
+            var description = await AIClient.GenerateAbstractAsync("service", context, existingMetadata);
+            if (!string.IsNullOrEmpty(description))
+            {
+                _model.Description = description;
+                Snackbar.Add("Description generated successfully!", Severity.Success);
+                EditorState.MarkDirty("service-editor");
+            }
+            else
+            {
+                Snackbar.Add("AI couldn't generate a description. Please try again.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to generate description: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _generatingDescription = false;
+        }
     }
 
     private void OnModelChanged()

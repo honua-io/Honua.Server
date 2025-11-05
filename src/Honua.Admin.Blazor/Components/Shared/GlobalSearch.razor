@@ -4,26 +4,29 @@
 @inject ServiceApiClient ServiceApi
 @inject LayerApiClient LayerApi
 @inject FolderApiClient FolderApi
+@inject AIAssistantApiClient AIClient
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 @implements IDisposable
 
-<MudAutocomplete T="GlobalSearchResult"
-                 @bind-Value="_selectedResult"
-                 SearchFunc="@SearchAsync"
-                 ToStringFunc="@(r => r?.Title ?? string.Empty)"
-                 Dense="true"
-                 Variant="Variant.Outlined"
-                 AdornmentIcon="@Icons.Material.Filled.Search"
-                 AdornmentColor="Color.Primary"
-                 Placeholder="Search services, layers, folders..."
-                 Clearable="true"
-                 CoerceText="false"
-                 CoerceValue="false"
-                 MaxItems="10"
-                 DebounceInterval="300"
-                 MinCharacters="2"
-                 ResetValueOnEmptyText="true"
-                 Class="@Class">
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="@Class">
+    <MudAutocomplete T="GlobalSearchResult"
+                     @bind-Value="_selectedResult"
+                     SearchFunc="@SearchAsync"
+                     ToStringFunc="@(r => r?.Title ?? string.Empty)"
+                     Dense="true"
+                     Variant="Variant.Outlined"
+                     AdornmentIcon="@(_useAISearch ? Icons.Material.Filled.Psychology : Icons.Material.Filled.Search)"
+                     AdornmentColor="@(_useAISearch ? Color.Success : Color.Primary)"
+                     Placeholder="@(_useAISearch ? "Ask AI: 'Show me all WMS services in Pacific region'..." : "Search services, layers, folders...")"
+                     Clearable="true"
+                     CoerceText="false"
+                     CoerceValue="false"
+                     MaxItems="10"
+                     DebounceInterval="300"
+                     MinCharacters="2"
+                     ResetValueOnEmptyText="true"
+                     Style="flex: 1;">
     <ItemTemplate Context="result">
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIcon Icon="@GetIconForType(result.Type)" Size="Size.Small" Color="@GetColorForType(result.Type)" />
@@ -42,10 +45,40 @@
     </ItemTemplate>
     <NoItemsTemplate>
         <MudText Typo="Typo.body2" Align="Align.Center" Class="py-2">
-            No results found
+            @if (_useAISearch && !string.IsNullOrEmpty(_aiInterpretation))
+            {
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        AI: @_aiInterpretation
+                    </MudText>
+                    <MudText Typo="Typo.body2">No results found</MudText>
+                </MudStack>
+            }
+            else
+            {
+                <text>No results found</text>
+            }
         </MudText>
     </NoItemsTemplate>
 </MudAutocomplete>
+
+    @if (_aiAvailable)
+    {
+        <MudTooltip Text="@(_useAISearch ? "Switch to normal search" : "Switch to AI-powered natural language search")">
+            <MudIconButton Icon="@Icons.Material.Filled.Psychology"
+                           Color="@(_useAISearch ? Color.Success : Color.Default)"
+                           Size="Size.Small"
+                           OnClick="ToggleAISearch" />
+        </MudTooltip>
+    }
+</MudStack>
+
+@if (_useAISearch && !string.IsNullOrEmpty(_aiInterpretation))
+{
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2 mt-1">
+        AI understood: @_aiInterpretation
+    </MudText>
+}
 
 @code {
     [Parameter]
@@ -56,10 +89,22 @@
     private List<LayerListItem> _allLayers = new();
     private List<FolderResponse> _allFolders = new();
     private bool _dataLoaded = false;
+    private bool _aiAvailable = false;
+    private bool _useAISearch = false;
+    private string _aiInterpretation = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDataAsync();
+
+        // Check if AI is available
+        _aiAvailable = await AIClient.IsAvailableAsync();
+    }
+
+    private void ToggleAISearch()
+    {
+        _useAISearch = !_useAISearch;
+        _aiInterpretation = string.Empty;
     }
 
     private async Task LoadDataAsync()
@@ -87,11 +132,32 @@
     private async Task<IEnumerable<GlobalSearchResult>> SearchAsync(string searchText)
     {
         if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < 2)
+        {
+            _aiInterpretation = string.Empty;
             return Enumerable.Empty<GlobalSearchResult>();
+        }
 
         if (!_dataLoaded)
             await LoadDataAsync();
 
+        // Use AI search if enabled and available
+        if (_useAISearch && _aiAvailable)
+        {
+            try
+            {
+                var aiResults = await PerformAISearchAsync(searchText);
+                if (aiResults.Any())
+                    return aiResults;
+                // Fall through to normal search if AI returns no results
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"AI search failed, using normal search: {ex.Message}", Severity.Warning);
+                // Fall through to normal search
+            }
+        }
+
+        _aiInterpretation = string.Empty;
         var results = new List<GlobalSearchResult>();
         var lowerSearch = searchText.ToLowerInvariant();
 
@@ -218,6 +284,48 @@
             _ => "/"
         };
         Navigation.NavigateTo(url);
+    }
+
+    private async Task<IEnumerable<GlobalSearchResult>> PerformAISearchAsync(string searchText)
+    {
+        var request = new NaturalLanguageSearchRequest
+        {
+            Query = searchText,
+            MaxResults = 10,
+            IncludeExplanation = true
+        };
+
+        var response = await AIClient.SearchAsync(request);
+
+        // Store AI interpretation
+        _aiInterpretation = response.Interpretation;
+
+        // Convert AI search results to GlobalSearchResult
+        var results = response.Results.Select(r => new GlobalSearchResult
+        {
+            Type = CapitalizeFirstLetter(r.Type),
+            Id = r.Id,
+            Title = r.Title,
+            Description = r.Description,
+            RelevanceScore = r.Relevance,
+            MatchReason = r.MatchReason
+        }).ToList();
+
+        // Add to search history
+        if (results.Any())
+        {
+            await SearchState.AddToHistoryAsync(searchText, results.Count);
+        }
+
+        return results;
+    }
+
+    private string CapitalizeFirstLetter(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+
+        return char.ToUpper(text[0]) + text.Substring(1).ToLower();
     }
 
     public void Dispose()

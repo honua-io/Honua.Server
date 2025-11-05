@@ -1,0 +1,159 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
+@inject AIAssistantApiClient AIClient
+@inject ISnackbar Snackbar
+
+@if (Suggestions.Count > 0)
+{
+    <MudPaper Elevation="1" Class="pa-3 mt-2">
+        <MudStack Spacing="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.Psychology" Color="Color.Success" Size="Size.Small" />
+                    <MudText Typo="Typo.subtitle2">AI Suggestions</MudText>
+                </MudStack>
+                @if (!string.IsNullOrEmpty(Title))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@Title</MudText>
+                }
+            </MudStack>
+
+            @if (IsLoading)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <MudText Typo="Typo.body2">Getting AI suggestions...</MudText>
+                </MudStack>
+            }
+            else
+            {
+                @if (DisplayMode == SuggestionDisplayMode.Chips)
+                {
+                    <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;">
+                        @foreach (var suggestion in Suggestions)
+                        {
+                            <MudChip Icon="@(suggestion.Recommended ? Icons.Material.Filled.Star : null)"
+                                     Color="@(suggestion.Recommended ? Color.Success : Color.Default)"
+                                     Variant="@(suggestion.Recommended ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="@(() => OnSuggestionSelected(suggestion))">
+                                @suggestion.Label
+                                @if (ShowConfidence)
+                                {
+                                    <MudText Typo="Typo.caption" Class="ml-1">(@suggestion.Confidence%)</MudText>
+                                }
+                            </MudChip>
+                        }
+                    </MudStack>
+                }
+                else
+                {
+                    <MudStack Spacing="1">
+                        @foreach (var suggestion in Suggestions)
+                        {
+                            <MudPaper Elevation="0" Outlined="true" Class="pa-2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudStack Spacing="0" Style="flex: 1;">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            @if (suggestion.Recommended)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Success" Size="Size.Small" />
+                                            }
+                                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@suggestion.Label</MudText>
+                                        </MudStack>
+                                        @if (!string.IsNullOrEmpty(suggestion.Reason))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@suggestion.Reason</MudText>
+                                        }
+                                    </MudStack>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        @if (ShowConfidence)
+                                        {
+                                            <MudChip Size="Size.Small" Color="@GetConfidenceColor(suggestion.Confidence)">
+                                                @suggestion.Confidence%
+                                            </MudChip>
+                                        }
+                                        <MudButton Size="Size.Small"
+                                                   Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => OnSuggestionSelected(suggestion))">
+                                            Apply
+                                        </MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+
+                @if (Suggestions.Any(s => s.Recommended))
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" /> indicates AI's recommended choice
+                    </MudAlert>
+                }
+            }
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public List<SmartSuggestion> Suggestions { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<SmartSuggestion> OnSuggestionApplied { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public bool ShowConfidence { get; set; } = true;
+
+    [Parameter]
+    public bool IsLoading { get; set; } = false;
+
+    [Parameter]
+    public SuggestionDisplayMode DisplayMode { get; set; } = SuggestionDisplayMode.Cards;
+
+    private async Task OnSuggestionSelected(SmartSuggestion suggestion)
+    {
+        try
+        {
+            await OnSuggestionApplied.InvokeAsync(suggestion);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to apply suggestion: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetConfidenceColor(int confidence)
+    {
+        return confidence switch
+        {
+            >= 80 => Color.Success,
+            >= 60 => Color.Info,
+            >= 40 => Color.Warning,
+            _ => Color.Default
+        };
+    }
+}
+
+/// <summary>
+/// Display mode for suggestions panel.
+/// </summary>
+public enum SuggestionDisplayMode
+{
+    /// <summary>
+    /// Display as simple chips.
+    /// </summary>
+    Chips,
+
+    /// <summary>
+    /// Display as detailed cards.
+    /// </summary>
+    Cards
+}

@@ -1,0 +1,333 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
+@inject AIAssistantApiClient AIClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (!_isAvailable)
+            {
+                <MudAlert Severity="Severity.Info">
+                    AI Assistant is currently unavailable. Please check your configuration or try again later.
+                </MudAlert>
+            }
+            else
+            {
+                @* Chat History *@
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3" Style="height: 400px; overflow-y: auto;" @ref="_chatContainer">
+                    @if (_messages.Count == 0)
+                    {
+                        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;">
+                            <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Large" Color="MudColor.Primary" />
+                            <MudText Typo="Typo.h6" Color="MudColor.Primary">AI Assistant</MudText>
+                            <MudText Typo="Typo.body2" Color="MudColor.Secondary" Align="Align.Center">
+                                Ask me anything about your GIS services, layers, or configurations.
+                            </MudText>
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="2">
+                            @foreach (var message in _messages)
+                            {
+                                <MudStack Row="true" Justify="@(message.Role == ChatRole.User ? Justify.FlexEnd : Justify.FlexStart)">
+                                    <MudPaper Elevation="1" Class="pa-3" Style="@GetMessageStyle(message.Role)">
+                                        <MudStack Spacing="1">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudIcon Icon="@GetMessageIcon(message.Role)"
+                                                         Size="Size.Small"
+                                                         Color="@(message.Role == ChatRole.User ? MudColor.Primary : MudColor.Success)" />
+                                                <MudText Typo="Typo.body2" Style="font-weight: 500;">
+                                                    @(message.Role == ChatRole.User ? "You" : "AI Assistant")
+                                                </MudText>
+                                            </MudStack>
+                                            <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">
+                                                @message.Content
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="MudColor.Secondary">
+                                                @message.Timestamp.LocalDateTime.ToString("HH:mm")
+                                            </MudText>
+                                        </MudStack>
+                                    </MudPaper>
+                                </MudStack>
+                            }
+
+                            @if (_isProcessing)
+                            {
+                                <MudStack Row="true" Justify="Justify.FlexStart">
+                                    <MudPaper Elevation="1" Class="pa-3" Style="max-width: 75%; background-color: var(--mud-palette-background-grey);">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                            <MudText Typo="Typo.body2">AI is thinking...</MudText>
+                                        </MudStack>
+                                    </MudPaper>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+
+                @* Suggested Actions (if any) *@
+                @if (_currentSuggestedActions.Count > 0)
+                {
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.caption" Color="MudColor.Secondary">Suggested Actions:</MudText>
+                        <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;">
+                            @foreach (var action in _currentSuggestedActions)
+                            {
+                                <MudChip Size="Size.Small"
+                                         Color="MudColor.Primary"
+                                         Variant="Variant.Outlined"
+                                         OnClick="@(() => HandleSuggestedAction(action))">
+                                    @action.Label
+                                </MudChip>
+                            }
+                        </MudStack>
+                    </MudStack>
+                }
+
+                @* Follow-up Questions (if any) *@
+                @if (_currentFollowUpQuestions.Count > 0)
+                {
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.caption" Color="MudColor.Secondary">You might also ask:</MudText>
+                        <MudStack Spacing="1">
+                            @foreach (var question in _currentFollowUpQuestions)
+                            {
+                                <MudButton Size="Size.Small"
+                                           Variant="Variant.Text"
+                                           Color="MudColor.Primary"
+                                           StartIcon="@Icons.Material.Filled.QuestionAnswer"
+                                           OnClick="@(() => SendFollowUpQuestion(question))"
+                                           Style="justify-content: flex-start; text-transform: none;">
+                                    @question
+                                </MudButton>
+                            }
+                        </MudStack>
+                    </MudStack>
+                }
+
+                @* Message Input *@
+                <MudStack Row="true" Spacing="2">
+                    <MudTextField @bind-Value="_currentMessage"
+                                  Label="Ask AI Assistant..."
+                                  Variant="Variant.Outlined"
+                                  Lines="1"
+                                  Disabled="_isProcessing"
+                                  OnKeyDown="HandleKeyDown"
+                                  FullWidth="true" />
+                    <MudButton Variant="Variant.Filled"
+                               Color="MudColor.Primary"
+                               Disabled="@(string.IsNullOrWhiteSpace(_currentMessage) || _isProcessing)"
+                               OnClick="SendMessage">
+                        Send
+                    </MudButton>
+                </MudStack>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        @if (_messages.Count > 0)
+        {
+            <MudButton Color="MudColor.Default" OnClick="ClearHistory">
+                Clear History
+            </MudButton>
+        }
+        <MudButton Color="MudColor.Default" OnClick="Close">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public Dictionary<string, string>? InitialContext { get; set; }
+
+    [Parameter]
+    public string? InitialMessage { get; set; }
+
+    private ElementReference _chatContainer;
+    private List<ChatMessage> _messages = new();
+    private string _currentMessage = string.Empty;
+    private bool _isAvailable = true;
+    private bool _isProcessing = false;
+    private List<SuggestedAction> _currentSuggestedActions = new();
+    private List<string> _currentFollowUpQuestions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if AI is available
+        _isAvailable = await AIClient.IsAvailableAsync();
+
+        if (_isAvailable && !string.IsNullOrEmpty(InitialMessage))
+        {
+            _currentMessage = InitialMessage;
+            await SendMessage();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Auto-scroll to bottom after render
+        if (_messages.Count > 0)
+        {
+            // Note: In a real implementation, you'd use JS interop to scroll
+            // For now, we rely on CSS overflow behavior
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_currentMessage) || _isProcessing)
+            return;
+
+        var userMessage = _currentMessage.Trim();
+        _currentMessage = string.Empty;
+
+        // Add user message to history
+        _messages.Add(new ChatMessage
+        {
+            Role = ChatRole.User,
+            Content = userMessage,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            // Prepare context
+            var context = InitialContext ?? new Dictionary<string, string>();
+            context["page"] = GetCurrentPage();
+
+            // Send chat request
+            var request = new AIChatRequest
+            {
+                Message = userMessage,
+                History = _messages.ToList(),
+                Context = context
+            };
+
+            var response = await AIClient.ChatAsync(request);
+
+            // Add AI response to history
+            _messages.Add(new ChatMessage
+            {
+                Role = ChatRole.Assistant,
+                Content = response.Message,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            // Update suggested actions and follow-up questions
+            _currentSuggestedActions = response.SuggestedActions ?? new List<SuggestedAction>();
+            _currentFollowUpQuestions = response.FollowUpQuestions ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to get AI response: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SendFollowUpQuestion(string question)
+    {
+        _currentMessage = question;
+        await SendMessage();
+    }
+
+    private void HandleSuggestedAction(SuggestedAction action)
+    {
+        switch (action.ActionType)
+        {
+            case ActionType.Navigate:
+                if (!string.IsNullOrEmpty(action.Target))
+                {
+                    Navigation.NavigateTo(action.Target);
+                    Close();
+                }
+                break;
+
+            case ActionType.Create:
+            case ActionType.Edit:
+            case ActionType.Delete:
+            case ActionType.Apply:
+                // These would be handled by parent component
+                // For now, just show the action
+                Snackbar.Add($"Action: {action.Label}", Severity.Info);
+                break;
+
+            default:
+                Snackbar.Add($"Unknown action type: {action.ActionType}", Severity.Warning);
+                break;
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private void ClearHistory()
+    {
+        _messages.Clear();
+        _currentSuggestedActions.Clear();
+        _currentFollowUpQuestions.Clear();
+        StateHasChanged();
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Ok(true));
+    }
+
+    private string GetCurrentPage()
+    {
+        var uri = Navigation.Uri;
+        var path = new Uri(uri).AbsolutePath;
+
+        return path switch
+        {
+            var p when p.Contains("/services") => "services",
+            var p when p.Contains("/layers") => "layers",
+            var p when p.Contains("/folders") => "folders",
+            var p when p.Contains("/styles") => "styles",
+            var p when p.Contains("/configuration") => "configuration",
+            var p when p.Contains("/cache") => "cache",
+            var p when p.Contains("/users") => "users",
+            var p when p.Contains("/audit") => "audit",
+            var p when p.Contains("/dashboard") => "dashboard",
+            _ => "unknown"
+        };
+    }
+
+    private string GetMessageStyle(string role)
+    {
+        var maxWidth = "max-width: 75%;";
+        var background = role == ChatRole.User
+            ? "background-color: var(--mud-palette-primary-lighten);"
+            : "background-color: var(--mud-palette-background-grey);";
+
+        return $"{maxWidth} {background}";
+    }
+
+    private string GetMessageIcon(string role) =>
+        role == ChatRole.User
+            ? Icons.Material.Filled.Person
+            : Icons.Material.Filled.Psychology;
+}
