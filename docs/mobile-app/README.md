@@ -18,7 +18,7 @@ The only mobile GIS app that combines:
 - 🤖 **AI-powered data collection** at every step
 - 🥽 **Augmented Reality** for visualization and navigation
 - 📡 **True offline-first** architecture with edge computing
-- 🎨 **Modern native apps** (Swift, Kotlin) - not hybrid
+- 🎨 **Modern cross-platform apps** (.NET MAUI) with native performance
 - 💰 **Fair pricing** - enterprise features without enterprise prices
 
 ---
@@ -58,9 +58,10 @@ After comprehensive competitive analysis of Esri Field Maps, QField, Survey123, 
 - Robust sync with conflict resolution
 
 ✅ **Native Performance**
-- Swift/SwiftUI (iOS)
-- Kotlin/Jetpack Compose (Android)
-- 60 FPS map rendering
+- .NET MAUI with platform-native UI controls
+- C# + MAUI XAML (cross-platform)
+- SkiaSharp hardware-accelerated rendering
+- 30-60 FPS map rendering (Mapsui)
 - < 100ms response times
 
 ✅ **Fair Pricing**
@@ -93,7 +94,7 @@ This directory contains **200+ pages** of comprehensive design documentation rea
 **30+ pages of validated architectural decisions:**
 - ADR-001: .NET MAUI vs Native (✅ Validated)
 - ADR-002: Hybrid AR Implementation (✅ Validated)
-- ADR-003: Esri ArcGIS Maps SDK (✅ Validated)
+- ADR-003: Mapsui Open-Source Maps SDK (✅ Validated, Revised 2025-11-05)
 - ADR-004: ML.NET + ONNX for AI (✅ Validated)
 - ADR-005: Offline-First Architecture (✅ Validated)
 - ADR-006: OGC Features API Integration (✅ Validated)
@@ -253,7 +254,7 @@ Bottom tab bar:
 - MAUI XAML or C# Markup
 - CommunityToolkit.Mvvm
 - ML.NET + ONNX Runtime (AI)
-- Esri ArcGIS Maps SDK for .NET
+- Mapsui (MIT-licensed open-source mapping SDK)
 - SQLite-net + NetTopologySuite
 
 **Platform-Specific (AR only):**

@@ -287,8 +287,8 @@ Honua Field is a mobile application for iOS and Android that enables field worke
 #### 2. Maps and Visualization
 
 **Feature: Base Maps**
-- Street maps (OpenStreetMap, Mapbox)
-- Satellite imagery
+- Street maps (OpenStreetMap)
+- Satellite imagery (custom tile sources)
 - Terrain and hillshade
 - Offline basemap downloads
 - Custom tile layers from Honua Server
@@ -564,8 +564,8 @@ Honua Field is a mobile application for iOS and Android that enables field worke
 │  │              Business Logic Layer (100% Shared)           │   │
 │  │  ┌──────────┐  ┌────────┐  ┌────────┐  ┌─────────────┐  │   │
 │  │  │  Forms   │  │  Maps  │  │  Sync  │  │  AI Engine  │  │   │
-│  │  │  Engine  │  │ (Esri  │  │ Engine │  │  (ML.NET +  │  │   │
-│  │  │          │  │  SDK)  │  │        │  │  ONNX)      │  │   │
+│  │  │  Engine  │  │(Mapsui)│  │ Engine │  │  (ML.NET +  │  │   │
+│  │  │          │  │  OSS   │  │        │  │  ONNX)      │  │   │
 │  │  └──────────┘  └────────┘  └────────┘  └─────────────┘  │   │
 │  └────────┬─────────────────────────────────────────────────┘   │
 │           │                                                     │
@@ -609,7 +609,11 @@ Honua Field is a mobile application for iOS and Android that enables field worke
 - **Architecture:** Clean Architecture + MVVM (CommunityToolkit.Mvvm)
 - **Database:** SQLite-net with NetTopologySuite (spatial)
 - **Networking:** HttpClient with async/await, System.Net.Http.Json
-- **Maps:** Esri ArcGIS Maps SDK for .NET (optimized for MAUI)
+- **Maps:** Mapsui (open-source MIT-licensed mapping SDK for .NET MAUI)
+  - Rendering: SkiaSharp
+  - Tiles: OpenStreetMap, OGC WMS/WFS/WMTS
+  - Offline: MBTiles support
+  - Spatial ops: NetTopologySuite integration
 - **ML/AI:** ML.NET + ONNX Runtime (cross-platform inference)
 - **Dependency Injection:** Built-in Microsoft.Extensions.DependencyInjection
 - **Testing:** xUnit, NUnit, Appium for UI testing
@@ -644,8 +648,8 @@ Honua Field is a mobile application for iOS and Android that enables field worke
 │                  Presentation Layer                    │
 │  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
 │  │   Views      │  │  ViewModels  │  │    State    │  │
-│  │  (SwiftUI/   │←→│   (Logic)    │←→│  (Combine/  │  │
-│  │   Compose)   │  │              │  │   Flow)     │  │
+│  │ (MAUI XAML)  │←→│   (Logic)    │←→│   (MVVM)    │  │
+│  │              │  │              │  │CommunityTK  │  │
 │  └──────────────┘  └──────┬───────┘  └─────────────┘  │
 └──────────────────────────┼────────────────────────────┘
                            │
@@ -674,8 +678,8 @@ Honua Field is a mobile application for iOS and Android that enables field worke
 
 **1. Map Module**
 - Responsibilities: Display maps, layers, handle user interactions
-- Components: MapViewController, MapViewModel, LayerRenderer, SymbologyEngine
-- Dependencies: Mapbox/Google Maps SDK
+- Components: MapControl, MapViewModel, LayerRenderer, SymbologyEngine
+- Dependencies: Mapsui (MIT open-source mapping SDK), SkiaSharp
 
 **2. Data Collection Module**
 - Responsibilities: Forms, attribute entry, geometry capture
@@ -688,9 +692,9 @@ Honua Field is a mobile application for iOS and Android that enables field worke
 - Dependencies: Database Module, Network Module
 
 **4. AI Module**
-- Responsibilities: ML model management, inference, training
+- Responsibilities: ML model management, on-device inference
 - Components: ModelManager, InferenceEngine, FeatureDetector
-- Dependencies: Core ML/TensorFlow Lite
+- Dependencies: ML.NET, ONNX Runtime (cross-platform edge AI)
 
 **5. AR Module**
 - Responsibilities: Augmented reality visualization
@@ -782,150 +786,165 @@ Change Tracker (Mark for Sync)
 ### Core Entities
 
 #### Feature
-```swift
-struct Feature: Identifiable, Codable {
-    let id: UUID
-    var serverId: String?
-    var collectionId: String
-    var geometry: Geometry
-    var properties: [String: Any]
-    var attachments: [Attachment]
-    var createdAt: Date
-    var updatedAt: Date
-    var createdBy: String
-    var version: Int
-    var syncStatus: SyncStatus
+```csharp
+// C# record for .NET MAUI
+public record Feature
+{
+    public Guid Id { get; init; }
+    public string? ServerId { get; set; }
+    public required string CollectionId { get; set; }
+    public required Geometry Geometry { get; set; }
+    public Dictionary<string, object> Properties { get; set; } = new();
+    public List<Attachment> Attachments { get; set; } = new();
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public required string CreatedBy { get; set; }
+    public int Version { get; set; }
+    public SyncStatus SyncStatus { get; set; }
 }
 
-enum SyncStatus {
-    case synced
-    case pending
-    case conflict
-    case error
+public enum SyncStatus
+{
+    Synced,
+    Pending,
+    Conflict,
+    Error
 }
 ```
 
 #### Geometry
-```swift
-enum Geometry: Codable {
-    case point(Point)
-    case lineString(LineString)
-    case polygon(Polygon)
-    case multiPoint([Point])
-    case multiLineString([LineString])
-    case multiPolygon([Polygon])
+```csharp
+// C# class hierarchy for .NET MAUI (using NetTopologySuite for geometry)
+using NetTopologySuite.Geometries;
+
+public abstract record Geometry
+{
+    // Uses NetTopologySuite.Geometries types:
+    // - Point, LineString, Polygon
+    // - MultiPoint, MultiLineString, MultiPolygon
 }
 
-struct Point {
-    var latitude: Double
-    var longitude: Double
-    var altitude: Double?
-    var accuracy: Double?
+public record PointGeometry(double Latitude, double Longitude, double? Altitude = null, double? Accuracy = null)
+{
+    public Point ToNtsPoint() => new Point(new Coordinate(Longitude, Latitude, Altitude ?? 0));
 }
 ```
 
 #### Collection (Layer)
-```swift
-struct Collection: Identifiable, Codable {
-    let id: String
-    var title: String
-    var description: String?
-    var schema: Schema
-    var symbology: Symbology
-    var extent: BoundingBox?
-    var itemsCount: Int?
+```csharp
+// C# records for .NET MAUI
+public record Collection
+{
+    public required string Id { get; init; }
+    public required string Title { get; set; }
+    public string? Description { get; set; }
+    public required Schema Schema { get; set; }
+    public required Symbology Symbology { get; set; }
+    public BoundingBox? Extent { get; set; }
+    public int? ItemsCount { get; set; }
 }
 
-struct Schema {
-    var properties: [Property]
-    var geometryType: GeometryType
+public record Schema
+{
+    public List<Property> Properties { get; set; } = new();
+    public GeometryType GeometryType { get; set; }
 }
 
-struct Property {
-    var name: String
-    var type: PropertyType
-    var required: Bool
-    var defaultValue: Any?
-    var constraints: [Constraint]?
-    var widget: WidgetType
+public record Property
+{
+    public required string Name { get; set; }
+    public PropertyType Type { get; set; }
+    public bool Required { get; set; }
+    public object? DefaultValue { get; set; }
+    public List<Constraint>? Constraints { get; set; }
+    public WidgetType Widget { get; set; }
 }
 
-enum PropertyType {
-    case string
-    case integer
-    case double
-    case boolean
-    case date
-    case datetime
-    case choice([String])
+public enum PropertyType
+{
+    String,
+    Integer,
+    Double,
+    Boolean,
+    Date,
+    DateTime,
+    Choice
 }
 
-enum WidgetType {
-    case textField
-    case textArea
-    case datePicker
-    case dropdown
-    case radio
-    case checkbox
-    case slider
-    case barcode
-    case photo
-    case sketch
-    case signature
+public enum WidgetType
+{
+    TextField,
+    TextArea,
+    DatePicker,
+    Dropdown,
+    Radio,
+    Checkbox,
+    Slider,
+    Barcode,
+    Photo,
+    Sketch,
+    Signature
 }
 ```
 
 #### Attachment
-```swift
-struct Attachment: Identifiable, Codable {
-    let id: UUID
-    var featureId: UUID
-    var type: AttachmentType
-    var filename: String
-    var filepath: String
-    var contentType: String
-    var size: Int64
-    var thumbnail: String?
-    var metadata: AttachmentMetadata?
-    var uploadStatus: UploadStatus
+```csharp
+// C# record for .NET MAUI
+public record Attachment
+{
+    public Guid Id { get; init; }
+    public Guid FeatureId { get; set; }
+    public AttachmentType Type { get; set; }
+    public required string Filename { get; set; }
+    public required string Filepath { get; set; }
+    public required string ContentType { get; set; }
+    public long Size { get; set; }
+    public string? Thumbnail { get; set; }
+    public AttachmentMetadata? Metadata { get; set; }
+    public UploadStatus UploadStatus { get; set; }
 }
 
-enum AttachmentType {
-    case photo
-    case video
-    case audio
-    case document
+public enum AttachmentType
+{
+    Photo,
+    Video,
+    Audio,
+    Document
 }
 
-struct AttachmentMetadata {
-    var capturedAt: Date?
-    var location: Point?
-    var width: Int?
-    var height: Int?
-    var duration: TimeInterval?
+public record AttachmentMetadata
+{
+    public DateTime? CapturedAt { get; set; }
+    public PointGeometry? Location { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public TimeSpan? Duration { get; set; }
 }
 ```
 
 #### Map
-```swift
-struct Map: Identifiable, Codable {
-    let id: UUID
-    var title: String
-    var description: String?
-    var extent: BoundingBox
-    var basemap: Basemap
-    var layers: [MapLayer]
-    var downloadedExtent: BoundingBox?
-    var downloadSize: Int64?
+```csharp
+// C# record for .NET MAUI
+public record Map
+{
+    public Guid Id { get; init; }
+    public required string Title { get; set; }
+    public string? Description { get; set; }
+    public required BoundingBox Extent { get; set; }
+    public required Basemap Basemap { get; set; }
+    public List<MapLayer> Layers { get; set; } = new();
+    public BoundingBox? DownloadedExtent { get; set; }
+    public long? DownloadSize { get; set; }
 }
 
-struct MapLayer: Identifiable, Codable {
-    let id: UUID
-    var collectionId: String
-    var visible: Bool
-    var opacity: Double
-    var minZoom: Int?
-    var maxZoom: Int?
+public record MapLayer
+{
+    public Guid Id { get; init; }
+    public required string CollectionId { get; set; }
+    public bool Visible { get; set; }
+    public double Opacity { get; set; }
+    public int? MinZoom { get; set; }
+    public int? MaxZoom { get; set; }
 }
 ```
 
@@ -1512,7 +1531,7 @@ await _arService.AddFeatureMarker(feature);
 #### Map Tile Caching
 
 **Options:**
-1. **MBTiles format** (Mapbox standard)
+1. **MBTiles format** (open SQLite-based standard for offline tiles)
 2. **GeoPackage tiles** (OGC standard)
 3. **File system** (z/x/y structure)
 
@@ -1673,9 +1692,10 @@ Download: [Wi-Fi Only] [Cellular OK]
 ### Third-Party Integrations
 
 **Mapping:**
-- Mapbox SDK
-- Google Maps SDK
+- Mapsui (MIT open-source)
+- SkiaSharp rendering
 - OpenStreetMap tiles
+- OGC WMS/WFS/WMTS support
 
 **GNSS:**
 - Trimble receivers (via Bluetooth)
@@ -1772,8 +1792,9 @@ Download: [Wi-Fi Only] [Cellular OK]
 ### Phase 2: Intelligence (6 months)
 
 **Month 7-8: AI Foundation**
-- [ ] ML model integration (Core ML, TensorFlow Lite)
+- [ ] ML model integration (ML.NET, ONNX Runtime)
 - [ ] Feature detection model training
+- [ ] ONNX model conversion and optimization
 - [ ] Smart suggestions engine
 - [ ] Voice input (speech-to-text)
 

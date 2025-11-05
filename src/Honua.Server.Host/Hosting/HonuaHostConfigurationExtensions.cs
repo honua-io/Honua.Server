@@ -2,7 +2,9 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿// using Honua.Server.Core.GitOps; // TODO: GitOps feature not yet implemented
 using Honua.Server.Core.Extensions;
+
 using Honua.Server.Enterprise.Events;
+using Honua.Server.Enterprise.Sensors.Extensions;
 using Honua.Server.Host.Extensions;
 using Honua.Server.Host.GeoEvent;
 using Microsoft.AspNetCore.Builder;
@@ -47,6 +49,7 @@ internal static class HonuaHostConfigurationExtensions
         builder.Services.AddHonuaRasterServices();
         builder.Services.AddHonuaStacServices();
         builder.Services.AddHonuaCartoServices();
+        builder.Services.AddSensorThings(builder.Configuration); // OGC SensorThings API v1.1
 
         // GeoEvent services (conditional - requires Postgres connection)
         var connectionString = builder.Configuration.GetConnectionString("Postgres")

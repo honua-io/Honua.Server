@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <!-- Honua Brand Colors -->
+    <Color x:Key="PrimaryBlue">#0066CC</Color>
+    <Color x:Key="PrimaryBlueDark">#0052A3</Color>
+    <Color x:Key="PrimaryBlueLight">#3384D6</Color>
+
+    <Color x:Key="SecondaryTeal">#00B4D8</Color>
+    <Color x:Key="AccentOrange">#FF6B35</Color>
+
+    <!-- Semantic Colors -->
+    <Color x:Key="SuccessGreen">#28A745</Color>
+    <Color x:Key="WarningYellow">#FFC107</Color>
+    <Color x:Key="ErrorRed">#DC3545</Color>
+    <Color x:Key="InfoBlue">#17A2B8</Color>
+
+    <!-- Neutral Colors (Light Mode) -->
+    <Color x:Key="Gray900">#212529</Color>
+    <Color x:Key="Gray800">#343A40</Color>
+    <Color x:Key="Gray700">#495057</Color>
+    <Color x:Key="Gray600">#6C757D</Color>
+    <Color x:Key="Gray500">#ADB5BD</Color>
+    <Color x:Key="Gray400">#CED4DA</Color>
+    <Color x:Key="Gray300">#DEE2E6</Color>
+    <Color x:Key="Gray200">#E9ECEF</Color>
+    <Color x:Key="Gray100">#F8F9FA</Color>
+
+    <!-- Text Colors -->
+    <Color x:Key="TextPrimary">#212529</Color>
+    <Color x:Key="TextSecondary">#6C757D</Color>
+    <Color x:Key="TextDisabled">#ADB5BD</Color>
+    <Color x:Key="TextOnPrimary">#FFFFFF</Color>
+
+    <!-- Background Colors -->
+    <Color x:Key="BackgroundPrimary">#FFFFFF</Color>
+    <Color x:Key="BackgroundSecondary">#F8F9FA</Color>
+    <Color x:Key="BackgroundTertiary">#E9ECEF</Color>
+
+    <!-- Surface Colors -->
+    <Color x:Key="SurfaceDefault">#FFFFFF</Color>
+    <Color x:Key="SurfaceElevated">#FFFFFF</Color>
+
+    <!-- Border Colors -->
+    <Color x:Key="BorderDefault">#DEE2E6</Color>
+    <Color x:Key="BorderFocus">#0066CC</Color>
+
+</ResourceDictionary>

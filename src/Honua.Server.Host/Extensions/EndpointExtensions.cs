@@ -1,6 +1,8 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using Honua.Server.Core.Configuration;
+using Honua.Server.Enterprise.Sensors.Extensions;
+using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Host.Admin;
 using Honua.Server.Host.Authentication;
 using Honua.Server.Host.Carto;
@@ -132,6 +134,13 @@ internal static class EndpointExtensions
         if (configurationService?.Current.Services.Zarr.Enabled ?? true)
         {
             app.MapZarrTimeSeriesEndpoints();
+        }
+
+        // OGC SensorThings API v1.1 (conditional on configuration)
+        var sensorThingsConfig = app.Services.GetService<SensorThingsServiceDefinition>();
+        if (sensorThingsConfig?.Enabled ?? false)
+        {
+            app.MapSensorThingsEndpoints(sensorThingsConfig);
         }
 
         return app;
