@@ -1,0 +1,62 @@
+{
+  "id": "union",
+  "title": "Union",
+  "description": "Computes the geometric union of all input geometries, merging overlapping areas into single geometries.",
+  "version": "1.0.0",
+  "keywords": ["union", "merge", "combine", "dissolve"],
+  "category": "vector",
+  "inputs": [
+    {
+      "id": "input_features",
+      "title": "Input Features",
+      "description": "The features to union together",
+      "minOccurs": 1,
+      "maxOccurs": 999,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    }
+  ],
+  "parameters": [],
+  "outputs": [
+    {
+      "id": "union_features",
+      "title": "Union Features",
+      "description": "The resulting merged geometry",
+      "schema": {
+        "type": "string",
+        "contentMediaType": "application/geo+json"
+      }
+    }
+  ],
+  "outputFormats": ["application/geo+json", "application/json"],
+  "executionConfig": {
+    "preferredTier": "nts",
+    "allowedTiers": ["nts", "postgis", "cloud_batch"],
+    "estimatedDurationSeconds": 30,
+    "memoryLimitMB": 2048,
+    "cpuCores": 2
+  },
+  "links": [
+    {
+      "rel": "about",
+      "type": "text/html",
+      "title": "Union operation documentation",
+      "href": "https://docs.honua.io/processes/union"
+    }
+  ],
+  "metadata": {
+    "complexity": "medium",
+    "category": "geometry",
+    "tags": ["merge", "analysis"]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "id": "convex_hull",
+  "title": "Convex Hull",
+  "description": "Computes the convex hull (smallest convex polygon) that contains all input geometries. Useful for creating bounding shapes and spatial extent analysis.",
+  "version": "1.0.0",
+  "keywords": ["convex hull", "envelope", "boundary", "extent"],
+  "category": "vector",
+  "inputs": [
+    {
+      "id": "input_features",
+      "title": "Input Features",
+      "description": "The features to compute convex hull for",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    }
+  ],
+  "parameters": [
+    {
+      "id": "per_feature",
+      "title": "Per Feature",
+      "description": "Whether to compute convex hull for each feature individually (true) or for all features combined (false)",
+      "minOccurs": 0,
+      "maxOccurs": 1,
+      "schema": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "convex_hull_features",
+      "title": "Convex Hull Features",
+      "description": "The resulting convex hull polygon(s)",
+      "schema": {
+        "type": "string",
+        "contentMediaType": "application/geo+json"
+      }
+    }
+  ],
+  "outputFormats": ["application/geo+json", "application/json"],
+  "executionConfig": {
+    "preferredTier": "nts",
+    "allowedTiers": ["nts", "postgis", "cloud_batch"],
+    "estimatedDurationSeconds": 3,
+    "memoryLimitMB": 256,
+    "cpuCores": 1
+  },
+  "links": [
+    {
+      "rel": "about",
+      "type": "text/html",
+      "title": "Convex Hull operation documentation",
+      "href": "https://docs.honua.io/processes/convex_hull"
+    }
+  ],
+  "metadata": {
+    "complexity": "simple",
+    "category": "geometry",
+    "tags": ["envelope", "extent"]
+  }
+}

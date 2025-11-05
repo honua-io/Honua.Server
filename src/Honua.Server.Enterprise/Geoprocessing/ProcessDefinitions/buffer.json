@@ -1,0 +1,111 @@
+{
+  "id": "buffer",
+  "title": "Buffer",
+  "description": "Creates a buffer (polygon) around input geometries at a specified distance. Useful for proximity analysis and creating zones around features.",
+  "version": "1.0.0",
+  "keywords": ["buffer", "proximity", "zone", "distance"],
+  "category": "vector",
+  "inputs": [
+    {
+      "id": "input_features",
+      "title": "Input Features",
+      "description": "The features to buffer",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    }
+  ],
+  "parameters": [
+    {
+      "id": "distance",
+      "title": "Buffer Distance",
+      "description": "The distance to buffer around each feature",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "type": "number",
+        "minimum": 0,
+        "exclusiveMinimum": true
+      }
+    },
+    {
+      "id": "units",
+      "title": "Distance Units",
+      "description": "The units for the buffer distance",
+      "minOccurs": 0,
+      "maxOccurs": 1,
+      "schema": {
+        "type": "string",
+        "enum": ["meters", "kilometers", "feet", "miles"],
+        "default": "meters"
+      }
+    },
+    {
+      "id": "segments",
+      "title": "Quadrant Segments",
+      "description": "Number of segments used to approximate a quarter circle (higher = smoother curves)",
+      "minOccurs": 0,
+      "maxOccurs": 1,
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 64,
+        "default": 8
+      }
+    },
+    {
+      "id": "dissolve",
+      "title": "Dissolve Overlapping Buffers",
+      "description": "Whether to merge overlapping buffer polygons into a single geometry",
+      "minOccurs": 0,
+      "maxOccurs": 1,
+      "schema": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "buffered_features",
+      "title": "Buffered Features",
+      "description": "The resulting buffer polygons",
+      "schema": {
+        "type": "string",
+        "contentMediaType": "application/geo+json"
+      }
+    }
+  ],
+  "outputFormats": ["application/geo+json", "application/json"],
+  "executionConfig": {
+    "preferredTier": "nts",
+    "allowedTiers": ["nts", "postgis", "cloud_batch"],
+    "estimatedDurationSeconds": 10,
+    "memoryLimitMB": 512,
+    "cpuCores": 1
+  },
+  "links": [
+    {
+      "rel": "about",
+      "type": "text/html",
+      "title": "Buffer operation documentation",
+      "href": "https://docs.honua.io/processes/buffer"
+    }
+  ],
+  "metadata": {
+    "complexity": "simple",
+    "category": "geometry",
+    "tags": ["proximity", "analysis"]
+  }
+}

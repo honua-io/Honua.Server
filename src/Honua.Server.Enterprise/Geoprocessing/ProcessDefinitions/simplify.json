@@ -1,0 +1,86 @@
+{
+  "id": "simplify",
+  "title": "Simplify",
+  "description": "Simplifies geometries by reducing vertex count while preserving shape using the Douglas-Peucker algorithm. Useful for reducing file size and improving rendering performance.",
+  "version": "1.0.0",
+  "keywords": ["simplify", "generalize", "reduce", "douglas-peucker"],
+  "category": "vector",
+  "inputs": [
+    {
+      "id": "input_features",
+      "title": "Input Features",
+      "description": "The features to simplify",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "oneOf": [
+          {
+            "type": "string",
+            "contentMediaType": "application/geo+json"
+          },
+          {
+            "type": "string",
+            "contentMediaType": "application/wkt"
+          }
+        ]
+      }
+    }
+  ],
+  "parameters": [
+    {
+      "id": "tolerance",
+      "title": "Simplification Tolerance",
+      "description": "The distance tolerance for simplification. Larger values result in more simplification.",
+      "minOccurs": 1,
+      "maxOccurs": 1,
+      "schema": {
+        "type": "number",
+        "minimum": 0,
+        "exclusiveMinimum": true
+      }
+    },
+    {
+      "id": "preserve_topology",
+      "title": "Preserve Topology",
+      "description": "Whether to preserve topology (prevents self-intersections and invalid geometries)",
+      "minOccurs": 0,
+      "maxOccurs": 1,
+      "schema": {
+        "type": "boolean",
+        "default": true
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "simplified_features",
+      "title": "Simplified Features",
+      "description": "The resulting simplified geometries",
+      "schema": {
+        "type": "string",
+        "contentMediaType": "application/geo+json"
+      }
+    }
+  ],
+  "outputFormats": ["application/geo+json", "application/json"],
+  "executionConfig": {
+    "preferredTier": "nts",
+    "allowedTiers": ["nts", "postgis", "cloud_batch"],
+    "estimatedDurationSeconds": 5,
+    "memoryLimitMB": 512,
+    "cpuCores": 1
+  },
+  "links": [
+    {
+      "rel": "about",
+      "type": "text/html",
+      "title": "Simplify operation documentation",
+      "href": "https://docs.honua.io/processes/simplify"
+    }
+  ],
+  "metadata": {
+    "complexity": "simple",
+    "category": "geometry",
+    "tags": ["generalization", "optimization"]
+  }
+}
