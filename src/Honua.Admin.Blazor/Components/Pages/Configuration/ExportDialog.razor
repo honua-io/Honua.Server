@@ -1,0 +1,223 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@inject ExportImportApiClient ExportImportClient
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.FileDownload" Class="mr-1" /> Export Configuration
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_isExporting)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+            <MudText Typo="Typo.body1" Align="Align.Center">Exporting configuration...</MudText>
+        }
+        else if (_exportResult != null)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-4">
+                Export completed successfully!
+            </MudAlert>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Export Summary</MudText>
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.body2"><strong>Services:</strong> @_exportResult.Summary.ServiceCount</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.body2"><strong>Layers:</strong> @_exportResult.Summary.LayerCount</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.body2"><strong>Folders:</strong> @_exportResult.Summary.FolderCount</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.body2"><strong>Styles:</strong> @_exportResult.Summary.StyleCount</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.body2"><strong>Data Sources:</strong> @_exportResult.Summary.DataSourceCount</MudText>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.body2"><strong>Size:</strong> @FormatBytes(_exportResult.Summary.SizeBytes)</MudText>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2"><strong>Exported:</strong> @_exportResult.ExportedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudText Typo="Typo.body2" Class="mb-2">
+                Click "Download" to save the configuration file to your device.
+            </MudText>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-4">
+                Configure the export options below. You can export the entire catalog or specific items.
+            </MudText>
+
+            <MudSelect @bind-Value="_scope" Label="Export Scope" Variant="Variant.Outlined" Class="mb-4">
+                <MudSelectItem Value="@ExportScope.All">All (Complete Catalog)</MudSelectItem>
+                <MudSelectItem Value="@ExportScope.Services">Services Only</MudSelectItem>
+                <MudSelectItem Value="@ExportScope.Layers">Layers Only</MudSelectItem>
+                <MudSelectItem Value="@ExportScope.Folders">Folders Only</MudSelectItem>
+                <MudSelectItem Value="@ExportScope.Styles">Styles Only</MudSelectItem>
+            </MudSelect>
+
+            @if (_scope != ExportScope.All)
+            {
+                <MudTextField @bind-Value="_itemIdsInput"
+                              Label="Item IDs (comma-separated)"
+                              Variant="Variant.Outlined"
+                              Lines="3"
+                              HelperText="Enter specific item IDs to export (leave empty to export all)"
+                              Class="mb-4" />
+            }
+
+            <MudSelect @bind-Value="_format" Label="Export Format" Variant="Variant.Outlined" Class="mb-4">
+                <MudSelectItem Value="@ExportFormat.Json">JSON</MudSelectItem>
+                <MudSelectItem Value="@ExportFormat.Yaml">YAML</MudSelectItem>
+            </MudSelect>
+
+            @if (_scope == ExportScope.Services)
+            {
+                <MudCheckBox @bind-Checked="_includeRelated"
+                             Label="Include Related Items (e.g., layers for services)"
+                             Color="Color.Primary"
+                             Class="mb-2" />
+            }
+
+            <MudCheckBox @bind-Checked="_includeMetadata"
+                         Label="Include Metadata (created/updated dates, created by)"
+                         Color="Color.Primary"
+                         Class="mb-2" />
+
+            <MudCheckBox @bind-Checked="_prettyPrint"
+                         Label="Pretty Print (formatted output)"
+                         Color="Color.Primary"
+                         Class="mb-2" />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-4">@_errorMessage</MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_exportResult != null)
+        {
+            <MudButton OnClick="Download" Color="Color.Success" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Download" Class="mr-1" /> Download
+            </MudButton>
+            <MudButton OnClick="Close" Color="Color.Default">Close</MudButton>
+        }
+        else
+        {
+            <MudButton OnClick="Close" Disabled="_isExporting">Cancel</MudButton>
+            <MudButton OnClick="Export" Color="Color.Primary" Variant="Variant.Filled" Disabled="_isExporting">
+                <MudIcon Icon="@Icons.Material.Filled.FileDownload" Class="mr-1" /> Export
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _scope = ExportScope.All;
+    private string _format = ExportFormat.Json;
+    private string _itemIdsInput = string.Empty;
+    private bool _includeRelated = true;
+    private bool _includeMetadata = true;
+    private bool _prettyPrint = true;
+
+    private bool _isExporting = false;
+    private ExportResponse? _exportResult = null;
+    private string _errorMessage = string.Empty;
+
+    private async Task Export()
+    {
+        _isExporting = true;
+        _errorMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var request = new ExportRequest
+            {
+                Format = _format,
+                Scope = _scope,
+                IncludeRelated = _includeRelated,
+                IncludeMetadata = _includeMetadata,
+                PrettyPrint = _prettyPrint
+            };
+
+            // Parse item IDs if provided
+            if (!string.IsNullOrWhiteSpace(_itemIdsInput))
+            {
+                request.ItemIds = _itemIdsInput
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToList();
+            }
+
+            _exportResult = await ExportImportClient.ExportAsync(request);
+            Snackbar.Add("Export completed successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Export failed: {ex.Message}";
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Download()
+    {
+        if (_exportResult == null) return;
+
+        try
+        {
+            var bytes = await ExportImportClient.DownloadExportAsync(_exportResult);
+            var fileName = _exportResult.FileName;
+
+            // Trigger browser download using JSInterop
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(bytes));
+            Snackbar.Add("Configuration downloaded", Severity.Success);
+
+            // Close dialog after download
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Download failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Close()
+    {
+        MudDialog.Cancel();
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+
+        return $"{len:0.##} {sizes[order]}";
+    }
+}

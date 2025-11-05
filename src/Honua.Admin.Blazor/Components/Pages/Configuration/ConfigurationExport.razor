@@ -1,0 +1,299 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@page "/configuration/export"
+@attribute [Authorize(Roles = "administrator")]
+
+@inject ExportImportApiClient ExportImportClient
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Export Configuration - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.FileDownload" Class="mr-2" /> Export Configuration
+    </MudText>
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+        Export your metadata configurations to JSON or YAML files for backup, migration, or sharing.
+    </MudText>
+
+    <MudGrid>
+        @* Quick Export Cards *@
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Folder" Class="mr-1" /> Complete Catalog
+                        </MudText>
+                    </CardHeaderContent>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Primary">
+                            <MudIcon Icon="@Icons.Material.Filled.Storage" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2">
+                        Export the entire catalog including all services, layers, folders, and styles.
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               OnClick="@(() => QuickExport(ExportScope.All, ExportFormat.Json))">
+                        Export JSON
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               OnClick="@(() => QuickExport(ExportScope.All, ExportFormat.Yaml))">
+                        Export YAML
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Layers" Class="mr-1" /> Services Only
+                        </MudText>
+                    </CardHeaderContent>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Success">
+                            <MudIcon Icon="@Icons.Material.Filled.Cloud" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2">
+                        Export all services with their associated layers and configurations.
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Success"
+                               OnClick="@(() => QuickExport(ExportScope.Services, ExportFormat.Json))">
+                        Export JSON
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Success"
+                               OnClick="@(() => QuickExport(ExportScope.Services, ExportFormat.Yaml))">
+                        Export YAML
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Palette" Class="mr-1" /> Styles Only
+                        </MudText>
+                    </CardHeaderContent>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Warning">
+                            <MudIcon Icon="@Icons.Material.Filled.FormatPaint" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2">
+                        Export all map styles and rendering configurations for reuse.
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Warning"
+                               OnClick="@(() => QuickExport(ExportScope.Styles, ExportFormat.Json))">
+                        Export JSON
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Warning"
+                               OnClick="@(() => QuickExport(ExportScope.Styles, ExportFormat.Yaml))">
+                        Export YAML
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Class="mr-1" /> Folders Only
+                        </MudText>
+                    </CardHeaderContent>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Info">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountTree" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2">
+                        Export folder structure and organization hierarchy.
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Info"
+                               OnClick="@(() => QuickExport(ExportScope.Folders, ExportFormat.Json))">
+                        Export JSON
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Info"
+                               OnClick="@(() => QuickExport(ExportScope.Folders, ExportFormat.Yaml))">
+                        Export YAML
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Map" Class="mr-1" /> Layers Only
+                        </MudText>
+                    </CardHeaderContent>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Secondary">
+                            <MudIcon Icon="@Icons.Material.Filled.Terrain" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2">
+                        Export all layer definitions without parent services.
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Secondary"
+                               OnClick="@(() => QuickExport(ExportScope.Layers, ExportFormat.Json))">
+                        Export JSON
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Secondary"
+                               OnClick="@(() => QuickExport(ExportScope.Layers, ExportFormat.Yaml))">
+                        Export YAML
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-1" /> Custom Export
+                        </MudText>
+                    </CardHeaderContent>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Dark">
+                            <MudIcon Icon="@Icons.Material.Filled.Tune" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body2">
+                        Configure advanced export options and select specific items.
+                    </MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Dark"
+                               OnClick="ShowCustomExportDialog">
+                        Configure Export
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* Export Tips *@
+    <MudPaper Elevation="2" Class="pa-4 mt-6">
+        <MudText Typo="Typo.h6" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-1" /> Export Tips
+        </MudText>
+        <MudList Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.Check">
+                <strong>Backup:</strong> Export your complete catalog regularly for backup purposes
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">
+                <strong>Migration:</strong> Use exports to migrate configurations between environments
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">
+                <strong>Sharing:</strong> Export specific services or styles to share with team members
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">
+                <strong>Version Control:</strong> Store exports in version control systems for change tracking
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Check">
+                <strong>Formats:</strong> JSON is easier to work with programmatically, YAML is more human-readable
+            </MudListItem>
+        </MudList>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private async Task QuickExport(string scope, string format)
+    {
+        try
+        {
+            var request = new ExportRequest
+            {
+                Format = format,
+                Scope = scope,
+                IncludeRelated = true,
+                IncludeMetadata = true,
+                PrettyPrint = true
+            };
+
+            var result = await ExportImportClient.ExportAsync(request);
+
+            // Trigger download
+            var bytes = await ExportImportClient.DownloadExportAsync(result);
+            await DownloadFile(result.FileName, bytes);
+
+            Snackbar.Add($"Exported {result.Summary.ServiceCount + result.Summary.LayerCount + result.Summary.FolderCount + result.Summary.StyleCount} items successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ShowCustomExportDialog()
+    {
+        var dialog = await DialogService.ShowAsync<ExportDialog>("Export Configuration", new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        });
+
+        var result = await dialog.Result;
+    }
+
+    private async Task DownloadFile(string fileName, byte[] bytes)
+    {
+        try
+        {
+            var base64 = Convert.ToBase64String(bytes);
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Download failed: {ex.Message}", Severity.Error);
+        }
+    }
+}

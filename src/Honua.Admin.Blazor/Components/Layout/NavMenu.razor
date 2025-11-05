@@ -46,9 +46,17 @@
 
     <MudDivider Class="my-2" />
 
-    <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
-        Settings
-    </MudNavLink>
+    <MudNavGroup Title="Configuration" Icon="@Icons.Material.Filled.Settings" Expanded="false">
+        <MudNavLink Href="/configuration/export" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FileDownload">
+            Export
+        </MudNavLink>
+        <MudNavLink Href="/configuration/import" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.FileUpload">
+            Import
+        </MudNavLink>
+        <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Tune">
+            Settings
+        </MudNavLink>
+    </MudNavGroup>
 </MudNavMenu>
 
 @code {

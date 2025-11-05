@@ -1,0 +1,519 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@page "/configuration/import"
+@attribute [Authorize(Roles = "administrator")]
+
+@inject ExportImportApiClient ExportImportClient
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>Import Configuration - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.FileUpload" Class="mr-2" /> Import Configuration
+    </MudText>
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+        Import metadata configurations from JSON or YAML files. You can validate before applying or perform a dry-run to preview changes.
+    </MudText>
+
+    <MudStepper @ref="_stepper" Color="Color.Primary" Variant="Variant.Filled">
+        @* Step 1: Upload File *@
+        <MudStep Title="Upload File" Icon="@Icons.Material.Filled.CloudUpload">
+            <ChildContent>
+                <MudPaper Elevation="2" Class="pa-6">
+                    <MudText Typo="Typo.h6" Class="mb-4">Select Configuration File</MudText>
+
+                    <MudFileUpload T="IBrowserFile" Accept=".json,.yaml,.yml" FilesChanged="OnFileSelected" MaximumFileCount="1">
+                        <ButtonTemplate>
+                            <MudButton HtmlTag="label"
+                                       Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.CloudUpload"
+                                       for="@context">
+                                Select File
+                            </MudButton>
+                        </ButtonTemplate>
+                    </MudFileUpload>
+
+                    @if (_selectedFile != null)
+                    {
+                        <MudPaper Elevation="1" Class="pa-4 mt-4">
+                            <MudText Typo="Typo.body1"><strong>File:</strong> @_selectedFile.Name</MudText>
+                            <MudText Typo="Typo.body2"><strong>Size:</strong> @FormatBytes(_selectedFile.Size)</MudText>
+                            <MudText Typo="Typo.body2"><strong>Type:</strong> @_selectedFile.ContentType</MudText>
+                        </MudPaper>
+                    }
+
+                    @if (_isReading)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-4" />
+                        <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-2">Reading file...</MudText>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_fileError))
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mt-4">@_fileError</MudAlert>
+                    }
+                </MudPaper>
+            </ChildContent>
+        </MudStep>
+
+        @* Step 2: Configure Import *@
+        <MudStep Title="Configure" Icon="@Icons.Material.Filled.Settings">
+            <ChildContent>
+                <MudPaper Elevation="2" Class="pa-6">
+                    <MudText Typo="Typo.h6" Class="mb-4">Import Options</MudText>
+
+                    <MudSelect @bind-Value="_importMode" Label="Import Mode" Variant="Variant.Outlined" Class="mb-4">
+                        <MudSelectItem Value="@ImportMode.Merge">
+                            <div>
+                                <MudText Typo="Typo.body1">Merge</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Create new items, update existing, keep others</MudText>
+                            </div>
+                        </MudSelectItem>
+                        <MudSelectItem Value="@ImportMode.Replace">
+                            <div>
+                                <MudText Typo="Typo.body1">Replace</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Delete existing items not in import, create/update from import</MudText>
+                            </div>
+                        </MudSelectItem>
+                        <MudSelectItem Value="@ImportMode.Skip">
+                            <div>
+                                <MudText Typo="Typo.body1">Skip</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Only create new items, skip existing</MudText>
+                            </div>
+                        </MudSelectItem>
+                    </MudSelect>
+
+                    <MudCheckBox @bind-Checked="_createBackup"
+                                 Label="Create Backup Snapshot Before Import"
+                                 Color="Color.Primary"
+                                 Class="mb-2" />
+
+                    @if (_createBackup)
+                    {
+                        <MudTextField @bind-Value="_backupLabel"
+                                      Label="Backup Label (optional)"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Provide a label for the backup snapshot"
+                                      Class="mb-4" />
+                    }
+
+                    <MudAlert Severity="Severity.Info" Class="mt-4">
+                        <strong>Tip:</strong> You can validate and preview changes in the next step before applying the import.
+                    </MudAlert>
+
+                    @if (_importMode == ImportMode.Replace)
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mt-4">
+                            <strong>Warning:</strong> Replace mode will delete items not present in the import file. A backup is highly recommended.
+                        </MudAlert>
+                    }
+                </MudPaper>
+            </ChildContent>
+        </MudStep>
+
+        @* Step 3: Validate & Preview *@
+        <MudStep Title="Validate" Icon="@Icons.Material.Filled.CheckCircle">
+            <ChildContent>
+                <MudPaper Elevation="2" Class="pa-6">
+                    @if (_isValidating)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+                        <MudText Typo="Typo.body1" Align="Align.Center">Validating configuration...</MudText>
+                    }
+                    else if (_validationResult != null)
+                    {
+                        <MudText Typo="Typo.h6" Class="mb-4">Validation Results</MudText>
+
+                        @if (_validationResult.Validation.IsValid)
+                        {
+                            <MudAlert Severity="Severity.Success" Class="mb-4">
+                                <MudText Typo="Typo.body1"><strong>Validation Passed</strong></MudText>
+                                <MudText Typo="Typo.body2">The configuration is valid and ready to import.</MudText>
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Error" Class="mb-4">
+                                <MudText Typo="Typo.body1"><strong>Validation Failed</strong></MudText>
+                                <MudText Typo="Typo.body2">@_validationResult.Validation.Errors.Count error(s) found. Please fix the issues before importing.</MudText>
+                            </MudAlert>
+
+                            <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2"><strong>Errors:</strong></MudText>
+                            @foreach (var error in _validationResult.Validation.Errors)
+                            {
+                                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">
+                                    <strong>[@error.Code]</strong> @error.Message
+                                    @if (!string.IsNullOrEmpty(error.ItemId))
+                                    {
+                                        <br />
+                                        <MudText Typo="Typo.body2">Item: @error.ItemType - @error.ItemId</MudText>
+                                    }
+                                </MudAlert>
+                            }
+                        }
+
+                        @if (_validationResult.Validation.Warnings.Count > 0)
+                        {
+                            <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2"><strong>Warnings:</strong></MudText>
+                            @foreach (var warning in _validationResult.Validation.Warnings)
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                                    <strong>[@warning.Code]</strong> @warning.Message
+                                    @if (!string.IsNullOrEmpty(warning.ItemId))
+                                    {
+                                        <br />
+                                        <MudText Typo="Typo.body2">Item: @warning.ItemType - @warning.ItemId</MudText>
+                                    }
+                                </MudAlert>
+                            }
+                        }
+
+                        <MudDivider Class="my-4" />
+
+                        <MudText Typo="Typo.h6" Class="mb-4">Planned Changes</MudText>
+
+                        <MudGrid>
+                            <MudItem xs="12" md="6">
+                                <MudPaper Elevation="1" Class="pa-4">
+                                    <MudText Typo="Typo.subtitle1" Color="Color.Success"><strong>To Be Created</strong></MudText>
+                                    <MudText Typo="Typo.body2">Services: @_validationResult.Changes.ServicesCreated.Count</MudText>
+                                    <MudText Typo="Typo.body2">Layers: @_validationResult.Changes.LayersCreated.Count</MudText>
+                                    <MudText Typo="Typo.body2">Folders: @_validationResult.Changes.FoldersCreated.Count</MudText>
+                                    <MudText Typo="Typo.body2">Styles: @_validationResult.Changes.StylesCreated.Count</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudPaper Elevation="1" Class="pa-4">
+                                    <MudText Typo="Typo.subtitle1" Color="Color.Warning"><strong>To Be Updated</strong></MudText>
+                                    <MudText Typo="Typo.body2">Services: @_validationResult.Changes.ServicesUpdated.Count</MudText>
+                                    <MudText Typo="Typo.body2">Layers: @_validationResult.Changes.LayersUpdated.Count</MudText>
+                                    <MudText Typo="Typo.body2">Folders: @_validationResult.Changes.FoldersUpdated.Count</MudText>
+                                    <MudText Typo="Typo.body2">Styles: @_validationResult.Changes.StylesUpdated.Count</MudText>
+                                </MudPaper>
+                            </MudItem>
+                            @if (_importMode == ImportMode.Replace)
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudPaper Elevation="1" Class="pa-4">
+                                        <MudText Typo="Typo.subtitle1" Color="Color.Error"><strong>To Be Deleted</strong></MudText>
+                                        <MudText Typo="Typo.body2">Services: @_validationResult.Changes.ServicesDeleted.Count</MudText>
+                                        <MudText Typo="Typo.body2">Layers: @_validationResult.Changes.LayersDeleted.Count</MudText>
+                                        <MudText Typo="Typo.body2">Folders: @_validationResult.Changes.FoldersDeleted.Count</MudText>
+                                        <MudText Typo="Typo.body2">Styles: @_validationResult.Changes.StylesDeleted.Count</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                            }
+                            @if (_importMode == ImportMode.Skip)
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudPaper Elevation="1" Class="pa-4">
+                                        <MudText Typo="Typo.subtitle1" Color="Color.Default"><strong>To Be Skipped</strong></MudText>
+                                        <MudText Typo="Typo.body2">Services: @_validationResult.Changes.ServicesSkipped.Count</MudText>
+                                        <MudText Typo="Typo.body2">Layers: @_validationResult.Changes.LayersSkipped.Count</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                            }
+                        </MudGrid>
+
+                        <MudAlert Severity="Severity.Info" Class="mt-4">
+                            <strong>Total Changes:</strong> @_validationResult.Changes.TotalChanges items will be affected by this import.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
+                            Click "Validate" to check the configuration and preview changes.
+                        </MudText>
+                    }
+                </MudPaper>
+            </ChildContent>
+        </MudStep>
+
+        @* Step 4: Import *@
+        <MudStep Title="Import" Icon="@Icons.Material.Filled.CloudDone">
+            <ChildContent>
+                <MudPaper Elevation="2" Class="pa-6">
+                    @if (_isImporting)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+                        <MudText Typo="Typo.body1" Align="Align.Center">Applying import...</MudText>
+                    }
+                    else if (_importResult != null && !_importResult.DryRun)
+                    {
+                        @if (_importResult.Success)
+                        {
+                            <MudAlert Severity="Severity.Success" Class="mb-4">
+                                <MudText Typo="Typo.h6"><strong>Import Completed Successfully!</strong></MudText>
+                                <MudText Typo="Typo.body2">The configuration has been imported successfully.</MudText>
+                            </MudAlert>
+
+                            @if (!string.IsNullOrEmpty(_importResult.BackupLabel))
+                            {
+                                <MudAlert Severity="Severity.Info" Class="mb-4">
+                                    <strong>Backup Created:</strong> @_importResult.BackupLabel
+                                    <br />
+                                    <MudText Typo="Typo.body2">You can restore from this backup if needed.</MudText>
+                                </MudAlert>
+                            }
+
+                            <MudText Typo="Typo.h6" Class="mb-4">Import Summary</MudText>
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudPaper Elevation="1" Class="pa-4">
+                                        <MudText Typo="Typo.subtitle1"><strong>Created</strong></MudText>
+                                        <MudText Typo="Typo.body2">Services: @_importResult.Changes.ServicesCreated.Count</MudText>
+                                        <MudText Typo="Typo.body2">Layers: @_importResult.Changes.LayersCreated.Count</MudText>
+                                        <MudText Typo="Typo.body2">Folders: @_importResult.Changes.FoldersCreated.Count</MudText>
+                                        <MudText Typo="Typo.body2">Styles: @_importResult.Changes.StylesCreated.Count</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudPaper Elevation="1" Class="pa-4">
+                                        <MudText Typo="Typo.subtitle1"><strong>Updated</strong></MudText>
+                                        <MudText Typo="Typo.body2">Services: @_importResult.Changes.ServicesUpdated.Count</MudText>
+                                        <MudText Typo="Typo.body2">Layers: @_importResult.Changes.LayersUpdated.Count</MudText>
+                                        <MudText Typo="Typo.body2">Folders: @_importResult.Changes.FoldersUpdated.Count</MudText>
+                                        <MudText Typo="Typo.body2">Styles: @_importResult.Changes.StylesUpdated.Count</MudText>
+                                    </MudPaper>
+                                </MudItem>
+                            </MudGrid>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Home"
+                                       OnClick="@(() => Navigation.NavigateTo("/"))"
+                                       Class="mt-4">
+                                Go to Dashboard
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Error" Class="mb-4">
+                                <MudText Typo="Typo.h6"><strong>Import Failed</strong></MudText>
+                                <MudText Typo="Typo.body2">The import encountered errors and was not applied.</MudText>
+                            </MudAlert>
+
+                            @foreach (var error in _importResult.Errors)
+                            {
+                                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@error</MudAlert>
+                            }
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
+                            Review the validation results and click "Apply Import" to proceed.
+                        </MudText>
+                    }
+                </MudPaper>
+            </ChildContent>
+        </MudStep>
+    </MudStepper>
+
+    <MudPaper Elevation="0" Class="pa-4 mt-4">
+        <MudStack Row="true" Spacing="2" Justify="Justify.SpaceBetween">
+            <MudButton OnClick="@(() => _stepper.Reset())"
+                       Disabled="@(_isValidating || _isImporting)"
+                       Variant="Variant.Text">
+                Reset
+            </MudButton>
+            <MudStack Row="true" Spacing="2">
+                @if (_stepper.GetActiveIndex() > 0)
+                {
+                    <MudButton OnClick="@(() => _stepper.Previous())"
+                               Disabled="@(_isValidating || _isImporting)"
+                               Variant="Variant.Outlined">
+                        Previous
+                    </MudButton>
+                }
+
+                @if (_stepper.GetActiveIndex() == 0)
+                {
+                    <MudButton OnClick="@(() => _stepper.Next())"
+                               Disabled="@(_selectedFile == null || _isReading)"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary">
+                        Next
+                    </MudButton>
+                }
+                else if (_stepper.GetActiveIndex() == 1)
+                {
+                    <MudButton OnClick="@(() => _stepper.Next())"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary">
+                        Next
+                    </MudButton>
+                }
+                else if (_stepper.GetActiveIndex() == 2)
+                {
+                    <MudButton OnClick="Validate"
+                               Disabled="@(_isValidating || _validationResult != null)"
+                               Variant="Variant.Filled"
+                               Color="Color.Info">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-1" /> Validate
+                    </MudButton>
+                    <MudButton OnClick="@(() => _stepper.Next())"
+                               Disabled="@(_validationResult == null || !_validationResult.Validation.IsValid)"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary">
+                        Next
+                    </MudButton>
+                }
+                else if (_stepper.GetActiveIndex() == 3)
+                {
+                    <MudButton OnClick="ApplyImport"
+                               Disabled="@(_isImporting || (_importResult != null && !_importResult.DryRun))"
+                               Variant="Variant.Filled"
+                               Color="Color.Success">
+                        <MudIcon Icon="@Icons.Material.Filled.CloudDone" Class="mr-1" /> Apply Import
+                    </MudButton>
+                }
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudStepper _stepper = null!;
+
+    private IBrowserFile? _selectedFile;
+    private string _fileContent = string.Empty;
+    private string _fileError = string.Empty;
+    private bool _isReading = false;
+
+    private string _importMode = ImportMode.Merge;
+    private bool _createBackup = true;
+    private string _backupLabel = string.Empty;
+
+    private bool _isValidating = false;
+    private ImportResponse? _validationResult = null;
+
+    private bool _isImporting = false;
+    private ImportResponse? _importResult = null;
+
+    private async Task OnFileSelected(IBrowserFile file)
+    {
+        _selectedFile = file;
+        _fileError = string.Empty;
+        _isReading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Validate file size
+            if (!ExportImportClient.ValidateFileSize(file.Size, out var errorMessage))
+            {
+                _fileError = errorMessage;
+                _selectedFile = null;
+                return;
+            }
+
+            // Read file content
+            using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024); // 50 MB
+            _fileContent = await ExportImportClient.ReadFileContentAsync(stream);
+
+            Snackbar.Add($"File loaded: {file.Name}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _fileError = $"Failed to read file: {ex.Message}";
+            _selectedFile = null;
+            Snackbar.Add($"Failed to read file: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isReading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Validate()
+    {
+        _isValidating = true;
+        _validationResult = null;
+        StateHasChanged();
+
+        try
+        {
+            _validationResult = await ExportImportClient.ValidateImportAsync(_fileContent, _importMode);
+            Snackbar.Add("Validation complete", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Validation failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isValidating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ApplyImport()
+    {
+        if (_validationResult == null || !_validationResult.Validation.IsValid)
+        {
+            Snackbar.Add("Please validate the configuration first", Severity.Warning);
+            return;
+        }
+
+        // Confirmation dialog
+        var confirmed = await DialogService.ShowMessageBox(
+            "Confirm Import",
+            $"Are you sure you want to import this configuration? This will affect {_validationResult.Changes.TotalChanges} items.",
+            yesText: "Import", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        _isImporting = true;
+        _importResult = null;
+        StateHasChanged();
+
+        try
+        {
+            var backupLabel = _createBackup && !string.IsNullOrWhiteSpace(_backupLabel)
+                ? _backupLabel
+                : $"Pre-import backup {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}";
+
+            _importResult = await ExportImportClient.ApplyImportAsync(_fileContent, _importMode, _createBackup, backupLabel);
+
+            if (_importResult.Success)
+            {
+                Snackbar.Add("Import completed successfully", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Import failed", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Import failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isImporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+
+        return $"{len:0.##} {sizes[order]}";
+    }
+}
