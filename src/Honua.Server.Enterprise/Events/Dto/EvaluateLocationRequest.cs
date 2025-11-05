@@ -41,6 +41,12 @@ public class EvaluateLocationRequest
     /// </summary>
     [JsonPropertyName("properties")]
     public Dictionary<string, object>? Properties { get; set; }
+
+    /// <summary>
+    /// Optional SensorThings observation ID to link to
+    /// </summary>
+    [JsonPropertyName("sensorthings_observation_id")]
+    public Guid? SensorThingsObservationId { get; set; }
 }
 
 /// <summary>
@@ -73,37 +79,52 @@ public class EvaluateLocationResponse
     public string EntityId { get; set; } = string.Empty;
 
     /// <summary>
+    /// Location that was evaluated
+    /// </summary>
+    [JsonPropertyName("location")]
+    public GeoJsonPoint? Location { get; set; }
+
+    /// <summary>
+    /// Event time
+    /// </summary>
+    [JsonPropertyName("event_time")]
+    public DateTime? EventTime { get; set; }
+
+    /// <summary>
     /// Events that were generated
     /// </summary>
-    [JsonPropertyName("events")]
-    public List<GeofenceEventResponse> Events { get; set; } = new();
+    [JsonPropertyName("events_generated")]
+    public List<GeofenceEventSummary> EventsGenerated { get; set; } = new();
 
     /// <summary>
     /// Current geofences the entity is inside
     /// </summary>
     [JsonPropertyName("current_geofences")]
-    public List<Guid> CurrentGeofences { get; set; } = new();
+    public List<GeofenceSummary> CurrentGeofences { get; set; } = new();
 
     /// <summary>
     /// Processing time in milliseconds
     /// </summary>
     [JsonPropertyName("processing_time_ms")]
-    public double ProcessingTimeMs { get; set; }
+    public double? ProcessingTimeMs { get; set; }
+
+    /// <summary>
+    /// Error message if evaluation failed
+    /// </summary>
+    [JsonPropertyName("error")]
+    public string? Error { get; set; }
 }
 
 /// <summary>
-/// Geofence event in API response
+/// Summary of a generated geofence event
 /// </summary>
-public class GeofenceEventResponse
+public class GeofenceEventSummary
 {
-    [JsonPropertyName("event_id")]
-    public Guid EventId { get; set; }
+    [JsonPropertyName("id")]
+    public Guid Id { get; set; }
 
     [JsonPropertyName("event_type")]
     public string EventType { get; set; } = string.Empty;
-
-    [JsonPropertyName("event_time")]
-    public DateTime EventTime { get; set; }
 
     [JsonPropertyName("geofence_id")]
     public Guid GeofenceId { get; set; }
@@ -111,12 +132,21 @@ public class GeofenceEventResponse
     [JsonPropertyName("geofence_name")]
     public string GeofenceName { get; set; } = string.Empty;
 
-    [JsonPropertyName("location")]
-    public GeoJsonPoint Location { get; set; } = null!;
-
-    [JsonPropertyName("properties")]
-    public Dictionary<string, object>? Properties { get; set; }
+    [JsonPropertyName("event_time")]
+    public DateTime EventTime { get; set; }
 
     [JsonPropertyName("dwell_time_seconds")]
     public int? DwellTimeSeconds { get; set; }
+}
+
+/// <summary>
+/// Summary of a geofence
+/// </summary>
+public class GeofenceSummary
+{
+    [JsonPropertyName("id")]
+    public Guid Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
 }
