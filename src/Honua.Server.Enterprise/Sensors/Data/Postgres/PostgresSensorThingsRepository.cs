@@ -47,8 +47,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 description,
                 properties,
                 created_at,
-                updated_at,
-                self_link
+                updated_at
             FROM sta_things
             WHERE id = @Id::uuid
             """;
@@ -58,6 +57,9 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 
         if (thing == null)
             return null;
+
+        // Generate self-link dynamically
+        thing = thing with { SelfLink = $"{_config.BasePath}/Things({thing.Id})" };
 
         // Handle expansions
         if (expand?.Properties.Contains("Locations") == true)
@@ -75,7 +77,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 
     public async Task<PagedResult<Thing>> GetThingsAsync(QueryOptions options, CancellationToken ct = default)
     {
-        var sql = "SELECT id::text, name, description, properties, created_at, updated_at, self_link FROM sta_things";
+        var sql = "SELECT id::text, name, description, properties, created_at, updated_at FROM sta_things";
         var countSql = "SELECT COUNT(*) FROM sta_things";
         var parameters = new DynamicParameters();
 
@@ -107,6 +109,9 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         var things = await _connection.QueryAsync<Thing>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
+        // Generate self-links dynamically
+        var thingsWithLinks = things.Select(t => t with { SelfLink = $"{_config.BasePath}/Things({t.Id})" }).ToList();
+
         long? totalCount = null;
         if (options.Count)
         {
@@ -125,7 +130,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 
         return new PagedResult<Thing>
         {
-            Items = things.ToList(),
+            Items = thingsWithLinks,
             TotalCount = totalCount,
             NextLink = nextLink
         };
@@ -140,8 +145,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 description,
                 properties,
                 created_at,
-                updated_at,
-                self_link
+                updated_at
             FROM sta_things
             WHERE user_id = @UserId
             ORDER BY created_at DESC
@@ -150,7 +154,8 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         var things = await _connection.QueryAsync<Thing>(
             new CommandDefinition(sql, new { UserId = userId }, cancellationToken: ct));
 
-        return things.ToList();
+        // Generate self-links dynamically
+        return things.Select(t => t with { SelfLink = $"{_config.BasePath}/Things({t.Id})" }).ToList();
     }
 
     public async Task<Thing> CreateThingAsync(Thing thing, CancellationToken ct = default)
@@ -158,7 +163,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         const string sql = """
             INSERT INTO sta_things (name, description, properties)
             VALUES (@Name, @Description, @Properties::jsonb)
-            RETURNING id::text, name, description, properties, created_at, updated_at, self_link
+            RETURNING id::text, name, description, properties, created_at, updated_at
             """;
 
         var created = await _connection.QuerySingleAsync<Thing>(
@@ -168,6 +173,9 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 thing.Description,
                 Properties = thing.Properties != null ? JsonSerializer.Serialize(thing.Properties) : null
             }, cancellationToken: ct));
+
+        // Generate self-link dynamically
+        created = created with { SelfLink = $"{_config.BasePath}/Things({created.Id})" };
 
         _logger.LogInformation("Created Thing {ThingId} with name '{Name}'", created.Id, created.Name);
 
@@ -183,7 +191,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 description = COALESCE(@Description, description),
                 properties = COALESCE(@Properties::jsonb, properties)
             WHERE id = @Id::uuid
-            RETURNING id::text, name, description, properties, created_at, updated_at, self_link
+            RETURNING id::text, name, description, properties, created_at, updated_at
             """;
 
         var updated = await _connection.QuerySingleAsync<Thing>(
@@ -194,6 +202,9 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 thing.Description,
                 Properties = thing.Properties != null ? JsonSerializer.Serialize(thing.Properties) : null
             }, cancellationToken: ct));
+
+        // Generate self-link dynamically
+        updated = updated with { SelfLink = $"{_config.BasePath}/Things({updated.Id})" };
 
         _logger.LogInformation("Updated Thing {ThingId}", id);
 
@@ -231,14 +242,18 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 client_timestamp,
                 server_timestamp,
                 sync_batch_id::text,
-                created_at,
-                self_link
+                created_at
             FROM sta_observations
             WHERE id = @Id::uuid
             """;
 
         var observation = await _connection.QuerySingleOrDefaultAsync<Observation>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
+
+        if (observation != null)
+        {
+            observation = observation with { SelfLink = $"{_config.BasePath}/Observations({observation.Id})" };
+        }
 
         return observation;
     }
@@ -255,8 +270,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 datastream_id::text,
                 feature_of_interest_id::text,
                 client_timestamp,
-                server_timestamp,
-                self_link
+                server_timestamp
             FROM sta_observations
             """;
         var countSql = "SELECT COUNT(*) FROM sta_observations";
@@ -290,6 +304,9 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         var observations = await _connection.QueryAsync<Observation>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
+        // Generate self-links dynamically
+        var observationsWithLinks = observations.Select(o => o with { SelfLink = $"{_config.BasePath}/Observations({o.Id})" }).ToList();
+
         long? totalCount = null;
         if (options.Count)
         {
@@ -305,7 +322,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 
         return new PagedResult<Observation>
         {
-            Items = observations.ToList(),
+            Items = observationsWithLinks,
             TotalCount = totalCount,
             NextLink = nextLink
         };
@@ -347,8 +364,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 result,
                 datastream_id::text,
                 feature_of_interest_id::text,
-                server_timestamp,
-                self_link
+                server_timestamp
             """;
 
         var created = await _connection.QuerySingleAsync<Observation>(
@@ -366,6 +382,9 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 observation.ClientTimestamp,
                 observation.SyncBatchId
             }, cancellationToken: ct));
+
+        // Generate self-link dynamically
+        created = created with { SelfLink = $"{_config.BasePath}/Observations({created.Id})" };
 
         _logger.LogDebug("Created Observation {ObservationId} for Datastream {DatastreamId}",
             created.Id, created.DatastreamId);
@@ -480,7 +499,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
             Properties = l.properties,
             CreatedAt = l.created_at,
             UpdatedAt = l.updated_at,
-            SelfLink = l.self_link
+            SelfLink = $"{_config.BasePath}/Locations({l.id})"
         }).ToList();
 
         return new PagedResult<Location>
@@ -507,8 +526,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 phenomenon_time_start,
                 phenomenon_time_end,
                 created_at,
-                updated_at,
-                self_link
+                updated_at
             FROM sta_datastreams
             WHERE thing_id = @ThingId::uuid
             ORDER BY created_at DESC
@@ -517,9 +535,12 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         var datastreams = await _connection.QueryAsync<Datastream>(
             new CommandDefinition(sql, new { ThingId = thingId }, cancellationToken: ct));
 
+        // Generate self-links dynamically
+        var datastreamsWithLinks = datastreams.Select(d => d with { SelfLink = $"{_config.BasePath}/Datastreams({d.Id})" }).ToList();
+
         return new PagedResult<Datastream>
         {
-            Items = datastreams.ToList()
+            Items = datastreamsWithLinks
         };
     }
 
@@ -536,8 +557,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 result,
                 datastream_id::text,
                 feature_of_interest_id::text,
-                server_timestamp,
-                self_link
+                server_timestamp
             FROM sta_observations
             WHERE datastream_id = @DatastreamId::uuid
             """;
@@ -562,9 +582,12 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         var observations = await _connection.QueryAsync<Observation>(
             new CommandDefinition(sql, new { DatastreamId = datastreamId }, cancellationToken: ct));
 
+        // Generate self-links dynamically
+        var observationsWithLinks = observations.Select(o => o with { SelfLink = $"{_config.BasePath}/Observations({o.Id})" }).ToList();
+
         return new PagedResult<Observation>
         {
-            Items = observations.ToList()
+            Items = observationsWithLinks
         };
     }
 
