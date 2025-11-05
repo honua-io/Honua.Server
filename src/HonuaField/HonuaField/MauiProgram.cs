@@ -72,6 +72,12 @@ public static class MauiProgram
 		services.AddSingleton<ISettingsService, SettingsService>();
 		services.AddSingleton<IBiometricService, BiometricService>();
 
+		// Data Repositories
+		services.AddSingleton<HonuaField.Data.Repositories.IChangeRepository, HonuaField.Data.Repositories.ChangeRepository>();
+		services.AddSingleton<HonuaField.Data.Repositories.IFeatureRepository, HonuaField.Data.Repositories.FeatureRepository>();
+		services.AddSingleton<HonuaField.Data.Repositories.ICollectionRepository, HonuaField.Data.Repositories.CollectionRepository>();
+		services.AddSingleton<HonuaField.Data.Repositories.IAttachmentRepository, HonuaField.Data.Repositories.AttachmentRepository>();
+
 		// API Services
 		services.AddSingleton<IApiClient, ApiClient>();
 		services.AddSingleton<IFeaturesService, FeaturesService>();
