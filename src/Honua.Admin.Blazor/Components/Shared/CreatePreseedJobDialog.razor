@@ -1,0 +1,158 @@
+@using Honua.Admin.Blazor.Shared.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info">
+                Configure a preseed job to pre-generate tiles for faster initial access. Tiles will be generated in the background.
+            </MudAlert>
+
+            <MudTextField @bind-Value="_request.DatasetIds"
+                          Label="Dataset IDs (comma-separated)"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          HelperText="Enter one or more dataset IDs separated by commas"
+                          Lines="2" />
+
+            <MudSelect T="string"
+                       @bind-Value="_selectedTileMatrixSet"
+                       Label="Tile Matrix Set"
+                       Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var set in TileMatrixSetOptions.Sets)
+                {
+                    <MudSelectItem Value="@set">@set</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_minZoom"
+                                     Label="Min Zoom"
+                                     Variant="Variant.Outlined"
+                                     Min="0"
+                                     Max="22"
+                                     Required="true" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_maxZoom"
+                                     Label="Max Zoom"
+                                     Variant="Variant.Outlined"
+                                     Min="0"
+                                     Max="22"
+                                     Required="true" />
+                </MudItem>
+            </MudGrid>
+
+            <MudSelect T="string"
+                       @bind-Value="_selectedFormat"
+                       Label="Tile Format"
+                       Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var format in TileFormatOptions.Formats)
+                {
+                    <MudSelectItem Value="@format">@format</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField @bind-Value="_styleId"
+                          Label="Style ID (optional)"
+                          Variant="Variant.Outlined"
+                          HelperText="Leave empty for default style" />
+
+            <MudNumericField @bind-Value="_tileSize"
+                             Label="Tile Size (pixels)"
+                             Variant="Variant.Outlined"
+                             Min="128"
+                             Max="1024" />
+
+            <MudSwitch @bind-Value="_transparent"
+                       Label="Transparent Background"
+                       Color="Color.Primary" />
+
+            <MudSwitch @bind-Value="_overwrite"
+                       Label="Overwrite Existing Tiles"
+                       Color="Color.Warning" />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Submit">
+            Create Job
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    private CreatePreseedJobRequest _request = new();
+    private string? _selectedTileMatrixSet = "WorldWebMercatorQuad";
+    private string? _selectedFormat = "image/png";
+    private string? _styleId;
+    private int _minZoom = 0;
+    private int _maxZoom = 10;
+    private int _tileSize = 256;
+    private bool _transparent = true;
+    private bool _overwrite = false;
+    private string? _errorMessage;
+
+    private void Submit()
+    {
+        _errorMessage = null;
+
+        // Validate
+        if (string.IsNullOrWhiteSpace(_request.DatasetIds))
+        {
+            _errorMessage = "Please enter at least one dataset ID";
+            return;
+        }
+
+        if (_minZoom > _maxZoom)
+        {
+            _errorMessage = "Min zoom must be less than or equal to max zoom";
+            return;
+        }
+
+        // Parse dataset IDs
+        var datasetIds = _request.DatasetIds
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        if (!datasetIds.Any())
+        {
+            _errorMessage = "Please enter valid dataset IDs";
+            return;
+        }
+
+        // Build request
+        var request = new CreatePreseedJobRequest
+        {
+            DatasetIds = datasetIds,
+            TileMatrixSetId = _selectedTileMatrixSet,
+            MinZoom = _minZoom,
+            MaxZoom = _maxZoom,
+            Format = _selectedFormat,
+            StyleId = string.IsNullOrWhiteSpace(_styleId) ? null : _styleId,
+            TileSize = _tileSize,
+            Transparent = _transparent,
+            Overwrite = _overwrite
+        };
+
+        MudDialog.Close(DialogResult.Ok(request));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

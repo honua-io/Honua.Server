@@ -72,6 +72,7 @@ builder.Services.AddScoped<FolderApiClient>();
 builder.Services.AddScoped<ImportApiClient>();
 builder.Services.AddScoped<SnapshotApiClient>();
 builder.Services.AddScoped<AuditLogApiClient>();
+builder.Services.AddScoped<CacheApiClient>();
 
 // Register SignalR hub service for real-time updates
 builder.Services.AddScoped<MetadataHubService>();

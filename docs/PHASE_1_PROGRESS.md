@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
 **Last Updated:** 2025-11-05
-**Current Phase:** Phase 2.5 (Audit Log Viewer) - COMPLETE
+**Current Phase:** Phase 2.6 (Caching Configuration UI) - COMPLETE
 
 ---
 
@@ -591,6 +591,111 @@
 - Export capabilities for compliance reporting
 - Risk scoring for anomaly detection
 - Tenant isolation for multi-tenant deployments
+
+---
+
+## ✅ Phase 2.6 Complete - Caching Configuration UI (Week 8)
+
+### Completed Tasks
+
+**Cache Models:**
+- ✅ `CacheModels.cs` - Cache configuration and statistics models
+  - CacheStatistics (hits, misses, evictions, size, hit rate)
+  - DatasetCacheStatistics (per-dataset statistics)
+  - CreatePreseedJobRequest (tile pre-generation configuration)
+  - PreseedJobSnapshot (job status with progress tracking)
+  - PurgeCacheRequest/Result (cache invalidation)
+  - CacheTtlPolicyOptions (VeryShort, Short, Medium, Long, VeryLong, Permanent)
+  - TileFormatOptions (PNG, JPEG, WebP)
+  - TileMatrixSetOptions (WorldWebMercatorQuad, WorldCRS84Quad)
+
+**Cache API Client:**
+- ✅ `CacheApiClient.cs` - Raster tile cache operations
+  - GetStatisticsAsync (overall cache statistics)
+  - GetAllDatasetStatisticsAsync (all dataset statistics)
+  - GetDatasetStatisticsAsync (specific dataset statistics)
+  - ResetStatisticsAsync (reset hit/miss counters)
+  - CreatePreseedJobAsync (create tile pre-generation job)
+  - ListPreseedJobsAsync (list all preseed jobs)
+  - GetPreseedJobAsync (get job status)
+  - CancelPreseedJobAsync (cancel running job)
+  - PurgeCacheAsync (invalidate cached tiles)
+
+**UI Pages:**
+- ✅ `CacheSettings.razor` - Main cache settings page at `/cache`
+  - Two-tab interface (Statistics, Preseed Jobs)
+  - **Statistics Tab:**
+    - Overall cache metrics (hit rate, size, misses, evictions)
+    - Dataset-level statistics table with per-dataset metrics
+    - Reset statistics button
+    - Purge cache per dataset
+    - Real-time auto-refresh every 10 seconds
+  - **Preseed Jobs Tab:**
+    - List all tile pre-generation jobs
+    - Job status with progress bars and completion percentages
+    - Create new preseed jobs
+    - Cancel running jobs
+    - View job details (datasets, zoom range, tiles generated)
+
+**UI Components:**
+- ✅ `CreatePreseedJobDialog.razor` - Modal for creating preseed jobs
+  - Dataset ID input (comma-separated)
+  - Tile matrix set selection
+  - Zoom range configuration (min/max)
+  - Tile format selection (PNG, JPEG, WebP)
+  - Optional style ID
+  - Tile size configuration (128-1024 pixels)
+  - Transparent background toggle
+  - Overwrite existing tiles toggle
+  - Input validation
+
+**Files Created:** 4 files, ~650 lines
+**Files Modified:** 2 files (Program.cs, NavMenu.razor)
+**Commit:** Pending
+
+**Technical Notes:**
+- Leverages existing `/admin/raster-cache` API endpoints
+- Statistics auto-refresh every 10 seconds using System.Timers.Timer
+- IDisposable implementation for proper timer cleanup
+- Hit rate color coding (green >= 80%, yellow >= 50%, red < 50%)
+- Job status color coding (Success, Running, Failed, Cancelled)
+- Administrator role required for all operations
+- Viewer role allowed for statistics viewing
+
+**Features:**
+- **Cache Statistics:**
+  - Overall metrics dashboard with 4 key metrics cards
+  - Per-dataset statistics table
+  - Hit rate analysis and monitoring
+  - Cache size tracking (bytes and entries)
+  - Eviction monitoring
+  - Last accessed timestamps
+- **Cache Management:**
+  - Purge cache per dataset with confirmation
+  - Reset statistics counters
+  - Real-time statistics updates
+- **Tile Pre-generation:**
+  - Create preseed jobs for specific datasets and zoom levels
+  - Configure tile matrix set (WebMercator, CRS84)
+  - Select output format (PNG, JPEG, WebP)
+  - Progress tracking with percentages and tile counts
+  - Cancel running jobs
+  - Overwrite existing tiles option
+  - Custom tile sizes (256, 512, etc.)
+
+**Performance Features:**
+- Auto-refresh statistics without manual reload
+- Progress bars for long-running preseed jobs
+- Efficient API calls with cancellation support
+- Proper timer disposal to prevent memory leaks
+
+**Cache TTL Policies:**
+- VeryShort: 1 minute (real-time data)
+- Short: 5 minutes (dynamic content)
+- Medium: 1 hour (semi-static content)
+- Long: 24 hours (static content)
+- VeryLong: 7 days (immutable content)
+- Permanent: 30 days (permanent content)
 
 ---
 
