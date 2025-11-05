@@ -33,9 +33,11 @@ public class GeoprocessingNode : WorkflowNodeBase
 
     public override string DisplayName => _operation switch
     {
+        // Phase 1 operations
         GeoprocessingOperation.Buffer => "Buffer",
         GeoprocessingOperation.Intersection => "Intersection",
         GeoprocessingOperation.Union => "Union",
+        // Phase 1.5 operations
         GeoprocessingOperation.Difference => "Difference",
         GeoprocessingOperation.Simplify => "Simplify",
         GeoprocessingOperation.ConvexHull => "Convex Hull",
@@ -45,13 +47,15 @@ public class GeoprocessingNode : WorkflowNodeBase
 
     public override string Description => _operation switch
     {
+        // Phase 1 operations
         GeoprocessingOperation.Buffer => "Creates buffer polygons around geometries at a specified distance",
         GeoprocessingOperation.Intersection => "Finds the geometric intersection of two datasets",
         GeoprocessingOperation.Union => "Merges geometries from two datasets",
+        // Phase 1.5 operations
         GeoprocessingOperation.Difference => "Subtracts geometries of one dataset from another",
-        GeoprocessingOperation.Simplify => "Simplifies geometries by reducing vertex count",
-        GeoprocessingOperation.ConvexHull => "Creates the smallest convex polygon enclosing geometries",
-        GeoprocessingOperation.Dissolve => "Merges adjacent geometries based on attributes",
+        GeoprocessingOperation.Simplify => "Simplifies geometries by reducing vertex count while preserving shape",
+        GeoprocessingOperation.ConvexHull => "Creates the smallest convex polygon that encloses all input geometries",
+        GeoprocessingOperation.Dissolve => "Merges adjacent or overlapping geometries based on attribute values",
         _ => $"Executes {_operation} geoprocessing operation"
     };
 
@@ -259,22 +263,28 @@ public class GeoprocessingNodeFactory
     }
 
     /// <summary>
-    /// Gets all available geoprocessing node types (Phase 1: 3 operations only)
+    /// Gets all available geoprocessing node types (Phase 1 + Phase 1.5: 7 operations)
     /// </summary>
     public static List<string> GetAvailableOperations()
     {
         return new List<string>
         {
-            // Phase 1 operations (design requirement: 3 only)
+            // Phase 1 operations (Tier 1 - Simple)
             GeoprocessingOperation.Buffer,
             GeoprocessingOperation.Intersection,
-            GeoprocessingOperation.Union
+            GeoprocessingOperation.Union,
 
-            // Phase 1.5 will add:
-            // GeoprocessingOperation.Difference,
-            // GeoprocessingOperation.Simplify,
-            // GeoprocessingOperation.ConvexHull,
-            // GeoprocessingOperation.Dissolve
+            // Phase 1.5 operations (Tier 2 - Moderate)
+            GeoprocessingOperation.Difference,
+            GeoprocessingOperation.Simplify,
+            GeoprocessingOperation.ConvexHull,
+            GeoprocessingOperation.Dissolve
+
+            // Future operations will include:
+            // - Tier 3 (Complex) operations with custom UIs
+            // - Spatial analysis (Clip, Erase, SpatialJoin)
+            // - Transformations (Reproject, Transform, Rotate)
+            // - Advanced analysis (Voronoi, Delaunay, Heatmap)
         };
     }
 }

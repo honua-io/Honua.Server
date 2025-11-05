@@ -696,12 +696,12 @@ CREATE INDEX idx_geoetl_node_runs_workflow_run ON geoetl_node_runs(workflow_run_
 ### 4.2 Frontend Architecture
 
 **Technology Stack:**
-- **Framework:** React 18+ with TypeScript
-- **State Management:** Zustand or Jotai (lightweight)
-- **Canvas Library:** Xyflow (React Flow v11+)
-- **Code Editor:** Monaco Editor
-- **UI Components:** Shadcn/ui or Mantine
-- **Real-time Collaboration:** Yjs + WebSocket
+- **Framework:** Blazor Server or Blazor WebAssembly
+- **State Management:** Fluxor (Redux-like for Blazor)
+- **Canvas Library:** Blazor.Diagrams or custom canvas with SVG/Canvas API
+- **Code Editor:** Monaco Editor for Blazor (BlazorMonaco)
+- **UI Components:** MudBlazor or Radzen Blazor Components
+- **Real-time Communication:** SignalR (built-in with Blazor Server)
 
 **Component Structure:**
 

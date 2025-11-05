@@ -179,10 +179,18 @@ foreach (var r in runs)
 - `data_source.postgis` - Read from PostGIS table or query
 - `data_source.file` - Parse GeoJSON file (inline or URL)
 
-### Geoprocessing (Phase 1)
-- `geoprocessing.buffer` - Create buffer polygons
-- `geoprocessing.intersection` - Find geometric intersection
-- `geoprocessing.union` - Merge geometries
+### Geoprocessing (Phase 1 + 1.5)
+
+**Phase 1 Operations (Tier 1 - Simple):**
+- `geoprocessing.buffer` - Create buffer polygons around geometries
+- `geoprocessing.intersection` - Find geometric intersection of datasets
+- `geoprocessing.union` - Merge geometries from datasets
+
+**Phase 1.5 Operations (Tier 2 - Moderate):**
+- `geoprocessing.difference` - Subtract geometries of one dataset from another
+- `geoprocessing.simplify` - Reduce geometry vertex count while preserving shape
+- `geoprocessing.convex_hull` - Create smallest convex polygon enclosing geometries
+- `geoprocessing.dissolve` - Merge adjacent/overlapping geometries by attributes
 
 ### Data Sinks
 - `data_sink.postgis` - Write to PostGIS table
@@ -232,28 +240,34 @@ public async Task CanExecuteSimpleWorkflow()
 }
 ```
 
-## Phase 1 Completion Status
+## Phase 1 + 1.5 Completion Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Core Models | ✅ Complete | WorkflowDefinition, WorkflowRun |
 | Workflow Engine | ✅ Complete | DAG validation, execution |
-| Geoprocessing Integration | ✅ Complete | 3 operations (Buffer, Intersection, Union) |
+| **Phase 1: Geoprocessing (Tier 1)** | ✅ Complete | 3 operations (Buffer, Intersection, Union) |
+| **Phase 1.5: Geoprocessing (Tier 2)** | ✅ Complete | 4 operations (Difference, Simplify, ConvexHull, Dissolve) |
 | Data Source Nodes | ✅ Complete | PostGIS, File |
 | Data Sink Nodes | ✅ Complete | PostGIS, GeoJSON, Output |
 | PostgreSQL Store | ✅ Complete | Full CRUD with metrics |
 | Database Migration | ✅ Complete | 017_ETL.sql |
-| Service Registration | ✅ Complete | DI extensions |
+| Service Registration | ✅ Complete | DI extensions, 12 node types |
 | Unit Tests | ⏳ Pending | Next phase |
-| Web UI | ⏳ Pending | Phase 2 |
+| **Blazor Web UI** | ⏳ Pending | Next phase |
+
+**Total Node Types Available: 12**
+- 7 Geoprocessing operations (Phase 1 + 1.5)
+- 2 Data source nodes
+- 3 Data sink nodes
 
 ## Next Steps
 
-### Phase 1.5 (Months 4-6)
-- Add remaining geoprocessing operations (Difference, Simplify, ConvexHull, Dissolve)
-- Build custom parameter UIs for complex operations
-- Implement long-running job progress tracking
-- Add retry logic and advanced error handling
+### Phase 1.5 Remaining Items
+- ⏳ Build custom parameter UIs for complex operations (Blazor components)
+- ⏳ Implement long-running job progress tracking
+- ⏳ Add retry logic and advanced error handling
+- ⏳ Tier 3 (Complex) operations with multi-step wizards
 
 ### Phase 2 (Months 4-6, Parallel)
 - AI-powered workflow generation (research phase)

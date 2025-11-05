@@ -45,7 +45,9 @@ public static class ServiceCollectionExtensions
             var geoprocessingService = sp.GetRequiredService<IGeoprocessingService>();
             var geoNodeFactory = new GeoprocessingNodeFactory(geoprocessingService, loggerFactory);
 
-            // Register geoprocessing nodes (Phase 1: 3 operations)
+            // Register geoprocessing nodes (Phase 1 + 1.5: 7 operations)
+            // Phase 1: Buffer, Intersection, Union
+            // Phase 1.5: Difference, Simplify, ConvexHull, Dissolve
             foreach (var operation in GeoprocessingNodeFactory.GetAvailableOperations())
             {
                 var node = geoNodeFactory.CreateNode(operation);
