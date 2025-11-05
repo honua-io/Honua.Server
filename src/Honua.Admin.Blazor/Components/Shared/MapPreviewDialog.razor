@@ -1,0 +1,232 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h6">@GetPreviewTitle()</MudText>
+
+            @if (!string.IsNullOrEmpty(ServiceUrl) || !string.IsNullOrEmpty(LayerUrl))
+            {
+                <MudPaper Elevation="2" Class="pa-3">
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.subtitle2">Service Information</MudText>
+                        @if (!string.IsNullOrEmpty(ServiceUrl))
+                        {
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Service URL:</MudText>
+                                <MudLink Href="@ServiceUrl" Target="_blank" Typo="Typo.body2" Style="flex: 1; overflow: hidden; text-overflow: ellipsis;">@ServiceUrl</MudLink>
+                                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="@(() => CopyToClipboard(ServiceUrl))"
+                                               Title="Copy URL to clipboard" />
+                            </MudStack>
+                        }
+                        @if (!string.IsNullOrEmpty(LayerName))
+                        {
+                            <MudStack Row="true" Spacing="1">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Layer:</MudText>
+                                <MudText Typo="Typo.body2">@LayerName</MudText>
+                            </MudStack>
+                        }
+                        @if (!string.IsNullOrEmpty(ServiceType))
+                        {
+                            <MudStack Row="true" Spacing="1">
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Type:</MudText>
+                                <MudChip Size="Size.Small" Color="Color.Primary">@ServiceType</MudChip>
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
+
+            @* Map Preview Placeholder *@
+            <MudPaper Elevation="1" Style="height: 500px; background-color: #f5f5f5; position: relative;">
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary">Map Preview</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                        Interactive map preview will be displayed here.
+                    </MudText>
+                    @if (!string.IsNullOrEmpty(BoundingBox))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Bounding Box: @BoundingBox
+                        </MudText>
+                    }
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-4">
+                        <MudText Typo="Typo.body2">
+                            <strong>Future Enhancement:</strong> This will show an interactive map using Leaflet/MapLibre
+                            with the @(IsService ? "service" : "layer") rendered in real-time.
+                        </MudText>
+                    </MudAlert>
+
+                    @* Quick Actions *@
+                    <MudStack Row="true" Spacing="2" Class="mt-4">
+                        @if (!string.IsNullOrEmpty(CatalogUrl))
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Info"
+                                       StartIcon="@Icons.Material.Filled.LibraryBooks"
+                                       Href="@CatalogUrl"
+                                       Target="_blank"
+                                       Size="Size.Small">
+                                View in Catalog
+                            </MudButton>
+                        }
+                        @if (!string.IsNullOrEmpty(GetCapabilitiesUrl))
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Description"
+                                       Href="@GetCapabilitiesUrl"
+                                       Target="_blank"
+                                       Size="Size.Small">
+                                View GetCapabilities
+                            </MudButton>
+                        }
+                        @if (!string.IsNullOrEmpty(PreviewImageUrl))
+                        {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Secondary"
+                                       StartIcon="@Icons.Material.Filled.Image"
+                                       Href="@PreviewImageUrl"
+                                       Target="_blank"
+                                       Size="Size.Small">
+                                View Preview Image
+                            </MudButton>
+                        }
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+
+            @* Preview Options *@
+            <MudExpansionPanels>
+                <MudExpansionPanel Text="Preview Options">
+                    <MudStack Spacing="2">
+                        <MudSelect @bind-Value="_selectedBasemap"
+                                   Label="Basemap"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   T="string">
+                            <MudSelectItem Value="@("osm")">OpenStreetMap</MudSelectItem>
+                            <MudSelectItem Value="@("satellite")">Satellite</MudSelectItem>
+                            <MudSelectItem Value="@("terrain")">Terrain</MudSelectItem>
+                            <MudSelectItem Value="@("none")">None</MudSelectItem>
+                        </MudSelect>
+
+                        <MudSlider @bind-Value="_layerOpacity"
+                                   Min="0"
+                                   Max="100"
+                                   Step="10"
+                                   ValueLabel="true"
+                                   ValueLabelFormat="@($"{_layerOpacity}%")"
+                                   Color="Color.Primary"
+                                   T="int">
+                            <MudText Typo="Typo.body2">Layer Opacity</MudText>
+                        </MudSlider>
+
+                        <MudCheckBox @bind-Checked="_showBoundingBox"
+                                     Label="Show Bounding Box"
+                                     Color="Color.Primary"
+                                     Size="Size.Small"
+                                     T="bool" />
+                    </MudStack>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+        @if (!string.IsNullOrEmpty(ServiceUrl))
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.OpenInNew"
+                       Href="@ServiceUrl"
+                       Target="_blank">
+                Open Service
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public bool IsService { get; set; } = true;
+
+    [Parameter]
+    public string? ServiceId { get; set; }
+
+    [Parameter]
+    public string? ServiceName { get; set; }
+
+    [Parameter]
+    public string? ServiceType { get; set; }
+
+    [Parameter]
+    public string? ServiceUrl { get; set; }
+
+    [Parameter]
+    public string? LayerId { get; set; }
+
+    [Parameter]
+    public string? LayerName { get; set; }
+
+    [Parameter]
+    public string? LayerUrl { get; set; }
+
+    [Parameter]
+    public string? BoundingBox { get; set; }
+
+    [Parameter]
+    public string? GetCapabilitiesUrl { get; set; }
+
+    [Parameter]
+    public string? PreviewImageUrl { get; set; }
+
+    [Parameter]
+    public string? CatalogUrl { get; set; }
+
+    private string _selectedBasemap = "osm";
+    private int _layerOpacity = 100;
+    private bool _showBoundingBox = true;
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Ok(true));
+    }
+
+    private string GetPreviewTitle()
+    {
+        if (IsService)
+        {
+            return $"Service Preview: {ServiceName ?? ServiceId ?? "Unknown"}";
+        }
+        else
+        {
+            return $"Layer Preview: {LayerName ?? LayerId ?? "Unknown"}";
+        }
+    }
+
+    private async Task CopyToClipboard(string text)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Snackbar.Add("URL copied to clipboard", Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add("Failed to copy URL to clipboard", Severity.Error);
+        }
+    }
+}

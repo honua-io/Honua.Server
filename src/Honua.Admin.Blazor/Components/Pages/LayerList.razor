@@ -180,6 +180,11 @@
                 </MudTd>
                 <MudTd DataLabel="Actions">
                     <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Map"
+                                       Size="Size.Small"
+                                       Color="Color.Success"
+                                       OnClick="@(() => ShowMapPreview(context))"
+                                       Title="Map Preview" />
                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                        Size="Size.Small"
                                        Color="Color.Primary"
@@ -409,5 +414,26 @@
     {
         await LoadLayersAsync();
         _bulkSelection.DeselectAll();
+    }
+
+    private async Task ShowMapPreview(LayerListItem layer)
+    {
+        var parameters = new DialogParameters
+        {
+            ["IsService"] = false,
+            ["LayerId"] = layer.Id,
+            ["LayerName"] = layer.Title,
+            ["ServiceType"] = "WMS", // Default to WMS for layer preview
+            ["LayerUrl"] = $"{Navigation.BaseUri}ogc/wms/{layer.ServiceId}?layers={layer.Id}",
+            ["ServiceUrl"] = $"{Navigation.BaseUri}ogc/wms/{layer.ServiceId}",
+            ["GetCapabilitiesUrl"] = $"{Navigation.BaseUri}ogc/wms/{layer.ServiceId}?service=WMS&request=GetCapabilities",
+            ["CatalogUrl"] = $"{Navigation.BaseUri}catalog/layers/{layer.Id}",
+            ["BoundingBox"] = layer.BoundingBox
+        };
+
+        await DialogService.ShowAsync<MapPreviewDialog>(
+            $"Layer Preview: {layer.Title}",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
     }
 }

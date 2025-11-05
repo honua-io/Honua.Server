@@ -159,6 +159,11 @@
                 </MudTd>
                 <MudTd DataLabel="Actions">
                     <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Map"
+                                       Size="Size.Small"
+                                       Color="Color.Success"
+                                       OnClick="@(() => ShowMapPreview(context))"
+                                       Title="Map Preview" />
                         <MudIconButton Icon="@Icons.Material.Filled.Edit"
                                        Size="Size.Small"
                                        Color="Color.Primary"
@@ -345,5 +350,24 @@
     {
         await LoadServicesAsync();
         _bulkSelection.DeselectAll();
+    }
+
+    private async Task ShowMapPreview(ServiceListItem service)
+    {
+        var parameters = new DialogParameters
+        {
+            ["IsService"] = true,
+            ["ServiceId"] = service.Id,
+            ["ServiceName"] = service.Title,
+            ["ServiceType"] = service.ServiceType,
+            ["ServiceUrl"] = $"{Navigation.BaseUri}ogc/{service.ServiceType.ToLowerInvariant()}/{service.Id}",
+            ["GetCapabilitiesUrl"] = $"{Navigation.BaseUri}ogc/{service.ServiceType.ToLowerInvariant()}/{service.Id}?service={service.ServiceType}&request=GetCapabilities",
+            ["CatalogUrl"] = $"{Navigation.BaseUri}catalog/services/{service.Id}"
+        };
+
+        await DialogService.ShowAsync<MapPreviewDialog>(
+            $"Service Preview: {service.Title}",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
     }
 }
