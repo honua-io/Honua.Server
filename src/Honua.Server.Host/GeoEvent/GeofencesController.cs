@@ -6,11 +6,19 @@ using Microsoft.AspNetCore.Mvc;
 namespace Honua.Server.Host.GeoEvent;
 
 /// <summary>
-/// API endpoints for geofence management
+/// API endpoints for geofence management (CRUD operations)
 /// </summary>
+/// <remarks>
+/// Geofences are geographic boundaries that trigger events when entities enter or exit them.
+/// This API allows you to create, read, update, and delete geofences.
+///
+/// For location evaluation and event generation, see the GeoEvent controller.
+/// </remarks>
 [ApiController]
 [Route("api/v1/geofences")]
 [Authorize] // Require authentication
+[Produces("application/json")]
+[Tags("GeoFencing")]
 public class GeofencesController : ControllerBase
 {
     private readonly IGeofenceManagementService _managementService;
@@ -27,9 +35,40 @@ public class GeofencesController : ControllerBase
     /// <summary>
     /// Create a new geofence
     /// </summary>
-    /// <param name="request">Geofence details</param>
+    /// <param name="request">Geofence details including name, geometry (GeoJSON Polygon), and event types</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Created geofence</returns>
+    /// <returns>Created geofence with assigned ID</returns>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     POST /api/v1/geofences
+    ///     {
+    ///       "name": "Downtown District",
+    ///       "description": "Main downtown area",
+    ///       "geometry": {
+    ///         "type": "Polygon",
+    ///         "coordinates": [[
+    ///           [-122.4194, 37.7749],
+    ///           [-122.4094, 37.7749],
+    ///           [-122.4094, 37.7849],
+    ///           [-122.4194, 37.7849],
+    ///           [-122.4194, 37.7749]
+    ///         ]]
+    ///       },
+    ///       "enabled_event_types": ["Enter", "Exit"],
+    ///       "is_active": true,
+    ///       "properties": {
+    ///         "zone_type": "restricted",
+    ///         "priority": "high"
+    ///       }
+    ///     }
+    ///
+    /// Enabled event types: Enter, Exit, Dwell (Phase 2), Approach (Phase 2)
+    /// Geometry must be a valid GeoJSON Polygon with WGS84 coordinates (EPSG:4326)
+    /// </remarks>
+    /// <response code="201">Geofence created successfully. Location header contains URL to retrieve it.</response>
+    /// <response code="400">Invalid request (e.g., invalid geometry, missing required fields)</response>
+    /// <response code="401">Unauthorized - authentication required</response>
     [HttpPost]
     [ProducesResponseType(typeof(GeofenceResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -93,15 +132,25 @@ public class GeofencesController : ControllerBase
     }
 
     /// <summary>
-    /// List geofences
+    /// List geofences with pagination and filtering
     /// </summary>
-    /// <param name="isActive">Filter by active status</param>
-    /// <param name="limit">Maximum number of results (default 100)</param>
-    /// <param name="offset">Offset for pagination (default 0)</param>
+    /// <param name="isActive">Filter by active status (optional: true/false/null for all)</param>
+    /// <param name="limit">Maximum number of results (1-1000, default 100)</param>
+    /// <param name="offset">Number of records to skip for pagination (default 0)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of geofences</returns>
+    /// <returns>Paginated list of geofences with total count</returns>
+    /// <remarks>
+    /// Examples:
+    /// - GET /api/v1/geofences - Get first 100 geofences
+    /// - GET /api/v1/geofences?limit=50&amp;offset=100 - Get geofences 101-150
+    /// - GET /api/v1/geofences?is_active=true - Get only active geofences
+    /// </remarks>
+    /// <response code="200">Successfully retrieved geofences</response>
+    /// <response code="400">Invalid pagination parameters</response>
+    /// <response code="401">Unauthorized - authentication required</response>
     [HttpGet]
     [ProducesResponseType(typeof(GeofenceListResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<GeofenceListResponse>> ListGeofences(
         [FromQuery] bool? isActive = null,

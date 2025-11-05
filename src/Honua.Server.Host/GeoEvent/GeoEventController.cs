@@ -7,11 +7,19 @@ using NetTopologySuite.Geometries;
 namespace Honua.Server.Host.GeoEvent;
 
 /// <summary>
-/// API endpoints for geofence event processing
+/// API endpoints for real-time location evaluation and geofence event generation
 /// </summary>
+/// <remarks>
+/// This API evaluates locations against active geofences and generates enter/exit events.
+/// Use this for real-time tracking of entities (vehicles, assets, people) moving through geofences.
+///
+/// Performance: Target P95 latency &lt; 100ms for 1,000 geofences
+/// </remarks>
 [ApiController]
 [Route("api/v1/geoevent")]
 [Authorize] // Require authentication
+[Produces("application/json")]
+[Tags("GeoFencing")]
 public class GeoEventController : ControllerBase
 {
     private readonly IGeofenceEvaluationService _evaluationService;
@@ -26,11 +34,42 @@ public class GeoEventController : ControllerBase
     }
 
     /// <summary>
-    /// Evaluate a location against all active geofences
+    /// Evaluate a single location against all active geofences
     /// </summary>
-    /// <param name="request">Location evaluation request</param>
+    /// <param name="request">Location evaluation request with entity ID, location coordinates, and optional metadata</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Evaluation result with generated events</returns>
+    /// <returns>Evaluation result with generated events (Enter/Exit), current geofences, and processing time</returns>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     POST /api/v1/geoevent/evaluate
+    ///     {
+    ///       "entity_id": "vehicle-123",
+    ///       "entity_type": "vehicle",
+    ///       "location": {
+    ///         "type": "Point",
+    ///         "coordinates": [-122.4194, 37.7749]
+    ///       },
+    ///       "event_time": "2025-11-05T10:30:00Z",
+    ///       "properties": {
+    ///         "speed": 45.5,
+    ///         "heading": 180,
+    ///         "driver_id": "D-456"
+    ///       }
+    ///     }
+    ///
+    /// **Event Generation Logic:**
+    /// - **Enter Event**: Generated when entity enters a geofence (was outside, now inside)
+    /// - **Exit Event**: Generated when entity exits a geofence (was inside, now outside). Includes dwell_time_seconds.
+    /// - **No Event**: If entity remains inside or outside the same geofences
+    ///
+    /// **State Tracking**: The service maintains entity state to detect enter/exit events efficiently (O(1) lookup).
+    ///
+    /// Coordinates must be in WGS84 (EPSG:4326) format: [longitude, latitude]
+    /// </remarks>
+    /// <response code="200">Location evaluated successfully. Returns events generated and current geofences.</response>
+    /// <response code="400">Invalid request (e.g., invalid coordinates, missing entity_id)</response>
+    /// <response code="401">Unauthorized - authentication required</response>
     [HttpPost("evaluate")]
     [ProducesResponseType(typeof(EvaluateLocationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -141,9 +180,39 @@ public class GeoEventController : ControllerBase
     /// <summary>
     /// Evaluate multiple locations in a batch (for high-throughput scenarios)
     /// </summary>
-    /// <param name="requests">List of location evaluation requests</param>
+    /// <param name="requests">Array of location evaluation requests (max 1000 per batch)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of evaluation results</returns>
+    /// <returns>Batch evaluation results with success/error counts and total processing time</returns>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     POST /api/v1/geoevent/evaluate/batch
+    ///     [
+    ///       {
+    ///         "entity_id": "vehicle-123",
+    ///         "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] }
+    ///       },
+    ///       {
+    ///         "entity_id": "vehicle-456",
+    ///         "location": { "type": "Point", "coordinates": [-122.4094, 37.7849] }
+    ///       }
+    ///     ]
+    ///
+    /// **Use Cases:**
+    /// - Bulk location updates from IoT devices
+    /// - Processing historical GPS tracks
+    /// - Integration with Azure Stream Analytics (MVP Phase 2)
+    ///
+    /// **Limits:**
+    /// - Maximum 1000 locations per batch
+    /// - Individual location failures don't fail the entire batch
+    /// - Returns detailed error information for each failed location
+    ///
+    /// **Performance Target:** 100 events/second sustained throughput
+    /// </remarks>
+    /// <response code="200">Batch processed. Returns individual results with success/error status for each location.</response>
+    /// <response code="400">Invalid batch request (e.g., empty array, exceeds 1000 limit)</response>
+    /// <response code="401">Unauthorized - authentication required</response>
     [HttpPost("evaluate/batch")]
     [ProducesResponseType(typeof(BatchEvaluateLocationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
