@@ -310,16 +310,49 @@ Coverage reports are generated in `TestResults/` directory.
 
 ## Continuous Integration
 
-Tests run automatically on:
-- Pull requests
-- Commits to main/develop branches
-- Nightly builds
+Tests run automatically via GitHub Actions workflow: `.github/workflows/admin-ui-tests.yml`
 
-**CI Configuration:**
-```yaml
-- name: Run Admin UI Tests
-  run: dotnet test tests/Honua.Admin.Blazor.Tests --no-build --logger trx
+**Triggers:**
+- Pull requests to main/master branches
+- Commits to main/master/develop branches
+- Changes to Admin UI source code or tests
+
+**Workflow Jobs:**
+
+1. **admin-ui-tests**: Main test execution
+   - Builds Admin UI and test project
+   - Runs all tests with code coverage
+   - Uploads test results and coverage reports
+   - Posts coverage summary to PRs
+
+2. **test-report**: Test result publishing
+   - Generates test result summary
+   - Posts test results to PR comments
+   - Compares results to previous commits
+
+3. **coverage-check**: Coverage validation
+   - Checks coverage thresholds (75% minimum, 80% target)
+   - Fails if coverage drops below threshold
+
+4. **integration-tests**: (Optional, main/develop only)
+   - Placeholder for integration tests
+   - Currently skipped (requires backend API)
+
+**Local CI Simulation:**
+```bash
+# Run exactly as CI does
+dotnet test tests/Honua.Admin.Blazor.Tests \
+  --configuration Release \
+  --logger "trx;LogFileName=test-results.trx" \
+  --collect:"XPlat Code Coverage" \
+  --results-directory ./TestResults
 ```
+
+**Coverage Reports:**
+- Uploaded as artifacts to GitHub Actions
+- Available for 30 days after workflow run
+- Coverage badge in PR comments
+- OpenCover format for SonarCloud integration
 
 ## Troubleshooting
 
