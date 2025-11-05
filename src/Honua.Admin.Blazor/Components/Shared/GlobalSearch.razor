@@ -1,0 +1,227 @@
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject SearchStateService SearchState
+@inject ServiceApiClient ServiceApi
+@inject LayerApiClient LayerApi
+@inject FolderApiClient FolderApi
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<MudAutocomplete T="GlobalSearchResult"
+                 @bind-Value="_selectedResult"
+                 SearchFunc="@SearchAsync"
+                 ToStringFunc="@(r => r?.Title ?? string.Empty)"
+                 Dense="true"
+                 Variant="Variant.Outlined"
+                 AdornmentIcon="@Icons.Material.Filled.Search"
+                 AdornmentColor="Color.Primary"
+                 Placeholder="Search services, layers, folders..."
+                 Clearable="true"
+                 CoerceText="false"
+                 CoerceValue="false"
+                 MaxItems="10"
+                 DebounceInterval="300"
+                 MinCharacters="2"
+                 ResetValueOnEmptyText="true"
+                 Class="@Class">
+    <ItemTemplate Context="result">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@GetIconForType(result.Type)" Size="Size.Small" Color="@GetColorForType(result.Type)" />
+            <div style="flex: 1;">
+                <MudText Typo="Typo.body2"><b>@result.Title</b></MudText>
+                @if (!string.IsNullOrEmpty(result.ParentTitle))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@result.Type in @result.ParentTitle</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@result.Type</MudText>
+                }
+            </div>
+        </MudStack>
+    </ItemTemplate>
+    <NoItemsTemplate>
+        <MudText Typo="Typo.body2" Align="Align.Center" Class="py-2">
+            No results found
+        </MudText>
+    </NoItemsTemplate>
+</MudAutocomplete>
+
+@code {
+    [Parameter]
+    public string? Class { get; set; }
+
+    private GlobalSearchResult? _selectedResult;
+    private List<ServiceListItem> _allServices = new();
+    private List<LayerListItem> _allLayers = new();
+    private List<FolderResponse> _allFolders = new();
+    private bool _dataLoaded = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            var servicesTask = ServiceApi.GetServicesAsync();
+            var layersTask = LayerApi.GetLayersAsync();
+            var foldersTask = FolderApi.GetFoldersAsync();
+
+            await Task.WhenAll(servicesTask, layersTask, foldersTask);
+
+            _allServices = await servicesTask;
+            _allLayers = await layersTask;
+            _allFolders = await foldersTask;
+            _dataLoaded = true;
+        }
+        catch (Exception)
+        {
+            // Silent fail for search - user can still navigate manually
+            _dataLoaded = true;
+        }
+    }
+
+    private async Task<IEnumerable<GlobalSearchResult>> SearchAsync(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < 2)
+            return Enumerable.Empty<GlobalSearchResult>();
+
+        if (!_dataLoaded)
+            await LoadDataAsync();
+
+        var results = new List<GlobalSearchResult>();
+        var lowerSearch = searchText.ToLowerInvariant();
+
+        // Search services
+        var serviceResults = _allServices
+            .Where(s =>
+                s.Title.Contains(lowerSearch, StringComparison.OrdinalIgnoreCase) ||
+                s.Id.Contains(lowerSearch, StringComparison.OrdinalIgnoreCase) ||
+                (s.Description?.Contains(lowerSearch, StringComparison.OrdinalIgnoreCase) ?? false))
+            .Select(s => new GlobalSearchResult
+            {
+                Type = "Service",
+                Id = s.Id,
+                Title = s.Title,
+                Description = s.Description,
+                ParentId = s.FolderId,
+                RelevanceScore = CalculateRelevance(s.Title, s.Id, lowerSearch)
+            });
+
+        // Search layers
+        var layerResults = _allLayers
+            .Where(l =>
+                l.Title.Contains(lowerSearch, StringComparison.OrdinalIgnoreCase) ||
+                l.Id.Contains(lowerSearch, StringComparison.OrdinalIgnoreCase))
+            .Select(l => new GlobalSearchResult
+            {
+                Type = "Layer",
+                Id = l.Id,
+                Title = l.Title,
+                Description = null,
+                ParentId = l.ServiceId,
+                ParentTitle = _allServices.FirstOrDefault(s => s.Id == l.ServiceId)?.Title,
+                RelevanceScore = CalculateRelevance(l.Title, l.Id, lowerSearch)
+            });
+
+        // Search folders
+        var folderResults = _allFolders
+            .Where(f =>
+                (f.Title?.Contains(lowerSearch, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                f.Id.Contains(lowerSearch, StringComparison.OrdinalIgnoreCase))
+            .Select(f => new GlobalSearchResult
+            {
+                Type = "Folder",
+                Id = f.Id,
+                Title = f.Title ?? f.Id,
+                Description = null,
+                RelevanceScore = CalculateRelevance(f.Title ?? f.Id, f.Id, lowerSearch)
+            });
+
+        results.AddRange(serviceResults);
+        results.AddRange(layerResults);
+        results.AddRange(folderResults);
+
+        // Add to search history
+        if (results.Any())
+        {
+            await SearchState.AddToHistoryAsync(searchText, results.Count);
+        }
+
+        return results
+            .OrderByDescending(r => r.RelevanceScore)
+            .ThenBy(r => r.Title)
+            .Take(10);
+    }
+
+    private double CalculateRelevance(string title, string id, string searchText)
+    {
+        var titleLower = title.ToLowerInvariant();
+        var idLower = id.ToLowerInvariant();
+
+        // Exact match = highest score
+        if (titleLower == searchText) return 100;
+        if (idLower == searchText) return 95;
+
+        // Starts with = high score
+        if (titleLower.StartsWith(searchText)) return 80;
+        if (idLower.StartsWith(searchText)) return 75;
+
+        // Contains = medium score
+        if (titleLower.Contains(searchText)) return 50;
+        if (idLower.Contains(searchText)) return 45;
+
+        return 0;
+    }
+
+    private string GetIconForType(string type)
+    {
+        return type switch
+        {
+            "Service" => Icons.Material.Filled.Layers,
+            "Layer" => Icons.Material.Filled.Map,
+            "Folder" => Icons.Material.Filled.Folder,
+            _ => Icons.Material.Filled.HelpOutline
+        };
+    }
+
+    private Color GetColorForType(string type)
+    {
+        return type switch
+        {
+            "Service" => Color.Primary,
+            "Layer" => Color.Success,
+            "Folder" => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (_selectedResult != null)
+        {
+            NavigateToResult(_selectedResult);
+            _selectedResult = null;
+        }
+    }
+
+    private void NavigateToResult(GlobalSearchResult result)
+    {
+        var url = result.Type switch
+        {
+            "Service" => $"/services/{result.Id}",
+            "Layer" => $"/layers/{result.Id}",
+            "Folder" => "/folders",
+            _ => "/"
+        };
+        Navigation.NavigateTo(url);
+    }
+
+    public void Dispose()
+    {
+        // Cleanup if needed
+    }
+}

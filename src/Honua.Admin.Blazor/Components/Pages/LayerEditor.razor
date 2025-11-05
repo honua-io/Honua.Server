@@ -1,0 +1,467 @@
+@page "/layers/new"
+@page "/layers/{Id}/edit"
+@page "/services/{ServiceId}/layers/new"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject LayerApiClient LayerApi
+@inject ServiceApiClient ServiceApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject EditorState EditorState
+
+<PageTitle>@(_isEditMode ? "Edit Layer" : "Create Layer") - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-6 mt-4">
+        <MudText Typo="Typo.h4" Class="mb-4">
+            @(_isEditMode ? $"Edit Layer: {_model.Title}" : "Create New Layer")
+        </MudText>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        <MudForm @ref="_form" @bind-IsValid="@_formValid">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.Id"
+                                  Label="Layer ID"
+                                  Required="true"
+                                  Disabled="@_isEditMode"
+                                  HelperText="Unique identifier (alphanumeric, hyphens, underscores)"
+                                  Validation="@(new Func<string, string>(ValidateLayerId))" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_model.ServiceId"
+                               Label="Service"
+                               Required="true"
+                               Disabled="@(_isEditMode || !string.IsNullOrEmpty(ServiceId))"
+                               HelperText="Parent service for this layer">
+                        @foreach (var service in _services)
+                        {
+                            <MudSelectItem Value="@service.Id">@service.Title</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Title"
+                                  Label="Title"
+                                  Required="true"
+                                  HelperText="Display name for the layer"
+                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_model.Description"
+                                  Label="Description"
+                                  Lines="3"
+                                  HelperText="Optional description of the layer" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_model.GeometryType"
+                               Label="Geometry Type"
+                               Required="true"
+                               HelperText="Type of geometry stored in this layer">
+                        @foreach (var (type, _) in GeometryTypes.AllTypes)
+                        {
+                            <MudSelectItem Value="@type">@GeometryTypes.GetDisplayName(type)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.IdField"
+                                  Label="ID Field"
+                                  Required="true"
+                                  HelperText="Feature ID column name"
+                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.GeometryField"
+                                  Label="Geometry Field"
+                                  Required="true"
+                                  HelperText="Geometry column name"
+                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_model.DisplayField"
+                                  Label="Display Field"
+                                  HelperText="Optional field to use for feature labels" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Coordinate Reference Systems (CRS)</MudText>
+                    <MudDivider Class="mb-4" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="string"
+                               Label="Add CRS"
+                               Variant="Variant.Outlined"
+                               AdornmentIcon="@Icons.Material.Filled.Add"
+                               AdornmentColor="Color.Primary"
+                               ValueChanged="@AddCrs">
+                        <MudSelectItem T="string" Value="@string.Empty" Disabled="true">Select CRS to add</MudSelectItem>
+                        @foreach (var (code, name) in CommonCrs.WellKnownCrs)
+                        {
+                            @if (!_model.Crs.Contains(code))
+                            {
+                                <MudSelectItem T="string" Value="@code">@code - @name</MudSelectItem>
+                            }
+                        }
+                        <MudSelectItem T="string" Value="custom">Custom CRS...</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    @if (_model.Crs.Count > 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Selected CRS:</MudText>
+                        <MudStack Spacing="1">
+                            @foreach (var crs in _model.Crs)
+                            {
+                                <MudChip Color="Color.Primary"
+                                         OnClose="@(() => RemoveCrs(crs))"
+                                         CloseIcon="@Icons.Material.Filled.Cancel">
+                                    @crs
+                                </MudChip>
+                            }
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Warning">At least one CRS is required</MudAlert>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+
+        <MudStack Row="true" Class="mt-6" Spacing="2">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="HandleSaveAsync"
+                       Disabled="@(!_formValid || _saving || _model.Crs.Count == 0)">
+                @if (_saving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                @(_isEditMode ? "Save Changes" : "Create Layer")
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       OnClick="HandleCancelAsync"
+                       Disabled="@_saving">
+                Cancel
+            </MudButton>
+
+            @if (_isEditMode)
+            {
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Error"
+                           OnClick="HandleDeleteAsync"
+                           Disabled="@_saving">
+                    Delete Layer
+                </MudButton>
+            }
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    [Parameter]
+    public string? ServiceId { get; set; }
+
+    private MudForm _form = default!;
+    private bool _formValid;
+    private bool _loading;
+    private bool _saving;
+    private bool _isEditMode => !string.IsNullOrEmpty(Id);
+    private string? _errorMessage;
+    private LayerEditorModel _model = new();
+    private List<ServiceListItem> _services = new();
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServicesAsync();
+
+        if (_isEditMode && !string.IsNullOrEmpty(Id))
+        {
+            await LoadLayerAsync();
+        }
+        else
+        {
+            // Set defaults for new layer
+            _model.GeometryType = GeometryTypes.Point;
+            _model.IdField = "id";
+            _model.GeometryField = "geom";
+            _model.Crs.Add("EPSG:4326");
+
+            // Pre-select service if provided in URL
+            if (!string.IsNullOrEmpty(ServiceId))
+            {
+                _model.ServiceId = ServiceId;
+            }
+        }
+
+        UpdateBreadcrumbs();
+    }
+
+    private async Task LoadServicesAsync()
+    {
+        try
+        {
+            _services = await ServiceApi.GetServicesAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading services: {ex.Message}";
+        }
+    }
+
+    private async Task LoadLayerAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var layer = await LayerApi.GetLayerByIdAsync(Id!);
+            if (layer == null)
+            {
+                _errorMessage = $"Layer '{Id}' not found.";
+                return;
+            }
+
+            _model = new LayerEditorModel
+            {
+                Id = layer.Id,
+                ServiceId = layer.ServiceId,
+                Title = layer.Title,
+                Description = layer.Description ?? string.Empty,
+                GeometryType = layer.GeometryType,
+                IdField = layer.IdField,
+                GeometryField = layer.GeometryField,
+                DisplayField = layer.DisplayField ?? string.Empty,
+                Crs = new List<string>(layer.Crs)
+            };
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading layer: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void AddCrs(string crsCode)
+    {
+        if (crsCode == "custom")
+        {
+            // TODO: Show dialog for custom CRS input
+            Snackbar.Add("Custom CRS input not yet implemented", Severity.Info);
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(crsCode) && !_model.Crs.Contains(crsCode))
+        {
+            _model.Crs.Add(crsCode);
+            EditorState.MarkDirty("layer-editor");
+        }
+    }
+
+    private void RemoveCrs(string crsCode)
+    {
+        _model.Crs.Remove(crsCode);
+        EditorState.MarkDirty("layer-editor");
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        await _form.Validate();
+        if (!_formValid || _model.Crs.Count == 0)
+        {
+            Snackbar.Add("Please fix validation errors before saving.", Severity.Error);
+            return;
+        }
+
+        _saving = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (_isEditMode)
+            {
+                var request = new UpdateLayerRequest
+                {
+                    Title = _model.Title,
+                    Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
+                    GeometryType = _model.GeometryType,
+                    IdField = _model.IdField,
+                    GeometryField = _model.GeometryField,
+                    DisplayField = string.IsNullOrWhiteSpace(_model.DisplayField) ? null : _model.DisplayField,
+                    Crs = _model.Crs
+                };
+
+                await LayerApi.UpdateLayerAsync(Id!, request);
+                Snackbar.Add("Layer updated successfully!", Severity.Success);
+                EditorState.MarkClean("layer-editor");
+                NavigateToLayerList();
+            }
+            else
+            {
+                var request = new CreateLayerRequest
+                {
+                    Id = _model.Id,
+                    ServiceId = _model.ServiceId,
+                    Title = _model.Title,
+                    Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
+                    GeometryType = _model.GeometryType,
+                    IdField = _model.IdField,
+                    GeometryField = _model.GeometryField,
+                    DisplayField = string.IsNullOrWhiteSpace(_model.DisplayField) ? null : _model.DisplayField,
+                    Crs = _model.Crs
+                };
+
+                await LayerApi.CreateLayerAsync(request);
+                Snackbar.Add("Layer created successfully!", Severity.Success);
+                EditorState.MarkClean("layer-editor");
+                NavigateToLayerList();
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _errorMessage = $"Error saving layer: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task HandleCancelAsync()
+    {
+        if (EditorState.HasUnsavedChanges("layer-editor"))
+        {
+            var confirmed = await EditorState.ConfirmNavigationAsync(DialogService);
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        EditorState.MarkClean("layer-editor");
+        NavigateToLayerList();
+    }
+
+    private async Task HandleDeleteAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to delete the layer '{_model.Title}'?",
+            ["ButtonText"] = "Delete",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Layer", parameters);
+        var result = await dialog.Result;
+
+        if (result.Canceled)
+        {
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            await LayerApi.DeleteLayerAsync(Id!);
+            Snackbar.Add("Layer deleted successfully.", Severity.Success);
+            EditorState.MarkClean("layer-editor");
+            NavigateToLayerList();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error deleting layer: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void NavigateToLayerList()
+    {
+        if (!string.IsNullOrEmpty(_model.ServiceId))
+        {
+            Navigation.NavigateTo($"/services/{_model.ServiceId}/layers");
+        }
+        else
+        {
+            Navigation.NavigateTo("/layers");
+        }
+    }
+
+    private void UpdateBreadcrumbs()
+    {
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/"),
+            new BreadcrumbItem("Layers", href: "/layers"),
+            new BreadcrumbItem(_isEditMode ? $"Edit: {Id}" : "New Layer", href: null, disabled: true)
+        };
+    }
+
+    private string ValidateLayerId(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return "Layer ID is required";
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9_-]+$"))
+            return "Layer ID must contain only alphanumeric characters, hyphens, and underscores";
+
+        return string.Empty;
+    }
+
+    private string ValidateRequired(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "This field is required" : string.Empty;
+    }
+
+    // Local model for form binding
+    private class LayerEditorModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string ServiceId { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string GeometryType { get; set; } = GeometryTypes.Point;
+        public string IdField { get; set; } = "id";
+        public string GeometryField { get; set; } = "geom";
+        public string DisplayField { get; set; } = string.Empty;
+        public List<string> Crs { get; set; } = new();
+    }
+}

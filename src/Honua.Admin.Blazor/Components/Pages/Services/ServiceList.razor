@@ -1,0 +1,167 @@
+@page "/services"
+@rendermode InteractiveServer
+
+<PageTitle>Services - Honua Admin</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Services</MudText>
+
+<MudPaper Elevation="2" Class="pa-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudTextField @bind-Value="_searchText"
+                      Placeholder="Search services..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      Style="max-width: 400px" />
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   Href="/services/new">
+            Create Service
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+        <MudText>Loading services...</MudText>
+    }
+    else if (!_services.Any())
+    {
+        <MudAlert Severity="Severity.Info">
+            No services found. Create your first service to get started!
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@_filteredServices"
+                  Hover="true"
+                  Striped="true"
+                  Dense="true"
+                  FixedHeader="true"
+                  Height="600px">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh>Folder</MudTh>
+                <MudTh>Layers</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">
+                    <MudLink Href="@($"/services/{context.Id}")">@context.Name</MudLink>
+                </MudTd>
+                <MudTd DataLabel="Type">
+                    <MudChip Size="Size.Small" Color="Color.Primary">@context.Type</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Folder">@(context.Folder ?? "Root")</MudTd>
+                <MudTd DataLabel="Layers">@context.LayerCount</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Href="@($"/services/{context.Id}/edit")" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                   Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="@(() => DeleteService(context.Id))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    private bool _loading = true;
+    private string _searchText = string.Empty;
+    private List<ServiceListItem> _services = new();
+    private IEnumerable<ServiceListItem> _filteredServices =>
+        string.IsNullOrWhiteSpace(_searchText)
+            ? _services
+            : _services.Where(s => s.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private NavigationState NavState { get; set; } = default!;
+    [Inject] private NotificationService Notifications { get; set; } = default!;
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        NavState.SetBreadcrumbs(
+            new BreadcrumbItem("Services", "/services", icon: Icons.Material.Filled.Layers)
+        );
+
+        await LoadServicesAsync();
+    }
+
+    private async Task LoadServicesAsync()
+    {
+        try
+        {
+            _loading = true;
+
+            // TODO: Replace with actual API call
+            // _services = await Http.GetFromJsonAsync<List<ServiceListItem>>("/admin/metadata/services") ?? new();
+
+            // Placeholder data for now
+            _services = new List<ServiceListItem>
+            {
+                new ServiceListItem { Id = "sample-wms", Name = "Sample WMS Service", Type = "WMS", Folder = "Maps", LayerCount = 3 },
+                new ServiceListItem { Id = "sample-wfs", Name = "Sample WFS Service", Type = "WFS", Folder = "Data", LayerCount = 5 }
+            };
+
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Failed to load services: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DeleteService(string serviceId)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Are you sure you want to delete service '{serviceId}'? This action cannot be undone." },
+            { "ButtonText", "Delete" },
+            { "Color", Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            try
+            {
+                // TODO: Call delete API
+                // await Http.DeleteAsync($"/admin/metadata/services/{serviceId}");
+
+                Notifications.Success($"Service '{serviceId}' deleted successfully");
+                await LoadServicesAsync();
+            }
+            catch (Exception ex)
+            {
+                Notifications.Error($"Failed to delete service: {ex.Message}");
+            }
+        }
+    }
+
+    // Placeholder DTO
+    private class ServiceListItem
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string? Folder { get; set; }
+        public int LayerCount { get; set; }
+    }
+}

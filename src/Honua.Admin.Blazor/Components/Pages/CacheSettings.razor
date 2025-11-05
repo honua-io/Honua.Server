@@ -1,0 +1,447 @@
+@page "/cache"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator")]
+@inject CacheApiClient CacheApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@implements IDisposable
+
+<PageTitle>Cache Settings - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudTabs Elevation="2" Rounded="true" Color="Color.Primary" Class="mt-4">
+        @* Statistics Tab *@
+        <MudTabPanel Text="Statistics" Icon="@Icons.Material.Filled.Analytics">
+            <MudPaper Elevation="0" Class="pa-4 mt-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudText Typo="Typo.h5">Cache Statistics</MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Warning"
+                               StartIcon="@Icons.Material.Filled.RestartAlt"
+                               OnClick="ResetStatistics">
+                        Reset Statistics
+                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                   OnClick="LoadStatisticsAsync"
+                                   Title="Refresh" />
+                </MudStack>
+
+                @if (_loadingStats)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+                else if (_statistics != null)
+                {
+                    <MudGrid>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">Hit Rate</MudText>
+                                    <MudText Typo="Typo.h3" Color="Color.Success">@(_statistics.HitRate.ToString("P1"))</MudText>
+                                    <MudText Typo="Typo.caption">@_statistics.TotalHits.ToString("N0") hits</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">Cache Size</MudText>
+                                    <MudText Typo="Typo.h3" Color="Color.Info">@FormatBytes(_statistics.TotalSizeBytes)</MudText>
+                                    <MudText Typo="Typo.caption">@_statistics.TotalEntries.ToString("N0") entries</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">Misses</MudText>
+                                    <MudText Typo="Typo.h3" Color="Color.Warning">@_statistics.TotalMisses.ToString("N0")</MudText>
+                                    <MudText Typo="Typo.caption">@(_statistics.MissRate.ToString("P1")) miss rate</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">Evictions</MudText>
+                                    <MudText Typo="Typo.h3" Color="Color.Error">@_statistics.TotalEvictions.ToString("N0")</MudText>
+                                    <MudText Typo="Typo.caption">Total evictions</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+                }
+
+                @* Dataset Statistics Table *@
+                <MudText Typo="Typo.h6" Class="mt-6 mb-4">Dataset Cache Statistics</MudText>
+                <MudTable Items="@_datasetStats"
+                          Dense="true"
+                          Hover="true"
+                          Loading="@_loadingStats"
+                          LoadingProgressColor="Color.Primary">
+                    <HeaderContent>
+                        <MudTh>Dataset ID</MudTh>
+                        <MudTh>Hits</MudTh>
+                        <MudTh>Misses</MudTh>
+                        <MudTh>Hit Rate</MudTh>
+                        <MudTh>Entries</MudTh>
+                        <MudTh>Size</MudTh>
+                        <MudTh>Last Accessed</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Dataset ID">@context.DatasetId</MudTd>
+                        <MudTd DataLabel="Hits">@context.Hits.ToString("N0")</MudTd>
+                        <MudTd DataLabel="Misses">@context.Misses.ToString("N0")</MudTd>
+                        <MudTd DataLabel="Hit Rate">
+                            <MudChip Size="Size.Small" Color="@GetHitRateColor(context.HitRate)">
+                                @context.HitRate.ToString("P1")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Entries">@context.Entries.ToString("N0")</MudTd>
+                        <MudTd DataLabel="Size">@FormatBytes(context.SizeBytes)</MudTd>
+                        <MudTd DataLabel="Last Accessed">
+                            @if (context.LastAccessed.HasValue)
+                            {
+                                <MudText Typo="Typo.body2">@GetRelativeTime(context.LastAccessed.Value)</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => PurgeDatasetCache(context.DatasetId))"
+                                           Title="Purge cache" />
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Align="Align.Center" Class="py-4">No dataset statistics available</MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+        </MudTabPanel>
+
+        @* Preseed Jobs Tab *@
+        <MudTabPanel Text="Preseed Jobs" Icon="@Icons.Material.Filled.Construction">
+            <MudPaper Elevation="0" Class="pa-4 mt-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudText Typo="Typo.h5">Tile Preseed Jobs</MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="OpenCreateJobDialog">
+                        Create Preseed Job
+                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                   OnClick="LoadJobsAsync"
+                                   Title="Refresh" />
+                </MudStack>
+
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    Preseed jobs pre-generate tiles for faster initial access. Create jobs for frequently accessed zoom levels and datasets.
+                </MudAlert>
+
+                @if (_loadingJobs)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+
+                <MudTable Items="@_jobs"
+                          Dense="true"
+                          Hover="true"
+                          Loading="@_loadingJobs"
+                          LoadingProgressColor="Color.Primary">
+                    <HeaderContent>
+                        <MudTh>Job ID</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Datasets</MudTh>
+                        <MudTh>Zoom Range</MudTh>
+                        <MudTh>Progress</MudTh>
+                        <MudTh>Created</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Job ID">
+                            <MudText Typo="Typo.body2" Class="text-monospace">@context.JobId.ToString().Substring(0, 8)...</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Datasets">
+                            <MudText Typo="Typo.body2">@string.Join(", ", context.DatasetIds.Take(2))</MudText>
+                            @if (context.DatasetIds.Count > 2)
+                            {
+                                <MudText Typo="Typo.caption">+@(context.DatasetIds.Count - 2) more</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Zoom Range">
+                            <MudText Typo="Typo.body2">@context.MinZoom - @context.MaxZoom</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Progress">
+                            <MudProgressLinear Value="@context.PercentComplete"
+                                               Color="Color.Primary"
+                                               Size="Size.Medium"
+                                               Class="my-2" />
+                            <MudText Typo="Typo.caption">@context.TilesGenerated.ToString("N0") / @(context.TotalTiles?.ToString("N0") ?? "?") tiles</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Created">
+                            <MudText Typo="Typo.body2">@GetRelativeTime(context.CreatedAt)</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            @if (context.Status == "Running" || context.Status == "Queued")
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                               Size="Size.Small"
+                                               Color="Color.Warning"
+                                               OnClick="@(() => CancelJob(context.JobId))"
+                                               Title="Cancel job" />
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Align="Align.Center" Class="py-4">No preseed jobs. Create a job to pre-generate tiles.</MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Cache Settings", href: null, disabled: true)
+    };
+
+    private bool _loadingStats = true;
+    private bool _loadingJobs = true;
+    private CacheStatistics? _statistics;
+    private List<DatasetCacheStatistics> _datasetStats = new();
+    private List<PreseedJobSnapshot> _jobs = new();
+    private System.Timers.Timer? _refreshTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatisticsAsync();
+        await LoadJobsAsync();
+
+        // Auto-refresh every 10 seconds
+        _refreshTimer = new System.Timers.Timer(10000);
+        _refreshTimer.Elapsed += async (sender, e) => await InvokeAsync(async () =>
+        {
+            await LoadStatisticsAsync();
+            await LoadJobsAsync();
+            StateHasChanged();
+        });
+        _refreshTimer.Start();
+    }
+
+    private async Task LoadStatisticsAsync()
+    {
+        _loadingStats = true;
+
+        try
+        {
+            _statistics = await CacheApi.GetStatisticsAsync();
+            _datasetStats = await CacheApi.GetAllDatasetStatisticsAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading statistics: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingStats = false;
+        }
+    }
+
+    private async Task LoadJobsAsync()
+    {
+        _loadingJobs = true;
+
+        try
+        {
+            _jobs = await CacheApi.ListPreseedJobsAsync();
+            _jobs = _jobs.OrderByDescending(j => j.CreatedAt).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading jobs: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingJobs = false;
+        }
+    }
+
+    private async Task ResetStatistics()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Reset",
+            "Are you sure you want to reset cache statistics? This will clear all hit/miss counters.",
+            yesText: "Reset",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await CacheApi.ResetStatisticsAsync();
+                Snackbar.Add("Cache statistics reset successfully", Severity.Success);
+                await LoadStatisticsAsync();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error resetting statistics: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task PurgeDatasetCache(string datasetId)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Purge",
+            $"Are you sure you want to purge the cache for dataset '{datasetId}'? This will remove all cached tiles.",
+            yesText: "Purge",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var request = new PurgeCacheRequest { DatasetIds = new List<string> { datasetId } };
+                var result = await CacheApi.PurgeCacheAsync(request);
+
+                if (result?.Purged.Contains(datasetId) == true)
+                {
+                    Snackbar.Add($"Cache purged for dataset '{datasetId}'", Severity.Success);
+                    await LoadStatisticsAsync();
+                }
+                else
+                {
+                    Snackbar.Add($"Failed to purge cache for dataset '{datasetId}'", Severity.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error purging cache: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenCreateJobDialog()
+    {
+        var dialog = await DialogService.ShowAsync<CreatePreseedJobDialog>("Create Preseed Job");
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreatePreseedJobRequest request)
+        {
+            try
+            {
+                var job = await CacheApi.CreatePreseedJobAsync(request);
+                if (job != null)
+                {
+                    Snackbar.Add($"Preseed job created: {job.JobId}", Severity.Success);
+                    await LoadJobsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error creating preseed job: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelJob(Guid jobId)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Cancel",
+            "Are you sure you want to cancel this preseed job?",
+            yesText: "Cancel Job",
+            cancelText: "Keep Running");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var success = await CacheApi.CancelPreseedJobAsync(jobId);
+                if (success)
+                {
+                    Snackbar.Add("Preseed job cancelled", Severity.Success);
+                    await LoadJobsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error cancelling job: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetHitRateColor(double hitRate)
+    {
+        if (hitRate >= 0.8) return Color.Success;
+        if (hitRate >= 0.5) return Color.Warning;
+        return Color.Error;
+    }
+
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Completed" => Color.Success,
+            "Running" => Color.Info,
+            "Queued" => Color.Default,
+            "Failed" => Color.Error,
+            "Cancelled" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private string GetRelativeTime(DateTimeOffset time)
+    {
+        var span = DateTimeOffset.UtcNow - time.ToUniversalTime();
+
+        if (span.TotalMinutes < 1)
+            return "just now";
+        if (span.TotalMinutes < 60)
+            return $"{(int)span.TotalMinutes} minutes ago";
+        if (span.TotalHours < 24)
+            return $"{(int)span.TotalHours} hours ago";
+        if (span.TotalDays < 7)
+            return $"{(int)span.TotalDays} days ago";
+        if (span.TotalDays < 30)
+            return $"{(int)(span.TotalDays / 7)} weeks ago";
+
+        return $"{(int)(span.TotalDays / 30)} months ago";
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Stop();
+        _refreshTimer?.Dispose();
+    }
+}

@@ -1,0 +1,230 @@
+@page "/services"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator,datapublisher")]
+@inject ServiceApiClient ServiceApi
+@inject FolderApiClient FolderApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Services - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">Services</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="/services/new">
+                Create Service
+            </MudButton>
+        </MudStack>
+
+        <MudTextField @bind-Value="_searchString"
+                      Placeholder="Search services..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium"
+                      Class="mb-4"
+                      Immediate="true"
+                      OnDebounceIntervalElapsed="OnSearchChanged"
+                      DebounceInterval="300" />
+
+        <AdvancedFilterPanel ShowServiceTypeFilter="true"
+                            ShowFolderFilter="true"
+                            ShowHasLayersFilter="true"
+                            ShowGeometryTypeFilter="false"
+                            ShowCrsFilter="false"
+                            Folders="_folders"
+                            OnFilterChanged="OnFiltersChanged"
+                            Class="mb-4" />
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        <MudTable Items="@_filteredServices"
+                  Hover="true"
+                  Breakpoint="Breakpoint.Sm"
+                  Loading="@_loading"
+                  LoadingProgressColor="Color.Primary">
+            <HeaderContent>
+                <MudTh>Service ID</MudTh>
+                <MudTh>Title</MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh>Layers</MudTh>
+                <MudTh>Last Updated</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Service ID">
+                    <MudText Typo="Typo.body2" Class="text-monospace">@context.Id</MudText>
+                </MudTd>
+                <MudTd DataLabel="Title">
+                    <MudText Typo="Typo.body1">@context.Title</MudText>
+                </MudTd>
+                <MudTd DataLabel="Type">
+                    <MudChip Size="Size.Small" Color="@GetServiceTypeColor(context.ServiceType)">
+                        @context.ServiceType
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Layers">
+                    <MudText>@context.LayerCount</MudText>
+                </MudTd>
+                <MudTd DataLabel="Last Updated">
+                    @if (context.UpdatedAt.HasValue)
+                    {
+                        <MudText Typo="Typo.body2">@context.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       Href="@($"/services/{context.Id}/edit")"
+                                       Title="Edit" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Layers"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       Href="@($"/services/{context.Id}/layers")"
+                                       Title="Manage Layers" />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Class="py-4">
+                    @(_searchString.Length > 0 ? "No services match your search." : "No services found. Create your first service to get started!")
+                </MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<ServiceListItem> _services = new();
+    private List<ServiceListItem> _filteredServices = new();
+    private List<FolderResponse> _folders = new();
+    private string _searchString = string.Empty;
+    private SearchFilter _currentFilter = new();
+    private bool _loading = true;
+    private string? _errorMessage;
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Services", href: null, disabled: true)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServicesAsync();
+        await LoadFoldersAsync();
+    }
+
+    private async Task LoadServicesAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _services = await ServiceApi.GetServicesAsync();
+            FilterServices();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading services: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadFoldersAsync()
+    {
+        try
+        {
+            _folders = await FolderApi.GetFoldersAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading folders: {ex.Message}";
+        }
+    }
+
+    private void OnSearchChanged()
+    {
+        FilterServices();
+    }
+
+    private void OnFiltersChanged(SearchFilter filter)
+    {
+        _currentFilter = filter;
+        FilterServices();
+    }
+
+    private void FilterServices()
+    {
+        var filtered = _services.AsEnumerable();
+
+        // Text search
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            var search = _searchString.ToLowerInvariant();
+            filtered = filtered.Where(s =>
+                s.Id.ToLowerInvariant().Contains(search) ||
+                s.Title.ToLowerInvariant().Contains(search) ||
+                s.ServiceType.ToLowerInvariant().Contains(search));
+        }
+
+        // Service type filter
+        if (_currentFilter.ServiceTypes.Any())
+        {
+            filtered = filtered.Where(s => _currentFilter.ServiceTypes.Contains(s.ServiceType));
+        }
+
+        // Folder filter
+        if (_currentFilter.FolderIds.Any())
+        {
+            filtered = filtered.Where(s =>
+                s.FolderId != null && _currentFilter.FolderIds.Contains(s.FolderId));
+        }
+
+        // Has layers filter
+        if (_currentFilter.HasLayers == true)
+        {
+            filtered = filtered.Where(s => s.LayerCount > 0);
+        }
+
+        _filteredServices = filtered.ToList();
+    }
+
+    private Color GetServiceTypeColor(string serviceType)
+    {
+        return serviceType switch
+        {
+            "WMS" => Color.Primary,
+            "WFS" => Color.Success,
+            "WMTS" => Color.Info,
+            "OGC_API" => Color.Warning,
+            "VECTOR_TILES" => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+}

@@ -1,0 +1,280 @@
+@page "/layers"
+@page "/services/{ServiceId}/layers"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator,datapublisher")]
+@inject LayerApiClient LayerApi
+@inject ServiceApiClient ServiceApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Layers - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">
+                @if (!string.IsNullOrEmpty(ServiceId))
+                {
+                    <span>Layers for @(_serviceName ?? ServiceId)</span>
+                }
+                else
+                {
+                    <span>All Layers</span>
+                }
+            </MudText>
+            <MudSpacer />
+            @if (!string.IsNullOrEmpty(ServiceId))
+            {
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Filled.ArrowBack"
+                           Href="@($"/services/{ServiceId}")">
+                    Back to Service
+                </MudButton>
+            }
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="@GetNewLayerUrl()">
+                Create Layer
+            </MudButton>
+        </MudStack>
+
+        <MudTextField @bind-Value="_searchString"
+                      Placeholder="Search layers..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Medium"
+                      Class="mb-4"
+                      Immediate="true"
+                      OnDebounceIntervalElapsed="OnSearchChanged"
+                      DebounceInterval="300" />
+
+        @if (string.IsNullOrEmpty(ServiceId))
+        {
+            <AdvancedFilterPanel ShowServiceTypeFilter="false"
+                                ShowFolderFilter="false"
+                                ShowHasLayersFilter="false"
+                                ShowGeometryTypeFilter="true"
+                                ShowCrsFilter="true"
+                                OnFilterChanged="OnFiltersChanged"
+                                Class="mb-4" />
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        <MudTable Items="@_filteredLayers"
+                  Hover="true"
+                  Breakpoint="Breakpoint.Sm"
+                  Loading="@_loading"
+                  LoadingProgressColor="Color.Primary">
+            <HeaderContent>
+                <MudTh>Layer ID</MudTh>
+                <MudTh>Title</MudTh>
+                @if (string.IsNullOrEmpty(ServiceId))
+                {
+                    <MudTh>Service</MudTh>
+                }
+                <MudTh>Geometry Type</MudTh>
+                <MudTh>Last Updated</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Layer ID">
+                    <MudText Typo="Typo.body2" Class="text-monospace">@context.Id</MudText>
+                </MudTd>
+                <MudTd DataLabel="Title">
+                    <MudText Typo="Typo.body1">@context.Title</MudText>
+                </MudTd>
+                @if (string.IsNullOrEmpty(ServiceId))
+                {
+                    <MudTd DataLabel="Service">
+                        <MudLink Href="@($"/services/{context.ServiceId}")">@context.ServiceId</MudLink>
+                    </MudTd>
+                }
+                <MudTd DataLabel="Geometry Type">
+                    <MudChip Size="Size.Small" Color="@GetGeometryTypeColor(context.GeometryType)">
+                        @GeometryTypes.GetDisplayName(context.GeometryType)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Last Updated">
+                    @if (context.UpdatedAt.HasValue)
+                    {
+                        <MudText Typo="Typo.body2">@context.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                       Size="Size.Small"
+                                       Color="Color.Primary"
+                                       Href="@($"/layers/{context.Id}/edit")"
+                                       Title="Edit" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                       Size="Size.Small"
+                                       Color="Color.Info"
+                                       Href="@($"/layers/{context.Id}")"
+                                       Title="View Details" />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Class="py-4">
+                    @if (_searchString.Length > 0)
+                    {
+                        <span>No layers match your search.</span>
+                    }
+                    else if (!string.IsNullOrEmpty(ServiceId))
+                    {
+                        <span>No layers found for this service. Create your first layer to get started!</span>
+                    }
+                    else
+                    {
+                        <span>No layers found. Create your first layer to get started!</span>
+                    }
+                </MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? ServiceId { get; set; }
+
+    private List<LayerListItem> _layers = new();
+    private List<LayerListItem> _filteredLayers = new();
+    private string _searchString = string.Empty;
+    private SearchFilter _currentFilter = new();
+    private bool _loading = true;
+    private string? _errorMessage;
+    private string? _serviceName;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLayersAsync();
+        UpdateBreadcrumbs();
+    }
+
+    private async Task LoadLayersAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Load service name if filtering by service
+            if (!string.IsNullOrEmpty(ServiceId))
+            {
+                var service = await ServiceApi.GetServiceByIdAsync(ServiceId);
+                _serviceName = service?.Title;
+            }
+
+            _layers = await LayerApi.GetLayersAsync(ServiceId);
+            FilterLayers();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading layers: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnSearchChanged()
+    {
+        FilterLayers();
+    }
+
+    private void OnFiltersChanged(SearchFilter filter)
+    {
+        _currentFilter = filter;
+        FilterLayers();
+    }
+
+    private void FilterLayers()
+    {
+        var filtered = _layers.AsEnumerable();
+
+        // Text search
+        if (!string.IsNullOrWhiteSpace(_searchString))
+        {
+            var search = _searchString.ToLowerInvariant();
+            filtered = filtered.Where(l =>
+                l.Id.ToLowerInvariant().Contains(search) ||
+                l.Title.ToLowerInvariant().Contains(search) ||
+                l.GeometryType.ToLowerInvariant().Contains(search));
+        }
+
+        // Geometry type filter
+        if (_currentFilter.GeometryTypes.Any())
+        {
+            filtered = filtered.Where(l => _currentFilter.GeometryTypes.Contains(l.GeometryType));
+        }
+
+        // CRS filter
+        if (_currentFilter.Crs.Any())
+        {
+            filtered = filtered.Where(l =>
+                l.Crs != null && _currentFilter.Crs.Any(crs => l.Crs.Contains(crs, StringComparer.OrdinalIgnoreCase)));
+        }
+
+        _filteredLayers = filtered.ToList();
+    }
+
+    private void UpdateBreadcrumbs()
+    {
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/"),
+        };
+
+        if (!string.IsNullOrEmpty(ServiceId))
+        {
+            _breadcrumbs.Add(new BreadcrumbItem("Services", href: "/services"));
+            _breadcrumbs.Add(new BreadcrumbItem(_serviceName ?? ServiceId, href: $"/services/{ServiceId}"));
+            _breadcrumbs.Add(new BreadcrumbItem("Layers", href: null, disabled: true));
+        }
+        else
+        {
+            _breadcrumbs.Add(new BreadcrumbItem("Layers", href: null, disabled: true));
+        }
+    }
+
+    private string GetNewLayerUrl()
+    {
+        return !string.IsNullOrEmpty(ServiceId)
+            ? $"/services/{ServiceId}/layers/new"
+            : "/layers/new";
+    }
+
+    private Color GetGeometryTypeColor(string geometryType) => geometryType.ToUpperInvariant() switch
+    {
+        GeometryTypes.Point => Color.Primary,
+        GeometryTypes.LineString => Color.Info,
+        GeometryTypes.Polygon => Color.Success,
+        GeometryTypes.MultiPoint => Color.Secondary,
+        GeometryTypes.MultiLineString => Color.Tertiary,
+        GeometryTypes.MultiPolygon => Color.Warning,
+        _ => Color.Default
+    };
+}

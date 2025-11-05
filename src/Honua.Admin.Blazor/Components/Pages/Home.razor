@@ -1,0 +1,138 @@
+@page "/"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ServiceApiClient ServiceApi
+@inject NavigationState NavState
+
+<PageTitle>Dashboard - Honua Admin</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+<MudText Class="mb-4">Welcome to the Honua Admin UI</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4">@_serviceCount</MudText>
+            <MudText Typo="Typo.body1">Active Services</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.Layers" Color="Color.Primary" Size="Size.Large" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4">@_layerCount</MudText>
+            <MudText Typo="Typo.body1">Total Layers</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Secondary" Size="Size.Large" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4">@_folderCount</MudText>
+            <MudText Typo="Typo.body1">Folders</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Tertiary" Size="Size.Large" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h4">Active</MudText>
+            <MudText Typo="Typo.body1">System Status</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mt-2" />
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-6">
+    <MudItem xs="12">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">Quick Actions</MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/services/new">
+                    Create Service
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Upload" Href="/import">
+                    Import Data
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Folder" Href="/folders">
+                    Browse Folders
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid Class="mt-6">
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">Recent Activity</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Default">
+                No recent activity to display.
+            </MudText>
+            @* TODO: Add recent activity feed after audit log integration *@
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">Getting Started</MudText>
+            <MudList Clickable="true">
+                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/services">
+                    View your services
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/import">
+                    Import your first dataset
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.PlayCircle" Href="/folders">
+                    Organize with folders
+                </MudListItem>
+            </MudList>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int _serviceCount = 0;
+    private int _layerCount = 0;
+    private int _folderCount = 0;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Set breadcrumbs for home page
+        NavState.Reset();
+
+        await LoadDashboardDataAsync();
+    }
+
+    private async Task LoadDashboardDataAsync()
+    {
+        _loading = true;
+
+        try
+        {
+            var stats = await ServiceApi.GetDashboardStatsAsync();
+            if (stats != null)
+            {
+                _serviceCount = stats.ServiceCount;
+                _layerCount = stats.LayerCount;
+                _folderCount = stats.FolderCount;
+            }
+        }
+        catch (Exception)
+        {
+            // Silently fail - dashboard will show zeros
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

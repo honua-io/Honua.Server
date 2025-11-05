@@ -1,0 +1,58 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h5" Class="ml-3">Honua Admin</MudText>
+        <MudSpacer />
+        <GlobalSearch Class="mx-4" Style="max-width: 500px; width: 100%;" />
+        <MudSpacer />
+        <LoginDisplay />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+            <MudBreadcrumbs Items="_breadcrumbs"></MudBreadcrumbs>
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    [Inject] private NavigationState NavState { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        // Subscribe to breadcrumb changes
+        NavState.OnChange += UpdateBreadcrumbs;
+        UpdateBreadcrumbs();
+    }
+
+    private void UpdateBreadcrumbs()
+    {
+        _breadcrumbs = NavState.Breadcrumbs.ToList();
+        StateHasChanged();
+    }
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    public void Dispose()
+    {
+        NavState.OnChange -= UpdateBreadcrumbs;
+    }
+}

@@ -1,0 +1,217 @@
+@page "/services/{Id}"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize]
+@inject ServiceApiClient ServiceApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Service Details - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mt-4" />
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-4">@_errorMessage</MudAlert>
+    }
+
+    @if (_service != null)
+    {
+        <MudPaper Elevation="2" Class="pa-6 mt-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.h4">@_service.Title</MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Edit"
+                           Href="@($"/services/{_service.Id}/edit")">
+                    Edit Service
+                </MudButton>
+            </MudStack>
+
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Service ID</MudText>
+                    <MudText Typo="Typo.body1" Class="mb-3 text-monospace">@_service.Id</MudText>
+
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Service Type</MudText>
+                    <MudChip Size="Size.Small" Color="@GetServiceTypeColor(_service.ServiceType)" Class="mb-3">
+                        @_service.ServiceType
+                    </MudChip>
+
+                    @if (!string.IsNullOrEmpty(_service.Description))
+                    {
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Description</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-3">@_service.Description</MudText>
+                    }
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Layer Count</MudText>
+                    <MudText Typo="Typo.body1" Class="mb-3">@_service.LayerCount layers</MudText>
+
+                    @if (_service.CreatedAt.HasValue)
+                    {
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Created</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-3">@_service.CreatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                    }
+
+                    @if (_service.UpdatedAt.HasValue)
+                    {
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Last Updated</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-3">@_service.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (_service.OgcOptions != null)
+        {
+            <MudPaper Elevation="2" Class="pa-6 mt-4">
+                <MudText Typo="Typo.h5" Class="mb-4">OGC Service Options</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@(_service.OgcOptions.WmsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                         Color="@(_service.OgcOptions.WmsEnabled ? Color.Success : Color.Default)" />
+                                <MudText>WMS (Web Map Service)</MudText>
+                            </MudStack>
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@(_service.OgcOptions.WfsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                         Color="@(_service.OgcOptions.WfsEnabled ? Color.Success : Color.Default)" />
+                                <MudText>WFS (Web Feature Service)</MudText>
+                            </MudStack>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@(_service.OgcOptions.WmtsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                         Color="@(_service.OgcOptions.WmtsEnabled ? Color.Success : Color.Default)" />
+                                <MudText>WMTS (Web Map Tile Service)</MudText>
+                            </MudStack>
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@(_service.OgcOptions.OgcApiEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                         Color="@(_service.OgcOptions.OgcApiEnabled ? Color.Success : Color.Default)" />
+                                <MudText>OGC API Features</MudText>
+                            </MudStack>
+                        </MudStack>
+                    </MudItem>
+                    @if (_service.OgcOptions.MaxFeatures.HasValue)
+                    {
+                        <MudItem xs="12">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Max Features</MudText>
+                            <MudText Typo="Typo.body1">@_service.OgcOptions.MaxFeatures.Value.ToString("N0")</MudText>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        }
+
+        <MudPaper Elevation="2" Class="pa-6 mt-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.h5">Layers</MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Href="@($"/services/{_service.Id}/layers/new")">
+                    Add Layer
+                </MudButton>
+            </MudStack>
+
+            @if (_service.LayerCount > 0)
+            {
+                <MudText Color="Color.Secondary">
+                    This service has @_service.LayerCount layer@(_service.LayerCount == 1 ? "" : "s").
+                </MudText>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Layers"
+                           Href="@($"/services/{_service.Id}/layers")"
+                           Class="mt-2">
+                    Manage Layers
+                </MudButton>
+            }
+            else
+            {
+                <MudText Color="Color.Secondary">
+                    No layers have been added to this service yet.
+                </MudText>
+            }
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private ServiceResponse? _service;
+    private bool _loading = true;
+    private string? _errorMessage;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServiceAsync();
+    }
+
+    private async Task LoadServiceAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            _service = await ServiceApi.GetServiceByIdAsync(Id);
+            if (_service == null)
+            {
+                _errorMessage = $"Service '{Id}' not found.";
+            }
+            else
+            {
+                UpdateBreadcrumbs();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading service: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void UpdateBreadcrumbs()
+    {
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/"),
+            new BreadcrumbItem("Services", href: "/services"),
+            new BreadcrumbItem(_service?.Title ?? Id, href: null, disabled: true)
+        };
+    }
+
+    private Color GetServiceTypeColor(string serviceType)
+    {
+        return serviceType switch
+        {
+            "WMS" => Color.Primary,
+            "WFS" => Color.Success,
+            "WMTS" => Color.Info,
+            "OGC_API" => Color.Warning,
+            "VECTOR_TILES" => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+}

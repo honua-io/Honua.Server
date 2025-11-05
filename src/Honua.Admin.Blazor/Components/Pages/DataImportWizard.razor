@@ -1,0 +1,340 @@
+@page "/import"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@attribute [Authorize(Roles = "administrator,datapublisher")]
+@inject ImportApiClient ImportApi
+@inject ServiceApiClient ServiceApi
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Import Data - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-6 mt-4">
+        <MudText Typo="Typo.h4" Class="mb-6">Import Geospatial Data</MudText>
+
+        <MudStepper @ref="_stepper" @bind-ActiveIndex="_activeStep" Linear="true" HeaderTextView="HeaderTextView.All">
+
+            @* Step 1: Upload File *@
+            <MudStep Title="Upload File" Icon="@Icons.Material.Filled.Upload">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudText Typo="Typo.h6">Select a geospatial file to import</MudText>
+
+                        <MudAlert Severity="Severity.Info">
+                            Supported formats: Shapefile (ZIP), GeoJSON, GeoPackage, KML, GML, CSV (with geometry)
+                        </MudAlert>
+
+                        <InputFile id="fileInput" OnChange="@HandleFileSelected" hidden accept="@SupportedFileTypes.GetAcceptString()" />
+
+                        @if (_wizardState.SelectedFile == null)
+                        {
+                            <MudPaper Outlined="true" Class="pa-8 text-center cursor-pointer" @onclick="@(() => document.getElementById("fileInput").click())" Style="border: 2px dashed #ccc;">
+                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                                <MudText Typo="Typo.h6">Click to select a file</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">or drag and drop</MudText>
+                                <MudText Typo="Typo.caption" Class="mt-2">Max file size: 500 MB</MudText>
+                            </MudPaper>
+                        }
+                        else
+                        {
+                            <MudPaper Elevation="1" Class="pa-4">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Color="Color.Primary" />
+                                        <div>
+                                            <MudText Typo="Typo.body1">@_wizardState.SelectedFile</MudText>
+                                            <MudText Typo="Typo.caption">@FormatFileSize(_wizardState.FileSize)</MudText>
+                                        </div>
+                                    </MudStack>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   OnClick="ClearSelectedFile" />
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="@(() => _stepper.ForceRender())"
+                               Disabled="@(_wizardState.SelectedFile == null || _selectedFile == null)">
+                        Next
+                    </MudButton>
+                </ActionContent>
+            </MudStep>
+
+            @* Step 2: Configure Target *@
+            <MudStep Title="Configure Target" Icon="@Icons.Material.Filled.Settings">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudText Typo="Typo.h6">Configure import settings</MudText>
+
+                        <MudSelect T="string"
+                                   Label="Target Service"
+                                   @bind-Value="_wizardState.TargetServiceId"
+                                   Variant="Variant.Filled"
+                                   Required="true"
+                                   Placeholder="Select a service">
+                            @foreach (var service in _services)
+                            {
+                                <MudSelectItem Value="@service.Id">@service.Title (@service.Id)</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudDivider />
+
+                        <MudText Typo="Typo.subtitle1">Layer Configuration</MudText>
+
+                        <MudSwitch @bind-Checked="_wizardState.CreateNewLayer"
+                                   Color="Color.Primary"
+                                   Label="Create new layer" />
+
+                        @if (_wizardState.CreateNewLayer)
+                        {
+                            <MudTextField Label="Layer ID"
+                                          @bind-Value="_wizardState.TargetLayerId"
+                                          Required="true"
+                                          Variant="Variant.Filled"
+                                          HelperText="Unique identifier (e.g., 'parcels', 'roads')" />
+
+                            <MudTextField Label="Layer Name"
+                                          @bind-Value="_wizardState.TargetLayerName"
+                                          Variant="Variant.Filled"
+                                          HelperText="Display name (optional)" />
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning">
+                                Appending to existing layers is not supported yet. Please create a new layer.
+                            </MudAlert>
+                        }
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="@(() => _stepper.ForceRender())"
+                               Disabled="@(!IsConfigurationValid())">
+                        Next
+                    </MudButton>
+                </ActionContent>
+            </MudStep>
+
+            @* Step 3: Review & Import *@
+            <MudStep Title="Review & Import" Icon="@Icons.Material.Filled.CheckCircle">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudText Typo="Typo.h6">Review import configuration</MudText>
+
+                        <MudSimpleTable Elevation="0" Dense="true">
+                            <tbody>
+                                <tr>
+                                    <td><strong>File:</strong></td>
+                                    <td>@_wizardState.SelectedFile</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>File Size:</strong></td>
+                                    <td>@FormatFileSize(_wizardState.FileSize)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Target Service:</strong></td>
+                                    <td>@GetServiceDisplayName(_wizardState.TargetServiceId)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Layer ID:</strong></td>
+                                    <td>@_wizardState.TargetLayerId</td>
+                                </tr>
+                                @if (!string.IsNullOrEmpty(_wizardState.TargetLayerName))
+                                {
+                                    <tr>
+                                        <td><strong>Layer Name:</strong></td>
+                                        <td>@_wizardState.TargetLayerName</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+
+                        @if (_importing)
+                        {
+                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+                            <MudText Typo="Typo.body1" Align="Align.Center">
+                                Uploading and processing file...
+                            </MudText>
+                        }
+
+                        @if (_wizardState.JobId.HasValue)
+                        {
+                            <MudAlert Severity="Severity.Success" Class="mt-4">
+                                <MudText Typo="Typo.body1">
+                                    Import job created successfully! Job ID: @_wizardState.JobId
+                                </MudText>
+                            </MudAlert>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.RemoveRedEye"
+                                       Href="@($"/import/jobs/{_wizardState.JobId}")">
+                                View Job Status
+                            </MudButton>
+                        }
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    @if (!_wizardState.JobId.HasValue)
+                    {
+                        <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())" Disabled="@_importing">Back</MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.CloudUpload"
+                                   OnClick="StartImport"
+                                   Disabled="@_importing">
+                            Start Import
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Text" OnClick="ResetWizard">Import Another File</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/import/jobs">View All Jobs</MudButton>
+                    }
+                </ActionContent>
+            </MudStep>
+
+        </MudStepper>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Import Data", href: null, disabled: true)
+    };
+
+    private MudStepper? _stepper;
+    private int _activeStep = 0;
+    private ImportWizardState _wizardState = new();
+    private IBrowserFile? _selectedFile;
+    private List<ServiceListItem> _services = new();
+    private bool _importing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServicesAsync();
+    }
+
+    private async Task LoadServicesAsync()
+    {
+        try
+        {
+            _services = await ServiceApi.GetServicesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading services: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _wizardState.SelectedFile = e.File.Name;
+        _wizardState.FileSize = e.File.Size;
+
+        // Auto-advance to next step
+        await Task.Delay(100);
+        _stepper?.ForceRender();
+    }
+
+    private void ClearSelectedFile()
+    {
+        _selectedFile = null;
+        _wizardState.SelectedFile = null;
+        _wizardState.FileSize = 0;
+    }
+
+    private bool IsConfigurationValid()
+    {
+        return !string.IsNullOrWhiteSpace(_wizardState.TargetServiceId)
+            && !string.IsNullOrWhiteSpace(_wizardState.TargetLayerId);
+    }
+
+    private string GetServiceDisplayName(string? serviceId)
+    {
+        if (string.IsNullOrEmpty(serviceId))
+            return "None";
+
+        var service = _services.FirstOrDefault(s => s.Id == serviceId);
+        return service != null ? $"{service.Title} ({service.Id})" : serviceId;
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private async Task StartImport()
+    {
+        if (_selectedFile == null || string.IsNullOrEmpty(_wizardState.TargetServiceId) || string.IsNullOrEmpty(_wizardState.TargetLayerId))
+        {
+            Snackbar.Add("Please complete all required fields", Severity.Warning);
+            return;
+        }
+
+        _importing = true;
+        try
+        {
+            var progress = new Progress<double>(percent =>
+            {
+                // Update progress UI if needed
+            });
+
+            var job = await ImportApi.CreateImportJobAsync(
+                _wizardState.TargetServiceId,
+                _wizardState.TargetLayerId,
+                _selectedFile,
+                overwrite: false,
+                progress: progress);
+
+            if (job != null)
+            {
+                _wizardState.JobId = job.JobId;
+                Snackbar.Add("Import job created successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to create import job", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error starting import: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    private void ResetWizard()
+    {
+        _wizardState = new ImportWizardState();
+        _selectedFile = null;
+        _activeStep = 0;
+        _stepper?.Reset();
+    }
+}

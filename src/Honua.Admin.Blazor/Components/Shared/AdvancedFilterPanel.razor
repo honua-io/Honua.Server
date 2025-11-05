@@ -1,0 +1,254 @@
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject SearchStateService SearchState
+@inject IDialogService DialogService
+
+<MudExpansionPanels>
+    <MudExpansionPanel Text="Advanced Filters" Icon="@Icons.Material.Filled.FilterAlt">
+        <MudStack Spacing="3" Class="pa-4">
+
+            @* Service Type Filter *@
+            @if (ShowServiceTypeFilter)
+            {
+                <MudSelect T="string"
+                           Label="Service Type"
+                           MultiSelection="true"
+                           @bind-SelectedValues="_selectedServiceTypes"
+                           Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomCenter"
+                           Dense="true">
+                    @foreach (var type in FilterOptions.ServiceTypes)
+                    {
+                        <MudSelectItem Value="@type">@type</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            @* Geometry Type Filter *@
+            @if (ShowGeometryTypeFilter)
+            {
+                <MudSelect T="string"
+                           Label="Geometry Type"
+                           MultiSelection="true"
+                           @bind-SelectedValues="_selectedGeometryTypes"
+                           Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomCenter"
+                           Dense="true">
+                    @foreach (var type in FilterOptions.GeometryTypes)
+                    {
+                        <MudSelectItem Value="@type">@type</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            @* CRS Filter *@
+            @if (ShowCrsFilter)
+            {
+                <MudSelect T="string"
+                           Label="Coordinate Reference System"
+                           MultiSelection="true"
+                           @bind-SelectedValues="_selectedCrs"
+                           Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomCenter"
+                           Dense="true">
+                    @foreach (var crs in FilterOptions.CommonCrs)
+                    {
+                        <MudSelectItem Value="@crs">@crs</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            @* Folder Filter *@
+            @if (ShowFolderFilter && Folders.Any())
+            {
+                <MudSelect T="string"
+                           Label="Folder"
+                           MultiSelection="true"
+                           @bind-SelectedValues="_selectedFolders"
+                           Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomCenter"
+                           Dense="true">
+                    @foreach (var folder in Folders)
+                    {
+                        <MudSelectItem Value="@folder.Id">@(folder.Title ?? folder.Id)</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            @* Has Layers Filter *@
+            @if (ShowHasLayersFilter)
+            {
+                <MudSwitch @bind-Checked="_hasLayers"
+                           Color="Color.Primary"
+                           Label="Only services with layers" />
+            }
+
+            <MudDivider />
+
+            @* Action Buttons *@
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="ApplyFilters"
+                           StartIcon="@Icons.Material.Filled.Check">
+                    Apply Filters
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           OnClick="ClearFilters"
+                           StartIcon="@Icons.Material.Filled.Clear">
+                    Clear
+                </MudButton>
+                <MudSpacer />
+                <MudButton Variant="Variant.Text"
+                           OnClick="SaveAsPreset"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           Disabled="@(!HasActiveFilters())">
+                    Save Preset
+                </MudButton>
+            </MudStack>
+
+            @* Saved Presets *@
+            @if (SearchState.Presets.Any())
+            {
+                <MudDivider />
+                <MudText Typo="Typo.subtitle2" Class="mt-2">Saved Presets</MudText>
+                <MudStack Spacing="1">
+                    @foreach (var preset in SearchState.Presets)
+                    {
+                        <MudPaper Outlined="true" Class="pa-2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <div style="flex: 1;">
+                                    <MudText Typo="Typo.body2"><b>@preset.Name</b></MudText>
+                                    @if (!string.IsNullOrEmpty(preset.Description))
+                                    {
+                                        <MudText Typo="Typo.caption">@preset.Description</MudText>
+                                    }
+                                </div>
+                                <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="@(() => LoadPreset(preset))"
+                                               Title="Load preset" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => DeletePreset(preset))"
+                                               Title="Delete preset" />
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
+        </MudStack>
+    </MudExpansionPanel>
+</MudExpansionPanels>
+
+@code {
+    [Parameter]
+    public bool ShowServiceTypeFilter { get; set; } = true;
+
+    [Parameter]
+    public bool ShowGeometryTypeFilter { get; set; } = false;
+
+    [Parameter]
+    public bool ShowCrsFilter { get; set; } = false;
+
+    [Parameter]
+    public bool ShowFolderFilter { get; set; } = true;
+
+    [Parameter]
+    public bool ShowHasLayersFilter { get; set; } = false;
+
+    [Parameter]
+    public List<FolderResponse> Folders { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<SearchFilter> OnFilterChanged { get; set; }
+
+    private IEnumerable<string> _selectedServiceTypes = new List<string>();
+    private IEnumerable<string> _selectedGeometryTypes = new List<string>();
+    private IEnumerable<string> _selectedCrs = new List<string>();
+    private IEnumerable<string> _selectedFolders = new List<string>();
+    private bool _hasLayers = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchState.InitializeAsync();
+        LoadCurrentFilter();
+    }
+
+    private void LoadCurrentFilter()
+    {
+        var filter = SearchState.CurrentFilter;
+        _selectedServiceTypes = filter.ServiceTypes;
+        _selectedGeometryTypes = filter.GeometryTypes;
+        _selectedCrs = filter.Crs;
+        _selectedFolders = filter.FolderIds;
+        _hasLayers = filter.HasLayers ?? false;
+    }
+
+    private async Task ApplyFilters()
+    {
+        var filter = new SearchFilter
+        {
+            ServiceTypes = _selectedServiceTypes.ToList(),
+            GeometryTypes = _selectedGeometryTypes.ToList(),
+            Crs = _selectedCrs.ToList(),
+            FolderIds = _selectedFolders.ToList(),
+            HasLayers = _hasLayers ? true : null
+        };
+
+        SearchState.UpdateFilter(filter);
+        await OnFilterChanged.InvokeAsync(filter);
+    }
+
+    private async Task ClearFilters()
+    {
+        _selectedServiceTypes = new List<string>();
+        _selectedGeometryTypes = new List<string>();
+        _selectedCrs = new List<string>();
+        _selectedFolders = new List<string>();
+        _hasLayers = false;
+
+        SearchState.ClearFilter();
+        await OnFilterChanged.InvokeAsync(new SearchFilter());
+    }
+
+    private bool HasActiveFilters()
+    {
+        return _selectedServiceTypes.Any()
+            || _selectedGeometryTypes.Any()
+            || _selectedCrs.Any()
+            || _selectedFolders.Any()
+            || _hasLayers;
+    }
+
+    private async Task SaveAsPreset()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Save Filter Preset" }
+        };
+
+        var dialog = await DialogService.ShowAsync<SavePresetDialog>("Save Preset", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is (string name, string description))
+        {
+            await SearchState.SavePresetAsync(name, description);
+        }
+    }
+
+    private void LoadPreset(FilterPreset preset)
+    {
+        SearchState.LoadPreset(preset);
+        LoadCurrentFilter();
+        _ = ApplyFilters(); // Fire and forget
+    }
+
+    private async Task DeletePreset(FilterPreset preset)
+    {
+        await SearchState.DeletePresetAsync(preset.Id);
+        StateHasChanged();
+    }
+}

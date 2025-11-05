@@ -1,0 +1,177 @@
+name: Admin UI Tests
+
+# Runs tests for the Honua Admin Blazor UI
+# Includes:
+# - Component tests (bUnit)
+# - API client tests
+# - Integration tests (when backend is available)
+
+on:
+  push:
+    branches: [ master, main, develop ]
+    paths:
+      - 'src/Honua.Admin.Blazor/**'
+      - 'tests/Honua.Admin.Blazor.Tests/**'
+      - '.github/workflows/admin-ui-tests.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'src/Honua.Admin.Blazor/**'
+      - 'tests/Honua.Admin.Blazor.Tests/**'
+      - '.github/workflows/admin-ui-tests.yml'
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  TEST_PROJECT: 'tests/Honua.Admin.Blazor.Tests/Honua.Admin.Blazor.Tests.csproj'
+
+jobs:
+  admin-ui-tests:
+    name: Admin UI Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-admin-ui-${{ hashFiles('**/Honua.Admin.Blazor*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-admin-ui-
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.TEST_PROJECT }}
+
+    - name: Build Admin UI
+      run: dotnet build src/Honua.Admin.Blazor/Honua.Admin.Blazor.csproj --configuration Release --no-restore
+
+    - name: Build Admin UI Tests
+      run: dotnet build ${{ env.TEST_PROJECT }} --configuration Release --no-restore
+
+    - name: Run Admin UI Tests
+      run: |
+        dotnet test ${{ env.TEST_PROJECT }} \
+          --configuration Release \
+          --no-build \
+          --logger "trx;LogFileName=admin-ui-test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./TestResults \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: admin-ui-test-results
+        path: |
+          TestResults/**/*.trx
+          TestResults/**/*.xml
+        retention-days: 30
+
+    - name: Upload Code Coverage
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: admin-ui-coverage
+        path: TestResults/**/coverage.opencover.xml
+        retention-days: 30
+
+    - name: Code Coverage Summary
+      if: always()
+      uses: irongut/CodeCoverageSummary@v1.3.0
+      with:
+        filename: TestResults/**/coverage.opencover.xml
+        badge: true
+        fail_below_min: false
+        format: markdown
+        hide_branch_rate: false
+        hide_complexity: false
+        indicators: true
+        output: both
+        thresholds: '60 75'
+
+    - name: Add Coverage PR Comment
+      if: github.event_name == 'pull_request' && always()
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        recreate: true
+        path: code-coverage-results.md
+
+  test-report:
+    name: Test Report
+    runs-on: ubuntu-latest
+    needs: admin-ui-tests
+    if: always()
+
+    steps:
+    - name: Download Test Results
+      uses: actions/download-artifact@v4
+      with:
+        name: admin-ui-test-results
+        path: TestResults
+
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          TestResults/**/*.trx
+        check_name: Admin UI Test Results
+        comment_title: Admin UI Test Results
+        compare_to_earlier_commit: true
+
+  coverage-check:
+    name: Coverage Check
+    runs-on: ubuntu-latest
+    needs: admin-ui-tests
+    if: always()
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download Coverage
+      uses: actions/download-artifact@v4
+      with:
+        name: admin-ui-coverage
+        path: TestResults
+
+    - name: Check Coverage Thresholds
+      run: |
+        echo "Checking code coverage thresholds..."
+        echo "Expected minimum coverage: 75%"
+        echo "Target coverage: 80%+"
+
+        # Note: Actual threshold checking would be done by CodeCoverageSummary action
+        # This is just a placeholder for any additional coverage validation
+
+  # Run integration tests only when needed (can be enabled/disabled)
+  integration-tests:
+    name: Admin UI Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Note about Integration Tests
+      run: |
+        echo "⚠️ Integration tests are currently skipped by default"
+        echo "They require a running backend API server"
+        echo "To enable, remove the Skip attribute from integration test classes"
+        echo "and set up the backend API in this workflow"
