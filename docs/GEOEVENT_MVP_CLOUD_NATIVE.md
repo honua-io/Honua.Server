@@ -2,7 +2,18 @@
 
 **Version:** 2.0 (Revised - Pragmatic Approach)
 **Date:** November 2025
-**Status:** MVP Design Phase
+**Status:** ⚠️ SUPERSEDED - See GEOEVENT_MVP_REALISTIC.md for achievable roadmap
+
+---
+
+> **⚠️ WARNING:** This document contains overambitious timelines and scope.
+>
+> **Please refer to:** `GEOEVENT_MVP_REALISTIC.md` for:
+> - Realistic 6-month MVP roadmap (not 4 months)
+> - Achievable performance targets (100ms, not 10ms)
+> - Clear MVP vs Phase 2 distinction
+> - Detailed operations and load testing plan
+> - No premature completion markers
 
 ---
 
