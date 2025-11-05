@@ -13,11 +13,13 @@ public sealed class LayerApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<LayerApiClient> _logger;
+    private readonly ClientCacheService _cache;
 
-    public LayerApiClient(IHttpClientFactory httpClientFactory, ILogger<LayerApiClient> logger)
+    public LayerApiClient(IHttpClientFactory httpClientFactory, ILogger<LayerApiClient> logger, ClientCacheService cache)
     {
         _httpClient = httpClientFactory.CreateClient("AdminApi");
         _logger = logger;
+        _cache = cache;
     }
 
     /// <summary>
@@ -25,24 +27,32 @@ public sealed class LayerApiClient
     /// </summary>
     public async Task<List<LayerListItem>> GetLayersAsync(string? serviceId = null, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var url = "/admin/metadata/layers";
-            if (!string.IsNullOrEmpty(serviceId))
-            {
-                url += $"?serviceId={Uri.EscapeDataString(serviceId)}";
-            }
+        var cacheKey = string.IsNullOrEmpty(serviceId) ? CacheKeys.Layers() : $"layers:service:{serviceId}";
 
-            var response = await _httpClient.GetAsync(url, cancellationToken);
-            response.EnsureSuccessStatusCode();
-            var layers = await response.Content.ReadFromJsonAsync<List<LayerListItem>>(cancellationToken: cancellationToken);
-            return layers ?? new List<LayerListItem>();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching layers");
-            throw;
-        }
+        return await _cache.GetOrSetAsync(
+            cacheKey,
+            async () =>
+            {
+                try
+                {
+                    var url = "/admin/metadata/layers";
+                    if (!string.IsNullOrEmpty(serviceId))
+                    {
+                        url += $"?serviceId={Uri.EscapeDataString(serviceId)}";
+                    }
+
+                    var response = await _httpClient.GetAsync(url, cancellationToken);
+                    response.EnsureSuccessStatusCode();
+                    var layers = await response.Content.ReadFromJsonAsync<List<LayerListItem>>(cancellationToken: cancellationToken);
+                    return layers ?? new List<LayerListItem>();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching layers");
+                    throw;
+                }
+            },
+            ttl: TimeSpan.FromMinutes(5));
     }
 
     /// <summary>
@@ -50,23 +60,29 @@ public sealed class LayerApiClient
     /// </summary>
     public async Task<LayerResponse?> GetLayerByIdAsync(string id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await _httpClient.GetAsync($"/admin/metadata/layers/{Uri.EscapeDataString(id)}", cancellationToken);
-
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        return await _cache.GetOrSetAsync(
+            CacheKeys.Layer(id),
+            async () =>
             {
-                return null;
-            }
+                try
+                {
+                    var response = await _httpClient.GetAsync($"/admin/metadata/layers/{Uri.EscapeDataString(id)}", cancellationToken);
 
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<LayerResponse>(cancellationToken: cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching layer {LayerId}", id);
-            throw;
-        }
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        return null;
+                    }
+
+                    response.EnsureSuccessStatusCode();
+                    return await response.Content.ReadFromJsonAsync<LayerResponse>(cancellationToken: cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching layer {LayerId}", id);
+                    throw;
+                }
+            },
+            ttl: TimeSpan.FromMinutes(5));
     }
 
     /// <summary>
@@ -79,6 +95,10 @@ public sealed class LayerApiClient
             var response = await _httpClient.PostAsJsonAsync("/admin/metadata/layers", request, cancellationToken);
             response.EnsureSuccessStatusCode();
             var created = await response.Content.ReadFromJsonAsync<LayerResponse>(cancellationToken: cancellationToken);
+
+            // Invalidate layers cache
+            _cache.InvalidatePrefix("layers:");
+
             return created ?? throw new InvalidOperationException("Layer creation returned null response");
         }
         catch (Exception ex)
@@ -97,6 +117,9 @@ public sealed class LayerApiClient
         {
             var response = await _httpClient.PutAsJsonAsync($"/admin/metadata/layers/{Uri.EscapeDataString(id)}", request, cancellationToken);
             response.EnsureSuccessStatusCode();
+
+            // Invalidate layers cache
+            _cache.InvalidatePrefix("layers:");
         }
         catch (Exception ex)
         {
@@ -114,6 +137,9 @@ public sealed class LayerApiClient
         {
             var response = await _httpClient.DeleteAsync($"/admin/metadata/layers/{Uri.EscapeDataString(id)}", cancellationToken);
             response.EnsureSuccessStatusCode();
+
+            // Invalidate layers cache
+            _cache.InvalidatePrefix("layers:");
         }
         catch (Exception ex)
         {

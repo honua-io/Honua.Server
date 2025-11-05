@@ -13,11 +13,13 @@ public sealed class ServiceApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<ServiceApiClient> _logger;
+    private readonly ClientCacheService _cache;
 
-    public ServiceApiClient(IHttpClientFactory httpClientFactory, ILogger<ServiceApiClient> logger)
+    public ServiceApiClient(IHttpClientFactory httpClientFactory, ILogger<ServiceApiClient> logger, ClientCacheService cache)
     {
         _httpClient = httpClientFactory.CreateClient("AdminApi");
         _logger = logger;
+        _cache = cache;
     }
 
     /// <summary>
@@ -43,18 +45,24 @@ public sealed class ServiceApiClient
     /// </summary>
     public async Task<List<ServiceListItem>> GetServicesAsync(CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await _httpClient.GetAsync("/admin/metadata/services", cancellationToken);
-            response.EnsureSuccessStatusCode();
-            var services = await response.Content.ReadFromJsonAsync<List<ServiceListItem>>(cancellationToken: cancellationToken);
-            return services ?? new List<ServiceListItem>();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching services");
-            throw;
-        }
+        return await _cache.GetOrSetAsync(
+            CacheKeys.Services(),
+            async () =>
+            {
+                try
+                {
+                    var response = await _httpClient.GetAsync("/admin/metadata/services", cancellationToken);
+                    response.EnsureSuccessStatusCode();
+                    var services = await response.Content.ReadFromJsonAsync<List<ServiceListItem>>(cancellationToken: cancellationToken);
+                    return services ?? new List<ServiceListItem>();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching services");
+                    throw;
+                }
+            },
+            ttl: TimeSpan.FromMinutes(5));
     }
 
     /// <summary>
@@ -62,23 +70,29 @@ public sealed class ServiceApiClient
     /// </summary>
     public async Task<ServiceResponse?> GetServiceByIdAsync(string id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await _httpClient.GetAsync($"/admin/metadata/services/{Uri.EscapeDataString(id)}", cancellationToken);
-
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        return await _cache.GetOrSetAsync(
+            CacheKeys.Service(id),
+            async () =>
             {
-                return null;
-            }
+                try
+                {
+                    var response = await _httpClient.GetAsync($"/admin/metadata/services/{Uri.EscapeDataString(id)}", cancellationToken);
 
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<ServiceResponse>(cancellationToken: cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching service {ServiceId}", id);
-            throw;
-        }
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        return null;
+                    }
+
+                    response.EnsureSuccessStatusCode();
+                    return await response.Content.ReadFromJsonAsync<ServiceResponse>(cancellationToken: cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching service {ServiceId}", id);
+                    throw;
+                }
+            },
+            ttl: TimeSpan.FromMinutes(5));
     }
 
     /// <summary>
@@ -91,6 +105,10 @@ public sealed class ServiceApiClient
             var response = await _httpClient.PostAsJsonAsync("/admin/metadata/services", request, cancellationToken);
             response.EnsureSuccessStatusCode();
             var created = await response.Content.ReadFromJsonAsync<ServiceResponse>(cancellationToken: cancellationToken);
+
+            // Invalidate services cache
+            _cache.InvalidatePrefix("services:");
+
             return created ?? throw new InvalidOperationException("Service creation returned null response");
         }
         catch (Exception ex)
@@ -109,6 +127,9 @@ public sealed class ServiceApiClient
         {
             var response = await _httpClient.PutAsJsonAsync($"/admin/metadata/services/{Uri.EscapeDataString(id)}", request, cancellationToken);
             response.EnsureSuccessStatusCode();
+
+            // Invalidate services cache
+            _cache.InvalidatePrefix("services:");
         }
         catch (Exception ex)
         {
@@ -126,6 +147,9 @@ public sealed class ServiceApiClient
         {
             var response = await _httpClient.DeleteAsync($"/admin/metadata/services/{Uri.EscapeDataString(id)}", cancellationToken);
             response.EnsureSuccessStatusCode();
+
+            // Invalidate services cache
+            _cache.InvalidatePrefix("services:");
         }
         catch (Exception ex)
         {

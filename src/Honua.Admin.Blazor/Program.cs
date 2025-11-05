@@ -65,6 +65,9 @@ builder.Services.AddScoped<EditorState>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SearchStateService>();
 
+// Register performance optimization services
+builder.Services.AddScoped<ClientCacheService>();
+
 // Register API clients
 builder.Services.AddScoped<ServiceApiClient>();
 builder.Services.AddScoped<LayerApiClient>();

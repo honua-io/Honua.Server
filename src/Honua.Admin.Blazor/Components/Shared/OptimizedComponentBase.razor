@@ -1,0 +1,119 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using System.Timers
+@implements IDisposable
+
+@code {
+    private bool _shouldRender = true;
+    private readonly List<IDisposable> _disposables = new();
+    private readonly List<Timer> _timers = new();
+    private CancellationTokenSource? _cancellationTokenSource;
+
+    /// <summary>
+    /// Controls whether the component should re-render.
+    /// Override this to implement custom ShouldRender logic.
+    /// </summary>
+    protected override bool ShouldRender()
+    {
+        if (_shouldRender)
+        {
+            _shouldRender = false;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Triggers a re-render of the component.
+    /// Call this after updating state to force a render.
+    /// </summary>
+    protected void TriggerRender()
+    {
+        _shouldRender = true;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Suppresses rendering for the next render cycle.
+    /// Useful for batch updates.
+    /// </summary>
+    protected void SuppressRender()
+    {
+        _shouldRender = false;
+    }
+
+    /// <summary>
+    /// Registers a disposable for automatic cleanup.
+    /// </summary>
+    protected void RegisterDisposable(IDisposable disposable)
+    {
+        _disposables.Add(disposable);
+    }
+
+    /// <summary>
+    /// Registers a timer for automatic cleanup.
+    /// </summary>
+    protected void RegisterTimer(Timer timer)
+    {
+        _timers.Add(timer);
+        _disposables.Add(timer);
+    }
+
+    /// <summary>
+    /// Gets a cancellation token for async operations.
+    /// Automatically cancelled when component is disposed.
+    /// </summary>
+    protected CancellationToken GetCancellationToken()
+    {
+        _cancellationTokenSource ??= new CancellationTokenSource();
+        return _cancellationTokenSource.Token;
+    }
+
+    /// <summary>
+    /// Disposes all registered resources.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Override this to add custom disposal logic.
+    /// Always call base.Dispose(disposing) when overriding.
+    /// </summary>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // Stop and dispose timers
+            foreach (var timer in _timers)
+            {
+                timer.Stop();
+                timer.Dispose();
+            }
+
+            // Dispose registered disposables
+            foreach (var disposable in _disposables)
+            {
+                try
+                {
+                    disposable.Dispose();
+                }
+                catch
+                {
+                    // Swallow disposal exceptions
+                }
+            }
+
+            // Cancel any pending operations
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+
+            _timers.Clear();
+            _disposables.Clear();
+        }
+    }
+}
