@@ -93,7 +93,7 @@ This directory contains **200+ pages** of comprehensive design documentation rea
 **30+ pages of validated architectural decisions:**
 - ADR-001: .NET MAUI vs Native (✅ Validated)
 - ADR-002: Hybrid AR Implementation (✅ Validated)
-- ADR-003: Esri ArcGIS Maps SDK (✅ Validated)
+- ADR-003: Mapsui Open-Source Maps SDK (✅ Validated, Revised 2025-11-05)
 - ADR-004: ML.NET + ONNX for AI (✅ Validated)
 - ADR-005: Offline-First Architecture (✅ Validated)
 - ADR-006: OGC Features API Integration (✅ Validated)
@@ -253,7 +253,7 @@ Bottom tab bar:
 - MAUI XAML or C# Markup
 - CommunityToolkit.Mvvm
 - ML.NET + ONNX Runtime (AI)
-- Esri ArcGIS Maps SDK for .NET
+- Mapsui (MIT-licensed open-source mapping SDK)
 - SQLite-net + NetTopologySuite
 
 **Platform-Specific (AR only):**

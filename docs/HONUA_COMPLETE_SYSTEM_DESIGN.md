@@ -1183,7 +1183,9 @@ Technician with Quest 3:
 | **Architecture** | MVVM | CommunityToolkit.Mvvm |
 | **Local DB** | SQLite-net | 1.8+ |
 | **Spatial** | NetTopologySuite | 2.5+ |
-| **Maps** | Esri ArcGIS Maps SDK | Latest |
+| **Maps** | Mapsui (MIT) | 4.1.9+ |
+| **Rendering** | SkiaSharp | 2.88+ |
+| **Tiles** | OpenStreetMap, OGC WMTS | - |
 
 ### 8.3 AR (Quest 3)
 
