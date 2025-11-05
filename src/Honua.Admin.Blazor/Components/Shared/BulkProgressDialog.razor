@@ -1,0 +1,253 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
+@inject BulkOperationsApiClient BulkApiClient
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h6">@OperationTitle</MudText>
+
+            @if (_status != null)
+            {
+                <MudStack Spacing="2">
+                    <MudProgressLinear Color="@GetProgressColor()"
+                                       Value="@_status.Progress"
+                                       Size="Size.Large"
+                                       Class="my-2">
+                        <MudText Typo="Typo.body1" Color="MudColor.Surface">
+                            @_status.Progress%
+                        </MudText>
+                    </MudProgressLinear>
+
+                    <MudText Typo="Typo.body1">
+                        Status: <MudChip Size="Size.Small" Color="@GetStatusColor()">@FormatStatus(_status.Status)</MudChip>
+                    </MudText>
+
+                    <MudText Typo="Typo.body2" Color="MudColor.Secondary">
+                        Processed: @_status.ProcessedItems / @_status.TotalItems items
+                    </MudText>
+
+                    @if (!string.IsNullOrEmpty(_status.CurrentItem))
+                    {
+                        <MudText Typo="Typo.body2" Color="MudColor.Secondary">
+                            Current: @_status.CurrentItem
+                        </MudText>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_status.ErrorMessage))
+                    {
+                        <MudAlert Severity="Severity.Error">
+                            @_status.ErrorMessage
+                        </MudAlert>
+                    }
+                </MudStack>
+
+                @if (_results != null && _showResults)
+                {
+                    <MudDivider />
+                    <MudText Typo="Typo.subtitle1">Results</MudText>
+
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3" Style="max-height: 300px; overflow-y: auto;">
+                        <MudStack Spacing="1">
+                            @foreach (var result in _results.Results)
+                            {
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@(result.Success ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error)"
+                                                 Color="@(result.Success ? MudColor.Success : MudColor.Error)"
+                                                 Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">@result.ItemName</MudText>
+                                    </MudStack>
+                                    @if (!result.Success && !string.IsNullOrEmpty(result.ErrorMessage))
+                                    {
+                                        <MudTooltip Text="@result.ErrorMessage">
+                                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Color="MudColor.Error" />
+                                        </MudTooltip>
+                                    }
+                                </MudStack>
+                            }
+                        </MudStack>
+                    </MudPaper>
+
+                    <MudStack Row="true" Spacing="2">
+                        <MudChip Icon="@Icons.Material.Filled.CheckCircle" Color="MudColor.Success" Size="Size.Small">
+                            Success: @_results.SuccessCount
+                        </MudChip>
+                        @if (_results.FailureCount > 0)
+                        {
+                            <MudChip Icon="@Icons.Material.Filled.Error" Color="MudColor.Error" Size="Size.Small">
+                                Failed: @_results.FailureCount
+                            </MudChip>
+                        }
+                    </MudStack>
+                }
+            }
+            else
+            {
+                <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                    <MudProgressCircular Color="MudColor.Primary" Size="Size.Large" Indeterminate="true" />
+                    <MudText Typo="Typo.body1">Initializing operation...</MudText>
+                </MudStack>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        @if (_canCancel && _status?.Status is "pending" or "in_progress")
+        {
+            <MudButton Color="MudColor.Warning" OnClick="CancelOperation" Disabled="_isCancelling">
+                @(_isCancelling ? "Cancelling..." : "Cancel Operation")
+            </MudButton>
+        }
+        @if (_status?.Status is "completed" or "failed")
+        {
+            <MudButton Variant="Variant.Filled" Color="MudColor.Primary" OnClick="Close">
+                Close
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public string OperationId { get; set; } = string.Empty;
+
+    [Parameter]
+    public string OperationTitle { get; set; } = "Bulk Operation Progress";
+
+    [Parameter]
+    public EventCallback<BulkOperationResponse?> OnCompleted { get; set; }
+
+    private BulkOperationStatus? _status;
+    private BulkOperationResponse? _results;
+    private System.Timers.Timer? _pollTimer;
+    private bool _canCancel = true;
+    private bool _isCancelling = false;
+    private bool _showResults = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await StartPolling();
+    }
+
+    private async Task StartPolling()
+    {
+        // Initial status check
+        await UpdateStatus();
+
+        // Set up polling timer (every 1 second)
+        _pollTimer = new System.Timers.Timer(1000);
+        _pollTimer.Elapsed += async (sender, e) => await PollStatus();
+        _pollTimer.AutoReset = true;
+        _pollTimer.Start();
+    }
+
+    private async Task PollStatus()
+    {
+        await InvokeAsync(async () =>
+        {
+            await UpdateStatus();
+            StateHasChanged();
+        });
+    }
+
+    private async Task UpdateStatus()
+    {
+        try
+        {
+            _status = await BulkApiClient.GetOperationStatusAsync(OperationId);
+            _canCancel = _status.CanCancel;
+
+            // If completed or failed, fetch results
+            if (_status.Status is "completed" or "failed")
+            {
+                _pollTimer?.Stop();
+
+                try
+                {
+                    _results = await BulkApiClient.GetOperationResultsAsync(OperationId);
+                    _showResults = true;
+                    await OnCompleted.InvokeAsync(_results);
+                }
+                catch
+                {
+                    // Results might not be available yet or operation failed
+                    await OnCompleted.InvokeAsync(null);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to update operation status: {ex.Message}", Severity.Error);
+            _pollTimer?.Stop();
+        }
+    }
+
+    private async Task CancelOperation()
+    {
+        if (_isCancelling) return;
+
+        _isCancelling = true;
+        try
+        {
+            await BulkApiClient.CancelOperationAsync(OperationId);
+            Snackbar.Add("Operation cancelled", Severity.Warning);
+            await UpdateStatus();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to cancel operation: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isCancelling = false;
+        }
+    }
+
+    private void Close()
+    {
+        MudDialog?.Close(DialogResult.Ok(_results));
+    }
+
+    private MudColor GetProgressColor() => _status?.Status switch
+    {
+        "completed" => MudColor.Success,
+        "failed" => MudColor.Error,
+        "in_progress" => MudColor.Primary,
+        _ => MudColor.Default
+    };
+
+    private MudColor GetStatusColor() => _status?.Status switch
+    {
+        "completed" => MudColor.Success,
+        "failed" => MudColor.Error,
+        "in_progress" => MudColor.Primary,
+        "pending" => MudColor.Info,
+        _ => MudColor.Default
+    };
+
+    private string FormatStatus(string status) => status switch
+    {
+        "pending" => "Pending",
+        "in_progress" => "In Progress",
+        "completed" => "Completed",
+        "failed" => "Failed",
+        _ => status
+    };
+
+    public void Dispose()
+    {
+        if (_pollTimer != null)
+        {
+            _pollTimer.Stop();
+            _pollTimer.Dispose();
+        }
+    }
+}

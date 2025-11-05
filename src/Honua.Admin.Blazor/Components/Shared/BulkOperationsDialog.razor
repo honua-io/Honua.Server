@@ -1,0 +1,268 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
+@inject BulkOperationsApiClient BulkApiClient
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info">
+                <MudText Typo="Typo.body1">
+                    <strong>@SelectedCount</strong> @ItemType selected
+                </MudText>
+            </MudAlert>
+
+            @if (OperationType == BulkOperationType.Delete)
+            {
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.body1">
+                        Are you sure you want to delete the selected @ItemType?
+                    </MudText>
+                    <MudAlert Severity="Severity.Warning">
+                        <strong>Warning:</strong> This action cannot be undone.
+                    </MudAlert>
+                    <MudCheckBox @bind-Checked="_forceDelete" Label="Force delete (ignore dependencies)" Color="MudColor.Error" />
+                </MudStack>
+            }
+            else if (OperationType == BulkOperationType.MoveToFolder)
+            {
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.body1">
+                        Move selected @ItemType to folder:
+                    </MudText>
+                    <MudSelect @bind-Value="_targetFolderId"
+                               Label="Target Folder"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Clearable="true"
+                               T="string?">
+                        <MudSelectItem Value="@((string?)null)">Root (no folder)</MudSelectItem>
+                        @foreach (var folder in Folders)
+                        {
+                            <MudSelectItem Value="@folder.Id">@folder.Path</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudStack>
+            }
+            else if (OperationType == BulkOperationType.UpdateMetadata)
+            {
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.body1">
+                        Update metadata for selected @ItemType:
+                    </MudText>
+
+                    <MudSelect @bind-Value="_updateMode"
+                               Label="Update Mode"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               T="string">
+                        <MudSelectItem Value="@("merge")">Merge (add new, keep existing)</MudSelectItem>
+                        <MudSelectItem Value="@("replace")">Replace (overwrite all)</MudSelectItem>
+                        <MudSelectItem Value="@("append")">Append (add only)</MudSelectItem>
+                    </MudSelect>
+
+                    <MudTextField @bind-Value="_tagsInput"
+                                  Label="Tags (comma-separated)"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  HelperText="e.g., gis, public, historical" />
+
+                    <MudTextField @bind-Value="_keywordsInput"
+                                  Label="Keywords (comma-separated)"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  HelperText="e.g., maps, geodata, boundaries" />
+                </MudStack>
+            }
+            else if (OperationType == BulkOperationType.ApplyStyle)
+            {
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.body1">
+                        Apply style to selected layers:
+                    </MudText>
+                    <MudSelect @bind-Value="_selectedStyleId"
+                               Label="Style"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Required="true"
+                               T="string">
+                        @foreach (var style in Styles)
+                        {
+                            <MudSelectItem Value="@style.Id">@style.Name (@style.RendererType)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudCheckBox @bind-Checked="_setAsDefault" Label="Set as default style" Color="MudColor.Primary" />
+                </MudStack>
+            }
+            else if (OperationType == BulkOperationType.EnableServices || OperationType == BulkOperationType.DisableServices)
+            {
+                <MudText Typo="Typo.body1">
+                    @(OperationType == BulkOperationType.EnableServices ? "Enable" : "Disable") the selected services?
+                </MudText>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="@GetActionColor()"
+                   OnClick="ExecuteOperation"
+                   Disabled="_isExecuting">
+            @(_isExecuting ? "Processing..." : GetActionText())
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public BulkOperationType OperationType { get; set; }
+
+    [Parameter]
+    public List<string> SelectedIds { get; set; } = new();
+
+    [Parameter]
+    public string ItemType { get; set; } = "items"; // "services", "layers"
+
+    [Parameter]
+    public List<FolderListItem> Folders { get; set; } = new();
+
+    [Parameter]
+    public List<StyleListItem> Styles { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<BulkOperationResponse> OnOperationCompleted { get; set; }
+
+    private bool _isExecuting = false;
+    private bool _forceDelete = false;
+    private string? _targetFolderId = null;
+    private string _updateMode = "merge";
+    private string _tagsInput = string.Empty;
+    private string _keywordsInput = string.Empty;
+    private string _selectedStyleId = string.Empty;
+    private bool _setAsDefault = false;
+
+    private int SelectedCount => SelectedIds.Count;
+
+    private void Cancel()
+    {
+        MudDialog?.Cancel();
+    }
+
+    private async Task ExecuteOperation()
+    {
+        if (_isExecuting) return;
+
+        _isExecuting = true;
+        try
+        {
+            BulkOperationResponse result = OperationType switch
+            {
+                BulkOperationType.Delete => await ExecuteDeleteAsync(),
+                BulkOperationType.MoveToFolder => await ExecuteMoveToFolderAsync(),
+                BulkOperationType.UpdateMetadata => await ExecuteUpdateMetadataAsync(),
+                BulkOperationType.ApplyStyle => await ExecuteApplyStyleAsync(),
+                BulkOperationType.EnableServices => await ExecuteEnableServicesAsync(true),
+                BulkOperationType.DisableServices => await ExecuteEnableServicesAsync(false),
+                _ => throw new NotImplementedException($"Operation type {OperationType} not implemented")
+            };
+
+            await OnOperationCompleted.InvokeAsync(result);
+
+            var message = $"Operation completed: {result.SuccessCount} succeeded";
+            if (result.FailureCount > 0)
+                message += $", {result.FailureCount} failed";
+
+            Snackbar.Add(message, result.FailureCount > 0 ? Severity.Warning : Severity.Success);
+            MudDialog?.Close(DialogResult.Ok(result));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Operation failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isExecuting = false;
+        }
+    }
+
+    private async Task<BulkOperationResponse> ExecuteDeleteAsync()
+    {
+        if (ItemType == "services")
+            return await BulkApiClient.BulkDeleteServicesAsync(SelectedIds, _forceDelete);
+        else
+            return await BulkApiClient.BulkDeleteLayersAsync(SelectedIds, _forceDelete);
+    }
+
+    private async Task<BulkOperationResponse> ExecuteMoveToFolderAsync()
+    {
+        if (ItemType == "services")
+            return await BulkApiClient.BulkMoveServicesToFolderAsync(SelectedIds, _targetFolderId);
+        else
+            return await BulkApiClient.BulkMoveLayersToFolderAsync(SelectedIds, _targetFolderId);
+    }
+
+    private async Task<BulkOperationResponse> ExecuteUpdateMetadataAsync()
+    {
+        var tags = string.IsNullOrWhiteSpace(_tagsInput)
+            ? null
+            : _tagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .ToList();
+
+        var keywords = string.IsNullOrWhiteSpace(_keywordsInput)
+            ? null
+            : _keywordsInput.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(k => k.Trim())
+                .Where(k => !string.IsNullOrEmpty(k))
+                .ToList();
+
+        if (tags == null && keywords == null)
+        {
+            throw new InvalidOperationException("Please specify at least tags or keywords to update");
+        }
+
+        if (ItemType == "services")
+            return await BulkApiClient.BulkUpdateServiceMetadataAsync(SelectedIds, tags, keywords, _updateMode);
+        else
+            return await BulkApiClient.BulkUpdateLayerMetadataAsync(SelectedIds, tags, keywords, _updateMode);
+    }
+
+    private async Task<BulkOperationResponse> ExecuteApplyStyleAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedStyleId))
+        {
+            throw new InvalidOperationException("Please select a style to apply");
+        }
+
+        return await BulkApiClient.BulkApplyStyleAsync(SelectedIds, _selectedStyleId, _setAsDefault);
+    }
+
+    private async Task<BulkOperationResponse> ExecuteEnableServicesAsync(bool enabled)
+    {
+        return await BulkApiClient.BulkSetServiceEnabledAsync(SelectedIds, enabled);
+    }
+
+    private MudColor GetActionColor() => OperationType switch
+    {
+        BulkOperationType.Delete => MudColor.Error,
+        _ => MudColor.Primary
+    };
+
+    private string GetActionText() => OperationType switch
+    {
+        BulkOperationType.Delete => "Delete",
+        BulkOperationType.MoveToFolder => "Move",
+        BulkOperationType.UpdateMetadata => "Update",
+        BulkOperationType.ApplyStyle => "Apply Style",
+        BulkOperationType.EnableServices => "Enable",
+        BulkOperationType.DisableServices => "Disable",
+        _ => "Execute"
+    };
+}

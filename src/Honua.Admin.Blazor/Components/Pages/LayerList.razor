@@ -5,8 +5,12 @@
 @attribute [Authorize(Roles = "administrator,datapublisher")]
 @inject LayerApiClient LayerApi
 @inject ServiceApiClient ServiceApi
+@inject BulkOperationsApiClient BulkApiClient
+@inject FolderApiClient FolderApi
+@inject StyleApiClient StyleApiClient
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 <PageTitle>Layers - Honua Admin</PageTitle>
 
@@ -74,12 +78,61 @@
             <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
         }
 
+        @* Bulk Operations Toolbar *@
+        @if (_bulkSelection.HasSelection)
+        {
+            <MudPaper Elevation="4" Class="pa-3 mb-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" />
+                    <MudText Typo="Typo.body1"><strong>@_bulkSelection.SelectedCount</strong> layers selected</MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.DriveFileMove"
+                               OnClick="@(() => ShowBulkOperationDialog(BulkOperationType.MoveToFolder))"
+                               Size="Size.Small">
+                        Move to Folder
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               OnClick="@(() => ShowBulkOperationDialog(BulkOperationType.UpdateMetadata))"
+                               Size="Size.Small">
+                        Update Metadata
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.Palette"
+                               OnClick="@(() => ShowBulkOperationDialog(BulkOperationType.ApplyStyle))"
+                               Size="Size.Small"
+                               Color="Color.Info">
+                        Apply Style
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.Delete"
+                               OnClick="@(() => ShowBulkOperationDialog(BulkOperationType.Delete))"
+                               Size="Size.Small"
+                               Color="Color.Error">
+                        Delete
+                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                   OnClick="@(() => _bulkSelection.DeselectAll())"
+                                   Size="Size.Small"
+                                   Title="Clear Selection" />
+                </MudStack>
+            </MudPaper>
+        }
+
         <MudTable Items="@_filteredLayers"
                   Hover="true"
                   Breakpoint="Breakpoint.Sm"
                   Loading="@_loading"
                   LoadingProgressColor="Color.Primary">
             <HeaderContent>
+                <MudTh Style="width: 50px;">
+                    <MudCheckBox @bind-Checked="_bulkSelection.IsAllSelected"
+                                 CheckedChanged="@((bool val) => OnSelectAllChanged(val))"
+                                 Color="Color.Primary"
+                                 Size="Size.Small"
+                                 T="bool" />
+                </MudTh>
                 <MudTh>Layer ID</MudTh>
                 <MudTh>Title</MudTh>
                 @if (string.IsNullOrEmpty(ServiceId))
@@ -91,6 +144,13 @@
                 <MudTh>Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
+                <MudTd DataLabel="Select">
+                    <MudCheckBox Checked="@_bulkSelection.IsSelected(context.Id)"
+                                 CheckedChanged="@((bool val) => OnItemSelectionChanged(context.Id, val))"
+                                 Color="Color.Primary"
+                                 Size="Size.Small"
+                                 T="bool" />
+                </MudTd>
                 <MudTd DataLabel="Layer ID">
                     <MudText Typo="Typo.body2" Class="text-monospace">@context.Id</MudText>
                 </MudTd>
@@ -159,11 +219,14 @@
 
     private List<LayerListItem> _layers = new();
     private List<LayerListItem> _filteredLayers = new();
+    private List<FolderResponse> _folders = new();
+    private List<StyleListItem> _styles = new();
     private string _searchString = string.Empty;
     private SearchFilter _currentFilter = new();
     private bool _loading = true;
     private string? _errorMessage;
     private string? _serviceName;
+    private BulkSelectionState<LayerListItem> _bulkSelection = new();
     private List<BreadcrumbItem> _breadcrumbs = new();
 
     protected override async Task OnInitializedAsync()
@@ -277,4 +340,74 @@
         GeometryTypes.MultiPolygon => Color.Warning,
         _ => Color.Default
     };
+
+    private void OnSelectAllChanged(bool selected)
+    {
+        if (selected)
+        {
+            _bulkSelection.SelectAll(_filteredLayers, l => l.Id);
+        }
+        else
+        {
+            _bulkSelection.DeselectAll();
+        }
+        StateHasChanged();
+    }
+
+    private void OnItemSelectionChanged(string itemId, bool selected)
+    {
+        _bulkSelection.ToggleSelection(itemId);
+        StateHasChanged();
+    }
+
+    private async Task ShowBulkOperationDialog(BulkOperationType operationType)
+    {
+        // Load folders and styles if not already loaded
+        if (!_folders.Any())
+        {
+            try
+            {
+                _folders = await FolderApi.GetFoldersAsync();
+            }
+            catch { }
+        }
+
+        if (!_styles.Any() && operationType == BulkOperationType.ApplyStyle)
+        {
+            try
+            {
+                _styles = await StyleApiClient.GetStylesAsync();
+            }
+            catch { }
+        }
+
+        var parameters = new DialogParameters
+        {
+            ["OperationType"] = operationType,
+            ["SelectedIds"] = _bulkSelection.SelectedIds.ToList(),
+            ["ItemType"] = "layers",
+            ["Folders"] = _folders,
+            ["Styles"] = _styles,
+            ["OnOperationCompleted"] = EventCallback.Factory.Create<BulkOperationResponse>(this, OnBulkOperationCompleted)
+        };
+
+        var dialog = await DialogService.ShowAsync<BulkOperationsDialog>(
+            $"Bulk {operationType}",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await LoadLayersAsync();
+            _bulkSelection.DeselectAll();
+        }
+    }
+
+    private async Task OnBulkOperationCompleted(BulkOperationResponse response)
+    {
+        await LoadLayersAsync();
+        _bulkSelection.DeselectAll();
+    }
 }

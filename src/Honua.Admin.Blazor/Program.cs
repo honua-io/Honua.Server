@@ -76,6 +76,7 @@ builder.Services.AddScoped<CacheApiClient>();
 builder.Services.AddScoped<UserApiClient>();
 builder.Services.AddScoped<DashboardApiClient>();
 builder.Services.AddScoped<StyleApiClient>();
+builder.Services.AddScoped<BulkOperationsApiClient>();
 
 // Register SignalR hub service for real-time updates
 builder.Services.AddScoped<MetadataHubService>();

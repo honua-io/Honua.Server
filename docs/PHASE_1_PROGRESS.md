@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
 **Last Updated:** 2025-11-05
-**Current Phase:** Phase 3.2 (Style Editor) - COMPLETE
+**Current Phase:** Phase 3.1 (Bulk Operations) - COMPLETE
 
 ---
 
@@ -1010,6 +1010,201 @@ Dashboard endpoints need to be implemented at:
 - System component health
 - Recent activity (last 20 actions)
 - Top services by usage
+
+---
+
+## ✅ Phase 3.1 Complete - Bulk Operations (Week 9)
+
+### Completed Tasks
+
+**Bulk Operation Models:**
+- ✅ `BulkOperationModels.cs` - Complete bulk operations models
+  - BulkOperationRequest (generic operation with parameters)
+  - BulkDeleteRequest (bulk delete with force option)
+  - BulkMoveToFolderRequest (move items to folder)
+  - BulkUpdateMetadataRequest (update tags/keywords)
+  - BulkApplyStyleRequest (apply style to layers)
+  - BulkEnableServicesRequest (enable/disable services)
+  - BulkOperationResponse (operation results with success/failure counts)
+  - BulkOperationItemResult (per-item result)
+  - BulkOperationStatus (long-running operation status with progress)
+  - BulkOperationType enum (Delete, MoveToFolder, UpdateMetadata, etc.)
+  - BulkSelectionState<T> (selection state helper with HashSet)
+
+**Bulk Operations API Client:**
+- ✅ `BulkOperationsApiClient.cs` - Complete bulk operations API
+  - BulkDeleteServicesAsync (delete multiple services)
+  - BulkDeleteLayersAsync (delete multiple layers)
+  - BulkMoveServicesToFolderAsync (move services to folder)
+  - BulkMoveLayersToFolderAsync (move layers to folder)
+  - BulkUpdateServiceMetadataAsync (update service tags/keywords)
+  - BulkUpdateLayerMetadataAsync (update layer tags/keywords)
+  - BulkApplyStyleAsync (apply style to multiple layers)
+  - BulkSetServiceEnabledAsync (enable/disable services)
+  - GetOperationStatusAsync (poll operation progress)
+  - CancelOperationAsync (cancel running operation)
+  - GetOperationResultsAsync (get final results)
+
+**UI Components:**
+- ✅ `BulkOperationsDialog.razor` - Bulk operation configuration dialog
+  - Operation type selection (Delete, Move, Update Metadata, Apply Style, Enable/Disable)
+  - Force delete option
+  - Folder selection for move operations
+  - Metadata update mode (merge, replace, append)
+  - Tags and keywords input (comma-separated)
+  - Style selection for apply style
+  - Set as default option
+  - Success/failure summary after completion
+- ✅ `BulkProgressDialog.razor` - Long-running operation progress dialog
+  - Real-time progress bar (0-100%)
+  - Status tracking (pending, in_progress, completed, failed)
+  - Processed items counter
+  - Current item display
+  - Error message display
+  - Polling timer (1 second interval)
+  - Cancel operation support
+  - Detailed results view with per-item success/failure
+  - IDisposable cleanup for timer
+
+**Updated Pages:**
+- ✅ Updated `ServiceList.razor` - Added bulk operations support
+  - Checkbox column for selection (header and rows)
+  - Select all/deselect all functionality
+  - Bulk operations toolbar (appears when items selected)
+  - 5 bulk operations: Move to Folder, Update Metadata, Enable, Disable, Delete
+  - Selection count display
+  - Clear selection button
+  - BulkSelectionState integration
+- ✅ Updated `LayerList.razor` - Added bulk operations support
+  - Checkbox column for selection
+  - Select all/deselect all functionality
+  - Bulk operations toolbar
+  - 4 bulk operations: Move to Folder, Update Metadata, Apply Style, Delete
+  - Lazy loading of folders and styles data
+  - Selection count display
+
+**Integration:**
+- ✅ Program.cs - Registered BulkOperationsApiClient in DI container
+
+**Files Created:** 4 files, ~1,200 lines
+**Files Modified:** 3 files (ServiceList.razor, LayerList.razor, Program.cs)
+**Commit:** Pending
+
+**Features:**
+
+**Bulk Operations Types:**
+1. **Delete** - Bulk delete with force option
+   - Force delete ignores dependencies
+   - Confirmation dialog with warning
+   - Per-item success/failure tracking
+
+2. **Move to Folder** - Bulk move to folder
+   - Folder selection dropdown (includes root)
+   - Moves all selected items to target folder
+   - Works for both services and layers
+
+3. **Update Metadata** - Bulk metadata updates
+   - Update modes: merge (add new, keep existing), replace (overwrite all), append (add only)
+   - Tags and keywords (comma-separated input)
+   - Applies updates across all selected items
+
+4. **Apply Style** (layers only)
+   - Style selection from available styles
+   - Set as default option
+   - Applies style to all selected layers
+
+5. **Enable/Disable** (services only)
+   - Bulk enable or disable services
+   - Quick status toggle for multiple services
+
+**UI/UX Features:**
+- **Selection State Management:**
+  - BulkSelectionState<T> helper class with HashSet
+  - Select all/deselect all
+  - Individual item selection toggle
+  - Selection count display
+  - Persistent selection across operations
+
+- **Bulk Operations Toolbar:**
+  - Appears only when items selected (conditional rendering)
+  - Elevated MudPaper with primary color
+  - Action buttons with icons
+  - Clear selection button
+  - Operation type-specific buttons
+
+- **Operation Configuration Dialog:**
+  - Modal dialog with operation-specific controls
+  - Validation before execution
+  - Confirmation for destructive operations
+  - Success/failure summary after completion
+
+- **Progress Tracking:**
+  - Real-time progress dialog for long-running operations
+  - Progress bar with percentage
+  - Status chips (Pending, In Progress, Completed, Failed)
+  - Processed items counter
+  - Cancel operation support
+  - Detailed results with per-item status
+  - Error message display
+
+**Backend Integration Required:**
+Bulk operation endpoints need to be implemented at:
+- POST /admin/services/bulk-delete (bulk delete services)
+- POST /admin/services/bulk-move (move services to folder)
+- POST /admin/services/bulk-update-metadata (update service metadata)
+- POST /admin/services/bulk-set-enabled (enable/disable services)
+- POST /admin/layers/bulk-delete (bulk delete layers)
+- POST /admin/layers/bulk-move (move layers to folder)
+- POST /admin/layers/bulk-update-metadata (update layer metadata)
+- POST /admin/layers/bulk-apply-style (apply style to layers)
+- GET /admin/bulk-operations/{id}/status (get operation status)
+- POST /admin/bulk-operations/{id}/cancel (cancel operation)
+- GET /admin/bulk-operations/{id}/results (get operation results)
+
+**Technical Implementation:**
+
+**Selection Pattern:**
+- Checkbox in table header for select all
+- Checkbox in each row for individual selection
+- BulkSelectionState<T> manages HashSet<string> of selected IDs
+- StateHasChanged() after selection changes for UI update
+
+**Bulk Operations Flow:**
+1. User selects items with checkboxes
+2. Bulk toolbar appears with available operations
+3. User clicks operation button
+4. BulkOperationsDialog opens with operation-specific controls
+5. User configures operation (folder, metadata, style, etc.)
+6. User confirms operation
+7. API call executes bulk operation
+8. BulkOperationResponse shows success/failure counts
+9. Page reloads data and clears selection
+
+**Long-Running Operations:**
+- BulkProgressDialog for operations that take time
+- Polling timer (1 second interval) to check status
+- Progress bar updates in real-time
+- Cancel support with CanCancel flag
+- IDisposable cleanup prevents memory leaks
+- Detailed results view after completion
+
+**Metadata Update Modes:**
+- **Merge**: Add new tags/keywords, keep existing ones
+- **Replace**: Overwrite all tags/keywords with new values
+- **Append**: Only add new tags/keywords, don't modify existing
+
+**UI State Management:**
+- BulkSelectionState<T> tracks selected items
+- HashSet<string> for O(1) lookup performance
+- SelectAll uses filtered items (respects search/filter)
+- Selection persists until cleared or operation completed
+
+**Next Steps:**
+- Backend implementation of bulk operation endpoints
+- Background job processing for long-running operations
+- Undo/rollback support for bulk operations
+- Bulk operation audit logging
+- Export bulk operation results to CSV
 
 ---
 
