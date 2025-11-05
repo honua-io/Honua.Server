@@ -1,0 +1,135 @@
+@using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
+@using MudBlazor
+@inject SnapshotApiClient SnapshotApi
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_details != null)
+            {
+                <MudSimpleTable Dense="true">
+                    <tbody>
+                        <tr>
+                            <td><strong>Label:</strong></td>
+                            <td>@_details.Snapshot.Label</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Created:</strong></td>
+                            <td>@_details.Snapshot.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        </tr>
+                        @if (_details.Snapshot.SizeBytes.HasValue)
+                        {
+                            <tr>
+                                <td><strong>Size:</strong></td>
+                                <td>@FormatBytes(_details.Snapshot.SizeBytes.Value)</td>
+                            </tr>
+                        }
+                        @if (!string.IsNullOrEmpty(_details.Snapshot.Checksum))
+                        {
+                            <tr>
+                                <td><strong>Checksum:</strong></td>
+                                <td class="text-monospace">@_details.Snapshot.Checksum</td>
+                            </tr>
+                        }
+                        @if (!string.IsNullOrEmpty(_details.Snapshot.Notes))
+                        {
+                            <tr>
+                                <td><strong>Notes:</strong></td>
+                                <td>@_details.Snapshot.Notes</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+
+                <MudDivider />
+
+                <MudText Typo="Typo.subtitle2">Metadata Preview</MudText>
+                <MudPaper Elevation="0" Class="pa-3" Style="background-color: #f5f5f5; max-height: 400px; overflow-y: auto;">
+                    <pre style="margin: 0; font-size: 0.8rem;">@FormatJson(_details.Metadata)</pre>
+                </MudPaper>
+            }
+            else if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public SnapshotDescriptor? Snapshot { get; set; }
+
+    private bool _loading = true;
+    private string? _error;
+    private SnapshotDetails? _details;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Snapshot != null)
+        {
+            await LoadDetailsAsync();
+        }
+    }
+
+    private async Task LoadDetailsAsync()
+    {
+        try
+        {
+            _details = await SnapshotApi.GetSnapshotAsync(Snapshot!.Label);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error loading snapshot details: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private string FormatJson(string json)
+    {
+        try
+        {
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+            return System.Text.Json.JsonSerializer.Serialize(doc, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+        }
+        catch
+        {
+            return json;
+        }
+    }
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+}

@@ -1,7 +1,7 @@
 # Admin UI Phase 1 Progress
 
 **Last Updated:** 2025-11-05
-**Current Phase:** Phase 2.3 (Enhanced Search & Filtering) - COMPLETE
+**Current Phase:** Phase 2.4 (Versioning UI) - COMPLETE
 
 ---
 
@@ -428,6 +428,77 @@
 - CRS: EPSG:4326, EPSG:3857, and other common coordinate systems
 - Folder: Dynamic folder list from API
 - Has Layers: Boolean filter for services with/without layers
+
+---
+
+## ✅ Phase 2.4 Complete - Versioning UI (Week 6-7)
+
+### Completed Tasks
+
+**Version Models:**
+- ✅ `VersionModels.cs` - Snapshot and diff models
+  - CreateSnapshotRequest (label, notes)
+  - SnapshotDescriptor (label, created, size, checksum)
+  - SnapshotDetails (snapshot + metadata content)
+  - SnapshotListResponse, CreateSnapshotResponse, RestoreSnapshotResponse
+  - MetadataDiffResult (added/removed/modified services/layers/folders)
+
+**Snapshot API Client:**
+- ✅ `SnapshotApiClient.cs` - Snapshot operations
+  - ListSnapshotsAsync (get all snapshots)
+  - GetSnapshotAsync (get details with metadata)
+  - CreateSnapshotAsync (create snapshot with optional label/notes)
+  - RestoreSnapshotAsync (restore to snapshot state)
+  - ComputeDiff (client-side JSON comparison for added/removed/modified entities)
+
+**UI Pages:**
+- ✅ `VersionHistory.razor` - Main snapshot management page
+  - List all snapshots with label, created date, size, notes
+  - Create snapshot button with dialog
+  - Restore snapshot with confirmation dialog
+  - Compare snapshot with current state
+  - View snapshot details
+  - Relative time display ("2 hours ago")
+  - Human-readable size formatting (KB, MB, GB)
+  - Checksum display (first 8 chars)
+- ✅ `VersionDiff.razor` - Snapshot comparison page
+  - Route: `/versions/compare/{SnapshotLabel}`
+  - Shows added/removed/modified services, layers, folders
+  - Color-coded changes (green=added, red=removed, yellow=modified)
+  - Split view with MudGrid for organized display
+  - Summary of total changes
+
+**UI Components:**
+- ✅ `CreateSnapshotDialog.razor` - Modal for creating snapshots
+  - Optional label input (auto-generated if empty)
+  - Optional notes input (multi-line)
+  - Helper text and validation
+- ✅ `SnapshotDetailsDialog.razor` - Modal showing snapshot details
+  - Snapshot metadata table (label, created, size, checksum, notes)
+  - Formatted JSON metadata preview (indented)
+  - Scrollable content with max height
+
+**Files Created:** 6 files, ~850 lines
+**Commit:** Pending
+
+**Technical Notes:**
+- Leverages existing `/admin/metadata/snapshots` API endpoints
+- Auto-generated labels use timestamp if not provided by user
+- Client-side diff computation using System.Text.Json.JsonDocument
+- Compares entity IDs and JSON content to identify changes
+- Page reload after restore to reflect new metadata state
+- Confirmation dialogs for destructive operations (restore)
+- Supports metadata versioning via IMetadataSnapshotStore backend
+- Snapshots are immutable and include checksums for integrity
+
+**Features:**
+- Create snapshots with optional labels and notes
+- List all snapshots sorted by created date (newest first)
+- View detailed snapshot information including metadata JSON
+- Compare snapshots to see what changed (services, layers, folders)
+- Restore any snapshot to roll back changes
+- Human-friendly time and size displays
+- Authorization required (administrator role)
 
 ---
 

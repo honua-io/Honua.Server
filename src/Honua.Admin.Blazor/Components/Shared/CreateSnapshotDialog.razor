@@ -1,0 +1,67 @@
+@using Honua.Admin.Blazor.Shared.Models
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info">
+                A snapshot captures the complete state of your metadata (services, layers, folders, etc.) at this moment.
+            </MudAlert>
+
+            <MudTextField Label="Label"
+                          @bind-Value="_label"
+                          Variant="Variant.Filled"
+                          HelperText="Unique label for this snapshot (e.g., 'before-migration', 'production-2025-01-15')"
+                          Immediate="true"
+                          Required="false"
+                          Placeholder="Auto-generated if empty" />
+
+            <MudTextField Label="Notes"
+                          @bind-Value="_notes"
+                          Variant="Variant.Filled"
+                          Lines="3"
+                          HelperText="Optional description of what this snapshot represents"
+                          Placeholder="e.g., 'Before updating service configurations'" />
+
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                If no label is provided, one will be automatically generated with a timestamp.
+            </MudText>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   StartIcon="@Icons.Material.Filled.AddPhotoAlternate"
+                   OnClick="Create">
+            Create Snapshot
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string Title { get; set; } = "Create Snapshot";
+
+    private string? _label;
+    private string? _notes;
+
+    private void Create()
+    {
+        var request = new CreateSnapshotRequest
+        {
+            Label = string.IsNullOrWhiteSpace(_label) ? null : _label.Trim(),
+            Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim()
+        };
+
+        MudDialog.Close(DialogResult.Ok(request));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}
