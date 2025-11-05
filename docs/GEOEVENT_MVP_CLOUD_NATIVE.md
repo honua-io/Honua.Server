@@ -444,7 +444,7 @@ SELECT * INTO [honua-api] FROM SpeedingVehicles
    - 10k+ geofences support
 
 2. **Workflow Designer MVP** (Month 2-3)
-   - Web UI (React)
+   - Web UI (Blazor)
    - Drag-and-drop nodes
    - Generate Azure SA SQL
    - Generate Honua orchestration JSON
@@ -510,7 +510,7 @@ SELECT * INTO [honua-api] FROM SpeedingVehicles
 │         └──────────────────────────────┘                    │
 │                                                              │
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │  Management Console (Blazor + React)                  │  │
+│  │  Management Console (Blazor)                          │  │
 │  │  • Workflow Designer                                  │  │
 │  │  • Geofence Manager                                   │  │
 │  │  • Real-time Monitor                                  │  │
@@ -526,7 +526,7 @@ SELECT * INTO [honua-api] FROM SpeedingVehicles
 | **Honua API** | ASP.NET Core 8 | Existing stack, high performance |
 | **Geofencing** | NetTopologySuite + R-tree | Proven spatial library |
 | **Database** | PostgreSQL + PostGIS | Existing infrastructure |
-| **Web UI** | Blazor + React | .NET integration, modern UX |
+| **Web UI** | Blazor Server / WebAssembly | .NET integration, C# full-stack |
 | **Deployment** | Azure App Service / AKS | Cloud-native, auto-scaling |
 | **Monitoring** | OpenTelemetry | Standard observability |
 
@@ -628,8 +628,15 @@ POST /api/v1/geofences/evaluate
 
 ### 6.1 MVP Workflow Designer
 
+**Technology:** Blazor Server or WebAssembly
+
+**UI Component Options:**
+- Blazor Diagrams library (MIT license, flowchart/node editor)
+- Syncfusion Blazor Diagram (commercial, rich features)
+- Custom SVG-based canvas with C# interop
+
 **Features:**
-- Drag-and-drop node canvas
+- Drag-and-drop node canvas (Blazor-based)
 - 10-15 built-in node types
 - Generate Azure SA SQL
 - Generate Honua orchestration config
@@ -738,7 +745,7 @@ POST /api/v1/geofences/evaluate
 ### Month 3: Workflow Designer MVP
 
 **Week 1-2:**
-- ✅ React-based canvas UI
+- ✅ Blazor-based canvas UI (using Blazor Diagram or similar)
 - ✅ Node library (10 nodes)
 - ✅ Drag-and-drop functionality
 - ✅ Connection validation
