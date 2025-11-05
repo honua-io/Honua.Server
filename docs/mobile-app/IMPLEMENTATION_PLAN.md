@@ -75,7 +75,6 @@ This document provides a **detailed, actionable implementation plan** for buildi
 - [ ] Set up Apple Developer Account ($99/year)
 - [ ] Set up Google Play Console ($25 one-time)
 - [ ] Configure Azure storage for development
-- [ ] Set up Esri Developer subscription
 
 **Deliverables:**
 - CI/CD pipelines operational
@@ -260,21 +259,23 @@ This document provides a **detailed, actionable implementation plan** for buildi
 
 #### Sprint 5 (Weeks 9-10): Map Integration
 
-**Goal:** Display map with Esri ArcGIS SDK
+**Goal:** Display map with Mapsui open-source mapping SDK
 
 **Tasks:**
-- [ ] Add Esri.ArcGISRuntime.Maui NuGet package
-- [ ] Create map view page with MapView control
-- [ ] Configure basemaps (Topographic, Streets, Satellite)
+- [ ] Add Mapsui.Maui NuGet package (MIT license)
+- [ ] Configure SkiaSharp dependency in MauiProgram.cs
+- [ ] Create map view page with Mapsui MapControl
+- [ ] Configure OpenStreetMap tile layer as default basemap
+- [ ] Add optional tile layers (satellite imagery, terrain)
 - [ ] Implement map controls:
-  - Pan and zoom
-  - Rotate and tilt (3D)
-  - Location button (center on user)
-- [ ] Add feature layers for collections
-- [ ] Implement feature symbology (points, lines, polygons)
-- [ ] Add identify/tap handler to select features
-- [ ] Implement map extent persistence
-- [ ] Optimize map performance (layer ordering, visibility ranges)
+  - Pan and zoom gestures
+  - Double-tap zoom, pinch-to-zoom
+  - Location button (center on user GPS position)
+- [ ] Add feature layers for collections using Mapsui memory layers
+- [ ] Implement feature symbology (points, lines, polygons) with custom styles
+- [ ] Add tap handler to identify and select features
+- [ ] Implement map extent persistence (save/restore viewport)
+- [ ] Optimize map performance (layer ordering, tile caching)
 
 **Deliverables:**
 - Interactive map displayed
@@ -1682,7 +1683,7 @@ developer's local branch
 - **Probability:** Medium (30%)
 - **Impact:** Medium
 - **Mitigation:**
-  - Use stable libraries (Esri SDK, CommunityToolkit)
+  - Use stable libraries (Mapsui, CommunityToolkit.Mvvm)
   - Have escape hatch to platform-specific code
   - Budget extra time for troubleshooting
 - **Owner:** Technical Lead

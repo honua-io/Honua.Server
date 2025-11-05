@@ -49,7 +49,7 @@ This document validates the architectural approach for **Honua Field**, ensuring
 |----------|--------|------------|--------|------|
 | Platform Framework | .NET MAUI | ✅ High | Very High | Medium |
 | AR Implementation | Custom Handlers | ✅ High | High | Medium-High |
-| Maps SDK | Esri ArcGIS | ✅ High | Very High | Low |
+| Maps SDK | Mapsui (MIT) | ✅ High | Very High | Low |
 | AI/ML Framework | ML.NET + ONNX | ✅ High | High | Low |
 | Database | SQLite + NTS | ✅ High | High | Low |
 | Backend API | OGC Features | ✅ High | Very High | Low |
@@ -183,7 +183,7 @@ This document validates the architectural approach for **Honua Field**, ensuring
 
 **Mitigation:**
 - Hire or contract iOS/Android developers for AR module (Phase 3 only)
-- Use Esri ArcGIS Maps SDK (MAUI-optimized) for best map performance
+- Use Mapsui (MAUI-native, SkiaSharp rendering) for optimal map performance
 - Extensive testing on both platforms
 - Fallback: AR can be isolated module if needed
 
@@ -368,65 +368,169 @@ public class ARViewHandler : ViewHandler<ARView, PlatformView>
 
 ---
 
-## ADR-003: Esri ArcGIS Maps SDK
+## ADR-003: Mapsui Open-Source Mapping SDK
 
-### Status: ✅ ACCEPTED
+### Status: ✅ ACCEPTED (REVISED 2025-11-05)
 
 ### Context
 
-**Decision:** Use Esri ArcGIS Maps SDK for .NET for map rendering instead of MapKit/Google Maps or Mapbox.
+**Decision:** Use Mapsui (MIT-licensed) for map rendering instead of proprietary solutions (Esri ArcGIS, Google Maps, MapKit) or Mapbox.
+
+**Revision History:**
+- **2025-11-05:** REVISED - Changed from Esri ArcGIS SDK to Mapsui to align with Honua's open-source mission
+- **Original:** Recommended Esri ArcGIS SDK (now rejected due to cost and vendor lock-in)
 
 ### Decision Drivers
 
-**1. MAUI Optimization: ✅ Critical**
-- ArcGIS Runtime SDK for .NET has official MAUI support
-- Optimized for MAUI performance (30-45 FPS achievable)
-- Better performance than wrapping MapKit/Google Maps via handlers
+**1. Open Source Mission: ✅ CRITICAL**
+- **Honua's core mission is to be an open-source alternative to proprietary GIS systems like Esri**
+- Using Esri SDK contradicts this mission and creates vendor lock-in
+- Mapsui is MIT-licensed (fully open source, no restrictions)
+- No licensing fees or per-user costs
 
-**2. Feature Richness: ✅ Superior**
-- Advanced symbology (Esri renderers)
-- Offline map packages (`.tpk`, `.vtpk`, `.mmpk`)
-- 3D scene support (future-proof)
-- Temporal layers (time-enabled data)
-- Geoprocessing tools
+**2. MAUI Optimization: ✅ Excellent**
+- Official Mapsui.Maui NuGet package with native MAUI support
+- SkiaSharp rendering engine (hardware-accelerated, cross-platform)
+- Performance: 30-60 FPS achievable for typical field maps
+- Better than WebView approaches (Leaflet/OpenLayers)
 
-**3. OGC Compatibility: ✅ Strong**
-- Native support for WMS, WMTS, WFS
-- GeoJSON and GeoPackage support
-- Can consume OGC Features API directly
+**3. OGC Standards Support: ✅ Superior**
+- Native support for OGC WMS, WFS, WMTS
+- BruTile integration for tile sources (OSM, custom tile servers)
+- NetTopologySuite integration for spatial operations
+- GeoJSON and WKB geometry support
+- **Better standards alignment than Esri (which uses proprietary formats)**
 
-**4. Licensing Cost: ⚠️ Medium**
-- Free for development and testing
-- Deployment license: ~$1,500/year for first 1,000 users
-- Scales with user base
-- **Mitigation:** Pass cost to customers (built into $25-50/user/month pricing)
+**4. Offline Capabilities: ✅ Strong**
+- MBTiles support for offline raster tiles
+- Local tile caching built-in
+- SQLite-based tile storage
+- Experimental vector tile support (MVT format)
 
-**5. Competitive Context: ✅ Industry Standard**
-- Esri is GIS industry leader
-- Customers expect Esri compatibility
-- Easier sales to Esri shops
-- "Works with ArcGIS" is marketing asset
+**5. Cost: ✅ Zero**
+- MIT license = free for commercial use
+- No per-user licensing fees
+- No deployment costs
+- No vendor relationship required
+
+**6. Community & Maturity: ✅ Proven**
+- 10+ years of active development
+- Supports 10+ UI frameworks (MAUI, Avalonia, Uno, Blazor, WPF, etc.)
+- Active GitHub repository with regular releases
+- Good documentation and samples
 
 ### Alternatives Considered
 
-| Maps SDK | MAUI Support | Offline | Symbology | GIS Features | Cost | Score |
-|----------|--------------|---------|-----------|--------------|------|-------|
-| Esri ArcGIS | ✅ Native | ✅ Excellent | ✅ Advanced | ✅ Full | $$$ | **9/10** |
-| Mapbox | ⚠️ Custom | ✅ Good | ⚠️ Basic | ⚠️ Limited | $$ | 6/10 |
-| MapLibre | ⚠️ Custom | ✅ Good | ⚠️ Basic | ⚠️ Limited | Free | 6/10 |
-| Google Maps | ⚠️ Custom | ⚠️ Poor | ❌ None | ❌ None | $ | 4/10 |
-| MapKit (iOS) | ❌ Native only | ⚠️ Limited | ❌ None | ❌ None | Free | 3/10 |
+| Maps SDK | MAUI Support | Offline | OGC Standards | Open Source | Cost | Score |
+|----------|--------------|---------|---------------|-------------|------|-------|
+| **Mapsui** | ✅ Native | ✅ Excellent | ✅ Full | ✅ MIT | Free | **9/10** |
+| Esri ArcGIS | ✅ Native | ✅ Excellent | ⚠️ Partial | ❌ Proprietary | $$$$ | 5/10 |
+| MapLibre Native | ❌ No bindings | ✅ Excellent | ⚠️ Limited | ✅ BSD | Free | 6/10 |
+| Microsoft.Maui.Maps | ✅ Native | ❌ No | ❌ None | ⚠️ Uses Google/Apple | Free | 4/10 |
+| WebView + Leaflet | ⚠️ WebView | ⚠️ Complex | ✅ Full | ✅ BSD | Free | 5/10 |
 
-**Winner: Esri ArcGIS** (best MAUI support + GIS features)
+**Winner: Mapsui** (only mature open-source SDK with native MAUI support)
 
 ### Validation: ✅ DECISION IS SOUND
 
 **Reasoning:**
-1. **Official MAUI support** is critical for performance and stability
-2. **GIS feature richness** is core to product value proposition
-3. **Licensing cost** is acceptable ($1,500/yr at scale is negligible vs revenue)
-4. **Industry alignment** makes sales easier to enterprise customers
-5. **Offline support** is mission-critical for field use
+1. **Mission Alignment:** Fully open source, no vendor lock-in - core to Honua's value proposition
+2. **Official MAUI Support:** Native .NET implementation, not WebView or custom bindings
+3. **OGC Standards:** Better standards support than Esri (WMS/WFS/WMTS native)
+4. **Cost Structure:** Zero licensing enables competitive pricing vs Esri
+5. **Offline Support:** MBTiles and tile caching meet field requirements
+6. **Proven Technology:** 10+ years mature, multiple UI frameworks supported
+
+### Trade-offs Accepted
+
+**1. No Built-in 3D Terrain (Phase 1-2)**
+- **Impact:** Cannot render 3D underground utilities in map view
+- **Mitigation:**
+  - Phase 1-2 only need 2D mapping for data collection
+  - Phase 3 AR features use platform-native AR (ARKit/ARCore) for 3D visualization
+  - Separate rendering pipeline: Mapsui for 2D maps, native AR for 3D overlays
+
+**2. Vector Tiles Still Experimental**
+- **Impact:** MBTiles raster tiles larger than vector tiles
+- **Mitigation:**
+  - Raster tiles adequate for field use (can pre-download regions)
+  - Monitor Mapsui v5+ for production-ready vector tile support
+  - Can switch to MapLibre Native if .NET MAUI bindings emerge (Phase 3 decision point)
+
+**3. Smaller Ecosystem vs Esri**
+- **Impact:** Fewer third-party plugins, tutorials, and integrations
+- **Mitigation:**
+  - Mapsui API is simpler than Esri (less complexity needed)
+  - NetTopologySuite provides spatial operations (buffer, intersection, etc.)
+  - Custom renderers and styles supported via SkiaSharp
+
+### Implementation Notes
+
+**Installation:**
+```bash
+dotnet add package Mapsui.Maui
+```
+
+**Configuration (MauiProgram.cs):**
+```csharp
+using SkiaSharp.Views.Maui.Controls.Hosting;
+
+var builder = MauiApp.CreateBuilder();
+builder
+    .UseMauiApp<App>()
+    .UseSkiaSharp(true) // Required for Mapsui
+    .ConfigureFonts(fonts => { /* ... */ });
+```
+
+**Basic Usage:**
+```csharp
+using Mapsui;
+using Mapsui.Tiling;
+using Mapsui.UI.Maui;
+
+var map = new MapControl();
+map.Map.Layers.Add(OpenStreetMap.CreateTileLayer());
+```
+
+**Offline MBTiles:**
+```csharp
+var tileSource = new MbTilesTileSource("offline_map.mbtiles");
+var tileLayer = new TileLayer(tileSource);
+map.Map.Layers.Add(tileLayer);
+```
+
+### Competitive Advantage
+
+**vs. Esri Field Maps:**
+- ✅ **No vendor lock-in** - works with any OGC-compliant backend
+- ✅ **Lower cost** - no per-user Esri licensing fees
+- ✅ **Open standards** - WMS/WFS/WMTS native support
+- ✅ **Mission alignment** - open-source alternative narrative
+
+**vs. QField/Mergin Maps:**
+- ✅ **Native performance** - not Qt-based like QField
+- ✅ **Modern UI** - MAUI vs QGIS mobile UI
+- ✅ **Better documentation** - clearer API than QField
+
+### Phase 3 Considerations (Months 13-18)
+
+**3D/AR Decision Point (Month 10-11):**
+
+**Option A (Recommended):** Dual rendering pipeline
+- **2D Mapping:** Continue with Mapsui (proven, stable)
+- **3D AR:** Platform-native AR frameworks
+  - iOS: ARKit + SceneKit for underground utility visualization
+  - Android: ARCore + Sceneview
+  - Quest 3: Native Quest SDK
+- **Architecture:** Separate concerns (map for context, AR for 3D overlay)
+
+**Option B (Evaluate):** Migrate to MapLibre Native
+- **IF** .NET MAUI bindings exist by Month 10
+- **IF** team has capacity for migration
+- **Benefit:** Unified SDK for 2D + 3D terrain
+- **Risk:** Custom bindings maintenance burden
+
+**Recommendation:** Start with Option A (lower risk, proven approach)
 
 ---
 
@@ -799,7 +903,7 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 2. **Open standards** prevent vendor lock-in
 3. **Feature-complete** for data collection use cases
 4. **Industry momentum** behind OGC APIs
-5. **Interoperability** with desktop GIS tools (QGIS, ArcGIS Pro)
+5. **Interoperability** with desktop GIS tools (QGIS, ArcGIS Pro, others)
 
 ---
 
@@ -809,7 +913,7 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 
 - [✅] .NET MAUI supports target platforms (iOS, Android)
 - [✅] AR implementation via custom handlers is documented and proven
-- [✅] Esri ArcGIS Maps SDK has official MAUI support
+- [✅] Mapsui has official MAUI support via Mapsui.Maui NuGet package
 - [✅] ML.NET + ONNX Runtime support mobile inference
 - [✅] SQLite + NetTopologySuite handle spatial data
 - [✅] OGC Features API provides necessary CRUD operations
@@ -882,8 +986,8 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 **Description:** MAUI is newer than native platforms; potential bugs or missing features
 
 **Mitigation:**
-- ✅ Use stable libraries (Esri SDK, ML.NET, CommunityToolkit)
-- ✅ Microsoft backing with active development
+- ✅ Use stable libraries (Mapsui, ML.NET, CommunityToolkit)
+- ✅ Microsoft backing with active MAUI development
 - ✅ Community is growing rapidly
 - ✅ Fallback: Can always drop to platform-specific code if needed
 
@@ -897,8 +1001,8 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 **Description:** Map rendering at 30-45 FPS vs 60 FPS native
 
 **Mitigation:**
-- ✅ Esri ArcGIS SDK is MAUI-optimized
-- ✅ Field data collection doesn't require gaming performance
+- ✅ Mapsui uses SkiaSharp (hardware-accelerated rendering)
+- ✅ Field data collection doesn't require gaming performance (30-60 FPS sufficient)
 - ✅ User testing validated acceptable performance
 - ✅ Hardware acceleration available (GPU)
 
@@ -941,7 +1045,7 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 ### Low Risks (Accept)
 
 - **Talent Acquisition:** C# developers are available (lower demand than iOS/Android native)
-- **Third-Party Dependencies:** All dependencies are enterprise-grade (Microsoft, Esri)
+- **Third-Party Dependencies:** All dependencies are enterprise-grade (Microsoft) or mature open-source (Mapsui, NetTopologySuite)
 - **Security:** OAuth 2.0, JWT, and HTTPS are industry standards
 - **Scalability:** SQLite handles 100k+ features on device
 
@@ -958,7 +1062,7 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 - ✅ .NET MAUI reduces development cost by 40-50% (enables competitive pricing)
 - ✅ Offline-first architecture is competitive advantage
 - ✅ OGC standards prevent vendor lock-in (sales benefit)
-- ✅ Esri compatibility makes enterprise sales easier
+- ✅ Open-source mapping aligns with Honua mission (sales differentiation vs Esri)
 
 ---
 
@@ -980,9 +1084,9 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 **Goal:** Position as "Intelligent Field GIS Platform" vs Esri and open-source
 
 **How Architecture Supports:**
-- ✅ AI features (differentiation vs Esri Field Maps)
-- ✅ AR features (differentiation vs QField, Mergin Maps)
-- ✅ Fair pricing enabled by development efficiency
+- ✅ AI features (differentiation vs Esri Field Maps, QField)
+- ✅ AR features (differentiation vs QField, Mergin Maps, Esri)
+- ✅ Fair pricing enabled by development efficiency and zero mapping license costs
 - ✅ Native performance addresses QField/Mergin Maps UX gap
 - ✅ Enterprise features (SSO, audit) address open-source limitations
 
@@ -1026,8 +1130,8 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 **Deployment:**
 - [✅] Apple Developer Account ($99/year)
 - [✅] Google Play Console ($25 one-time)
-- [✅] Esri Developer subscription (free to start)
 - [✅] Azure storage (map tile cache, attachments)
+- [✅] OpenStreetMap tile server (or self-hosted tiles)
 
 ---
 
@@ -1077,8 +1181,9 @@ The architectural approach for Honua Field is **validated as production-ready** 
 ### Weaknesses (Addressed)
 
 1. ⚠️ **AR Complexity:** Mitigated by Phase 3 delay and hiring specialists
-2. ⚠️ **Map Performance:** 30-45 FPS acceptable for field use; Esri SDK optimized
+2. ⚠️ **Map Performance:** 30-60 FPS acceptable for field use; Mapsui SkiaSharp rendering optimized
 3. ⚠️ **MAUI Maturity:** Microsoft backing and active community reduce risk
+4. ⚠️ **3D Terrain:** Mapsui 2D only; mitigated by platform-native AR for 3D (Phase 3)
 
 ---
 

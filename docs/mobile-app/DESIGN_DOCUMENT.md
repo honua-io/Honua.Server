@@ -564,8 +564,8 @@ Honua Field is a mobile application for iOS and Android that enables field worke
 │  │              Business Logic Layer (100% Shared)           │   │
 │  │  ┌──────────┐  ┌────────┐  ┌────────┐  ┌─────────────┐  │   │
 │  │  │  Forms   │  │  Maps  │  │  Sync  │  │  AI Engine  │  │   │
-│  │  │  Engine  │  │ (Esri  │  │ Engine │  │  (ML.NET +  │  │   │
-│  │  │          │  │  SDK)  │  │        │  │  ONNX)      │  │   │
+│  │  │  Engine  │  │(Mapsui)│  │ Engine │  │  (ML.NET +  │  │   │
+│  │  │          │  │  OSS   │  │        │  │  ONNX)      │  │   │
 │  │  └──────────┘  └────────┘  └────────┘  └─────────────┘  │   │
 │  └────────┬─────────────────────────────────────────────────┘   │
 │           │                                                     │
@@ -609,7 +609,11 @@ Honua Field is a mobile application for iOS and Android that enables field worke
 - **Architecture:** Clean Architecture + MVVM (CommunityToolkit.Mvvm)
 - **Database:** SQLite-net with NetTopologySuite (spatial)
 - **Networking:** HttpClient with async/await, System.Net.Http.Json
-- **Maps:** Esri ArcGIS Maps SDK for .NET (optimized for MAUI)
+- **Maps:** Mapsui (open-source MIT-licensed mapping SDK for .NET MAUI)
+  - Rendering: SkiaSharp
+  - Tiles: OpenStreetMap, OGC WMS/WFS/WMTS
+  - Offline: MBTiles support
+  - Spatial ops: NetTopologySuite integration
 - **ML/AI:** ML.NET + ONNX Runtime (cross-platform inference)
 - **Dependency Injection:** Built-in Microsoft.Extensions.DependencyInjection
 - **Testing:** xUnit, NUnit, Appium for UI testing
