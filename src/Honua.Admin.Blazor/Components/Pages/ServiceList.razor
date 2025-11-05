@@ -3,6 +3,7 @@
 @using Honua.Admin.Blazor.Shared.Models
 @attribute [Authorize(Roles = "administrator,datapublisher")]
 @inject ServiceApiClient ServiceApi
+@inject FolderApiClient FolderApi
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
@@ -32,6 +33,15 @@
                       Immediate="true"
                       OnDebounceIntervalElapsed="OnSearchChanged"
                       DebounceInterval="300" />
+
+        <AdvancedFilterPanel ShowServiceTypeFilter="true"
+                            ShowFolderFilter="true"
+                            ShowHasLayersFilter="true"
+                            ShowGeometryTypeFilter="false"
+                            ShowCrsFilter="false"
+                            Folders="_folders"
+                            OnFilterChanged="OnFiltersChanged"
+                            Class="mb-4" />
 
         @if (_loading)
         {
@@ -108,7 +118,9 @@
 @code {
     private List<ServiceListItem> _services = new();
     private List<ServiceListItem> _filteredServices = new();
+    private List<FolderResponse> _folders = new();
     private string _searchString = string.Empty;
+    private SearchFilter _currentFilter = new();
     private bool _loading = true;
     private string? _errorMessage;
     private List<BreadcrumbItem> _breadcrumbs = new()
@@ -120,6 +132,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadServicesAsync();
+        await LoadFoldersAsync();
     }
 
     private async Task LoadServicesAsync()
@@ -143,26 +156,63 @@
         }
     }
 
+    private async Task LoadFoldersAsync()
+    {
+        try
+        {
+            _folders = await FolderApi.GetFoldersAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading folders: {ex.Message}";
+        }
+    }
+
     private void OnSearchChanged()
     {
         FilterServices();
     }
 
+    private void OnFiltersChanged(SearchFilter filter)
+    {
+        _currentFilter = filter;
+        FilterServices();
+    }
+
     private void FilterServices()
     {
-        if (string.IsNullOrWhiteSpace(_searchString))
-        {
-            _filteredServices = _services;
-        }
-        else
+        var filtered = _services.AsEnumerable();
+
+        // Text search
+        if (!string.IsNullOrWhiteSpace(_searchString))
         {
             var search = _searchString.ToLowerInvariant();
-            _filteredServices = _services.Where(s =>
+            filtered = filtered.Where(s =>
                 s.Id.ToLowerInvariant().Contains(search) ||
                 s.Title.ToLowerInvariant().Contains(search) ||
-                s.ServiceType.ToLowerInvariant().Contains(search)
-            ).ToList();
+                s.ServiceType.ToLowerInvariant().Contains(search));
         }
+
+        // Service type filter
+        if (_currentFilter.ServiceTypes.Any())
+        {
+            filtered = filtered.Where(s => _currentFilter.ServiceTypes.Contains(s.ServiceType));
+        }
+
+        // Folder filter
+        if (_currentFilter.FolderIds.Any())
+        {
+            filtered = filtered.Where(s =>
+                s.FolderId != null && _currentFilter.FolderIds.Contains(s.FolderId));
+        }
+
+        // Has layers filter
+        if (_currentFilter.HasLayers == true)
+        {
+            filtered = filtered.Where(s => s.LayerCount > 0);
+        }
+
+        _filteredServices = filtered.ToList();
     }
 
     private Color GetServiceTypeColor(string serviceType)

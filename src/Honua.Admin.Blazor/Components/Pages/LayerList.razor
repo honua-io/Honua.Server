@@ -53,6 +53,17 @@
                       OnDebounceIntervalElapsed="OnSearchChanged"
                       DebounceInterval="300" />
 
+        @if (string.IsNullOrEmpty(ServiceId))
+        {
+            <AdvancedFilterPanel ShowServiceTypeFilter="false"
+                                ShowFolderFilter="false"
+                                ShowHasLayersFilter="false"
+                                ShowGeometryTypeFilter="true"
+                                ShowCrsFilter="true"
+                                OnFilterChanged="OnFiltersChanged"
+                                Class="mb-4" />
+        }
+
         @if (_loading)
         {
             <MudProgressLinear Indeterminate="true" Class="mb-4" />
@@ -149,6 +160,7 @@
     private List<LayerListItem> _layers = new();
     private List<LayerListItem> _filteredLayers = new();
     private string _searchString = string.Empty;
+    private SearchFilter _currentFilter = new();
     private bool _loading = true;
     private string? _errorMessage;
     private string? _serviceName;
@@ -193,21 +205,40 @@
         FilterLayers();
     }
 
+    private void OnFiltersChanged(SearchFilter filter)
+    {
+        _currentFilter = filter;
+        FilterLayers();
+    }
+
     private void FilterLayers()
     {
-        if (string.IsNullOrWhiteSpace(_searchString))
-        {
-            _filteredLayers = _layers;
-        }
-        else
+        var filtered = _layers.AsEnumerable();
+
+        // Text search
+        if (!string.IsNullOrWhiteSpace(_searchString))
         {
             var search = _searchString.ToLowerInvariant();
-            _filteredLayers = _layers.Where(l =>
+            filtered = filtered.Where(l =>
                 l.Id.ToLowerInvariant().Contains(search) ||
                 l.Title.ToLowerInvariant().Contains(search) ||
-                l.GeometryType.ToLowerInvariant().Contains(search)
-            ).ToList();
+                l.GeometryType.ToLowerInvariant().Contains(search));
         }
+
+        // Geometry type filter
+        if (_currentFilter.GeometryTypes.Any())
+        {
+            filtered = filtered.Where(l => _currentFilter.GeometryTypes.Contains(l.GeometryType));
+        }
+
+        // CRS filter
+        if (_currentFilter.Crs.Any())
+        {
+            filtered = filtered.Where(l =>
+                l.Crs != null && _currentFilter.Crs.Any(crs => l.Crs.Contains(crs, StringComparer.OrdinalIgnoreCase)));
+        }
+
+        _filteredLayers = filtered.ToList();
     }
 
     private void UpdateBreadcrumbs()

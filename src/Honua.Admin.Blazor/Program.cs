@@ -63,6 +63,7 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<NavigationState>();
 builder.Services.AddScoped<EditorState>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<SearchStateService>();
 
 // Register API clients
 builder.Services.AddScoped<ServiceApiClient>();

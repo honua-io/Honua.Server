@@ -1,0 +1,50 @@
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField Label="Preset Name"
+                          @bind-Value="_name"
+                          Required="true"
+                          Variant="Variant.Filled"
+                          Immediate="true"
+                          HelperText="Give your filter preset a descriptive name" />
+
+            <MudTextField Label="Description"
+                          @bind-Value="_description"
+                          Variant="Variant.Filled"
+                          Lines="3"
+                          HelperText="Optional description (e.g., 'All WMS services in Europe folder')" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Save"
+                   Disabled="@string.IsNullOrWhiteSpace(_name)">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string Title { get; set; } = "Save Preset";
+
+    private string _name = string.Empty;
+    private string _description = string.Empty;
+
+    private void Save()
+    {
+        MudDialog.Close(DialogResult.Ok((_name.Trim(), _description.Trim())));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}
