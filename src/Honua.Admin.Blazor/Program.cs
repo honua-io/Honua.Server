@@ -81,6 +81,7 @@ builder.Services.AddScoped<DashboardApiClient>();
 builder.Services.AddScoped<StyleApiClient>();
 builder.Services.AddScoped<BulkOperationsApiClient>();
 builder.Services.AddScoped<ExportImportApiClient>();
+builder.Services.AddScoped<AIAssistantApiClient>();
 
 // Register SignalR hub service for real-time updates
 builder.Services.AddScoped<MetadataHubService>();
