@@ -1,0 +1,199 @@
+@page "/leaflet-example"
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Models
+@inject LeafletConfiguration LeafletConfig
+
+<PageTitle>Honua Leaflet Map Example</PageTitle>
+
+<h3>Leaflet Map Examples</h3>
+
+<div class="example-controls mb-3">
+    <button class="btn btn-primary" @onclick="SwitchToMapLibre">Use MapLibre</button>
+    <button class="btn btn-primary" @onclick="SwitchToLeaflet">Use Leaflet</button>
+    <button class="btn btn-secondary" @onclick="ChangeBasemap">Change Basemap</button>
+    <button class="btn btn-secondary" @onclick="AddGeoJsonLayer">Add GeoJSON</button>
+    <button class="btn btn-secondary" @onclick="FlyToLocation">Fly to Hawaii</button>
+</div>
+
+<div class="map-container" style="height: 600px;">
+    @if (_useMapLibre)
+    {
+        <HonuaMap Id="@_mapId"
+                  Center="@_center"
+                  Zoom="@_zoom"
+                  OnMapReady="OnMapReady"
+                  OnExtentChanged="OnExtentChanged"
+                  OnFeatureClicked="OnFeatureClicked" />
+    }
+    else
+    {
+        <HonuaLeaflet @ref="_leafletMap"
+                      Id="@_mapId"
+                      TileUrl="@_currentTileUrl"
+                      Attribution="@_currentAttribution"
+                      Center="@_center"
+                      Zoom="@_zoom"
+                      EnableFullscreen="true"
+                      EnableMeasure="true"
+                      EnableDraw="true"
+                      EnableMarkerCluster="true"
+                      OnMapReady="OnMapReady"
+                      OnExtentChanged="OnExtentChanged"
+                      OnFeatureClicked="OnFeatureClicked"
+                      OnDrawCreated="OnDrawCreated"
+                      OnMeasureComplete="OnMeasureComplete" />
+    }
+</div>
+
+<div class="mt-3">
+    <h5>Map Events</h5>
+    <div class="event-log" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;">
+        @foreach (var log in _eventLogs.AsEnumerable().Reverse().Take(10))
+        {
+            <div>@log</div>
+        }
+    </div>
+</div>
+
+@code {
+    private HonuaLeaflet? _leafletMap;
+    private string _mapId = "example-map";
+    private bool _useMapLibre = false;
+    private double[] _center = new[] { -157.8583, 21.3099 }; // Honolulu
+    private double _zoom = 10;
+    private List<string> _eventLogs = new();
+    private int _basemapIndex = 0;
+
+    private string _currentTileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    private string _currentAttribution = "&copy; OpenStreetMap contributors";
+
+    private readonly string[] _basemapUrls = new[]
+    {
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    };
+
+    private readonly string[] _basemapAttributions = new[]
+    {
+        "&copy; OpenStreetMap contributors",
+        "&copy; OpenStreetMap contributors &copy; CARTO",
+        "&copy; OpenStreetMap contributors &copy; CARTO",
+        "Tiles &copy; Esri"
+    };
+
+    private void SwitchToMapLibre()
+    {
+        _useMapLibre = true;
+        AddLog("Switched to MapLibre");
+    }
+
+    private void SwitchToLeaflet()
+    {
+        _useMapLibre = false;
+        AddLog("Switched to Leaflet");
+    }
+
+    private void ChangeBasemap()
+    {
+        _basemapIndex = (_basemapIndex + 1) % _basemapUrls.Length;
+        _currentTileUrl = _basemapUrls[_basemapIndex];
+        _currentAttribution = _basemapAttributions[_basemapIndex];
+        AddLog($"Changed basemap to index {_basemapIndex}");
+        StateHasChanged();
+    }
+
+    private async Task AddGeoJsonLayer()
+    {
+        if (_leafletMap != null)
+        {
+            var geoJson = new
+            {
+                type = "FeatureCollection",
+                features = new[]
+                {
+                    new
+                    {
+                        type = "Feature",
+                        geometry = new
+                        {
+                            type = "Point",
+                            coordinates = new[] { -157.8583, 21.3099 }
+                        },
+                        properties = new Dictionary<string, object>
+                        {
+                            ["name"] = "Honolulu",
+                            ["population"] = "345,064"
+                        }
+                    },
+                    new
+                    {
+                        type = "Feature",
+                        geometry = new
+                        {
+                            type = "Point",
+                            coordinates = new[] { -156.3319, 20.7984 }
+                        },
+                        properties = new Dictionary<string, object>
+                        {
+                            ["name"] = "Kahului",
+                            ["population"] = "26,337"
+                        }
+                    }
+                }
+            };
+
+            await _leafletMap.AddGeoJsonLayerAsync("cities", geoJson, new Dictionary<string, object>
+            {
+                ["color"] = "#ff0000",
+                ["weight"] = 2
+            });
+
+            AddLog("Added GeoJSON layer with 2 cities");
+        }
+    }
+
+    private async Task FlyToLocation()
+    {
+        if (_leafletMap != null)
+        {
+            await _leafletMap.FlyToAsync(new[] { -157.8583, 21.3099 }, 12);
+            AddLog("Flying to Honolulu");
+        }
+    }
+
+    private void OnMapReady(MapReadyMessage message)
+    {
+        AddLog($"Map ready: {message.MapId} at zoom {message.Zoom}");
+    }
+
+    private void OnExtentChanged(MapExtentChangedMessage message)
+    {
+        AddLog($"Extent changed: Zoom {message.Zoom:F2}, Center [{message.Center[0]:F4}, {message.Center[1]:F4}]");
+    }
+
+    private void OnFeatureClicked(FeatureClickedMessage message)
+    {
+        AddLog($"Feature clicked: {message.FeatureId} on layer {message.LayerId}");
+    }
+
+    private void OnDrawCreated(Dictionary<string, object> data)
+    {
+        var type = data.ContainsKey("type") ? data["type"]?.ToString() : "unknown";
+        AddLog($"Drawing created: {type}");
+    }
+
+    private void OnMeasureComplete(Dictionary<string, object> data)
+    {
+        var length = data.ContainsKey("length") ? data["length"]?.ToString() : "N/A";
+        var area = data.ContainsKey("area") ? data["area"]?.ToString() : "N/A";
+        AddLog($"Measurement complete: Length={length}, Area={area}");
+    }
+
+    private void AddLog(string message)
+    {
+        _eventLogs.Add($"[{DateTime.Now:HH:mm:ss}] {message}");
+        StateHasChanged();
+    }
+}
