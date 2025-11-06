@@ -1,0 +1,289 @@
+/* Honua Coordinate Display Styles */
+
+.honua-coordinate-display {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--mud-palette-surface);
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: var(--mud-default-borderradius);
+    box-shadow: var(--mud-elevation-4);
+    font-family: var(--mud-typography-default-family);
+    font-size: var(--mud-typography-body2-size);
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.honua-coordinate-display:hover {
+    box-shadow: var(--mud-elevation-8);
+}
+
+/* Positioning */
+.display-floating {
+    position: absolute;
+    z-index: 10;
+    max-width: 600px;
+    min-width: 320px;
+}
+
+.display-top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.display-top-left {
+    top: 10px;
+    left: 10px;
+}
+
+.display-bottom-right {
+    bottom: 10px;
+    right: 10px;
+}
+
+.display-bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+.display-embedded {
+    width: 100%;
+}
+
+/* Container */
+.coordinate-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+}
+
+/* Coordinate Row */
+.coordinate-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.coordinate-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.coordinate-text {
+    font-family: 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--mud-palette-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: text;
+    cursor: text;
+}
+
+.pinned-chip {
+    height: 20px !important;
+    font-size: 0.7rem !important;
+}
+
+.coordinate-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.action-button {
+    min-width: 28px !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+
+/* Info Row */
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+    white-space: nowrap;
+}
+
+.info-icon {
+    color: var(--mud-palette-text-secondary);
+    opacity: 0.7;
+}
+
+/* Placeholder */
+.coordinate-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 0;
+    min-height: 40px;
+}
+
+/* Copy Notification */
+.copy-notification {
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--mud-palette-success);
+    color: white;
+    border-radius: 4px;
+    box-shadow: var(--mud-elevation-8);
+    font-size: 0.75rem;
+    font-weight: 500;
+    animation: slideDown 0.3s ease;
+    z-index: 100;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Menu Styles */
+.format-menu,
+.precision-menu {
+    margin-left: 0 !important;
+}
+
+.menu-check {
+    margin-right: 8px;
+}
+
+.menu-item-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.format-description {
+    font-size: 0.7rem;
+    color: var(--mud-palette-text-secondary);
+    font-weight: normal;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .honua-coordinate-display {
+        background: rgba(30, 30, 30, 0.95);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .coordinate-text {
+        color: rgba(255, 255, 255, 0.95);
+    }
+
+    .info-row {
+        border-top-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .display-floating {
+        max-width: calc(100vw - 20px);
+        min-width: 280px;
+    }
+
+    .coordinate-text {
+        font-size: 0.75rem;
+    }
+
+    .info-item {
+        font-size: 0.7rem;
+    }
+
+    .coordinate-container {
+        padding: 10px;
+    }
+
+    .info-row {
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .display-floating {
+        min-width: 240px;
+    }
+
+    .coordinate-row {
+        flex-wrap: wrap;
+    }
+
+    .coordinate-actions {
+        flex-wrap: wrap;
+    }
+
+    .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .honua-coordinate-display {
+        border-width: 2px;
+    }
+
+    .coordinate-text {
+        font-weight: 600;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    .honua-coordinate-display,
+    .copy-notification {
+        transition: none;
+        animation: none;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .honua-coordinate-display {
+        position: static !important;
+        box-shadow: none !important;
+        border: 1px solid black;
+    }
+
+    .coordinate-actions {
+        display: none !important;
+    }
+
+    .copy-notification {
+        display: none !important;
+    }
+}

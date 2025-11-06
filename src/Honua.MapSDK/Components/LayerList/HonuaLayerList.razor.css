@@ -1,0 +1,479 @@
+/* HonuaLayerList Component Styles */
+
+.honua-layerlist {
+    font-family: 'Roboto', sans-serif;
+    font-size: 14px;
+}
+
+.layerlist-container {
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* Header Styles */
+.layerlist-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #fafafa;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.layerlist-title {
+    font-weight: 500;
+    font-size: 14px;
+    color: #424242;
+}
+
+.layer-count {
+    font-size: 12px;
+    color: #757575;
+    margin-left: 4px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Search Styles */
+.layerlist-search {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.search-field {
+    width: 100%;
+}
+
+/* Content Styles */
+.layerlist-content {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 600px;
+    min-height: 200px;
+}
+
+.layerlist-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.layerlist-content::-webkit-scrollbar-track {
+    background: #f5f5f5;
+}
+
+.layerlist-content::-webkit-scrollbar-thumb {
+    background: #bdbdbd;
+    border-radius: 4px;
+}
+
+.layerlist-content::-webkit-scrollbar-thumb:hover {
+    background: #9e9e9e;
+}
+
+/* Loading and Empty States */
+.loading-state,
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    gap: 12px;
+    color: #757575;
+}
+
+/* Layer Group Styles */
+.layer-group {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+    background: #fafafa;
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.2s;
+}
+
+.group-header:hover {
+    background: #f5f5f5;
+}
+
+.group-name {
+    flex: 1;
+    font-weight: 500;
+    font-size: 13px;
+    color: #424242;
+}
+
+.group-count {
+    font-size: 12px;
+    color: #757575;
+}
+
+.group-content {
+    background: white;
+}
+
+/* Layer Item Styles */
+.layer-item {
+    border-bottom: 1px solid #f5f5f5;
+    transition: background-color 0.2s;
+}
+
+.layer-item:hover {
+    background: #fafafa;
+}
+
+.layer-item.selected {
+    background: #e3f2fd;
+    border-left: 3px solid #2196f3;
+}
+
+.layer-item.compact .layer-main {
+    padding: 6px 8px;
+}
+
+.layer-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    min-height: 48px;
+}
+
+/* Drag Handle */
+.drag-handle {
+    cursor: move;
+    color: #9e9e9e;
+    display: flex;
+    align-items: center;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.layer-item:hover .drag-handle {
+    opacity: 1;
+}
+
+/* Visibility Checkbox */
+.visibility-checkbox {
+    flex-shrink: 0;
+}
+
+/* Layer Icon */
+.layer-icon {
+    flex-shrink: 0;
+    color: #616161;
+}
+
+/* Layer Info */
+.layer-info {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.layer-name {
+    font-weight: 400;
+    color: #212121;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.layer-meta {
+    margin-top: 2px;
+    line-height: 1.3;
+}
+
+/* Layer Actions */
+.layer-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+/* Layer Details (Expanded) */
+.layer-details {
+    padding: 12px 16px 12px 52px;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Opacity Control */
+.opacity-control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.opacity-label {
+    font-weight: 500;
+    color: #616161;
+}
+
+.opacity-slider {
+    width: 100%;
+}
+
+/* Legend Styles */
+.layer-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.legend-swatch {
+    width: 20px;
+    height: 16px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.legend-label {
+    color: #616161;
+    line-height: 1.3;
+}
+
+/* Layer Description */
+.layer-description {
+    padding: 8px;
+    background: white;
+    border-radius: 4px;
+    border-left: 3px solid #2196f3;
+    line-height: 1.4;
+}
+
+/* View Modes */
+.honua-layerlist.view-compact .layer-main {
+    padding: 8px 12px;
+    min-height: 40px;
+}
+
+.honua-layerlist.view-compact .layer-meta {
+    display: none;
+}
+
+/* Position Classes */
+.layerlist-floating {
+    position: absolute;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.layerlist-top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.layerlist-top-left {
+    top: 10px;
+    left: 10px;
+}
+
+.layerlist-bottom-right {
+    bottom: 10px;
+    right: 10px;
+}
+
+.layerlist-bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+.layerlist-embedded {
+    width: 100%;
+    height: 100%;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .honua-layerlist {
+        font-size: 13px;
+    }
+
+    .layerlist-content {
+        max-height: 400px;
+    }
+
+    .layer-main {
+        padding: 8px 10px;
+    }
+
+    .layer-details {
+        padding: 10px 12px 10px 44px;
+    }
+
+    .layerlist-floating {
+        max-width: calc(100vw - 20px);
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .layerlist-container {
+        background: #1e1e1e;
+        color: #e0e0e0;
+    }
+
+    .layerlist-header {
+        background: #2a2a2a;
+        border-bottom-color: #333;
+    }
+
+    .layerlist-title {
+        color: #e0e0e0;
+    }
+
+    .layer-count {
+        color: #9e9e9e;
+    }
+
+    .layerlist-search {
+        border-bottom-color: #333;
+    }
+
+    .layer-group {
+        border-bottom-color: #2a2a2a;
+    }
+
+    .group-header {
+        background: #252525;
+        border-bottom-color: #333;
+    }
+
+    .group-header:hover {
+        background: #2a2a2a;
+    }
+
+    .group-name {
+        color: #e0e0e0;
+    }
+
+    .group-content {
+        background: #1e1e1e;
+    }
+
+    .layer-item {
+        border-bottom-color: #2a2a2a;
+    }
+
+    .layer-item:hover {
+        background: #252525;
+    }
+
+    .layer-item.selected {
+        background: #1a237e;
+        border-left-color: #448aff;
+    }
+
+    .layer-name {
+        color: #e0e0e0;
+    }
+
+    .layer-details {
+        background: #252525;
+        border-top-color: #333;
+    }
+
+    .opacity-label {
+        color: #9e9e9e;
+    }
+
+    .legend-label {
+        color: #9e9e9e;
+    }
+
+    .layer-description {
+        background: #1e1e1e;
+        border-left-color: #448aff;
+    }
+
+    .loading-state,
+    .empty-state {
+        color: #9e9e9e;
+    }
+
+    .layerlist-content::-webkit-scrollbar-track {
+        background: #2a2a2a;
+    }
+
+    .layerlist-content::-webkit-scrollbar-thumb {
+        background: #424242;
+    }
+
+    .layerlist-content::-webkit-scrollbar-thumb:hover {
+        background: #616161;
+    }
+}
+
+/* Drag and Drop Styles */
+.layer-item.dragging {
+    opacity: 0.5;
+    background: #e0e0e0;
+}
+
+.layer-item.drag-over {
+    border-top: 2px solid #2196f3;
+}
+
+/* Animation for expand/collapse */
+.group-content,
+.layer-details {
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        overflow: hidden;
+    }
+    to {
+        opacity: 1;
+        max-height: 1000px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .layerlist-floating {
+        position: static;
+        box-shadow: none;
+    }
+
+    .header-actions,
+    .layer-actions {
+        display: none;
+    }
+}

@@ -137,6 +137,36 @@ public class LayerRemovedMessage
 }
 
 /// <summary>
+/// Published when layers are reordered
+/// </summary>
+public class LayerReorderedMessage
+{
+    public required string LayerId { get; init; }
+    public required int NewOrder { get; init; }
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a layer is selected in the layer list
+/// </summary>
+public class LayerSelectedMessage
+{
+    public required string LayerId { get; init; }
+    public required string LayerName { get; init; }
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when layer metadata is updated
+/// </summary>
+public class LayerMetadataUpdatedMessage
+{
+    public required string LayerId { get; init; }
+    public Dictionary<string, object> Metadata { get; init; } = new();
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
 /// Published during timeline animation when time position changes
 /// </summary>
 public class TimeChangedMessage
@@ -487,4 +517,171 @@ public class StopDrawingRequestMessage
 {
     public required string MapId { get; init; }
     public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a feature is selected (clicked or hovered)
+/// </summary>
+public class FeatureSelectedMessage
+{
+    public required string MapId { get; init; }
+    public required string FeatureId { get; init; }
+    public required string LayerId { get; init; }
+    public Dictionary<string, object> Properties { get; init; } = new();
+    public object? Geometry { get; init; }
+    public double[]? Coordinates { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a popup is opened
+/// </summary>
+public class PopupOpenedMessage
+{
+    public required string PopupId { get; init; }
+    public required string FeatureId { get; init; }
+    public required string LayerId { get; init; }
+    public required double[] Coordinates { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a popup is closed
+/// </summary>
+public class PopupClosedMessage
+{
+    public required string PopupId { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Request to open a popup at a specific location
+/// </summary>
+public class OpenPopupRequestMessage
+{
+    public required string MapId { get; init; }
+    public required double[] Coordinates { get; init; }
+    public string? FeatureId { get; init; }
+    public string? LayerId { get; init; }
+    public Dictionary<string, object>? Properties { get; init; }
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Request to close popup
+/// </summary>
+public class ClosePopupRequestMessage
+{
+    public required string MapId { get; init; }
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a feature is created in the editor
+/// </summary>
+public class FeatureCreatedMessage
+{
+    public required string FeatureId { get; init; }
+    public required string LayerId { get; init; }
+    public required string GeometryType { get; init; }
+    public required object Geometry { get; init; }
+    public Dictionary<string, object> Attributes { get; init; } = new();
+    public required string ComponentId { get; init; }
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when a feature is updated in the editor
+/// </summary>
+public class FeatureUpdatedMessage
+{
+    public required string FeatureId { get; init; }
+    public required string LayerId { get; init; }
+    public object? Geometry { get; init; }
+    public Dictionary<string, object>? Attributes { get; init; }
+    public required string UpdateType { get; init; } // "geometry", "attributes", "both"
+    public required string ComponentId { get; init; }
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when an edit session is started
+/// </summary>
+public class EditSessionStartedMessage
+{
+    public required string SessionId { get; init; }
+    public required string ComponentId { get; init; }
+    public List<string> EditableLayers { get; init; } = new();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when an edit session is ended
+/// </summary>
+public class EditSessionEndedMessage
+{
+    public required string SessionId { get; init; }
+    public required string ComponentId { get; init; }
+    public bool ChangesSaved { get; init; }
+    public int OperationCount { get; init; }
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when edit session state changes (dirty/clean)
+/// </summary>
+public class EditSessionStateChangedMessage
+{
+    public required string SessionId { get; init; }
+    public required string ComponentId { get; init; }
+    public bool IsDirty { get; init; }
+    public int UnsavedChanges { get; init; }
+    public bool CanUndo { get; init; }
+    public bool CanRedo { get; init; }
+}
+
+/// <summary>
+/// Published when a feature is selected in the editor for editing
+/// </summary>
+public class EditorFeatureSelectedMessage
+{
+    public required string FeatureId { get; init; }
+    public required string LayerId { get; init; }
+    public required string ComponentId { get; init; }
+    public Dictionary<string, object> Attributes { get; init; } = new();
+}
+
+/// <summary>
+/// Published when validation errors occur during editing
+/// </summary>
+public class EditValidationErrorMessage
+{
+    public required string FeatureId { get; init; }
+    public required string ComponentId { get; init; }
+    public List<string> Errors { get; init; } = new();
+    public List<string> Warnings { get; init; } = new();
+}
+
+/// <summary>
+/// Published when coordinates are clicked on the map
+/// </summary>
+public class CoordinateClickedMessage
+{
+    public required string DisplayId { get; init; }
+    public required double Longitude { get; init; }
+    public required double Latitude { get; init; }
+    public double? Elevation { get; init; }
+    public required string Formatted { get; init; }
+}
+
+/// <summary>
+/// Published when coordinates are pinned in the coordinate display
+/// </summary>
+public class CoordinatePinnedMessage
+{
+    public required string DisplayId { get; init; }
+    public required double Longitude { get; init; }
+    public required double Latitude { get; init; }
+    public double? Elevation { get; init; }
+    public required string Formatted { get; init; }
 }

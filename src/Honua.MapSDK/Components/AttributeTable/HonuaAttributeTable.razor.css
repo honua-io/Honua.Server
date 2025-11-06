@@ -1,0 +1,383 @@
+/* HonuaAttributeTable - Advanced attribute table styling */
+
+.honua-attribute-table {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background: var(--mud-palette-surface);
+    border-radius: var(--mud-default-borderradius);
+    overflow: hidden;
+}
+
+/* Data Grid Customization */
+.honua-attribute-table ::deep .mud-table-container {
+    height: 100%;
+    overflow: auto;
+}
+
+.honua-attribute-table ::deep .mud-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Table Header Styling */
+.honua-attribute-table ::deep .mud-table-head {
+    background: var(--mud-palette-background-grey);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.honua-attribute-table ::deep .mud-table-head .mud-table-cell {
+    font-weight: 600;
+    color: var(--mud-palette-text-primary);
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--mud-palette-divider);
+    white-space: nowrap;
+}
+
+/* Frozen Column Support */
+.honua-attribute-table ::deep .mud-table-cell.frozen-column {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: var(--mud-palette-surface);
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+
+.honua-attribute-table ::deep .mud-table-head .frozen-column {
+    z-index: 15;
+    background: var(--mud-palette-background-grey);
+}
+
+/* Table Body Styling */
+.honua-attribute-table ::deep .mud-table-body .mud-table-row {
+    transition: background-color 0.2s ease;
+}
+
+.honua-attribute-table ::deep .mud-table-body .mud-table-row:hover {
+    background: var(--mud-palette-action-default-hover);
+}
+
+.honua-attribute-table ::deep .mud-table-body .mud-table-cell {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+/* Alternating Row Colors */
+.honua-attribute-table ::deep .mud-table-striped .mud-table-row:nth-of-type(even) {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+    .honua-attribute-table ::deep .mud-table-striped .mud-table-row:nth-of-type(even) {
+        background: rgba(255, 255, 255, 0.02);
+    }
+}
+
+/* Selected Row Styling */
+.honua-attribute-table ::deep .mud-table-row.mud-selected {
+    background: rgba(var(--mud-palette-primary-rgb), 0.12) !important;
+}
+
+.honua-attribute-table ::deep .mud-table-row.mud-selected:hover {
+    background: rgba(var(--mud-palette-primary-rgb), 0.18) !important;
+}
+
+/* Cell Content Alignment */
+.honua-attribute-table ::deep .mud-table-cell {
+    vertical-align: middle;
+}
+
+.honua-attribute-table ::deep .mud-table-cell[data-type="number"],
+.honua-attribute-table ::deep .mud-table-cell[data-type="currency"] {
+    text-align: right;
+}
+
+.honua-attribute-table ::deep .mud-table-cell[data-type="boolean"] {
+    text-align: center;
+}
+
+/* Column Resizing */
+.honua-attribute-table ::deep .mud-table-cell-resize-handle {
+    cursor: col-resize;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.honua-attribute-table ::deep .mud-table-cell:hover .mud-table-cell-resize-handle {
+    opacity: 1;
+}
+
+/* Sortable Column Indicators */
+.honua-attribute-table ::deep .mud-table-head .mud-table-sortlabel {
+    cursor: pointer;
+    user-select: none;
+}
+
+.honua-attribute-table ::deep .mud-table-head .mud-table-sortlabel:hover {
+    color: var(--mud-palette-primary);
+}
+
+.honua-attribute-table ::deep .mud-table-sortlabel-icon {
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+}
+
+.honua-attribute-table ::deep .mud-table-sortlabel-icon.mud-table-sort-active {
+    opacity: 1;
+    color: var(--mud-palette-primary);
+}
+
+/* Filter Row */
+.honua-attribute-table ::deep .mud-table-head .mud-table-row.filter-row {
+    background: rgba(var(--mud-palette-primary-rgb), 0.04);
+}
+
+.honua-attribute-table ::deep .filter-row .mud-input-control {
+    margin: 0;
+    padding: 4px 8px;
+}
+
+/* Toolbar Styling */
+.honua-attribute-table ::deep .mud-toolbar {
+    background: var(--mud-palette-surface);
+    border-bottom: 1px solid var(--mud-palette-divider);
+    padding: 12px 16px;
+    min-height: 64px;
+}
+
+.honua-attribute-table ::deep .mud-toolbar .mud-button-root,
+.honua-attribute-table ::deep .mud-toolbar .mud-icon-button {
+    margin: 0 4px;
+}
+
+/* Summary Row */
+.attribute-table-summary {
+    border-top: 2px solid var(--mud-palette-divider);
+    background: var(--mud-palette-background-grey);
+    padding: 8px 16px;
+}
+
+.attribute-table-summary .mud-text {
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.875rem;
+}
+
+/* Pagination */
+.honua-attribute-table ::deep .mud-table-pagination {
+    background: var(--mud-palette-surface);
+    border-top: 1px solid var(--mud-palette-divider);
+    padding: 8px 16px;
+}
+
+.honua-attribute-table ::deep .mud-table-pagination-caption {
+    font-weight: 500;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Loading State */
+.honua-attribute-table ::deep .mud-table-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+}
+
+/* Empty State */
+.honua-attribute-table ::deep .mud-table-empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* Conditional Formatting Styles */
+.honua-attribute-table ::deep .cell-positive {
+    color: var(--mud-palette-success);
+    font-weight: 500;
+}
+
+.honua-attribute-table ::deep .cell-negative {
+    color: var(--mud-palette-error);
+    font-weight: 500;
+}
+
+.honua-attribute-table ::deep .cell-warning {
+    color: var(--mud-palette-warning);
+    font-weight: 500;
+}
+
+.honua-attribute-table ::deep .cell-highlight {
+    background: rgba(var(--mud-palette-warning-rgb), 0.15);
+    font-weight: 500;
+}
+
+/* Editable Cell Indicators */
+.honua-attribute-table ::deep .mud-table-cell.editable {
+    cursor: pointer;
+    position: relative;
+}
+
+.honua-attribute-table ::deep .mud-table-cell.editable::after {
+    content: '✎';
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    font-size: 10px;
+    color: var(--mud-palette-text-disabled);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.honua-attribute-table ::deep .mud-table-cell.editable:hover::after {
+    opacity: 1;
+}
+
+/* Geometry Type Chips */
+.honua-attribute-table ::deep .mud-chip.geometry-chip {
+    font-size: 0.75rem;
+    height: 24px;
+    padding: 0 8px;
+}
+
+/* Selection Checkbox */
+.honua-attribute-table ::deep .mud-table-cell .mud-checkbox {
+    margin: -8px 0;
+}
+
+/* Column Menu */
+.honua-attribute-table ::deep .mud-table-head .mud-menu {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.honua-attribute-table ::deep .mud-table-head .mud-table-cell:hover .mud-menu {
+    opacity: 1;
+}
+
+/* Compact Mode */
+.honua-attribute-table.compact ::deep .mud-table-cell {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+}
+
+.honua-attribute-table.compact ::deep .mud-toolbar {
+    min-height: 48px;
+    padding: 8px 12px;
+}
+
+/* Scrollbar Styling */
+.honua-attribute-table ::deep .mud-table-container::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.honua-attribute-table ::deep .mud-table-container::-webkit-scrollbar-track {
+    background: var(--mud-palette-background-grey);
+}
+
+.honua-attribute-table ::deep .mud-table-container::-webkit-scrollbar-thumb {
+    background: var(--mud-palette-divider);
+    border-radius: 6px;
+}
+
+.honua-attribute-table ::deep .mud-table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--mud-palette-text-disabled);
+}
+
+/* Responsive Design */
+@media (max-width: 960px) {
+    .honua-attribute-table ::deep .mud-toolbar {
+        flex-wrap: wrap;
+        min-height: auto;
+    }
+
+    .honua-attribute-table ::deep .mud-toolbar .mud-text {
+        width: 100%;
+        margin-bottom: 8px;
+    }
+
+    .honua-attribute-table ::deep .mud-table-cell {
+        padding: 6px 8px;
+        font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .honua-attribute-table ::deep .mud-table-pagination {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .honua-attribute-table ::deep .mud-table-pagination-actions {
+        margin-top: 8px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .honua-attribute-table ::deep .mud-toolbar,
+    .honua-attribute-table ::deep .mud-table-pagination,
+    .honua-attribute-table ::deep .mud-menu,
+    .honua-attribute-table ::deep .mud-icon-button {
+        display: none !important;
+    }
+
+    .honua-attribute-table ::deep .mud-table {
+        border-collapse: collapse;
+    }
+
+    .honua-attribute-table ::deep .mud-table-cell {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+}
+
+/* Accessibility */
+.honua-attribute-table ::deep .mud-table-row:focus-within {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: -2px;
+}
+
+.honua-attribute-table ::deep .mud-table-cell:focus {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: -2px;
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .honua-attribute-table ::deep .mud-table-cell {
+        border: 1px solid currentColor;
+    }
+
+    .honua-attribute-table ::deep .mud-table-row.mud-selected {
+        outline: 3px solid var(--mud-palette-primary);
+    }
+}
+
+/* Animation for row updates */
+@keyframes row-flash {
+    0%, 100% {
+        background: transparent;
+    }
+    50% {
+        background: rgba(var(--mud-palette-warning-rgb), 0.3);
+    }
+}
+
+.honua-attribute-table ::deep .mud-table-row.updated {
+    animation: row-flash 1s ease-in-out;
+}
+
+/* Virtual Scrolling Performance */
+.honua-attribute-table ::deep .mud-table-container {
+    will-change: scroll-position;
+}
+
+.honua-attribute-table ::deep .mud-table-body {
+    will-change: transform;
+}
