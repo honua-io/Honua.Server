@@ -203,6 +203,16 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IRasterTileCacheMetrics, RasterTileCacheMetrics>();
 
+        // Register raster source providers (required by IRasterSourceProviderRegistry)
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.FileSystemRasterSourceProvider>();
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.HttpRasterSourceProvider>();
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.S3RasterSourceProvider>();
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.AzureBlobRasterSourceProvider>();
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.GcsRasterSourceProvider>();
+
+        // Register raster source provider registry (required by IRasterRenderer)
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProviderRegistry, Honua.Server.Core.Raster.Sources.RasterSourceProviderRegistry>();
+
         // Register raster renderer (required by WMS/WCS)
         services.AddSingleton<Honua.Server.Core.Raster.Rendering.IRasterRenderer, Honua.Server.Core.Raster.Rendering.SkiaSharpRasterRenderer>();
 
