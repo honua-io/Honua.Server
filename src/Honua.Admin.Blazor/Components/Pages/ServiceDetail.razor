@@ -7,6 +7,7 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject ILogger<ServiceDetail> Logger
+@inject IJSRuntime JSRuntime
 
 <PageTitle>@(_service?.Title ?? "Service Details") - Honua Admin</PageTitle>
 
@@ -37,6 +38,36 @@
                            Color="Color.Success"
                            Label="@(_service.Enabled ? "Running" : "Stopped")"
                            OnChange="ToggleServiceEnabled" />
+
+                @* Use Service Dropdown *@
+                <MudMenu Icon="@Icons.Material.Filled.Map"
+                         Label="Use Service"
+                         Variant="Variant.Filled"
+                         Color="Color.Info"
+                         Dense="true">
+                    <MudMenuItem Icon="@Icons.Material.Filled.Preview"
+                                 Href="@GetPreviewUrl()"
+                                 Target="_blank">
+                        Preview in Map
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Language"
+                                 Href="@GetArcGISOnlineUrl()"
+                                 Target="_blank">
+                        Open in ArcGIS Online
+                    </MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem Icon="@Icons.Material.Filled.Download"
+                                 Href="@GetConnectionFileUrl("qgis")"
+                                 Target="_blank">
+                        Download for QGIS (.qgs)
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Download"
+                                 Href="@GetConnectionFileUrl("arcgis")"
+                                 Target="_blank">
+                        Download for ArcGIS Pro (.ags)
+                    </MudMenuItem>
+                </MudMenu>
+
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Edit"
@@ -109,7 +140,7 @@
         </MudPaper>
 
         @* OGC Protocols Section *@
-        @if (_service.OgcOptions != null)
+        @if (_service.OgcOptions != null && HasAnyProtocolEnabled())
         {
             <MudPaper Elevation="2" Class="pa-6 mt-4">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
@@ -122,66 +153,126 @@
                                    OnClick="() => _showOgcEdit = !_showOgcEdit" />
                 </MudStack>
 
-                <MudGrid>
-                    <MudItem xs="12" md="6">
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Map Services</MudText>
-                        <MudStack Spacing="2">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@(_service.OgcOptions.WmsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                             Color="@(_service.OgcOptions.WmsEnabled ? Color.Success : Color.Default)"
-                                             Size="Size.Small" />
-                                    <MudText>WMS (Web Map Service)</MudText>
+                @if (!_showOgcEdit)
+                {
+                    @* Display Mode - Only show enabled protocols *@
+                    <MudStack Spacing="3">
+                        @if (HasMapServices())
+                        {
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Map Services</MudText>
+                                <MudStack Spacing="2">
+                                    @if (_service.OgcOptions.WmsEnabled)
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                                <MudText>WMS (Web Map Service)</MudText>
+                                            </MudStack>
+                                            <MudStack Row="true" Spacing="1">
+                                                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                                               Size="Size.Small"
+                                                               Title="Copy URL"
+                                                               OnClick="@(() => CopyToClipboard(GetWmsUrl()))" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                               Size="Size.Small"
+                                                               Title="Download .wms file"
+                                                               Href="@GetConnectionFileUrl("wms")"
+                                                               Target="_blank" />
+                                            </MudStack>
+                                        </MudStack>
+                                    }
+                                    @if (_service.OgcOptions.WmtsEnabled)
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                                <MudText>WMTS (Web Map Tile Service)</MudText>
+                                            </MudStack>
+                                            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                                           Size="Size.Small"
+                                                           Title="Copy URL"
+                                                           OnClick="@(() => CopyToClipboard(GetWmtsUrl()))" />
+                                        </MudStack>
+                                    }
                                 </MudStack>
-                                @if (_showOgcEdit)
-                                {
-                                    <MudSwitch @bind-Value="_service.OgcOptions.WmsEnabled" Color="Color.Primary" Dense="true" />
-                                }
-                            </MudStack>
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@(_service.OgcOptions.WmtsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                             Color="@(_service.OgcOptions.WmtsEnabled ? Color.Success : Color.Default)"
-                                             Size="Size.Small" />
-                                    <MudText>WMTS (Web Map Tile Service)</MudText>
-                                </MudStack>
-                                @if (_showOgcEdit)
-                                {
-                                    <MudSwitch @bind-Value="_service.OgcOptions.WmtsEnabled" Color="Color.Primary" Dense="true" />
-                                }
-                            </MudStack>
-                        </MudStack>
-                    </MudItem>
+                            </div>
+                        }
 
-                    <MudItem xs="12" md="6">
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Feature Services</MudText>
-                        <MudStack Spacing="2">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@(_service.OgcOptions.WfsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                             Color="@(_service.OgcOptions.WfsEnabled ? Color.Success : Color.Default)"
-                                             Size="Size.Small" />
+                        @if (HasFeatureServices())
+                        {
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Feature Services</MudText>
+                                <MudStack Spacing="2">
+                                    @if (_service.OgcOptions.WfsEnabled)
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                                <MudText>WFS (Web Feature Service)</MudText>
+                                            </MudStack>
+                                            <MudStack Row="true" Spacing="1">
+                                                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                                               Size="Size.Small"
+                                                               Title="Copy URL"
+                                                               OnClick="@(() => CopyToClipboard(GetWfsUrl()))" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                               Size="Size.Small"
+                                                               Title="Download .wfs file"
+                                                               Href="@GetConnectionFileUrl("wfs")"
+                                                               Target="_blank" />
+                                            </MudStack>
+                                        </MudStack>
+                                    }
+                                    @if (_service.OgcOptions.OgcApiEnabled)
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                                <MudText>OGC API Features</MudText>
+                                            </MudStack>
+                                            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                                           Size="Size.Small"
+                                                           Title="Copy URL"
+                                                           OnClick="@(() => CopyToClipboard(GetOgcApiUrl()))" />
+                                        </MudStack>
+                                    }
+                                </MudStack>
+                            </div>
+                        }
+                    </MudStack>
+                }
+                else
+                {
+                    @* Edit Mode - Show all protocols with toggles *@
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Map Services</MudText>
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudText>WMS (Web Map Service)</MudText>
+                                    <MudSwitch @bind-Value="_service.OgcOptions.WmsEnabled" Color="Color.Primary" Dense="true" />
+                                </MudStack>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudText>WMTS (Web Map Tile Service)</MudText>
+                                    <MudSwitch @bind-Value="_service.OgcOptions.WmtsEnabled" Color="Color.Primary" Dense="true" />
+                                </MudStack>
+                            </MudStack>
+                        </MudItem>
+
+                        <MudItem xs="12" md="6">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Feature Services</MudText>
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                                     <MudText>WFS (Web Feature Service)</MudText>
-                                </MudStack>
-                                @if (_showOgcEdit)
-                                {
                                     <MudSwitch @bind-Value="_service.OgcOptions.WfsEnabled" Color="Color.Primary" Dense="true" />
-                                }
-                            </MudStack>
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@(_service.OgcOptions.OgcApiEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                             Color="@(_service.OgcOptions.OgcApiEnabled ? Color.Success : Color.Default)"
-                                             Size="Size.Small" />
-                                    <MudText>OGC API Features</MudText>
                                 </MudStack>
-                                @if (_showOgcEdit)
-                                {
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                    <MudText>OGC API Features</MudText>
                                     <MudSwitch @bind-Value="_service.OgcOptions.OgcApiEnabled" Color="Color.Primary" Dense="true" />
-                                }
+                                </MudStack>
                             </MudStack>
-                        </MudStack>
-                    </MudItem>
+                        </MudItem>
 
                     @if (_service.OgcOptions.MaxFeatures.HasValue || _showOgcEdit)
                     {
@@ -432,5 +523,83 @@
             "VECTOR_TILES" => Color.Secondary,
             _ => Color.Default
         };
+    }
+
+    // GIS Connection Helper Methods
+
+    private string GetPreviewUrl()
+    {
+        return $"/preview/{_service?.Id}";
+    }
+
+    private string GetArcGISOnlineUrl()
+    {
+        var baseUrl = Navigation.BaseUri.TrimEnd('/');
+        var serviceUrl = $"{baseUrl}/ogc/services/{_service?.Id}/wms?SERVICE=WMS&REQUEST=GetCapabilities";
+        return $"https://www.arcgis.com/home/webmap/viewer.html?url={Uri.EscapeDataString(serviceUrl)}";
+    }
+
+    private string GetConnectionFileUrl(string type)
+    {
+        return $"/admin/metadata/services/{_service?.Id}/connection/{type}";
+    }
+
+    private string GetWmsUrl()
+    {
+        var baseUrl = Navigation.BaseUri.TrimEnd('/');
+        return $"{baseUrl}/ogc/services/{_service?.Id}/wms?SERVICE=WMS&REQUEST=GetCapabilities";
+    }
+
+    private string GetWfsUrl()
+    {
+        var baseUrl = Navigation.BaseUri.TrimEnd('/');
+        return $"{baseUrl}/ogc/services/{_service?.Id}/wfs?SERVICE=WFS&REQUEST=GetCapabilities";
+    }
+
+    private string GetWmtsUrl()
+    {
+        var baseUrl = Navigation.BaseUri.TrimEnd('/');
+        return $"{baseUrl}/ogc/services/{_service?.Id}/wmts?SERVICE=WMTS&REQUEST=GetCapabilities";
+    }
+
+    private string GetOgcApiUrl()
+    {
+        var baseUrl = Navigation.BaseUri.TrimEnd('/');
+        return $"{baseUrl}/ogc/api/collections/{_service?.Id}";
+    }
+
+    private async Task CopyToClipboard(string text)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Snackbar.Add("URL copied to clipboard", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to copy to clipboard");
+            Snackbar.Add("Failed to copy URL. Please copy manually.", Severity.Error);
+        }
+    }
+
+    private bool HasAnyProtocolEnabled()
+    {
+        return _service?.OgcOptions != null &&
+               (_service.OgcOptions.WmsEnabled ||
+                _service.OgcOptions.WmtsEnabled ||
+                _service.OgcOptions.WfsEnabled ||
+                _service.OgcOptions.OgcApiEnabled);
+    }
+
+    private bool HasMapServices()
+    {
+        return _service?.OgcOptions != null &&
+               (_service.OgcOptions.WmsEnabled || _service.OgcOptions.WmtsEnabled);
+    }
+
+    private bool HasFeatureServices()
+    {
+        return _service?.OgcOptions != null &&
+               (_service.OgcOptions.WfsEnabled || _service.OgcOptions.OgcApiEnabled);
     }
 }

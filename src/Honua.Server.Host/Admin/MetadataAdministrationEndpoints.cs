@@ -66,6 +66,10 @@ public static class MetadataAdministrationEndpoints
             .WithName("DisableService")
             .WithSummary("Disable a service");
 
+        group.MapGet("/services/{id}/connection/{type}", GetServiceConnectionFile)
+            .WithName("GetServiceConnectionFile")
+            .WithSummary("Download connection file for GIS applications");
+
         // Layers
         group.MapGet("/layers", GetLayers)
             .WithName("GetLayers")
@@ -517,6 +521,139 @@ public static class MetadataAdministrationEndpoints
                 statusCode: StatusCodes.Status500InternalServerError,
                 detail: $"An error occurred while {(enabled ? "enabling" : "disabling")} the service");
         }
+    }
+
+    private static async Task<IResult> GetServiceConnectionFile(
+        string id,
+        string type,
+        HttpContext context,
+        IMutableMetadataProvider metadataProvider,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var service = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (service is null)
+            {
+                return Results.Problem(
+                    title: "Service not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Service with ID '{id}' does not exist");
+            }
+
+            // Get base URL from the request
+            var request = context.Request;
+            var baseUrl = $"{request.Scheme}://{request.Host}";
+
+            string content;
+            string fileName;
+            string contentType;
+
+            switch (type.ToLowerInvariant())
+            {
+                case "wms":
+                    var wmsUrl = $"{baseUrl}/ogc/services/{service.Id}/wms?SERVICE=WMS&REQUEST=GetCapabilities";
+                    content = GenerateWmsConnectionFile(service.Title, wmsUrl);
+                    fileName = $"{service.Id}.wms";
+                    contentType = "application/xml";
+                    break;
+
+                case "wfs":
+                    var wfsUrl = $"{baseUrl}/ogc/services/{service.Id}/wfs?SERVICE=WFS&REQUEST=GetCapabilities";
+                    content = GenerateWfsConnectionFile(service.Title, wfsUrl);
+                    fileName = $"{service.Id}.wfs";
+                    contentType = "application/xml";
+                    break;
+
+                case "qgis":
+                    var qgisWmsUrl = $"{baseUrl}/ogc/services/{service.Id}/wms";
+                    var qgisWfsUrl = $"{baseUrl}/ogc/services/{service.Id}/wfs";
+                    content = GenerateQgisConnectionFile(service.Title, service.Id, qgisWmsUrl, qgisWfsUrl);
+                    fileName = $"{service.Id}.qgs";
+                    contentType = "application/xml";
+                    break;
+
+                case "arcgis":
+                    var arcgisWmsUrl = $"{baseUrl}/ogc/services/{service.Id}/wms";
+                    content = GenerateArcGisConnectionFile(service.Title, arcgisWmsUrl);
+                    fileName = $"{service.Id}.ags";
+                    contentType = "application/xml";
+                    break;
+
+                default:
+                    return Results.Problem(
+                        title: "Invalid connection type",
+                        statusCode: StatusCodes.Status400BadRequest,
+                        detail: $"Connection type '{type}' is not supported. Valid types: wms, wfs, qgis, arcgis");
+            }
+
+            return Results.File(
+                System.Text.Encoding.UTF8.GetBytes(content),
+                contentType,
+                fileName);
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem(
+                title: "Internal server error",
+                statusCode: StatusCodes.Status500InternalServerError,
+                detail: "An error occurred while generating the connection file");
+        }
+    }
+
+    private static string GenerateWmsConnectionFile(string title, string url)
+    {
+        return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<WMS_Capabilities>
+  <Service>
+    <Name>{System.Security.SecurityElement.Escape(title)}</Name>
+    <OnlineResource xmlns:xlink=""http://www.w3.org/1999/xlink"" xlink:href=""{System.Security.SecurityElement.Escape(url)}""/>
+  </Service>
+</WMS_Capabilities>";
+    }
+
+    private static string GenerateWfsConnectionFile(string title, string url)
+    {
+        return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<WFS_Capabilities>
+  <Service>
+    <Name>{System.Security.SecurityElement.Escape(title)}</Name>
+    <OnlineResource xmlns:xlink=""http://www.w3.org/1999/xlink"" xlink:href=""{System.Security.SecurityElement.Escape(url)}""/>
+  </Service>
+</WFS_Capabilities>";
+    }
+
+    private static string GenerateQgisConnectionFile(string title, string id, string wmsUrl, string wfsUrl)
+    {
+        return $@"<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version=""3.0"">
+  <projectlayers>
+    <maplayer>
+      <id>{System.Security.SecurityElement.Escape(id)}</id>
+      <datasource>{System.Security.SecurityElement.Escape(wmsUrl)}</datasource>
+      <layername>{System.Security.SecurityElement.Escape(title)}</layername>
+      <provider>wms</provider>
+    </maplayer>
+  </projectlayers>
+  <properties>
+    <WMSUrl type=""QString"">{System.Security.SecurityElement.Escape(wmsUrl)}</WMSUrl>
+    <WFSUrl type=""QString"">{System.Security.SecurityElement.Escape(wfsUrl)}</WFSUrl>
+  </properties>
+</qgis>";
+    }
+
+    private static string GenerateArcGisConnectionFile(string title, string wmsUrl)
+    {
+        return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<ARCGIS>
+  <WMSConnection>
+    <Name>{System.Security.SecurityElement.Escape(title)}</Name>
+    <URL>{System.Security.SecurityElement.Escape(wmsUrl)}</URL>
+    <Version>1.3.0</Version>
+  </WMSConnection>
+</ARCGIS>";
     }
 
     #endregion
