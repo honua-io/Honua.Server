@@ -1,0 +1,189 @@
+@using static Honua.Admin.Blazor.Components.Shared.ColumnConfiguration
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body1">
+                Define coded values for <b>@ColumnName</b>. This creates a lookup table that maps codes to display names.
+            </MudText>
+
+            <MudAlert Severity="Severity.Info" Dense="true">
+                <MudText Typo="Typo.caption">
+                    <b>Example:</b> Map numeric codes like <code>1, 2, 3</code> to names like <code>"Residential", "Commercial", "Industrial"</code>
+                </MudText>
+            </MudAlert>
+
+            <MudDivider />
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.subtitle1">Coded Values (@_domain.Values.Count)</MudText>
+                <MudButton Size="Size.Small"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AddCodedValue">
+                    Add Value
+                </MudButton>
+            </MudStack>
+
+            @if (!_domain.Values.Any())
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">
+                    No coded values defined. Click "Add Value" to create mappings.
+                </MudAlert>
+            }
+            else
+            {
+                <MudPaper Outlined="true" Class="pa-2">
+                    <MudStack Spacing="2">
+                        @for (int i = 0; i < _domain.Values.Count; i++)
+                        {
+                            var index = i; // Capture for closure
+                            var value = _domain.Values[index];
+
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudTextField @bind-Value="value.Code"
+                                              Label="Code"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Style="max-width: 150px;"
+                                              HelperText="Actual value" />
+                                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                                <MudTextField @bind-Value="value.Name"
+                                              Label="Display Name"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              HelperText="User-friendly name" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="Color.Error"
+                                               Size="Size.Small"
+                                               OnClick="@(() => RemoveCodedValue(index))" />
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                <MudDivider />
+
+                <MudExpansionPanels>
+                    <MudExpansionPanel Text="Quick Import (CSV)">
+                        <MudStack Spacing="2">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Paste comma-separated values in the format: <code>code,name</code> (one per line)
+                            </MudText>
+
+                            <MudTextField @bind-Value="_csvImport"
+                                          Label="CSV Data"
+                                          Variant="Variant.Outlined"
+                                          Lines="5"
+                                          Placeholder="@("1,Residential\n2,Commercial\n3,Industrial")" />
+
+                            <MudButton Size="Size.Small"
+                                       Variant="Variant.Outlined"
+                                       StartIcon="@Icons.Material.Filled.Upload"
+                                       OnClick="ImportFromCsv">
+                                Import
+                            </MudButton>
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   OnClick="Clear">
+            Clear All
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Save">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public string ColumnName { get; set; } = string.Empty;
+
+    [Parameter]
+    public CodedValueDomain? ExistingDomain { get; set; }
+
+    private CodedValueDomain _domain = new();
+    private string _csvImport = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        if (ExistingDomain != null)
+        {
+            _domain = new CodedValueDomain
+            {
+                Type = ExistingDomain.Type,
+                Values = ExistingDomain.Values.Select(v => new CodedValue
+                {
+                    Code = v.Code,
+                    Name = v.Name
+                }).ToList()
+            };
+        }
+    }
+
+    private void AddCodedValue()
+    {
+        _domain.Values.Add(new CodedValue());
+    }
+
+    private void RemoveCodedValue(int index)
+    {
+        _domain.Values.RemoveAt(index);
+    }
+
+    private void ImportFromCsv()
+    {
+        if (string.IsNullOrWhiteSpace(_csvImport))
+            return;
+
+        var lines = _csvImport.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var line in lines)
+        {
+            var parts = line.Split(',', StringSplitOptions.TrimEntries);
+            if (parts.Length >= 2)
+            {
+                _domain.Values.Add(new CodedValue
+                {
+                    Code = parts[0],
+                    Name = parts[1]
+                });
+            }
+        }
+
+        _csvImport = string.Empty;
+    }
+
+    private void Clear()
+    {
+        _domain.Values.Clear();
+    }
+
+    private void Save()
+    {
+        // Remove empty values
+        _domain.Values = _domain.Values
+            .Where(v => !string.IsNullOrWhiteSpace(v.Code) && !string.IsNullOrWhiteSpace(v.Name))
+            .ToList();
+
+        MudDialog.Close(DialogResult.Ok(_domain));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

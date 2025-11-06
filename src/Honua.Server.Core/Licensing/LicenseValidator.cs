@@ -288,4 +288,9 @@ public interface ILicenseStore
     /// Gets all expired licenses.
     /// </summary>
     Task<LicenseInfo[]> GetExpiredLicensesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the first active license (for single-tenant deployments).
+    /// </summary>
+    Task<LicenseInfo?> GetFirstActiveLicenseAsync(CancellationToken cancellationToken = default);
 }

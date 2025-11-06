@@ -1,0 +1,275 @@
+@using Honua.Admin.Blazor.Shared.Models
+@inject IDialogService DialogService
+
+<MudStack Spacing="4" Class="mt-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudText Typo="Typo.h6">Configure Columns</MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Size="Size.Small"
+                       Variant="Variant.Outlined"
+                       OnClick="SelectAll">
+                Select All
+            </MudButton>
+            <MudButton Size="Size.Small"
+                       Variant="Variant.Outlined"
+                       OnClick="DeselectAll">
+                Deselect All
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+    @if (TableInfo != null)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Select which columns to include in the layer and configure their display properties.
+        </MudText>
+
+        <MudTable Items="@TableInfo.Columns" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh Style="width: 60px;">
+                    <MudCheckBox Checked="@AllSelected"
+                                 CheckedChanged="@((bool val) => ToggleAll(val))"
+                                 Color="Color.Primary" />
+                </MudTh>
+                <MudTh>Column Name</MudTh>
+                <MudTh>Data Type</MudTh>
+                <MudTh>Alias (Display Name)</MudTh>
+                <MudTh>Coded Values</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudCheckBox Checked="@SelectedColumns.Contains(context.Name)"
+                                 CheckedChanged="@((bool val) => ToggleColumn(context.Name, val))"
+                                 Color="Color.Primary"
+                                 Disabled="@IsRequiredColumn(context.Name)" />
+                </MudTd>
+                <MudTd DataLabel="Column">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        @if (context.Name == TableInfo.GeometryColumn)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Place" Color="Color.Primary" Size="Size.Small" Title="Geometry Column" />
+                        }
+                        @if (context.IsPrimaryKey)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Warning" Size="Size.Small" Title="Primary Key" />
+                        }
+                        <MudText>@context.Name</MudText>
+                    </MudStack>
+                </MudTd>
+                <MudTd DataLabel="Type">
+                    <code>@context.DataType</code>
+                </MudTd>
+                <MudTd DataLabel="Alias">
+                    @if (SelectedColumns.Contains(context.Name))
+                    {
+                        <MudTextField @bind-Value="@ColumnAliases[context.Name]"
+                                      Placeholder="@context.Name"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      HelperText="Optional display name" />
+                    }
+                </MudTd>
+                <MudTd DataLabel="Coded Values">
+                    @if (SelectedColumns.Contains(context.Name) && !IsGeometryOrPrimaryKey(context.Name))
+                    {
+                        @if (CodedValueDomains.ContainsKey(context.Name))
+                        {
+                            <MudChip Size="Size.Small"
+                                     Color="Color.Success"
+                                     Icon="@Icons.Material.Filled.List"
+                                     OnClick="@(() => OpenCodedValuesDialog(context.Name))">
+                                @CodedValueDomains[context.Name].Values.Count values
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudButton Size="Size.Small"
+                                       Variant="Variant.Text"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       OnClick="@(() => OpenCodedValuesDialog(context.Name))">
+                                Add
+                            </MudButton>
+                        }
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        <MudAlert Severity="Severity.Info" Dense="true">
+            <MudText Typo="Typo.caption">
+                <b>Selected:</b> @SelectedColumns.Count / @TableInfo.Columns.Count columns
+                @if (!string.IsNullOrEmpty(TableInfo.GeometryColumn))
+                {
+                    <span> • Geometry column (<code>@TableInfo.GeometryColumn</code>) is required</span>
+                }
+            </MudText>
+        </MudAlert>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public TableInfo? TableInfo { get; set; }
+
+    [Parameter]
+    public HashSet<string> SelectedColumns { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<HashSet<string>> SelectedColumnsChanged { get; set; }
+
+    [Parameter]
+    public Dictionary<string, string> ColumnAliases { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<Dictionary<string, string>> ColumnAliasesChanged { get; set; }
+
+    [Parameter]
+    public Dictionary<string, CodedValueDomain> CodedValueDomains { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<Dictionary<string, CodedValueDomain>> CodedValueDomainsChanged { get; set; }
+
+    private bool AllSelected => TableInfo != null && SelectedColumns.Count == TableInfo.Columns.Count;
+
+    protected override void OnParametersSet()
+    {
+        // Initialize column aliases dictionary for all columns
+        if (TableInfo != null)
+        {
+            foreach (var column in TableInfo.Columns)
+            {
+                if (!ColumnAliases.ContainsKey(column.Name))
+                {
+                    ColumnAliases[column.Name] = string.Empty;
+                }
+            }
+        }
+    }
+
+    private void SelectAll()
+    {
+        if (TableInfo != null)
+        {
+            SelectedColumns = TableInfo.Columns.Select(c => c.Name).ToHashSet();
+            SelectedColumnsChanged.InvokeAsync(SelectedColumns);
+        }
+    }
+
+    private void DeselectAll()
+    {
+        // Keep required columns
+        if (TableInfo != null)
+        {
+            var required = new HashSet<string>();
+            if (!string.IsNullOrEmpty(TableInfo.GeometryColumn))
+            {
+                required.Add(TableInfo.GeometryColumn);
+            }
+
+            var pkColumn = TableInfo.Columns.FirstOrDefault(c => c.IsPrimaryKey);
+            if (pkColumn != null)
+            {
+                required.Add(pkColumn.Name);
+            }
+
+            SelectedColumns = required;
+            SelectedColumnsChanged.InvokeAsync(SelectedColumns);
+        }
+    }
+
+    private void ToggleAll(bool selected)
+    {
+        if (selected)
+        {
+            SelectAll();
+        }
+        else
+        {
+            DeselectAll();
+        }
+    }
+
+    private void ToggleColumn(string columnName, bool selected)
+    {
+        if (selected)
+        {
+            SelectedColumns.Add(columnName);
+        }
+        else
+        {
+            // Don't allow deselecting required columns
+            if (!IsRequiredColumn(columnName))
+            {
+                SelectedColumns.Remove(columnName);
+            }
+        }
+
+        SelectedColumnsChanged.InvokeAsync(SelectedColumns);
+    }
+
+    private bool IsRequiredColumn(string columnName)
+    {
+        if (TableInfo == null) return false;
+
+        // Geometry column is required
+        if (columnName == TableInfo.GeometryColumn)
+            return true;
+
+        // Primary key is required
+        var column = TableInfo.Columns.FirstOrDefault(c => c.Name == columnName);
+        return column?.IsPrimaryKey == true;
+    }
+
+    private bool IsGeometryOrPrimaryKey(string columnName)
+    {
+        if (TableInfo == null) return false;
+
+        if (columnName == TableInfo.GeometryColumn)
+            return true;
+
+        var column = TableInfo.Columns.FirstOrDefault(c => c.Name == columnName);
+        return column?.IsPrimaryKey == true;
+    }
+
+    private async Task OpenCodedValuesDialog(string columnName)
+    {
+        var existingDomain = CodedValueDomains.ContainsKey(columnName) ? CodedValueDomains[columnName] : null;
+
+        var parameters = new DialogParameters<CodedValueDialog>
+        {
+            { x => x.ColumnName, columnName },
+            { x => x.ExistingDomain, existingDomain }
+        };
+
+        var dialog = await DialogService.ShowAsync<CodedValueDialog>($"Coded Values: {columnName}",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is CodedValueDomain domain)
+        {
+            if (domain.Values.Any())
+            {
+                CodedValueDomains[columnName] = domain;
+            }
+            else
+            {
+                CodedValueDomains.Remove(columnName);
+            }
+
+            await CodedValueDomainsChanged.InvokeAsync(CodedValueDomains);
+        }
+    }
+
+    public class CodedValueDomain
+    {
+        public string Type { get; set; } = "codedValue";
+        public List<CodedValue> Values { get; set; } = new();
+    }
+
+    public class CodedValue
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+}

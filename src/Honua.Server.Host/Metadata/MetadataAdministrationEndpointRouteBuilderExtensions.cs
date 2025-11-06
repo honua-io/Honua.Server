@@ -376,6 +376,15 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
         // Map new CRUD endpoints for services, layers, and folders
         group.MapAdminMetadataEndpoints();
 
+        // Map feature flag endpoints
+        group.MapAdminFeatureFlagEndpoints();
+
+        // Map server configuration endpoints (CORS, etc.)
+        group.MapAdminServerEndpoints();
+
+        // Map RBAC endpoints (roles and permissions)
+        group.MapAdminRbacEndpoints();
+
         return group;
     }
 

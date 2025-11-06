@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject FeatureFlagService FeatureFlags
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -12,6 +13,28 @@
         <MudSpacer />
         <GlobalSearch Class="mx-4" Style="max-width: 500px; width: 100%;" />
         <MudSpacer />
+
+        @* License Tier Badge *@
+        @if (_featureFlags != null)
+        {
+            <MudChip Color="@GetTierColor()" Size="Size.Small" Icon="@Icons.Material.Filled.Badge" Class="mr-2">
+                @_featureFlags.Tier
+            </MudChip>
+
+            @if (_featureFlags.DaysUntilExpiration <= 30 && _featureFlags.DaysUntilExpiration > 0)
+            {
+                <MudChip Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Warning" Class="mr-2">
+                    Expires in @_featureFlags.DaysUntilExpiration days
+                </MudChip>
+            }
+            else if (_featureFlags.DaysUntilExpiration <= 0)
+            {
+                <MudChip Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Error" Class="mr-2">
+                    License Expired
+                </MudChip>
+            }
+        }
+
         <LoginDisplay />
     </MudAppBar>
 
@@ -30,14 +53,18 @@
 @code {
     private bool _drawerOpen = true;
     private List<BreadcrumbItem> _breadcrumbs = new();
+    private FeatureFlagState? _featureFlags;
 
     [Inject] private NavigationState NavState { get; set; } = default!;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         // Subscribe to breadcrumb changes
         NavState.OnChange += UpdateBreadcrumbs;
         UpdateBreadcrumbs();
+
+        // Load feature flags for license tier display
+        _featureFlags = await FeatureFlags.GetFeatureFlagsAsync();
     }
 
     private void UpdateBreadcrumbs()
@@ -50,6 +77,13 @@
     {
         _drawerOpen = !_drawerOpen;
     }
+
+    private Color GetTierColor() => _featureFlags?.Tier switch
+    {
+        LicenseTier.Enterprise => Color.Success,
+        LicenseTier.Professional => Color.Info,
+        _ => Color.Default
+    };
 
     public void Dispose()
     {

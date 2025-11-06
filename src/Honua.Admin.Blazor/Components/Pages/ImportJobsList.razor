@@ -1,10 +1,12 @@
 @page "/import/jobs"
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
+@using Microsoft.JSInterop
 @attribute [Authorize(Roles = "administrator,datapublisher")]
 @inject ImportApiClient ImportApi
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 @implements IDisposable
 
 <PageTitle>Import Jobs - Honua Admin</PageTitle>
@@ -38,54 +40,281 @@
             <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
         }
 
-        <MudTable Items="@_jobs"
+        <!-- Filter Controls -->
+        <MudExpansionPanels Class="mb-4">
+            <MudExpansionPanel Text="Filters & Search" IsInitiallyExpanded="true">
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudTextField @bind-Value="_searchText"
+                                      Label="Search"
+                                      Placeholder="Filename, service, or layer..."
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Search"
+                                      Clearable="true"
+                                      Immediate="true"
+                                      OnClearButtonClick="ClearSearch" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect @bind-Value="_filterStatus"
+                                   Label="Status"
+                                   Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="@("All")">All Statuses</MudSelectItem>
+                            <MudSelectItem Value="@("Running")">Running</MudSelectItem>
+                            <MudSelectItem Value="@("Queued")">Queued</MudSelectItem>
+                            <MudSelectItem Value="@("Completed")">Completed</MudSelectItem>
+                            <MudSelectItem Value="@("Failed")">Failed</MudSelectItem>
+                            <MudSelectItem Value="@("Cancelled")">Cancelled</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect @bind-Value="_filterJobType"
+                                   Label="Job Type"
+                                   Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="@("All")">All Types</MudSelectItem>
+                            <MudSelectItem Value="@("File")">File Upload</MudSelectItem>
+                            <MudSelectItem Value="@("Esri")">Esri Import</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudSelect @bind-Value="_filterDateRange"
+                                   Label="Date Range"
+                                   Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="@("All")">All Time</MudSelectItem>
+                            <MudSelectItem Value="@("24h")">Last 24 Hours</MudSelectItem>
+                            <MudSelectItem Value="@("7d")">Last 7 Days</MudSelectItem>
+                            <MudSelectItem Value="@("30d")">Last 30 Days</MudSelectItem>
+                            <MudSelectItem Value="@("Custom")">Custom Range</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    @if (_filterDateRange == "Custom")
+                    {
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudDatePicker @bind-Date="_customDateFrom"
+                                           Label="From Date"
+                                           Variant="Variant.Outlined"
+                                           Editable="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudDatePicker @bind-Date="_customDateTo"
+                                           Label="To Date"
+                                           Variant="Variant.Outlined"
+                                           Editable="true" />
+                        </MudItem>
+                    }
+                </MudGrid>
+                <MudStack Row="true" Class="mt-3" Spacing="2">
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.FilterAltOff"
+                               OnClick="ClearFilters"
+                               Size="Size.Small">
+                        Clear Filters
+                    </MudButton>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="align-self-center">
+                        Showing @FilteredJobs.Count() of @_jobs.Count jobs
+                    </MudText>
+                </MudStack>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        <!-- Bulk Actions -->
+        @if (_selectedJobs.Any())
+        {
+            <MudPaper Outlined="true" Class="pa-3 mb-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudText Typo="Typo.body1">
+                        <strong>@_selectedJobs.Count</strong> job(s) selected
+                    </MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.Cancel"
+                               OnClick="CancelSelectedJobs"
+                               Disabled="@(!CanCancelSelected())">
+                        Cancel Selected
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.Deselect"
+                               OnClick="ClearSelection">
+                        Clear Selection
+                    </MudButton>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.Download"
+                               OnClick="ExportToCSV">
+                        Export to CSV
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <MudStack Row="true" Justify="Justify.FlexEnd" Class="mb-4">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Success"
+                           StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="ExportToCSV">
+                    Export to CSV
+                </MudButton>
+            </MudStack>
+        }
+
+        <MudTable Items="@FilteredJobs"
                   Hover="true"
                   Breakpoint="Breakpoint.Sm"
                   Loading="@_loading"
                   LoadingProgressColor="Color.Primary">
             <HeaderContent>
+                <MudTh Style="width: 50px;">
+                    <MudCheckBox @bind-Value="_selectAll"
+                                 Color="Color.Primary"
+                                 Size="Size.Small"
+                                 T="bool"
+                                 ValueChanged="@ToggleSelectAll" />
+                </MudTh>
+                <MudTh Style="width: 50px;"></MudTh>
                 <MudTh>Job ID</MudTh>
-                <MudTh>File Name</MudTh>
-                <MudTh>Service / Layer</MudTh>
+                <MudTh>Source</MudTh>
+                <MudTh>Target</MudTh>
                 <MudTh>Status</MudTh>
-                <MudTh>Progress</MudTh>
-                <MudTh>Created</MudTh>
+                <MudTh Style="min-width: 250px;">Progress</MudTh>
+                <MudTh>Time</MudTh>
                 <MudTh>Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
+                <MudTd>
+                    <MudCheckBox @bind-Value="@_selectedJobs[context.JobId]"
+                                 Color="Color.Primary"
+                                 Size="Size.Small"
+                                 T="bool" />
+                </MudTd>
+                <MudTd>
+                    @if (HasDetails(context))
+                    {
+                        <MudIconButton Icon="@(_expandedJobs.Contains(context.JobId) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                       Size="Size.Small"
+                                       OnClick="@(() => ToggleJobDetails(context.JobId))" />
+                    }
+                </MudTd>
                 <MudTd DataLabel="Job ID">
-                    <MudText Typo="Typo.body2" Class="text-monospace">@context.JobId.ToString().Substring(0, 8)...</MudText>
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body2" Style="font-family: monospace; font-size: 0.85rem;">
+                            @context.JobId.ToString().Substring(0, 8)...
+                        </MudText>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                            @GetJobTypeLabel(context)
+                        </MudChip>
+                    </MudStack>
                 </MudTd>
-                <MudTd DataLabel="File Name">
-                    <MudText Typo="Typo.body1">@context.FileName</MudText>
+                <MudTd DataLabel="Source">
+                    @if (!string.IsNullOrEmpty(context.FileName))
+                    {
+                        <MudStack Spacing="0">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" />
+                                <MudText Typo="Typo.body1">@context.FileName</MudText>
+                            </MudStack>
+                            @if (context.FileSizeBytes.HasValue)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @FormatFileSize(context.FileSizeBytes.Value)
+                                </MudText>
+                            }
+                        </MudStack>
+                    }
+                    else if (!string.IsNullOrEmpty(context.SourceUrl))
+                    {
+                        <MudStack Spacing="0">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.Public" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">Esri Service</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
+                                @context.SourceUrl
+                            </MudText>
+                        </MudStack>
+                    }
                 </MudTd>
-                <MudTd DataLabel="Service / Layer">
-                    <MudText Typo="Typo.body2">@context.ServiceId / @context.LayerId</MudText>
+                <MudTd DataLabel="Target">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body2">@context.ServiceId</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.LayerId</MudText>
+                    </MudStack>
                 </MudTd>
                 <MudTd DataLabel="Status">
-                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Icon="@GetStatusIcon(context.Status)">
                         @context.Status
                     </MudChip>
                 </MudTd>
                 <MudTd DataLabel="Progress">
                     @if (context.Status == "Running")
                     {
-                        <MudProgressLinear Value="@context.Progress" Color="Color.Primary" />
-                        <MudText Typo="Typo.caption">@($"{context.RecordsProcessed:N0} / {context.RecordsTotal:N0}")</MudText>
+                        <MudStack Spacing="1">
+                            <MudProgressLinear Value="@context.Progress" Color="Color.Primary" Size="Size.Medium" />
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.caption">
+                                    @($"{context.RecordsProcessed:N0} / {context.RecordsTotal:N0} features")
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @($"{context.Progress:F1}%")
+                                </MudText>
+                            </MudStack>
+                            @if (context.RecordsProcessed > 0 && context.StartedAt.HasValue)
+                            {
+                                var throughput = CalculateThroughput(context);
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @($"{throughput:N0} features/sec")
+                                </MudText>
+                            }
+                        </MudStack>
                     }
                     else if (context.Status == "Completed")
                     {
-                        <MudText Typo="Typo.body2">@($"{context.RecordsProcessed:N0} records")</MudText>
+                        <MudStack Spacing="0">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">@($"{context.RecordsProcessed:N0} features")</MudText>
+                            </MudStack>
+                            @if (context.StartedAt.HasValue && context.CompletedAt.HasValue)
+                            {
+                                var duration = context.CompletedAt.Value - context.StartedAt.Value;
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @FormatDuration(duration)
+                                </MudText>
+                            }
+                        </MudStack>
                     }
                     else if (context.Status == "Failed")
                     {
                         <MudTooltip Text="@context.ErrorMessage">
-                            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Error">
+                                Click for details
+                            </MudChip>
                         </MudTooltip>
                     }
+                    else if (context.Status == "Queued")
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Waiting to start...</MudText>
+                        </MudStack>
+                    }
                 </MudTd>
-                <MudTd DataLabel="Created">
-                    <MudText Typo="Typo.body2">@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                <MudTd DataLabel="Time">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Created:</MudText>
+                        <MudText Typo="Typo.body2">@context.CreatedAt.ToString("yyyy-MM-dd HH:mm")</MudText>
+                        @if (context.Status == "Running" && context.StartedAt.HasValue)
+                        {
+                            var elapsed = DateTime.UtcNow - context.StartedAt.Value;
+                            <MudText Typo="Typo.caption" Color="Color.Info">
+                                Elapsed: @FormatDuration(elapsed)
+                            </MudText>
+                        }
+                    </MudStack>
                 </MudTd>
                 <MudTd DataLabel="Actions">
                     <MudStack Row="true" Spacing="1">
@@ -102,9 +331,95 @@
                                            OnClick="@(() => CancelJob(context.JobId))"
                                            Title="Cancel" />
                         }
+                        @if (context.Status == "Completed")
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                           Size="Size.Small"
+                                           Href="@($"/services/{context.ServiceId}/layers/{context.LayerId}")"
+                                           Title="View Layer" />
+                        }
                     </MudStack>
                 </MudTd>
             </RowTemplate>
+            <ChildRowContent>
+                @if (_expandedJobs.Contains(context.JobId))
+                {
+                    <MudTr>
+                        <td colspan="9">
+                            <MudPaper Outlined="true" Class="pa-4 ma-2">
+                                @if (context.Layers?.Any() == true)
+                                {
+                                    <MudText Typo="Typo.subtitle2" Class="mb-2">Layer Progress:</MudText>
+                                    <MudStack Spacing="2">
+                                        @foreach (var layer in context.Layers)
+                                        {
+                                            <MudPaper Outlined="true" Class="pa-3">
+                                                <MudStack Spacing="1">
+                                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                            <MudIcon Icon="@GetGeometryIcon(layer.GeometryType)" Size="Size.Small" />
+                                                            <MudText Typo="Typo.body1"><b>@layer.Name</b></MudText>
+                                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@layer.GeometryType</MudChip>
+                                                        </MudStack>
+                                                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(layer.Status)">
+                                                            @layer.Status
+                                                        </MudChip>
+                                                    </MudStack>
+
+                                                    @if (layer.Status == "Running" || layer.Status == "Completed")
+                                                    {
+                                                        <MudProgressLinear Value="@layer.Progress" Color="Color.Primary" />
+                                                        <MudText Typo="Typo.caption">
+                                                            @($"{layer.FeaturesImported:N0} / {layer.TotalFeatures:N0} features ({layer.Progress:F1}%)")
+                                                        </MudText>
+                                                    }
+
+                                                    @if (!string.IsNullOrEmpty(layer.ErrorMessage))
+                                                    {
+                                                        <MudAlert Severity="Severity.Error" Dense="true">@layer.ErrorMessage</MudAlert>
+                                                    }
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
+                                    </MudStack>
+                                }
+                                else
+                                {
+                                    <MudSimpleTable Dense="true">
+                                        <tbody>
+                                            <tr>
+                                                <td><strong>Job ID:</strong></td>
+                                                <td>@context.JobId</td>
+                                            </tr>
+                                            @if (!string.IsNullOrEmpty(context.SourceUrl))
+                                            {
+                                                <tr>
+                                                    <td><strong>Source URL:</strong></td>
+                                                    <td><MudLink Href="@context.SourceUrl" Target="_blank">@context.SourceUrl</MudLink></td>
+                                                </tr>
+                                            }
+                                            @if (context.RecordsTotal.HasValue)
+                                            {
+                                                <tr>
+                                                    <td><strong>Total Features:</strong></td>
+                                                    <td>@context.RecordsTotal.Value.ToString("N0")</td>
+                                                </tr>
+                                            }
+                                            @if (!string.IsNullOrEmpty(context.ErrorMessage))
+                                            {
+                                                <tr>
+                                                    <td><strong>Error:</strong></td>
+                                                    <td><MudText Color="Color.Error">@context.ErrorMessage</MudText></td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </MudSimpleTable>
+                                }
+                            </MudPaper>
+                        </td>
+                    </MudTr>
+                }
+            </ChildRowContent>
             <NoRecordsContent>
                 <MudText Align="Align.Center" Class="py-4">
                     No import jobs yet. Click "New Import" to get started.
@@ -138,6 +453,19 @@
     private List<ImportJobSnapshot> _jobs = new();
     private string? _paginationToken;
     private System.Threading.Timer? _refreshTimer;
+    private HashSet<Guid> _expandedJobs = new();
+
+    // Filter and search fields
+    private string _searchText = "";
+    private string _filterStatus = "All";
+    private string _filterJobType = "All";
+    private string _filterDateRange = "All";
+    private DateTime? _customDateFrom;
+    private DateTime? _customDateTo;
+
+    // Bulk selection
+    private Dictionary<Guid, bool> _selectedJobs = new();
+    private bool _selectAll = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -169,6 +497,9 @@
             var result = await ImportApi.ListImportJobsAsync(pageSize: 25);
             _jobs = result.Items;
             _paginationToken = result.NextPageToken;
+
+            // Initialize selection dictionary with all jobs
+            _selectedJobs = _jobs.ToDictionary(j => j.JobId, j => false);
         }
         catch (Exception ex)
         {
@@ -193,6 +524,15 @@
             var result = await ImportApi.ListImportJobsAsync(pageSize: 25, pageToken: _paginationToken);
             _jobs.AddRange(result.Items);
             _paginationToken = result.NextPageToken;
+
+            // Add new jobs to selection dictionary
+            foreach (var job in result.Items)
+            {
+                if (!_selectedJobs.ContainsKey(job.JobId))
+                {
+                    _selectedJobs[job.JobId] = false;
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -260,6 +600,318 @@
             "cancelled" => Color.Warning,
             _ => Color.Default
         };
+    }
+
+    private string GetStatusIcon(string? status)
+    {
+        return status?.ToLowerInvariant() switch
+        {
+            "completed" => Icons.Material.Filled.CheckCircle,
+            "running" => Icons.Material.Filled.PlayArrow,
+            "queued" => Icons.Material.Filled.Schedule,
+            "failed" => Icons.Material.Filled.Error,
+            "cancelled" => Icons.Material.Filled.Cancel,
+            _ => Icons.Material.Filled.Info
+        };
+    }
+
+    private bool HasDetails(ImportJobSnapshot job)
+    {
+        return job.Layers?.Any() == true
+            || !string.IsNullOrEmpty(job.SourceUrl)
+            || !string.IsNullOrEmpty(job.ErrorMessage);
+    }
+
+    private void ToggleJobDetails(Guid jobId)
+    {
+        if (_expandedJobs.Contains(jobId))
+        {
+            _expandedJobs.Remove(jobId);
+        }
+        else
+        {
+            _expandedJobs.Add(jobId);
+        }
+    }
+
+    private string GetJobTypeLabel(ImportJobSnapshot job)
+    {
+        if (!string.IsNullOrEmpty(job.SourceUrl))
+        {
+            return "Esri Import";
+        }
+        else if (!string.IsNullOrEmpty(job.FileName))
+        {
+            var extension = System.IO.Path.GetExtension(job.FileName)?.ToLowerInvariant();
+            return extension switch
+            {
+                ".shp" => "Shapefile",
+                ".geojson" or ".json" => "GeoJSON",
+                ".gpkg" => "GeoPackage",
+                ".kml" => "KML",
+                ".gml" => "GML",
+                ".csv" => "CSV",
+                _ => "File Upload"
+            };
+        }
+        return "Unknown";
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+        {
+            return $"{duration.Hours}h {duration.Minutes}m";
+        }
+        else if (duration.TotalMinutes >= 1)
+        {
+            return $"{duration.Minutes}m {duration.Seconds}s";
+        }
+        else
+        {
+            return $"{duration.Seconds}s";
+        }
+    }
+
+    private double CalculateThroughput(ImportJobSnapshot job)
+    {
+        if (job.RecordsProcessed == 0 || !job.StartedAt.HasValue)
+            return 0;
+
+        var elapsed = DateTime.UtcNow - job.StartedAt.Value;
+        if (elapsed.TotalSeconds == 0)
+            return 0;
+
+        return job.RecordsProcessed / elapsed.TotalSeconds;
+    }
+
+    private string GetGeometryIcon(string? geometryType)
+    {
+        return geometryType?.ToUpperInvariant() switch
+        {
+            "POINT" or "MULTIPOINT" => Icons.Material.Filled.Place,
+            "LINESTRING" or "MULTILINESTRING" => Icons.Material.Filled.Timeline,
+            "POLYGON" or "MULTIPOLYGON" => Icons.Material.Filled.Polyline,
+            "GEOMETRY" or "GEOMETRYCOLLECTION" => Icons.Material.Filled.Layers,
+            _ => Icons.Material.Filled.Place
+        };
+    }
+
+    // Filtering and Search
+    private IEnumerable<ImportJobSnapshot> FilteredJobs
+    {
+        get
+        {
+            var filtered = _jobs.AsEnumerable();
+
+            // Filter by status
+            if (_filterStatus != "All")
+            {
+                filtered = filtered.Where(j => j.Status.Equals(_filterStatus, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Filter by job type
+            if (_filterJobType != "All")
+            {
+                if (_filterJobType == "File")
+                {
+                    filtered = filtered.Where(j => !string.IsNullOrEmpty(j.FileName));
+                }
+                else if (_filterJobType == "Esri")
+                {
+                    filtered = filtered.Where(j => !string.IsNullOrEmpty(j.SourceUrl));
+                }
+            }
+
+            // Filter by date range
+            if (_filterDateRange != "All")
+            {
+                DateTime cutoffDate;
+                if (_filterDateRange == "24h")
+                {
+                    cutoffDate = DateTime.UtcNow.AddHours(-24);
+                    filtered = filtered.Where(j => j.CreatedAt >= cutoffDate);
+                }
+                else if (_filterDateRange == "7d")
+                {
+                    cutoffDate = DateTime.UtcNow.AddDays(-7);
+                    filtered = filtered.Where(j => j.CreatedAt >= cutoffDate);
+                }
+                else if (_filterDateRange == "30d")
+                {
+                    cutoffDate = DateTime.UtcNow.AddDays(-30);
+                    filtered = filtered.Where(j => j.CreatedAt >= cutoffDate);
+                }
+                else if (_filterDateRange == "Custom" && _customDateFrom.HasValue)
+                {
+                    var fromDate = _customDateFrom.Value;
+                    var toDate = _customDateTo?.AddDays(1) ?? DateTime.UtcNow.AddDays(1);
+                    filtered = filtered.Where(j => j.CreatedAt >= fromDate && j.CreatedAt < toDate);
+                }
+            }
+
+            // Search text
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                var search = _searchText.ToLowerInvariant();
+                filtered = filtered.Where(j =>
+                    (!string.IsNullOrEmpty(j.FileName) && j.FileName.ToLowerInvariant().Contains(search)) ||
+                    (!string.IsNullOrEmpty(j.ServiceId) && j.ServiceId.ToLowerInvariant().Contains(search)) ||
+                    (!string.IsNullOrEmpty(j.LayerId) && j.LayerId.ToLowerInvariant().Contains(search)) ||
+                    (!string.IsNullOrEmpty(j.SourceUrl) && j.SourceUrl.ToLowerInvariant().Contains(search))
+                );
+            }
+
+            return filtered;
+        }
+    }
+
+    private void ClearSearch()
+    {
+        _searchText = "";
+    }
+
+    private void ClearFilters()
+    {
+        _searchText = "";
+        _filterStatus = "All";
+        _filterJobType = "All";
+        _filterDateRange = "All";
+        _customDateFrom = null;
+        _customDateTo = null;
+    }
+
+    // Bulk Selection
+    private void ToggleSelectAll(bool value)
+    {
+        _selectAll = value;
+        foreach (var job in FilteredJobs)
+        {
+            if (_selectedJobs.ContainsKey(job.JobId))
+            {
+                _selectedJobs[job.JobId] = value;
+            }
+        }
+    }
+
+    private void ClearSelection()
+    {
+        foreach (var key in _selectedJobs.Keys.ToList())
+        {
+            _selectedJobs[key] = false;
+        }
+        _selectAll = false;
+    }
+
+    private bool CanCancelSelected()
+    {
+        return _selectedJobs.Any(kvp => kvp.Value && _jobs.Any(j => j.JobId == kvp.Key && (j.Status == "Running" || j.Status == "Queued")));
+    }
+
+    private async Task CancelSelectedJobs()
+    {
+        var selectedJobIds = _selectedJobs.Where(kvp => kvp.Value).Select(kvp => kvp.Key).ToList();
+        var jobsToCancel = _jobs.Where(j => selectedJobIds.Contains(j.JobId) && (j.Status == "Running" || j.Status == "Queued")).ToList();
+
+        if (!jobsToCancel.Any())
+        {
+            Snackbar.Add("No running or queued jobs selected", Severity.Warning);
+            return;
+        }
+
+        var cancelCount = 0;
+        var failCount = 0;
+
+        foreach (var job in jobsToCancel)
+        {
+            try
+            {
+                var success = await ImportApi.CancelImportJobAsync(job.JobId);
+                if (success)
+                {
+                    cancelCount++;
+                    await RefreshJob(job.JobId);
+                }
+                else
+                {
+                    failCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                failCount++;
+                Snackbar.Add($"Error cancelling job {job.JobId}: {ex.Message}", Severity.Error);
+            }
+        }
+
+        if (cancelCount > 0)
+        {
+            Snackbar.Add($"Successfully cancelled {cancelCount} job(s)", Severity.Success);
+        }
+
+        if (failCount > 0)
+        {
+            Snackbar.Add($"Failed to cancel {failCount} job(s)", Severity.Error);
+        }
+
+        ClearSelection();
+    }
+
+    // CSV Export
+    private async Task ExportToCSV()
+    {
+        try
+        {
+            var jobsToExport = _selectedJobs.Any(kvp => kvp.Value)
+                ? _jobs.Where(j => _selectedJobs.ContainsKey(j.JobId) && _selectedJobs[j.JobId])
+                : FilteredJobs;
+
+            var csv = new System.Text.StringBuilder();
+
+            // Header
+            csv.AppendLine("Job ID,Job Type,Source,Target Service,Target Layer,Status,Progress,Records Processed,Records Total,File Size,Created At,Started At,Completed At,Duration,Error Message");
+
+            // Data rows
+            foreach (var job in jobsToExport)
+            {
+                var jobType = GetJobTypeLabel(job);
+                var source = !string.IsNullOrEmpty(job.FileName) ? job.FileName : job.SourceUrl ?? "";
+                var duration = job.StartedAt.HasValue && job.CompletedAt.HasValue
+                    ? (job.CompletedAt.Value - job.StartedAt.Value).ToString()
+                    : "";
+                var fileSize = job.FileSizeBytes.HasValue ? FormatFileSize(job.FileSizeBytes.Value) : "";
+                var errorMessage = (job.ErrorMessage ?? "").Replace("\"", "\"\"");
+
+                csv.AppendLine($"\"{job.JobId}\",\"{jobType}\",\"{source}\",\"{job.ServiceId}\",\"{job.LayerId}\",\"{job.Status}\",{job.Progress},{job.RecordsProcessed ?? 0},{job.RecordsTotal ?? 0},\"{fileSize}\",\"{job.CreatedAt:yyyy-MM-dd HH:mm:ss}\",\"{job.StartedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""}\",\"{job.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? ""}\",\"{duration}\",\"{errorMessage}\"");
+            }
+
+            // Download the file
+            var fileName = $"import-jobs-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+
+            // Trigger download using JavaScript interop
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, "text/csv", base64);
+
+            Snackbar.Add($"Exported {jobsToExport.Count()} jobs to CSV", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error exporting to CSV: {ex.Message}", Severity.Error);
+        }
     }
 
     public void Dispose()

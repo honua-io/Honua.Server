@@ -1,3 +1,5 @@
+@inject FeatureFlagService FeatureFlags
+
 <MudNavMenu>
     <MudText Typo="Typo.h6" Class="px-4 py-2">Navigation</MudText>
     <MudDivider Class="mb-2" />
@@ -18,15 +20,30 @@
         Folders
     </MudNavLink>
 
+    <MudNavLink Href="/datasources" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Storage">
+        Data Sources
+    </MudNavLink>
+
     <MudDivider Class="my-2" />
 
-    <MudNavLink Href="/import" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Upload">
-        Import Data
-    </MudNavLink>
+    <MudNavGroup Title="Import" Icon="@Icons.Material.Filled.Upload" Expanded="false">
+        <MudNavLink Href="/import" Icon="@Icons.Material.Filled.CloudUpload">
+            Upload File
+        </MudNavLink>
+        <MudNavLink Href="/import/esri" Icon="@Icons.Material.Filled.Public">
+            Import Esri Service
+        </MudNavLink>
+        <MudNavLink Href="/import/jobs" Icon="@Icons.Material.Filled.ListAlt">
+            Import Jobs
+        </MudNavLink>
+    </MudNavGroup>
 
-    <MudNavLink Href="/versions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">
-        Version History
-    </MudNavLink>
+    @if (_hasVersioning)
+    {
+        <MudNavLink Href="/versions" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.History">
+            Version History
+        </MudNavLink>
+    }
 
     <MudNavLink Href="/audit" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Security">
         Audit Log
@@ -36,17 +53,67 @@
         Cache Settings
     </MudNavLink>
 
+    <MudNavLink Href="/cors" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Public">
+        CORS Settings
+    </MudNavLink>
+
     <MudNavLink Href="/users" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.People">
         User Management
     </MudNavLink>
 
+    <MudNavGroup Title="RBAC" Icon="@Icons.Material.Filled.Security" Expanded="false">
+        <MudNavLink Href="/roles" Icon="@Icons.Material.Filled.AdminPanelSettings">
+            Roles
+        </MudNavLink>
+        <MudNavLink Href="/permissions" Icon="@Icons.Material.Filled.Lock">
+            Permissions
+        </MudNavLink>
+    </MudNavGroup>
+
     <MudDivider Class="my-2" />
+
+    @* Enterprise Features Section *@
+    @if (_hasAnyEnterpriseFeature)
+    {
+        <MudText Typo="Typo.subtitle2" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">
+            Enterprise
+        </MudText>
+
+        @if (_hasGeoEtl)
+        {
+            <MudNavGroup Title="GeoETL" Icon="@Icons.Material.Filled.Transform" Expanded="false">
+                <MudNavLink Href="/geoetl/workflows" Icon="@Icons.Material.Filled.ViewList">
+                    Workflows
+                </MudNavLink>
+                <MudNavLink Href="/geoetl/designer" Icon="@Icons.Material.Filled.AccountTree">
+                    Workflow Designer
+                </MudNavLink>
+            </MudNavGroup>
+        }
+
+        <MudDivider Class="my-2" />
+    }
 
     <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
         Settings
     </MudNavLink>
+
+    <MudNavLink Href="/licensing" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Badge">
+        License & Features
+    </MudNavLink>
 </MudNavMenu>
 
 @code {
-    // Navigation menu component
+    private bool _hasVersioning;
+    private bool _hasGeoEtl;
+    private bool _hasAnyEnterpriseFeature;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check enterprise feature flags
+        _hasVersioning = await FeatureFlags.IsEnabledAsync("versioning");
+        _hasGeoEtl = await FeatureFlags.IsEnabledAsync("geoetl");
+
+        _hasAnyEnterpriseFeature = _hasGeoEtl || _hasVersioning;
+    }
 }

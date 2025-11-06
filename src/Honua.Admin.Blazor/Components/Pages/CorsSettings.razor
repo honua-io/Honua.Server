@@ -1,0 +1,506 @@
+@page "/cors"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator")]
+@inject CorsApiClient CorsApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>CORS Settings - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h3" Class="mb-2">CORS Settings</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        Configure Cross-Origin Resource Sharing (CORS) to allow web applications from other domains to access your API.
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mb-4" />
+    }
+
+    @if (_config != null)
+    {
+        <!-- Enable/Disable CORS -->
+        <MudPaper Elevation="2" Class="pa-6 mb-4">
+            <MudStack Spacing="3">
+                <MudSwitch @bind-Value="_config.Enabled"
+                           Color="Color.Primary"
+                           Label="Enable CORS"
+                           T="bool">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Allow cross-origin requests from web browsers
+                    </MudText>
+                </MudSwitch>
+
+                @if (!_config.Enabled)
+                {
+                    <MudAlert Severity="Severity.Info">
+                        CORS is currently <strong>disabled</strong>. All cross-origin requests will be blocked by the browser.
+                    </MudAlert>
+                }
+            </MudStack>
+        </MudPaper>
+
+        @if (_config.Enabled)
+        {
+            <!-- Origins Configuration -->
+            <MudPaper Elevation="2" Class="pa-6 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Public" Class="mr-2" />
+                    Allowed Origins
+                </MudText>
+
+                <MudSwitch @bind-Value="_config.AllowAnyOrigin"
+                           Color="Color.Warning"
+                           Label="Allow Any Origin (*)"
+                           T="bool"
+                           Class="mb-3">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        ⚠️ Warning: This allows requests from ANY domain. Only use for public APIs.
+                    </MudText>
+                </MudSwitch>
+
+                @if (!_config.AllowAnyOrigin)
+                {
+                    <MudStack Spacing="2">
+                        @foreach (var origin in _config.AllowedOrigins)
+                        {
+                            <MudChip Color="Color.Primary"
+                                     Icon="@Icons.Material.Filled.Link"
+                                     OnClose="() => RemoveOrigin(origin)">
+                                @origin
+                            </MudChip>
+                        }
+
+                        <MudStack Row="true" Spacing="2" Class="mt-2">
+                            <MudTextField @bind-Value="_newOrigin"
+                                          Label="Add Origin"
+                                          Placeholder="https://example.com or https://*.example.com"
+                                          Variant="Variant.Outlined"
+                                          HelperText="Supports wildcards: https://*.example.com"
+                                          Immediate="true"
+                                          OnKeyDown="OnOriginKeyDown" />
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       OnClick="AddOrigin"
+                                       Disabled="string.IsNullOrWhiteSpace(_newOrigin)">
+                                Add
+                            </MudButton>
+                        </MudStack>
+
+                        @if (_config.AllowedOrigins.Count == 0)
+                        {
+                            <MudAlert Severity="Severity.Warning" Class="mt-2">
+                                No origins configured. Add at least one origin or enable "Allow Any Origin".
+                            </MudAlert>
+                        }
+                    </MudStack>
+                }
+
+                @if (_config.AllowAnyOrigin && _config.AllowCredentials)
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-3">
+                        <strong>Invalid Configuration:</strong> Cannot use AllowCredentials with AllowAnyOrigin for security reasons.
+                        Please specify explicit origins.
+                    </MudAlert>
+                }
+            </MudPaper>
+
+            <!-- Methods Configuration -->
+            <MudPaper Elevation="2" Class="pa-6 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Http" Class="mr-2" />
+                    Allowed HTTP Methods
+                </MudText>
+
+                <MudSwitch @bind-Value="_config.AllowAnyMethod"
+                           Color="Color.Primary"
+                           Label="Allow All Methods"
+                           T="bool"
+                           Class="mb-3" />
+
+                @if (!_config.AllowAnyMethod)
+                {
+                    <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                        @foreach (var method in _standardMethods)
+                        {
+                            var isSelected = _config.AllowedMethods.Contains(method);
+                            <MudChip Color="@(isSelected ? Color.Primary : Color.Default)"
+                                     Variant="@(isSelected ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="() => ToggleMethod(method)"
+                                     Icon="@(isSelected ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.RadioButtonUnchecked)">
+                                @method
+                            </MudChip>
+                        }
+                    </MudStack>
+
+                    @if (_config.AllowedMethods.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-2">
+                            Select at least one HTTP method or enable "Allow All Methods"
+                        </MudAlert>
+                    }
+                }
+            </MudPaper>
+
+            <!-- Headers Configuration -->
+            <MudPaper Elevation="2" Class="pa-6 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.ViewHeadline" Class="mr-2" />
+                    Request Headers
+                </MudText>
+
+                <MudSwitch @bind-Value="_config.AllowAnyHeader"
+                           Color="Color.Primary"
+                           Label="Allow Any Header"
+                           T="bool"
+                           Class="mb-3" />
+
+                @if (!_config.AllowAnyHeader)
+                {
+                    <MudStack Spacing="2">
+                        @foreach (var header in _config.AllowedHeaders)
+                        {
+                            <MudChip Color="Color.Info"
+                                     Icon="@Icons.Material.Filled.Label"
+                                     OnClose="() => RemoveHeader(header)">
+                                @header
+                            </MudChip>
+                        }
+
+                        <MudStack Row="true" Spacing="2" Class="mt-2">
+                            <MudTextField @bind-Value="_newHeader"
+                                          Label="Add Header"
+                                          Placeholder="Content-Type, Authorization, X-Custom-Header"
+                                          Variant="Variant.Outlined"
+                                          Immediate="true"
+                                          OnKeyDown="OnHeaderKeyDown" />
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       OnClick="AddHeader"
+                                       Disabled="string.IsNullOrWhiteSpace(_newHeader)">
+                                Add
+                            </MudButton>
+                        </MudStack>
+                    </MudStack>
+                }
+            </MudPaper>
+
+            <!-- Advanced Settings -->
+            <MudPaper Elevation="2" Class="pa-6 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
+                    Advanced Settings
+                </MudText>
+
+                <MudStack Spacing="3">
+                    <MudSwitch @bind-Value="_config.AllowCredentials"
+                               Color="Color.Primary"
+                               Label="Allow Credentials"
+                               T="bool">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Allow cookies and authorization headers in cross-origin requests
+                        </MudText>
+                    </MudSwitch>
+
+                    <MudNumericField @bind-Value="_config.MaxAge"
+                                     Label="Preflight Cache Max Age (seconds)"
+                                     Variant="Variant.Outlined"
+                                     Min="0"
+                                     Max="86400"
+                                     HelperText="How long browsers can cache preflight responses (0-86400 seconds / 24 hours)" />
+
+                    <MudText Typo="Typo.subtitle2" Class="mt-2">Exposed Headers</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                        Headers that the browser can expose to JavaScript (optional)
+                    </MudText>
+
+                    @foreach (var header in _config.ExposedHeaders)
+                    {
+                        <MudChip Color="Color.Success"
+                                 Icon="@Icons.Material.Filled.Visibility"
+                                 OnClose="() => RemoveExposedHeader(header)">
+                            @header
+                        </MudChip>
+                    }
+
+                    <MudStack Row="true" Spacing="2">
+                        <MudTextField @bind-Value="_newExposedHeader"
+                                      Label="Add Exposed Header"
+                                      Placeholder="X-Total-Count, X-Custom-Header"
+                                      Variant="Variant.Outlined"
+                                      Immediate="true"
+                                      OnKeyDown="OnExposedHeaderKeyDown" />
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddExposedHeader"
+                                   Disabled="string.IsNullOrWhiteSpace(_newExposedHeader)">
+                            Add
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+
+            <!-- Test CORS Configuration -->
+            <MudPaper Elevation="2" Class="pa-6 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.BugReport" Class="mr-2" />
+                    Test CORS Configuration
+                </MudText>
+
+                <MudStack Row="true" Spacing="2" Class="mb-3">
+                    <MudTextField @bind-Value="_testOrigin"
+                                  Label="Test Origin"
+                                  Placeholder="https://example.com"
+                                  Variant="Variant.Outlined"
+                                  Style="flex: 1;" />
+                    <MudSelect @bind-Value="_testMethod"
+                               Label="Method"
+                               Variant="Variant.Outlined"
+                               T="string"
+                               Style="width: 150px;">
+                        <MudSelectItem Value="@("GET")">GET</MudSelectItem>
+                        <MudSelectItem Value="@("POST")">POST</MudSelectItem>
+                        <MudSelectItem Value="@("PUT")">PUT</MudSelectItem>
+                        <MudSelectItem Value="@("DELETE")">DELETE</MudSelectItem>
+                        <MudSelectItem Value="@("PATCH")">PATCH</MudSelectItem>
+                        <MudSelectItem Value="@("OPTIONS")">OPTIONS</MudSelectItem>
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Info"
+                               StartIcon="@Icons.Material.Filled.PlayArrow"
+                               OnClick="TestCors"
+                               Disabled="string.IsNullOrWhiteSpace(_testOrigin)">
+                        Test
+                    </MudButton>
+                </MudStack>
+
+                @if (_testResult != null)
+                {
+                    <MudAlert Severity="@(_testResult.IsAllowed ? Severity.Success : Severity.Error)">
+                        <MudText Typo="Typo.body1">
+                            <strong>Result:</strong> @(_testResult.IsAllowed ? "✅ Allowed" : "❌ Blocked")
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(_testResult.Reason))
+                        {
+                            <MudText Typo="Typo.body2">@_testResult.Reason</MudText>
+                        }
+                        @if (!string.IsNullOrEmpty(_testResult.MatchedPattern))
+                        {
+                            <MudText Typo="Typo.caption">Matched Pattern: <code>@_testResult.MatchedPattern</code></MudText>
+                        }
+                    </MudAlert>
+                }
+            </MudPaper>
+        }
+
+        <!-- Save/Cancel Actions -->
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Row="true" Spacing="2" Justify="Justify.FlexEnd">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Filled.Cancel"
+                           OnClick="ReloadConfiguration">
+                    Reset
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           OnClick="SaveConfiguration"
+                           Disabled="_saving">
+                    @if (_saving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ml-2">Saving...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>Save Changes</MudText>
+                    }
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private CorsConfiguration? _config;
+    private string? _newOrigin;
+    private string? _newHeader;
+    private string? _newExposedHeader;
+    private string? _testOrigin;
+    private string _testMethod = "GET";
+    private CorsTestResult? _testResult;
+
+    private readonly string[] _standardMethods = { "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadConfiguration();
+    }
+
+    private async Task ReloadConfiguration()
+    {
+        _loading = true;
+        try
+        {
+            _config = await CorsApi.GetCorsConfigurationAsync();
+            _config ??= CorsConfiguration.GetDefault();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading CORS configuration: {ex.Message}", Severity.Error);
+            _config = CorsConfiguration.GetDefault();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveConfiguration()
+    {
+        if (_config == null) return;
+
+        // Validate
+        if (_config.AllowCredentials && _config.AllowAnyOrigin)
+        {
+            Snackbar.Add("Cannot use AllowCredentials with AllowAnyOrigin. Please specify explicit origins.", Severity.Error);
+            return;
+        }
+
+        if (_config.Enabled && !_config.AllowAnyOrigin && _config.AllowedOrigins.Count == 0)
+        {
+            Snackbar.Add("Please add at least one allowed origin or enable 'Allow Any Origin'.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            await CorsApi.UpdateCorsConfigurationAsync(_config);
+            Snackbar.Add("CORS configuration saved successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving CORS configuration: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void AddOrigin()
+    {
+        if (string.IsNullOrWhiteSpace(_newOrigin) || _config == null) return;
+
+        var origin = _newOrigin.Trim();
+        if (!_config.AllowedOrigins.Contains(origin))
+        {
+            _config.AllowedOrigins.Add(origin);
+            _newOrigin = string.Empty;
+        }
+        else
+        {
+            Snackbar.Add("Origin already exists", Severity.Info);
+        }
+    }
+
+    private void RemoveOrigin(string origin)
+    {
+        _config?.AllowedOrigins.Remove(origin);
+    }
+
+    private void OnOriginKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddOrigin();
+        }
+    }
+
+    private void ToggleMethod(string method)
+    {
+        if (_config == null) return;
+
+        if (_config.AllowedMethods.Contains(method))
+        {
+            _config.AllowedMethods.Remove(method);
+        }
+        else
+        {
+            _config.AllowedMethods.Add(method);
+        }
+    }
+
+    private void AddHeader()
+    {
+        if (string.IsNullOrWhiteSpace(_newHeader) || _config == null) return;
+
+        var header = _newHeader.Trim();
+        if (!_config.AllowedHeaders.Contains(header))
+        {
+            _config.AllowedHeaders.Add(header);
+            _newHeader = string.Empty;
+        }
+    }
+
+    private void RemoveHeader(string header)
+    {
+        _config?.AllowedHeaders.Remove(header);
+    }
+
+    private void OnHeaderKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddHeader();
+        }
+    }
+
+    private void AddExposedHeader()
+    {
+        if (string.IsNullOrWhiteSpace(_newExposedHeader) || _config == null) return;
+
+        var header = _newExposedHeader.Trim();
+        if (!_config.ExposedHeaders.Contains(header))
+        {
+            _config.ExposedHeaders.Add(header);
+            _newExposedHeader = string.Empty;
+        }
+    }
+
+    private void RemoveExposedHeader(string header)
+    {
+        _config?.ExposedHeaders.Remove(header);
+    }
+
+    private void OnExposedHeaderKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddExposedHeader();
+        }
+    }
+
+    private async Task TestCors()
+    {
+        if (string.IsNullOrWhiteSpace(_testOrigin)) return;
+
+        try
+        {
+            _testResult = await CorsApi.TestCorsAsync(_testOrigin, _testMethod);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error testing CORS: {ex.Message}", Severity.Error);
+        }
+    }
+}

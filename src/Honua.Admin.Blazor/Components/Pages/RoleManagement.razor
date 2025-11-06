@@ -1,0 +1,274 @@
+@page "/roles"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator")]
+@inject RbacApiClient RbacApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<RoleManagement> Logger
+
+<PageTitle>Role Management - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">Role Management</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateRoleDialog">
+                Create Role
+            </MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Color="Color.Default"
+                           OnClick="LoadRolesAsync"
+                           Title="Refresh" />
+        </MudStack>
+
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            Roles define sets of permissions that can be assigned to users. System roles cannot be modified or deleted.
+        </MudAlert>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        @* Roles Table *@
+        <MudTable Items="@_roles"
+                  Hover="true"
+                  Breakpoint="Breakpoint.Sm"
+                  Loading="@_loading"
+                  LoadingProgressColor="Color.Primary"
+                  Dense="false">
+            <HeaderContent>
+                <MudTh>Role Name</MudTh>
+                <MudTh>Description</MudTh>
+                <MudTh>Permissions</MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh>Created</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Role Name">
+                    <MudStack Row="false" Spacing="1">
+                        <MudText Typo="Typo.body1"><b>@context.DisplayName</b></MudText>
+                        <MudText Typo="Typo.caption">@context.Name</MudText>
+                    </MudStack>
+                </MudTd>
+                <MudTd DataLabel="Description">
+                    <MudText Typo="Typo.body2">@(context.Description ?? "-")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Permissions">
+                    <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;">
+                        @if (context.Permissions.Count > 3)
+                        {
+                            <MudChip Size="Size.Small" Color="Color.Info">
+                                @context.Permissions.Count permissions
+                            </MudChip>
+                        }
+                        else
+                        {
+                            @foreach (var permission in context.Permissions)
+                            {
+                                <MudChip Size="Size.Small" Variant="Variant.Text">@permission</MudChip>
+                            }
+                        }
+                    </MudStack>
+                </MudTd>
+                <MudTd DataLabel="Type">
+                    @if (context.IsSystem)
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Lock">System</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.Edit">Custom</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Created">
+                    <MudText Typo="Typo.body2">@GetRelativeTime(context.CreatedAt)</MudText>
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" OnClick="@(() => ViewRoleDetails(context))">
+                            View Details
+                        </MudMenuItem>
+                        @if (!context.IsSystem)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="@(() => OpenEditRoleDialog(context))">
+                                Edit
+                            </MudMenuItem>
+                            <MudDivider />
+                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteRole(context))">
+                                <MudText Color="Color.Error">Delete</MudText>
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Class="py-4">
+                    No roles found. System roles should be loaded automatically.
+                </MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Role Management", href: null, disabled: true)
+    };
+
+    private bool _loading = true;
+    private string? _errorMessage;
+    private List<RoleDefinition> _roles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRolesAsync();
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await RbacApi.ListRolesAsync();
+            _roles = response?.Roles ?? new List<RoleDefinition>();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading roles: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error loading roles");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateRoleDialog()
+    {
+        var dialog = await DialogService.ShowAsync<RoleDialog>("Create Role", new DialogParameters
+        {
+            { "IsEditMode", false }
+        }, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateRoleRequest request)
+        {
+            try
+            {
+                var role = await RbacApi.CreateRoleAsync(request);
+                if (role != null)
+                {
+                    Snackbar.Add($"Role '{role.DisplayName}' created successfully", Severity.Success);
+                    await LoadRolesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error creating role: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error creating role");
+            }
+        }
+    }
+
+    private async Task OpenEditRoleDialog(RoleDefinition role)
+    {
+        var dialog = await DialogService.ShowAsync<RoleDialog>("Edit Role", new DialogParameters
+        {
+            { "IsEditMode", true },
+            { "Role", role }
+        }, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UpdateRoleRequest request)
+        {
+            try
+            {
+                var updated = await RbacApi.UpdateRoleAsync(role.Id, request);
+                if (updated != null)
+                {
+                    Snackbar.Add($"Role '{role.DisplayName}' updated successfully", Severity.Success);
+                    await LoadRolesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error updating role: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error updating role");
+            }
+        }
+    }
+
+    private async Task ViewRoleDetails(RoleDefinition role)
+    {
+        await DialogService.ShowAsync<RoleDetailsDialog>("Role Details", new DialogParameters
+        {
+            { "Role", role }
+        }, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task DeleteRole(RoleDefinition role)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Delete",
+            $"Are you sure you want to delete role '{role.DisplayName}'? Users with this role will lose associated permissions.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                var deleted = await RbacApi.DeleteRoleAsync(role.Id);
+                if (deleted)
+                {
+                    Snackbar.Add($"Role '{role.DisplayName}' deleted", Severity.Success);
+                    await LoadRolesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting role: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error deleting role");
+            }
+        }
+    }
+
+    private string GetRelativeTime(DateTimeOffset time)
+    {
+        var span = DateTimeOffset.UtcNow - time.ToUniversalTime();
+
+        if (span.TotalMinutes < 1)
+            return "just now";
+        if (span.TotalMinutes < 60)
+            return $"{(int)span.TotalMinutes} minutes ago";
+        if (span.TotalHours < 24)
+            return $"{(int)span.TotalHours} hours ago";
+        if (span.TotalDays < 7)
+            return $"{(int)span.TotalDays} days ago";
+        if (span.TotalDays < 30)
+            return $"{(int)(span.TotalDays / 7)} weeks ago";
+
+        return $"{(int)(span.TotalDays / 30)} months ago";
+    }
+}

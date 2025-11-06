@@ -1,0 +1,111 @@
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info">
+                Create a custom permission for application-specific access control needs.
+            </MudAlert>
+
+            <MudTextField @bind-Value="_name"
+                          Label="Permission Name"
+                          Required="true"
+                          Placeholder="e.g., reports.export, analytics.view"
+                          HelperText="Use dot notation for hierarchical permissions (e.g., resource.action)" />
+
+            <MudTextField @bind-Value="_displayName"
+                          Label="Display Name"
+                          Required="true"
+                          Placeholder="e.g., Export Reports, View Analytics" />
+
+            <MudTextField @bind-Value="_description"
+                          Label="Description"
+                          Lines="2"
+                          Placeholder="Describe what this permission allows" />
+
+            <MudSelect @bind-Value="_category"
+                       Label="Category"
+                       Required="true"
+                       HelperText="Group this permission with related permissions">
+                @foreach (var category in _predefinedCategories)
+                {
+                    <MudSelectItem Value="@category">@category</MudSelectItem>
+                }
+                <MudSelectItem Value="@_customCategoryValue">Custom...</MudSelectItem>
+            </MudSelect>
+
+            @if (_category == _customCategoryValue)
+            {
+                <MudTextField @bind-Value="_customCategory"
+                              Label="Custom Category Name"
+                              Required="true"
+                              Placeholder="e.g., Reports, Analytics" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Submit"
+                   Disabled="!IsValid()">
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _name = "";
+    private string _displayName = "";
+    private string? _description;
+    private string _category = "Custom";
+    private string _customCategory = "";
+
+    private const string _customCategoryValue = "__custom__";
+
+    private readonly List<string> _predefinedCategories = new()
+    {
+        "System",
+        "Data",
+        "DataTransfer",
+        "Collections",
+        "Layers",
+        "Administration",
+        "Metadata",
+        "Custom"
+    };
+
+    private bool IsValid()
+    {
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_displayName))
+            return false;
+
+        if (_category == _customCategoryValue && string.IsNullOrWhiteSpace(_customCategory))
+            return false;
+
+        return true;
+    }
+
+    private void Submit()
+    {
+        var finalCategory = _category == _customCategoryValue ? _customCategory : _category;
+
+        var request = new CreatePermissionRequest
+        {
+            Name = _name,
+            DisplayName = _displayName,
+            Description = _description,
+            Category = finalCategory
+        };
+
+        MudDialog.Close(DialogResult.Ok(request));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

@@ -1,0 +1,190 @@
+@using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
+@inject RbacApiClient RbacApi
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+
+            <MudTextField @bind-Value="_name"
+                          Label="Role Name"
+                          Required="true"
+                          Disabled="IsEditMode"
+                          Placeholder="e.g., editor, manager"
+                          HelperText="Unique identifier for the role (cannot be changed after creation)" />
+
+            <MudTextField @bind-Value="_displayName"
+                          Label="Display Name"
+                          Required="true"
+                          Placeholder="e.g., Editor, Content Manager" />
+
+            <MudTextField @bind-Value="_description"
+                          Label="Description"
+                          Lines="3"
+                          Placeholder="Describe what this role allows users to do" />
+
+            <MudDivider />
+
+            <MudText Typo="Typo.h6">Permissions</MudText>
+
+            @if (_allPermissions.Any())
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Select permissions to grant to this role
+                </MudText>
+
+                @foreach (var category in _permissionsByCategory.Keys.OrderBy(k => k))
+                {
+                    <MudPaper Elevation="0" Class="pa-3" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2"><b>@category</b></MudText>
+                        <MudStack Spacing="2">
+                            @foreach (var permission in _permissionsByCategory[category])
+                            {
+                                <MudCheckBox @bind-Value="@_selectedPermissions[permission.Name]"
+                                             Color="Color.Primary"
+                                             Dense="true">
+                                    <MudStack Row="false" Spacing="0">
+                                        <MudText Typo="Typo.body2">@permission.DisplayName</MudText>
+                                        @if (!string.IsNullOrEmpty(permission.Description))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@permission.Description</MudText>
+                                        }
+                                    </MudStack>
+                                </MudCheckBox>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning">
+                    No permissions available. Please create permissions first.
+                </MudAlert>
+            }
+
+            @if (!_selectedPermissions.Values.Any(v => v))
+            {
+                <MudAlert Severity="Severity.Warning">
+                    Warning: Role has no permissions assigned. Users with this role will have no access.
+                </MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="Submit"
+                   Disabled="_loading || string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_displayName)">
+            @(IsEditMode ? "Update" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public bool IsEditMode { get; set; }
+
+    [Parameter]
+    public RoleDefinition? Role { get; set; }
+
+    private bool _loading = true;
+    private string _name = "";
+    private string _displayName = "";
+    private string? _description;
+
+    private List<PermissionDefinition> _allPermissions = new();
+    private Dictionary<string, List<PermissionDefinition>> _permissionsByCategory = new();
+    private Dictionary<string, bool> _selectedPermissions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPermissions();
+
+        if (IsEditMode && Role != null)
+        {
+            _name = Role.Name;
+            _displayName = Role.DisplayName;
+            _description = Role.Description;
+
+            // Set selected permissions from role
+            foreach (var permission in Role.Permissions)
+            {
+                if (_selectedPermissions.ContainsKey(permission))
+                {
+                    _selectedPermissions[permission] = true;
+                }
+            }
+        }
+
+        _loading = false;
+    }
+
+    private async Task LoadPermissions()
+    {
+        try
+        {
+            var response = await RbacApi.ListPermissionsAsync();
+            _allPermissions = response?.Permissions ?? new List<PermissionDefinition>();
+
+            // Group by category
+            _permissionsByCategory = _allPermissions
+                .GroupBy(p => p.Category)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Initialize selection dictionary
+            foreach (var permission in _allPermissions)
+            {
+                _selectedPermissions[permission.Name] = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading permissions: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Submit()
+    {
+        var selectedPerms = _selectedPermissions
+            .Where(kvp => kvp.Value)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        if (IsEditMode)
+        {
+            var request = new UpdateRoleRequest
+            {
+                DisplayName = _displayName,
+                Description = _description,
+                Permissions = selectedPerms
+            };
+            MudDialog.Close(DialogResult.Ok(request));
+        }
+        else
+        {
+            var request = new CreateRoleRequest
+            {
+                Name = _name,
+                DisplayName = _displayName,
+                Description = _description,
+                Permissions = selectedPerms
+            };
+            MudDialog.Close(DialogResult.Ok(request));
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

@@ -133,4 +133,38 @@ public sealed class ServiceApiClient
             throw;
         }
     }
+
+    /// <summary>
+    /// Enables a service (starts it).
+    /// </summary>
+    public async Task EnableServiceAsync(string id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/admin/metadata/services/{Uri.EscapeDataString(id)}/enable", null, cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error enabling service {ServiceId}", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Disables a service (stops it).
+    /// </summary>
+    public async Task DisableServiceAsync(string id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/admin/metadata/services/{Uri.EscapeDataString(id)}/disable", null, cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error disabling service {ServiceId}", id);
+            throw;
+        }
+    }
 }

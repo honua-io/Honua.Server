@@ -60,6 +60,7 @@ public sealed record ServiceListItem
     public required string Title { get; init; }
     public required string FolderId { get; init; }
     public required string ServiceType { get; init; }
+    public string? DataSourceId { get; init; }
     public bool Enabled { get; init; }
     public int LayerCount { get; init; }
 }

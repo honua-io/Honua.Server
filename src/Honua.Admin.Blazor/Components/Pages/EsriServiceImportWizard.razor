@@ -1,0 +1,561 @@
+@page "/import/esri"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator,datapublisher")]
+@inject DataSourceApiClient DataSourceApi
+@inject ServiceApiClient ServiceApi
+@inject FolderApiClient FolderApi
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject HttpClient HttpClient
+
+<PageTitle>Import Esri Service - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-6 mt-4">
+        <MudText Typo="Typo.h4" Class="mb-6">Import from Esri Service</MudText>
+
+        <MudStepper @ref="_stepper" Linear="true" HeaderTextView="HeaderTextView.All">
+
+            @* Step 1: Service URL *@
+            <MudStep Title="Service URL" Icon="@Icons.Material.Filled.Link">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudText Typo="Typo.h6">Enter Esri Service URL</MudText>
+
+                        <MudAlert Severity="Severity.Info">
+                            Supported services: ArcGIS Server, ArcGIS Online, Feature Server, Map Server
+                        </MudAlert>
+
+                        <MudTextField @bind-Value="_serviceUrl"
+                                      Label="Service URL"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      Placeholder="https://services.arcgis.com/.../FeatureServer"
+                                      HelperText="Enter the full URL to the REST endpoint" />
+
+                        <MudExpansionPanels>
+                            <MudExpansionPanel Text="Examples">
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.caption"><b>ArcGIS Online:</b></MudText>
+                                    <code>https://services.arcgis.com/V6ZHFr6zdgNZuVG0/arcgis/rest/services/LandUse/FeatureServer</code>
+
+                                    <MudText Typo="Typo.caption" Class="mt-2"><b>ArcGIS Server:</b></MudText>
+                                    <code>https://sampleserver6.arcgisonline.com/arcgis/rest/services/USA/MapServer</code>
+                                </MudStack>
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+
+                        @if (_serviceMetadata != null)
+                        {
+                            <MudAlert Severity="Severity.Success" Dense="true">
+                                Service loaded: <b>@_serviceMetadata.ServiceName</b>
+                            </MudAlert>
+                        }
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="LoadServiceMetadata"
+                               Disabled="@(string.IsNullOrWhiteSpace(_serviceUrl) || _loading)">
+                        @if (_loading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ml-2">Loading...</MudText>
+                        }
+                        else
+                        {
+                            <text>Load Service Info</text>
+                        }
+                    </MudButton>
+                </ActionContent>
+            </MudStep>
+
+            @* Step 2: Layer Selection *@
+            <MudStep Title="Select Layers" Icon="@Icons.Material.Filled.Layers">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.h6">Select layers to import</MudText>
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="SelectAllLayers">
+                                    Select All
+                                </MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="DeselectAllLayers">
+                                    Deselect All
+                                </MudButton>
+                            </MudStack>
+                        </MudStack>
+
+                        @if (_serviceMetadata != null)
+                        {
+                            <MudPaper Outlined="true" Class="pa-4 mb-4">
+                                <MudText Typo="Typo.subtitle1"><b>@_serviceMetadata.ServiceName</b></MudText>
+                                @if (!string.IsNullOrEmpty(_serviceMetadata.Description))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@_serviceMetadata.Description</MudText>
+                                }
+                            </MudPaper>
+
+                            <MudTable Items="@_serviceMetadata.Layers" Dense="true" Hover="true">
+                                <HeaderContent>
+                                    <MudTh Style="width: 60px;">
+                                        <MudCheckBox Checked="@AllLayersSelected"
+                                                     CheckedChanged="@((bool val) => ToggleAllLayers(val))"
+                                                     Color="Color.Primary" />
+                                    </MudTh>
+                                    <MudTh>Layer</MudTh>
+                                    <MudTh>Type</MudTh>
+                                    <MudTh>Features</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>
+                                        <MudCheckBox Checked="@_selectedLayerIds.Contains(context.Id)"
+                                                     CheckedChanged="@((bool val) => ToggleLayer(context.Id, val))"
+                                                     Color="Color.Primary" />
+                                    </MudTd>
+                                    <MudTd DataLabel="Layer">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudIcon Icon="@GetGeometryIcon(context.GeometryType)"
+                                                     Color="@GetGeometryColor(context.GeometryType)"
+                                                     Size="Size.Small" />
+                                            <div>
+                                                <MudText><b>@context.Name</b></MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">ID: @context.Id</MudText>
+                                            </div>
+                                        </MudStack>
+                                    </MudTd>
+                                    <MudTd DataLabel="Type">
+                                        <MudChip Size="Size.Small" Variant="Variant.Outlined">@context.GeometryType</MudChip>
+                                    </MudTd>
+                                    <MudTd DataLabel="Features">
+                                        @if (context.FeatureCount.HasValue)
+                                        {
+                                            <MudText Typo="Typo.caption">@context.FeatureCount.Value.ToString("N0")</MudText>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Unknown</MudText>
+                                        }
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+
+                            <MudAlert Severity="Severity.Info" Dense="true">
+                                <MudText Typo="Typo.caption">
+                                    <b>Selected:</b> @_selectedLayerIds.Count / @_serviceMetadata.Layers.Count layers
+                                </MudText>
+                            </MudAlert>
+                        }
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="@(() => _stepper.ForceRender())"
+                               Disabled="@(!_selectedLayerIds.Any())">
+                        Next
+                    </MudButton>
+                </ActionContent>
+            </MudStep>
+
+            @* Step 3: Configuration *@
+            <MudStep Title="Configure Import" Icon="@Icons.Material.Filled.Settings">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudText Typo="Typo.h6">Configure import settings</MudText>
+
+                        <MudSelect @bind-Value="_targetDataSourceId"
+                                   Label="Target Data Source"
+                                   Variant="Variant.Outlined"
+                                   Required="true"
+                                   HelperText="Where to store the imported data">
+                            @foreach (var ds in _dataSources)
+                            {
+                                <MudSelectItem Value="@ds.Id">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />
+                                        <MudText>@ds.Id</MudText>
+                                        <MudChip Size="Size.Small" Variant="Variant.Outlined">@ds.Provider</MudChip>
+                                    </MudStack>
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudSelect @bind-Value="_targetFolderId"
+                                   Label="Target Folder"
+                                   Variant="Variant.Outlined"
+                                   Required="true">
+                            @foreach (var folder in _folders)
+                            {
+                                <MudSelectItem Value="@folder.Id">@folder.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudTextField @bind-Value="_targetServiceId"
+                                      Label="Service ID"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      HelperText="Unique identifier for the new service" />
+
+                        <MudDivider />
+
+                        <MudText Typo="Typo.subtitle1">Data Import Options</MudText>
+
+                        <MudSwitch @bind-Value="_includeData"
+                                   Label="Include Feature Data"
+                                   Color="Color.Primary"
+                                   HelperText="Import all features from the service (may take time for large datasets)" />
+
+                        @if (_includeData)
+                        {
+                            <MudNumericField @bind-Value="_batchSize"
+                                             Label="Batch Size"
+                                             Variant="Variant.Outlined"
+                                             Min="100"
+                                             Max="10000"
+                                             HelperText="Number of features to import per request (default: 1000)" />
+                        }
+
+                        <MudDivider />
+
+                        <MudExpansionPanels>
+                            <MudExpansionPanel Text="Advanced Options">
+                                <MudStack Spacing="3">
+                                    <MudTextField @bind-Value="_tableNamePrefix"
+                                                  Label="Table Name Prefix"
+                                                  Variant="Variant.Outlined"
+                                                  HelperText="Optional prefix for database table names" />
+
+                                    <MudTextField @bind-Value="_geometryColumnName"
+                                                  Label="Geometry Column Name"
+                                                  Variant="Variant.Outlined"
+                                                  Placeholder="geom"
+                                                  HelperText="Name for geometry column (default: geom)" />
+                                </MudStack>
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="@(() => _stepper.ForceRender())"
+                               Disabled="@(string.IsNullOrEmpty(_targetDataSourceId) || string.IsNullOrEmpty(_targetFolderId) || string.IsNullOrEmpty(_targetServiceId))">
+                        Next
+                    </MudButton>
+                </ActionContent>
+            </MudStep>
+
+            @* Step 4: Review & Start Import *@
+            <MudStep Title="Review & Import" Icon="@Icons.Material.Filled.CheckCircle">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudText Typo="Typo.h6">Review import configuration</MudText>
+
+                        <MudSimpleTable Dense="true">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Source URL:</strong></td>
+                                    <td><code>@_serviceUrl</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Service Name:</strong></td>
+                                    <td>@_serviceMetadata?.ServiceName</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Layers to Import:</strong></td>
+                                    <td>@_selectedLayerIds.Count</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Target Data Source:</strong></td>
+                                    <td>@_targetDataSourceId</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Target Folder:</strong></td>
+                                    <td>@_targetFolderId</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Service ID:</strong></td>
+                                    <td>@_targetServiceId</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Include Data:</strong></td>
+                                    <td>@(_includeData ? "Yes" : "Metadata Only")</td>
+                                </tr>
+                                @if (_includeData)
+                                {
+                                    <tr>
+                                        <td><strong>Batch Size:</strong></td>
+                                        <td>@_batchSize features per request</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+
+                        @if (_serviceMetadata != null && _selectedLayerIds.Any())
+                        {
+                            <MudAlert Severity="Severity.Info">
+                                <MudText Typo="Typo.body2">
+                                    <b>Estimated Features:</b> @GetTotalFeatureCount().ToString("N0")
+                                </MudText>
+                                @if (_includeData)
+                                {
+                                    <MudText Typo="Typo.caption">
+                                        This may take several minutes for large datasets. You can monitor progress on the Import Jobs page.
+                                    </MudText>
+                                }
+                            </MudAlert>
+                        }
+
+                        @if (!string.IsNullOrEmpty(_errorMessage))
+                        {
+                            <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+                        }
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())" Disabled="@_importing">Back</MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.CloudDownload"
+                               OnClick="StartImport"
+                               Disabled="@_importing">
+                        @if (_importing)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ml-2">Starting Import...</MudText>
+                        }
+                        else
+                        {
+                            <text>Start Import</text>
+                        }
+                    </MudButton>
+                </ActionContent>
+            </MudStep>
+
+        </MudStepper>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Import", href: "/import"),
+        new BreadcrumbItem("Esri Service", href: null, disabled: true)
+    };
+
+    private MudStepper? _stepper;
+    private string _serviceUrl = string.Empty;
+    private EsriServiceMetadata? _serviceMetadata;
+    private HashSet<int> _selectedLayerIds = new();
+    private List<DataSourceListItem> _dataSources = new();
+    private List<FolderResponse> _folders = new();
+    private string _targetDataSourceId = string.Empty;
+    private string _targetFolderId = string.Empty;
+    private string _targetServiceId = string.Empty;
+    private bool _includeData = true;
+    private int _batchSize = 1000;
+    private string _tableNamePrefix = string.Empty;
+    private string _geometryColumnName = "geom";
+    private bool _loading;
+    private bool _importing;
+    private string? _errorMessage;
+
+    private bool AllLayersSelected => _serviceMetadata != null && _selectedLayerIds.Count == _serviceMetadata.Layers.Count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(
+            LoadDataSourcesAsync(),
+            LoadFoldersAsync()
+        );
+    }
+
+    private async Task LoadDataSourcesAsync()
+    {
+        try
+        {
+            _dataSources = await DataSourceApi.GetDataSourcesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data sources: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadFoldersAsync()
+    {
+        try
+        {
+            _folders = await FolderApi.GetFoldersAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading folders: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadServiceMetadata()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // TODO: Call actual Esri REST API to get service metadata
+            // For now, use mock data
+            await Task.Delay(1000);
+
+            _serviceMetadata = new EsriServiceMetadata
+            {
+                ServiceName = "Sample Feature Service",
+                Description = "Example service from ArcGIS Online",
+                Layers = new List<EsriLayerInfo>
+                {
+                    new() { Id = 0, Name = "Parcels", GeometryType = "Polygon", FeatureCount = 25000 },
+                    new() { Id = 1, Name = "Buildings", GeometryType = "Polygon", FeatureCount = 12500 },
+                    new() { Id = 2, Name = "Roads", GeometryType = "LineString", FeatureCount = 8000 }
+                }
+            };
+
+            // Auto-select all layers
+            _selectedLayerIds = _serviceMetadata.Layers.Select(l => l.Id).ToHashSet();
+
+            // Auto-suggest service ID from URL
+            if (string.IsNullOrEmpty(_targetServiceId))
+            {
+                var uri = new Uri(_serviceUrl);
+                var segments = uri.Segments;
+                _targetServiceId = segments[^2].TrimEnd('/').ToLowerInvariant();
+            }
+
+            _stepper?.ForceRender();
+            Snackbar.Add("Service metadata loaded successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading service: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SelectAllLayers()
+    {
+        if (_serviceMetadata != null)
+        {
+            _selectedLayerIds = _serviceMetadata.Layers.Select(l => l.Id).ToHashSet();
+        }
+    }
+
+    private void DeselectAllLayers()
+    {
+        _selectedLayerIds.Clear();
+    }
+
+    private void ToggleAllLayers(bool selected)
+    {
+        if (selected)
+        {
+            SelectAllLayers();
+        }
+        else
+        {
+            DeselectAllLayers();
+        }
+    }
+
+    private void ToggleLayer(int layerId, bool selected)
+    {
+        if (selected)
+        {
+            _selectedLayerIds.Add(layerId);
+        }
+        else
+        {
+            _selectedLayerIds.Remove(layerId);
+        }
+    }
+
+    private async Task StartImport()
+    {
+        _importing = true;
+        _errorMessage = null;
+
+        try
+        {
+            // TODO: Call migration API
+            // POST /admin/migrations/jobs
+            await Task.Delay(2000);
+
+            Snackbar.Add("Import job started successfully!", Severity.Success);
+            Navigation.NavigateTo("/import/jobs");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error starting import: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    private long GetTotalFeatureCount()
+    {
+        if (_serviceMetadata == null) return 0;
+
+        return _serviceMetadata.Layers
+            .Where(l => _selectedLayerIds.Contains(l.Id))
+            .Sum(l => l.FeatureCount ?? 0);
+    }
+
+    private string GetGeometryIcon(string? geometryType)
+    {
+        return geometryType?.ToUpperInvariant() switch
+        {
+            "POINT" or "MULTIPOINT" => Icons.Material.Filled.LocationOn,
+            "LINESTRING" or "MULTILINESTRING" or "POLYLINE" => Icons.Material.Filled.Timeline,
+            "POLYGON" or "MULTIPOLYGON" => Icons.Material.Filled.Hexagon,
+            _ => Icons.Material.Filled.Layers
+        };
+    }
+
+    private Color GetGeometryColor(string? geometryType)
+    {
+        return geometryType?.ToUpperInvariant() switch
+        {
+            "POINT" or "MULTIPOINT" => Color.Primary,
+            "LINESTRING" or "MULTILINESTRING" or "POLYLINE" => Color.Info,
+            "POLYGON" or "MULTIPOLYGON" => Color.Success,
+            _ => Color.Default
+        };
+    }
+
+    // Placeholder classes - will be replaced with actual API models
+    private class EsriServiceMetadata
+    {
+        public string ServiceName { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public List<EsriLayerInfo> Layers { get; set; } = new();
+    }
+
+    private class EsriLayerInfo
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? GeometryType { get; set; }
+        public long? FeatureCount { get; set; }
+    }
+}
