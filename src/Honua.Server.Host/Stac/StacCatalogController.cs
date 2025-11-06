@@ -26,7 +26,7 @@ namespace Honua.Server.Host.Stac;
 /// </remarks>
 [ApiController]
 [Authorize(Policy = "RequireViewer")]
-[Route("stac")]
+[Route("v1/stac")]
 public sealed class StacCatalogController : ControllerBase
 {
     private readonly IMetadataRegistry _metadataRegistry;

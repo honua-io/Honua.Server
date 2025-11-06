@@ -203,6 +203,16 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IRasterTileCacheMetrics, RasterTileCacheMetrics>();
 
+        // Register raster tile cache provider factory and provider
+        services.AddSingleton<Honua.Server.Core.Raster.Caching.IRasterTileCacheProviderFactory, Honua.Server.Core.Raster.Caching.RasterTileCacheProviderFactory>();
+        services.AddSingleton<Honua.Server.Core.Raster.Caching.IRasterTileCacheProvider>(sp =>
+        {
+            var factory = sp.GetRequiredService<Honua.Server.Core.Raster.Caching.IRasterTileCacheProviderFactory>();
+            var configService = sp.GetRequiredService<IHonuaConfigurationService>();
+            var rasterTileCacheConfig = configService.Current.Services.RasterTiles;
+            return factory.Create(rasterTileCacheConfig);
+        });
+
         // Register raster source providers (required by IRasterSourceProviderRegistry)
         // Only register providers without external dependencies for now
         services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.FileSystemRasterSourceProvider>();
