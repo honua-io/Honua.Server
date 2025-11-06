@@ -1,0 +1,489 @@
+@page "/maps/new"
+@page "/maps/edit/{Id}"
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services
+@using System.Text.Json
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ComponentBus Bus
+@inject IMapConfigurationService ConfigService
+
+<PageTitle>@(IsEditMode ? "Edit Map" : "Create New Map")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                              OnClick="@(() => Navigation.NavigateTo("/maps"))" />
+                <MudText Typo="Typo.h4">
+                    @(IsEditMode ? "Edit Map" : "Create New Map")
+                </MudText>
+                @if (_isSaving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                }
+            </MudStack>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined"
+                          StartIcon="@Icons.Material.Filled.Visibility"
+                          OnClick="TogglePreview">
+                    @(_showPreview ? "Hide" : "Show") Preview
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                          StartIcon="@Icons.Material.Filled.Code"
+                          OnClick="ShowExportDialog">
+                    Export
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                          Color="Color.Primary"
+                          StartIcon="@Icons.Material.Filled.Save"
+                          OnClick="SaveMap"
+                          Disabled="@_isSaving">
+                    Save Map
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <MudGrid>
+        <!-- Configuration Panels -->
+        <MudItem xs="12" md="@(_showPreview ? 4 : 6)">
+            <MudStack Spacing="3">
+                <!-- Basic Settings -->
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Basic Settings</MudText>
+                    <MudStack Spacing="3">
+                        <MudTextField @bind-Value="_config.Name"
+                                     Label="Map Name"
+                                     Required="true"
+                                     Variant="Variant.Outlined" />
+
+                        <MudTextField @bind-Value="_config.Description"
+                                     Label="Description"
+                                     Lines="3"
+                                     Variant="Variant.Outlined" />
+
+                        <MudTextField @bind-Value="_config.Settings.Style"
+                                     Label="Map Style URL"
+                                     Placeholder="https://demotiles.maplibre.org/style.json"
+                                     Variant="Variant.Outlined"
+                                     HelperText="MapLibre style URL or style JSON" />
+
+                        <MudGrid>
+                            <MudItem xs="12" sm="6">
+                                <MudNumericField @bind-Value="_centerLng"
+                                               Label="Center Longitude"
+                                               Variant="Variant.Outlined"
+                                               Min="-180"
+                                               Max="180" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudNumericField @bind-Value="_centerLat"
+                                               Label="Center Latitude"
+                                               Variant="Variant.Outlined"
+                                               Min="-90"
+                                               Max="90" />
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudNumericField @bind-Value="_config.Settings.Zoom"
+                                       Label="Zoom Level"
+                                       Variant="Variant.Outlined"
+                                       Min="0"
+                                       Max="22" />
+
+                        <MudSelect @bind-Value="_config.Settings.Projection"
+                                  Label="Projection"
+                                  Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("mercator")">Mercator (2D)</MudSelectItem>
+                            <MudSelectItem Value="@("globe")">Globe (3D)</MudSelectItem>
+                        </MudSelect>
+
+                        <MudSwitch @bind-Value="_config.Settings.EnableGPU"
+                                  Label="Enable GPU Acceleration"
+                                  Color="Color.Primary" />
+
+                        <MudButton Variant="Variant.Filled"
+                                  Color="Color.Secondary"
+                                  FullWidth="true"
+                                  OnClick="UpdateMapPreview">
+                            Update Preview
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Layers -->
+                <MudPaper Class="pa-4">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6">Layers</MudText>
+                        <MudButton Size="Size.Small"
+                                  StartIcon="@Icons.Material.Filled.Add"
+                                  OnClick="AddLayer">
+                            Add Layer
+                        </MudButton>
+                    </MudStack>
+
+                    @if (_config.Layers.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4 text-center">
+                            No layers added yet. Add a layer to display data on the map.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="2">
+                            @foreach (var layer in _config.Layers)
+                            {
+                                <MudPaper Outlined="true" Class="pa-3">
+                                    <MudStack Spacing="2">
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                            <MudText Typo="Typo.subtitle2">
+                                                <strong>@layer.Name</strong>
+                                            </MudText>
+                                            <MudStack Row="true" Spacing="1">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                             Size="Size.Small"
+                                                             OnClick="@(() => EditLayer(layer))" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                             Size="Size.Small"
+                                                             Color="Color.Error"
+                                                             OnClick="@(() => RemoveLayer(layer))" />
+                                            </MudStack>
+                                        </MudStack>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            Type: @layer.Type | Source: @layer.Source
+                                        </MudText>
+                                        <MudStack Row="true" Spacing="2">
+                                            <MudSwitch @bind-Value="layer.Visible"
+                                                      Label="Visible"
+                                                      Color="Color.Primary"
+                                                      Size="Size.Small" />
+                                            <MudSlider @bind-Value="layer.Opacity"
+                                                      Min="0"
+                                                      Max="1"
+                                                      Step="0.1"
+                                                      Style="width: 120px;">
+                                                Opacity: @layer.Opacity.ToString("F1")
+                                            </MudSlider>
+                                        </MudStack>
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+
+                <!-- Controls -->
+                <MudPaper Class="pa-4">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6">Map Controls</MudText>
+                        <MudButton Size="Size.Small"
+                                  StartIcon="@Icons.Material.Filled.Add"
+                                  OnClick="AddControl">
+                            Add Control
+                        </MudButton>
+                    </MudStack>
+
+                    <MudStack Spacing="2">
+                        @foreach (var control in _config.Controls)
+                        {
+                            <MudPaper Outlined="true" Class="pa-2">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                        <MudSwitch @bind-Value="control.Visible"
+                                                  Color="Color.Primary"
+                                                  Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">@control.Type</MudText>
+                                    </MudStack>
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudText Typo="Typo.caption">@control.Position</MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                     Size="Size.Small"
+                                                     Color="Color.Error"
+                                                     OnClick="@(() => RemoveControl(control))" />
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+
+        <!-- Map Preview -->
+        @if (_showPreview)
+        {
+            <MudItem xs="12" md="8">
+                <MudPaper Class="pa-4" Style="height: calc(100vh - 200px); position: sticky; top: 100px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">Live Preview</MudText>
+                    <div style="height: calc(100% - 50px); border: 1px solid #e0e0e0; border-radius: 4px;">
+                        <HonuaMap Id="previewMap"
+                                 MapStyle="@_config.Settings.Style"
+                                 Center="@_config.Settings.Center"
+                                 Zoom="@_config.Settings.Zoom"
+                                 Bearing="@_config.Settings.Bearing"
+                                 Pitch="@_config.Settings.Pitch"
+                                 Projection="@_config.Settings.Projection"
+                                 EnableGPU="@_config.Settings.EnableGPU"
+                                 Style="width: 100%; height: 100%;" />
+                    </div>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    private MapConfiguration _config = new()
+    {
+        Name = "New Map",
+        Settings = new MapSettings
+        {
+            Style = "https://demotiles.maplibre.org/style.json",
+            Center = new[] { 0.0, 0.0 },
+            Zoom = 2,
+            EnableGPU = true
+        }
+    };
+
+    private bool _showPreview = true;
+    private bool _isSaving = false;
+    private bool IsEditMode => !string.IsNullOrEmpty(Id);
+
+    // Helper properties for two-way binding
+    private double _centerLng
+    {
+        get => _config.Settings.Center[0];
+        set => _config.Settings.Center[0] = value;
+    }
+
+    private double _centerLat
+    {
+        get => _config.Settings.Center[1];
+        set => _config.Settings.Center[1] = value;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode)
+        {
+            await LoadMap();
+        }
+    }
+
+    private async Task LoadMap()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"/admin/api/map-configurations/{Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                var entity = await response.Content.ReadFromJsonAsync<MapConfigurationEntity>();
+                if (entity != null)
+                {
+                    _config = JsonSerializer.Deserialize<MapConfiguration>(entity.Configuration) ?? _config;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading map: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SaveMap()
+    {
+        _isSaving = true;
+        try
+        {
+            // Validate configuration
+            var validation = ConfigService.Validate(_config);
+            if (!validation.IsValid)
+            {
+                Snackbar.Add($"Validation failed: {string.Join(", ", validation.Errors)}", Severity.Error);
+                return;
+            }
+
+            var configJson = ConfigService.ExportAsJson(_config, false);
+
+            if (IsEditMode)
+            {
+                // Update existing
+                var response = await Http.PutAsJsonAsync($"/admin/api/map-configurations/{Id}", new
+                {
+                    name = _config.Name,
+                    description = _config.Description,
+                    configuration = configJson
+                });
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Map updated successfully", Severity.Success);
+                }
+            }
+            else
+            {
+                // Create new
+                var response = await Http.PostAsJsonAsync("/admin/api/map-configurations", new
+                {
+                    name = _config.Name,
+                    description = _config.Description,
+                    configuration = configJson,
+                    createdBy = "admin"
+                });
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Map created successfully", Severity.Success);
+                    var created = await response.Content.ReadFromJsonAsync<MapConfigurationEntity>();
+                    if (created != null)
+                    {
+                        Navigation.NavigateTo($"/maps/edit/{created.Id}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving map: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void TogglePreview()
+    {
+        _showPreview = !_showPreview;
+    }
+
+    private async Task UpdateMapPreview()
+    {
+        // Trigger map update via ComponentBus
+        await Bus.PublishAsync(new BasemapChangedMessage
+        {
+            MapId = "previewMap",
+            Style = _config.Settings.Style
+        }, "MapEditor");
+
+        await Bus.PublishAsync(new FlyToRequestMessage
+        {
+            MapId = "previewMap",
+            Center = _config.Settings.Center,
+            Zoom = _config.Settings.Zoom,
+            Bearing = _config.Settings.Bearing,
+            Pitch = _config.Settings.Pitch
+        }, "MapEditor");
+
+        Snackbar.Add("Preview updated", Severity.Info);
+    }
+
+    private void AddLayer()
+    {
+        var newLayer = new LayerConfiguration
+        {
+            Name = $"Layer {_config.Layers.Count + 1}",
+            Type = LayerType.Vector,
+            Source = "https://example.com/data.geojson",
+            Visible = true,
+            Opacity = 1.0
+        };
+        _config.Layers.Add(newLayer);
+    }
+
+    private async Task EditLayer(LayerConfiguration layer)
+    {
+        var parameters = new DialogParameters<Dialogs.LayerEditorDialog>
+        {
+            { x => x.Layer, layer }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        var dialog = await DialogService.ShowAsync<Dialogs.LayerEditorDialog>(
+            $"Edit Layer: {layer.Name}",
+            parameters,
+            options
+        );
+
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveLayer(LayerConfiguration layer)
+    {
+        _config.Layers.Remove(layer);
+    }
+
+    private void AddControl()
+    {
+        var newControl = new ControlConfiguration
+        {
+            Type = ControlType.Navigation,
+            Position = "top-right",
+            Visible = true
+        };
+        _config.Controls.Add(newControl);
+    }
+
+    private void RemoveControl(ControlConfiguration control)
+    {
+        _config.Controls.Remove(control);
+    }
+
+    private async Task ShowExportDialog()
+    {
+        var parameters = new DialogParameters<Dialogs.ExportDialog>
+        {
+            { x => x.Config, _config }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<Dialogs.ExportDialog>(
+            "Export Map Configuration",
+            parameters,
+            options
+        );
+    }
+
+    // DTO for API
+    private class MapConfigurationEntity
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string Configuration { get; set; } = "{}";
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public string CreatedBy { get; set; } = string.Empty;
+        public bool IsPublic { get; set; }
+        public bool IsTemplate { get; set; }
+        public string? Tags { get; set; }
+        public string? ThumbnailUrl { get; set; }
+        public int ViewCount { get; set; }
+    }
+}

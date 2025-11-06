@@ -192,6 +192,7 @@ internal static class VersionedEndpointExtensions
         group.MapVectorTilePreseedEndpoints();
         group.MapTracingConfiguration();
         group.MapDegradationStatusEndpoints();
+        group.MapGeofenceAlertAdministrationEndpoints();
 
         return group;
     }

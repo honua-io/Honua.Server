@@ -1,0 +1,264 @@
+@page "/licensing"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject FeatureFlagService FeatureFlags
+
+<PageTitle>License & Features - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h3" Class="mb-4">License & Features</MudText>
+
+    @if (_featureFlags != null)
+    {
+        <!-- License Summary Card -->
+        <MudPaper Elevation="2" Class="pa-6 mb-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Large" Color="@GetTierColor()" />
+                <div>
+                    <MudText Typo="Typo.h4">@_featureFlags.Tier Tier</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Current License Status: @(_featureFlags.IsValid ? "Active" : "Inactive")
+                    </MudText>
+                </div>
+                <MudSpacer />
+                @if (_featureFlags.Tier != LicenseTier.Enterprise)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Upgrade"
+                               Href="https://honua.io/pricing"
+                               Target="_blank">
+                        Upgrade License
+                    </MudButton>
+                }
+            </MudStack>
+
+            @if (_featureFlags.DaysUntilExpiration <= 30 && _featureFlags.DaysUntilExpiration > 0)
+            {
+                <MudAlert Severity="Severity.Warning" Icon="@Icons.Material.Filled.Warning">
+                    Your license will expire in <strong>@_featureFlags.DaysUntilExpiration days</strong>.
+                    Please contact support to renew your license.
+                </MudAlert>
+            }
+            else if (_featureFlags.DaysUntilExpiration <= 0)
+            {
+                <MudAlert Severity="Severity.Error" Icon="@Icons.Material.Filled.Error">
+                    Your license has expired. Enterprise features have been disabled.
+                </MudAlert>
+            }
+        </MudPaper>
+
+        <!-- Feature Availability -->
+        <MudPaper Elevation="2" Class="pa-6 mb-4">
+            <MudText Typo="Typo.h5" Class="mb-4">Available Features</MudText>
+
+            <MudGrid>
+                <!-- Core Features -->
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6" Class="mb-3">Core Features</MudText>
+                    <MudList Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                            <MudText>OGC Web Services (WMS, WFS, WMTS)</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                            <MudText>OGC API Features & Tiles</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.VectorTiles)" IconColor="@GetFeatureColor(_featureFlags.VectorTiles)">
+                            <MudText>Vector Tiles (MVT)</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.RasterProcessing)" IconColor="@GetFeatureColor(_featureFlags.RasterProcessing)">
+                            <MudText>Raster Processing</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.StacCatalog)" IconColor="@GetFeatureColor(_featureFlags.StacCatalog)">
+                            <MudText>STAC Catalog</MudText>
+                        </MudListItem>
+                    </MudList>
+                </MudItem>
+
+                <!-- Professional Features -->
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.h6" Class="mb-3">Professional Features</MudText>
+                    <MudList Dense="true">
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.AdvancedAnalytics)" IconColor="@GetFeatureColor(_featureFlags.AdvancedAnalytics)">
+                            <MudText>Advanced Analytics</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.CloudIntegrations)" IconColor="@GetFeatureColor(_featureFlags.CloudIntegrations)">
+                            <MudText>Cloud Integrations (AWS, Azure, GCP)</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.PrioritySupport)" IconColor="@GetFeatureColor(_featureFlags.PrioritySupport)">
+                            <MudText>Priority Support</MudText>
+                        </MudListItem>
+                    </MudList>
+                </MudItem>
+
+                <!-- Enterprise Features -->
+                <MudItem xs="12">
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Stars" Class="mr-2" />
+                        Enterprise Features
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudList Dense="true">
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.GeoEtl)" IconColor="@GetFeatureColor(_featureFlags.GeoEtl)">
+                            <MudStack>
+                                <MudText>GeoETL Workflows</MudText>
+                                @if (!_featureFlags.GeoEtl)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        AI-powered workflow engine for geospatial data pipelines
+                                    </MudText>
+                                }
+                            </MudStack>
+                        </MudListItem>
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.Versioning)" IconColor="@GetFeatureColor(_featureFlags.Versioning)">
+                            <MudStack>
+                                <MudText>Versioning & Branching</MudText>
+                                @if (!_featureFlags.Versioning)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Git-like version control for geospatial data
+                                    </MudText>
+                                }
+                            </MudStack>
+                        </MudListItem>
+                    </MudList>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudList Dense="true">
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.OracleSupport)" IconColor="@GetFeatureColor(_featureFlags.OracleSupport)">
+                            <MudStack>
+                                <MudText>Oracle Spatial Support</MudText>
+                                @if (!_featureFlags.OracleSupport)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Native Oracle Spatial database connectivity
+                                    </MudText>
+                                }
+                            </MudStack>
+                        </MudListItem>
+                        <MudListItem Icon="@GetFeatureIcon(_featureFlags.ElasticsearchSupport)" IconColor="@GetFeatureColor(_featureFlags.ElasticsearchSupport)">
+                            <MudStack>
+                                <MudText>Elasticsearch Support</MudText>
+                                @if (!_featureFlags.ElasticsearchSupport)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Full-text search and analytics for spatial data
+                                    </MudText>
+                                }
+                            </MudStack>
+                        </MudListItem>
+                    </MudList>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <!-- Quota Information -->
+        <MudPaper Elevation="2" Class="pa-6 mb-4">
+            <MudText Typo="Typo.h5" Class="mb-4">Quotas & Limits</MudText>
+
+            <MudSimpleTable Dense="true">
+                <thead>
+                    <tr>
+                        <th>Resource</th>
+                        <th>Limit</th>
+                        <th>Current Tier</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Maximum Users</td>
+                        <td>@FormatLimit(_featureFlags.MaxUsers)</td>
+                        <td><MudChip Size="Size.Small" Color="@GetTierColor()">@_featureFlags.Tier</MudChip></td>
+                    </tr>
+                    <tr>
+                        <td>Maximum Collections/Layers</td>
+                        <td>@FormatLimit(_featureFlags.MaxCollections)</td>
+                        <td><MudChip Size="Size.Small" Color="@GetTierColor()">@_featureFlags.Tier</MudChip></td>
+                    </tr>
+                    <tr>
+                        <td>API Requests per Day</td>
+                        <td>@FormatLimit(_featureFlags.MaxApiRequestsPerDay)</td>
+                        <td><MudChip Size="Size.Small" Color="@GetTierColor()">@_featureFlags.Tier</MudChip></td>
+                    </tr>
+                    <tr>
+                        <td>Storage (GB)</td>
+                        <td>@FormatLimit(_featureFlags.MaxStorageGb)</td>
+                        <td><MudChip Size="Size.Small" Color="@GetTierColor()">@_featureFlags.Tier</MudChip></td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+
+        <!-- Tier Comparison -->
+        @if (_featureFlags.Tier != LicenseTier.Enterprise)
+        {
+            <MudPaper Elevation="2" Class="pa-6 mb-4">
+                <MudText Typo="Typo.h5" Class="mb-4">Upgrade to Unlock More</MudText>
+
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    Upgrade to @(_featureFlags.Tier == LicenseTier.Free ? "Professional or Enterprise" : "Enterprise")
+                    to access additional features and higher quotas.
+                </MudAlert>
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Upgrade"
+                               Href="https://honua.io/pricing"
+                               Target="_blank">
+                        View Pricing
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               StartIcon="@Icons.Material.Filled.Email"
+                               Href="https://honua.io/contact"
+                               Target="_blank">
+                        Contact Sales
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Default"
+                               StartIcon="@Icons.Material.Filled.Info"
+                               Href="https://honua.io/docs/licensing"
+                               Target="_blank">
+                        Documentation
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+    }
+    else
+    {
+        <MudProgressCircular Indeterminate="true" />
+        <MudText Class="mt-2">Loading license information...</MudText>
+    }
+</MudContainer>
+
+@code {
+    private FeatureFlagState? _featureFlags;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _featureFlags = await FeatureFlags.GetFeatureFlagsAsync();
+    }
+
+    private Color GetTierColor() => _featureFlags?.Tier switch
+    {
+        LicenseTier.Enterprise => Color.Success,
+        LicenseTier.Professional => Color.Info,
+        _ => Color.Default
+    };
+
+    private string GetFeatureIcon(bool enabled) => enabled
+        ? Icons.Material.Filled.CheckCircle
+        : Icons.Material.Filled.Cancel;
+
+    private Color GetFeatureColor(bool enabled) => enabled
+        ? Color.Success
+        : Color.Default;
+
+    private string FormatLimit(int limit) => limit == 0 ? "Unlimited" : limit.ToString("N0");
+}

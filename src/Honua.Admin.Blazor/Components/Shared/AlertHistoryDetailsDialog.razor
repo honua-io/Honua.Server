@@ -1,0 +1,140 @@
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudDialog>
+    <DialogContent>
+        @if (Alert != null)
+        {
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6">@Alert.RuleName</MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Severity</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@GetSeverityColor(Alert.Severity)">
+                        @Alert.Severity
+                    </MudChip>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Status</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(Alert.Status)">
+                        @Alert.Status
+                    </MudChip>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Started At</MudText>
+                    <MudText Typo="Typo.body1">@Alert.StartsAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Ended At</MudText>
+                    <MudText Typo="Typo.body1">
+                        @if (Alert.EndsAt.HasValue)
+                        {
+                            @Alert.EndsAt.Value.ToString("yyyy-MM-dd HH:mm:ss")
+                        }
+                        else
+                        {
+                            <span>Still active</span>
+                        }
+                    </MudText>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Message</MudText>
+                    <MudPaper Outlined="true" Class="pa-3">
+                        <MudText Typo="Typo.body2">@Alert.Message</MudText>
+                    </MudPaper>
+                </MudItem>
+
+                @if (Alert.Labels.Any())
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Labels</MudText>
+                        <MudPaper Outlined="true" Class="pa-3">
+                            @foreach (var label in Alert.Labels)
+                            {
+                                <MudChip T="string" Size="Size.Small" Class="mb-1">
+                                    @label.Key: @label.Value
+                                </MudChip>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                }
+
+                @if (Alert.Annotations.Any())
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Annotations</MudText>
+                        <MudPaper Outlined="true" Class="pa-3">
+                            @foreach (var annotation in Alert.Annotations)
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-2">
+                                    <b>@annotation.Key:</b> @annotation.Value
+                                </MudText>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                }
+
+                @if (Alert.NotifiedChannels.Any())
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Notified Channels</MudText>
+                        <MudPaper Outlined="true" Class="pa-3">
+                            @foreach (var channel in Alert.NotifiedChannels)
+                            {
+                                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Class="mb-1">
+                                    @channel
+                                </MudChip>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                }
+
+                @if (!string.IsNullOrEmpty(Alert.Fingerprint))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Fingerprint</MudText>
+                        <MudText Typo="Typo.caption" Class="text-monospace">@Alert.Fingerprint</MudText>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public AlertHistoryModel? Alert { get; set; }
+
+    private void Close()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private Color GetSeverityColor(AlertSeverity severity) => severity switch
+    {
+        AlertSeverity.Info => Color.Info,
+        AlertSeverity.Warning => Color.Warning,
+        AlertSeverity.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetStatusColor(AlertStatus status) => status switch
+    {
+        AlertStatus.Pending => Color.Default,
+        AlertStatus.Firing => Color.Error,
+        AlertStatus.Resolved => Color.Success,
+        AlertStatus.Silenced => Color.Secondary,
+        _ => Color.Default
+    };
+}

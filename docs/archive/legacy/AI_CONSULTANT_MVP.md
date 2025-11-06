@@ -10,7 +10,7 @@
 - Provide cost estimates and optimization recommendations
 
 **Market Opportunity**:
-- Esri customers pay $100-200K total cost (software + consulting)
+- enterprise GIS organizations pay $100-200K total cost (software + consulting)
 - We undercut by 40-60% through AI automation
 - Target: Mid-market customers (cities, agencies, companies with <$50M revenue)
 

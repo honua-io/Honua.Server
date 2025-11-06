@@ -194,7 +194,7 @@ HONUA_BASE_URL=http://localhost:8081 ./scripts/test-seeded-deployment.sh
 ### 3. Comprehensive Testing
 - All OGC standards supported (WFS, WMS, WCS, OGC API)
 - STAC 1.0 catalog
-- GeoServices REST API (Esri-compatible)
+- GeoServices REST API
 - Health check endpoints (Kubernetes-compatible)
 - Sample data with realistic geometries and attributes
 
@@ -260,7 +260,7 @@ Once deployed, the following endpoints are available:
 | **WMS** | http://localhost:8080/wms | Web Map Service |
 | **WCS** | http://localhost:8080/wcs | Web Coverage Service |
 | **STAC** | http://localhost:8080/stac | SpatioTemporal Asset Catalog |
-| **GeoServices** | http://localhost:8080/rest | Esri-compatible REST API |
+| **GeoServices** | http://localhost:8080/rest | GeoServices REST compatible API |
 
 ## Sample Data
 

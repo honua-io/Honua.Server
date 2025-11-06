@@ -22,7 +22,7 @@ The comprehensive design for **Honua Field** is complete and validated for produ
 - 🥽 **Augmented Reality** for visualization and navigation
 - 📡 **True offline-first** architecture with edge computing
 - 🎨 **Modern cross-platform apps** (.NET MAUI) - 85-90% code sharing
-- 💰 **Fair pricing** - $25-50/user/month (vs Esri $500-1500/yr)
+- 💰 **Fair pricing** - $25-50/user/month (vs commercial GIS platforms $500-1500/yr)
 
 ---
 
@@ -271,7 +271,7 @@ The comprehensive design for **Honua Field** is complete and validated for produ
 - **Savings with MAUI:** $900k
 
 **Infrastructure:**
-- Esri licenses: $10k/yr (scales with users)
+- commercial GIS licenses: $10k/yr (scales with users)
 - Azure DevOps: $5k/yr
 - Apple/Google fees: $124/yr
 - **Total:** $15-20k/yr (negligible)
@@ -396,7 +396,7 @@ The architectural approach for Honua Field is **validated as production-ready** 
 **4. Competitive Advantages**
 - **AI + AR + Native performance:** Triple differentiation
 - **Fair pricing:** 1/3 to 1/2 cost of Esri
-- **Open standards:** No vendor lock-in (vs Esri proprietary)
+- **Open standards:** No vendor lock-in (vs commercial GIS platforms proprietary)
 - **Developer-friendly:** APIs, plugins, webhooks
 
 **5. Existing Infrastructure**

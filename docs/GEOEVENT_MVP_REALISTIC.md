@@ -703,7 +703,7 @@ Deploy to Production
 **Plus Azure Costs:**
 - Azure Stream Analytics: ~$80/month
 - Azure Event Hub: ~$15/month
-- **Total: $194-574/month** (vs Esri $1,667/month)
+- **Total: $194-574/month** (vs commercial GIS platforms $1,667/month)
 
 ---
 

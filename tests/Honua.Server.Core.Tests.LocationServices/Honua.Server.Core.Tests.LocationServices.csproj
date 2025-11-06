@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Honua.Server.Core.Tests.Shared\Honua.Server.Core.Tests.Shared.csproj" />
+    <ProjectReference Include="..\..\src\Honua.Server.Core\Honua.Server.Core.csproj" />
+  </ItemGroup>
+
+</Project>

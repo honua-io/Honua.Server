@@ -1,0 +1,145 @@
+@*
+    Copyright (c) 2025 HonuaIO
+    Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@namespace Honua.MapSDK.Components.Map
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="honua-maplibre-container @CssClass" style="@ContainerStyle">
+    <div @ref="_mapElement"
+         id="@MapId"
+         class="honua-maplibre-map"
+         style="width: @Width; height: @Height;"
+         role="region"
+         aria-label="Interactive map"
+         tabindex="0">
+    </div>
+
+    @if (ShowControls)
+    {
+        <div class="honua-maplibre-controls">
+            @ChildContent
+        </div>
+    }
+
+    @if (Loading)
+    {
+        <div class="honua-maplibre-loading">
+            <div class="honua-maplibre-spinner"></div>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this map instance.
+    /// </summary>
+    [Parameter]
+    public string MapId { get; set; } = $"map-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map configuration.
+    /// </summary>
+    [Parameter]
+    public MapConfiguration? Configuration { get; set; }
+
+    /// <summary>
+    /// Map height (CSS value).
+    /// </summary>
+    [Parameter]
+    public string Height { get; set; } = "600px";
+
+    /// <summary>
+    /// Map width (CSS value).
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "100%";
+
+    /// <summary>
+    /// Show built-in controls.
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Enable map interactions (pan, zoom, rotate, etc.).
+    /// </summary>
+    [Parameter]
+    public bool EnableInteractions { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class for the container.
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom container style.
+    /// </summary>
+    [Parameter]
+    public string? ContainerStyle { get; set; }
+
+    /// <summary>
+    /// Child content (custom controls, overlays, etc.).
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Event fired when map is fully loaded.
+    /// </summary>
+    [Parameter]
+    public EventCallback<MapLibreViewport> OnMapLoad { get; set; }
+
+    /// <summary>
+    /// Event fired when map is clicked.
+    /// </summary>
+    [Parameter]
+    public EventCallback<MapClickEventArgs> OnMapClick { get; set; }
+
+    /// <summary>
+    /// Event fired when map is moved (pan, zoom, rotate, pitch).
+    /// </summary>
+    [Parameter]
+    public EventCallback<MapMoveEventArgs> OnMapMove { get; set; }
+
+    /// <summary>
+    /// Event fired when viewport changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<ViewportChangeEventArgs> OnViewportChange { get; set; }
+
+    /// <summary>
+    /// Event fired when style is loaded.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnStyleLoad { get; set; }
+
+    /// <summary>
+    /// Event fired when style data changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnStyleDataChange { get; set; }
+
+    /// <summary>
+    /// Event fired when source data changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnSourceDataChange { get; set; }
+
+    /// <summary>
+    /// Event fired when an error occurs.
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    private ElementReference _mapElement;
+    private DotNetObjectReference<HonuaMapLibre>? _dotNetRef;
+    private bool _isInitialized = false;
+    private bool Loading { get; set; } = true;
+}

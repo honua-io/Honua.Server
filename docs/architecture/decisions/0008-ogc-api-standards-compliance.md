@@ -27,7 +27,7 @@ Honua will **fully implement OGC API Standards** as the primary API design, with
 
 **Primary:** OGC API - Features 1.0 (modern JSON/GeoJSON)
 **Legacy:** WFS 2.0, WMS 1.3 (XML-based, for compatibility)
-**Additional:** Esri REST API (for ArcGIS ecosystem integration)
+**Additional:** Geoservices REST a.k.a. Esri REST API (for ArcGIS ecosystem integration)
 
 **Standards Compliance:**
 - OpenAPI 3.0 specification for API documentation
@@ -59,7 +59,7 @@ Honua will **fully implement OGC API Standards** as the primary API design, with
 
 ### Neutral
 
-- Some clients prefer Esri REST API over OGC
+- Some clients prefer Geoservices REST a.k.a. Esri REST API over OGC
 - Standards evolve slowly (both pro and con)
 
 ## Alternatives Considered
@@ -67,8 +67,8 @@ Honua will **fully implement OGC API Standards** as the primary API design, with
 ### 1. Custom REST API Only
 **Verdict:** Rejected - reinventing the wheel, poor interoperability
 
-### 2. Esri REST API Only
-**Verdict:** Rejected - vendor lock-in, limited to Esri ecosystem
+### 2. Geoservices REST a.k.a. Esri REST API Only
+**Verdict:** Rejected - vendor lock-in, limited to proprietary GIS platforms
 
 ### 3. GraphQL API
 **Verdict:** Rejected - not standard in GIS, poor client support

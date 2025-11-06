@@ -386,7 +386,7 @@ public sealed class EsriGeometrySerializer : IGeometrySerializer
                 throw new GeometrySerializationException($"Cannot serialize invalid polygon: {validationResult.ErrorMessage}");
             }
 
-            // Ensure polygon has correct Esri orientation (CW exterior, CCW holes)
+            // Ensure polygon has correct GeoServices ring orientation (CW exterior, CCW holes)
             var esriPolygon = GeometryValidator.EnsureEsriOrientation(polygon);
 
             rings.Add(CreateCoordinateCollection(esriPolygon.ExteriorRing.CoordinateSequence));

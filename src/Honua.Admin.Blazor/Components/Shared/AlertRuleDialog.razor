@@ -1,0 +1,144 @@
+@using Honua.Admin.Blazor.Shared.Models
+@inject ISnackbar Snackbar
+@inject HttpClient Http
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_formValid">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Name"
+                                  Label="Rule Name"
+                                  Required="true"
+                                  RequiredError="Name is required"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSelect T="AlertSeverity"
+                               @bind-Value="_model.Severity"
+                               Label="Severity"
+                               Required="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@AlertSeverity.Info">Info</MudSelectItem>
+                        <MudSelectItem Value="@AlertSeverity.Warning">Warning</MudSelectItem>
+                        <MudSelectItem Value="@AlertSeverity.Critical">Critical</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Description"
+                                  Label="Description"
+                                  Lines="2"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Expression"
+                                  Label="Alert Expression"
+                                  Required="true"
+                                  RequiredError="Expression is required"
+                                  Variant="Variant.Outlined"
+                                  HelperText="Prometheus PromQL expression"
+                                  Lines="2" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Duration"
+                                  Label="Duration"
+                                  Required="true"
+                                  RequiredError="Duration is required"
+                                  Variant="Variant.Outlined"
+                                  HelperText="Example: 5m, 10m, 1h" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSwitch T="bool"
+                               @bind-Checked="_model.Enabled"
+                               Label="Enabled"
+                               Color="Color.Primary" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="string"
+                               Label="Notification Channels"
+                               MultiSelection="true"
+                               @bind-SelectedValues="_selectedChannelIds"
+                               Variant="Variant.Outlined">
+                        @foreach (var channel in _availableChannels)
+                        {
+                            <MudSelectItem Value="@channel.Id">@channel.Name (@channel.Type)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(!_formValid)">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public AlertRuleModel? Rule { get; set; }
+
+    private MudForm? _form;
+    private bool _formValid;
+    private CreateAlertRuleRequest _model = new()
+    {
+        Name = string.Empty,
+        Severity = AlertSeverity.Warning,
+        Expression = string.Empty,
+        Duration = "5m"
+    };
+
+    private List<NotificationChannelListItem> _availableChannels = new();
+    private IEnumerable<string> _selectedChannelIds
+    {
+        get => _model.ChannelIds;
+        set => _model.ChannelIds = value.ToList();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load available channels
+        // TODO: Replace with actual API call
+        // _availableChannels = await Http.GetFromJsonAsync<List<NotificationChannelListItem>>("/admin/alerts/channels") ?? new();
+        _availableChannels = new List<NotificationChannelListItem>();
+
+        if (Rule != null)
+        {
+            _model = new CreateAlertRuleRequest
+            {
+                Name = Rule.Name,
+                Description = Rule.Description,
+                Severity = Rule.Severity,
+                Enabled = Rule.Enabled,
+                Expression = Rule.Expression,
+                Duration = Rule.Duration,
+                Labels = new Dictionary<string, string>(Rule.Labels),
+                Annotations = new Dictionary<string, string>(Rule.Annotations),
+                ChannelIds = new List<string>(Rule.ChannelIds)
+            };
+        }
+    }
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

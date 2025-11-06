@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Successfully implemented comprehensive integration testing for ALL Honua API standards using industry-standard GIS client libraries. This provides real-world validation that goes beyond unit tests to ensure actual client compatibility with OGC, STAC, and Esri specifications.
+Successfully implemented comprehensive integration testing for ALL Honua API standards using industry-standard GIS client libraries. This provides real-world validation that goes beyond unit tests to ensure actual client compatibility with OGC, STAC, and GeoServices REST specifications.
 
 ## What Was Accomplished
 
@@ -359,7 +359,7 @@ pytest --cov=src/Honua.Server.Host/Ogc tests/qgis/test_ogc_features_comprehensiv
 - Catches subtle compatibility issues that unit tests miss
 
 ### 2. Specification Compliance
-- Reference implementations enforce OGC/STAC/Esri specifications
+- Reference implementations enforce OGC/STAC/GeoServices REST specifications
 - 100% coverage of major operations for each standard
 - Validates XML/JSON schema compliance
 

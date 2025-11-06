@@ -124,7 +124,7 @@ Honua implements **two API surfaces** over a shared backend:
 - JSON-based REST API (easier than XML)
 - Transferred to Open Web Foundation (2010) - open specification
 - Wide ecosystem adoption (ArcGIS Online, Enterprise, third-party tools)
-- Familiar to Esri users migrating to Honua
+- Familiar to GIS professionals migrating to Honua
 
 **Example Request:**
 ```json

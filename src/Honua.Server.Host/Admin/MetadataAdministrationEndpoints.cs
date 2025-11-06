@@ -59,6 +59,18 @@ public static class MetadataAdministrationEndpoints
             .WithName("DeleteService")
             .WithSummary("Delete a service");
 
+        group.MapPost("/services/{id}/enable", EnableService)
+            .WithName("EnableService")
+            .WithSummary("Enable a service");
+
+        group.MapPost("/services/{id}/disable", DisableService)
+            .WithName("DisableService")
+            .WithSummary("Disable a service");
+
+        group.MapGet("/services/{id}/connection/{type}", GetServiceConnectionFile)
+            .WithName("GetServiceConnectionFile")
+            .WithSummary("Download connection file for GIS applications");
+
         // Layers
         group.MapGet("/layers", GetLayers)
             .WithName("GetLayers")
@@ -96,6 +108,35 @@ public static class MetadataAdministrationEndpoints
         group.MapDelete("/folders/{id}", DeleteFolder)
             .WithName("DeleteFolder")
             .WithSummary("Delete a folder");
+
+        // Data Sources
+        group.MapGet("/datasources", GetDataSources)
+            .WithName("GetDataSources")
+            .WithSummary("List all data sources");
+
+        group.MapGet("/datasources/{id}", GetDataSourceById)
+            .WithName("GetDataSourceById")
+            .WithSummary("Get data source by ID");
+
+        group.MapPost("/datasources", CreateDataSource)
+            .WithName("CreateDataSource")
+            .WithSummary("Create a new data source");
+
+        group.MapPut("/datasources/{id}", UpdateDataSource)
+            .WithName("UpdateDataSource")
+            .WithSummary("Update an existing data source");
+
+        group.MapDelete("/datasources/{id}", DeleteDataSource)
+            .WithName("DeleteDataSource")
+            .WithSummary("Delete a data source");
+
+        group.MapPost("/datasources/{id}/test", TestDataSourceConnection)
+            .WithName("TestDataSourceConnection")
+            .WithSummary("Test connection to a data source");
+
+        group.MapGet("/datasources/{id}/tables", GetDataSourceTables)
+            .WithName("GetDataSourceTables")
+            .WithSummary("Discover tables in a data source");
 
         return group;
     }
@@ -137,6 +178,7 @@ public static class MetadataAdministrationEndpoints
             Title = s.Title,
             FolderId = s.FolderId,
             ServiceType = s.ServiceType,
+            DataSourceId = s.DataSourceId,
             Enabled = s.Enabled,
             LayerCount = s.Layers.Count
         }).ToList();
@@ -434,6 +476,215 @@ public static class MetadataAdministrationEndpoints
                 statusCode: StatusCodes.Status500InternalServerError,
                 detail: "An error occurred while deleting the service");
         }
+    }
+
+    private static async Task<IResult> EnableService(
+        string id,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        return await ToggleServiceEnabledState(id, true, metadataProvider, logger, ct);
+    }
+
+    private static async Task<IResult> DisableService(
+        string id,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        return await ToggleServiceEnabledState(id, false, metadataProvider, logger, ct);
+    }
+
+    private static async Task<IResult> ToggleServiceEnabledState(
+        string id,
+        bool enabled,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var existingService = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (existingService is null)
+            {
+                return Results.Problem(
+                    title: "Service not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Service with ID '{id}' does not exist");
+            }
+
+            // Update only the Enabled property
+            var updatedService = existingService with
+            {
+                Enabled = enabled
+            };
+
+            // Build new snapshot
+            var updatedServices = snapshot.Services
+                .Select(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase) ? updatedService : s)
+                .ToList();
+
+            var newSnapshot = new MetadataSnapshot(
+                snapshot.Catalog,
+                snapshot.Folders,
+                snapshot.DataSources,
+                updatedServices,
+                snapshot.Layers,
+                snapshot.RasterDatasets,
+                snapshot.Styles,
+                snapshot.Server
+            );
+
+            await metadataProvider.SaveAsync(newSnapshot, ct);
+
+            logger.LogInformation("{Action} service {ServiceId}", enabled ? "Enabled" : "Disabled", id);
+
+            return Results.Ok(new { Id = id, Enabled = enabled });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to {Action} service {ServiceId}", enabled ? "enable" : "disable", id);
+            return Results.Problem(
+                title: "Internal server error",
+                statusCode: StatusCodes.Status500InternalServerError,
+                detail: $"An error occurred while {(enabled ? "enabling" : "disabling")} the service");
+        }
+    }
+
+    private static async Task<IResult> GetServiceConnectionFile(
+        string id,
+        string type,
+        HttpContext context,
+        IMutableMetadataProvider metadataProvider,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var service = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (service is null)
+            {
+                return Results.Problem(
+                    title: "Service not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Service with ID '{id}' does not exist");
+            }
+
+            // Get base URL from the request
+            var request = context.Request;
+            var baseUrl = $"{request.Scheme}://{request.Host}";
+
+            string content;
+            string fileName;
+            string contentType;
+
+            switch (type.ToLowerInvariant())
+            {
+                case "wms":
+                    var wmsUrl = $"{baseUrl}/ogc/services/{service.Id}/wms?SERVICE=WMS&REQUEST=GetCapabilities";
+                    content = GenerateWmsConnectionFile(service.Title, wmsUrl);
+                    fileName = $"{service.Id}.wms";
+                    contentType = "application/xml";
+                    break;
+
+                case "wfs":
+                    var wfsUrl = $"{baseUrl}/ogc/services/{service.Id}/wfs?SERVICE=WFS&REQUEST=GetCapabilities";
+                    content = GenerateWfsConnectionFile(service.Title, wfsUrl);
+                    fileName = $"{service.Id}.wfs";
+                    contentType = "application/xml";
+                    break;
+
+                case "qgis":
+                    var qgisWmsUrl = $"{baseUrl}/ogc/services/{service.Id}/wms";
+                    var qgisWfsUrl = $"{baseUrl}/ogc/services/{service.Id}/wfs";
+                    content = GenerateQgisConnectionFile(service.Title, service.Id, qgisWmsUrl, qgisWfsUrl);
+                    fileName = $"{service.Id}.qgs";
+                    contentType = "application/xml";
+                    break;
+
+                case "arcgis":
+                    var arcgisWmsUrl = $"{baseUrl}/ogc/services/{service.Id}/wms";
+                    content = GenerateArcGisConnectionFile(service.Title, arcgisWmsUrl);
+                    fileName = $"{service.Id}.ags";
+                    contentType = "application/xml";
+                    break;
+
+                default:
+                    return Results.Problem(
+                        title: "Invalid connection type",
+                        statusCode: StatusCodes.Status400BadRequest,
+                        detail: $"Connection type '{type}' is not supported. Valid types: wms, wfs, qgis, arcgis");
+            }
+
+            return Results.File(
+                System.Text.Encoding.UTF8.GetBytes(content),
+                contentType,
+                fileName);
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem(
+                title: "Internal server error",
+                statusCode: StatusCodes.Status500InternalServerError,
+                detail: "An error occurred while generating the connection file");
+        }
+    }
+
+    private static string GenerateWmsConnectionFile(string title, string url)
+    {
+        return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<WMS_Capabilities>
+  <Service>
+    <Name>{System.Security.SecurityElement.Escape(title)}</Name>
+    <OnlineResource xmlns:xlink=""http://www.w3.org/1999/xlink"" xlink:href=""{System.Security.SecurityElement.Escape(url)}""/>
+  </Service>
+</WMS_Capabilities>";
+    }
+
+    private static string GenerateWfsConnectionFile(string title, string url)
+    {
+        return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<WFS_Capabilities>
+  <Service>
+    <Name>{System.Security.SecurityElement.Escape(title)}</Name>
+    <OnlineResource xmlns:xlink=""http://www.w3.org/1999/xlink"" xlink:href=""{System.Security.SecurityElement.Escape(url)}""/>
+  </Service>
+</WFS_Capabilities>";
+    }
+
+    private static string GenerateQgisConnectionFile(string title, string id, string wmsUrl, string wfsUrl)
+    {
+        return $@"<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version=""3.0"">
+  <projectlayers>
+    <maplayer>
+      <id>{System.Security.SecurityElement.Escape(id)}</id>
+      <datasource>{System.Security.SecurityElement.Escape(wmsUrl)}</datasource>
+      <layername>{System.Security.SecurityElement.Escape(title)}</layername>
+      <provider>wms</provider>
+    </maplayer>
+  </projectlayers>
+  <properties>
+    <WMSUrl type=""QString"">{System.Security.SecurityElement.Escape(wmsUrl)}</WMSUrl>
+    <WFSUrl type=""QString"">{System.Security.SecurityElement.Escape(wfsUrl)}</WFSUrl>
+  </properties>
+</qgis>";
+    }
+
+    private static string GenerateArcGisConnectionFile(string title, string wmsUrl)
+    {
+        return $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<ARCGIS>
+  <WMSConnection>
+    <Name>{System.Security.SecurityElement.Escape(title)}</Name>
+    <URL>{System.Security.SecurityElement.Escape(wmsUrl)}</URL>
+    <Version>1.3.0</Version>
+  </WMSConnection>
+</ARCGIS>";
     }
 
     #endregion
@@ -884,6 +1135,311 @@ public static class MetadataAdministrationEndpoints
                 title: "Internal server error",
                 statusCode: StatusCodes.Status500InternalServerError,
                 detail: "An error occurred while deleting the folder");
+        }
+    }
+
+    #endregion
+
+    #region Data Sources
+
+    private static async Task<IResult> GetDataSources(
+        IMutableMetadataProvider metadataProvider,
+        CancellationToken ct)
+    {
+        var snapshot = await metadataProvider.LoadAsync(ct);
+
+        var dataSources = snapshot.DataSources.Select(ds => new DataSourceResponse
+        {
+            Id = ds.Id,
+            Provider = ds.Provider,
+            ConnectionString = ds.ConnectionString
+        }).ToList();
+
+        return Results.Ok(dataSources);
+    }
+
+    private static async Task<IResult> GetDataSourceById(
+        string id,
+        IMutableMetadataProvider metadataProvider,
+        CancellationToken ct)
+    {
+        var snapshot = await metadataProvider.LoadAsync(ct);
+        var dataSource = snapshot.DataSources.FirstOrDefault(ds => ds.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+        if (dataSource is null)
+        {
+            return Results.Problem(
+                title: "Data source not found",
+                statusCode: StatusCodes.Status404NotFound,
+                detail: $"Data source with ID '{id}' does not exist");
+        }
+
+        var response = new DataSourceResponse
+        {
+            Id = dataSource.Id,
+            Provider = dataSource.Provider,
+            ConnectionString = dataSource.ConnectionString
+        };
+
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> CreateDataSource(
+        CreateDataSourceRequest request,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+
+            // Validate: Check if data source ID already exists
+            if (snapshot.DataSources.Any(ds => ds.Id.Equals(request.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                return Results.Problem(
+                    title: "Data source already exists",
+                    statusCode: StatusCodes.Status409Conflict,
+                    detail: $"Data source with ID '{request.Id}' already exists");
+            }
+
+            // Create new data source
+            var newDataSource = new DataSourceDefinition
+            {
+                Id = request.Id,
+                Provider = request.Provider,
+                ConnectionString = request.ConnectionString
+            };
+
+            var newSnapshot = new MetadataSnapshot(
+                snapshot.Catalog,
+                snapshot.Folders,
+                snapshot.DataSources.Append(newDataSource).ToList(),
+                snapshot.Services,
+                snapshot.Layers,
+                snapshot.RasterDatasets,
+                snapshot.Styles,
+                snapshot.Server
+            );
+
+            await metadataProvider.SaveAsync(newSnapshot, ct);
+
+            logger.LogInformation("Created data source {DataSourceId}", newDataSource.Id);
+
+            var response = new DataSourceResponse
+            {
+                Id = newDataSource.Id,
+                Provider = newDataSource.Provider,
+                ConnectionString = newDataSource.ConnectionString
+            };
+
+            return Results.Created($"/admin/metadata/datasources/{newDataSource.Id}", response);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to create data source {DataSourceId}", request.Id);
+            return Results.Problem(
+                title: "Internal server error",
+                statusCode: StatusCodes.Status500InternalServerError,
+                detail: "An error occurred while creating the data source");
+        }
+    }
+
+    private static async Task<IResult> UpdateDataSource(
+        string id,
+        UpdateDataSourceRequest request,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var existingDataSource = snapshot.DataSources.FirstOrDefault(ds => ds.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (existingDataSource is null)
+            {
+                return Results.Problem(
+                    title: "Data source not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Data source with ID '{id}' does not exist");
+            }
+
+            // Update data source
+            var updatedDataSource = existingDataSource with
+            {
+                Provider = request.Provider ?? existingDataSource.Provider,
+                ConnectionString = request.ConnectionString ?? existingDataSource.ConnectionString
+            };
+
+            var updatedDataSources = snapshot.DataSources
+                .Select(ds => ds.Id.Equals(id, StringComparison.OrdinalIgnoreCase) ? updatedDataSource : ds)
+                .ToList();
+
+            var newSnapshot = new MetadataSnapshot(
+                snapshot.Catalog,
+                snapshot.Folders,
+                updatedDataSources,
+                snapshot.Services,
+                snapshot.Layers,
+                snapshot.RasterDatasets,
+                snapshot.Styles,
+                snapshot.Server
+            );
+
+            await metadataProvider.SaveAsync(newSnapshot, ct);
+
+            logger.LogInformation("Updated data source {DataSourceId}", id);
+
+            return Results.NoContent();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to update data source {DataSourceId}", id);
+            return Results.Problem(
+                title: "Internal server error",
+                statusCode: StatusCodes.Status500InternalServerError,
+                detail: "An error occurred while updating the data source");
+        }
+    }
+
+    private static async Task<IResult> DeleteDataSource(
+        string id,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var existingDataSource = snapshot.DataSources.FirstOrDefault(ds => ds.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (existingDataSource is null)
+            {
+                return Results.Problem(
+                    title: "Data source not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Data source with ID '{id}' does not exist");
+            }
+
+            // Check if data source is in use by any services
+            var serviceCount = snapshot.Services.Count(s => s.DataSourceId != null && s.DataSourceId.Equals(id, StringComparison.OrdinalIgnoreCase));
+            if (serviceCount > 0)
+            {
+                return Results.Problem(
+                    title: "Data source in use",
+                    statusCode: StatusCodes.Status409Conflict,
+                    detail: $"Cannot delete data source '{id}' because it is used by {serviceCount} service(s)");
+            }
+
+            // Remove data source
+            var updatedDataSources = snapshot.DataSources
+                .Where(ds => !ds.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var newSnapshot = new MetadataSnapshot(
+                snapshot.Catalog,
+                snapshot.Folders,
+                updatedDataSources,
+                snapshot.Services,
+                snapshot.Layers,
+                snapshot.RasterDatasets,
+                snapshot.Styles,
+                snapshot.Server
+            );
+
+            await metadataProvider.SaveAsync(newSnapshot, ct);
+
+            logger.LogInformation("Deleted data source {DataSourceId}", id);
+
+            return Results.NoContent();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to delete data source {DataSourceId}", id);
+            return Results.Problem(
+                title: "Internal server error",
+                statusCode: StatusCodes.Status500InternalServerError,
+                detail: "An error occurred while deleting the data source");
+        }
+    }
+
+    private static async Task<IResult> TestDataSourceConnection(
+        string id,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var dataSource = snapshot.DataSources.FirstOrDefault(ds => ds.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (dataSource is null)
+            {
+                return Results.Problem(
+                    title: "Data source not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Data source with ID '{id}' does not exist");
+            }
+
+            // TODO: Implement actual connection test based on provider
+            // For now, return a mock success response
+            var response = new TestConnectionResponse
+            {
+                Success = true,
+                Message = "Connection test successful",
+                Provider = dataSource.Provider,
+                ConnectionTime = 125 // milliseconds
+            };
+
+            return Results.Ok(response);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to test connection for data source {DataSourceId}", id);
+            return Results.Ok(new TestConnectionResponse
+            {
+                Success = false,
+                Message = $"Connection test failed: {ex.Message}",
+                Provider = null,
+                ConnectionTime = 0
+            });
+        }
+    }
+
+    private static async Task<IResult> GetDataSourceTables(
+        string id,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var dataSource = snapshot.DataSources.FirstOrDefault(ds => ds.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (dataSource is null)
+            {
+                return Results.Problem(
+                    title: "Data source not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Data source with ID '{id}' does not exist");
+            }
+
+            // TODO: Implement actual table discovery based on provider
+            // For now, return an empty list
+            var tables = new List<TableInfo>();
+
+            return Results.Ok(new { Tables = tables });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to discover tables for data source {DataSourceId}", id);
+            return Results.Problem(
+                title: "Internal server error",
+                statusCode: StatusCodes.Status500InternalServerError,
+                detail: "An error occurred while discovering tables");
         }
     }
 

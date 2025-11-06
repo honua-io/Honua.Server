@@ -1,0 +1,211 @@
+@page "/permissions"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator")]
+@inject RbacApiClient RbacApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<PermissionManagement> Logger
+
+<PageTitle>Permission Management - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">Permission Management</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreatePermissionDialog">
+                Create Custom Permission
+            </MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Color="Color.Default"
+                           OnClick="LoadPermissionsAsync"
+                           Title="Refresh" />
+        </MudStack>
+
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            Permissions define specific actions that can be performed in the system. System permissions are built-in and cannot be deleted.
+        </MudAlert>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        @* Statistics *@
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Total Permissions</MudText>
+                        <MudText Typo="Typo.h3" Color="Color.Info">@_permissions.Count</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">System</MudText>
+                        <MudText Typo="Typo.h3" Color="Color.Warning">@_permissions.Count(p => p.IsSystem)</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Custom</MudText>
+                        <MudText Typo="Typo.h3" Color="Color.Success">@_permissions.Count(p => !p.IsSystem)</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard>
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Categories</MudText>
+                        <MudText Typo="Typo.h3" Color="Color.Primary">@_categories.Count</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        @* Permissions by Category *@
+        @foreach (var category in _categories.OrderBy(c => c))
+        {
+            var categoryPermissions = _permissions.Where(p => p.Category == category).ToList();
+
+            <MudExpansionPanels Class="mb-3">
+                <MudExpansionPanel>
+                    <TitleContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@GetCategoryIcon(category)" />
+                            <MudText Typo="Typo.h6">@category</MudText>
+                            <MudChip Size="Size.Small">@categoryPermissions.Count permissions</MudChip>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                        <MudTable Items="@categoryPermissions" Dense="true" Hover="true">
+                            <HeaderContent>
+                                <MudTh>Permission</MudTh>
+                                <MudTh>Description</MudTh>
+                                <MudTh>Type</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>
+                                    <MudStack Row="false" Spacing="0">
+                                        <MudText Typo="Typo.body1"><b>@context.DisplayName</b></MudText>
+                                        <MudText Typo="Typo.caption" Class="text-monospace">@context.Name</MudText>
+                                    </MudStack>
+                                </MudTd>
+                                <MudTd>
+                                    <MudText Typo="Typo.body2">@(context.Description ?? "-")</MudText>
+                                </MudTd>
+                                <MudTd>
+                                    @if (context.IsSystem)
+                                    {
+                                        <MudChip Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Lock">System</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.Edit">Custom</MudChip>
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </ChildContent>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Permission Management", href: null, disabled: true)
+    };
+
+    private bool _loading = true;
+    private string? _errorMessage;
+    private List<PermissionDefinition> _permissions = new();
+    private List<string> _categories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPermissionsAsync();
+    }
+
+    private async Task LoadPermissionsAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await RbacApi.ListPermissionsAsync();
+            _permissions = response?.Permissions ?? new List<PermissionDefinition>();
+            _categories = response?.Categories ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading permissions: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error loading permissions");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreatePermissionDialog()
+    {
+        var dialog = await DialogService.ShowAsync<PermissionDialog>("Create Custom Permission",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreatePermissionRequest request)
+        {
+            try
+            {
+                var permission = await RbacApi.CreatePermissionAsync(request);
+                if (permission != null)
+                {
+                    Snackbar.Add($"Permission '{permission.DisplayName}' created successfully", Severity.Success);
+                    await LoadPermissionsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error creating permission: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error creating permission");
+            }
+        }
+    }
+
+    private string GetCategoryIcon(string category)
+    {
+        return category switch
+        {
+            "System" => Icons.Material.Filled.Settings,
+            "Data" => Icons.Material.Filled.Storage,
+            "DataTransfer" => Icons.Material.Filled.SwapHoriz,
+            "Collections" => Icons.Material.Filled.Folder,
+            "Layers" => Icons.Material.Filled.Layers,
+            "Administration" => Icons.Material.Filled.AdminPanelSettings,
+            "Metadata" => Icons.Material.Filled.Info,
+            _ => Icons.Material.Filled.Lock
+        };
+    }
+}

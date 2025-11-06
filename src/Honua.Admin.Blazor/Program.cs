@@ -69,11 +69,15 @@ builder.Services.AddScoped<SearchStateService>();
 builder.Services.AddScoped<ServiceApiClient>();
 builder.Services.AddScoped<LayerApiClient>();
 builder.Services.AddScoped<FolderApiClient>();
+builder.Services.AddScoped<DataSourceApiClient>();
 builder.Services.AddScoped<ImportApiClient>();
 builder.Services.AddScoped<SnapshotApiClient>();
 builder.Services.AddScoped<AuditLogApiClient>();
 builder.Services.AddScoped<CacheApiClient>();
 builder.Services.AddScoped<UserApiClient>();
+builder.Services.AddScoped<CorsApiClient>();
+builder.Services.AddScoped<RbacApiClient>();
+builder.Services.AddScoped<FeatureFlagService>();
 
 // Register SignalR hub service for real-time updates
 builder.Services.AddScoped<MetadataHubService>();

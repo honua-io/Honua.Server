@@ -237,7 +237,7 @@ Complete job lifecycle tracking with 35+ fields:
 2. **PostGIS Executor**: Database-side stored procedures
 3. **Cloud Batch Executor**: AWS/Azure/GCP integration
 4. **Event-Driven Completion**: SQS/Service Bus/Pub/Sub for cloud batch
-5. **GeoservicesREST Endpoints**: Esri-compatible GPServer API
+5. **GeoservicesREST Endpoints**: GeoServices REST compatible GPServer API
 6. **Worker Service**: BackgroundService/Hangfire for job processing
 7. **Sample Process Definitions**: Buffer, intersection, union, etc.
 8. **Integration Tests**: End-to-end workflow tests
@@ -299,7 +299,7 @@ To complete the geoprocessing feature:
 
 4. **Add GeoservicesREST API**:
    - `/arcgis/rest/services/GP/GPServer`
-   - Esri-compatible response formats
+   - GeoServices REST compatible response formats
    - Shared backend with OGC
 
 5. **Integration Tests**:

@@ -4,11 +4,11 @@ Keywords: styling, symbolization, renderer, colors, symbols, cartography, visual
 
 ## Overview
 
-Honua provides a comprehensive map styling system that controls how geographic features and raster data are visualized across multiple service protocols (OGC API Features, WMS, Esri REST). The styling architecture supports three primary renderer types: **simple**, **unique value**, and **rule-based**, each designed for different cartographic use cases.
+Honua provides a comprehensive map styling system that controls how geographic features and raster data are visualized across multiple service protocols (OGC API Features, WMS, Geoservices REST a.k.a. Esri REST). The styling architecture supports three primary renderer types: **simple**, **unique value**, and **rule-based**, each designed for different cartographic use cases.
 
 ### Key Capabilities
 
-- **Multi-Protocol Support**: Styles are converted automatically to SLD (OGC), Esri DrawingInfo (REST), and KML formats
+- **Multi-Protocol Support**: Styles are converted automatically to SLD (OGC), GeoServices DrawingInfo format (REST), and KML formats
 - **Geometry Type Specific**: Point, line, polygon, and raster symbolization
 - **Categorical Classification**: Unique value rendering based on feature attributes
 - **Scale-Dependent Rendering**: Control visibility and symbolization by map scale
@@ -668,7 +668,7 @@ Point symbols represent discrete locations with markers or icons.
 }
 ```
 
-**Converted to Esri REST (Simple Marker Symbol - SMS)**
+**Converted to Geoservices REST a.k.a. Esri REST (Simple Marker Symbol - SMS)**
 
 ```json
 {
@@ -711,7 +711,7 @@ Line symbols represent linear features like roads, rivers, and boundaries.
 }
 ```
 
-**Converted to Esri REST (Simple Line Symbol - SLS)**
+**Converted to Geoservices REST a.k.a. Esri REST (Simple Line Symbol - SLS)**
 
 ```json
 {
@@ -761,7 +761,7 @@ Polygon symbols represent area features with fill and outline.
 }
 ```
 
-**Converted to Esri REST (Simple Fill Symbol - SFS)**
+**Converted to Geoservices REST a.k.a. Esri REST (Simple Fill Symbol - SFS)**
 
 ```json
 {
@@ -872,7 +872,7 @@ If colors are not specified, Honua uses these defaults:
 
 ### Color Conversion
 
-**Hex to Esri REST (RGBA array)**
+**Hex to Geoservices REST a.k.a. Esri REST (RGBA array)**
 
 Hex: `#FF6347AA`
 Esri: `[255, 99, 71, 170]`
@@ -1007,9 +1007,9 @@ GET /wms?SERVICE=WMS&REQUEST=GetMap&LAYERS=aerial-2024&STYLES=infrared&...
 
 If no style is specified, the default style is used.
 
-### Esri REST Renderer Conversion
+### Geoservices REST a.k.a. Esri REST Renderer Conversion
 
-Honua automatically converts styles to Esri DrawingInfo format for REST services:
+Honua automatically converts styles to GeoServices DrawingInfo format format for REST services:
 
 **Request**
 ```
@@ -1375,11 +1375,11 @@ var sld = StyleFormatConverter.CreateSld(style, "LayerName", "polygon");
 }
 ```
 
-## Migration from ArcGIS/Esri
+## Migration from ArcGIS/GeoServices REST
 
-### Converting Esri Simple Renderer
+### Converting GeoServices Simple Renderer
 
-**Esri DrawingInfo**
+**GeoServices DrawingInfo format**
 ```json
 {
   "renderer": {
@@ -1425,9 +1425,9 @@ Hex: #90EE90B2
   A = 178 = 0xB2
 ```
 
-### Converting Esri Unique Value Renderer
+### Converting GeoServices Unique Value Renderer
 
-**Esri DrawingInfo**
+**GeoServices DrawingInfo format**
 ```json
 {
   "renderer": {
@@ -1739,7 +1739,7 @@ string StyleFormatConverter.CreateSld(
     string layerName,
     string? geometryType = null)
 
-// Convert to Esri DrawingInfo
+// Convert to GeoServices DrawingInfo format
 JsonObject StyleFormatConverter.CreateEsriDrawingInfo(
     StyleDefinition style,
     string geometryType)
@@ -1753,7 +1753,7 @@ Style? StyleFormatConverter.CreateKmlStyle(
 
 ## Summary
 
-Honua's styling system provides powerful, flexible cartographic control across multiple geospatial service protocols. By understanding the three renderer types (simple, unique value, rule-based), color specifications, and service integrations, you can create professional map visualizations that work seamlessly with OGC, Esri, and other GIS clients.
+Honua's styling system provides powerful, flexible cartographic control across multiple geospatial service protocols. By understanding the three renderer types (simple, unique value, rule-based), color specifications, and service integrations, you can create professional map visualizations that work seamlessly with OGC, GeoServices REST, and other GIS clients.
 
 Key takeaways:
 - Use **simple renderer** for uniform styling

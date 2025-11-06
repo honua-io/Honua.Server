@@ -6,31 +6,75 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject FeatureFlagService FeatureFlags
 
 <PageTitle>Version History - Honua Admin</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
     <MudBreadcrumbs Items="_breadcrumbs" />
 
-    <MudPaper Elevation="2" Class="pa-4 mt-4">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-            <MudText Typo="Typo.h4">Metadata Snapshots</MudText>
-            <MudSpacer />
-            <MudButton Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.AddPhotoAlternate"
-                       OnClick="OpenCreateSnapshotDialog">
-                Create Snapshot
-            </MudButton>
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+    @if (!_hasVersioning)
+    {
+        <MudPaper Elevation="2" Class="pa-6 mt-4">
+            <MudAlert Severity="Severity.Warning" Icon="@Icons.Material.Filled.Lock">
+                <MudText Typo="Typo.h5" Class="mb-2">Enterprise Feature Required</MudText>
+                <MudText Typo="Typo.body1" Class="mb-4">
+                    Version History and Metadata Snapshots are available with an Enterprise license.
+                    This powerful feature allows you to:
+                </MudText>
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.Restore">
+                        <MudText>Preserve complete metadata state at any point in time</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.History">
+                        <MudText>Roll back changes with one-click restore</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CompareArrows">
+                        <MudText>Compare configurations across different snapshots</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.BranchingScenarioTree">
+                        <MudText>Branch and merge geospatial data (coming soon)</MudText>
+                    </MudListItem>
+                </MudList>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Href="/licensing"
+                           StartIcon="@Icons.Material.Filled.Upgrade"
+                           Class="mt-4">
+                    View License Options
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
                            Color="Color.Default"
-                           OnClick="LoadSnapshotsAsync"
-                           Title="Refresh" />
-        </MudStack>
+                           Href="https://honua.io/contact"
+                           Target="_blank"
+                           StartIcon="@Icons.Material.Filled.Email"
+                           Class="mt-4 ml-2">
+                    Contact Sales
+                </MudButton>
+            </MudAlert>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Elevation="2" Class="pa-4 mt-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.h4">Metadata Snapshots</MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.AddPhotoAlternate"
+                           OnClick="OpenCreateSnapshotDialog">
+                    Create Snapshot
+                </MudButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                               Color="Color.Default"
+                               OnClick="LoadSnapshotsAsync"
+                               Title="Refresh" />
+            </MudStack>
 
-        <MudAlert Severity="Severity.Info" Class="mb-4">
-            Snapshots preserve the complete state of your metadata configuration (services, layers, folders, etc.) at a specific point in time. You can restore any snapshot to roll back changes.
-        </MudAlert>
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                Snapshots preserve the complete state of your metadata configuration (services, layers, folders, etc.) at a specific point in time. You can restore any snapshot to roll back changes.
+            </MudAlert>
 
         @if (_loading)
         {
@@ -115,6 +159,7 @@
             </NoRecordsContent>
         </MudTable>
     </MudPaper>
+    }
 </MudContainer>
 
 @code {
@@ -128,10 +173,18 @@
     private string? _errorMessage;
     private List<SnapshotDescriptor> _snapshots = new();
     private SnapshotDescriptor? _selectedSnapshot;
+    private bool _hasVersioning;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadSnapshotsAsync();
+        // Check if versioning feature is enabled
+        _hasVersioning = await FeatureFlags.IsEnabledAsync("versioning");
+
+        // Only load snapshots if versioning is enabled
+        if (_hasVersioning)
+        {
+            await LoadSnapshotsAsync();
+        }
     }
 
     private async Task LoadSnapshotsAsync()

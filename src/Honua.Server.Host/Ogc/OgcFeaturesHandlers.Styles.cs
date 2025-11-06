@@ -92,10 +92,28 @@ internal static partial class OgcFeaturesHandlers
             return OgcStyleResponseBuilder.CreateSldFileResponse(style, style.Title ?? style.Id, style.GeometryType, fileName);
         }
 
+        if (string.Equals(format, "maplibre", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(format, "mapbox", StringComparison.OrdinalIgnoreCase))
+        {
+            // Generate MapLibre Style Spec v8 document
+            var sourceId = $"{style.Id}-source";
+            var layerId = style.Id;
+            var mapLibreStyle = StyleFormatConverter.CreateMapLibreStyle(
+                style,
+                layerId,
+                sourceId,
+                null, // No source layer for standalone styles
+                style.Title
+            );
+
+            return Results.Ok(mapLibreStyle);
+        }
+
         var links = new List<OgcLink>
         {
             OgcSharedHandlers.BuildLink(request, $"/ogc/styles/{style.Id}", "self", "application/json", style.Title ?? style.Id, null, new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase) { ["f"] = null }),
-            OgcSharedHandlers.BuildLink(request, $"/ogc/styles/{style.Id}", "stylesheet", "application/vnd.ogc.sld+xml", style.Title ?? style.Id, null, new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase) { ["f"] = "sld" })
+            OgcSharedHandlers.BuildLink(request, $"/ogc/styles/{style.Id}", "stylesheet", "application/vnd.ogc.sld+xml", style.Title ?? style.Id, null, new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase) { ["f"] = "sld" }),
+            OgcSharedHandlers.BuildLink(request, $"/ogc/styles/{style.Id}", "stylesheet", "application/vnd.mapbox-style+json", $"{style.Title ?? style.Id} (MapLibre)", null, new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase) { ["f"] = "maplibre" })
         };
 
         return Results.Ok(new
@@ -170,7 +188,8 @@ internal static partial class OgcFeaturesHandlers
 
             var links = new List<OgcLink>
             {
-                OgcSharedHandlers.BuildLink(request, $"/ogc/collections/{collectionId}/styles/{id}", "stylesheet", "application/vnd.ogc.sld+xml", style?.Title ?? id)
+                OgcSharedHandlers.BuildLink(request, $"/ogc/collections/{collectionId}/styles/{id}", "stylesheet", "application/vnd.ogc.sld+xml", $"{style?.Title ?? id} (SLD)", null, new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase) { ["f"] = "sld" }),
+                OgcSharedHandlers.BuildLink(request, $"/ogc/collections/{collectionId}/styles/{id}", "stylesheet", "application/vnd.mapbox-style+json", $"{style?.Title ?? id} (MapLibre)", null, new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase) { ["f"] = "maplibre" })
             };
 
             entries.Add(new
@@ -200,7 +219,7 @@ internal static partial class OgcFeaturesHandlers
     }
 
     /// <summary>
-    /// Gets a specific style for a collection, typically as SLD XML.
+    /// Gets a specific style for a collection in various formats (SLD XML, MapLibre Style Spec).
     /// OGC API - Features collection style endpoint.
     /// </summary>
     public static async Task<IResult> GetCollectionStyle(
@@ -228,6 +247,30 @@ internal static partial class OgcFeaturesHandlers
         }
 
         var geometry = layer.GeometryType.IsNullOrWhiteSpace() ? style.GeometryType : layer.GeometryType;
+
+        // Check for format parameter
+        var format = request.Query.TryGetValue("f", out var formatValues)
+            ? formatValues.ToString()
+            : "sld"; // Default to SLD for backward compatibility
+
+        if (string.Equals(format, "maplibre", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(format, "mapbox", StringComparison.OrdinalIgnoreCase))
+        {
+            // Generate MapLibre Style Spec v8 document
+            var sourceId = collectionId;
+            var layerId = $"{collectionId}-{styleId}";
+            var mapLibreStyle = StyleFormatConverter.CreateMapLibreStyle(
+                style,
+                layerId,
+                sourceId,
+                collectionId, // Use collection ID as source layer
+                layer.Title ?? style.Title
+            );
+
+            return Results.Ok(mapLibreStyle);
+        }
+
+        // Default to SLD format
         var fileName = FileNameHelper.BuildDownloadFileName(collectionId, style.Id, "sld");
         return OgcStyleResponseBuilder.CreateSldFileResponse(style, layer.Title ?? layer.Id, geometry, fileName);
     }

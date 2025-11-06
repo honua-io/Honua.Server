@@ -1,0 +1,96 @@
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Large" Color="Color.Primary" />
+                <MudStack Row="false" Spacing="0">
+                    <MudText Typo="Typo.h5">@Role?.DisplayName</MudText>
+                    <MudText Typo="Typo.caption">@Role?.Name</MudText>
+                </MudStack>
+                @if (Role?.IsSystem == true)
+                {
+                    <MudChip Color="Color.Warning" Icon="@Icons.Material.Filled.Lock">System Role</MudChip>
+                }
+            </MudStack>
+
+            @if (!string.IsNullOrEmpty(Role?.Description))
+            {
+                <MudPaper Elevation="0" Class="pa-3" Style="background-color: var(--mud-palette-background-grey);">
+                    <MudText Typo="Typo.body2">@Role.Description</MudText>
+                </MudPaper>
+            }
+
+            <MudDivider />
+
+            <MudStack Row="false" Spacing="2">
+                <MudText Typo="Typo.h6">Metadata</MudText>
+                <MudSimpleTable Dense="true">
+                    <tbody>
+                        <tr>
+                            <td><b>Role ID</b></td>
+                            <td>@Role?.Id</td>
+                        </tr>
+                        <tr>
+                            <td><b>Type</b></td>
+                            <td>@(Role?.IsSystem == true ? "System Role (Cannot be modified)" : "Custom Role")</td>
+                        </tr>
+                        <tr>
+                            <td><b>Created</b></td>
+                            <td>@Role?.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        </tr>
+                        @if (Role?.UpdatedAt != null)
+                        {
+                            <tr>
+                                <td><b>Last Updated</b></td>
+                                <td>@Role.UpdatedAt?.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            </tr>
+                        }
+                        <tr>
+                            <td><b>Permissions Count</b></td>
+                            <td>@Role?.Permissions.Count</td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudStack>
+
+            <MudDivider />
+
+            <MudStack Row="false" Spacing="2">
+                <MudText Typo="Typo.h6">Permissions</MudText>
+                @if (Role?.Permissions.Any() == true)
+                {
+                    <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;">
+                        @foreach (var permission in Role.Permissions)
+                        {
+                            <MudChip Color="Color.Primary" Variant="Variant.Outlined">@permission</MudChip>
+                        }
+                    </MudStack>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Warning">
+                        This role has no permissions assigned.
+                    </MudAlert>
+                }
+            </MudStack>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public RoleDefinition? Role { get; set; }
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+}

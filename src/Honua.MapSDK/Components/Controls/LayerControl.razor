@@ -1,0 +1,419 @@
+@using Honua.MapSDK.Services
+@using Honua.MapSDK.Models
+@inject ILayerManager LayerManager
+
+<div class="honua-layer-control @CssClass" style="@Style">
+    <div class="layer-control-header">
+        <h3>@Title</h3>
+        @if (ShowSearch)
+        {
+            <div class="layer-control-search">
+                <input type="text"
+                       class="form-control form-control-sm"
+                       placeholder="Search layers..."
+                       @bind="_searchQuery"
+                       @bind:event="oninput" />
+            </div>
+        }
+        @if (ShowToolbar)
+        {
+            <div class="layer-control-toolbar">
+                <button class="btn btn-sm btn-outline-secondary"
+                        @onclick="ShowAllLayers"
+                        title="Show all layers">
+                    <i class="bi bi-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary"
+                        @onclick="HideAllLayers"
+                        title="Hide all layers">
+                    <i class="bi bi-eye-slash"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary"
+                        @onclick="ExpandAllGroups"
+                        title="Expand all groups">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary"
+                        @onclick="CollapseAllGroups"
+                        title="Collapse all groups">
+                    <i class="bi bi-chevron-up"></i>
+                </button>
+            </div>
+        }
+    </div>
+
+    <div class="layer-control-body">
+        @if (_filteredGroups.Any())
+        {
+            @foreach (var group in _filteredGroups)
+            {
+                <div class="layer-group" data-group-id="@group.Id">
+                    <div class="layer-group-header" @onclick="() => ToggleGroup(group.Id)">
+                        <i class="bi @(group.Expanded ? "bi-chevron-down" : "bi-chevron-right")"></i>
+                        <input type="checkbox"
+                               checked="@group.Visible"
+                               @onclick:stopPropagation="true"
+                               @onchange="(e) => ToggleGroupVisibility(group.Id, e)"
+                               class="form-check-input" />
+                        <span class="layer-group-name">@group.Name</span>
+                        @if (ShowOpacitySlider)
+                        {
+                            <input type="range"
+                                   class="layer-opacity-slider"
+                                   min="0"
+                                   max="100"
+                                   value="@((int)(group.Opacity * 100))"
+                                   @onclick:stopPropagation="true"
+                                   @oninput="(e) => SetGroupOpacity(group.Id, e)" />
+                        }
+                    </div>
+
+                    @if (group.Expanded)
+                    {
+                        <div class="layer-group-content">
+                            @foreach (var layer in GetGroupLayers(group.Id))
+                            {
+                                @if (MatchesSearch(layer))
+                                {
+                                    <div class="layer-item @(EnableDragDrop ? "draggable" : "")"
+                                         data-layer-id="@layer.Id"
+                                         draggable="@EnableDragDrop"
+                                         @ondragstart="(e) => OnDragStart(e, layer.Id)"
+                                         @ondrop="(e) => OnDrop(e, layer.Id)"
+                                         @ondragover="OnDragOver">
+                                        @if (EnableDragDrop)
+                                        {
+                                            <i class="bi bi-grip-vertical drag-handle"></i>
+                                        }
+                                        <input type="checkbox"
+                                               checked="@layer.Visible"
+                                               @onchange="(e) => ToggleLayerVisibility(layer.Id, e)"
+                                               class="form-check-input" />
+                                        <span class="layer-name" title="@layer.Description">@layer.Name</span>
+                                        @if (ShowOpacitySlider)
+                                        {
+                                            <input type="range"
+                                                   class="layer-opacity-slider"
+                                                   min="0"
+                                                   max="100"
+                                                   value="@((int)(layer.Opacity * 100))"
+                                                   @oninput="(e) => SetLayerOpacity(layer.Id, e)" />
+                                        }
+                                        @if (ShowLegend && !string.IsNullOrWhiteSpace(layer.Legend))
+                                        {
+                                            <div class="layer-legend">
+                                                <img src="@layer.Legend" alt="@layer.Name legend" />
+                                            </div>
+                                        }
+                                        @if (ShowActions)
+                                        {
+                                            <div class="layer-actions">
+                                                <button class="btn btn-sm btn-link"
+                                                        @onclick="() => ZoomToLayer(layer.Id)"
+                                                        title="Zoom to layer">
+                                                    <i class="bi bi-zoom-in"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-link"
+                                                        @onclick="() => ShowLayerInfo(layer.Id)"
+                                                        title="Layer info">
+                                                    <i class="bi bi-info-circle"></i>
+                                                </button>
+                                                @if (AllowRemove)
+                                                {
+                                                    <button class="btn btn-sm btn-link text-danger"
+                                                            @onclick="() => RemoveLayer(layer.Id)"
+                                                            title="Remove layer">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @if (_ungroupedLayers.Any())
+        {
+            <div class="layer-list-ungrouped">
+                @foreach (var layer in _ungroupedLayers)
+                {
+                    @if (MatchesSearch(layer))
+                    {
+                        <div class="layer-item @(EnableDragDrop ? "draggable" : "")"
+                             data-layer-id="@layer.Id"
+                             draggable="@EnableDragDrop"
+                             @ondragstart="(e) => OnDragStart(e, layer.Id)"
+                             @ondrop="(e) => OnDrop(e, layer.Id)"
+                             @ondragover="OnDragOver">
+                            @if (EnableDragDrop)
+                            {
+                                <i class="bi bi-grip-vertical drag-handle"></i>
+                            }
+                            <input type="checkbox"
+                                   checked="@layer.Visible"
+                                   @onchange="(e) => ToggleLayerVisibility(layer.Id, e)"
+                                   class="form-check-input" />
+                            <span class="layer-name" title="@layer.Description">@layer.Name</span>
+                            @if (ShowOpacitySlider)
+                            {
+                                <input type="range"
+                                       class="layer-opacity-slider"
+                                       min="0"
+                                       max="100"
+                                       value="@((int)(layer.Opacity * 100))"
+                                       @oninput="(e) => SetLayerOpacity(layer.Id, e)" />
+                            }
+                            @if (ShowLegend && !string.IsNullOrWhiteSpace(layer.Legend))
+                            {
+                                <div class="layer-legend">
+                                    <img src="@layer.Legend" alt="@layer.Name legend" />
+                                </div>
+                            }
+                            @if (ShowActions)
+                            {
+                                <div class="layer-actions">
+                                    <button class="btn btn-sm btn-link"
+                                            @onclick="() => ZoomToLayer(layer.Id)"
+                                            title="Zoom to layer">
+                                        <i class="bi bi-zoom-in"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-link"
+                                            @onclick="() => ShowLayerInfo(layer.Id)"
+                                            title="Layer info">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                    @if (AllowRemove)
+                                    {
+                                        <button class="btn btn-sm btn-link text-danger"
+                                                @onclick="() => RemoveLayer(layer.Id)"
+                                                title="Remove layer">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        }
+
+        @if (!_filteredGroups.Any() && !_ungroupedLayers.Any())
+        {
+            <div class="layer-control-empty">
+                <p>No layers available</p>
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(_searchQuery) && !HasVisibleLayers())
+        {
+            <div class="layer-control-empty">
+                <p>No layers match "@_searchQuery"</p>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .honua-layer-control {
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        width: 300px;
+        max-height: 500px;
+        display: flex;
+        flex-direction: column;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+    }
+
+    .layer-control-header {
+        padding: 12px;
+        border-bottom: 1px solid #e0e0e0;
+        flex-shrink: 0;
+    }
+
+    .layer-control-header h3 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .layer-control-search {
+        margin-bottom: 8px;
+    }
+
+    .layer-control-toolbar {
+        display: flex;
+        gap: 4px;
+    }
+
+    .layer-control-toolbar .btn {
+        padding: 4px 8px;
+    }
+
+    .layer-control-body {
+        overflow-y: auto;
+        flex: 1;
+        padding: 8px;
+    }
+
+    .layer-group {
+        margin-bottom: 8px;
+    }
+
+    .layer-group-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: #f5f5f5;
+        border-radius: 4px;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .layer-group-header:hover {
+        background: #e8e8e8;
+    }
+
+    .layer-group-header i.bi {
+        width: 16px;
+        flex-shrink: 0;
+    }
+
+    .layer-group-name {
+        flex: 1;
+        font-weight: 500;
+    }
+
+    .layer-group-content {
+        margin-left: 24px;
+        margin-top: 4px;
+    }
+
+    .layer-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 2px;
+    }
+
+    .layer-item:hover {
+        background: #f9f9f9;
+    }
+
+    .layer-item.draggable {
+        cursor: move;
+    }
+
+    .layer-item.drag-over {
+        border-top: 2px solid #007bff;
+    }
+
+    .drag-handle {
+        cursor: grab;
+        color: #999;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .layer-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .layer-opacity-slider {
+        width: 60px;
+        height: 4px;
+    }
+
+    .layer-legend {
+        padding: 4px 0;
+    }
+
+    .layer-legend img {
+        max-width: 100%;
+        height: auto;
+    }
+
+    .layer-actions {
+        display: flex;
+        gap: 2px;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .layer-item:hover .layer-actions {
+        opacity: 1;
+    }
+
+    .layer-actions .btn {
+        padding: 2px 6px;
+        line-height: 1;
+    }
+
+    .layer-control-empty {
+        text-align: center;
+        padding: 24px;
+        color: #999;
+    }
+
+    .form-check-input {
+        cursor: pointer;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .honua-layer-control {
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .layer-opacity-slider {
+            display: none;
+        }
+
+        .layer-actions {
+            opacity: 1;
+        }
+    }
+
+    /* Dark theme support */
+    @media (prefers-color-scheme: dark) {
+        .honua-layer-control {
+            background: #2d2d2d;
+            color: #e0e0e0;
+        }
+
+        .layer-control-header {
+            border-bottom-color: #444;
+        }
+
+        .layer-group-header {
+            background: #3a3a3a;
+        }
+
+        .layer-group-header:hover {
+            background: #444;
+        }
+
+        .layer-item:hover {
+            background: #3a3a3a;
+        }
+
+        .layer-control-empty {
+            color: #888;
+        }
+    }
+</style>
