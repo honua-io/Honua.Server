@@ -4,7 +4,7 @@
 
 # Honua Server
 
-A cloud-native geospatial server built on .NET 9, implementing OGC standards and Esri REST APIs with first-class support for modern cloud infrastructure.
+A cloud-native geospatial server built on .NET 9, implementing OGC standards and Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST APIs with first-class support for modern cloud infrastructure.
 
 **Part of the Honua Platform** - A comprehensive geospatial ecosystem including Honua Server, Honua Mobile, Honua Web, and more.
 
@@ -21,7 +21,7 @@ A cloud-native geospatial server built on .NET 9, implementing OGC standards and
 
 Honua provides a complete OGC-compliant geospatial server with:
 
-- **Standards Implementation**: OGC API Features/Tiles/Records, WFS 2.0/3.0, WMS 1.3, WCS 2.0, STAC 1.0, Esri REST API
+- **Standards Implementation**: OGC API Features/Tiles/Records, WFS 2.0/3.0, WMS 1.3, WCS 2.0, STAC 1.0, Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
 - **Data Providers**: PostgreSQL/PostGIS, MySQL, SQLite, SQL Server, Oracle, Snowflake, BigQuery, Redshift, MongoDB, Cosmos DB
 - **Cloud-Native Architecture**: Docker, Kubernetes, multi-cloud deployment, OpenTelemetry observability
 - **High Performance**: Built on .NET 9 with NetTopologySuite for geometry operations
@@ -227,7 +227,7 @@ See [deployment documentation](docs/DEPLOYMENT.md) for production configurations
 ┌─────────────────────────────────────────────┐
 │  API Layer                                   │
 │  OGC API Features · WFS/WMS/WCS             │
-│  STAC · Esri REST · OData · GraphQL         │
+│  STAC · Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST · OData · GraphQL         │
 └──────────────────┬──────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────┐

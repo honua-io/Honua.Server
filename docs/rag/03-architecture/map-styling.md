@@ -4,7 +4,7 @@ Keywords: styling, symbolization, renderer, colors, symbols, cartography, visual
 
 ## Overview
 
-Honua provides a comprehensive map styling system that controls how geographic features and raster data are visualized across multiple service protocols (OGC API Features, WMS, Esri REST). The styling architecture supports three primary renderer types: **simple**, **unique value**, and **rule-based**, each designed for different cartographic use cases.
+Honua provides a comprehensive map styling system that controls how geographic features and raster data are visualized across multiple service protocols (OGC API Features, WMS, Geoservices REST a.k.a. Esri REST). The styling architecture supports three primary renderer types: **simple**, **unique value**, and **rule-based**, each designed for different cartographic use cases.
 
 ### Key Capabilities
 
@@ -668,7 +668,7 @@ Point symbols represent discrete locations with markers or icons.
 }
 ```
 
-**Converted to Esri REST (Simple Marker Symbol - SMS)**
+**Converted to Geoservices REST a.k.a. Esri REST (Simple Marker Symbol - SMS)**
 
 ```json
 {
@@ -711,7 +711,7 @@ Line symbols represent linear features like roads, rivers, and boundaries.
 }
 ```
 
-**Converted to Esri REST (Simple Line Symbol - SLS)**
+**Converted to Geoservices REST a.k.a. Esri REST (Simple Line Symbol - SLS)**
 
 ```json
 {
@@ -761,7 +761,7 @@ Polygon symbols represent area features with fill and outline.
 }
 ```
 
-**Converted to Esri REST (Simple Fill Symbol - SFS)**
+**Converted to Geoservices REST a.k.a. Esri REST (Simple Fill Symbol - SFS)**
 
 ```json
 {
@@ -872,7 +872,7 @@ If colors are not specified, Honua uses these defaults:
 
 ### Color Conversion
 
-**Hex to Esri REST (RGBA array)**
+**Hex to Geoservices REST a.k.a. Esri REST (RGBA array)**
 
 Hex: `#FF6347AA`
 Esri: `[255, 99, 71, 170]`
@@ -1007,7 +1007,7 @@ GET /wms?SERVICE=WMS&REQUEST=GetMap&LAYERS=aerial-2024&STYLES=infrared&...
 
 If no style is specified, the default style is used.
 
-### Esri REST Renderer Conversion
+### Geoservices REST a.k.a. Esri REST Renderer Conversion
 
 Honua automatically converts styles to Esri DrawingInfo format for REST services:
 

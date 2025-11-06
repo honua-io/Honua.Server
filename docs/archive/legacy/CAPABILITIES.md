@@ -27,11 +27,11 @@ Honua is a production-ready geospatial server implementing:
 
 - **7 OGC Standards** (OGC API Features, Tiles, WFS 2.0, WMS 1.3, WMTS 1.0, CSW 2.0.2, WCS 2.0.1)
 - **STAC 1.0** (Full catalog, collections, items, search)
-- **Esri REST API** (FeatureServer, MapServer, ImageServer, GeometryServer)
+- **Geoservices REST a.k.a. Esri REST API** (FeatureServer, MapServer, ImageServer, GeometryServer)
 - **OData v4** with spatial extensions
 - **10 Data Providers** (4 open source + 6 enterprise)
 - **9+ Export Formats**
-- **Full CRUD** across OGC API Features, WFS-T, Esri REST
+- **Full CRUD** across OGC API Features, WFS-T, Geoservices REST a.k.a. Esri REST
 - **RBAC** with 4 roles
 - **Temporal support** across protocols
 - **Vector tiles** with clustering
@@ -270,7 +270,7 @@ All OGC standard implementations verified via handler code inspection.
 
 ### ✅ Esri ArcGIS REST API (COMPREHENSIVE)
 
-All Esri REST implementations verified in `src/Honua.Server.Host/GeoservicesREST/` directory.
+All Geoservices REST a.k.a. Esri REST implementations verified in `src/Honua.Server.Host/GeoservicesREST/` directory.
 
 #### FeatureServer (FULL CRUD + ATTACHMENTS)
 
@@ -489,7 +489,7 @@ All export formats verified via implementation inspection.
 | **Shapefile** | `ShapefileExporter.cs` | `application/zip` | ✅ >10k | Unlimited |
 | **CSV** | `CsvExporter.cs` | `text/csv` | ❌ | 100,000 |
 | **GML 3.2** | Via WFS | `application/gml+xml; version=3.2` | ❌ | 10,000 |
-| **Esri JSON** | Via Esri REST | `application/json` | ❌ | 10,000 |
+| **Esri JSON** | Via Geoservices REST a.k.a. Esri REST | `application/json` | ❌ | 10,000 |
 | **HTML** | Built-in | `text/html` | ❌ | N/A (view only) |
 
 **Evidence:** `src/Honua.Server.Core/Export/`, `src/Honua.Server.Core/Serialization/`
@@ -696,7 +696,7 @@ All export formats verified via implementation inspection.
 **Features:**
 - One-to-many relationships
 - Foreign key relationships
-- Related record queries (Esri REST API `queryRelatedRecords`)
+- Related record queries (Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API `queryRelatedRecords`)
 - Composite relationships
 
 **Configuration:**
@@ -719,7 +719,7 @@ All export formats verified via implementation inspection.
 - GlobalID requirement option
 - Pre-signed URL generation
 - OGC API link exposure (`ExposeAsOgcApiLinks`)
-- Full CRUD via Esri REST API
+- Full CRUD via Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
 
 **Operations:**
 - Query attachments
@@ -915,7 +915,7 @@ Based on comprehensive code scan (zero matches):
 |----------|-------|-------|
 | **OGC Standards** | 7 | Features, Tiles, WFS, WMS, WMTS, CSW, WCS |
 | **STAC** | 1 | Full 1.0 implementation |
-| **Industry APIs** | 5 | Esri REST (3 servers), OData, Carto SQL, OpenRosa |
+| **Industry APIs** | 5 | Geoservices REST a.k.a. Esri REST (3 servers), OData, Carto SQL, OpenRosa |
 | **Data Providers (OSS)** | 4 | PostgreSQL, SQLite, SQL Server, MySQL |
 | **Data Providers (Enterprise)** | 6 | Oracle, Snowflake, BigQuery, MongoDB, Redshift, Cosmos DB |
 | **Export Formats** | 11 | GeoJSON, GeoJSON-Seq, KML, KMZ, TopoJSON, GeoPackage, Shapefile, CSV, GML, Esri JSON, HTML |

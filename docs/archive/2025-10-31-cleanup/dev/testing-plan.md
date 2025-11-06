@@ -40,7 +40,7 @@ Immediate Next Steps
 
 Esri ↔ OGC Metadata Matrix (Draft)
 ----------------------------------
-| Esri REST Field        | Honua Metadata Source                                | OGC API Expectation                               | Gap / Notes |
+| Geoservices REST a.k.a. Esri REST Field        | Honua Metadata Source                                | OGC API Expectation                               | Gap / Notes |
 |------------------------|------------------------------------------------------|----------------------------------------------------|-------------|
 | `serviceDescription`   | `ServiceDefinition.Catalog.Summary`                  | `collections/{id}.description`                     | Align names; ensure summary propagates consistently to OGC responses and HTML catalog. |
 | `currentVersion`       | Hard-coded in controllers (`10.81`)                  | Not required by OGC; landing page advertises conformance classes | Track version in configuration so docs stay honest when we bump Esri parity. |

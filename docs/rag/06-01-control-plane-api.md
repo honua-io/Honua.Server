@@ -900,7 +900,7 @@ Content-Type: application/json
 ```
 
 **Request Fields:**
-- `sourceServiceUri` (required) - Esri REST service URL
+- `sourceServiceUri` (required) - Geoservices REST a.k.a. Esri REST service URL
 - `targetServiceId` (required) - Target service ID in metadata.json
 - `targetFolderId` (required) - Target folder ID
 - `targetDataSourceId` (required) - Target data source ID

@@ -7,7 +7,7 @@ Status: Accepted
 ## Context
 
 Honua is built as a web service that handles OGC API requests, WFS/WMS requests, and administrative operations. We need a request processing architecture that supports:
-- Multiple API standards (OGC API, WFS, WMS, Esri REST)
+- Multiple API standards (OGC API, WFS, WMS, Geoservices REST a.k.a. Esri REST)
 - Authentication and authorization
 - Content negotiation (GeoJSON, KML, CSV, etc.)
 - Request logging and tracing

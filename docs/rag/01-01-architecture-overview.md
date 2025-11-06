@@ -21,12 +21,12 @@ Complete guide to Honua's architecture, technology stack, and system design prin
 
 ## System Overview
 
-Honua is a cloud-native geospatial server built on ASP.NET Core 9.0 that implements multiple OGC standards, Esri REST API, and STAC specifications. It's designed for high performance, scalability, and modern cloud deployments.
+Honua is a cloud-native geospatial server built on ASP.NET Core 9.0 that implements multiple OGC standards, Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API, and STAC specifications. It's designed for high performance, scalability, and modern cloud deployments.
 
 ### Key Characteristics
 
 - **Cloud-Native**: Built for containerized deployments with Kubernetes support
-- **Standards-Based**: OGC API Features, WMS, WFS, WMTS, WCS, CSW, Esri REST API, STAC
+- **Standards-Based**: OGC API Features, WMS, WFS, WMTS, WCS, CSW, Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API, STAC
 - **High Performance**: Native COG/Zarr readers, tile caching, compression
 - **Observable**: OpenTelemetry metrics, traces, and structured logging
 - **Flexible**: Multiple database backends (PostGIS, SQLite, SQL Server)

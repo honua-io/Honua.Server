@@ -139,7 +139,7 @@ jq -s '{type:"FeatureCollection",features:.}' parcels.ndjson > parcels.geojson
 | `/ogc/collections/{id}/items` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `/ogc/collections/{id}/items/{featureId}` | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
 
-### Esri REST API
+### Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
 
 | Endpoint | Esri JSON | GeoJSON | TopoJSON | KML | KMZ | CSV | Shapefile | MVT |
 |----------|-----------|---------|----------|-----|-----|-----|-----------|-----|

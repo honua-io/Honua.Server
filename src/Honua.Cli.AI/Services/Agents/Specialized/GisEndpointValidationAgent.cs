@@ -706,7 +706,7 @@ public sealed class GisEndpointValidationAgent
     }
 
     /// <summary>
-    /// Validates Esri REST API catalog endpoint.
+    /// Validates Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API catalog endpoint.
     /// </summary>
     private async Task<EndpointValidation> ValidateEsriRestAsync(
         string baseUrl,
@@ -731,11 +731,11 @@ public sealed class GisEndpointValidationAgent
 
                 return new EndpointValidation
                 {
-                    EndpointType = "Esri REST API Catalog",
+                    EndpointType = "Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API Catalog",
                     Url = $"{baseUrl}/rest/services",
                     Status = (hasFolders || hasServices) ? EndpointStatus.Passed : EndpointStatus.Warning,
                     ResponseTimeMs = (int)sw.ElapsedMilliseconds,
-                    Message = $"Esri REST catalog: {serviceCount} services, {folderCount} folders",
+                    Message = $"Geoservices REST a.k.a. Esri REST catalog: {serviceCount} services, {folderCount} folders",
                     Details = new Dictionary<string, string>
                     {
                         ["service_count"] = serviceCount.ToString(),
@@ -746,21 +746,21 @@ public sealed class GisEndpointValidationAgent
 
             return new EndpointValidation
             {
-                EndpointType = "Esri REST API Catalog",
+                EndpointType = "Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API Catalog",
                 Url = $"{baseUrl}/rest/services",
                 Status = EndpointStatus.Failed,
                 ResponseTimeMs = (int)sw.ElapsedMilliseconds,
-                Message = $"Esri REST catalog returned {response.StatusCode}"
+                Message = $"Geoservices REST a.k.a. Esri REST catalog returned {response.StatusCode}"
             };
         }
         catch (Exception ex)
         {
             return new EndpointValidation
             {
-                EndpointType = "Esri REST API Catalog",
+                EndpointType = "Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API Catalog",
                 Url = $"{baseUrl}/rest/services",
                 Status = EndpointStatus.Failed,
-                Message = $"Esri REST validation failed: {ex.Message}"
+                Message = $"Geoservices REST a.k.a. Esri REST validation failed: {ex.Message}"
             };
         }
     }

@@ -54,7 +54,7 @@
 - ✅ OGC API Features endpoints
 - ✅ WFS service
 - ✅ WMS service
-- ✅ Esri REST API
+- ✅ Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
 - ✅ OData service
 - ✅ STAC catalog
 - ✅ Tile caching (S3, Azure, Redis)

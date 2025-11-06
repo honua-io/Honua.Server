@@ -14,7 +14,7 @@ This document provides comprehensive reference for all Honua service endpoints, 
 4. [OGC WFS (Web Feature Service)](#ogc-wfs-web-feature-service)
 5. [OGC WMS (Web Map Service)](#ogc-wms-web-map-service)
 6. [OGC Tiles API](#ogc-tiles-api)
-7. [Esri REST Services](#esri-rest-services)
+7. [Geoservices REST a.k.a. Esri REST Services](#esri-rest-services)
 8. [OData v4 API](#odata-v4-api)
 9. [STAC API](#stac-api)
 10. [Carto API](#carto-api)
@@ -40,7 +40,7 @@ Honua provides a comprehensive suite of geospatial service protocols:
 | OGC WFS 2.0 | `/wfs` | Standards-based feature queries and transactions | Yes |
 | OGC WMS 1.3.0 | `/wms` | Map image rendering and feature info | Yes |
 | OGC Tiles API | `/ogc/collections/{id}/tiles` | Vector and raster tiles | Yes |
-| Esri REST | `/rest/services` | ArcGIS-compatible services | Yes |
+| Geoservices REST a.k.a. Esri REST | `/rest/services` | ArcGIS-compatible services | Yes |
 | OData v4 | `/odata` | Entity framework queries with spatial support | Optional |
 | STAC API | `/stac` | SpatioTemporal Asset Catalog | Optional |
 | Carto API | `/carto` | SQL-based analytics | Optional |
@@ -979,7 +979,7 @@ curl "https://localhost:5000/ogc/collections/basemap::imagery/tiles/imagery-tile
 
 ---
 
-## Esri REST Services
+## Geoservices REST a.k.a. Esri REST Services
 
 ArcGIS-compatible REST services for feature access, mapping, and editing.
 
@@ -2507,7 +2507,7 @@ Formats can be requested via:
 
 ### Supported Formats by Service
 
-| Format | MIME Type | OGC API | WFS | WMS | Esri REST |
+| Format | MIME Type | OGC API | WFS | WMS | Geoservices REST a.k.a. Esri REST |
 |--------|-----------|---------|-----|-----|-----------|
 | JSON | application/json | Yes | Yes | Info | Yes |
 | GeoJSON | application/geo+json | Yes | Yes | Info | Yes |
@@ -2569,7 +2569,7 @@ Content-Type: image/png
 }
 ```
 
-**Esri REST**:
+**Geoservices REST a.k.a. Esri REST**:
 ```json
 {
   "error": {
@@ -2638,7 +2638,7 @@ curl "https://localhost:5000/ogc/collections/roads/items?limit=100"
 curl "https://localhost:5000/ogc/collections/roads/items?limit=100&offset=100"
 ```
 
-**Esri REST**:
+**Geoservices REST a.k.a. Esri REST**:
 ```bash
 # Use resultOffset and resultRecordCount
 curl "https://localhost:5000/rest/services/Public/Parcels/FeatureServer/0/query?where=1=1&resultOffset=0&resultRecordCount=100"
@@ -2652,7 +2652,7 @@ curl "https://localhost:5000/rest/services/Public/Parcels/FeatureServer/0/query?
 curl "https://localhost:5000/ogc/collections/roads/items?properties=name,lanes&limit=100"
 ```
 
-**Esri REST**:
+**Geoservices REST a.k.a. Esri REST**:
 ```bash
 # Use outFields parameter
 curl "https://localhost:5000/rest/services/Public/Parcels/FeatureServer/0/query?where=1=1&outFields=PARCEL_ID,OWNER_NAME"

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Honua** is a production-grade, standards-driven geospatial API server for .NET built on .NET 9. It's a complete geospatial data platform combining OGC-compliant APIs, Esri REST compatibility, transactional editing, advanced raster support, and deep observability into a single deployable service.
+**Honua** is a production-grade, standards-driven geospatial API server for .NET built on .NET 9. It's a complete geospatial data platform combining OGC-compliant APIs, Geoservices REST a.k.a. Esri REST compatibility, transactional editing, advanced raster support, and deep observability into a single deployable service.
 
 **Codebase Metrics:**
 - Total C# Source Files: ~975 files
@@ -45,7 +45,7 @@
   - Exception handling and problem details
   - Request/response processing
   - Health checks and readiness probes
-  - Carto and Esri REST adapters
+  - Carto and Geoservices REST a.k.a. Esri REST adapters
   - OpenRosa form handling
   - Admin and management APIs
 - **Size**: 309 C# files across 33+ directories
@@ -190,7 +190,7 @@ Key Components:
 - `Cql2/Cql2Parser.cs` - Filter expression parsing
 - Storage backends: PostgreSQL, MySQL, SQLite, SQL Server, in-memory
 
-#### **Esri REST API** (`/GeoservicesREST/`)
+#### **Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API** (`/GeoservicesREST/`)
 - FeatureServer (query, add, update, delete, applyEdits)
 - MapServer (identify, export, layer definitions)
 - GeometryService (buffer, simplify, project, union, difference)

@@ -544,7 +544,7 @@ The codebase correctly handles the fact that **Esri and OGC use OPPOSITE ring or
 
 **Implementation:**
 - Internal storage: OGC standard (CCW exterior, CW holes)
-- Esri REST API: Automatic conversion via `EnsureEsriOrientation()`
+- Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API: Automatic conversion via `EnsureEsriOrientation()`
 - GeoJSON/WKT: Uses OGC standard (native)
 - Clear documentation in code comments (GeometryValidator.cs lines 232-236)
 

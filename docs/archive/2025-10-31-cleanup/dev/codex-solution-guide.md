@@ -11,7 +11,7 @@ Honua.Next.sln
 ├── src/
 │   ├── Honua.Cli/                 # Operator CLI (bootstrap, metadata, sandbox helpers)
 │   ├── Honua.Server.Core/         # Provider-agnostic domain services, auth abstractions
-│   └── Honua.Server.Host/         # ASP.NET Core host exposing OGC, Esri REST, OData
+│   └── Honua.Server.Host/         # ASP.NET Core host exposing OGC, Geoservices REST a.k.a. Esri REST, OData
 ├── tests/
 │   ├── Honua.Cli.Tests/           # CLI command coverage
 │   └── Honua.Server.Core.Tests/   # Unit & integration tests (WebApplicationFactory)
@@ -36,7 +36,7 @@ Honua.Next.sln
 - `FeatureRepository` orchestrates read queries against providers (SQLite/Postgres/SQL Server). Providers live under `src/Honua.Server.Core/Data/*` and implement `IDataStoreProvider`.
 - Providers reuse pooled connections: Postgres/MySQL create/lazy-cache `*DataSource` instances keyed by normalized connection strings, while SQL Server/SQLite normalise strings so the built-in pools coalesce connections. Remember to set pool sizing or `Pooling=false` in metadata if an environment has special requirements.
 - CRS reprojection is handled by GDAL via `CrsTransform`, which caches coordinate system handles and feeds SQLite/SQL Server responses (and SQL Server bbox filters) with correctly transformed GeoJSON/WKT when clients request alternate `crs` or `outSR` values.
-- OGC API handlers honour the `Accept-Crs` header (falling back to the `crs` query parameter), and the Esri REST translator now respects `outSR`/`Accept-Crs` preferences when building `FeatureQuery` instances.
+- OGC API handlers honour the `Accept-Crs` header (falling back to the `crs` query parameter), and the Geoservices REST a.k.a. Esri REST translator now respects `outSR`/`Accept-Crs` preferences when building `FeatureQuery` instances.
 
 ### Authentication
 
@@ -79,7 +79,7 @@ The CLI shares service registrations with `Honua.Server.Core`, so changes to rep
 ### Host Endpoints
 
 - **OGC API Features**: `/ogc/...` implemented in `Ogc/OgcHandlers.cs` and mapped in `Ogc/OgcApiEndpointExtensions.cs`.
-- **Esri REST**: `/rest/services/...` controllers under `GeoservicesREST/` provide FeatureServer/MapServer compatibility.
+- **Geoservices REST a.k.a. Esri REST**: `/rest/services/...` controllers under `GeoservicesREST/` provide FeatureServer/MapServer compatibility.
 - **OData**: `DynamicODataController` emits an EDM model derived from metadata.
 - **Admin APIs**: `/admin/metadata` handles diff/apply/snapshot operations and is guarded by the `RequireAdministrator` policy.
 - **Ingestion APIs**: `/admin/ingestion/jobs` create/list/cancel ingestion jobs and surface job snapshots. Always use the CLI or an authenticated REST client; direct calls must include operator JWTs.
@@ -119,7 +119,7 @@ Integration tests spin up lightweight web hosts against temporary metadata/auth 
 
 - **Authentication Hardening**: QuickStart mode is locked down; Local/OIDC mode must be enabled for administrative changes. Local auth now includes Argon2id hashing, account lockouts, and a CLI-driven bootstrap/login flow.
 - **CLI Enhancements**: User creation command added (`honua auth create-user`), enabling operators to rotate credentials without manual database edits.
-- **Endpoint Protection**: OGC, WFS, Esri REST, and Catalog endpoints now require `RequireViewer`; tests were updated to authenticate before exercising protected routes.
+- **Endpoint Protection**: OGC, WFS, Geoservices REST a.k.a. Esri REST, and Catalog endpoints now require `RequireViewer`; tests were updated to authenticate before exercising protected routes.
 - **Raster Observability**: Cache hits/misses, render latency, preseed job outcomes, and purge events now emit OpenTelemetry metrics (`honua.raster.*`) that surface in the Prometheus exporter.
 
 If you encounter 401/403 responses in tests or manual runs, ensure you:

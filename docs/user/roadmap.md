@@ -4,7 +4,7 @@ Provide feedback or vote on features via GitHub Discussions: <https://github.com
 
 ## Phase 0 (MVP)
 - ✅ OGC API Features core plus transactional create/update/delete with GeoJSON, KML, GeoPackage, and tiles.
-- ✅ Esri REST FeatureServer compatibility, including applyEdits pipelines.
+- ✅ Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST FeatureServer compatibility, including applyEdits pipelines.
 - ✅ SQLite, PostGIS, SQL Server providers with read/write CRUD support.
 - ✅ Styling MVP + catalog refresh.
 - ✅ Support CLI, telemetry opt-in, compliance docs.

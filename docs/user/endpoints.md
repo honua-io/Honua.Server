@@ -8,7 +8,7 @@
 - OGC WMS: https://{host}/wms
 - OGC API Records: https://{host}/records
 - STAC API: https://{host}/stac
-- Esri REST Services Directory: https://{host}/rest/services
+- Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST Services Directory: https://{host}/rest/services
 - Esri Geometry Service: https://{host}/rest/services/Geometry/GeometryServer
 - OData (metadata query): https://{host}/odata
 - Carto-compatible API: https://{host}/carto
@@ -51,7 +51,7 @@
 
 > WFS gaps: only the first entry in `typeNames` is evaluated (multi-type joins and ad-hoc stored queries are not implemented yet). Supported output formats are GeoJSON (`application/geo+json`) and GML 3.2 (`application/gml+xml; version=3.2`); other encodings and `GetPropertyValue` are not exposed. Locking and transactions require the target layer to publish a stable `idField` value. Bounding boxes and `srsName` arguments accept plain `EPSG:{code}` strings or full OGC URNs; responses advertise normalized URN identifiers (`http://www.opengis.net/def/crs/...`).
 
-## Esri REST Feature Services
+## Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST Feature Services
 | Operation | Endpoint | Example |
 |-----------|----------|---------|
 | Service directories | /rest/services | curl "https://localhost:5000/rest/services?f=pjson" |

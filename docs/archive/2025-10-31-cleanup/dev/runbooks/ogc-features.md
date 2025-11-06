@@ -31,7 +31,7 @@ Provide a repeatable workflow for preparing the Honua host with the canonical OG
   curl "http://localhost:5000/ogc/collections/roads/items?f=geojson&limit=1" | jq '.features[0].geometry.type'
   curl "http://localhost:5000/ogc/collections/roads/items?f=mvt&tileMatrix=0&tileRow=0&tileCol=0" --output tile.mvt
   `
-- For Esri REST parity, call .../FeatureServer/0/query?f=kml and ?f=geojson and confirm responses.
+- For Geoservices REST a.k.a. Esri REST parity, call .../FeatureServer/0/query?f=kml and ?f=geojson and confirm responses.
 - Record results in the QA report before proceeding.
 
 ## Run the ETS Conformance Suite

@@ -586,7 +586,7 @@ tests/Honua.Server.Core.Tests/Stac/StacSpatialBenchmarks.cs (NEW)
 # STAC compliance test suite
 tests/Honua.Server.Deployment.E2ETests/StacComplianceTests.cs (NEW)
 
-# Esri REST API validation
+# Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API validation
 tests/Honua.Server.Deployment.E2ETests/EsriApiComplianceTests.cs (NEW)
 ```
 
@@ -599,7 +599,7 @@ tests/Honua.Server.Deployment.E2ETests/EsriApiComplianceTests.cs (NEW)
 2. **Performance Tuning Guide**: Database indexes, caching strategies, query optimization
 3. **Telemetry Best Practices**: Activity/Metrics/Logging patterns with examples
 4. **STAC API Conformance**: Document supported/unsupported features, extensions
-5. **Esri REST API Coverage**: Document implemented vs. missing endpoints
+5. **Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API Coverage**: Document implemented vs. missing endpoints
 
 **Medium Priority**:
 6. API rate limiting policies and thresholds
@@ -738,7 +738,7 @@ tests/Honua.Server.Deployment.E2ETests/EsriApiComplianceTests.cs (NEW)
 
 ### Feature Completeness
 - [ ] STAC API compliance test suite passing (100%)
-- [ ] Esri REST API core features implemented (applyEdits, attachments)
+- [ ] Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API core features implemented (applyEdits, attachments)
 - [ ] Catalog API feature parity with requirements
 - [ ] Documentation coverage 100% for public APIs
 
@@ -767,11 +767,11 @@ tests/Honua.Server.Deployment.E2ETests/EsriApiComplianceTests.cs (NEW)
 
 ## 9. Conclusion
 
-This comprehensive review identified **89 issues** across Security, Performance, Telemetry, and Feature Completeness dimensions. The Honua catalog implementations demonstrate a **solid foundation** with excellent STAC API transaction support, good Esri REST API metadata mapping, and strong authentication/authorization patterns.
+This comprehensive review identified **89 issues** across Security, Performance, Telemetry, and Feature Completeness dimensions. The Honua catalog implementations demonstrate a **solid foundation** with excellent STAC API transaction support, good Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API metadata mapping, and strong authentication/authorization patterns.
 
 ### Strengths
 ✅ Comprehensive STAC CRUD operations with ETags
-✅ Strong Esri REST API metadata compatibility
+✅ Strong Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API metadata compatibility
 ✅ Excellent telemetry in StacSearchController (best practice example)
 ✅ Good authentication and authorization framework
 ✅ Bulk operations with progress reporting

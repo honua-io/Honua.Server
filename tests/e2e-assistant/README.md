@@ -188,7 +188,7 @@ The legacy test suite validates infrastructure (no AI generation):
 - ✅ OGC API Features (landing page, collections, items)
 - ✅ Spatial queries (bbox, limit, offset)
 - ✅ WFS/WMS endpoints
-- ✅ Esri REST API
+- ✅ Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
 - ✅ OData queries
 - ✅ Performance (response times, throughput)
 - ✅ Concurrent load handling
