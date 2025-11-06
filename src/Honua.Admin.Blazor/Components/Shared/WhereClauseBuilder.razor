@@ -115,10 +115,48 @@
             </MudTabs>
 
             <MudPaper Outlined="true" Class="pa-3">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">SQL Preview:</MudText>
-                <MudText Typo="Typo.body2" Style="font-family: monospace; word-break: break-all;">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">SQL Preview:</MudText>
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.PlayArrow"
+                               OnClick="TestQuery"
+                               Disabled="@(_testingQuery || string.IsNullOrWhiteSpace(GetWhereClause()))">
+                        @if (_testingQuery)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <span class="ml-2">Testing...</span>
+                        }
+                        else
+                        {
+                            <text>Test Query</text>
+                        }
+                    </MudButton>
+                </MudStack>
+                <MudText Typo="Typo.body2" Style="font-family: monospace; word-break: break-all;" Class="mb-2">
                     <code>WHERE @GetWhereClause()</code>
                 </MudText>
+
+                @if (_validationResult != null)
+                {
+                    <MudAlert Severity="@(_validationResult.IsValid ? Severity.Success : Severity.Error)"
+                              Dense="true"
+                              Class="mt-2">
+                        @if (_validationResult.IsValid)
+                        {
+                            <MudText Typo="Typo.body2">
+                                <strong>Query Valid!</strong> No syntax errors detected.
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2">
+                                <strong>Validation Error:</strong> @_validationResult.ErrorMessage
+                            </MudText>
+                        }
+                    </MudAlert>
+                }
             </MudPaper>
         </MudStack>
     }
@@ -143,6 +181,8 @@
     private bool _useFilter;
     private List<FilterCondition> _conditions = new();
     private string _manualSql = string.Empty;
+    private bool _testingQuery;
+    private QueryValidationResult? _validationResult;
 
     protected override void OnParametersSet()
     {
@@ -245,11 +285,143 @@
         };
     }
 
+    private async Task TestQuery()
+    {
+        _testingQuery = true;
+        _validationResult = null;
+
+        try
+        {
+            // Simulate API call delay
+            await Task.Delay(500);
+
+            var whereClause = GetWhereClause();
+
+            // TODO: Call backend endpoint to validate query against actual database
+            // For now, perform basic client-side validation
+            var result = ValidateWhereClause(whereClause);
+
+            _validationResult = result;
+        }
+        finally
+        {
+            _testingQuery = false;
+        }
+    }
+
+    private QueryValidationResult ValidateWhereClause(string whereClause)
+    {
+        if (string.IsNullOrWhiteSpace(whereClause))
+        {
+            return new QueryValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = "WHERE clause cannot be empty"
+            };
+        }
+
+        // Basic SQL injection pattern detection
+        var dangerousPatterns = new[]
+        {
+            @";\s*DROP\s+",
+            @";\s*DELETE\s+",
+            @";\s*UPDATE\s+",
+            @";\s*INSERT\s+",
+            @"--",
+            @"/\*",
+            @"\*/",
+            @"xp_",
+            @"sp_"
+        };
+
+        foreach (var pattern in dangerousPatterns)
+        {
+            if (System.Text.RegularExpressions.Regex.IsMatch(whereClause, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                return new QueryValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Query contains potentially dangerous SQL patterns"
+                };
+            }
+        }
+
+        // Check for balanced parentheses
+        int parenCount = 0;
+        foreach (char c in whereClause)
+        {
+            if (c == '(') parenCount++;
+            else if (c == ')') parenCount--;
+
+            if (parenCount < 0)
+            {
+                return new QueryValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Unbalanced parentheses: closing parenthesis without opening"
+                };
+            }
+        }
+
+        if (parenCount != 0)
+        {
+            return new QueryValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = $"Unbalanced parentheses: {Math.Abs(parenCount)} {(parenCount > 0 ? "opening" : "closing")} parenthesis without match"
+            };
+        }
+
+        // Check for balanced quotes
+        bool inSingleQuote = false;
+        bool inDoubleQuote = false;
+        for (int i = 0; i < whereClause.Length; i++)
+        {
+            char c = whereClause[i];
+
+            if (c == '\'' && !inDoubleQuote)
+            {
+                // Check if it's escaped
+                if (i + 1 < whereClause.Length && whereClause[i + 1] == '\'')
+                {
+                    i++; // Skip escaped quote
+                    continue;
+                }
+                inSingleQuote = !inSingleQuote;
+            }
+            else if (c == '"' && !inSingleQuote)
+            {
+                inDoubleQuote = !inDoubleQuote;
+            }
+        }
+
+        if (inSingleQuote || inDoubleQuote)
+        {
+            return new QueryValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = "Unbalanced quotes: missing closing quote"
+            };
+        }
+
+        // If all checks pass, query is valid
+        return new QueryValidationResult
+        {
+            IsValid = true
+        };
+    }
+
     private class FilterCondition
     {
         public string LogicalOperator { get; set; } = "AND";
         public string Field { get; set; } = string.Empty;
         public string Operator { get; set; } = "=";
         public string Value { get; set; } = string.Empty;
+    }
+
+    private class QueryValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
     }
 }

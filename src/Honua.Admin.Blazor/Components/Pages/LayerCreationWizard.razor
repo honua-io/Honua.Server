@@ -153,16 +153,150 @@
                         <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
                         <MudButton Variant="Variant.Filled"
                                    Color="Color.Primary"
+                                   OnClick="LoadDataPreview">
+                            Next
+                        </MudButton>
+                    </ActionContent>
+                </MudStep>
+
+                <MudStep Title="Data Preview" Icon="@Icons.Material.Filled.Preview">
+                    <ChildContent>
+                        <MudStack Spacing="4" Class="mt-4">
+                            <MudText Typo="Typo.h6">Preview Data</MudText>
+
+                            @if (_loadingPreview)
+                            {
+                                <MudPaper Outlined="true" Class="pa-6 text-center">
+                                    <MudProgressCircular Indeterminate="true" />
+                                    <MudText Typo="Typo.body2" Class="mt-2">Loading preview data...</MudText>
+                                </MudPaper>
+                            }
+                            else if (_previewData != null && _previewData.Any())
+                            {
+                                <MudStack Spacing="3">
+                                    <MudAlert Severity="Severity.Info" Dense="true">
+                                        @if (_estimatedFeatureCount.HasValue)
+                                        {
+                                            <MudText Typo="Typo.body2">
+                                                <strong>Estimated Feature Count:</strong> @_estimatedFeatureCount.Value.ToString("N0") features
+                                                @if (!string.IsNullOrEmpty(_whereClause))
+                                                {
+                                                    <text> (with filter applied)</text>
+                                                }
+                                            </MudText>
+                                        }
+                                        <MudText Typo="Typo.body2">
+                                            Showing first 10 rows from selected table
+                                        </MudText>
+                                    </MudAlert>
+
+                                    <MudTable Items="@_previewData"
+                                              Dense="true"
+                                              Hover="true"
+                                              Striped="true"
+                                              Elevation="2">
+                                        <HeaderContent>
+                                            @foreach (var column in _selectedColumns.Take(10))
+                                            {
+                                                <MudTh>
+                                                    @if (_columnAliases.TryGetValue(column, out var alias) && !string.IsNullOrEmpty(alias))
+                                                    {
+                                                        <div>
+                                                            <div>@alias</div>
+                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">(@column)</MudText>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <text>@column</text>
+                                                    }
+                                                </MudTh>
+                                            }
+                                            @if (_selectedColumns.Count > 10)
+                                            {
+                                                <MudTh>
+                                                    <MudText Typo="Typo.caption">+@(_selectedColumns.Count - 10) more...</MudText>
+                                                </MudTh>
+                                            }
+                                        </HeaderContent>
+                                        <RowTemplate>
+                                            @foreach (var column in _selectedColumns.Take(10))
+                                            {
+                                                <MudTd>
+                                                    @if (context.TryGetValue(column, out var value))
+                                                    {
+                                                        <text>@(value?.ToString() ?? "<null>")</text>
+                                                    }
+                                                </MudTd>
+                                            }
+                                            @if (_selectedColumns.Count > 10)
+                                            {
+                                                <MudTd></MudTd>
+                                            }
+                                        </RowTemplate>
+                                    </MudTable>
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Warning">
+                                    No preview data available. The table may be empty or there was an error loading the data.
+                                </MudAlert>
+                            }
+                        </MudStack>
+                    </ChildContent>
+                    <ActionContent>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
                                    OnClick="@(() => _stepper.ForceRender())">
                             Next
                         </MudButton>
                     </ActionContent>
                 </MudStep>
 
-                <MudStep Title="Data Filter (Optional)" Icon="@Icons.Material.Filled.FilterAlt">
+                <MudStep Title="Data Filter (Optional)" Icon="@Icons.Material.Filtered.FilterAlt">
                     <ChildContent>
-                        <WhereClauseBuilder TableInfo="@_selectedTable"
-                                            @bind-WhereClause="_whereClause" />
+                        <MudStack Spacing="3">
+                            <WhereClauseBuilder TableInfo="@_selectedTable"
+                                                @bind-WhereClause="_whereClause" />
+
+                            @if (!string.IsNullOrEmpty(_whereClause))
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <MudText Typo="Typo.body2">
+                                            Filter applied. You can refresh the preview to see how many features match your filter.
+                                        </MudText>
+                                        <MudButton Size="Size.Small"
+                                                   Variant="Variant.Outlined"
+                                                   Color="Color.Primary"
+                                                   StartIcon="@Icons.Material.Filled.Refresh"
+                                                   OnClick="RefreshPreviewWithFilter"
+                                                   Disabled="@_loadingPreview">
+                                            @if (_loadingPreview)
+                                            {
+                                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                            }
+                                            else
+                                            {
+                                                <text>Update Preview</text>
+                                            }
+                                        </MudButton>
+                                    </MudStack>
+                                </MudAlert>
+
+                                @if (_filteredFeatureCount.HasValue && _filteredFeatureCount != _estimatedFeatureCount)
+                                {
+                                    <MudPaper Outlined="true" Class="pa-3">
+                                        <MudText Typo="Typo.body2">
+                                            <strong>Estimated Features with Filter:</strong> @_filteredFeatureCount.Value.ToString("N0") features
+                                            (reduced from @(_estimatedFeatureCount?.ToString("N0") ?? "unknown"))
+                                        </MudText>
+                                    </MudPaper>
+                                }
+                            }
+                        </MudStack>
                     </ChildContent>
                     <ActionContent>
                         <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
@@ -254,12 +388,26 @@
                                             <td><strong>Selected Columns:</strong></td>
                                             <td>@_selectedColumns.Count / @_selectedTable.Columns.Count</td>
                                         </tr>
+                                        @if (_estimatedFeatureCount.HasValue)
+                                        {
+                                            <tr>
+                                                <td><strong>Total Features:</strong></td>
+                                                <td>@_estimatedFeatureCount.Value.ToString("N0")</td>
+                                            </tr>
+                                        }
                                         @if (!string.IsNullOrEmpty(_whereClause))
                                         {
                                             <tr>
                                                 <td><strong>Filter:</strong></td>
                                                 <td><code>@_whereClause</code></td>
                                             </tr>
+                                            @if (_filteredFeatureCount.HasValue)
+                                            {
+                                                <tr>
+                                                    <td><strong>Filtered Features:</strong></td>
+                                                    <td>@_filteredFeatureCount.Value.ToString("N0") features</td>
+                                                </tr>
+                                            }
                                         }
                                     </tbody>
                                 </MudSimpleTable>
@@ -318,6 +466,12 @@
     private Dictionary<string, CodedValueDomain> _codedValueDomains = new();
     private string _whereClause = string.Empty;
 
+    // Data preview
+    private bool _loadingPreview;
+    private List<Dictionary<string, object?>>? _previewData;
+    private long? _estimatedFeatureCount;
+    private long? _filteredFeatureCount;
+
     protected override async Task OnInitializedAsync()
     {
         await Task.WhenAll(
@@ -373,6 +527,116 @@
         if (string.IsNullOrEmpty(_layerTitle))
         {
             _layerTitle = table.Table;
+        }
+
+        // Reset preview data when table changes
+        _previewData = null;
+        _estimatedFeatureCount = null;
+    }
+
+    private async Task LoadDataPreview()
+    {
+        _loadingPreview = true;
+        _previewData = null;
+        _estimatedFeatureCount = null;
+
+        try
+        {
+            // Move to next step first
+            _stepper?.ForceRender();
+
+            // Simulate API call delay
+            await Task.Delay(800);
+
+            // TODO: Call backend endpoint to fetch preview data
+            // For now, generate mock preview data
+            _previewData = GenerateMockPreviewData();
+
+            // Use the row count from TableInfo as estimated feature count
+            _estimatedFeatureCount = _selectedTable?.RowCount ?? 0;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading preview data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingPreview = false;
+        }
+    }
+
+    private List<Dictionary<string, object?>> GenerateMockPreviewData()
+    {
+        // TODO: Replace with actual backend API call
+        // Example endpoint: GET /admin/datasources/{id}/tables/{schema}.{table}/preview?limit=10&columns=col1,col2
+
+        var mockData = new List<Dictionary<string, object?>>();
+
+        if (_selectedTable == null || !_selectedColumns.Any())
+            return mockData;
+
+        // Generate 10 mock rows
+        for (int i = 0; i < 10; i++)
+        {
+            var row = new Dictionary<string, object?>();
+
+            foreach (var column in _selectedColumns)
+            {
+                var columnInfo = _selectedTable.Columns.FirstOrDefault(c => c.Name == column);
+                if (columnInfo == null) continue;
+
+                // Generate mock data based on column type
+                row[column] = columnInfo.DataType.ToLower() switch
+                {
+                    var t when t.Contains("int") => Random.Shared.Next(1, 1000),
+                    var t when t.Contains("decimal") || t.Contains("numeric") || t.Contains("float") || t.Contains("double") =>
+                        Math.Round(Random.Shared.NextDouble() * 1000, 2),
+                    var t when t.Contains("bool") => Random.Shared.Next(0, 2) == 1,
+                    var t when t.Contains("date") || t.Contains("time") => DateTime.Now.AddDays(-Random.Shared.Next(0, 365)),
+                    var t when t.Contains("geometry") || t.Contains("geography") => "POINT(...)", // Don't show full geometry
+                    _ => $"Sample {column} {i + 1}"
+                };
+            }
+
+            mockData.Add(row);
+        }
+
+        return mockData;
+    }
+
+    private async Task RefreshPreviewWithFilter()
+    {
+        _loadingPreview = true;
+
+        try
+        {
+            // Simulate API call delay
+            await Task.Delay(500);
+
+            // TODO: Call backend endpoint to get filtered count
+            // Example endpoint: GET /admin/datasources/{id}/tables/{schema}.{table}/count?where={whereClause}
+
+            // Mock: Simulate filter reducing the count
+            if (!string.IsNullOrEmpty(_whereClause) && _estimatedFeatureCount.HasValue)
+            {
+                // Simulate filter reducing results by a random percentage (30-90%)
+                var reductionFactor = Random.Shared.NextDouble() * 0.6 + 0.1; // 0.1 to 0.7
+                _filteredFeatureCount = (long)(_estimatedFeatureCount.Value * reductionFactor);
+            }
+            else
+            {
+                _filteredFeatureCount = _estimatedFeatureCount;
+            }
+
+            Snackbar.Add($"Preview updated. Estimated {_filteredFeatureCount:N0} features match your filter.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error refreshing preview: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingPreview = false;
         }
     }
 
