@@ -43,7 +43,7 @@ Honua provides a complete OGC-compliant geospatial server with:
 | Component | Description |
 |-----------|-------------|
 | **🗺️ MapSDK** | Visual map builder with no-code editor, live preview, and export to JSON/YAML/HTML/Blazor. [Docs](src/Honua.MapSDK/README.md) |
-| **📱 HonuaField Mobile** | Cross-platform field data collection app for iOS/Android/Windows/macOS with offline support. |
+| **📱 HonuaField Mobile** | Cross-platform field data collection app for iOS/Android/Windows/macOS with offline support. [Docs](src/HonuaField/README.md) |
 | **⚡ GeoEvent Server** | Real-time geofencing with <100ms latency, batch processing, and webhook notifications. [API Guide](docs/GEOEVENT_API_GUIDE.md) |
 | **🔄 GeoETL** | Container registry provisioning and build delivery for multi-tenant deployments. [Docs](src/Honua.Server.Intake/README.md) |
 | **⚙️ Geoprocessing** | Distributed spatial analysis with 40+ operations (buffer, union, dissolve, heatmaps). Enterprise tier. |
@@ -470,6 +470,7 @@ Annual pricing available (20% discount).
 
 **Platform Components:**
 - [MapSDK Documentation](src/Honua.MapSDK/README.md) - Visual map builder
+- [HonuaField Mobile App](src/HonuaField/README.md) - Field data collection
 - [GeoEvent API Guide](docs/GEOEVENT_API_GUIDE.md) - Real-time geofencing
 - [GeoETL/Intake README](src/Honua.Server.Intake/README.md) - Container distribution
 
