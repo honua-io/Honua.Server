@@ -185,10 +185,45 @@
 
                         @if (_importing)
                         {
-                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
-                            <MudText Typo="Typo.body1" Align="Align.Center">
-                                Uploading and processing file...
-                            </MudText>
+                            <MudPaper Outlined="true" Class="pa-4 my-4">
+                                <MudStack Spacing="2">
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                        <MudText Typo="Typo.body1">
+                                            @if (_uploadProgress < 100)
+                                            {
+                                                <text>Uploading file...</text>
+                                            }
+                                            else
+                                            {
+                                                <text>Processing file...</text>
+                                            }
+                                        </MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Primary">
+                                            <b>@($"{_uploadProgress:F1}%")</b>
+                                        </MudText>
+                                    </MudStack>
+
+                                    <MudProgressLinear Value="@_uploadProgress" Color="Color.Primary" Size="Size.Medium" />
+
+                                    @if (_uploadProgress < 100 && _uploadProgress > 0)
+                                    {
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @FormatFileSize((long)(_wizardState.FileSize * _uploadProgress / 100)) / @FormatFileSize(_wizardState.FileSize)
+                                            </MudText>
+                                            @if (_uploadStartTime.HasValue)
+                                            {
+                                                var elapsed = DateTime.Now - _uploadStartTime.Value;
+                                                var bytesUploaded = (long)(_wizardState.FileSize * _uploadProgress / 100);
+                                                var speed = elapsed.TotalSeconds > 0 ? bytesUploaded / elapsed.TotalSeconds : 0;
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @($"{FormatFileSize((long)speed)}/s")
+                                                </MudText>
+                                            }
+                                        </MudStack>
+                                    }
+                                </MudStack>
+                            </MudPaper>
                         }
 
                         @if (_wizardState.JobId.HasValue)
@@ -248,6 +283,8 @@
     private bool _isDraggingOver = false;
     private IJSObjectReference? _dragDropModule;
     private bool _dragDropInitialized = false;
+    private double _uploadProgress = 0;
+    private DateTime? _uploadStartTime;
 
     protected override async Task OnInitializedAsync()
     {
@@ -364,11 +401,15 @@
         }
 
         _importing = true;
+        _uploadProgress = 0;
+        _uploadStartTime = DateTime.Now;
+
         try
         {
             var progress = new Progress<double>(percent =>
             {
-                // Update progress UI if needed
+                _uploadProgress = percent;
+                InvokeAsync(StateHasChanged);
             });
 
             var job = await ImportApi.CreateImportJobAsync(
@@ -395,6 +436,8 @@
         finally
         {
             _importing = false;
+            _uploadProgress = 0;
+            _uploadStartTime = null;
         }
     }
 

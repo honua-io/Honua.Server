@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using System.Net;
 using System.Net.Http.Json;
 using Honua.Admin.Blazor.Shared.Models;
 using Microsoft.AspNetCore.Components.Forms;
@@ -34,6 +35,8 @@ public sealed class ImportApiClient
     {
         try
         {
+            _logger.LogInformation("Uploading file: {FileName} ({Size} bytes)", file.Name, file.Size);
+
             using var content = new MultipartFormDataContent();
 
             // Add form fields
@@ -41,16 +44,11 @@ public sealed class ImportApiClient
             content.Add(new StringContent(layerId), "layerId");
             content.Add(new StringContent(overwrite.ToString().ToLowerInvariant()), "overwrite");
 
-            // Add file
-            var fileContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 500 * 1024 * 1024, cancellationToken));
-            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "file", file.Name);
-
-            // Track upload progress
-            var uploadedBytes = 0L;
-            var totalBytes = file.Size;
-
-            _logger.LogInformation("Uploading file: {FileName} ({Size} bytes)", file.Name, totalBytes);
+            // Add file with progress tracking
+            var fileStream = file.OpenReadStream(maxAllowedSize: 500 * 1024 * 1024, cancellationToken);
+            var progressStream = new ProgressStreamContent(fileStream, file.Size, progress);
+            progressStream.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            content.Add(progressStream, "file", file.Name);
 
             var response = await _httpClient.PostAsync("/admin/ingestion/jobs", content, cancellationToken);
 
@@ -160,5 +158,49 @@ public sealed class ImportApiClient
     {
         [System.Text.Json.Serialization.JsonPropertyName("job")]
         public ImportJobSnapshot? Job { get; set; }
+    }
+
+    /// <summary>
+    /// StreamContent wrapper that reports upload progress.
+    /// </summary>
+    private sealed class ProgressStreamContent : StreamContent
+    {
+        private readonly Stream _stream;
+        private readonly long _totalBytes;
+        private readonly IProgress<double>? _progress;
+        private long _bytesUploaded;
+
+        public ProgressStreamContent(Stream stream, long totalBytes, IProgress<double>? progress)
+            : base(stream, 8192)
+        {
+            _stream = stream;
+            _totalBytes = totalBytes;
+            _progress = progress;
+            _bytesUploaded = 0;
+        }
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            var buffer = new byte[8192];
+            int bytesRead;
+
+            while ((bytesRead = await _stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+            {
+                await stream.WriteAsync(buffer, 0, bytesRead).ConfigureAwait(false);
+                _bytesUploaded += bytesRead;
+
+                if (_progress != null && _totalBytes > 0)
+                {
+                    var percentage = (_bytesUploaded * 100.0) / _totalBytes;
+                    _progress.Report(percentage);
+                }
+            }
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = _totalBytes;
+            return true;
+        }
     }
 }
