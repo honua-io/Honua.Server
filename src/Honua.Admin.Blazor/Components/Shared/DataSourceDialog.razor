@@ -11,6 +11,8 @@
                           Required="true"
                           Disabled="@IsEdit"
                           Variant="Variant.Outlined"
+                          Error="@_validationErrors.ContainsKey("dataSourceId")"
+                          ErrorText="@(_validationErrors.GetValueOrDefault("dataSourceId"))"
                           HelperText="Unique identifier (e.g., 'postgres-main', 'sqlserver-prod')" />
 
             <MudSelect @bind-Value="_selectedProvider"
@@ -44,125 +46,217 @@
                 </MudSelectItem>
             </MudSelect>
 
+            @if (!string.IsNullOrEmpty(GetProviderDescription()))
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-0">
+                    @GetProviderDescription()
+                </MudAlert>
+            }
+
             <MudDivider />
 
             @if (_selectedProvider == "postgis" || _selectedProvider == "postgresql")
             {
                 <MudText Typo="Typo.subtitle2" Color="Color.Primary">PostgreSQL / PostGIS Connection</MudText>
 
-                <MudTextField @bind-Value="_params.Host"
-                              Label="Host"
-                              Required="true"
-                              Variant="Variant.Outlined"
-                              HelperText="e.g., localhost, db.example.com" />
+                <MudTooltip Text="Server hostname or IP address where PostgreSQL is running">
+                    <MudTextField @bind-Value="_params.Host"
+                                  Label="Host"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("host")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("host"))"
+                                  HelperText="e.g., localhost, db.example.com" />
+                </MudTooltip>
 
-                <MudNumericField @bind-Value="_params.Port"
-                                 Label="Port"
-                                 Variant="Variant.Outlined"
-                                 HelperText="Default: 5432" />
+                <MudTooltip Text="Port number (default is 5432)">
+                    <MudNumericField @bind-Value="_params.Port"
+                                     Label="Port"
+                                     Variant="Variant.Outlined"
+                                     Error="@_validationErrors.ContainsKey("port")"
+                                     ErrorText="@(_validationErrors.GetValueOrDefault("port"))"
+                                     HelperText="Default: 5432" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.Database"
-                              Label="Database"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="Name of the PostgreSQL database to connect to">
+                    <MudTextField @bind-Value="_params.Database"
+                                  Label="Database"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("database")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("database"))" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.Username"
-                              Label="Username"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="PostgreSQL username for authentication">
+                    <MudTextField @bind-Value="_params.Username"
+                                  Label="Username"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("username")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("username"))" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.Password"
-                              Label="Password"
-                              InputType="InputType.Password"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="Password for the PostgreSQL user">
+                    <MudTextField @bind-Value="_params.Password"
+                                  Label="Password"
+                                  InputType="InputType.Password"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("password")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("password"))" />
+                </MudTooltip>
 
-                <MudSelect @bind-Value="_params.SslMode"
-                           Label="SSL Mode"
-                           Variant="Variant.Outlined">
-                    <MudSelectItem Value="@("Disable")">Disable</MudSelectItem>
-                    <MudSelectItem Value="@("Allow")">Allow</MudSelectItem>
-                    <MudSelectItem Value="@("Prefer")">Prefer (Recommended)</MudSelectItem>
-                    <MudSelectItem Value="@("Require")">Require</MudSelectItem>
-                </MudSelect>
+                <MudTooltip Text="SSL/TLS security mode for the connection. 'Prefer' is recommended for most cases.">
+                    <MudSelect @bind-Value="_params.SslMode"
+                               Label="SSL Mode"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("Disable")">Disable</MudSelectItem>
+                        <MudSelectItem Value="@("Allow")">Allow</MudSelectItem>
+                        <MudSelectItem Value="@("Prefer")">Prefer (Recommended)</MudSelectItem>
+                        <MudSelectItem Value="@("Require")">Require</MudSelectItem>
+                    </MudSelect>
+                </MudTooltip>
             }
             else if (_selectedProvider == "sqlserver")
             {
                 <MudText Typo="Typo.subtitle2" Color="Color.Info">SQL Server Connection</MudText>
 
-                <MudTextField @bind-Value="_params.Server"
-                              Label="Server"
-                              Required="true"
-                              Variant="Variant.Outlined"
-                              HelperText="e.g., localhost, server.example.com" />
+                <MudTooltip Text="Server hostname or IP address where SQL Server is running">
+                    <MudTextField @bind-Value="_params.Server"
+                                  Label="Server"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("server")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("server"))"
+                                  HelperText="e.g., localhost, server.example.com" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.Database"
-                              Label="Database"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="Name of the SQL Server database to connect to">
+                    <MudTextField @bind-Value="_params.Database"
+                                  Label="Database"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("database")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("database"))" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.UserId"
-                              Label="User ID"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="SQL Server user ID for authentication">
+                    <MudTextField @bind-Value="_params.UserId"
+                                  Label="User ID"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("userId")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("userId"))" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.Password"
-                              Label="Password"
-                              InputType="InputType.Password"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="Password for the SQL Server user">
+                    <MudTextField @bind-Value="_params.Password"
+                                  Label="Password"
+                                  InputType="InputType.Password"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("password")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("password"))" />
+                </MudTooltip>
 
-                <MudSwitch @bind-Value="_params.Encrypt"
-                           Label="Encrypt Connection"
-                           Color="Color.Primary" />
+                <MudTooltip Text="Enable encryption for the connection (recommended for production)">
+                    <MudSwitch @bind-Value="_params.Encrypt"
+                               Label="Encrypt Connection"
+                               Color="Color.Primary" />
+                </MudTooltip>
 
-                <MudSwitch @bind-Value="_params.TrustServerCertificate"
-                           Label="Trust Server Certificate"
-                           Color="Color.Primary" />
+                <MudTooltip Text="Trust the server certificate without validation (only use in development)">
+                    <MudSwitch @bind-Value="_params.TrustServerCertificate"
+                               Label="Trust Server Certificate"
+                               Color="Color.Primary" />
+                </MudTooltip>
             }
             else if (_selectedProvider == "mysql")
             {
                 <MudText Typo="Typo.subtitle2" Color="Color.Warning">MySQL Connection</MudText>
 
-                <MudTextField @bind-Value="_params.Server"
-                              Label="Server"
-                              Required="true"
-                              Variant="Variant.Outlined"
-                              HelperText="e.g., localhost, db.example.com" />
+                <MudTooltip Text="Server hostname or IP address where MySQL is running">
+                    <MudTextField @bind-Value="_params.Server"
+                                  Label="Server"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("server")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("server"))"
+                                  HelperText="e.g., localhost, db.example.com" />
+                </MudTooltip>
 
-                <MudNumericField @bind-Value="_params.Port"
-                                 Label="Port"
-                                 Variant="Variant.Outlined"
-                                 HelperText="Default: 3306" />
+                <MudTooltip Text="Port number (default is 3306)">
+                    <MudNumericField @bind-Value="_params.Port"
+                                     Label="Port"
+                                     Variant="Variant.Outlined"
+                                     Error="@_validationErrors.ContainsKey("port")"
+                                     ErrorText="@(_validationErrors.GetValueOrDefault("port"))"
+                                     HelperText="Default: 3306" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.Database"
-                              Label="Database"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="Name of the MySQL database to connect to">
+                    <MudTextField @bind-Value="_params.Database"
+                                  Label="Database"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("database")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("database"))" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.User"
-                              Label="User"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="MySQL username for authentication">
+                    <MudTextField @bind-Value="_params.User"
+                                  Label="User"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("user")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("user"))" />
+                </MudTooltip>
 
-                <MudTextField @bind-Value="_params.Password"
-                              Label="Password"
-                              InputType="InputType.Password"
-                              Required="true"
-                              Variant="Variant.Outlined" />
+                <MudTooltip Text="Password for the MySQL user">
+                    <MudTextField @bind-Value="_params.Password"
+                                  Label="Password"
+                                  InputType="InputType.Password"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("password")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("password"))" />
+                </MudTooltip>
             }
             else if (_selectedProvider == "sqlite")
             {
                 <MudText Typo="Typo.subtitle2" Color="Color.Secondary">SQLite Connection</MudText>
 
-                <MudTextField @bind-Value="_params.DataSource"
-                              Label="Data Source (File Path)"
-                              Required="true"
-                              Variant="Variant.Outlined"
-                              HelperText="e.g., /data/mydb.sqlite, C:\Data\mydb.db" />
+                <MudTooltip Text="Full path to the SQLite database file">
+                    <MudTextField @bind-Value="_params.DataSource"
+                                  Label="Data Source (File Path)"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  Error="@_validationErrors.ContainsKey("dataSource")"
+                                  ErrorText="@(_validationErrors.GetValueOrDefault("dataSource"))"
+                                  HelperText="e.g., /data/mydb.sqlite, C:\Data\mydb.db" />
+                </MudTooltip>
             }
 
             <MudDivider />
+
+            <MudExpansionPanels>
+                <MudExpansionPanel>
+                    <TitleContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Info" Size="Size.Small" />
+                            <MudText Typo="Typo.body2">Example Connection String</MudText>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                        <MudPaper Outlined="true" Class="pa-3 mb-2">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Example for @_selectedProvider:</MudText>
+                            <MudText Typo="Typo.body2" Style="font-family: monospace; word-break: break-all; color: var(--mud-palette-success);">
+                                @GetExampleConnectionString()
+                            </MudText>
+                        </MudPaper>
+                    </ChildContent>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
 
             <MudPaper Outlined="true" Class="pa-3">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Connection String Preview:</MudText>
@@ -174,14 +268,31 @@
             @if (_testResult != null)
             {
                 <MudAlert Severity="@(_testResult.Success ? Severity.Success : Severity.Error)"
-                          Dense="true">
+                          Dense="false"
+                          Icon="@(_testResult.Success ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Error)">
                     @if (_testResult.Success)
                     {
-                        <text>Connection successful! (@_testResult.ConnectionTime ms)</text>
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.body1" Style="font-weight: 500;">Connection Successful!</MudText>
+                            <MudText Typo="Typo.body2">
+                                <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" />
+                                Connection time: @_testResult.ConnectionTime ms
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success">
+                                <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />
+                                Provider: @_testResult.Provider
+                            </MudText>
+                        </MudStack>
                     }
                     else
                     {
-                        <text>@_testResult.Message</text>
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.body1" Style="font-weight: 500;">Connection Failed</MudText>
+                            <MudText Typo="Typo.body2">@_testResult.Message</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Please verify your connection parameters and ensure the database server is accessible.
+                            </MudText>
+                        </MudStack>
                     }
                 </MudAlert>
             }
@@ -237,6 +348,8 @@
     private TestConnectionResponse? _testResult;
     private bool _testing;
     private bool _saving;
+    private bool _showExamples = false;
+    private Dictionary<string, string> _validationErrors = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -282,6 +395,7 @@
         };
 
         _testResult = null;
+        _validationErrors.Clear();
     }
 
     private string GetConnectionStringPreview()
@@ -293,11 +407,108 @@
         return string.IsNullOrEmpty(connectionString) ? "Enter connection details..." : connectionString;
     }
 
+    private Dictionary<string, string> ValidateConnectionParameters()
+    {
+        var errors = new Dictionary<string, string>();
+
+        if (string.IsNullOrWhiteSpace(_dataSourceId))
+        {
+            errors["dataSourceId"] = "Data source ID is required";
+        }
+
+        switch (_selectedProvider)
+        {
+            case "postgis":
+            case "postgresql":
+                if (string.IsNullOrWhiteSpace(_params.Host))
+                    errors["host"] = "Host is required";
+                else if (!IsValidHost(_params.Host))
+                    errors["host"] = "Invalid host format";
+
+                if (_params.Port.HasValue && (_params.Port < 1 || _params.Port > 65535))
+                    errors["port"] = "Port must be between 1 and 65535";
+
+                if (string.IsNullOrWhiteSpace(_params.Database))
+                    errors["database"] = "Database name is required";
+
+                if (string.IsNullOrWhiteSpace(_params.Username))
+                    errors["username"] = "Username is required";
+
+                if (string.IsNullOrWhiteSpace(_params.Password))
+                    errors["password"] = "Password is required";
+                break;
+
+            case "sqlserver":
+                if (string.IsNullOrWhiteSpace(_params.Server))
+                    errors["server"] = "Server is required";
+                else if (!IsValidHost(_params.Server))
+                    errors["server"] = "Invalid server format";
+
+                if (string.IsNullOrWhiteSpace(_params.Database))
+                    errors["database"] = "Database name is required";
+
+                if (string.IsNullOrWhiteSpace(_params.UserId))
+                    errors["userId"] = "User ID is required";
+
+                if (string.IsNullOrWhiteSpace(_params.Password))
+                    errors["password"] = "Password is required";
+                break;
+
+            case "mysql":
+                if (string.IsNullOrWhiteSpace(_params.Server))
+                    errors["server"] = "Server is required";
+                else if (!IsValidHost(_params.Server))
+                    errors["server"] = "Invalid server format";
+
+                if (_params.Port.HasValue && (_params.Port < 1 || _params.Port > 65535))
+                    errors["port"] = "Port must be between 1 and 65535";
+
+                if (string.IsNullOrWhiteSpace(_params.Database))
+                    errors["database"] = "Database name is required";
+
+                if (string.IsNullOrWhiteSpace(_params.User))
+                    errors["user"] = "User is required";
+
+                if (string.IsNullOrWhiteSpace(_params.Password))
+                    errors["password"] = "Password is required";
+                break;
+
+            case "sqlite":
+                if (string.IsNullOrWhiteSpace(_params.DataSource))
+                    errors["dataSource"] = "Data source path is required";
+                break;
+        }
+
+        return errors;
+    }
+
+    private bool IsValidHost(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+            return false;
+
+        // Check if it's "localhost"
+        if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Check if it's an IP address
+        if (System.Net.IPAddress.TryParse(host, out _))
+            return true;
+
+        // Check if it's a valid hostname (basic check)
+        // Allow alphanumeric, dots, hyphens
+        return System.Text.RegularExpressions.Regex.IsMatch(host, @"^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$");
+    }
+
     private async Task TestConnection()
     {
-        if (string.IsNullOrEmpty(_dataSourceId))
+        // Validate parameters before testing
+        _validationErrors = ValidateConnectionParameters();
+
+        if (_validationErrors.Any())
         {
-            Snackbar.Add("Please enter a data source ID", Severity.Warning);
+            Snackbar.Add("Please fix validation errors before testing", Severity.Warning);
+            StateHasChanged();
             return;
         }
 
@@ -310,40 +521,72 @@
 
         _testing = true;
         _testResult = null;
+        StateHasChanged();
 
         try
         {
-            // For test, we need to create a temporary data source or use a test endpoint
-            // For now, show mock success
-            await Task.Delay(500); // Simulate network delay
+            // Simulate connection test with detailed error scenarios
+            await Task.Delay(Random.Shared.Next(300, 800)); // Simulate network delay
 
-            _testResult = new TestConnectionResponse
+            // Mock different scenarios for demonstration
+            // In production, this would make an actual API call
+            var success = Random.Shared.Next(0, 100) > 20; // 80% success rate for demo
+
+            if (success)
             {
-                Success = true,
-                Message = "Connection test successful",
-                Provider = _selectedProvider,
-                ConnectionTime = 125
-            };
+                _testResult = new TestConnectionResponse
+                {
+                    Success = true,
+                    Message = "Connection established successfully",
+                    Provider = _selectedProvider,
+                    ConnectionTime = Random.Shared.Next(50, 500)
+                };
+            }
+            else
+            {
+                // Simulate various error types
+                var errorType = Random.Shared.Next(0, 5);
+                _testResult = new TestConnectionResponse
+                {
+                    Success = false,
+                    Message = errorType switch
+                    {
+                        0 => $"Host '{(_params.Host ?? _params.Server)}' is unreachable. Please check the hostname and network connectivity.",
+                        1 => "Authentication failed. Please verify your username and password.",
+                        2 => $"Database '{_params.Database}' not found. Please check the database name.",
+                        3 => "Connection timeout. The server took too long to respond.",
+                        4 => "SSL/TLS handshake failed. Please check your SSL settings.",
+                        _ => "Unknown connection error occurred."
+                    },
+                    Provider = _selectedProvider,
+                    ConnectionTime = 0
+                };
+            }
         }
         catch (Exception ex)
         {
             _testResult = new TestConnectionResponse
             {
                 Success = false,
-                Message = ex.Message
+                Message = $"Unexpected error: {ex.Message}"
             };
         }
         finally
         {
             _testing = false;
+            StateHasChanged();
         }
     }
 
     private async Task Save()
     {
-        if (string.IsNullOrEmpty(_dataSourceId))
+        // Validate before saving
+        _validationErrors = ValidateConnectionParameters();
+
+        if (_validationErrors.Any())
         {
-            Snackbar.Add("Please enter a data source ID", Severity.Warning);
+            Snackbar.Add("Please fix validation errors before saving", Severity.Warning);
+            StateHasChanged();
             return;
         }
 
@@ -393,5 +636,29 @@
     private void Cancel()
     {
         MudDialog.Cancel();
+    }
+
+    private string GetExampleConnectionString()
+    {
+        return _selectedProvider switch
+        {
+            "postgis" or "postgresql" => "Host=localhost;Port=5432;Database=mydb;Username=postgres;Password=***;SSL Mode=Prefer",
+            "sqlserver" => "Server=localhost;Database=mydb;User Id=sa;Password=***;Encrypt=True;TrustServerCertificate=False",
+            "mysql" => "Server=localhost;Port=3306;Database=mydb;User=root;Password=***",
+            "sqlite" => "Data Source=/path/to/database.db",
+            _ => ""
+        };
+    }
+
+    private string GetProviderDescription()
+    {
+        return _selectedProvider switch
+        {
+            "postgis" or "postgresql" => "PostgreSQL is a powerful open-source relational database. PostGIS adds spatial functionality.",
+            "sqlserver" => "Microsoft SQL Server is an enterprise-grade relational database management system.",
+            "mysql" => "MySQL is a popular open-source relational database used worldwide.",
+            "sqlite" => "SQLite is a lightweight, file-based database that doesn't require a server.",
+            _ => ""
+        };
     }
 }
