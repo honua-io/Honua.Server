@@ -127,6 +127,24 @@
                 <MudText Color="Color.Secondary">No CRS configured</MudText>
             }
         </MudPaper>
+
+        <MudPaper Elevation="2" Class="pa-6 mt-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.h5">Map Preview</MudText>
+                <MudSpacer />
+                <MudChip Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Layers">
+                    Powered by MapLibre GL JS
+                </MudChip>
+            </MudStack>
+            <MapLibreMapPreview Height="500"
+                                LayerId="@_layer.Id"
+                                ServiceId="@_layer.ServiceId"
+                                Center="@(new double[] { -98.5795, 39.8283 })"
+                                Zoom="4" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                Interactive preview of layer geometry and styling. Use mouse/touch to pan and zoom.
+            </MudText>
+        </MudPaper>
     }
 </MudContainer>
 
