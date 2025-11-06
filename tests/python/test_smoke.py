@@ -7,20 +7,23 @@ Run with: pytest tests/python/test_smoke.py -v
 Total: ~15 tests, should complete in < 30 seconds
 """
 
+import os
 import pytest
 import requests
 
 # Base URL for the Honua server
-BASE_URL = "http://localhost:8080"
+BASE_URL = os.getenv("HONUA_API_BASE_URL", "http://localhost:5100")
 
 
 @pytest.fixture(scope="module")
 def server_url():
     """Get server URL, skip all tests if server not available."""
     try:
+        # Check if server is responding at all
+        # Don't check status code - just that we get a response (even 503 Unhealthy is fine)
         response = requests.get(f"{BASE_URL}/health", timeout=5)
-        if response.status_code == 200:
-            return BASE_URL
+        # Any response means server is up, even if unhealthy
+        return BASE_URL
     except requests.exceptions.RequestException:
         pass
 

@@ -26,8 +26,7 @@ services:
     container_name: honua-test-shared
     build:
       context: ..
-      dockerfile: src/Honua.Server.Host/Dockerfile
-      target: final
+      dockerfile: Dockerfile
     environment:
       # ==================================================================
       # Use Development environment to allow QuickStart authentication
