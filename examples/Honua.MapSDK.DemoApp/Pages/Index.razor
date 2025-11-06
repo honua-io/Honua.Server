@@ -31,12 +31,12 @@
 
             <div class="hero-stats">
                 <div class="hero-stat">
-                    <span class="hero-stat-value">7+</span>
+                    <span class="hero-stat-value">18</span>
                     <span class="hero-stat-label">Components</span>
                 </div>
                 <div class="hero-stat">
-                    <span class="hero-stat-value">6</span>
-                    <span class="hero-stat-label">Demo Scenarios</span>
+                    <span class="hero-stat-value">15</span>
+                    <span class="hero-stat-label">Demo Pages</span>
                 </div>
                 <div class="hero-stat">
                     <span class="hero-stat-value">100%</span>
@@ -219,6 +219,247 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Playground -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/playground"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.Science" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">Component Playground</h3>
+                    <p class="demo-card-description">
+                        Interactive testing environment. Experiment with component properties and see changes in real-time.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">Interactive</span>
+                        <span class="demo-card-tag">Live Editing</span>
+                        <span class="demo-card-tag">Code Generation</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <span class="demo-card-complexity">
+                            <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" /> All Levels
+                        </span>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            Start Experimenting
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+
+            <!-- City Planning Dashboard -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/dashboards/city-planning"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">City Planning Dashboard</h3>
+                    <p class="demo-card-description">
+                        Comprehensive urban planning with zoning analysis, editing tools, and report generation.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">Editor</span>
+                        <span class="demo-card-tag">LayerList</span>
+                        <span class="demo-card-tag">AttributeTable</span>
+                        <span class="demo-card-tag">Print</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <span class="demo-card-complexity">
+                            <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" /> Advanced
+                        </span>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Asset Management Dashboard -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/dashboards/asset-management"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">Asset Management Dashboard</h3>
+                    <p class="demo-card-description">
+                        Infrastructure asset tracking with maintenance schedules, condition assessments, and lifecycle analysis.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">Timeline</span>
+                        <span class="demo-card-tag">LayerList</span>
+                        <span class="demo-card-tag">Popup</span>
+                        <span class="demo-card-tag">CoordinateDisplay</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <span class="demo-card-complexity">
+                            <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" /> Advanced
+                        </span>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Response Dashboard -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/dashboards/emergency-response"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">Emergency Response Dashboard</h3>
+                    <p class="demo-card-description">
+                        Real-time incident tracking and coordination for emergency services with live updates.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">Real-time</span>
+                        <span class="demo-card-tag">Popup</span>
+                        <span class="demo-card-tag">Timeline</span>
+                        <span class="demo-card-tag">AttributeTable</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <span class="demo-card-complexity">
+                            <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" /> Advanced
+                        </span>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Component Demos Section -->
+        <h2 class="section-title" style="margin-top: 60px;">Component Demos</h2>
+        <p class="text-center mb-4" style="font-size: 1.1rem; color: var(--text-secondary); max-width: 800px; margin: 0 auto 50px;">
+            Deep dive into individual components with comprehensive examples and API references.
+        </p>
+
+        <div class="demo-cards-grid">
+            <!-- LayerList Demo -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/components/layer-list"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.Layers" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">LayerList Component</h3>
+                    <p class="demo-card-description">
+                        Layer management with drag & drop, opacity controls, search, and legend integration.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">HonuaLayerList</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Popup Demo -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/components/popup"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">Popup Component</h3>
+                    <p class="demo-card-description">
+                        Display feature info with click popups, hover tooltips, and custom templates.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">HonuaPopup</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editor Demo -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/components/editor"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.Edit" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">Editor Component</h3>
+                    <p class="demo-card-description">
+                        Draw and edit features with attribute editing, undo/redo, and save workflows.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">HonuaEditor</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CoordinateDisplay Demo -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/components/coordinate-display"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.GpsFixed" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">CoordinateDisplay Component</h3>
+                    <p class="demo-card-description">
+                        Display coordinates in 6 formats with pin, measure, and copy functionality.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">HonuaCoordinateDisplay</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AttributeTable Demo -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/components/attribute-table"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.TableView" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">AttributeTable Component</h3>
+                    <p class="demo-card-description">
+                        High-performance tables for large datasets with sorting, filtering, and editing.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">HonuaAttributeTable</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Print Demo -->
+            <div class="demo-card" @onclick="@(() => NavigateTo("/components/print"))">
+                <div class="demo-card-image" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.Print" Class="demo-card-icon" />
+                </div>
+                <div class="demo-card-content">
+                    <h3 class="demo-card-title">Print Component</h3>
+                    <p class="demo-card-description">
+                        MapFish Print integration for creating high-quality PDF maps with layouts.
+                    </p>
+                    <div class="demo-card-tags">
+                        <span class="demo-card-tag">HonuaPrint</span>
+                    </div>
+                    <div class="demo-card-footer">
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward">
+                            View Demo
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -242,10 +483,10 @@
                     <div class="feature-icon">
                         <MudIcon Icon="@Icons.Material.Filled.Layers" />
                     </div>
-                    <h3 class="feature-title">Rich Component Library</h3>
+                    <h3 class="feature-title">18 Powerful Components</h3>
                     <p class="feature-description">
-                        Maps, data grids, charts, legends, filters, search, and timeline components
-                        work seamlessly together.
+                        Maps, data grids, charts, legends, filters, search, timeline, layer list, popup, editor,
+                        coordinate display, attribute table, print, draw, basemap gallery, bookmarks, import wizard, and overview map.
                     </p>
                 </div>
 

@@ -17,8 +17,11 @@
                     <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" /> Home
                 </MudMenuItem>
                 <MudDivider />
+
+                <!-- Original Dashboards -->
+                <MudText Typo="Typo.caption" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">SCENARIO DASHBOARDS</MudText>
                 <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/property-dashboard"))">
-                    <MudIcon Icon="@Icons.Material.Filled.HomeWork" Class="mr-2" /> Property Dashboard
+                    <MudIcon Icon="@Icons.Material.Filled.HomeWork" Class="mr-2" /> Property Analysis
                 </MudMenuItem>
                 <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/environmental-monitoring"))">
                     <MudIcon Icon="@Icons.Material.Filled.Co2" Class="mr-2" /> Environmental Monitoring
@@ -32,8 +35,52 @@
                 <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/urban-planning"))">
                     <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="mr-2" /> Urban Planning
                 </MudMenuItem>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Comprehensive Dashboards -->
+                <MudText Typo="Typo.caption" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">COMPREHENSIVE DASHBOARDS</MudText>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/dashboards/city-planning"))">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="mr-2" /> City Planning
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/dashboards/asset-management"))">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="mr-2" /> Asset Management
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/dashboards/emergency-response"))">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Class="mr-2" /> Emergency Response
+                </MudMenuItem>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Component Demos -->
+                <MudText Typo="Typo.caption" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">COMPONENT DEMOS</MudText>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/layer-list"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Layers" Class="mr-2" /> LayerList
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/popup"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" /> Popup
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/editor"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" /> Editor
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/coordinate-display"))">
+                    <MudIcon Icon="@Icons.Material.Filled.GpsFixed" Class="mr-2" /> CoordinateDisplay
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/attribute-table"))">
+                    <MudIcon Icon="@Icons.Material.Filled.TableView" Class="mr-2" /> AttributeTable
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/print"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Print" Class="mr-2" /> Print
+                </MudMenuItem>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Other Pages -->
                 <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/component-showcase"))">
                     <MudIcon Icon="@Icons.Material.Filled.Widgets" Class="mr-2" /> Component Showcase
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/playground"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Science" Class="mr-2" /> Playground
                 </MudMenuItem>
             </MudMenu>
 

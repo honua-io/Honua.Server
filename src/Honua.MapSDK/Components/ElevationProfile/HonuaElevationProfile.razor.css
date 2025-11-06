@@ -1,0 +1,508 @@
+.honua-elevation-profile {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    overflow: hidden;
+}
+
+/* Position variants */
+.elevation-floating {
+    position: absolute;
+    z-index: 10;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+}
+
+.elevation-top-right {
+    top: 20px;
+    right: 20px;
+}
+
+.elevation-top-left {
+    top: 20px;
+    left: 20px;
+}
+
+.elevation-bottom-right {
+    bottom: 20px;
+    right: 20px;
+}
+
+.elevation-bottom-left {
+    bottom: 20px;
+    left: 20px;
+}
+
+.elevation-embedded {
+    position: relative;
+    width: 100%;
+}
+
+/* Toolbar */
+.elevation-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+    flex-shrink: 0;
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.tool-button {
+    transition: all 0.2s;
+}
+
+.tool-button:hover {
+    transform: scale(1.05);
+}
+
+.toolbar-divider {
+    height: 24px;
+    margin: 0 8px;
+}
+
+/* Settings panel */
+.elevation-settings {
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+    flex-shrink: 0;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.settings-content {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Loading state */
+.elevation-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 20px;
+    flex-direction: column;
+}
+
+/* Chart container */
+.elevation-chart-container {
+    position: relative;
+    padding: 16px;
+    flex-grow: 1;
+    min-height: 200px;
+}
+
+.elevation-chart {
+    width: 100%;
+    position: relative;
+}
+
+.elevation-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.marker-line {
+    width: 100%;
+    height: 100%;
+    background: #3b82f6;
+    opacity: 0.7;
+    box-shadow: 0 0 4px rgba(59, 130, 246, 0.5);
+}
+
+/* Statistics panel */
+.elevation-statistics {
+    border-top: 1px solid #e5e7eb;
+    padding: 16px;
+    background: #f9fafb;
+    flex-shrink: 0;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+}
+
+.stat-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* Steep sections */
+.steep-sections {
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f9fafb;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.section-header:hover {
+    background: #f3f4f6;
+}
+
+.section-title {
+    flex: 1;
+    font-weight: 500;
+}
+
+.sections-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.section-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-top: 1px solid #e5e7eb;
+    border-left: 4px solid transparent;
+    transition: all 0.2s;
+}
+
+.section-item:hover {
+    background: #f9fafb;
+}
+
+.section-item.severity-flat {
+    border-left-color: #10b981;
+}
+
+.section-item.severity-low {
+    border-left-color: #f59e0b;
+}
+
+.section-item.severity-moderate {
+    border-left-color: #f97316;
+}
+
+.section-item.severity-high {
+    border-left-color: #ef4444;
+}
+
+.section-item.severity-extreme {
+    border-left-color: #dc2626;
+    background: #fef2f2;
+}
+
+.section-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.section-distance {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+}
+
+.section-stats {
+    display: flex;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.grade-badge {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.length,
+.elevation-change {
+    padding: 2px 6px;
+}
+
+/* Waypoints */
+.waypoints-list {
+    border-top: 1px solid #e5e7eb;
+    flex-shrink: 0;
+}
+
+.waypoint-items {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.waypoint-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid #e5e7eb;
+    transition: background 0.2s;
+}
+
+.waypoint-item:hover {
+    background: #f9fafb;
+}
+
+.waypoint-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.waypoint-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #111827;
+}
+
+.waypoint-details {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+/* Empty state */
+.elevation-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    color: #6b7280;
+}
+
+.elevation-empty .mud-icon-root {
+    opacity: 0.3;
+}
+
+/* Error message */
+.elevation-error {
+    margin: 12px;
+    flex-shrink: 0;
+}
+
+/* Scrollbar styling */
+.sections-list::-webkit-scrollbar,
+.waypoint-items::-webkit-scrollbar,
+.elevation-floating::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sections-list::-webkit-scrollbar-track,
+.waypoint-items::-webkit-scrollbar-track,
+.elevation-floating::-webkit-scrollbar-track {
+    background: #f3f4f6;
+}
+
+.sections-list::-webkit-scrollbar-thumb,
+.waypoint-items::-webkit-scrollbar-thumb,
+.elevation-floating::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.sections-list::-webkit-scrollbar-thumb:hover,
+.waypoint-items::-webkit-scrollbar-thumb:hover,
+.elevation-floating::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .honua-elevation-profile {
+        background: #1f2937;
+        color: #f9fafb;
+    }
+
+    .elevation-toolbar,
+    .elevation-settings,
+    .elevation-statistics,
+    .section-header {
+        background: #111827;
+        border-color: #374151;
+    }
+
+    .stat-item,
+    .section-item,
+    .waypoint-item {
+        background: #111827;
+        border-color: #374151;
+        color: #f9fafb;
+    }
+
+    .stat-label,
+    .waypoint-details,
+    .section-stats {
+        color: #9ca3af;
+    }
+
+    .stat-value,
+    .section-distance,
+    .waypoint-name {
+        color: #f9fafb;
+    }
+
+    .section-header:hover,
+    .section-item:hover,
+    .waypoint-item:hover {
+        background: #1f2937;
+    }
+
+    .section-item.severity-extreme {
+        background: #1f2937;
+    }
+
+    .elevation-empty {
+        color: #9ca3af;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .elevation-floating {
+        max-width: calc(100vw - 40px);
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .toolbar-section {
+        gap: 2px;
+    }
+
+    .elevation-toolbar {
+        padding: 8px;
+    }
+
+    .elevation-statistics {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .elevation-floating {
+        max-width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+    }
+
+    .elevation-top-right,
+    .elevation-top-left {
+        top: 10px;
+    }
+
+    .elevation-bottom-right,
+    .elevation-bottom-left {
+        bottom: 10px;
+    }
+
+    .elevation-top-right,
+    .elevation-bottom-right {
+        right: 10px;
+    }
+
+    .elevation-top-left,
+    .elevation-bottom-left {
+        left: 10px;
+    }
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.elevation-chart-container,
+.elevation-statistics {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Print styles */
+@media print {
+    .elevation-toolbar,
+    .elevation-settings {
+        display: none;
+    }
+
+    .honua-elevation-profile {
+        box-shadow: none;
+        border: 1px solid #e5e7eb;
+    }
+
+    .elevation-floating {
+        position: relative;
+        top: auto;
+        right: auto;
+        bottom: auto;
+        left: auto;
+    }
+}

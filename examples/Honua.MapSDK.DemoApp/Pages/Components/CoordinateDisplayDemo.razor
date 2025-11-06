@@ -1,0 +1,384 @@
+@page "/components/coordinate-display"
+<PageTitle>CoordinateDisplay Demo - Honua MapSDK</PageTitle>
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">
+                <MudIcon Icon="@Icons.Material.Filled.GpsFixed" Class="mr-2" />
+                HonuaCoordinateDisplay Component
+            </h1>
+            <p class="dashboard-subtitle">
+                Display cursor coordinates in multiple formats with pin, measure, and copy functionality.
+            </p>
+        </div>
+    </div>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Color="Color.Primary">
+        <!-- All Formats -->
+        <MudTabPanel Icon="@Icons.Material.Filled.LocationOn" Text="All Formats">
+            <div style="height: 500px; margin-bottom: 24px; position: relative;">
+                <HonuaMap Id="coord-formats-map"
+                          MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                          Center="new[] { -122.4194, 37.7749 }"
+                          Zoom="13"
+                          Style="width: 100%; height: 100%; border-radius: 8px;" />
+
+                <div style="position: absolute; bottom: 16px; left: 16px; right: 16px; background: rgba(255,255,255,0.95); border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                    <HonuaCoordinateDisplay Id="all-formats-display"
+                                            SyncWith="coord-formats-map"
+                                            ShowAllFormats="true"
+                                            Style="width: 100%;" />
+                </div>
+            </div>
+
+            <MudText Typo="Typo.h6" Class="mb-3">Supported Coordinate Formats</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Public" Size="Size.Small" Class="mr-1" />
+                            Decimal Degrees (DD)
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">-122.4194, 37.7749</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-1">Most common format, easy to use with APIs</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Navigation" Size="Size.Small" Class="mr-1" />
+                            Degrees Minutes Seconds (DMS)
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">37° 46' 29.6" N, 122° 25' 9.8" W</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-1">Traditional navigation format</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Small" Class="mr-1" />
+                            Universal Transverse Mercator (UTM)
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Zone 10N: 551316E, 4180843N</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-1">Military and surveying standard</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.GridOn" Size="Size.Small" Class="mr-1" />
+                            Military Grid Reference System (MGRS)
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">10SEG5131680843</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-1">NATO standard for grid references</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" Class="mr-1" />
+                            Plus Codes
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">849VQHFJ+2C</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-1">Google's open location code</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.DataObject" Size="Size.Small" Class="mr-1" />
+                            Web Mercator (EPSG:3857)
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">-13627341, 4544699</MudText>
+                        <MudText Typo="Typo.caption" Class="mt-1">Web mapping standard projection</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <!-- Pin Location -->
+        <MudTabPanel Icon="@Icons.Material.Filled.PushPin" Text="Pin">
+            <div style="height: 500px; margin-bottom: 24px; position: relative;">
+                <HonuaMap Id="coord-pin-map"
+                          MapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+                          Center="new[] { -122.4194, 37.7749 }"
+                          Zoom="13"
+                          Style="width: 100%; height: 100%; border-radius: 8px;" />
+
+                <div style="position: absolute; top: 16px; right: 16px; background: rgba(30,30,30,0.95); border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); color: white; min-width: 300px;">
+                    <HonuaCoordinateDisplay Id="pin-display"
+                                            SyncWith="coord-pin-map"
+                                            ShowPinButton="true"
+                                            ShowCopyButton="true"
+                                            Format="DecimalDegrees"
+                                            Precision="6"
+                                            Style="width: 100%;" />
+
+                    <MudDivider Class="my-3" Style="background: rgba(255,255,255,0.2);" />
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Pinned Locations</MudText>
+                    <MudList Dense="true" Style="color: white;">
+                        <MudListItem Icon="@Icons.Material.Filled.Place" Style="color: white;">
+                            <MudText Typo="Typo.caption" Style="color: white;">San Francisco City Hall</MudText>
+                            <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.7);">-122.4194, 37.7749</MudText>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Place" Style="color: white;">
+                            <MudText Typo="Typo.caption" Style="color: white;">Golden Gate Park</MudText>
+                            <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.7);">-122.4862, 37.7694</MudText>
+                        </MudListItem>
+                    </MudList>
+                </div>
+            </div>
+
+            <MudAlert Severity="Severity.Info">
+                Click the pin button to save the current location. Useful for marking points of interest or creating waypoints.
+            </MudAlert>
+
+            <div class="code-example mt-4">
+                <pre><code>&lt;HonuaCoordinateDisplay SyncWith="my-map"
+                        ShowPinButton="true"
+                        ShowCopyButton="true"
+                        Format="DecimalDegrees"
+                        Precision="6"
+                        OnLocationPinned="HandleLocationPinned" /&gt;
+
+@@code {
+    private void HandleLocationPinned(Coordinate coord)
+    {
+        // Save pinned location
+        savedLocations.Add(coord);
+    }
+}</code></pre>
+            </div>
+        </MudTabPanel>
+
+        <!-- Measure -->
+        <MudTabPanel Icon="@Icons.Material.Filled.Straighten" Text="Measure">
+            <div style="height: 500px; margin-bottom: 24px; position: relative;">
+                <HonuaMap Id="coord-measure-map"
+                          MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                          Center="new[] { -122.4194, 37.7749 }"
+                          Zoom="13"
+                          Style="width: 100%; height: 100%; border-radius: 8px;" />
+
+                <div style="position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.95); border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); min-width: 400px;">
+                    <HonuaCoordinateDisplay Id="measure-display"
+                                            SyncWith="coord-measure-map"
+                                            ShowMeasureTools="true"
+                                            ShowDistanceFromOrigin="true"
+                                            ShowBearing="true"
+                                            Format="DecimalDegrees"
+                                            Style="width: 100%;" />
+
+                    <MudDivider Class="my-3" />
+
+                    <MudGrid>
+                        <MudItem xs="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Distance</MudText>
+                            <MudText Typo="Typo.h6">2.4 km</MudText>
+                        </MudItem>
+                        <MudItem xs="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Bearing</MudText>
+                            <MudText Typo="Typo.h6">45° NE</MudText>
+                        </MudItem>
+                        <MudItem xs="4">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Unit</MudText>
+                            <MudSelect T="string" Dense="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                <MudSelectItem Value="@("km")">Kilometers</MudSelectItem>
+                                <MudSelectItem Value="@("mi")">Miles</MudSelectItem>
+                                <MudSelectItem Value="@("m")">Meters</MudSelectItem>
+                                <MudSelectItem Value="@("ft")">Feet</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </div>
+            </div>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Measurement Features</MudText>
+            <MudList Dense="true">
+                <MudListItem Icon="@Icons.Material.Filled.Straighten" IconColor="Color.Primary">
+                    <strong>Distance from Origin:</strong> Measure distance from a reference point
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Explore" IconColor="Color.Primary">
+                    <strong>Bearing:</strong> Show direction in degrees and cardinal directions
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.SwapHoriz" IconColor="Color.Primary">
+                    <strong>Multiple Units:</strong> Switch between km, miles, meters, and feet
+                </MudListItem>
+            </MudList>
+        </MudTabPanel>
+
+        <!-- Format Comparison -->
+        <MudTabPanel Icon="@Icons.Material.Filled.CompareArrows" Text="Compare">
+            <MudText Typo="Typo.h6" Class="mb-3">Format Comparison</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                See the same location displayed in all supported coordinate formats simultaneously.
+            </MudText>
+
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <div style="height: 500px;">
+                        <HonuaMap Id="coord-compare-map"
+                                  MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                                  Center="new[] { -122.4194, 37.7749 }"
+                                  Zoom="13"
+                                  Style="width: 100%; height: 100%; border-radius: 8px;" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="component-panel" style="height: 500px; overflow-y: auto;">
+                        <div class="panel-header">
+                            <h3 class="panel-title">All Formats</h3>
+                            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" Title="Copy All" />
+                        </div>
+
+                        <MudSimpleTable Dense="true">
+                            <tbody>
+                                <tr>
+                                    <td><strong>Decimal Degrees</strong></td>
+                                    <td>-122.419400, 37.774900</td>
+                                    <td><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" /></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>DMS</strong></td>
+                                    <td>37° 46' 29.6" N, 122° 25' 9.8" W</td>
+                                    <td><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" /></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>UTM</strong></td>
+                                    <td>10N 551316E 4180843N</td>
+                                    <td><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" /></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>MGRS</strong></td>
+                                    <td>10SEG5131680843</td>
+                                    <td><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" /></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Plus Code</strong></td>
+                                    <td>849VQHFJ+2C</td>
+                                    <td><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" /></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Web Mercator</strong></td>
+                                    <td>-13627341, 4544699</td>
+                                    <td><MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" /></td>
+                                </tr>
+                            </tbody>
+                        </MudSimpleTable>
+
+                        <MudDivider Class="my-3" />
+
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Quick Actions</MudText>
+                        <MudStack Spacing="2">
+                            <MudButton Variant="Variant.Outlined" FullWidth="true" StartIcon="@Icons.Material.Filled.ContentCopy">
+                                Copy All Formats
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" FullWidth="true" StartIcon="@Icons.Material.Filled.Download">
+                                Export as CSV
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" FullWidth="true" StartIcon="@Icons.Material.Filled.Share">
+                                Share Location
+                            </MudButton>
+                        </MudStack>
+                    </div>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <!-- API Reference -->
+        <MudTabPanel Icon="@Icons.Material.Filled.Code" Text="API">
+            <MudText Typo="Typo.h6" Class="mb-3">Component Properties</MudText>
+            <MudSimpleTable Elevation="0" Dense="true">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Type</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>SyncWith</code></td>
+                        <td>string</td>
+                        <td>-</td>
+                        <td>Map ID to synchronize with</td>
+                    </tr>
+                    <tr>
+                        <td><code>Format</code></td>
+                        <td>CoordinateFormat</td>
+                        <td>DecimalDegrees</td>
+                        <td>Display format (DD, DMS, UTM, MGRS, PlusCode, WebMercator)</td>
+                    </tr>
+                    <tr>
+                        <td><code>ShowAllFormats</code></td>
+                        <td>bool</td>
+                        <td>false</td>
+                        <td>Show all formats simultaneously</td>
+                    </tr>
+                    <tr>
+                        <td><code>Precision</code></td>
+                        <td>int</td>
+                        <td>6</td>
+                        <td>Decimal precision (0-12)</td>
+                    </tr>
+                    <tr>
+                        <td><code>ShowPinButton</code></td>
+                        <td>bool</td>
+                        <td>false</td>
+                        <td>Show pin location button</td>
+                    </tr>
+                    <tr>
+                        <td><code>ShowCopyButton</code></td>
+                        <td>bool</td>
+                        <td>true</td>
+                        <td>Show copy to clipboard button</td>
+                    </tr>
+                    <tr>
+                        <td><code>ShowMeasureTools</code></td>
+                        <td>bool</td>
+                        <td>false</td>
+                        <td>Show distance and bearing tools</td>
+                    </tr>
+                    <tr>
+                        <td><code>ShowDistanceFromOrigin</code></td>
+                        <td>bool</td>
+                        <td>false</td>
+                        <td>Show distance from reference point</td>
+                    </tr>
+                    <tr>
+                        <td><code>ShowBearing</code></td>
+                        <td>bool</td>
+                        <td>false</td>
+                        <td>Show bearing/direction</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+
+            <MudText Typo="Typo.h6" Class="mt-4 mb-3">Events</MudText>
+            <MudSimpleTable Elevation="0" Dense="true">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>OnLocationPinned</code></td>
+                        <td>EventCallback&lt;Coordinate&gt;</td>
+                        <td>Fired when location is pinned</td>
+                    </tr>
+                    <tr>
+                        <td><code>OnCoordinateCopied</code></td>
+                        <td>EventCallback&lt;string&gt;</td>
+                        <td>Fired when coordinates copied</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        </MudTabPanel>
+    </MudTabs>
+</div>

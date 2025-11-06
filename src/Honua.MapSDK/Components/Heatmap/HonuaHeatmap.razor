@@ -1,0 +1,758 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-heatmap @CssClass @(_isDarkMode ? "dark-mode" : "")" @ref="_containerRef" id="@Id">
+    @if (ShowControls)
+    {
+        <div class="honua-heatmap-controls">
+            <div class="honua-heatmap-header">
+                <h3>Heatmap Controls</h3>
+                <button class="honua-heatmap-close" @onclick="ToggleControls" title="Hide controls">×</button>
+            </div>
+
+            <div class="honua-heatmap-control-group">
+                <label for="@($"{Id}-radius")">
+                    Radius: <span class="honua-heatmap-value">@_currentRadius px</span>
+                </label>
+                <input
+                    id="@($"{Id}-radius")"
+                    type="range"
+                    min="5"
+                    max="100"
+                    step="1"
+                    value="@_currentRadius"
+                    @oninput="OnRadiusChanged"
+                    class="honua-heatmap-slider" />
+            </div>
+
+            <div class="honua-heatmap-control-group">
+                <label for="@($"{Id}-intensity")">
+                    Intensity: <span class="honua-heatmap-value">@_currentIntensity.ToString("F1")</span>
+                </label>
+                <input
+                    id="@($"{Id}-intensity")"
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value="@_currentIntensity"
+                    @oninput="OnIntensityChanged"
+                    class="honua-heatmap-slider" />
+            </div>
+
+            <div class="honua-heatmap-control-group">
+                <label for="@($"{Id}-opacity")">
+                    Opacity: <span class="honua-heatmap-value">@((_currentOpacity * 100).ToString("F0"))%</span>
+                </label>
+                <input
+                    id="@($"{Id}-opacity")"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value="@_currentOpacity"
+                    @oninput="OnOpacityChanged"
+                    class="honua-heatmap-slider" />
+            </div>
+
+            <div class="honua-heatmap-control-group">
+                <label for="@($"{Id}-gradient")">Gradient</label>
+                <select
+                    id="@($"{Id}-gradient")"
+                    value="@_currentGradient"
+                    @onchange="OnGradientChanged"
+                    class="honua-heatmap-select">
+                    <option value="Hot">Hot (Yellow → Red)</option>
+                    <option value="Cool">Cool (Cyan → Blue)</option>
+                    <option value="Rainbow">Rainbow</option>
+                    <option value="Viridis">Viridis</option>
+                    <option value="Plasma">Plasma</option>
+                    <option value="Inferno">Inferno</option>
+                    @if (CustomGradient != null)
+                    {
+                        <option value="Custom">Custom</option>
+                    }
+                </select>
+
+                <div class="honua-heatmap-gradient-preview" style="@GetGradientPreviewStyle()"></div>
+            </div>
+
+            @if (ShowWeightProperty && _availableProperties.Count > 0)
+            {
+                <div class="honua-heatmap-control-group">
+                    <label for="@($"{Id}-weight")">Weight by</label>
+                    <select
+                        id="@($"{Id}-weight")"
+                        value="@(_currentWeightProperty ?? "")"
+                        @onchange="OnWeightPropertyChanged"
+                        class="honua-heatmap-select">
+                        <option value="">Uniform (All equal)</option>
+                        @foreach (var prop in _availableProperties)
+                        {
+                            <option value="@prop">@prop</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            @if (ShowStatistics && _statistics != null)
+            {
+                <div class="honua-heatmap-statistics">
+                    <h4>Statistics</h4>
+                    <div class="honua-heatmap-stat">
+                        <span class="label">Points:</span>
+                        <span class="value">@_statistics.PointCount.ToString("N0")</span>
+                    </div>
+                    @if (_statistics.TotalWeight.HasValue)
+                    {
+                        <div class="honua-heatmap-stat">
+                            <span class="label">Total Weight:</span>
+                            <span class="value">@_statistics.TotalWeight.Value.ToString("N2")</span>
+                        </div>
+                        <div class="honua-heatmap-stat">
+                            <span class="label">Max Weight:</span>
+                            <span class="value">@_statistics.MaxWeight?.ToString("N2")</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="honua-heatmap-actions">
+                <button class="honua-heatmap-button" @onclick="ToggleVisibility">
+                    @(_isVisible ? "Hide" : "Show") Layer
+                </button>
+                <button class="honua-heatmap-button" @onclick="RefreshHeatmap">
+                    Refresh
+                </button>
+                @if (AllowExport)
+                {
+                    <button class="honua-heatmap-button" @onclick="ExportImage">
+                        Export
+                    </button>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <button class="honua-heatmap-toggle" @onclick="ToggleControls" title="Show heatmap controls">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="6"></circle>
+                <circle cx="12" cy="12" r="2"></circle>
+            </svg>
+        </button>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this heatmap component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"heatmap-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to sync with (required)
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// Data source: layer ID, GeoJSON URL, or "data" for inline data
+    /// </summary>
+    [Parameter]
+    public string? DataSource { get; set; }
+
+    /// <summary>
+    /// GeoJSON data (if not using a layer source)
+    /// </summary>
+    [Parameter]
+    public object? Data { get; set; }
+
+    /// <summary>
+    /// Heatmap radius in pixels (default 30)
+    /// </summary>
+    [Parameter]
+    public int Radius { get; set; } = 30;
+
+    /// <summary>
+    /// Heatmap intensity (0-2, default 1.0)
+    /// </summary>
+    [Parameter]
+    public double Intensity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Heatmap opacity (0-1, default 0.6)
+    /// </summary>
+    [Parameter]
+    public double Opacity { get; set; } = 0.6;
+
+    /// <summary>
+    /// Color gradient preset
+    /// </summary>
+    [Parameter]
+    public HeatmapGradient ColorGradient { get; set; } = HeatmapGradient.Hot;
+
+    /// <summary>
+    /// Custom gradient color stops (only used with Custom gradient)
+    /// </summary>
+    [Parameter]
+    public Dictionary<double, string>? CustomGradient { get; set; }
+
+    /// <summary>
+    /// Property name to use for weighting points
+    /// </summary>
+    [Parameter]
+    public string? WeightProperty { get; set; }
+
+    /// <summary>
+    /// Maximum zoom level to show heatmap
+    /// </summary>
+    [Parameter]
+    public int? MaxZoom { get; set; }
+
+    /// <summary>
+    /// Minimum zoom level to show heatmap
+    /// </summary>
+    [Parameter]
+    public int? MinZoom { get; set; }
+
+    /// <summary>
+    /// Show interactive controls
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Show statistics panel
+    /// </summary>
+    [Parameter]
+    public bool ShowStatistics { get; set; } = true;
+
+    /// <summary>
+    /// Show weight property selector
+    /// </summary>
+    [Parameter]
+    public bool ShowWeightProperty { get; set; } = true;
+
+    /// <summary>
+    /// Allow image export
+    /// </summary>
+    [Parameter]
+    public bool AllowExport { get; set; } = true;
+
+    /// <summary>
+    /// Auto-sync with map extent changes
+    /// </summary>
+    [Parameter]
+    public bool AutoSync { get; set; } = true;
+
+    /// <summary>
+    /// Dark mode enabled
+    /// </summary>
+    [Parameter]
+    public bool DarkMode { get; set; } = false;
+
+    /// <summary>
+    /// Additional CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Callback when heatmap is updated
+    /// </summary>
+    [Parameter]
+    public EventCallback<HeatmapUpdatedEventArgs> OnHeatmapUpdated { get; set; }
+
+    /// <summary>
+    /// Callback when image is exported
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnImageExported { get; set; }
+
+    private ElementReference _containerRef;
+    private IJSObjectReference? _heatmapModule;
+    private IJSObjectReference? _heatmapInstance;
+    private DotNetObjectReference<HonuaHeatmap>? _dotNetRef;
+    private bool _isInitialized = false;
+    private bool _isVisible = true;
+    private bool _isDarkMode = false;
+
+    // Current values (for two-way binding)
+    private int _currentRadius;
+    private double _currentIntensity;
+    private double _currentOpacity;
+    private string _currentGradient = "Hot";
+    private string? _currentWeightProperty;
+
+    // Data storage
+    private string? _sourceId;
+    private string? _layerId;
+    private HeatmapStatistics? _statistics;
+    private List<string> _availableProperties = new();
+
+    protected override void OnInitialized()
+    {
+        _currentRadius = Radius;
+        _currentIntensity = Intensity;
+        _currentOpacity = Opacity;
+        _currentGradient = ColorGradient.ToString();
+        _currentWeightProperty = WeightProperty;
+        _isDarkMode = DarkMode;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeHeatmap();
+            SetupSubscriptions();
+        }
+    }
+
+    private async Task InitializeHeatmap()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load heatmap module
+            _heatmapModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-heatmap.js"
+            );
+
+            // Get the map instance (requires integration with HonuaMap)
+            var mapModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-map.js"
+            );
+
+            var mapInstance = await mapModule.InvokeAsync<IJSObjectReference>("getMapInstance", SyncWith);
+
+            // Initialize heatmap with map instance
+            await _heatmapModule.InvokeVoidAsync("initializeHeatmap", SyncWith, mapInstance);
+
+            // Prepare data source
+            _sourceId = DataSource ?? $"heatmap-source-{Id}";
+            _layerId = $"heatmap-layer-{Id}";
+
+            // Create GeoJSON source if needed
+            if (Data != null)
+            {
+                await _heatmapModule.InvokeVoidAsync("updateHeatmapData", SyncWith, _sourceId, Data);
+            }
+            else if (!string.IsNullOrEmpty(DataSource) && DataSource != "data")
+            {
+                // Request data from layer or other source
+                await RequestDataFromSource();
+            }
+
+            // Create heatmap layer
+            var options = new
+            {
+                layerId = _layerId,
+                radius = _currentRadius,
+                intensity = _currentIntensity,
+                opacity = _currentOpacity,
+                gradient = _currentGradient,
+                customGradient = CustomGradient,
+                weightProperty = _currentWeightProperty,
+                minZoom = MinZoom,
+                maxZoom = MaxZoom
+            };
+
+            _heatmapInstance = await _heatmapModule.InvokeAsync<IJSObjectReference>(
+                "createHeatmap",
+                SyncWith,
+                _sourceId,
+                options,
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+
+            // Calculate initial statistics
+            await UpdateStatistics();
+
+            // Publish heatmap created message
+            await Bus.PublishAsync(new LayerAddedMessage
+            {
+                LayerId = _layerId,
+                LayerName = $"Heatmap-{Id}"
+            }, Id);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing heatmap: {ex.Message}");
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map extent changes
+        if (AutoSync)
+        {
+            Bus.Subscribe<MapExtentChangedMessage>(async args =>
+            {
+                if (args.Message.MapId == SyncWith)
+                {
+                    // Could filter data based on visible extent
+                    await UpdateStatistics();
+                }
+            });
+        }
+
+        // Listen for data updates
+        Bus.Subscribe<DataLoadedMessage>(async args =>
+        {
+            if (args.Message.ComponentId == DataSource)
+            {
+                await RequestDataFromSource();
+            }
+        });
+
+        // Listen for filter changes
+        Bus.Subscribe<FilterAppliedMessage>(async args =>
+        {
+            // Could filter heatmap data based on filter
+            await UpdateStatistics();
+        });
+    }
+
+    private async Task RequestDataFromSource()
+    {
+        if (string.IsNullOrEmpty(DataSource)) return;
+
+        try
+        {
+            await Bus.PublishAsync(new DataRequestMessage
+            {
+                ComponentId = Id,
+                MapId = SyncWith
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error requesting data: {ex.Message}");
+        }
+    }
+
+    private async Task OnRadiusChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _currentRadius = value;
+            await UpdateHeatmapProperty("radius", value);
+        }
+    }
+
+    private async Task OnIntensityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            _currentIntensity = value;
+            await UpdateHeatmapProperty("intensity", value);
+        }
+    }
+
+    private async Task OnOpacityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            _currentOpacity = value;
+            await UpdateHeatmapProperty("opacity", value);
+        }
+    }
+
+    private async Task OnGradientChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(value))
+        {
+            _currentGradient = value;
+            await UpdateHeatmapGradient(value);
+        }
+    }
+
+    private async Task OnWeightPropertyChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        _currentWeightProperty = string.IsNullOrEmpty(value) ? null : value;
+        await UpdateHeatmapWeight(_currentWeightProperty);
+    }
+
+    private async Task UpdateHeatmapProperty(string property, object value)
+    {
+        if (!_isInitialized || _heatmapInstance == null) return;
+
+        try
+        {
+            switch (property)
+            {
+                case "radius":
+                    await _heatmapInstance.InvokeVoidAsync("updateRadius", value);
+                    break;
+                case "intensity":
+                    await _heatmapInstance.InvokeVoidAsync("updateIntensity", value);
+                    break;
+                case "opacity":
+                    await _heatmapInstance.InvokeVoidAsync("updateOpacity", value);
+                    break;
+            }
+
+            await NotifyHeatmapUpdated();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating heatmap {property}: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateHeatmapGradient(string gradient)
+    {
+        if (!_isInitialized || _heatmapInstance == null) return;
+
+        try
+        {
+            await _heatmapInstance.InvokeVoidAsync("updateGradient", gradient, CustomGradient);
+            await NotifyHeatmapUpdated();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating gradient: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateHeatmapWeight(string? property)
+    {
+        if (!_isInitialized || _heatmapInstance == null) return;
+
+        try
+        {
+            await _heatmapInstance.InvokeVoidAsync("setWeight", property);
+            await UpdateStatistics();
+            await NotifyHeatmapUpdated();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating weight: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateStatistics()
+    {
+        if (!_isInitialized || _heatmapInstance == null || _sourceId == null) return;
+
+        try
+        {
+            var stats = await _heatmapInstance.InvokeAsync<JsonElement>("getStatistics");
+
+            _statistics = new HeatmapStatistics
+            {
+                PointCount = stats.GetProperty("pointCount").GetInt32()
+            };
+
+            if (stats.TryGetProperty("totalWeight", out var totalWeight) && totalWeight.ValueKind != JsonValueKind.Null)
+            {
+                _statistics.TotalWeight = totalWeight.GetDouble();
+            }
+
+            if (stats.TryGetProperty("maxWeight", out var maxWeight) && maxWeight.ValueKind != JsonValueKind.Null)
+            {
+                _statistics.MaxWeight = maxWeight.GetDouble();
+            }
+
+            if (stats.TryGetProperty("minWeight", out var minWeight) && minWeight.ValueKind != JsonValueKind.Null)
+            {
+                _statistics.MinWeight = minWeight.GetDouble();
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating statistics: {ex.Message}");
+        }
+    }
+
+    private async Task NotifyHeatmapUpdated()
+    {
+        var config = new HeatmapConfiguration
+        {
+            Radius = _currentRadius,
+            Intensity = _currentIntensity,
+            Opacity = _currentOpacity,
+            Gradient = Enum.Parse<HeatmapGradient>(_currentGradient),
+            CustomGradient = CustomGradient,
+            WeightProperty = _currentWeightProperty,
+            LayerId = _layerId
+        };
+
+        var args = new HeatmapUpdatedEventArgs
+        {
+            LayerId = _layerId!,
+            Configuration = config,
+            Statistics = _statistics
+        };
+
+        await OnHeatmapUpdated.InvokeAsync(args);
+    }
+
+    private async Task ToggleVisibility()
+    {
+        _isVisible = !_isVisible;
+
+        if (_heatmapInstance != null)
+        {
+            await _heatmapInstance.InvokeVoidAsync("setVisibility", _isVisible);
+
+            await Bus.PublishAsync(new LayerVisibilityChangedMessage
+            {
+                LayerId = _layerId!,
+                Visible = _isVisible
+            }, Id);
+        }
+    }
+
+    private void ToggleControls()
+    {
+        ShowControls = !ShowControls;
+        StateHasChanged();
+    }
+
+    private async Task RefreshHeatmap()
+    {
+        await UpdateStatistics();
+        await NotifyHeatmapUpdated();
+    }
+
+    private async Task ExportImage()
+    {
+        if (_heatmapInstance == null) return;
+
+        try
+        {
+            var imageData = await _heatmapInstance.InvokeAsync<string>("exportImage");
+
+            if (!string.IsNullOrEmpty(imageData))
+            {
+                await OnImageExported.InvokeAsync(imageData);
+
+                // Trigger browser download
+                await JS.InvokeVoidAsync("eval", $@"
+                    const link = document.createElement('a');
+                    link.download = 'heatmap-{DateTime.Now:yyyyMMddHHmmss}.png';
+                    link.href = '{imageData}';
+                    link.click();
+                ");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error exporting image: {ex.Message}");
+        }
+    }
+
+    private string GetGradientPreviewStyle()
+    {
+        var gradients = new Dictionary<string, string>
+        {
+            ["Hot"] = "linear-gradient(to right, rgba(0,0,255,0.2), rgba(0,255,255,0.4), rgba(0,255,0,0.6), rgba(255,255,0,0.8), rgba(255,128,0,0.9), rgba(255,0,0,1))",
+            ["Cool"] = "linear-gradient(to right, rgba(0,0,255,0.2), rgba(0,128,255,0.4), rgba(0,191,255,0.6), rgba(64,224,208,0.8), rgba(0,255,255,1))",
+            ["Rainbow"] = "linear-gradient(to right, rgba(138,43,226,0.3), rgba(75,0,130,0.5), rgba(0,0,255,0.7), rgba(0,255,0,0.8), rgba(255,255,0,0.9), rgba(255,127,0,0.95), rgba(255,0,0,1))",
+            ["Viridis"] = "linear-gradient(to right, rgba(68,1,84,0.3), rgba(59,81,139,0.5), rgba(33,144,141,0.7), rgba(92,200,99,0.9), rgba(253,231,37,1))",
+            ["Plasma"] = "linear-gradient(to right, rgba(13,8,135,0.3), rgba(125,3,168,0.5), rgba(203,70,121,0.7), rgba(248,148,65,0.9), rgba(240,249,33,1))",
+            ["Inferno"] = "linear-gradient(to right, rgba(0,0,4,0.3), rgba(85,15,109,0.5), rgba(186,54,85,0.7), rgba(249,140,10,0.9), rgba(252,255,164,1))"
+        };
+
+        return $"background: {gradients.GetValueOrDefault(_currentGradient, gradients["Hot"])};";
+    }
+
+    /// <summary>
+    /// Public API: Update heatmap data
+    /// </summary>
+    public async Task UpdateDataAsync(object geojsonData)
+    {
+        if (!_isInitialized || _heatmapInstance == null) return;
+
+        try
+        {
+            await _heatmapInstance.InvokeVoidAsync("updateData", geojsonData);
+            await UpdateStatistics();
+            await NotifyHeatmapUpdated();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Public API: Set configuration programmatically
+    /// </summary>
+    public async Task SetConfigurationAsync(HeatmapConfiguration config)
+    {
+        _currentRadius = config.Radius;
+        _currentIntensity = config.Intensity;
+        _currentOpacity = config.Opacity;
+        _currentGradient = config.Gradient.ToString();
+        _currentWeightProperty = config.WeightProperty;
+
+        if (_isInitialized && _heatmapInstance != null)
+        {
+            await _heatmapInstance.InvokeVoidAsync("updateRadius", config.Radius);
+            await _heatmapInstance.InvokeVoidAsync("updateIntensity", config.Intensity);
+            await _heatmapInstance.InvokeVoidAsync("updateOpacity", config.Opacity);
+            await _heatmapInstance.InvokeVoidAsync("updateGradient", config.Gradient.ToString(), config.CustomGradient);
+
+            if (config.WeightProperty != null)
+            {
+                await _heatmapInstance.InvokeVoidAsync("setWeight", config.WeightProperty);
+            }
+
+            await NotifyHeatmapUpdated();
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Public API: Get current statistics
+    /// </summary>
+    public HeatmapStatistics? GetStatistics() => _statistics;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_heatmapInstance != null)
+        {
+            await _heatmapInstance.InvokeVoidAsync("dispose");
+            await _heatmapInstance.DisposeAsync();
+        }
+
+        if (_heatmapModule != null)
+        {
+            await _heatmapModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+
+        if (!string.IsNullOrEmpty(_layerId))
+        {
+            await Bus.PublishAsync(new LayerRemovedMessage
+            {
+                LayerId = _layerId
+            }, Id);
+        }
+    }
+}

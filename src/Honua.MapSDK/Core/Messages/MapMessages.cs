@@ -1,3 +1,5 @@
+using Honua.MapSDK.Models;
+
 namespace Honua.MapSDK.Core.Messages;
 
 /// <summary>
@@ -684,4 +686,367 @@ public class CoordinatePinnedMessage
     public required double Latitude { get; init; }
     public double? Elevation { get; init; }
     public required string Formatted { get; init; }
+}
+
+/// <summary>
+/// Published when a spatial analysis operation is started
+/// </summary>
+public class AnalysisStartedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string OperationType { get; init; }
+    public Dictionary<string, object> Parameters { get; init; } = new();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when a spatial analysis operation completes successfully
+/// </summary>
+public class AnalysisCompletedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string OperationType { get; init; }
+    public bool Success { get; init; }
+    public int FeatureCount { get; init; }
+    public double ExecutionTime { get; init; }
+    public Dictionary<string, double> Statistics { get; init; } = new();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when a spatial analysis operation fails
+/// </summary>
+public class AnalysisErrorMessage
+{
+    public required string ComponentId { get; init; }
+    public required string OperationType { get; init; }
+    public required string ErrorMessage { get; init; }
+    public List<string> Warnings { get; init; } = new();
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when an analysis result is added to the map as a layer
+/// </summary>
+public class AnalysisResultAddedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string LayerId { get; init; }
+    public required string LayerName { get; init; }
+    public required string OperationType { get; init; }
+    public int FeatureCount { get; init; }
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when an analysis result layer is removed from the map
+/// </summary>
+public class AnalysisResultRemovedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string LayerId { get; init; }
+    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Published when analysis progress updates (for long-running operations)
+/// </summary>
+public class AnalysisProgressMessage
+{
+    public required string ComponentId { get; init; }
+    public required string OperationType { get; init; }
+    public required int Current { get; init; }
+    public required int Total { get; init; }
+    public required string Status { get; init; }
+    public double Percentage => Total > 0 ? (double)Current / Total * 100 : 0;
+}
+
+/// <summary>
+/// Request to perform a spatial analysis operation
+/// </summary>
+public class AnalysisRequestMessage
+{
+    public required string RequesterId { get; init; }
+    public required string OperationType { get; init; }
+    public required string InputLayerId { get; init; }
+    public string? SecondaryLayerId { get; init; }
+    public Dictionary<string, object> Parameters { get; init; } = new();
+}
+
+/// <summary>
+/// Request to clear all analysis results from the map
+/// </summary>
+public class ClearAnalysisResultsRequestMessage
+{
+    public required string MapId { get; init; }
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when compare component is initialized and ready
+/// </summary>
+public class CompareReadyMessage
+{
+    public required string CompareId { get; init; }
+    public required CompareMode Mode { get; init; }
+    public required string LeftStyle { get; init; }
+    public required string RightStyle { get; init; }
+}
+
+/// <summary>
+/// Published when comparison mode changes
+/// </summary>
+public class CompareModeChangedMessage
+{
+    public required string CompareId { get; init; }
+    public required CompareMode Mode { get; init; }
+}
+
+/// <summary>
+/// Published when compare view (camera position) changes
+/// </summary>
+public class CompareViewChangedMessage
+{
+    public required string CompareId { get; init; }
+    public required double[] Center { get; init; }
+    public required double Zoom { get; init; }
+    public double Bearing { get; init; }
+    public double Pitch { get; init; }
+}
+
+/// <summary>
+/// Published when divider position changes in swipe/side-by-side mode
+/// </summary>
+public class CompareDividerChangedMessage
+{
+    public required string CompareId { get; init; }
+    public required double Position { get; init; } // 0-1
+}
+
+/// <summary>
+/// Published when an elevation profile is successfully generated
+/// </summary>
+public class ElevationProfileGeneratedMessage
+{
+    public required string ProfileId { get; init; }
+    public required double TotalDistance { get; init; }
+    public required double ElevationGain { get; init; }
+    public required double ElevationLoss { get; init; }
+    public double MaxElevation { get; init; }
+    public double MinElevation { get; init; }
+    public double AverageGrade { get; init; }
+    public required string ComponentId { get; init; }
+    public int SampleCount { get; init; }
+    public string? Source { get; init; }
+}
+
+/// <summary>
+/// Published when a point on the elevation chart is hovered
+/// </summary>
+public class ElevationPointHoveredMessage
+{
+    public required string ProfileId { get; init; }
+    public required double Distance { get; init; }
+    public required double Elevation { get; init; }
+    public required double[] Coordinates { get; init; }
+    public double Grade { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a point on the elevation chart is clicked
+/// </summary>
+public class ElevationPointClickedMessage
+{
+    public required string ProfileId { get; init; }
+    public required double Distance { get; init; }
+    public required double Elevation { get; init; }
+    public required double[] Coordinates { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a steep section is identified in the profile
+/// </summary>
+public class SteepSectionIdentifiedMessage
+{
+    public required string ProfileId { get; init; }
+    public required double StartDistance { get; init; }
+    public required double EndDistance { get; init; }
+    public required double AverageGrade { get; init; }
+    public required double MaxGrade { get; init; }
+    public required string Severity { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Request to generate elevation profile for a path
+/// </summary>
+public class GenerateElevationProfileRequestMessage
+{
+    public required string MapId { get; init; }
+    public required double[][] Coordinates { get; init; }
+    public string? ElevationSource { get; init; }
+    public int SamplePoints { get; init; } = 100;
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when elevation profile generation fails
+/// </summary>
+public class ElevationProfileErrorMessage
+{
+    public required string ComponentId { get; init; }
+    public required string ErrorMessage { get; init; }
+    public string? ErrorType { get; init; } // "api", "network", "data", "validation"
+}
+
+/// <summary>
+/// Published when a route is successfully calculated
+/// </summary>
+public class RouteCalculatedMessage
+{
+    public required string RoutingId { get; init; }
+    public required string RouteId { get; init; }
+    public required double Distance { get; init; } // meters
+    public required int Duration { get; init; } // seconds
+    public required string FormattedDistance { get; init; }
+    public required string FormattedDuration { get; init; }
+    public required string TravelMode { get; init; }
+    public required string ComponentId { get; init; }
+    public int WaypointCount { get; init; }
+    public int InstructionCount { get; init; }
+    public bool IsAlternative { get; init; }
+    public int AlternativeIndex { get; init; }
+}
+
+/// <summary>
+/// Published when route calculation fails
+/// </summary>
+public class RoutingErrorMessage
+{
+    public required string RoutingId { get; init; }
+    public required string ErrorMessage { get; init; }
+    public required string ComponentId { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? RoutingEngine { get; init; }
+}
+
+/// <summary>
+/// Published when a waypoint is added to the route
+/// </summary>
+public class WaypointAddedMessage
+{
+    public required string RoutingId { get; init; }
+    public required string WaypointId { get; init; }
+    public required double Longitude { get; init; }
+    public required double Latitude { get; init; }
+    public string? Name { get; init; }
+    public string? Address { get; init; }
+    public required string WaypointType { get; init; } // "start", "via", "end"
+    public required int Index { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a waypoint is removed from the route
+/// </summary>
+public class WaypointRemovedMessage
+{
+    public required string RoutingId { get; init; }
+    public required string WaypointId { get; init; }
+    public required int Index { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when waypoints are reordered
+/// </summary>
+public class WaypointsReorderedMessage
+{
+    public required string RoutingId { get; init; }
+    public required string ComponentId { get; init; }
+    public List<string> WaypointOrder { get; init; } = new();
+}
+
+/// <summary>
+/// Published when a route instruction/step is selected
+/// </summary>
+public class RouteInstructionSelectedMessage
+{
+    public required string RoutingId { get; init; }
+    public required int InstructionIndex { get; init; }
+    public required string Text { get; init; }
+    public required double Distance { get; init; }
+    public required double[] Coordinate { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when routing options change (travel mode, preferences, etc.)
+/// </summary>
+public class RoutingOptionsChangedMessage
+{
+    public required string RoutingId { get; init; }
+    public required string TravelMode { get; init; }
+    public required string Preference { get; init; }
+    public List<string> AvoidOptions { get; init; } = new();
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Request to calculate a route from a location selected on the map
+/// </summary>
+public class LocationSelectedForRoutingMessage
+{
+    public required string MapId { get; init; }
+    public required double Longitude { get; init; }
+    public required double Latitude { get; init; }
+    public string? Name { get; init; }
+    public string? Address { get; init; }
+    public required string WaypointType { get; init; } // "start", "via", "end"
+}
+
+/// <summary>
+/// Published when an isochrone is calculated
+/// </summary>
+public class IsochroneCalculatedMessage
+{
+    public required string RoutingId { get; init; }
+    public required double[] Center { get; init; }
+    public required string TravelMode { get; init; }
+    public List<int> Intervals { get; init; } = new();
+    public required string ComponentId { get; init; }
+    public int PolygonCount { get; init; }
+}
+
+/// <summary>
+/// Published when route is cleared/reset
+/// </summary>
+public class RouteClearedMessage
+{
+    public required string RoutingId { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a route is exported (GPX, KML, etc.)
+/// </summary>
+public class RouteExportedMessage
+{
+    public required string RoutingId { get; init; }
+    public required string RouteId { get; init; }
+    public required string Format { get; init; } // "gpx", "kml", "geojson", "pdf"
+    public required string ComponentId { get; init; }
+    public string? FileName { get; init; }
+}
+
+/// <summary>
+/// Published when a route segment is highlighted
+/// </summary>
+public class RouteSegmentHighlightedMessage
+{
+    public required string RoutingId { get; init; }
+    public required int SegmentIndex { get; init; }
+    public required string ComponentId { get; init; }
 }
