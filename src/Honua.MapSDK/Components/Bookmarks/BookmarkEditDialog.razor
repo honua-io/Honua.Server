@@ -1,0 +1,211 @@
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services.BookmarkStorage
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (!string.IsNullOrEmpty(Bookmark.ThumbnailUrl))
+            {
+                <div style="text-align: center;">
+                    <img src="@Bookmark.ThumbnailUrl"
+                         alt="Bookmark preview"
+                         style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd;" />
+                </div>
+            }
+
+            <MudTextField @bind-Value="Bookmark.Name"
+                          Label="Name"
+                          Variant="Variant.Outlined"
+                          Required="true"
+                          HelperText="Give your bookmark a memorable name" />
+
+            <MudTextField @bind-Value="Bookmark.Description"
+                          Label="Description"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          HelperText="Optional description of this view" />
+
+            @if (ShowFolderSelection && Folders.Any())
+            {
+                <MudSelect @bind-Value="Bookmark.FolderId"
+                           Label="Folder"
+                           Variant="Variant.Outlined"
+                           Clearable="true"
+                           HelperText="Organize your bookmarks into folders">
+                    @foreach (var folder in Folders)
+                    {
+                        <MudSelectItem Value="@folder.Id">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <MudIcon Icon="@(folder.Icon ?? Icons.Material.Filled.Folder)" Size="Size.Small" />
+                                <span>@folder.Name</span>
+                            </div>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            @if (ShowAdvancedOptions)
+            {
+                <MudExpansionPanels>
+                    <MudExpansionPanel Text="Advanced Options" IsInitiallyExpanded="false">
+                        <MudStack Spacing="2">
+                            <MudTextField @bind-Value="_tagsInput"
+                                          Label="Tags"
+                                          Variant="Variant.Outlined"
+                                          HelperText="Comma-separated tags for categorization"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@Icons.Material.Filled.Tag" />
+
+                            <MudGrid>
+                                <MudItem xs="6">
+                                    <MudNumericField @bind-Value="Bookmark.Zoom"
+                                                     Label="Zoom Level"
+                                                     Variant="Variant.Outlined"
+                                                     Format="F2"
+                                                     Min="0"
+                                                     Max="24" />
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudNumericField @bind-Value="Bookmark.Bearing"
+                                                     Label="Bearing"
+                                                     Variant="Variant.Outlined"
+                                                     Format="F0"
+                                                     Min="0"
+                                                     Max="360"
+                                                     Adornment="Adornment.End"
+                                                     AdornmentText="°" />
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudNumericField @bind-Value="Bookmark.Pitch"
+                                                     Label="Pitch"
+                                                     Variant="Variant.Outlined"
+                                                     Format="F0"
+                                                     Min="0"
+                                                     Max="60"
+                                                     Adornment="Adornment.End"
+                                                     AdornmentText="°" />
+                                </MudItem>
+                            </MudGrid>
+
+                            <MudGrid>
+                                <MudItem xs="6">
+                                    <MudNumericField @bind-Value="Bookmark.Center[0]"
+                                                     Label="Longitude"
+                                                     Variant="Variant.Outlined"
+                                                     Format="F6" />
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudNumericField @bind-Value="Bookmark.Center[1]"
+                                                     Label="Latitude"
+                                                     Variant="Variant.Outlined"
+                                                     Format="F6" />
+                                </MudItem>
+                            </MudGrid>
+
+                            @if (AllowPublicSharing)
+                            {
+                                <MudSwitch @bind-Checked="Bookmark.IsPublic"
+                                           Label="Make this bookmark public"
+                                           Color="Color.Primary" />
+                            }
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        @if (AllowDelete && !IsNew)
+        {
+            <MudButton Color="Color.Error"
+                       Variant="Variant.Text"
+                       OnClick="Delete"
+                       StartIcon="@Icons.Material.Filled.Delete">
+                Delete
+            </MudButton>
+        }
+        <MudSpacer />
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Save"
+                   StartIcon="@Icons.Material.Filled.Save">
+            @(IsNew ? "Create" : "Update")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public Bookmark Bookmark { get; set; } = new();
+
+    [Parameter]
+    public bool IsNew { get; set; } = true;
+
+    [Parameter]
+    public List<BookmarkFolder> Folders { get; set; } = new();
+
+    [Parameter]
+    public bool ShowFolderSelection { get; set; } = true;
+
+    [Parameter]
+    public bool ShowAdvancedOptions { get; set; } = true;
+
+    [Parameter]
+    public bool AllowDelete { get; set; } = true;
+
+    [Parameter]
+    public bool AllowPublicSharing { get; set; } = true;
+
+    private string _tagsInput = string.Empty;
+    private string? _errorMessage;
+
+    protected override void OnInitialized()
+    {
+        // Initialize tags input
+        if (Bookmark.Tags.Any())
+        {
+            _tagsInput = string.Join(", ", Bookmark.Tags);
+        }
+    }
+
+    private void Save()
+    {
+        // Validate
+        if (string.IsNullOrWhiteSpace(Bookmark.Name))
+        {
+            _errorMessage = "Name is required";
+            return;
+        }
+
+        // Parse tags
+        if (!string.IsNullOrWhiteSpace(_tagsInput))
+        {
+            Bookmark.Tags = _tagsInput
+                .Split(',')
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .ToList();
+        }
+
+        MudDialog.Close(DialogResult.Ok(Bookmark));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Delete()
+    {
+        MudDialog.Close(DialogResult.Ok(new { Action = "Delete", Bookmark }));
+    }
+}

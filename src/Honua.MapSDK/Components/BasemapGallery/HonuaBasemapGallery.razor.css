@@ -1,0 +1,488 @@
+/* Honua Basemap Gallery Styles */
+
+.honua-basemap-gallery {
+    font-family: var(--mud-typography-default-family);
+    background: var(--mud-palette-background-default);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Floating Position Classes */
+.gallery-floating {
+    position: absolute;
+    z-index: 1000;
+    max-width: 400px;
+    max-height: 600px;
+}
+
+.gallery-top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.gallery-top-left {
+    top: 10px;
+    left: 10px;
+}
+
+.gallery-bottom-right {
+    bottom: 10px;
+    right: 10px;
+}
+
+.gallery-bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+/* Floating Container */
+.floating-container {
+    position: relative;
+}
+
+.basemap-toggle-button {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.basemap-toggle-button:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+}
+
+.basemap-floating-panel {
+    width: 380px;
+    max-height: 580px;
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Panel Header */
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--mud-palette-divider);
+    background: var(--mud-palette-surface);
+}
+
+.panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.panel-title h6 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+/* Gallery Header */
+.gallery-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+.gallery-search {
+    margin-bottom: 12px;
+}
+
+.category-tabs {
+    margin-top: 8px;
+}
+
+.category-tabs ::deep .mud-tab {
+    text-transform: none;
+    font-weight: 500;
+    min-height: 40px;
+}
+
+/* Gallery Content */
+.gallery-content {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+    max-height: 450px;
+}
+
+/* Scrollbar Styling */
+.gallery-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.gallery-content::-webkit-scrollbar-track {
+    background: var(--mud-palette-background-grey);
+    border-radius: 4px;
+}
+
+.gallery-content::-webkit-scrollbar-thumb {
+    background: var(--mud-palette-action-default);
+    border-radius: 4px;
+}
+
+.gallery-content::-webkit-scrollbar-thumb:hover {
+    background: var(--mud-palette-action-default-hover);
+}
+
+/* Grid Layout */
+.basemap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    animation: fadeIn 0.3s ease;
+}
+
+@media (max-width: 600px) {
+    .basemap-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 8px;
+    }
+}
+
+@media (min-width: 1200px) {
+    .basemap-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Basemap Card */
+.basemap-card {
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    overflow: hidden;
+    height: 100%;
+}
+
+.basemap-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.basemap-card.active {
+    border-color: var(--mud-palette-primary);
+    box-shadow: 0 0 0 1px var(--mud-palette-primary);
+}
+
+.basemap-card.previewing {
+    border-color: var(--mud-palette-info);
+    opacity: 0.9;
+}
+
+.basemap-thumbnail {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.basemap-card:hover .basemap-thumbnail {
+    transform: scale(1.05);
+}
+
+.basemap-card-content {
+    padding: 12px !important;
+}
+
+.basemap-name {
+    font-weight: 500;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.basemap-provider {
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+}
+
+.basemap-badges {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.basemap-badges ::deep .mud-chip {
+    height: 20px;
+    font-size: 0.7rem;
+}
+
+/* Active Indicator */
+.active-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: white;
+    border-radius: 50%;
+    padding: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    animation: bounceIn 0.3s ease;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Favorite Button */
+.favorite-button {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.basemap-card:hover .favorite-button {
+    opacity: 1;
+}
+
+/* List Layout */
+.basemap-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.basemap-list-item {
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    padding: 12px !important;
+}
+
+.basemap-list-item:hover {
+    background: var(--mud-palette-action-default-hover);
+    border-color: var(--mud-palette-action-default);
+}
+
+.basemap-list-item.active {
+    border-color: var(--mud-palette-primary);
+    background: var(--mud-palette-primary-lighten);
+}
+
+.list-item-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.list-item-thumbnail {
+    width: 60px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.list-item-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.list-item-details .basemap-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.list-item-indicator {
+    flex-shrink: 0;
+}
+
+/* Dropdown Layout */
+.basemap-dropdown {
+    width: 100%;
+    min-width: 200px;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dropdown-thumbnail {
+    width: 32px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+/* Gallery Footer */
+.gallery-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--mud-palette-divider);
+    background: var(--mud-palette-surface);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.opacity-label {
+    min-width: 50px;
+    font-weight: 500;
+}
+
+.opacity-slider {
+    flex: 1;
+}
+
+.opacity-value {
+    min-width: 40px;
+    text-align: right;
+    font-weight: 500;
+}
+
+/* Loading State */
+.gallery-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    min-height: 200px;
+}
+
+/* Empty State */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    gap: 12px;
+    min-height: 200px;
+}
+
+/* Modal Button */
+.basemap-modal-button {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+.basemap-modal-button:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .gallery-floating {
+        max-width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+    }
+
+    .basemap-floating-panel {
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+    }
+
+    .gallery-content {
+        max-height: calc(100vh - 200px);
+    }
+
+    .basemap-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 8px;
+    }
+
+    .gallery-header {
+        padding: 12px;
+    }
+
+    .gallery-content {
+        padding: 12px;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .basemap-toggle-button,
+    .basemap-modal-button {
+        background: var(--mud-palette-surface);
+    }
+
+    .active-indicator {
+        background: var(--mud-palette-surface);
+    }
+
+    .favorite-button {
+        background: rgba(0, 0, 0, 0.7);
+    }
+}
+
+/* Accessibility */
+.basemap-card:focus,
+.basemap-list-item:focus {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+/* Loading skeleton animation */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.basemap-card.loading,
+.basemap-list-item.loading {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Smooth transitions for layout changes */
+.layout-grid .gallery-content,
+.layout-list .gallery-content {
+    transition: all 0.3s ease;
+}
+
+/* Print styles */
+@media print {
+    .gallery-floating,
+    .basemap-toggle-button,
+    .basemap-modal-button {
+        display: none;
+    }
+}

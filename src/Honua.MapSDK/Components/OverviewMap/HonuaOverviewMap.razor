@@ -1,0 +1,599 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-overview-map @GetPositionClass() @CssClass @(_isCollapsed ? "collapsed" : "")"
+     style="@GetContainerStyle()"
+     data-overview-id="@Id"
+     @ref="_containerRef">
+
+    @if (Collapsible && ShowToggleButton)
+    {
+        <button class="overview-toggle @(_isCollapsed ? "collapsed" : "")"
+                @onclick="ToggleCollapsed"
+                aria-label="@(_isCollapsed ? "Expand overview map" : "Collapse overview map")"
+                title="@(_isCollapsed ? "Show overview map" : "Hide overview map")">
+            @if (_isCollapsed)
+            {
+                <span class="toggle-icon">🗺️</span>
+            }
+            else
+            {
+                <span class="toggle-icon">✕</span>
+            }
+        </button>
+    }
+
+    @if (!_isCollapsed)
+    {
+        <div class="overview-map-container" @ref="_mapContainer" id="@Id" style="@GetMapStyle()">
+            @if (_isLoading)
+            {
+                <div class="overview-loading">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">Loading...</div>
+                </div>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(Title))
+        {
+            <div class="overview-title">@Title</div>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the overview map
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"overview-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// ID of the main map to synchronize with
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// Width of overview map in pixels
+    /// </summary>
+    [Parameter]
+    public int Width { get; set; } = 200;
+
+    /// <summary>
+    /// Height of overview map in pixels
+    /// </summary>
+    [Parameter]
+    public int Height { get; set; } = 200;
+
+    /// <summary>
+    /// Position: top-left, top-right, bottom-left, bottom-right, or custom
+    /// </summary>
+    [Parameter]
+    public string Position { get; set; } = "bottom-right";
+
+    /// <summary>
+    /// Zoom offset from main map (negative = zoomed out)
+    /// </summary>
+    [Parameter]
+    public int ZoomOffset { get; set; } = -5;
+
+    /// <summary>
+    /// Color of extent box outline
+    /// </summary>
+    [Parameter]
+    public string ExtentBoxColor { get; set; } = "#FF4444";
+
+    /// <summary>
+    /// Width of extent box outline
+    /// </summary>
+    [Parameter]
+    public int ExtentBoxWidth { get; set; } = 2;
+
+    /// <summary>
+    /// Opacity of extent box outline (0-1)
+    /// </summary>
+    [Parameter]
+    public double ExtentBoxOpacity { get; set; } = 0.8;
+
+    /// <summary>
+    /// Color of extent box fill
+    /// </summary>
+    [Parameter]
+    public string ExtentBoxFillColor { get; set; } = "#FF4444";
+
+    /// <summary>
+    /// Opacity of extent box fill (0-1)
+    /// </summary>
+    [Parameter]
+    public double ExtentBoxFillOpacity { get; set; } = 0.1;
+
+    /// <summary>
+    /// Whether overview can be collapsed
+    /// </summary>
+    [Parameter]
+    public bool Collapsible { get; set; } = true;
+
+    /// <summary>
+    /// Start in collapsed state
+    /// </summary>
+    [Parameter]
+    public bool InitiallyCollapsed { get; set; } = false;
+
+    /// <summary>
+    /// Rotate overview map with main map bearing
+    /// </summary>
+    [Parameter]
+    public bool RotateWithBearing { get; set; } = false;
+
+    /// <summary>
+    /// Click overview to pan main map
+    /// </summary>
+    [Parameter]
+    public bool ClickToPan { get; set; } = true;
+
+    /// <summary>
+    /// Drag extent box to pan main map
+    /// </summary>
+    [Parameter]
+    public bool DragToPan { get; set; } = true;
+
+    /// <summary>
+    /// Scroll over overview to zoom main map
+    /// </summary>
+    [Parameter]
+    public bool ScrollToZoom { get; set; } = false;
+
+    /// <summary>
+    /// Custom basemap style for overview (null = use same as main map)
+    /// </summary>
+    [Parameter]
+    public string? OverviewBasemap { get; set; }
+
+    /// <summary>
+    /// Horizontal offset for custom positioning
+    /// </summary>
+    [Parameter]
+    public int OffsetX { get; set; } = 10;
+
+    /// <summary>
+    /// Vertical offset for custom positioning
+    /// </summary>
+    [Parameter]
+    public int OffsetY { get; set; } = 10;
+
+    /// <summary>
+    /// Show toggle button
+    /// </summary>
+    [Parameter]
+    public bool ShowToggleButton { get; set; } = true;
+
+    /// <summary>
+    /// Border radius in pixels
+    /// </summary>
+    [Parameter]
+    public int BorderRadius { get; set; } = 4;
+
+    /// <summary>
+    /// Box shadow
+    /// </summary>
+    [Parameter]
+    public string BoxShadow { get; set; } = "0 2px 8px rgba(0,0,0,0.3)";
+
+    /// <summary>
+    /// Border color
+    /// </summary>
+    [Parameter]
+    public string BorderColor { get; set; } = "#ccc";
+
+    /// <summary>
+    /// Border width in pixels
+    /// </summary>
+    [Parameter]
+    public int BorderWidth { get; set; } = 1;
+
+    /// <summary>
+    /// Background color
+    /// </summary>
+    [Parameter]
+    public string BackgroundColor { get; set; } = "#fff";
+
+    /// <summary>
+    /// Hide on mobile devices
+    /// </summary>
+    [Parameter]
+    public bool HideOnMobile { get; set; } = false;
+
+    /// <summary>
+    /// Mobile breakpoint in pixels
+    /// </summary>
+    [Parameter]
+    public int MobileBreakpoint { get; set; } = 768;
+
+    /// <summary>
+    /// Minimum zoom for overview map
+    /// </summary>
+    [Parameter]
+    public double? MinZoom { get; set; }
+
+    /// <summary>
+    /// Maximum zoom for overview map
+    /// </summary>
+    [Parameter]
+    public double? MaxZoom { get; set; }
+
+    /// <summary>
+    /// Update throttle in milliseconds
+    /// </summary>
+    [Parameter]
+    public int UpdateThrottleMs { get; set; } = 100;
+
+    /// <summary>
+    /// Show navigation controls on overview
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = false;
+
+    /// <summary>
+    /// Z-index for positioning
+    /// </summary>
+    [Parameter]
+    public int ZIndex { get; set; } = 1000;
+
+    /// <summary>
+    /// Title to display on overview map
+    /// </summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Event callback when overview map is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<OverviewMapClickedMessage> OnOverviewClicked { get; set; }
+
+    private ElementReference _containerRef;
+    private ElementReference _mapContainer;
+    private IJSObjectReference? _overviewModule;
+    private IJSObjectReference? _overviewInstance;
+    private DotNetObjectReference<HonuaOverviewMap>? _dotNetRef;
+    private bool _isInitialized = false;
+    private bool _isCollapsed = false;
+    private bool _isLoading = true;
+    private string? _mainMapStyle;
+    private double[] _mainMapCenter = new[] { 0.0, 0.0 };
+    private double _mainMapZoom = 2;
+    private double _mainMapBearing = 0;
+
+    protected override void OnInitialized()
+    {
+        _isCollapsed = InitiallyCollapsed;
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_isCollapsed)
+        {
+            await InitializeOverviewMap();
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for main map ready
+        Bus.Subscribe<MapReadyMessage>(async args =>
+        {
+            if (args.Message.MapId == SyncWith)
+            {
+                _mainMapCenter = args.Message.Center;
+                _mainMapZoom = args.Message.Zoom;
+
+                if (!_isInitialized && !_isCollapsed)
+                {
+                    await InitializeOverviewMap();
+                }
+            }
+        });
+
+        // Listen for main map extent changes
+        Bus.Subscribe<MapExtentChangedMessage>(async args =>
+        {
+            if (args.Message.MapId == SyncWith && _isInitialized && _overviewInstance != null)
+            {
+                _mainMapCenter = args.Message.Center;
+                _mainMapZoom = args.Message.Zoom;
+                _mainMapBearing = args.Message.Bearing;
+
+                await UpdateExtentBox(args.Message.Bounds, args.Message.Bearing);
+                await SyncOverviewPosition(args.Message.Center, args.Message.Zoom, args.Message.Bearing);
+            }
+        });
+
+        // Listen for basemap changes on main map
+        Bus.Subscribe<BasemapChangedMessage>(async args =>
+        {
+            if (args.Message.MapId == SyncWith && _isInitialized && _overviewInstance != null && string.IsNullOrEmpty(OverviewBasemap))
+            {
+                _mainMapStyle = args.Message.Style;
+                await _overviewInstance.InvokeVoidAsync("setStyle", args.Message.Style);
+            }
+        });
+    }
+
+    private async Task InitializeOverviewMap()
+    {
+        try
+        {
+            _isLoading = true;
+            StateHasChanged();
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load overview map module
+            _overviewModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-overview-map.js"
+            );
+
+            // Determine which style to use
+            var styleToUse = OverviewBasemap ?? _mainMapStyle ?? "https://demotiles.maplibre.org/style.json";
+
+            // Create overview map instance
+            _overviewInstance = await _overviewModule.InvokeAsync<IJSObjectReference>(
+                "createOverviewMap",
+                _mapContainer,
+                SyncWith,
+                new
+                {
+                    style = styleToUse,
+                    center = _mainMapCenter,
+                    zoom = Math.Max(0, _mainMapZoom + ZoomOffset),
+                    interactive = ClickToPan || DragToPan || ScrollToZoom,
+                    minZoom = MinZoom,
+                    maxZoom = MaxZoom,
+                    zoomOffset = ZoomOffset,
+                    extentBoxColor = ExtentBoxColor,
+                    extentBoxWidth = ExtentBoxWidth,
+                    extentBoxOpacity = ExtentBoxOpacity,
+                    extentBoxFillColor = ExtentBoxFillColor,
+                    extentBoxFillOpacity = ExtentBoxFillOpacity,
+                    rotateWithBearing = RotateWithBearing,
+                    clickToPan = ClickToPan,
+                    dragToPan = DragToPan,
+                    scrollToZoom = ScrollToZoom,
+                    updateThrottleMs = UpdateThrottleMs
+                },
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+            _isLoading = false;
+            StateHasChanged();
+
+            Console.WriteLine($"Honua Overview Map {Id} initialized for main map {SyncWith}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing overview map: {ex.Message}");
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task UpdateExtentBox(double[] bounds, double bearing)
+    {
+        if (_overviewInstance != null)
+        {
+            await _overviewInstance.InvokeVoidAsync("updateExtent", bounds, bearing);
+        }
+    }
+
+    private async Task SyncOverviewPosition(double[] center, double zoom, double bearing)
+    {
+        if (_overviewInstance != null)
+        {
+            await _overviewInstance.InvokeVoidAsync("syncWithMainMap", center, zoom, bearing);
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when user clicks overview map
+    /// </summary>
+    [JSInvokable]
+    public async Task OnOverviewClickedInternal(double[] center)
+    {
+        // Pan main map to clicked location
+        await Bus.PublishAsync(new FlyToRequestMessage
+        {
+            MapId = SyncWith,
+            Center = center,
+            Zoom = _mainMapZoom,
+            Duration = 500
+        }, Id);
+
+        // Publish overview clicked message
+        var message = new OverviewMapClickedMessage
+        {
+            Center = center,
+            Zoom = _mainMapZoom,
+            ComponentId = Id
+        };
+
+        await Bus.PublishAsync(message, Id);
+        await OnOverviewClicked.InvokeAsync(message);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when user drags extent box
+    /// </summary>
+    [JSInvokable]
+    public async Task OnOverviewDraggedInternal(double[] center)
+    {
+        // Pan main map to dragged location
+        await Bus.PublishAsync(new FlyToRequestMessage
+        {
+            MapId = SyncWith,
+            Center = center,
+            Zoom = _mainMapZoom,
+            Duration = 0 // Instant for dragging
+        }, Id);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when user scrolls over overview
+    /// </summary>
+    [JSInvokable]
+    public async Task OnOverviewScrolledInternal(double zoomDelta)
+    {
+        // Zoom main map
+        var newZoom = _mainMapZoom + zoomDelta;
+        await Bus.PublishAsync(new FlyToRequestMessage
+        {
+            MapId = SyncWith,
+            Center = _mainMapCenter,
+            Zoom = newZoom,
+            Duration = 200
+        }, Id);
+    }
+
+    private async Task ToggleCollapsed()
+    {
+        _isCollapsed = !_isCollapsed;
+
+        if (!_isCollapsed && !_isInitialized)
+        {
+            // Initialize map when expanding for the first time
+            await Task.Delay(100); // Wait for DOM to update
+            await InitializeOverviewMap();
+        }
+        else if (!_isCollapsed && _isInitialized && _overviewInstance != null)
+        {
+            // Resize map when expanding
+            await Task.Delay(100);
+            await _overviewInstance.InvokeVoidAsync("resize");
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Public API: Expand overview map
+    /// </summary>
+    public async Task ExpandAsync()
+    {
+        if (_isCollapsed)
+        {
+            await ToggleCollapsed();
+        }
+    }
+
+    /// <summary>
+    /// Public API: Collapse overview map
+    /// </summary>
+    public async Task CollapseAsync()
+    {
+        if (!_isCollapsed)
+        {
+            await ToggleCollapsed();
+        }
+    }
+
+    /// <summary>
+    /// Public API: Update extent box styling
+    /// </summary>
+    public async Task UpdateExtentStyleAsync(string? color = null, int? width = null, double? opacity = null, string? fillColor = null, double? fillOpacity = null)
+    {
+        if (_overviewInstance != null)
+        {
+            await _overviewInstance.InvokeVoidAsync("updateExtentStyle", color, width, opacity, fillColor, fillOpacity);
+        }
+    }
+
+    private string GetPositionClass()
+    {
+        return Position.ToLowerInvariant() switch
+        {
+            "top-left" => "overview-top-left",
+            "top-right" => "overview-top-right",
+            "bottom-left" => "overview-bottom-left",
+            "bottom-right" => "overview-bottom-right",
+            "custom" => "overview-custom",
+            _ => "overview-bottom-right"
+        };
+    }
+
+    private string GetContainerStyle()
+    {
+        var styles = new List<string>();
+
+        if (!string.IsNullOrEmpty(Style))
+        {
+            styles.Add(Style);
+        }
+
+        if (Position.Equals("custom", StringComparison.OrdinalIgnoreCase))
+        {
+            styles.Add($"right: {OffsetX}px");
+            styles.Add($"bottom: {OffsetY}px");
+        }
+
+        if (!_isCollapsed)
+        {
+            styles.Add($"width: {Width}px");
+            styles.Add($"height: {Height}px");
+        }
+
+        styles.Add($"border-radius: {BorderRadius}px");
+        styles.Add($"box-shadow: {BoxShadow}");
+        styles.Add($"border: {BorderWidth}px solid {BorderColor}");
+        styles.Add($"background-color: {BackgroundColor}");
+        styles.Add($"z-index: {ZIndex}");
+
+        if (HideOnMobile)
+        {
+            styles.Add($"@media (max-width: {MobileBreakpoint}px) {{ display: none; }}");
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    private string GetMapStyle()
+    {
+        return $"width: 100%; height: 100%;";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_overviewInstance != null)
+        {
+            await _overviewInstance.InvokeVoidAsync("dispose");
+            await _overviewInstance.DisposeAsync();
+        }
+
+        if (_overviewModule != null)
+        {
+            await _overviewModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

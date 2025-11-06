@@ -1,0 +1,196 @@
+@using Honua.MapSDK.Models.Import
+
+<div class="import-step import-progress-step">
+    @if (!IsComplete)
+    {
+        <div class="import-progress">
+            <MudText Typo="Typo.h6" Align="Align.Center" Class="mb-4">
+                @Status
+            </MudText>
+
+            <MudProgressLinear Color="Color.Primary"
+                               Value="@Progress"
+                               Size="Size.Large"
+                               Class="mb-2" />
+
+            <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary" Class="mb-4">
+                @Current of @Total features processed (@Progress.ToString("F0")%)
+            </MudText>
+
+            <MudPaper Elevation="0" Class="pa-4">
+                <MudList Dense="true">
+                    @foreach (var step in _completedSteps)
+                    {
+                        <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                            <MudText Typo="Typo.body2">@step</MudText>
+                        </MudListItem>
+                    }
+                    @if (!string.IsNullOrEmpty(_currentStep))
+                    {
+                        <MudListItem>
+                            <div class="d-flex align-center">
+                                <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <MudText Typo="Typo.body2">@_currentStep</MudText>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+
+            <div class="mt-4" style="text-align: center;">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           OnClick="OnCancel"
+                           Disabled="@_cancellationRequested">
+                    @(_cancellationRequested ? "Cancelling..." : "Cancel")
+                </MudButton>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="import-complete">
+            @if (Result != null && Result.Success)
+            {
+                <div class="success-content">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                             Color="Color.Success"
+                             Size="Size.Large"
+                             Class="mb-3" />
+
+                    <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-2">
+                        Import Complete!
+                    </MudText>
+
+                    <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary" Class="mb-4">
+                        Successfully imported @Result.FeaturesImported of @Result.TotalFeatures features
+                    </MudText>
+
+                    <MudPaper Elevation="0" Class="pa-4 mb-4">
+                        <MudGrid>
+                            <MudItem xs="6">
+                                <div class="result-stat">
+                                    <MudText Typo="Typo.h6" Color="Color.Success">@Result.FeaturesImported</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Imported</MudText>
+                                </div>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <div class="result-stat">
+                                    <MudText Typo="Typo.h6" Color="Color.Error">@Result.FeaturesFailed</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Failed</MudText>
+                                </div>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+
+                    @if (Result.Warnings.Any())
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mb-4">
+                            @Result.Warnings.Count warning(s) encountered
+                        </MudAlert>
+                    }
+
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        Layer "@Result.LayerName" added to map
+                    </MudText>
+
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Completed in @Result.Duration.TotalSeconds.ToString("F1") seconds
+                    </MudText>
+                </div>
+            }
+            else if (Result != null)
+            {
+                <div class="error-content">
+                    <MudIcon Icon="@Icons.Material.Filled.Error"
+                             Color="Color.Error"
+                             Size="Size.Large"
+                             Class="mb-3" />
+
+                    <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-2">
+                        Import Failed
+                    </MudText>
+
+                    <MudAlert Severity="Severity.Error" Class="mb-4">
+                        @if (Result.Errors.Any())
+                        {
+                            <MudList Dense="true">
+                                @foreach (var error in Result.Errors.Take(5))
+                                {
+                                    <MudListItem>
+                                        Row @error.RowNumber: @error.Message
+                                    </MudListItem>
+                                }
+                                @if (Result.Errors.Count > 5)
+                                {
+                                    <MudListItem>
+                                        <MudText Typo="Typo.caption">
+                                            ... and @(Result.Errors.Count - 5) more errors
+                                        </MudText>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                        else
+                        {
+                            <text>An unknown error occurred during import</text>
+                        }
+                    </MudAlert>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Current { get; set; }
+    [Parameter] public int Total { get; set; }
+    [Parameter] public string Status { get; set; } = "Processing...";
+    [Parameter] public bool IsComplete { get; set; }
+    [Parameter] public ImportResult? Result { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private List<string> _completedSteps = new();
+    private string? _currentStep;
+    private bool _cancellationRequested = false;
+
+    private double Progress => Total > 0 ? (double)Current / Total * 100 : 0;
+
+    public void UpdateProgress(string step, bool completed = false)
+    {
+        if (completed && !string.IsNullOrEmpty(_currentStep))
+        {
+            _completedSteps.Add(_currentStep);
+            _currentStep = null;
+        }
+
+        if (!completed)
+        {
+            _currentStep = step;
+        }
+
+        StateHasChanged();
+    }
+
+    public void AddCompletedStep(string step)
+    {
+        if (!_completedSteps.Contains(step))
+        {
+            _completedSteps.Add(step);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnCancelClicked()
+    {
+        _cancellationRequested = true;
+        await OnCancel.InvokeAsync();
+    }
+
+    public void Reset()
+    {
+        _completedSteps.Clear();
+        _currentStep = null;
+        _cancellationRequested = false;
+    }
+}

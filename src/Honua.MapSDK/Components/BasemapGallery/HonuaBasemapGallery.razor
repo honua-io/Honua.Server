@@ -1,0 +1,815 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services
+@using Microsoft.JSInterop
+@implements IDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-basemap-gallery @CssClass @GetPositionClass() @($"layout-{Layout}")" style="@Style">
+    @if (Layout == "dropdown")
+    {
+        @* Dropdown Layout *@
+        <MudSelect T="string"
+                   Value="@_activeBasemapId"
+                   ValueChanged="@OnBasemapSelectedAsync"
+                   Label="Basemap"
+                   Variant="Variant.Outlined"
+                   Dense="true"
+                   Margin="Margin.Dense"
+                   Class="basemap-dropdown">
+            @foreach (var basemap in GetFilteredBasemaps())
+            {
+                <MudSelectItem Value="@basemap.Id">
+                    <div class="dropdown-item">
+                        @if (!string.IsNullOrEmpty(basemap.ThumbnailUrl))
+                        {
+                            <img src="@basemap.ThumbnailUrl" alt="@basemap.Name" class="dropdown-thumbnail" />
+                        }
+                        <span>@basemap.Name</span>
+                        @if (basemap.IsPremium)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Color="Color.Warning" />
+                        }
+                    </div>
+                </MudSelectItem>
+            }
+        </MudSelect>
+    }
+    else if (Layout == "floating")
+    {
+        @* Floating Panel with Toggle *@
+        <div class="floating-container">
+            @if (!_isExpanded)
+            {
+                <MudTooltip Text="Basemap Gallery">
+                    <MudIconButton Icon="@Icons.Material.Filled.Map"
+                                   OnClick="@(() => _isExpanded = true)"
+                                   Color="Color.Default"
+                                   Class="basemap-toggle-button"
+                                   aria-label="Open basemap gallery" />
+                </MudTooltip>
+            }
+            else
+            {
+                <MudPaper Class="basemap-floating-panel" Elevation="4">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Small" />
+                            <MudText Typo="Typo.h6">@Title</MudText>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                       Size="Size.Small"
+                                       OnClick="@(() => _isExpanded = false)"
+                                       aria-label="Close basemap gallery" />
+                    </div>
+                    @RenderGalleryContent()
+                </MudPaper>
+            }
+        </div>
+    }
+    else if (Layout == "modal")
+    {
+        @* Modal Dialog *@
+        <MudTooltip Text="Change Basemap">
+            <MudIconButton Icon="@Icons.Material.Filled.Map"
+                           OnClick="@(() => _modalOpen = true)"
+                           Color="Color.Default"
+                           Class="basemap-modal-button"
+                           aria-label="Open basemap gallery" />
+        </MudTooltip>
+
+        <MudDialog @bind-IsVisible="_modalOpen" Options="_dialogOptions">
+            <TitleContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.Map" Class="mr-2" />
+                    @Title
+                </MudText>
+            </TitleContent>
+            <DialogContent>
+                @RenderGalleryContent()
+            </DialogContent>
+            <DialogActions>
+                <MudButton OnClick="@(() => _modalOpen = false)" Color="Color.Primary">Close</MudButton>
+            </DialogActions>
+        </MudDialog>
+    }
+    else
+    {
+        @* Panel/Grid/List Layout (default) *@
+        @RenderGalleryContent()
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the gallery component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"basemap-gallery-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Title displayed in gallery header
+    /// </summary>
+    [Parameter]
+    public string Title { get; set; } = "Basemap Gallery";
+
+    /// <summary>
+    /// Gallery layout: grid, list, dropdown, floating, modal
+    /// </summary>
+    [Parameter]
+    public string Layout { get; set; } = "grid";
+
+    /// <summary>
+    /// Position on the map: top-right, top-left, bottom-right, bottom-left, or null for embedded
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; }
+
+    /// <summary>
+    /// Custom basemaps to display (overrides built-in if provided)
+    /// </summary>
+    [Parameter]
+    public List<Basemap>? Basemaps { get; set; }
+
+    /// <summary>
+    /// Categories to show (if null, shows all)
+    /// </summary>
+    [Parameter]
+    public string[]? Categories { get; set; }
+
+    /// <summary>
+    /// Default basemap ID to activate
+    /// </summary>
+    [Parameter]
+    public string? DefaultBasemap { get; set; }
+
+    /// <summary>
+    /// Show opacity slider
+    /// </summary>
+    [Parameter]
+    public bool ShowOpacitySlider { get; set; }
+
+    /// <summary>
+    /// Show category tabs/filter
+    /// </summary>
+    [Parameter]
+    public bool ShowCategories { get; set; } = true;
+
+    /// <summary>
+    /// Show search bar
+    /// </summary>
+    [Parameter]
+    public bool ShowSearch { get; set; } = true;
+
+    /// <summary>
+    /// Show favorites section
+    /// </summary>
+    [Parameter]
+    public bool ShowFavorites { get; set; }
+
+    /// <summary>
+    /// Enable preview on hover
+    /// </summary>
+    [Parameter]
+    public bool EnablePreview { get; set; }
+
+    /// <summary>
+    /// Thumbnail base path
+    /// </summary>
+    [Parameter]
+    public string ThumbnailBasePath { get; set; } = "/_content/Honua.MapSDK/basemap-thumbnails/";
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Event fired when basemap changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<Basemap> OnBasemapChanged { get; set; }
+
+    private BasemapService _basemapService = new();
+    private List<Basemap> _allBasemaps = new();
+    private string? _activeBasemapId;
+    private string _selectedCategory = "All";
+    private string _searchQuery = "";
+    private double _basemapOpacity = 1.0;
+    private bool _isLoading = false;
+    private bool _isExpanded = false;
+    private bool _modalOpen = false;
+    private string? _previewBasemapId;
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+
+    protected override void OnInitialized()
+    {
+        // Initialize basemaps
+        _allBasemaps = Basemaps ?? _basemapService.GetBasemaps();
+
+        // Set default basemap
+        if (!string.IsNullOrEmpty(DefaultBasemap))
+        {
+            _activeBasemapId = DefaultBasemap;
+        }
+        else if (_allBasemaps.Any())
+        {
+            _activeBasemapId = _allBasemaps.First().Id;
+        }
+
+        SetupSubscriptions();
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready to set initial basemap
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (ShouldHandleMessage(args.Message.MapId))
+            {
+                if (!string.IsNullOrEmpty(_activeBasemapId))
+                {
+                    var basemap = GetBasemap(_activeBasemapId);
+                    if (basemap != null)
+                    {
+                        _ = PublishBasemapChangeAsync(basemap);
+                    }
+                }
+            }
+        });
+    }
+
+    private bool ShouldHandleMessage(string? mapId)
+    {
+        return string.IsNullOrEmpty(SyncWith) || SyncWith == mapId;
+    }
+
+    private RenderFragment RenderGalleryContent() => builder =>
+    {
+        var sequence = 0;
+
+        // Header with search and categories
+        if (Layout == "grid" || Layout == "list" || Layout == "floating" || string.IsNullOrEmpty(Layout))
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "gallery-header");
+
+            // Search bar
+            if (ShowSearch)
+            {
+                builder.OpenComponent<MudTextField<string>>(sequence++);
+                builder.AddAttribute(sequence++, "Value", _searchQuery);
+                builder.AddAttribute(sequence++, "ValueChanged", EventCallback.Factory.Create<string>(this, value =>
+                {
+                    _searchQuery = value;
+                    StateHasChanged();
+                }));
+                builder.AddAttribute(sequence++, "Placeholder", "Search basemaps...");
+                builder.AddAttribute(sequence++, "Adornment", Adornment.Start);
+                builder.AddAttribute(sequence++, "AdornmentIcon", Icons.Material.Filled.Search);
+                builder.AddAttribute(sequence++, "Variant", Variant.Outlined);
+                builder.AddAttribute(sequence++, "Margin", Margin.Dense);
+                builder.AddAttribute(sequence++, "Class", "gallery-search");
+                builder.CloseComponent();
+            }
+
+            // Category tabs
+            if (ShowCategories && string.IsNullOrEmpty(_searchQuery))
+            {
+                builder.OpenComponent<MudTabs>(sequence++);
+                builder.AddAttribute(sequence++, "ActivePanelIndex", GetActiveCategoryIndex());
+                builder.AddAttribute(sequence++, "ActivePanelIndexChanged", EventCallback.Factory.Create<int>(this, index =>
+                {
+                    _selectedCategory = GetCategoryByIndex(index);
+                    StateHasChanged();
+                }));
+                builder.AddAttribute(sequence++, "Rounded", true);
+                builder.AddAttribute(sequence++, "Centered", true);
+                builder.AddAttribute(sequence++, "Class", "category-tabs");
+
+                var categories = GetAvailableCategories();
+                foreach (var category in categories)
+                {
+                    builder.OpenComponent<MudTabPanel>(sequence++);
+                    builder.AddAttribute(sequence++, "Text", category);
+                    builder.AddAttribute(sequence++, "Icon", GetCategoryIcon(category));
+                    builder.CloseComponent();
+                }
+
+                builder.CloseComponent(); // MudTabs
+            }
+
+            builder.CloseElement(); // gallery-header
+        }
+
+        // Content area
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "gallery-content");
+
+        var filteredBasemaps = GetFilteredBasemaps();
+
+        if (_isLoading)
+        {
+            // Loading state
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "gallery-loading");
+            builder.OpenComponent<MudProgressCircular>(sequence++);
+            builder.AddAttribute(sequence++, "Color", Color.Primary);
+            builder.AddAttribute(sequence++, "Indeterminate", true);
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+        else if (!filteredBasemaps.Any())
+        {
+            // Empty state
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "empty-state");
+            builder.OpenComponent<MudIcon>(sequence++);
+            builder.AddAttribute(sequence++, "Icon", Icons.Material.Filled.Map);
+            builder.AddAttribute(sequence++, "Size", Size.Large);
+            builder.AddAttribute(sequence++, "Color", Color.Secondary);
+            builder.CloseComponent();
+            builder.OpenComponent<MudText>(sequence++);
+            builder.AddAttribute(sequence++, "Typo", Typo.body2);
+            builder.AddAttribute(sequence++, "Color", Color.Secondary);
+            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "No basemaps found")));
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+        else
+        {
+            // Render basemaps based on layout
+            if (Layout == "list")
+            {
+                RenderListLayout(builder, ref sequence, filteredBasemaps);
+            }
+            else
+            {
+                RenderGridLayout(builder, ref sequence, filteredBasemaps);
+            }
+        }
+
+        builder.CloseElement(); // gallery-content
+
+        // Opacity slider
+        if (ShowOpacitySlider && !string.IsNullOrEmpty(_activeBasemapId))
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "gallery-footer");
+
+            builder.OpenComponent<MudText>(sequence++);
+            builder.AddAttribute(sequence++, "Typo", Typo.caption);
+            builder.AddAttribute(sequence++, "Class", "opacity-label");
+            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Opacity")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<MudSlider<double>>(sequence++);
+            builder.AddAttribute(sequence++, "Value", _basemapOpacity * 100);
+            builder.AddAttribute(sequence++, "ValueChanged", EventCallback.Factory.Create<double>(this, async value =>
+            {
+                _basemapOpacity = value / 100.0;
+                await OnOpacityChangedAsync(_basemapOpacity);
+            }));
+            builder.AddAttribute(sequence++, "Min", 0.0);
+            builder.AddAttribute(sequence++, "Max", 100.0);
+            builder.AddAttribute(sequence++, "Step", 5.0);
+            builder.AddAttribute(sequence++, "Color", Color.Primary);
+            builder.AddAttribute(sequence++, "Class", "opacity-slider");
+            builder.CloseComponent();
+
+            builder.OpenComponent<MudText>(sequence++);
+            builder.AddAttribute(sequence++, "Typo", Typo.caption);
+            builder.AddAttribute(sequence++, "Class", "opacity-value");
+            builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(b => b.AddContent(0, $"{_basemapOpacity * 100:F0}%")));
+            builder.CloseComponent();
+
+            builder.CloseElement(); // gallery-footer
+        }
+    };
+
+    private void RenderGridLayout(RenderTreeBuilder builder, ref int sequence, List<Basemap> basemaps)
+    {
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "basemap-grid");
+
+        foreach (var basemap in basemaps)
+        {
+            RenderBasemapCard(builder, ref sequence, basemap);
+        }
+
+        builder.CloseElement(); // basemap-grid
+    }
+
+    private void RenderListLayout(RenderTreeBuilder builder, ref int sequence, List<Basemap> basemaps)
+    {
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "basemap-list");
+
+        foreach (var basemap in basemaps)
+        {
+            RenderBasemapListItem(builder, ref sequence, basemap);
+        }
+
+        builder.CloseElement(); // basemap-list
+    }
+
+    private void RenderBasemapCard(RenderTreeBuilder builder, ref int sequence, Basemap basemap)
+    {
+        var isActive = _activeBasemapId == basemap.Id;
+        var isPreviewing = _previewBasemapId == basemap.Id;
+
+        builder.OpenComponent<MudCard>(sequence++);
+        builder.AddAttribute(sequence++, "Class", $"basemap-card {(isActive ? "active" : "")} {(isPreviewing ? "previewing" : "")}");
+        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => OnBasemapClickedAsync(basemap)));
+        builder.AddAttribute(sequence++, "onmouseenter", EventCallback.Factory.Create(this, () => OnBasemapHoverAsync(basemap, true)));
+        builder.AddAttribute(sequence++, "onmouseleave", EventCallback.Factory.Create(this, () => OnBasemapHoverAsync(basemap, false)));
+
+        builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(cardBuilder =>
+        {
+            // Thumbnail
+            cardBuilder.OpenComponent<MudCardMedia>(0);
+            cardBuilder.AddAttribute(1, "Image", GetThumbnailUrl(basemap));
+            cardBuilder.AddAttribute(2, "Alt", basemap.Name);
+            cardBuilder.AddAttribute(3, "Height", 120);
+            cardBuilder.AddAttribute(4, "Class", "basemap-thumbnail");
+            cardBuilder.CloseComponent();
+
+            // Content
+            cardBuilder.OpenComponent<MudCardContent>(5);
+            cardBuilder.AddAttribute(6, "Class", "basemap-card-content");
+            cardBuilder.AddAttribute(7, "ChildContent", (RenderFragment)(contentBuilder =>
+            {
+                contentBuilder.OpenComponent<MudText>(0);
+                contentBuilder.AddAttribute(1, "Typo", Typo.body2);
+                contentBuilder.AddAttribute(2, "Class", "basemap-name");
+                contentBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, basemap.Name)));
+                contentBuilder.CloseComponent();
+
+                if (!string.IsNullOrEmpty(basemap.Provider))
+                {
+                    contentBuilder.OpenComponent<MudText>(4);
+                    contentBuilder.AddAttribute(5, "Typo", Typo.caption);
+                    contentBuilder.AddAttribute(6, "Color", Color.Secondary);
+                    contentBuilder.AddAttribute(7, "Class", "basemap-provider");
+                    contentBuilder.AddAttribute(8, "ChildContent", (RenderFragment)(b => b.AddContent(0, basemap.Provider)));
+                    contentBuilder.CloseComponent();
+                }
+
+                // Badges
+                contentBuilder.OpenElement(9, "div");
+                contentBuilder.AddAttribute(10, "class", "basemap-badges");
+
+                if (basemap.IsPremium)
+                {
+                    contentBuilder.OpenComponent<MudChip>(11);
+                    contentBuilder.AddAttribute(12, "Size", Size.Small);
+                    contentBuilder.AddAttribute(13, "Color", Color.Warning);
+                    contentBuilder.AddAttribute(14, "Icon", Icons.Material.Filled.Star);
+                    contentBuilder.AddAttribute(15, "Text", "Premium");
+                    contentBuilder.CloseComponent();
+                }
+
+                if (basemap.RequiresApiKey)
+                {
+                    contentBuilder.OpenComponent<MudChip>(16);
+                    contentBuilder.AddAttribute(17, "Size", Size.Small);
+                    contentBuilder.AddAttribute(18, "Color", Color.Info);
+                    contentBuilder.AddAttribute(19, "Icon", Icons.Material.Filled.Key);
+                    contentBuilder.AddAttribute(20, "Text", "API Key");
+                    contentBuilder.CloseComponent();
+                }
+
+                contentBuilder.CloseElement(); // basemap-badges
+            }));
+            cardBuilder.CloseComponent();
+
+            // Active indicator
+            if (isActive)
+            {
+                cardBuilder.OpenElement(8, "div");
+                cardBuilder.AddAttribute(9, "class", "active-indicator");
+                cardBuilder.OpenComponent<MudIcon>(10);
+                cardBuilder.AddAttribute(11, "Icon", Icons.Material.Filled.CheckCircle);
+                cardBuilder.AddAttribute(12, "Color", Color.Success);
+                cardBuilder.AddAttribute(13, "Size", Size.Medium);
+                cardBuilder.CloseComponent();
+                cardBuilder.CloseElement();
+            }
+
+            // Favorite button
+            if (ShowFavorites)
+            {
+                var isFavorite = _basemapService.Settings.Favorites.Contains(basemap.Id);
+                cardBuilder.OpenElement(14, "div");
+                cardBuilder.AddAttribute(15, "class", "favorite-button");
+                cardBuilder.OpenComponent<MudIconButton>(16);
+                cardBuilder.AddAttribute(17, "Icon", isFavorite ? Icons.Material.Filled.Favorite : Icons.Material.Outlined.FavoriteBorder);
+                cardBuilder.AddAttribute(18, "Size", Size.Small);
+                cardBuilder.AddAttribute(19, "Color", isFavorite ? Color.Error : Color.Default);
+                cardBuilder.AddAttribute(20, "OnClick", EventCallback.Factory.Create(this, (MouseEventArgs e) =>
+                {
+                    e.StopPropagation();
+                    ToggleFavorite(basemap.Id);
+                }));
+                cardBuilder.CloseComponent();
+                cardBuilder.CloseElement();
+            }
+        }));
+
+        builder.CloseComponent(); // MudCard
+    }
+
+    private void RenderBasemapListItem(RenderTreeBuilder builder, ref int sequence, Basemap basemap)
+    {
+        var isActive = _activeBasemapId == basemap.Id;
+
+        builder.OpenComponent<MudListItem>(sequence++);
+        builder.AddAttribute(sequence++, "Class", $"basemap-list-item {(isActive ? "active" : "")}");
+        builder.AddAttribute(sequence++, "OnClick", EventCallback.Factory.Create(this, () => OnBasemapClickedAsync(basemap)));
+
+        builder.AddAttribute(sequence++, "ChildContent", (RenderFragment)(itemBuilder =>
+        {
+            itemBuilder.OpenElement(0, "div");
+            itemBuilder.AddAttribute(1, "class", "list-item-content");
+
+            // Thumbnail
+            if (!string.IsNullOrEmpty(basemap.ThumbnailUrl))
+            {
+                itemBuilder.OpenElement(2, "img");
+                itemBuilder.AddAttribute(3, "src", GetThumbnailUrl(basemap));
+                itemBuilder.AddAttribute(4, "alt", basemap.Name);
+                itemBuilder.AddAttribute(5, "class", "list-item-thumbnail");
+                itemBuilder.CloseElement();
+            }
+
+            // Details
+            itemBuilder.OpenElement(6, "div");
+            itemBuilder.AddAttribute(7, "class", "list-item-details");
+
+            itemBuilder.OpenComponent<MudText>(8);
+            itemBuilder.AddAttribute(9, "Typo", Typo.body2);
+            itemBuilder.AddAttribute(10, "Class", "basemap-name");
+            itemBuilder.AddAttribute(11, "ChildContent", (RenderFragment)(b => b.AddContent(0, basemap.Name)));
+            itemBuilder.CloseComponent();
+
+            if (!string.IsNullOrEmpty(basemap.Description))
+            {
+                itemBuilder.OpenComponent<MudText>(12);
+                itemBuilder.AddAttribute(13, "Typo", Typo.caption);
+                itemBuilder.AddAttribute(14, "Color", Color.Secondary);
+                itemBuilder.AddAttribute(15, "ChildContent", (RenderFragment)(b => b.AddContent(0, basemap.Description)));
+                itemBuilder.CloseComponent();
+            }
+
+            itemBuilder.CloseElement(); // list-item-details
+
+            // Active indicator
+            if (isActive)
+            {
+                itemBuilder.OpenComponent<MudIcon>(16);
+                itemBuilder.AddAttribute(17, "Icon", Icons.Material.Filled.CheckCircle);
+                itemBuilder.AddAttribute(18, "Color", Color.Success);
+                itemBuilder.AddAttribute(19, "Class", "list-item-indicator");
+                itemBuilder.CloseComponent();
+            }
+
+            itemBuilder.CloseElement(); // list-item-content
+        }));
+
+        builder.CloseComponent(); // MudListItem
+    }
+
+    private async Task OnBasemapClickedAsync(Basemap basemap)
+    {
+        await OnBasemapSelectedAsync(basemap.Id);
+
+        // Close modal or floating panel
+        if (Layout == "modal")
+        {
+            _modalOpen = false;
+        }
+        else if (Layout == "floating")
+        {
+            _isExpanded = false;
+        }
+    }
+
+    private async Task OnBasemapSelectedAsync(string basemapId)
+    {
+        if (_activeBasemapId == basemapId)
+            return;
+
+        var basemap = GetBasemap(basemapId);
+        if (basemap == null)
+            return;
+
+        _isLoading = true;
+        _activeBasemapId = basemapId;
+        StateHasChanged();
+
+        try
+        {
+            // Publish loading message
+            await Bus.PublishAsync(new BasemapLoadingMessage
+            {
+                MapId = SyncWith ?? "",
+                IsLoading = true,
+                BasemapId = basemap.Id,
+                ComponentId = Id
+            }, Id);
+
+            // Publish basemap change
+            await PublishBasemapChangeAsync(basemap);
+
+            // Mark as recently used
+            _basemapService.MarkAsRecentlyUsed(basemap.Id);
+
+            // Fire event callback
+            await OnBasemapChanged.InvokeAsync(basemap);
+
+            // Simulate loading delay for smooth transition
+            await Task.Delay(300);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+
+            // Publish loading complete
+            await Bus.PublishAsync(new BasemapLoadingMessage
+            {
+                MapId = SyncWith ?? "",
+                IsLoading = false,
+                BasemapId = basemap.Id,
+                ComponentId = Id
+            }, Id);
+        }
+    }
+
+    private async Task OnBasemapHoverAsync(Basemap basemap, bool isHovering)
+    {
+        if (!EnablePreview)
+            return;
+
+        if (isHovering)
+        {
+            _previewBasemapId = basemap.Id;
+            // Could publish a preview message here for the map to show temporarily
+        }
+        else
+        {
+            _previewBasemapId = null;
+        }
+
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task OnOpacityChangedAsync(double opacity)
+    {
+        // Publish opacity change through the bus
+        // This would need to be implemented in the map component
+        await Task.CompletedTask;
+    }
+
+    private async Task PublishBasemapChangeAsync(Basemap basemap)
+    {
+        await Bus.PublishAsync(new BasemapChangedMessage
+        {
+            MapId = SyncWith ?? "",
+            Style = basemap.StyleUrl,
+            BasemapId = basemap.Id,
+            BasemapName = basemap.Name,
+            ComponentId = Id
+        }, Id);
+    }
+
+    private void ToggleFavorite(string basemapId)
+    {
+        _basemapService.ToggleFavorite(basemapId);
+        StateHasChanged();
+    }
+
+    private List<Basemap> GetFilteredBasemaps()
+    {
+        var basemaps = _allBasemaps.AsEnumerable();
+
+        // Filter by search query
+        if (!string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            basemaps = basemaps.Where(b =>
+                b.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                (b.Description != null && b.Description.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                b.Tags.Any(t => t.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+            );
+        }
+        // Filter by category
+        else if (_selectedCategory != "All")
+        {
+            basemaps = basemaps.Where(b => b.Category.Equals(_selectedCategory, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Filter by allowed categories
+        if (Categories != null && Categories.Length > 0)
+        {
+            basemaps = basemaps.Where(b => Categories.Contains(b.Category, StringComparer.OrdinalIgnoreCase));
+        }
+
+        return basemaps.OrderBy(b => b.SortOrder).ToList();
+    }
+
+    private string[] GetAvailableCategories()
+    {
+        var categories = new List<string> { "All" };
+
+        var basemapCategories = _allBasemaps
+            .Select(b => b.Category)
+            .Distinct()
+            .OrderBy(c => Array.IndexOf(BasemapCategories.All, c));
+
+        if (Categories != null && Categories.Length > 0)
+        {
+            basemapCategories = basemapCategories.Where(c => Categories.Contains(c, StringComparer.OrdinalIgnoreCase));
+        }
+
+        categories.AddRange(basemapCategories);
+        return categories.ToArray();
+    }
+
+    private int GetActiveCategoryIndex()
+    {
+        var categories = GetAvailableCategories();
+        var index = Array.IndexOf(categories, _selectedCategory);
+        return index >= 0 ? index : 0;
+    }
+
+    private string GetCategoryByIndex(int index)
+    {
+        var categories = GetAvailableCategories();
+        return index >= 0 && index < categories.Length ? categories[index] : "All";
+    }
+
+    private string GetCategoryIcon(string category)
+    {
+        return category switch
+        {
+            "Streets" => Icons.Material.Filled.Map,
+            "Satellite" => Icons.Material.Filled.Satellite,
+            "Terrain" => Icons.Material.Filled.Terrain,
+            "Specialty" => Icons.Material.Filled.Palette,
+            "Custom" => Icons.Material.Filled.AddCircle,
+            _ => Icons.Material.Filled.Category
+        };
+    }
+
+    private Basemap? GetBasemap(string id)
+    {
+        return _allBasemaps.FirstOrDefault(b => b.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string GetThumbnailUrl(Basemap basemap)
+    {
+        if (!string.IsNullOrEmpty(basemap.ThumbnailUrl))
+        {
+            return basemap.ThumbnailUrl;
+        }
+
+        // Fallback to a default thumbnail based on category
+        return $"{ThumbnailBasePath}default-{basemap.Category.ToLowerInvariant()}.png";
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position) || Layout == "dropdown" || Layout == "modal")
+            return "";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "gallery-floating gallery-top-right",
+            "top-left" => "gallery-floating gallery-top-left",
+            "bottom-right" => "gallery-floating gallery-bottom-right",
+            "bottom-left" => "gallery-floating gallery-bottom-left",
+            _ => ""
+        };
+    }
+
+    public void Dispose()
+    {
+        // Subscriptions are automatically cleaned up by ComponentBus
+    }
+}

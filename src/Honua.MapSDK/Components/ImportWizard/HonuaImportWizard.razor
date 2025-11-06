@@ -1,0 +1,642 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Import
+@using Honua.MapSDK.Services.Import
+@using Honua.MapSDK.Components.ImportWizard.Steps
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+
+<div class="honua-import-wizard @CssClass" style="@Style">
+    @if (ShowAsDialog)
+    {
+        @if (!string.IsNullOrEmpty(TriggerText))
+        {
+            <MudButton Variant="@TriggerVariant"
+                       Color="@TriggerColor"
+                       StartIcon="@Icons.Material.Filled.Upload"
+                       OnClick="@(() => _isDialogOpen = true)">
+                @TriggerText
+            </MudButton>
+        }
+
+        <MudDialog @bind-IsVisible="_isDialogOpen" Options="_dialogOptions">
+            <TitleContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
+                    Import Data
+                </MudText>
+            </TitleContent>
+            <DialogContent>
+                @RenderWizardContent()
+            </DialogContent>
+            <DialogActions>
+                @if (_activeStep > 0 && _activeStep < 3)
+                {
+                    <MudButton OnClick="@PreviousStep" Disabled="@_isProcessing">
+                        Back
+                    </MudButton>
+                }
+                @if (_activeStep < 2)
+                {
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               OnClick="@NextStep"
+                               Disabled="@(!CanProceed())">
+                        Next
+                    </MudButton>
+                }
+                @if (_activeStep == 2)
+                {
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               OnClick="@StartImport"
+                               Disabled="@(!CanProceed() || _isProcessing)"
+                               StartIcon="@Icons.Material.Filled.Upload">
+                        @(_isProcessing ? "Importing..." : "Import")
+                    </MudButton>
+                }
+                @if (_activeStep == 4 && _importResult?.Success == true)
+                {
+                    <MudButton Color="Color.Success"
+                               Variant="Variant.Filled"
+                               OnClick="@ViewOnMap"
+                               StartIcon="@Icons.Material.Filled.Map">
+                        View on Map
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               OnClick="@StartOver">
+                        Import More
+                    </MudButton>
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               OnClick="@Close">
+                        Close
+                    </MudButton>
+                }
+            </DialogActions>
+        </MudDialog>
+    }
+    else
+    {
+        <MudPaper Elevation="@Elevation" Class="import-wizard-paper">
+            <div class="wizard-header">
+                <MudText Typo="Typo.h5">
+                    <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
+                    Import Data
+                </MudText>
+            </div>
+
+            @RenderWizardContent()
+
+            <div class="wizard-actions">
+                @if (_activeStep > 0 && _activeStep < 3)
+                {
+                    <MudButton OnClick="@PreviousStep" Disabled="@_isProcessing">
+                        Back
+                    </MudButton>
+                }
+                <MudSpacer />
+                @if (_activeStep < 2)
+                {
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               OnClick="@NextStep"
+                               Disabled="@(!CanProceed())">
+                        Next
+                    </MudButton>
+                }
+                @if (_activeStep == 2)
+                {
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               OnClick="@StartImport"
+                               Disabled="@(!CanProceed() || _isProcessing)"
+                               StartIcon="@Icons.Material.Filled.Upload">
+                        @(_isProcessing ? "Importing..." : "Import")
+                    </MudButton>
+                }
+                @if (_activeStep == 4 && _importResult?.Success == true)
+                {
+                    <MudButton Color="Color.Success"
+                               Variant="Variant.Filled"
+                               OnClick="@ViewOnMap"
+                               StartIcon="@Icons.Material.Filled.Map">
+                        View on Map
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               OnClick="@StartOver">
+                        Import More
+                    </MudButton>
+                }
+            </div>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    private RenderFragment RenderWizardContent() => __builder =>
+    {
+        <div class="wizard-content">
+            <MudStepper @ref="_stepper"
+                        ActiveStepChanged="OnStepChanged"
+                        Linear="true"
+                        HeaderSize="Size.Large"
+                        HeaderTextView="HeaderTextView.All">
+                <MudStep Title="Upload" Icon="@Icons.Material.Filled.Upload">
+                    <ChildContent>
+                        <UploadStep OnFileLoaded="OnFileLoaded" />
+                    </ChildContent>
+                </MudStep>
+
+                <MudStep Title="Preview" Icon="@Icons.Material.Filled.Visibility" Optional="false">
+                    <ChildContent>
+                        <PreviewStep Data="@_parsedData" MaxPreviewRows="@MaxPreviewRows" />
+                    </ChildContent>
+                </MudStep>
+
+                <MudStep Title="Configure" Icon="@Icons.Material.Filled.Settings">
+                    <ChildContent>
+                        <ConfigureStep Data="@_parsedData" Configuration="@_importConfig" />
+                    </ChildContent>
+                </MudStep>
+
+                <MudStep Title="Import" Icon="@Icons.Material.Filled.CloudUpload">
+                    <ChildContent>
+                        <ImportStep @ref="_importStepRef"
+                                    Current="@_currentProgress"
+                                    Total="@_totalProgress"
+                                    Status="@_importStatus"
+                                    IsComplete="@_importComplete"
+                                    Result="@_importResult"
+                                    OnCancel="CancelImport" />
+                    </ChildContent>
+                </MudStep>
+            </MudStepper>
+        </div>
+    };
+}
+
+@code {
+    /// <summary>
+    /// Unique identifier for this component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"import-wizard-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Show wizard in a dialog
+    /// </summary>
+    [Parameter]
+    public bool ShowAsDialog { get; set; } = false;
+
+    /// <summary>
+    /// Text for trigger button (when ShowAsDialog is true)
+    /// </summary>
+    [Parameter]
+    public string? TriggerText { get; set; } = "Import Data";
+
+    /// <summary>
+    /// Trigger button variant
+    /// </summary>
+    [Parameter]
+    public Variant TriggerVariant { get; set; } = Variant.Filled;
+
+    /// <summary>
+    /// Trigger button color
+    /// </summary>
+    [Parameter]
+    public Color TriggerColor { get; set; } = Color.Primary;
+
+    /// <summary>
+    /// Maximum file size in bytes
+    /// </summary>
+    [Parameter]
+    public long MaxFileSize { get; set; } = 10 * 1024 * 1024; // 10 MB
+
+    /// <summary>
+    /// Maximum number of features to import (0 = unlimited)
+    /// </summary>
+    [Parameter]
+    public int MaxFeatures { get; set; } = 0;
+
+    /// <summary>
+    /// Maximum rows to show in preview
+    /// </summary>
+    [Parameter]
+    public int MaxPreviewRows { get; set; } = 100;
+
+    /// <summary>
+    /// Enable geocoding for address fields
+    /// </summary>
+    [Parameter]
+    public bool AllowGeocoding { get; set; } = false;
+
+    /// <summary>
+    /// Automatically zoom to imported data
+    /// </summary>
+    [Parameter]
+    public bool AutoZoomToData { get; set; } = true;
+
+    /// <summary>
+    /// Paper elevation (when not in dialog mode)
+    /// </summary>
+    [Parameter]
+    public int Elevation { get; set; } = 1;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Callback when import completes successfully
+    /// </summary>
+    [Parameter]
+    public EventCallback<ImportResult> OnImportComplete { get; set; }
+
+    /// <summary>
+    /// Callback when error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    private MudStepper? _stepper;
+    private ImportStep? _importStepRef;
+    private int _activeStep = 0;
+    private bool _isDialogOpen = false;
+    private bool _isProcessing = false;
+    private bool _mapReady = false;
+
+    private byte[]? _fileContent;
+    private string? _fileName;
+    private ParsedData? _parsedData;
+    private ImportConfiguration _importConfig = new();
+    private ImportResult? _importResult;
+
+    private int _currentProgress = 0;
+    private int _totalProgress = 0;
+    private string _importStatus = "Processing...";
+    private bool _importComplete = false;
+
+    private readonly FileParserFactory _parserFactory = new();
+    private CancellationTokenSource? _cancellationTokenSource;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Large,
+        FullWidth = true,
+        CloseButton = true,
+        DisableBackdropClick = false
+    };
+
+    protected override void OnInitialized()
+    {
+        SetupSubscriptions();
+    }
+
+    private void SetupSubscriptions()
+    {
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private async Task OnFileLoaded((byte[] Content, string FileName) data)
+    {
+        _fileContent = data.Content;
+        _fileName = data.FileName;
+
+        // Parse the file
+        await ParseFile();
+
+        // Auto-advance to preview step
+        if (_parsedData != null && !_parsedData.Errors.Any(e => e.Severity == ValidationSeverity.Error))
+        {
+            await NextStep();
+        }
+    }
+
+    private async Task ParseFile()
+    {
+        if (_fileContent == null || string.IsNullOrEmpty(_fileName))
+        {
+            await OnError.InvokeAsync("No file selected");
+            return;
+        }
+
+        try
+        {
+            var parser = _parserFactory.GetParser(_fileContent, _fileName);
+            if (parser == null)
+            {
+                await OnError.InvokeAsync("Unsupported file format");
+                return;
+            }
+
+            _parsedData = await parser.ParseAsync(_fileContent, _fileName);
+
+            // Initialize configuration with defaults
+            _importConfig = new ImportConfiguration
+            {
+                LayerName = Path.GetFileNameWithoutExtension(_fileName),
+                MaxFeatures = MaxFeatures,
+                AutoZoom = AutoZoomToData,
+                EnableGeocoding = AllowGeocoding
+            };
+        }
+        catch (Exception ex)
+        {
+            await OnError.InvokeAsync($"Error parsing file: {ex.Message}");
+        }
+    }
+
+    private void OnStepChanged(int newStep)
+    {
+        _activeStep = newStep;
+    }
+
+    private async Task NextStep()
+    {
+        if (_stepper != null)
+        {
+            await _stepper.NextStep();
+        }
+    }
+
+    private async Task PreviousStep()
+    {
+        if (_stepper != null)
+        {
+            await _stepper.PreviousStep();
+        }
+    }
+
+    private bool CanProceed()
+    {
+        return _activeStep switch
+        {
+            0 => _fileContent != null && _parsedData != null,
+            1 => _parsedData != null && _parsedData.ValidRows > 0,
+            2 => _importConfig != null && ValidateConfiguration(),
+            _ => false
+        };
+    }
+
+    private bool ValidateConfiguration()
+    {
+        if (_importConfig == null || _parsedData == null) return false;
+
+        // Validate geometry source configuration
+        return _importConfig.GeometrySource switch
+        {
+            GeometrySource.ExistingGeometry => _parsedData.Features.Any(f => f.Geometry != null),
+            GeometrySource.LatLonColumns => !string.IsNullOrEmpty(_importConfig.LatitudeField) &&
+                                            !string.IsNullOrEmpty(_importConfig.LongitudeField),
+            GeometrySource.AddressColumn => !string.IsNullOrEmpty(_importConfig.AddressField) &&
+                                            _importConfig.EnableGeocoding,
+            _ => false
+        };
+    }
+
+    private async Task StartImport()
+    {
+        if (_parsedData == null || _importConfig == null) return;
+
+        _isProcessing = true;
+        _importComplete = false;
+        _cancellationTokenSource = new CancellationTokenSource();
+
+        try
+        {
+            await NextStep(); // Move to import step
+
+            var startTime = DateTime.UtcNow;
+            _importStepRef?.Reset();
+            _importStepRef?.UpdateProgress("Preparing import...");
+
+            // Create import result
+            _importResult = new ImportResult
+            {
+                Success = false,
+                TotalFeatures = _parsedData.Features.Count,
+                SourceFormat = _parsedData.Format.ToString(),
+                SourceFileName = _fileName
+            };
+
+            _totalProgress = _parsedData.Features.Count;
+            _currentProgress = 0;
+
+            // Generate layer ID
+            var layerId = $"imported-layer-{Guid.NewGuid():N}";
+
+            _importStepRef?.AddCompletedStep("Preparing import...");
+            _importStepRef?.UpdateProgress("Processing features...");
+
+            // Process features
+            var validFeatures = new List<ParsedFeature>();
+            foreach (var feature in _parsedData.Features)
+            {
+                if (_cancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException("Import cancelled by user");
+                }
+
+                _currentProgress++;
+
+                if (feature.IsValid || _importConfig.SkipErrors)
+                {
+                    validFeatures.Add(feature);
+                }
+                else
+                {
+                    _importResult.FeaturesFailed++;
+                    _importResult.Errors.AddRange(feature.Errors);
+                }
+
+                // Update progress every 10 features
+                if (_currentProgress % 10 == 0)
+                {
+                    _importStatus = $"Processing feature {_currentProgress} of {_totalProgress}";
+                    await Bus.PublishAsync(new ImportProgressMessage
+                    {
+                        ComponentId = Id,
+                        Current = _currentProgress,
+                        Total = _totalProgress,
+                        Status = _importStatus
+                    }, Id);
+
+                    StateHasChanged();
+                    await Task.Delay(1); // Allow UI to update
+                }
+            }
+
+            _importResult.FeaturesImported = validFeatures.Count;
+
+            _importStepRef?.AddCompletedStep($"Processed {validFeatures.Count} features");
+            _importStepRef?.UpdateProgress("Adding to map...");
+
+            // Publish data imported message
+            await Bus.PublishAsync(new DataImportedMessage
+            {
+                ComponentId = Id,
+                LayerId = layerId,
+                LayerName = _importConfig.LayerName,
+                FeatureCount = _importResult.FeaturesImported,
+                Format = _parsedData.Format.ToString()
+            }, Id);
+
+            // Publish layer added message
+            await Bus.PublishAsync(new LayerAddedMessage
+            {
+                LayerId = layerId,
+                LayerName = _importConfig.LayerName
+            }, Id);
+
+            _importStepRef?.AddCompletedStep("Added to map");
+
+            // Auto-zoom if enabled
+            if (_importConfig.AutoZoom && _parsedData.BoundingBox != null && _parsedData.BoundingBox.Length == 4)
+            {
+                _importStepRef?.UpdateProgress("Zooming to data...");
+
+                var targetMapId = SyncWith ?? "*";
+                await Bus.PublishAsync(new FitBoundsRequestMessage
+                {
+                    MapId = targetMapId,
+                    Bounds = _parsedData.BoundingBox,
+                    Padding = 50
+                }, Id);
+
+                _importStepRef?.AddCompletedStep("Zoomed to data");
+            }
+
+            _importResult.Success = true;
+            _importResult.LayerId = layerId;
+            _importResult.LayerName = _importConfig.LayerName;
+            _importResult.BoundingBox = _parsedData.BoundingBox;
+            _importResult.Duration = DateTime.UtcNow - startTime;
+
+            _importComplete = true;
+            _importStatus = "Import complete!";
+
+            await OnImportComplete.InvokeAsync(_importResult);
+        }
+        catch (OperationCanceledException)
+        {
+            _importResult = new ImportResult
+            {
+                Success = false,
+                TotalFeatures = _parsedData.Features.Count,
+                FeaturesImported = _currentProgress,
+                FeaturesFailed = _parsedData.Features.Count - _currentProgress
+            };
+            _importResult.Errors.Add(new ValidationError
+            {
+                RowNumber = 0,
+                Message = "Import was cancelled by user",
+                Severity = ValidationSeverity.Error
+            });
+            _importComplete = true;
+        }
+        catch (Exception ex)
+        {
+            _importResult = new ImportResult
+            {
+                Success = false,
+                TotalFeatures = _parsedData.Features.Count
+            };
+            _importResult.Errors.Add(new ValidationError
+            {
+                RowNumber = 0,
+                Message = ex.Message,
+                Severity = ValidationSeverity.Error
+            });
+            _importComplete = true;
+
+            await OnError.InvokeAsync(ex.Message);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CancelImport()
+    {
+        _cancellationTokenSource?.Cancel();
+        await Task.CompletedTask;
+    }
+
+    private async Task ViewOnMap()
+    {
+        if (_importResult?.BoundingBox != null && _importResult.BoundingBox.Length == 4)
+        {
+            var targetMapId = SyncWith ?? "*";
+            await Bus.PublishAsync(new FitBoundsRequestMessage
+            {
+                MapId = targetMapId,
+                Bounds = _importResult.BoundingBox,
+                Padding = 50
+            }, Id);
+        }
+
+        Close();
+    }
+
+    private void StartOver()
+    {
+        Reset();
+        _activeStep = 0;
+        if (_stepper != null)
+        {
+            _stepper.Reset();
+        }
+    }
+
+    private void Close()
+    {
+        _isDialogOpen = false;
+        Reset();
+    }
+
+    private void Reset()
+    {
+        _fileContent = null;
+        _fileName = null;
+        _parsedData = null;
+        _importConfig = new ImportConfiguration();
+        _importResult = null;
+        _currentProgress = 0;
+        _totalProgress = 0;
+        _importComplete = false;
+        _isProcessing = false;
+        _cancellationTokenSource?.Dispose();
+        _cancellationTokenSource = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _cancellationTokenSource?.Dispose();
+        await Task.CompletedTask;
+    }
+}

@@ -248,6 +248,20 @@ public class BasemapChangedMessage
 {
     public required string MapId { get; init; }
     public required string Style { get; init; }
+    public string? BasemapId { get; init; }
+    public string? BasemapName { get; init; }
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when basemap is loading
+/// </summary>
+public class BasemapLoadingMessage
+{
+    public required string MapId { get; init; }
+    public required bool IsLoading { get; init; }
+    public string? BasemapId { get; init; }
+    public string? ComponentId { get; init; }
 }
 
 /// <summary>
@@ -298,4 +312,179 @@ public class SearchResultSelectedMessage
     public double[]? BoundingBox { get; init; }
     public string? Type { get; init; }
     public Dictionary<string, string> Metadata { get; init; } = new();
+}
+
+/// <summary>
+/// Published when data import completes successfully
+/// </summary>
+public class DataImportedMessage
+{
+    public required string LayerId { get; init; }
+    public required string LayerName { get; init; }
+    public required int FeatureCount { get; init; }
+    public required string Format { get; init; }
+    public required string ComponentId { get; init; }
+    public Dictionary<string, object> Metadata { get; init; } = new();
+}
+
+/// <summary>
+/// Published during import to report progress
+/// </summary>
+public class ImportProgressMessage
+{
+    public required int Current { get; init; }
+    public required int Total { get; init; }
+    public required string Status { get; init; }
+    public required string ComponentId { get; init; }
+    public double Percentage => Total > 0 ? (double)Current / Total * 100 : 0;
+}
+
+/// <summary>
+/// Published when import fails with errors
+/// </summary>
+public class ImportErrorMessage
+{
+    public required string ComponentId { get; init; }
+    public required string ErrorMessage { get; init; }
+    public List<ImportValidationError> Errors { get; init; } = new();
+}
+
+/// <summary>
+/// Import validation error details
+/// </summary>
+public class ImportValidationError
+{
+    public required int RowNumber { get; init; }
+    public required string Field { get; init; }
+    public required string Message { get; init; }
+    public required string Severity { get; init; } // "error", "warning", "info"
+}
+
+/// <summary>
+/// Published when user clicks on the overview map to navigate main map
+/// </summary>
+public class OverviewMapClickedMessage
+{
+    public required double[] Center { get; init; }
+    public required double Zoom { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a bookmark is selected and map should navigate to it
+/// </summary>
+public class BookmarkSelectedMessage
+{
+    public required string BookmarkId { get; init; }
+    public required string BookmarkName { get; init; }
+    public required double[] Center { get; init; }
+    public required double Zoom { get; init; }
+    public double Bearing { get; init; }
+    public double Pitch { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a new bookmark is created
+/// </summary>
+public class BookmarkCreatedMessage
+{
+    public required string BookmarkId { get; init; }
+    public required string BookmarkName { get; init; }
+    public required string ComponentId { get; init; }
+    public required double[] Center { get; init; }
+    public required double Zoom { get; init; }
+}
+
+/// <summary>
+/// Published when a bookmark is deleted
+/// </summary>
+public class BookmarkDeletedMessage
+{
+    public required string BookmarkId { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a bookmark is updated
+/// </summary>
+public class BookmarkUpdatedMessage
+{
+    public required string BookmarkId { get; init; }
+    public required string BookmarkName { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a feature is drawn on the map
+/// </summary>
+public class FeatureDrawnMessage
+{
+    public required string FeatureId { get; init; }
+    public required string GeometryType { get; init; }
+    public required object Geometry { get; init; }
+    public Dictionary<string, object> Properties { get; init; } = new();
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a feature is measured
+/// </summary>
+public class FeatureMeasuredMessage
+{
+    public required string FeatureId { get; init; }
+    public double? Distance { get; init; }
+    public double? Area { get; init; }
+    public double? Perimeter { get; init; }
+    public double? Radius { get; init; }
+    public required string Unit { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a drawn feature is edited
+/// </summary>
+public class FeatureEditedMessage
+{
+    public required string FeatureId { get; init; }
+    public required object Geometry { get; init; }
+    public required string EditType { get; init; } // "move", "reshape", "rotate", "scale"
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when a drawn feature is deleted
+/// </summary>
+public class FeatureDeletedMessage
+{
+    public required string FeatureId { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when drawing mode changes
+/// </summary>
+public class DrawModeChangedMessage
+{
+    public required string Mode { get; init; } // "point", "line", "polygon", "circle", "rectangle", "freehand", "text", "select", "edit", null for idle
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Request to start drawing mode
+/// </summary>
+public class StartDrawingRequestMessage
+{
+    public required string MapId { get; init; }
+    public required string Mode { get; init; }
+    public string? ComponentId { get; init; }
+}
+
+/// <summary>
+/// Request to stop drawing mode
+/// </summary>
+public class StopDrawingRequestMessage
+{
+    public required string MapId { get; init; }
+    public string? ComponentId { get; init; }
 }
