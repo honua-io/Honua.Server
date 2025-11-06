@@ -1,0 +1,323 @@
+@page "/alerts/history"
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator")]
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<AlertHistory> Logger
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Alert History - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">Alert History</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Href="/alerts">
+                Back to Configuration
+            </MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Color="Color.Default"
+                           OnClick="LoadAlertsAsync"
+                           Title="Refresh" />
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        <MudExpansionPanels>
+            <MudExpansionPanel Text="Filters" Icon="@Icons.Material.Filled.FilterList">
+                <MudGrid>
+                    <MudItem xs="12" md="6" lg="3">
+                        <MudSelect T="AlertSeverity?" Label="Severity" @bind-Value="_filterSeverity" Clearable="true">
+                            <MudSelectItem T="AlertSeverity?" Value="@AlertSeverity.Info">Info</MudSelectItem>
+                            <MudSelectItem T="AlertSeverity?" Value="@AlertSeverity.Warning">Warning</MudSelectItem>
+                            <MudSelectItem T="AlertSeverity?" Value="@AlertSeverity.Critical">Critical</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6" lg="3">
+                        <MudSelect T="AlertStatus?" Label="Status" @bind-Value="_filterStatus" Clearable="true">
+                            <MudSelectItem T="AlertStatus?" Value="@AlertStatus.Pending">Pending</MudSelectItem>
+                            <MudSelectItem T="AlertStatus?" Value="@AlertStatus.Firing">Firing</MudSelectItem>
+                            <MudSelectItem T="AlertStatus?" Value="@AlertStatus.Resolved">Resolved</MudSelectItem>
+                            <MudSelectItem T="AlertStatus?" Value="@AlertStatus.Silenced">Silenced</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6" lg="3">
+                        <MudDatePicker Label="Start Date" @bind-Date="_filterStartDate" />
+                    </MudItem>
+                    <MudItem xs="12" md="6" lg="3">
+                        <MudDatePicker Label="End Date" @bind-Date="_filterEndDate" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_searchText"
+                                      Label="Search"
+                                      Placeholder="Search by rule name or message..."
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Search"
+                                      Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="ApplyFilters">
+                                Apply Filters
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       OnClick="ClearFilters">
+                                Clear Filters
+                            </MudButton>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        <MudTable Items="@_filteredAlerts"
+                  Hover="true"
+                  Breakpoint="Breakpoint.Sm"
+                  Dense="false"
+                  Class="mt-4">
+            <HeaderContent>
+                <MudTh>Time</MudTh>
+                <MudTh>Rule</MudTh>
+                <MudTh>Severity</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Message</MudTh>
+                <MudTh>Duration</MudTh>
+                <MudTh>Channels</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Time">
+                    <MudText Typo="Typo.body2">@context.StartsAt.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Rule">
+                    <MudText Typo="Typo.body2">@context.RuleName</MudText>
+                </MudTd>
+                <MudTd DataLabel="Severity">
+                    <MudChip T="string" Size="Size.Small" Color="@GetSeverityColor(context.Severity)">
+                        @context.Severity
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                        @context.Status
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Message">
+                    <MudText Typo="Typo.body2" Class="text-truncate" Style="max-width: 400px;">
+                        @context.Message
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Duration">
+                    @if (context.EndsAt.HasValue)
+                    {
+                        var duration = context.EndsAt.Value - context.StartsAt;
+                        <MudText Typo="Typo.body2">@FormatDuration(duration)</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Active</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Channels">
+                    <MudText Typo="Typo.body2">@context.NotifiedChannels.Count</MudText>
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Info"
+                                   Size="Size.Small"
+                                   Title="View Details"
+                                   OnClick="@(() => ViewAlertDetails(context))" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Align="Align.Center" Class="py-4">
+                    @if (_hasFilters)
+                    {
+                        <span>No alerts match your filters.</span>
+                    }
+                    else
+                    {
+                        <span>No alert history available.</span>
+                    }
+                </MudText>
+            </NoRecordsContent>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+            </PagerContent>
+        </MudTable>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Alerts", href: "/alerts"),
+        new BreadcrumbItem("History", href: null, disabled: true)
+    };
+
+    private bool _loading = true;
+    private string? _errorMessage;
+    private string _searchText = string.Empty;
+
+    private List<AlertHistoryModel> _alerts = new();
+    private IEnumerable<AlertHistoryModel> _filteredAlerts => FilterAlerts();
+
+    private AlertSeverity? _filterSeverity;
+    private AlertStatus? _filterStatus;
+    private DateTime? _filterStartDate;
+    private DateTime? _filterEndDate;
+
+    private bool _hasFilters =>
+        _filterSeverity.HasValue ||
+        _filterStatus.HasValue ||
+        _filterStartDate.HasValue ||
+        _filterEndDate.HasValue ||
+        !string.IsNullOrWhiteSpace(_searchText);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAlertsAsync();
+    }
+
+    private async Task LoadAlertsAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // TODO: Replace with actual API call
+            // _alerts = await Http.GetFromJsonAsync<List<AlertHistoryModel>>("/admin/alerts/history") ?? new();
+            _alerts = new List<AlertHistoryModel>();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load alert history: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error loading alert history");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IEnumerable<AlertHistoryModel> FilterAlerts()
+    {
+        var filtered = _alerts.AsEnumerable();
+
+        // Severity filter
+        if (_filterSeverity.HasValue)
+        {
+            filtered = filtered.Where(a => a.Severity == _filterSeverity.Value);
+        }
+
+        // Status filter
+        if (_filterStatus.HasValue)
+        {
+            filtered = filtered.Where(a => a.Status == _filterStatus.Value);
+        }
+
+        // Date range filter
+        if (_filterStartDate.HasValue)
+        {
+            var startDate = _filterStartDate.Value.ToUniversalTime();
+            filtered = filtered.Where(a => a.StartsAt >= startDate);
+        }
+
+        if (_filterEndDate.HasValue)
+        {
+            var endDate = _filterEndDate.Value.AddDays(1).ToUniversalTime();
+            filtered = filtered.Where(a => a.StartsAt < endDate);
+        }
+
+        // Text search
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            var search = _searchText.ToLowerInvariant();
+            filtered = filtered.Where(a =>
+                a.RuleName.ToLowerInvariant().Contains(search) ||
+                a.Message.ToLowerInvariant().Contains(search));
+        }
+
+        return filtered.OrderByDescending(a => a.StartsAt);
+    }
+
+    private async Task ApplyFilters()
+    {
+        // Filters are applied automatically via FilterAlerts()
+        StateHasChanged();
+    }
+
+    private async Task ClearFilters()
+    {
+        _filterSeverity = null;
+        _filterStatus = null;
+        _filterStartDate = null;
+        _filterEndDate = null;
+        _searchText = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task ViewAlertDetails(AlertHistoryModel alert)
+    {
+        // TODO: Open dialog with full alert details
+        var parameters = new DialogParameters
+        {
+            { "Alert", alert }
+        };
+
+        var dialog = await DialogService.ShowAsync<AlertHistoryDetailsDialog>("Alert Details", parameters, new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true
+        });
+
+        var result = await dialog.Result;
+    }
+
+    private Color GetSeverityColor(AlertSeverity severity) => severity switch
+    {
+        AlertSeverity.Info => Color.Info,
+        AlertSeverity.Warning => Color.Warning,
+        AlertSeverity.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetStatusColor(AlertStatus status) => status switch
+    {
+        AlertStatus.Pending => Color.Default,
+        AlertStatus.Firing => Color.Error,
+        AlertStatus.Resolved => Color.Success,
+        AlertStatus.Silenced => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalDays >= 1)
+            return $"{(int)duration.TotalDays}d {duration.Hours}h";
+        if (duration.TotalHours >= 1)
+            return $"{(int)duration.TotalHours}h {duration.Minutes}m";
+        if (duration.TotalMinutes >= 1)
+            return $"{(int)duration.TotalMinutes}m {duration.Seconds}s";
+        return $"{duration.Seconds}s";
+    }
+}

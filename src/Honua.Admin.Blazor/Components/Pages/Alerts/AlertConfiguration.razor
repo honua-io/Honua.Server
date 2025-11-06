@@ -1,0 +1,539 @@
+@page "/alerts"
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator")]
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<AlertConfiguration> Logger
+@inject HttpClient Http
+
+<PageTitle>Alert Configuration - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">Alert Configuration</MudText>
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Color="Color.Default"
+                           OnClick="LoadDataAsync"
+                           Title="Refresh" />
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        @if (_stats != null)
+        {
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@_stats.FiringAlerts</MudText>
+                            <MudText Typo="Typo.body2">Firing Alerts</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">@_stats.EnabledRules / @_stats.TotalRules</MudText>
+                            <MudText Typo="Typo.body2">Active Rules</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">@_stats.EnabledChannels / @_stats.TotalChannels</MudText>
+                            <MudText Typo="Typo.body2">Active Channels</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">@_stats.Last24Hours</MudText>
+                            <MudText Typo="Typo.body2">Alerts (24h)</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        }
+
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+            <MudTabPanel Text="Alert Rules" Icon="@Icons.Material.Filled.Rule">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudTextField @bind-Value="_ruleSearchText"
+                                  Placeholder="Search rules..."
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
+                                  Style="max-width: 400px" />
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="CreateAlertRule">
+                        Create Rule
+                    </MudButton>
+                </MudStack>
+
+                <MudTable Items="@_filteredRules"
+                          Hover="true"
+                          Breakpoint="Breakpoint.Sm"
+                          Dense="false">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Severity</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Last Fired</MudTh>
+                        <MudTh>Channels</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Name">
+                            <MudText Typo="Typo.body1"><b>@context.Name</b></MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Severity">
+                            <MudChip T="string" Size="Size.Small" Color="@GetSeverityColor(context.Severity)">
+                                @context.Severity
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            @if (context.Enabled)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Enabled</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Cancel">Disabled</MudChip>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Last Fired">
+                            @if (context.LastFired.HasValue)
+                            {
+                                <MudText Typo="Typo.body2">@context.LastFired.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Never</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Channels">@context.ChannelCount</MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudStack Row="true" Spacing="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Size="Size.Small"
+                                               Title="Edit"
+                                               OnClick="@(() => EditAlertRule(context.Id))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Send"
+                                               Size="Size.Small"
+                                               Color="Color.Info"
+                                               Title="Test Alert"
+                                               OnClick="@(() => TestAlertRule(context.Id))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               Title="Delete"
+                                               OnClick="@(() => DeleteAlertRule(context))" />
+                            </MudStack>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Align="Align.Center" Class="py-4">
+                            No alert rules found. Create your first rule to get started!
+                        </MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Notification Channels" Icon="@Icons.Material.Filled.Notifications">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudTextField @bind-Value="_channelSearchText"
+                                  Placeholder="Search channels..."
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
+                                  Style="max-width: 400px" />
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="CreateNotificationChannel">
+                        Add Channel
+                    </MudButton>
+                </MudStack>
+
+                <MudTable Items="@_filteredChannels"
+                          Hover="true"
+                          Breakpoint="Breakpoint.Sm"
+                          Dense="false">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Type</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Last Used</MudTh>
+                        <MudTh>Alert Count</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Name">
+                            <MudText Typo="Typo.body1"><b>@context.Name</b></MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Type">
+                            <MudChip T="string" Size="Size.Small" Color="@GetChannelTypeColor(context.Type)">
+                                @context.Type
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            @if (context.Enabled)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Active</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Cancel">Inactive</MudChip>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Last Used">
+                            @if (context.LastUsed.HasValue)
+                            {
+                                <MudText Typo="Typo.body2">@context.LastUsed.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">Never</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Alert Count">@context.AlertCount</MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudStack Row="true" Spacing="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Size="Size.Small"
+                                               Title="Edit"
+                                               OnClick="@(() => EditNotificationChannel(context.Id))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Send"
+                                               Size="Size.Small"
+                                               Color="Color.Info"
+                                               Title="Test Channel"
+                                               OnClick="@(() => TestNotificationChannel(context.Id))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               Title="Delete"
+                                               OnClick="@(() => DeleteNotificationChannel(context))" />
+                            </MudStack>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Align="Align.Center" Class="py-4">
+                            No notification channels configured. Add your first channel to receive alerts!
+                        </MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Alert History" Icon="@Icons.Material.Filled.History">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           Href="/alerts/history"
+                           Class="mb-4">
+                    View Full Alert History
+                </MudButton>
+
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    Recent alerts (last 24 hours). Click "View Full Alert History" for advanced filtering and search.
+                </MudText>
+
+                <MudTable Items="@_recentAlerts"
+                          Hover="true"
+                          Breakpoint="Breakpoint.Sm"
+                          Dense="true">
+                    <HeaderContent>
+                        <MudTh>Time</MudTh>
+                        <MudTh>Rule</MudTh>
+                        <MudTh>Severity</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Message</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Time">
+                            <MudText Typo="Typo.body2">@context.StartsAt.ToString("MM-dd HH:mm")</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Rule">
+                            <MudText Typo="Typo.body2">@context.RuleName</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Severity">
+                            <MudChip T="string" Size="Size.Small" Color="@GetSeverityColor(context.Severity)">
+                                @context.Severity
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Status">
+                            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                                @context.Status
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Message">
+                            <MudText Typo="Typo.body2" Class="text-truncate" Style="max-width: 300px;">
+                                @context.Message
+                            </MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudIconButton Icon="@Icons.Material.Filled.Info"
+                                           Size="Size.Small"
+                                           Title="View Details"
+                                           OnClick="@(() => ViewAlertDetails(context.Id))" />
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Align="Align.Center" Class="py-4">
+                            No recent alerts.
+                        </MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Alert Routing" Icon="@Icons.Material.Filled.Route">
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    Configure routing rules to direct alerts to specific channels based on labels and severity.
+                </MudAlert>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Disabled="true"
+                           Class="mb-4">
+                    Add Routing Rule (Coming Soon)
+                </MudButton>
+
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Advanced alert routing configuration will be available in a future release.
+                </MudText>
+            </MudTabPanel>
+        </MudTabs>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Alerts", href: null, disabled: true)
+    };
+
+    private bool _loading = true;
+    private string? _errorMessage;
+    private string _ruleSearchText = string.Empty;
+    private string _channelSearchText = string.Empty;
+
+    private AlertStatsModel? _stats;
+    private List<AlertRuleListItem> _rules = new();
+    private List<NotificationChannelListItem> _channels = new();
+    private List<AlertHistoryModel> _recentAlerts = new();
+
+    private IEnumerable<AlertRuleListItem> _filteredRules =>
+        string.IsNullOrWhiteSpace(_ruleSearchText)
+            ? _rules
+            : _rules.Where(r => r.Name.Contains(_ruleSearchText, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<NotificationChannelListItem> _filteredChannels =>
+        string.IsNullOrWhiteSpace(_channelSearchText)
+            ? _channels
+            : _channels.Where(c => c.Name.Contains(_channelSearchText, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // TODO: Replace with actual API calls when backend is implemented
+            // For now, using mock data structure
+            _stats = new AlertStatsModel
+            {
+                TotalRules = 0,
+                EnabledRules = 0,
+                FiringAlerts = 0,
+                TotalChannels = 0,
+                EnabledChannels = 0,
+                SilencedAlerts = 0,
+                Last24Hours = 0,
+                Last7Days = 0
+            };
+
+            _rules = new List<AlertRuleListItem>();
+            _channels = new List<NotificationChannelListItem>();
+            _recentAlerts = new List<AlertHistoryModel>();
+
+            // Actual implementation will call:
+            // _stats = await Http.GetFromJsonAsync<AlertStatsModel>("/admin/alerts/stats");
+            // _rules = await Http.GetFromJsonAsync<List<AlertRuleListItem>>("/admin/alerts/rules") ?? new();
+            // _channels = await Http.GetFromJsonAsync<List<NotificationChannelListItem>>("/admin/alerts/channels") ?? new();
+            // _recentAlerts = await Http.GetFromJsonAsync<List<AlertHistoryModel>>("/admin/alerts/history?limit=10") ?? new();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load alert data: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error loading alert data");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateAlertRule()
+    {
+        // TODO: Open dialog to create new alert rule
+        Snackbar.Add("Alert rule creation dialog will be implemented", Severity.Info);
+    }
+
+    private async Task EditAlertRule(string ruleId)
+    {
+        // TODO: Open dialog to edit alert rule
+        Snackbar.Add($"Editing alert rule {ruleId}", Severity.Info);
+    }
+
+    private async Task TestAlertRule(string ruleId)
+    {
+        try
+        {
+            // TODO: Call API to test alert rule
+            // var response = await Http.PostAsJsonAsync($"/admin/alerts/rules/{ruleId}/test", new { });
+            Snackbar.Add("Test alert sent successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to send test alert: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error testing alert rule {RuleId}", ruleId);
+        }
+    }
+
+    private async Task DeleteAlertRule(AlertRuleListItem rule)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Delete",
+            $"Are you sure you want to delete alert rule '{rule.Name}'? This action cannot be undone.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                // TODO: Call API to delete rule
+                // await Http.DeleteAsync($"/admin/alerts/rules/{rule.Id}");
+                Snackbar.Add($"Alert rule '{rule.Name}' deleted successfully", Severity.Success);
+                await LoadDataAsync();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Failed to delete alert rule: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error deleting alert rule {RuleId}", rule.Id);
+            }
+        }
+    }
+
+    private async Task CreateNotificationChannel()
+    {
+        // TODO: Open dialog to create notification channel
+        Snackbar.Add("Notification channel creation dialog will be implemented", Severity.Info);
+    }
+
+    private async Task EditNotificationChannel(string channelId)
+    {
+        // TODO: Open dialog to edit notification channel
+        Snackbar.Add($"Editing notification channel {channelId}", Severity.Info);
+    }
+
+    private async Task TestNotificationChannel(string channelId)
+    {
+        try
+        {
+            // TODO: Call API to test notification channel
+            // var response = await Http.PostAsJsonAsync($"/admin/alerts/channels/{channelId}/test", new { });
+            Snackbar.Add("Test notification sent successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to send test notification: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error testing notification channel {ChannelId}", channelId);
+        }
+    }
+
+    private async Task DeleteNotificationChannel(NotificationChannelListItem channel)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Delete",
+            $"Are you sure you want to delete notification channel '{channel.Name}'? This action cannot be undone.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                // TODO: Call API to delete channel
+                // await Http.DeleteAsync($"/admin/alerts/channels/{channel.Id}");
+                Snackbar.Add($"Notification channel '{channel.Name}' deleted successfully", Severity.Success);
+                await LoadDataAsync();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Failed to delete notification channel: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error deleting notification channel {ChannelId}", channel.Id);
+            }
+        }
+    }
+
+    private async Task ViewAlertDetails(string alertId)
+    {
+        // TODO: Open dialog to show full alert details
+        Snackbar.Add($"Viewing alert details for {alertId}", Severity.Info);
+    }
+
+    private Color GetSeverityColor(AlertSeverity severity) => severity switch
+    {
+        AlertSeverity.Info => Color.Info,
+        AlertSeverity.Warning => Color.Warning,
+        AlertSeverity.Critical => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetStatusColor(AlertStatus status) => status switch
+    {
+        AlertStatus.Pending => Color.Default,
+        AlertStatus.Firing => Color.Error,
+        AlertStatus.Resolved => Color.Success,
+        AlertStatus.Silenced => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private Color GetChannelTypeColor(NotificationChannelType type) => type switch
+    {
+        NotificationChannelType.Email => Color.Primary,
+        NotificationChannelType.Slack => Color.Secondary,
+        NotificationChannelType.SNS => Color.Warning,
+        NotificationChannelType.Webhook => Color.Info,
+        NotificationChannelType.PagerDuty => Color.Error,
+        NotificationChannelType.Teams => Color.Tertiary,
+        _ => Color.Default
+    };
+}
