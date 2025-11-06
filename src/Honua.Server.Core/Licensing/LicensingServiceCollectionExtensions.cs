@@ -42,6 +42,9 @@ public static class LicensingServiceCollectionExtensions
         services.AddSingleton<ILicenseValidator, LicenseValidator>();
         services.AddSingleton<ILicenseManager, LicenseManager>();
 
+        // Register feature flag service
+        services.AddSingleton<Features.ILicenseFeatureFlagService, Features.LicenseFeatureFlagService>();
+
         // Note: ICredentialRevocationService implementation is registered in Core.Cloud
         // via AddCloudCredentialRevocation extension method
 
@@ -77,6 +80,9 @@ public static class LicensingServiceCollectionExtensions
         // Register core services
         services.AddSingleton<ILicenseValidator, LicenseValidator>();
         services.AddSingleton<ILicenseManager, LicenseManager>();
+
+        // Register feature flag service
+        services.AddSingleton<Features.ILicenseFeatureFlagService, Features.LicenseFeatureFlagService>();
 
         // Note: ICredentialRevocationService implementation is registered in Core.Cloud
         // via AddCloudCredentialRevocation extension method
