@@ -213,6 +213,9 @@ public static class ServiceCollectionExtensions
         // Register raster source provider registry (required by IRasterRenderer)
         services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProviderRegistry, Honua.Server.Core.Raster.Sources.RasterSourceProviderRegistry>();
 
+        // Register raster metadata cache (required by IRasterRenderer)
+        services.AddSingleton<Honua.Server.Core.Raster.RasterMetadataCache>();
+
         // Register raster renderer (required by WMS/WCS)
         services.AddSingleton<Honua.Server.Core.Raster.Rendering.IRasterRenderer, Honua.Server.Core.Raster.Rendering.SkiaSharpRasterRenderer>();
 
