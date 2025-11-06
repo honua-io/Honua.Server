@@ -20,11 +20,23 @@
         Folders
     </MudNavLink>
 
+    <MudNavLink Href="/datasources" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Storage">
+        Data Sources
+    </MudNavLink>
+
     <MudDivider Class="my-2" />
 
-    <MudNavLink Href="/import" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Upload">
-        Import Data
-    </MudNavLink>
+    <MudNavGroup Title="Import" Icon="@Icons.Material.Filled.Upload" Expanded="false">
+        <MudNavLink Href="/import" Icon="@Icons.Material.Filled.CloudUpload">
+            Upload File
+        </MudNavLink>
+        <MudNavLink Href="/import/esri" Icon="@Icons.Material.Filled.Public">
+            Import Esri Service
+        </MudNavLink>
+        <MudNavLink Href="/import/jobs" Icon="@Icons.Material.Filled.ListAlt">
+            Import Jobs
+        </MudNavLink>
+    </MudNavGroup>
 
     @if (_hasVersioning)
     {
