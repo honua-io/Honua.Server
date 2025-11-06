@@ -16,7 +16,7 @@ This directory contains comprehensive Honua documentation optimized for Retrieva
 - `kubernetes-deployment.md` - Kubernetes with HPA and Helm charts (28 KB)
 - `aws-ecs-deployment.md` - AWS ECS Fargate and CloudFormation (28 KB)
 - `reverse-proxy-ssl.md` - Nginx, Caddy, Traefik with Let's Encrypt SSL (52 KB)
-- `service-endpoints.md` - Complete API reference (OGC, WFS, WMS, Esri REST, OData, STAC) (69 KB)
+- `service-endpoints.md` - Complete API reference (OGC, WFS, WMS, Geoservices REST a.k.a. Esri REST, OData, STAC) (69 KB)
 - Azure deployment options
 - Local development setup
 
@@ -123,7 +123,7 @@ To update RAG documentation:
 - ✅ Real-world troubleshooting scenarios
 - ✅ Performance optimization strategies
 - ✅ Security best practices (OAuth, SSL/TLS, headers)
-- ✅ Complete API reference for all protocols (OGC, WFS, WMS, Esri REST, OData, STAC)
+- ✅ Complete API reference for all protocols (OGC, WFS, WMS, Geoservices REST a.k.a. Esri REST, OData, STAC)
 - ✅ Complete data provider configuration (PostGIS, SQL Server, SQLite, MySQL, Redis)
 - ✅ Metadata schema and service configuration
 - ✅ Map styling and symbolization

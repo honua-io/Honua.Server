@@ -68,7 +68,7 @@ Both variants support:
 - Vector geometry processing only (NetTopologySuite)
 - PostgreSQL, MySQL, SQLite support
 - OGC API Features, WFS 2.0/3.0, STAC 1.0
-- Esri REST API vector services
+- Geoservices REST a.k.a. Esri REST API vector services
 - No raster processing (no GDAL)
 - No cloud SDKs (smaller dependency tree)
 - Optional trimming for even smaller size

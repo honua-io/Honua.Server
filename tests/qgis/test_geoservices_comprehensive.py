@@ -3,7 +3,7 @@ Comprehensive Esri GeoServices REST API Integration Tests with QGIS
 
 This test suite provides comprehensive coverage of Esri GeoServices REST API operations
 using QGIS as the reference client. Tests validate Honua's GeoServices implementation
-against the Esri REST API specification using real-world client library integration.
+against the Geoservices REST a.k.a. Esri REST API specification using real-world client library integration.
 
 Test Coverage:
 - Service Discovery: Service root metadata (MapServer, FeatureServer)

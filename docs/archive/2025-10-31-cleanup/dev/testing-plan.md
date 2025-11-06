@@ -40,12 +40,12 @@ Immediate Next Steps
 
 Esri ↔ OGC Metadata Matrix (Draft)
 ----------------------------------
-| Esri REST Field        | Honua Metadata Source                                | OGC API Expectation                               | Gap / Notes |
+| Geoservices REST a.k.a. Esri REST Field        | Honua Metadata Source                                | OGC API Expectation                               | Gap / Notes |
 |------------------------|------------------------------------------------------|----------------------------------------------------|-------------|
 | `serviceDescription`   | `ServiceDefinition.Catalog.Summary`                  | `collections/{id}.description`                     | Align names; ensure summary propagates consistently to OGC responses and HTML catalog. |
 | `currentVersion`       | Hard-coded in controllers (`10.81`)                  | Not required by OGC; landing page advertises conformance classes | Track version in configuration so docs stay honest when we bump Esri parity. |
 | `capabilities`         | Not explicitly modeled; implied by enabled endpoints | `conformance` list + `collections/{id}.links`      | Add explicit service capability list so both Esri and OGC outputs reflect query/export support. |
-| `maxRecordCount`       | `LayerDefinition.Query.MaxRecordCount`               | `service.Ogc.ItemLimit` (collection `itemType`)    | Ensure layer override wins; expose negotiated limit in both Esri JSON and OGC pagination links. |
+| `maxRecordCount`       | `LayerDefinition.Query.MaxRecordCount`               | `service.Ogc.ItemLimit` (collection `itemType`)    | Ensure layer override wins; expose negotiated limit in both GeoServices JSON format and OGC pagination links. |
 | `supportedQueryFormats`| Derived in controllers (`JSON,geoJSON,KML…`)         | Advertised via `links`/`mediaTypes`                | Drive from metadata so new exporters automatically appear in both surfaces. |
 | `drawingInfo`          | Not captured today                                   | N/A (OGC has styles via maps/tiles extensions)     | Record optional renderer/style metadata to unblock future symbology tests. |
 | `hasVersionedData`     | Absent                                               | N/A                                                | Decide whether to expose as metadata flag or drop for MVP parity messaging. |

@@ -22,7 +22,7 @@
 | **WFS 2.0** | `Host/Wfs/` | WfsHandlers, WfsTransactionHandlers, WfsLockHandlers | Full transactional |
 | **WMS 1.3** | `Host/Wms/` | WmsHandlers, WmsGetMapHandlers, WmsCapabilitiesBuilder | Full |
 | **STAC 1.0** | `Host/Stac/` + `Core/Stac/` | StacSearchController, StacCatalogBuilder | Full |
-| **Esri REST** | `Host/GeoservicesREST/` | Esri adapters for Feature/Map/Image Server | Full |
+| **Geoservices REST a.k.a. Esri REST** | `Host/GeoservicesREST/` | Esri adapters for Feature/Map/Image Server | Full |
 | **OData v4** | `Host/OData/` | OData filtering & projection | Full |
 
 **Query Filters:**

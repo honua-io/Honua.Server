@@ -532,4 +532,4 @@ Adding ISO 19115 support to Honua's metadata model:
 ✅ **Enables enterprise use cases** - Government, scientific, commercial catalogs
 ✅ **Competitive with GeoServer** - Matches open-source leader's CSW functionality
 
-**Recommendation:** Implement in Phase 2 after core OGC/Esri functionality is stable.
+**Recommendation:** Implement in Phase 2 after core OGC/GeoServices REST functionality is stable.

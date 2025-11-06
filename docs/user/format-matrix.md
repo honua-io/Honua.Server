@@ -14,7 +14,7 @@ Complete reference for all supported data formats and content types across Honua
 | **CSV** | `text/csv` | `?f=csv` | `Accept: text/csv` | Comma-separated values with geometry as WKT or GeoJSON. |
 | **Shapefile** | `application/zip` | `?f=shapefile` | `Accept: application/x-shapefile` | Zipped SHP/SHX/DBF/PRJ bundle. Enforces record limits (configurable, default 10k). |
 | **GeoPackage** | `application/geopackage+sqlite3` | `?f=geopackage` or `?f=gpkg` | `Accept: application/geopackage+sqlite3` | OGC GeoPackage SQLite database. May return 202 Accepted with async job for large datasets. |
-| **Esri JSON** | `application/json` | `?f=json` or `?f=pjson` | `Accept: application/json` | Esri FeatureSet JSON format (FeatureServer endpoints only). |
+| **GeoServices JSON format** | `application/json` | `?f=json` or `?f=pjson` | `Accept: application/json` | GeoServices FeatureSet format (FeatureServer endpoints only). |
 | **GML 3.2** | `application/gml+xml; version=3.2` | `?outputFormat=application/gml+xml; version=3.2` | `Accept: application/gml+xml` | OGC Geography Markup Language 3.2. Used for WFS locking and transactions. |
 
 ## Raster Tile Formats
@@ -139,9 +139,9 @@ jq -s '{type:"FeatureCollection",features:.}' parcels.ndjson > parcels.geojson
 | `/ogc/collections/{id}/items` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `/ogc/collections/{id}/items/{featureId}` | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
 
-### Esri REST API
+### Geoservices REST a.k.a. Esri REST API
 
-| Endpoint | Esri JSON | GeoJSON | TopoJSON | KML | KMZ | CSV | Shapefile | MVT |
+| Endpoint | GeoServices JSON format | GeoJSON | TopoJSON | KML | KMZ | CSV | Shapefile | MVT |
 |----------|-----------|---------|----------|-----|-----|-----|-----------|-----|
 | `/rest/services/.../FeatureServer/{layer}/query` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `/rest/services/.../FeatureServer/{layer}/{objectId}` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |

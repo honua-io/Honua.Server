@@ -142,7 +142,7 @@ public sealed class DataIngestionPlugin
                         crsFlexibility = "High",
                         performance = "Excellent (proprietary format)"
                     },
-                    recommendedFor = new[] { "Esri ecosystem", "Complex spatial data" },
+                    recommendedFor = new[] { "proprietary GIS platforms", "Complex spatial data" },
                     limitations = "Proprietary format, requires GDAL with FileGDB driver"
                 },
                 _ => new

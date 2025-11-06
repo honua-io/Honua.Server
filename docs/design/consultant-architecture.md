@@ -573,7 +573,7 @@ $ honua assistant migrate \
 
 2. Schema Migration (1 min)
    - Convert coded domains to constraints
-   - Map Esri types to PostGIS
+   - Map GeoServices REST types to PostGIS
 
 3. Data Transfer (8 min)
    - Parallel bulk load (8 workers)

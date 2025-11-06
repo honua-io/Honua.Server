@@ -129,7 +129,7 @@ Successfully implemented all critical missing features for GeoServices REST API 
 **Verification**: Reviewed existing implementation in `GeoservicesTemporalResolver.cs`
 
 **Supported Time Formats**:
-1. ✅ **Unix Epoch Milliseconds** (Esri standard) - e.g., `1730391600000`
+1. ✅ **Unix Epoch Milliseconds** (GeoServices specification) - e.g., `1730391600000`
 2. ✅ **ISO-8601 DateTime** - e.g., `2025-10-31T12:00:00Z`
 3. ✅ **Time Ranges** - e.g., `start,end` or `start,null` for open-ended
 
@@ -431,7 +431,7 @@ These enhancements are **NOT BLOCKING** for ArcGIS compatibility. The current im
 **For Developers**:
 - Clean, maintainable code following existing patterns
 - Comprehensive test coverage prevents regressions
-- Well-documented with inline references to Esri specifications
+- Well-documented with inline references to GeoServices REST specifications
 
 **For Operations**:
 - Zero breaking changes - safe to deploy

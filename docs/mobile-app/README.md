@@ -321,7 +321,7 @@ Data Layer (Repository, API, Database)
 **vs. Survey123:**
 - 🗺️ General purpose (not survey-only)
 - 🔓 Works with any backend (not just Esri)
-- 💰 Standalone pricing (no Esri requirement)
+- 💰 Standalone pricing (no commercial GIS platform requirement)
 
 ### Target Market
 

@@ -358,7 +358,7 @@ This script:
 
 ## Constraints
 
-- **MUST maintain Esri REST API compatibility**
+- **MUST maintain Geoservices REST a.k.a. Esri REST API compatibility**
 - **MUST preserve exact endpoint behavior**
 - **MUST keep existing authorization logic**
 - **MUST pass all existing tests**

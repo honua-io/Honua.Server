@@ -372,7 +372,7 @@ Migration Strategy:
 1. Schema Migration (5 min)
    - Create PostGIS tables
    - Convert coded domains to constraints
-   - Map Esri types to PostgreSQL
+   - Map GeoServices REST types to PostgreSQL
 
 2. Data Transfer (15 min)
    - Parallel bulk load (8 workers)
