@@ -11,8 +11,8 @@ name: Quick Integration Tests (Fast Feedback)
 # For comprehensive testing, use the full integration-tests.yml workflow.
 
 on:
-  pull_request:
-    branches: [master, main, dev]
+  # pull_request:
+  #   branches: [master, main, dev]
   workflow_dispatch:
 
 env:

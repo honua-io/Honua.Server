@@ -1,8 +1,8 @@
 name: "Mutation Testing"
 
 on:
-  pull_request:
-    branches: [ "master", "dev" ]
+  # pull_request:
+  #   branches: [ "master", "dev" ]
   workflow_dispatch:
   schedule:
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC

@@ -1,11 +1,11 @@
 name: Performance Benchmarks
 
 on:
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'tests/Honua.Server.Benchmarks/**'
-      - '.github/workflows/benchmarks.yml'
+  # pull_request:
+  #   paths:
+  #     - 'src/**'
+  #     - 'tests/Honua.Server.Benchmarks/**'
+  #     - '.github/workflows/benchmarks.yml'
   push:
     branches:
       - master

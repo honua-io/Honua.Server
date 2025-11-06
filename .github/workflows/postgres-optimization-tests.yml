@@ -14,13 +14,13 @@ on:
       - 'tests/Honua.Server.Core.Tests/Data/Postgres/OptimizedPostgresFeatureOperationsTests.cs'
       - 'tests/Honua.Server.Integration.Tests/Data/PostgresOptimizationsIntegrationTests.cs'
       - '.github/workflows/postgres-optimization-tests.yml'
-  pull_request:
-    branches: [ master, main ]
-    paths:
-      - 'src/Honua.Server.Core/Data/Migrations/014_PostgresOptimizations.sql'
-      - 'src/Honua.Server.Core/Data/Postgres/**'
-      - 'tests/**/*PostgresOptimization*'
-      - '.github/workflows/postgres-optimization-tests.yml'
+  # pull_request:
+  #   branches: [ master, main ]
+  #   paths:
+  #     - 'src/Honua.Server.Core/Data/Migrations/014_PostgresOptimizations.sql'
+  #     - 'src/Honua.Server.Core/Data/Postgres/**'
+  #     - 'tests/**/*PostgresOptimization*'
+  #     - '.github/workflows/postgres-optimization-tests.yml'
   workflow_dispatch:
     inputs:
       run_benchmarks:
