@@ -18,6 +18,7 @@ public sealed class S3CogCacheStorage : CloudStorageCacheProviderBase, IAsyncDis
 {
     private readonly IAmazonS3 _client;
     private readonly bool _ownsClient;
+    private int _disposed;
 
     public S3CogCacheStorage(
         IAmazonS3 client,
@@ -92,11 +93,17 @@ public sealed class S3CogCacheStorage : CloudStorageCacheProviderBase, IAsyncDis
 
     public ValueTask DisposeAsync()
     {
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return ValueTask.CompletedTask; // Already disposed
+        }
+
         if (_ownsClient && _client is IDisposable disposableClient)
         {
             disposableClient.Dispose();
         }
 
+        GC.SuppressFinalize(this);
         return ValueTask.CompletedTask;
     }
 }

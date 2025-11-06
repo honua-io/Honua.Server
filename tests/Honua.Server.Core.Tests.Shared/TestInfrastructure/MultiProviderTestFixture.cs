@@ -126,12 +126,24 @@ public sealed class MultiProviderTestFixture : IAsyncLifetime
                 .WithEnvironment("MYSQL_DATABASE", "honua_test")
                 .WithWaitStrategy(Wait.ForUnixContainer()
                     .UntilCommandIsCompleted("/bin/sh", "-c", "mysqladmin ping -h localhost -uroot -phonua_test_password || exit 1"))
+                .WithStartupCallback(async (container, ct) =>
+                {
+                    // Add extra delay after container reports ready to ensure MySQL is fully initialized
+                    await Task.Delay(TimeSpan.FromSeconds(2), ct);
+                })
                 .Build();
 
             await _mysqlContainer.StartAsync();
 
             var port = _mysqlContainer.GetMappedPublicPort(3306);
-            var connectionString = $"Server=localhost;Port={port};Database=honua_test;User=root;Password=honua_test_password;";
+
+            // Add connection pool settings for better stability
+            var connectionString = $"Server=localhost;Port={port};Database=honua_test;User=root;Password=honua_test_password;" +
+                                 $"ConnectionTimeout=60;DefaultCommandTimeout=300;Pooling=true;MinimumPoolSize=1;MaximumPoolSize=10;" +
+                                 $"ConnectionIdleTimeout=180;AllowUserVariables=true;";
+
+            // Verify MySQL is ready with retry logic
+            await WaitForMySqlReadyAsync(connectionString);
 
             Providers[MySqlProvider] = new TestDatabaseInfo
             {
@@ -146,6 +158,38 @@ public sealed class MultiProviderTestFixture : IAsyncLifetime
             Console.Error.WriteLine($"[MultiProviderTestFixture] Unable to start MySQL test container: {ex.Message}");
             _mysqlContainer = null;
         }
+    }
+
+    private static async Task WaitForMySqlReadyAsync(string connectionString, int maxRetries = 10)
+    {
+        var delay = TimeSpan.FromMilliseconds(500);
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var connection = new MySqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                // Execute a simple query to ensure database is fully ready
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT 1";
+                await cmd.ExecuteScalarAsync();
+
+                Console.WriteLine($"[MultiProviderTestFixture] MySQL connection verified after {attempt} attempt(s)");
+                return;
+            }
+            catch (MySqlException ex) when (attempt < maxRetries)
+            {
+                Console.WriteLine($"[MultiProviderTestFixture] MySQL connection attempt {attempt}/{maxRetries} failed: {ex.Message}. Retrying in {delay.TotalMilliseconds}ms...");
+                await Task.Delay(delay);
+
+                // Exponential backoff with max of 5 seconds
+                delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 1.5, 5000));
+            }
+        }
+
+        throw new InvalidOperationException($"MySQL failed to become ready after {maxRetries} attempts");
     }
 
     private async Task SeedAllProvidersAsync()
@@ -279,55 +323,86 @@ public sealed class MultiProviderTestFixture : IAsyncLifetime
 
     private async Task SeedMySqlAsync(TestDatabaseInfo provider)
     {
-        using var connection = new MySqlConnection(provider.ConnectionString);
-        await connection.OpenAsync();
-
-        var featureId = 1;
-        foreach (var (type, scenario) in GeometryTestData.GetAllTestCombinations())
+        await ExecuteWithRetryAsync(async () =>
         {
-            var tableName = GetTableName(type, scenario);
-            var geometry = GeometryTestData.GetTestGeometry(type, scenario);
-            var wkt = GeometryTestData.ToWkt(geometry);
+            using var connection = new MySqlConnection(provider.ConnectionString);
+            await connection.OpenAsync();
 
-            // Create table with MySQL geometry
-            using var createCmd = connection.CreateCommand();
-            createCmd.CommandText = $@"
-                CREATE TABLE IF NOT EXISTS {tableName} (
-                    feature_id INTEGER PRIMARY KEY,
-                    name TEXT,
-                    geometry_type TEXT,
-                    category TEXT,
-                    priority INTEGER,
-                    active BOOLEAN,
-                    created_at DATETIME,
-                    measurement DOUBLE,
-                    description TEXT,
-                    geom GEOMETRY NOT NULL SRID 4326
-                );";
-            await createCmd.ExecuteNonQueryAsync();
+            var featureId = 1;
+            foreach (var (type, scenario) in GeometryTestData.GetAllTestCombinations())
+            {
+                var tableName = GetTableName(type, scenario);
+                var geometry = GeometryTestData.GetTestGeometry(type, scenario);
+                var wkt = GeometryTestData.ToWkt(geometry);
 
-            // Insert test feature using ST_GeomFromText
-            // MySQL 8.0 with SRID 4326 expects lat/lon order by default, but WKT is lon/lat
-            // Use 'axis-order=long-lat' to force XY (lon/lat) interpretation
-            using var insertCmd = connection.CreateCommand();
-            insertCmd.CommandText = $@"
-                INSERT IGNORE INTO {tableName} (feature_id, name, geometry_type, category, priority, active, created_at, measurement, description, geom)
-                VALUES (@id, @name, @geom_type, @category, @priority, @active, @created_at, @measurement, @description, ST_GeomFromText(@wkt, 4326, 'axis-order=long-lat'));";
+                // Create table with MySQL geometry
+                using var createCmd = connection.CreateCommand();
+                createCmd.CommandText = $@"
+                    CREATE TABLE IF NOT EXISTS {tableName} (
+                        feature_id INTEGER PRIMARY KEY,
+                        name TEXT,
+                        geometry_type TEXT,
+                        category TEXT,
+                        priority INTEGER,
+                        active BOOLEAN,
+                        created_at DATETIME,
+                        measurement DOUBLE,
+                        description TEXT,
+                        geom GEOMETRY NOT NULL SRID 4326
+                    );";
+                await createCmd.ExecuteNonQueryAsync();
 
-            var attrs = GeometryTestData.GetTestAttributes(type, featureId++);
-            insertCmd.Parameters.AddWithValue("@id", attrs["feature_id"]!);
-            insertCmd.Parameters.AddWithValue("@name", attrs["name"]!);
-            insertCmd.Parameters.AddWithValue("@geom_type", attrs["geometry_type"]!);
-            insertCmd.Parameters.AddWithValue("@category", attrs["category"]!);
-            insertCmd.Parameters.AddWithValue("@priority", attrs["priority"]!);
-            insertCmd.Parameters.AddWithValue("@active", (bool)attrs["active"]!);
-            insertCmd.Parameters.AddWithValue("@created_at", (DateTime)attrs["created_at"]!);
-            insertCmd.Parameters.AddWithValue("@measurement", attrs["measurement"]!);
-            insertCmd.Parameters.AddWithValue("@description", attrs["description"]!);
-            insertCmd.Parameters.AddWithValue("@wkt", wkt);
+                // Insert test feature using ST_GeomFromText
+                // MySQL 8.0 with SRID 4326 expects lat/lon order by default, but WKT is lon/lat
+                // Use 'axis-order=long-lat' to force XY (lon/lat) interpretation
+                using var insertCmd = connection.CreateCommand();
+                insertCmd.CommandText = $@"
+                    INSERT IGNORE INTO {tableName} (feature_id, name, geometry_type, category, priority, active, created_at, measurement, description, geom)
+                    VALUES (@id, @name, @geom_type, @category, @priority, @active, @created_at, @measurement, @description, ST_GeomFromText(@wkt, 4326, 'axis-order=long-lat'));";
 
-            await insertCmd.ExecuteNonQueryAsync();
+                var attrs = GeometryTestData.GetTestAttributes(type, featureId++);
+                insertCmd.Parameters.AddWithValue("@id", attrs["feature_id"]!);
+                insertCmd.Parameters.AddWithValue("@name", attrs["name"]!);
+                insertCmd.Parameters.AddWithValue("@geom_type", attrs["geometry_type"]!);
+                insertCmd.Parameters.AddWithValue("@category", attrs["category"]!);
+                insertCmd.Parameters.AddWithValue("@priority", attrs["priority"]!);
+                insertCmd.Parameters.AddWithValue("@active", (bool)attrs["active"]!);
+                insertCmd.Parameters.AddWithValue("@created_at", (DateTime)attrs["created_at"]!);
+                insertCmd.Parameters.AddWithValue("@measurement", attrs["measurement"]!);
+                insertCmd.Parameters.AddWithValue("@description", attrs["description"]!);
+                insertCmd.Parameters.AddWithValue("@wkt", wkt);
+
+                await insertCmd.ExecuteNonQueryAsync();
+            }
+        }, "MySQL seeding");
+    }
+
+    private static async Task ExecuteWithRetryAsync(Func<Task> action, string operationName, int maxRetries = 5)
+    {
+        var delay = TimeSpan.FromMilliseconds(500);
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                await action();
+                if (attempt > 1)
+                {
+                    Console.WriteLine($"[MultiProviderTestFixture] {operationName} succeeded after {attempt} attempt(s)");
+                }
+                return;
+            }
+            catch (MySqlException ex) when (attempt < maxRetries)
+            {
+                Console.WriteLine($"[MultiProviderTestFixture] {operationName} attempt {attempt}/{maxRetries} failed: {ex.Message}. Retrying in {delay.TotalMilliseconds}ms...");
+                await Task.Delay(delay);
+
+                // Exponential backoff with max of 5 seconds
+                delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 1.5, 5000));
+            }
         }
+
+        throw new InvalidOperationException($"{operationName} failed after {maxRetries} attempts");
     }
 
     private static string GetTableName(GeometryTestData.GeometryType type, GeometryTestData.GeodeticScenario scenario)

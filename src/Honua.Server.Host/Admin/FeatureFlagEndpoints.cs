@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Honua.Server.Core.Features;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 
@@ -43,8 +44,8 @@ public static class FeatureFlagEndpoints
     /// Gets all feature flags for the current license.
     /// </summary>
     private static async Task<IResult> GetFeatureFlags(
-        ILicenseFeatureFlagService featureFlagService,
-        ILogger<Program> logger,
+        [FromServices] ILicenseFeatureFlagService featureFlagService,
+        [FromServices] ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         try
@@ -72,8 +73,8 @@ public static class FeatureFlagEndpoints
     /// </summary>
     private static async Task<IResult> IsFeatureEnabled(
         string featureName,
-        ILicenseFeatureFlagService featureFlagService,
-        ILogger<Program> logger,
+        [FromServices] ILicenseFeatureFlagService featureFlagService,
+        [FromServices] ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(featureName))

@@ -480,7 +480,7 @@ public static class MetadataAdministrationEndpoints
 
     private static async Task<IResult> EnableService(
         string id,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
@@ -489,7 +489,7 @@ public static class MetadataAdministrationEndpoints
 
     private static async Task<IResult> DisableService(
         string id,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
@@ -499,7 +499,7 @@ public static class MetadataAdministrationEndpoints
     private static async Task<IResult> ToggleServiceEnabledState(
         string id,
         bool enabled,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
@@ -558,7 +558,7 @@ public static class MetadataAdministrationEndpoints
         string id,
         string type,
         HttpContext context,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         CancellationToken ct)
     {
         try
@@ -1143,7 +1143,7 @@ public static class MetadataAdministrationEndpoints
     #region Data Sources
 
     private static async Task<IResult> GetDataSources(
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         CancellationToken ct)
     {
         var snapshot = await metadataProvider.LoadAsync(ct);
@@ -1160,7 +1160,7 @@ public static class MetadataAdministrationEndpoints
 
     private static async Task<IResult> GetDataSourceById(
         string id,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         CancellationToken ct)
     {
         var snapshot = await metadataProvider.LoadAsync(ct);
@@ -1186,7 +1186,7 @@ public static class MetadataAdministrationEndpoints
 
     private static async Task<IResult> CreateDataSource(
         CreateDataSourceRequest request,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
@@ -1248,7 +1248,7 @@ public static class MetadataAdministrationEndpoints
     private static async Task<IResult> UpdateDataSource(
         string id,
         UpdateDataSourceRequest request,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
@@ -1305,7 +1305,7 @@ public static class MetadataAdministrationEndpoints
 
     private static async Task<IResult> DeleteDataSource(
         string id,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
@@ -1366,7 +1366,7 @@ public static class MetadataAdministrationEndpoints
 
     private static async Task<IResult> TestDataSourceConnection(
         string id,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
@@ -1410,7 +1410,7 @@ public static class MetadataAdministrationEndpoints
 
     private static async Task<IResult> GetDataSourceTables(
         string id,
-        IMutableMetadataProvider metadataProvider,
+        [FromServices] IMutableMetadataProvider metadataProvider,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {

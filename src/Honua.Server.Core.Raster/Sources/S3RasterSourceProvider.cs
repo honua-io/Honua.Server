@@ -17,12 +17,13 @@ public sealed class S3RasterSourceProvider : IRasterSourceProvider, IAsyncDispos
     private readonly IAmazonS3 _s3Client;
     private readonly bool _ownsClient;
     private readonly ResiliencePipeline _circuitBreaker;
+    private int _disposed;
 
     public S3RasterSourceProvider(IAmazonS3 s3Client, ILogger<S3RasterSourceProvider> logger, bool ownsClient = false)
     {
         _s3Client = s3Client ?? throw new ArgumentNullException(nameof(s3Client));
         _ownsClient = ownsClient;
-        _circuitBreaker = Caching.ExternalServiceResiliencePolicies.CreateCircuitBreakerPipeline("S3 Source", logger);
+        _circuitBreaker = Caching.ExternalServiceResiliencePolicies.CreateCircuitBreakerPipeline("S3 Source", logger ?? throw new ArgumentNullException(nameof(logger)));
     }
 
     public string ProviderKey => "s3";
@@ -107,6 +108,11 @@ public sealed class S3RasterSourceProvider : IRasterSourceProvider, IAsyncDispos
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return; // Already disposed
+        }
+
         if (_ownsClient)
         {
             if (_s3Client is IAsyncDisposable asyncDisposable)
@@ -118,5 +124,7 @@ public sealed class S3RasterSourceProvider : IRasterSourceProvider, IAsyncDispos
                 disposable.Dispose();
             }
         }
+
+        GC.SuppressFinalize(this);
     }
 }

@@ -1116,9 +1116,9 @@ public sealed class GdalCogCacheServiceTests : IDisposable
                 await service.ConvertToCogAsync(invalidFile, options);
                 Assert.Fail("Expected exception was not thrown");
             }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (ex is InvalidOperationException || ex is ApplicationException)
             {
-                // Expected - invalid file format
+                // Expected - invalid file format (GDAL may throw ApplicationException)
                 // The important part is that this doesn't leak GDAL Dataset objects
             }
             finally

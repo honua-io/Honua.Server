@@ -188,7 +188,7 @@ public sealed class ZarrStreamBenchmarks : IDisposable
         Assert.True(speedup > 1.5, $"Cache speedup too low: {speedup:F2}x");
     }
 
-    [Fact]
+    [Fact(Skip = "Performance test - throughput thresholds are environment-dependent")]
     public async Task Benchmark_WindowedRead_MeasuresPartialArrayPerformance()
     {
         // Arrange

@@ -1,0 +1,14 @@
+{
+  "configProperties": {
+    "System.Runtime.TieredCompilation.QuickJit": false,
+    "System.Runtime.TieredCompilation.QuickJitForLoops": false
+  },
+  "runtimeOptions": {
+    "includedFrameworks": [
+      {
+        "name": "Microsoft.AspNetCore.App",
+        "version": "9.0.0"
+      }
+    ]
+  }
+}

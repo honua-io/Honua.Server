@@ -262,6 +262,9 @@ internal static class StacApiMapper
         // 2. Both start_datetime and end_datetime fields with datetime explicitly set to null
         if (record.Datetime.HasValue)
         {
+            // Remove any null datetime fields from properties before setting the valid value
+            properties.Remove("start_datetime");
+            properties.Remove("end_datetime");
             properties["datetime"] = record.Datetime.Value.ToString("O");
         }
         else if (record.StartDatetime.HasValue && record.EndDatetime.HasValue)
@@ -276,12 +279,17 @@ internal static class StacApiMapper
             // If only one of start/end is present, use it as datetime
             // This handles edge cases where data might have incomplete temporal info
             var fallbackDatetime = record.StartDatetime ?? record.EndDatetime;
+            properties.Remove("start_datetime");
+            properties.Remove("end_datetime");
             properties["datetime"] = fallbackDatetime?.ToString("O");
         }
         else
         {
             // No temporal information available - provide a default datetime
             // Use Unix epoch as a fallback to indicate unknown acquisition time
+            // Remove any null temporal fields that may have been in the properties JSON
+            properties.Remove("start_datetime");
+            properties.Remove("end_datetime");
             properties["datetime"] = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero).ToString("O");
         }
 
