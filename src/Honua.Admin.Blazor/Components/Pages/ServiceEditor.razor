@@ -3,6 +3,8 @@
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
 @inject ServiceApiClient ServiceApi
+@inject DataSourceApiClient DataSourceApi
+@inject FolderApiClient FolderApi
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -43,12 +45,59 @@
                     <MudSelect @bind-Value="_model.ServiceType"
                                Label="Service Type"
                                Required="true"
-                               HelperText="Type of OGC service">
+                               Disabled="@_isEditMode"
+                               HelperText="@(_isEditMode ? "Service type cannot be changed after creation" : "Type of OGC service")">
                         <MudSelectItem Value="@("WMS")">WMS (Web Map Service)</MudSelectItem>
                         <MudSelectItem Value="@("WFS")">WFS (Web Feature Service)</MudSelectItem>
                         <MudSelectItem Value="@("WMTS")">WMTS (Web Map Tile Service)</MudSelectItem>
                         <MudSelectItem Value="@("OGC_API")">OGC API Features</MudSelectItem>
                         <MudSelectItem Value="@("VECTOR_TILES")">Vector Tiles</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_model.DataSourceId"
+                               Label="Data Source"
+                               Required="@(!_isEditMode)"
+                               Disabled="@_isEditMode"
+                               HelperText="@(_isEditMode ? "Data source cannot be changed after creation" : "Database connection for this service")">
+                        @if (_dataSources.Count == 0)
+                        {
+                            <MudSelectItem Value="@("")" Disabled="true">No data sources available - create one first</MudSelectItem>
+                        }
+                        else
+                        {
+                            @foreach (var ds in _dataSources)
+                            {
+                                <MudSelectItem Value="@ds.Id">
+                                    @ds.Id (@ds.Provider)
+                                </MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                    @if (!_isEditMode && _dataSources.Count == 0)
+                    {
+                        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                                   Size="Size.Small"
+                                   Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   Href="/datasources"
+                                   Class="mt-2">
+                            Create Data Source
+                        </MudButton>
+                    }
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="_model.FolderId"
+                               Label="Folder"
+                               Clearable="true"
+                               HelperText="Optional folder to organize services">
+                        <MudSelectItem Value="@((string?)null)">None</MudSelectItem>
+                        @foreach (var folder in _folders)
+                        {
+                            <MudSelectItem Value="@folder.Id">@folder.Title</MudSelectItem>
+                        }
                     </MudSelect>
                 </MudItem>
 
@@ -144,11 +193,19 @@
     private bool _isEditMode => !string.IsNullOrEmpty(Id);
     private string? _errorMessage;
     private ServiceEditorModel _model = new();
+    private List<DataSourceListItem> _dataSources = new();
+    private List<FolderListItem> _folders = new();
     private List<BreadcrumbItem> _breadcrumbs = new();
 
     protected override async Task OnInitializedAsync()
     {
         UpdateBreadcrumbs();
+
+        // Load data sources and folders in parallel
+        await Task.WhenAll(
+            LoadDataSourcesAsync(),
+            LoadFoldersAsync()
+        );
 
         if (_isEditMode && !string.IsNullOrEmpty(Id))
         {
@@ -158,6 +215,30 @@
         {
             // Set defaults for new service
             _model.ServiceType = "WMS";
+        }
+    }
+
+    private async Task LoadDataSourcesAsync()
+    {
+        try
+        {
+            _dataSources = await DataSourceApi.GetDataSourcesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data sources: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private async Task LoadFoldersAsync()
+    {
+        try
+        {
+            _folders = await FolderApi.GetFoldersAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading folders: {ex.Message}", Severity.Warning);
         }
     }
 
@@ -191,6 +272,7 @@
                 Title = service.Title,
                 Description = service.Description ?? string.Empty,
                 ServiceType = service.ServiceType,
+                DataSourceId = service.DataSourceId,
                 FolderId = service.FolderId,
                 OgcOptions = service.OgcOptions ?? new ServiceOgcOptions()
             };
@@ -225,8 +307,7 @@
                 {
                     Title = _model.Title,
                     Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
-                    ServiceType = _model.ServiceType,
-                    FolderId = string.IsNullOrWhiteSpace(_model.FolderId) ? null : _model.FolderId,
+                    FolderId = _model.FolderId ?? string.Empty,
                     OgcOptions = _model.OgcOptions
                 };
 
@@ -237,12 +318,19 @@
             }
             else
             {
+                if (string.IsNullOrWhiteSpace(_model.DataSourceId))
+                {
+                    Snackbar.Add("Please select a data source", Severity.Error);
+                    return;
+                }
+
                 var request = new CreateServiceRequest
                 {
                     Id = _model.Id,
                     Title = _model.Title,
                     Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
                     ServiceType = _model.ServiceType,
+                    DataSourceId = _model.DataSourceId,
                     FolderId = string.IsNullOrWhiteSpace(_model.FolderId) ? null : _model.FolderId,
                     OgcOptions = _model.OgcOptions
                 };
@@ -344,6 +432,7 @@
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ServiceType { get; set; } = "WMS";
+        public string? DataSourceId { get; set; }
         public string? FolderId { get; set; }
         public ServiceOgcOptions OgcOptions { get; set; } = new();
     }
