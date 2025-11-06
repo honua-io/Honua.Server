@@ -199,6 +199,9 @@ internal static class EndpointExtensions
         app.MapLoggingConfiguration();
         app.MapTokenRevocationEndpoints();
 
+        // Map MapSDK configuration endpoints (visual map builder)
+        app.MapMapConfigurationEndpoints();
+
         // Map Admin UI SignalR hub for real-time updates
         app.MapHub<Honua.Server.Host.Admin.Hubs.MetadataChangeNotificationHub>("/admin/hub/metadata");
 
