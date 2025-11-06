@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Honua MapSDK - Demo Application</title>
+    <base href="/" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="@_isDarkMode" />
+        <MudDialogProvider />
+        <MudSnackbarProvider />
+
+        <Router AppAssembly="@typeof(App).Assembly">
+            <Found Context="routeData">
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(Components.Layout.DemoLayout)" />
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <PageTitle>Not found</PageTitle>
+                <LayoutView Layout="@typeof(Components.Layout.DemoLayout)">
+                    <div class="not-found">
+                        <MudText Typo="Typo.h3">404 - Page Not Found</MudText>
+                        <MudText Typo="Typo.body1" Class="mt-4">
+                            The page you're looking for doesn't exist.
+                        </MudText>
+                        <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4">
+                            Go to Home
+                        </MudButton>
+                    </div>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+</body>
+
+</html>
+
+@code {
+    private MudThemeProvider? _mudThemeProvider;
+    private bool _isDarkMode;
+}

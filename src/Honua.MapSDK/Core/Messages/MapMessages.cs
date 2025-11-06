@@ -137,12 +137,85 @@ public class LayerRemovedMessage
 }
 
 /// <summary>
-/// Published during timeline animation
+/// Published during timeline animation when time position changes
 /// </summary>
 public class TimeChangedMessage
 {
-    public required DateTime Timestamp { get; init; }
-    public required string TimeField { get; init; }
+    /// <summary>
+    /// Current time position
+    /// </summary>
+    public required DateTime CurrentTime { get; init; }
+
+    /// <summary>
+    /// Timeline start time
+    /// </summary>
+    public required DateTime StartTime { get; init; }
+
+    /// <summary>
+    /// Timeline end time
+    /// </summary>
+    public required DateTime EndTime { get; init; }
+
+    /// <summary>
+    /// Timeline component ID
+    /// </summary>
+    public required string ComponentId { get; init; }
+
+    /// <summary>
+    /// Field name containing timestamp data
+    /// </summary>
+    public string? TimeField { get; init; }
+
+    /// <summary>
+    /// Current step index (0-based)
+    /// </summary>
+    public int CurrentStep { get; init; }
+
+    /// <summary>
+    /// Total number of steps
+    /// </summary>
+    public int TotalSteps { get; init; }
+
+    /// <summary>
+    /// Progress percentage (0-100)
+    /// </summary>
+    public double Progress { get; init; }
+
+    /// <summary>
+    /// Whether timeline is playing
+    /// </summary>
+    public bool IsPlaying { get; init; }
+
+    /// <summary>
+    /// Playback direction (1 = forward, -1 = reverse)
+    /// </summary>
+    public int Direction { get; init; } = 1;
+}
+
+/// <summary>
+/// Published when timeline playback state changes
+/// </summary>
+public class TimelineStateChangedMessage
+{
+    /// <summary>
+    /// Timeline component ID
+    /// </summary>
+    public required string ComponentId { get; init; }
+
+    /// <summary>
+    /// New playback state
+    /// </summary>
+    public required string State { get; init; } // "playing", "paused", "stopped"
+
+    /// <summary>
+    /// Current speed multiplier
+    /// </summary>
+    public double Speed { get; init; } = 1.0;
+
+    /// <summary>
+    /// Loop enabled
+    /// </summary>
+    public bool Loop { get; init; }
 }
 
 /// <summary>
@@ -211,4 +284,18 @@ public class DataResponseMessage
 {
     public required string RequesterId { get; init; }
     public required List<Dictionary<string, object>> Features { get; init; }
+}
+
+/// <summary>
+/// Published when a search result is selected in HonuaSearch
+/// </summary>
+public class SearchResultSelectedMessage
+{
+    public required string SearchId { get; init; }
+    public required string DisplayName { get; init; }
+    public required double Latitude { get; init; }
+    public required double Longitude { get; init; }
+    public double[]? BoundingBox { get; init; }
+    public string? Type { get; init; }
+    public Dictionary<string, string> Metadata { get; init; } = new();
 }
