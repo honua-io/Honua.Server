@@ -4,6 +4,7 @@
 @attribute [Authorize]
 @inject ServiceApiClient ServiceApi
 @inject LayerApiClient LayerApi
+@inject DataSourceApiClient DataSourceApi
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject ILogger<ServiceDetail> Logger
@@ -138,6 +139,133 @@
                 </MudItem>
             </MudGrid>
         </MudPaper>
+
+        @* Data Source Section *@
+        @if (!string.IsNullOrEmpty(_service.DataSourceId))
+        {
+            <MudPaper Elevation="2" Class="pa-6 mt-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Medium" Color="Color.Primary" />
+                    <MudText Typo="Typo.h5">Data Source</MudText>
+                </MudStack>
+
+                @if (_loadingDataSource)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+                else if (_dataSource != null)
+                {
+                    <MudGrid>
+                        <MudItem xs="12" md="8">
+                            <MudStack Spacing="3">
+                                @* Data Source ID and Link *@
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Data Source:</MudText>
+                                    <MudLink Href="@($"/datasources/{_dataSource.Id}")" Typo="Typo.body1">
+                                        @_dataSource.Id
+                                    </MudLink>
+                                </MudStack>
+
+                                @* Provider Type *@
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Provider:</MudText>
+                                    <MudChip Icon="@GetProviderIcon(_dataSource.Provider)"
+                                             Color="Color.Info"
+                                             Size="Size.Small">
+                                        @GetProviderDisplayName(_dataSource.Provider)
+                                    </MudChip>
+                                </MudStack>
+
+                                @* Connection Status *@
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Connection Status:</MudText>
+                                    @if (_connectionStatus == ConnectionStatus.NotTested)
+                                    {
+                                        <MudChip Color="Color.Default" Size="Size.Small">Not Tested</MudChip>
+                                    }
+                                    else if (_connectionStatus == ConnectionStatus.Testing)
+                                    {
+                                        <MudChip Color="Color.Info" Size="Size.Small">
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="width: 16px; height: 16px;" />
+                                            Testing...
+                                        </MudChip>
+                                    }
+                                    else if (_connectionStatus == ConnectionStatus.Connected)
+                                    {
+                                        <MudChip Icon="@Icons.Material.Filled.CheckCircle"
+                                                 Color="Color.Success"
+                                                 Size="Size.Small">
+                                            Connected @(_connectionTime > 0 ? $"({_connectionTime}ms)" : "")
+                                        </MudChip>
+                                    }
+                                    else if (_connectionStatus == ConnectionStatus.Failed)
+                                    {
+                                        <MudChip Icon="@Icons.Material.Filled.Error"
+                                                 Color="Color.Error"
+                                                 Size="Size.Small">
+                                            Failed
+                                        </MudChip>
+                                    }
+                                    <MudButton Variant="Variant.Outlined"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Refresh"
+                                               OnClick="TestConnectionAsync"
+                                               Disabled="_connectionStatus == ConnectionStatus.Testing">
+                                        Test Connection
+                                    </MudButton>
+                                </MudStack>
+
+                                @* Connection Error Message *@
+                                @if (!string.IsNullOrEmpty(_connectionMessage) && _connectionStatus == ConnectionStatus.Failed)
+                                {
+                                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">
+                                        @_connectionMessage
+                                    </MudAlert>
+                                }
+
+                                @* Last Verified *@
+                                @if (_lastConnectionTest.HasValue)
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Last Verified:</MudText>
+                                        <MudText Typo="Typo.body2">@_lastConnectionTest.Value.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                                    </MudStack>
+                                }
+                            </MudStack>
+                        </MudItem>
+
+                        <MudItem xs="12" md="4">
+                            <MudPaper Elevation="0" Class="pa-3" Style="background-color: var(--mud-palette-background-grey);">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Quick Actions</MudText>
+                                <MudStack Spacing="2">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.TableView"
+                                               Href="@($"/datasources/{_dataSource.Id}/tables")"
+                                               FullWidth="true">
+                                        Browse Tables
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Edit"
+                                               Href="@($"/datasources/{_dataSource.Id}/edit")"
+                                               FullWidth="true">
+                                        Edit Data Source
+                                    </MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Warning">
+                        Unable to load data source information for @_service.DataSourceId
+                    </MudAlert>
+                }
+            </MudPaper>
+        }
 
         @* OGC Protocols Section *@
         @if (_service.OgcOptions != null && HasAnyProtocolEnabled())
@@ -426,6 +554,22 @@
     private bool _showOgcEdit = false;
     private ServiceOgcOptions? _originalOgcOptions;
 
+    // Data Source fields
+    private DataSourceResponse? _dataSource;
+    private bool _loadingDataSource = false;
+    private ConnectionStatus _connectionStatus = ConnectionStatus.NotTested;
+    private string _connectionMessage = string.Empty;
+    private int _connectionTime = 0;
+    private DateTimeOffset? _lastConnectionTest;
+
+    private enum ConnectionStatus
+    {
+        NotTested,
+        Testing,
+        Connected,
+        Failed
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadServiceAsync();
@@ -446,6 +590,11 @@
             else
             {
                 UpdateBreadcrumbs();
+                // Load data source information if available
+                if (!string.IsNullOrEmpty(_service.DataSourceId))
+                {
+                    await LoadDataSourceAsync();
+                }
             }
         }
         catch (Exception ex)
@@ -457,6 +606,62 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task LoadDataSourceAsync()
+    {
+        if (_service == null || string.IsNullOrEmpty(_service.DataSourceId))
+            return;
+
+        _loadingDataSource = true;
+        try
+        {
+            _dataSource = await DataSourceApi.GetDataSourceByIdAsync(_service.DataSourceId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading data source {DataSourceId}", _service.DataSourceId);
+            _dataSource = null;
+        }
+        finally
+        {
+            _loadingDataSource = false;
+        }
+    }
+
+    private async Task TestConnectionAsync()
+    {
+        if (_dataSource == null) return;
+
+        _connectionStatus = ConnectionStatus.Testing;
+        _connectionMessage = string.Empty;
+        _connectionTime = 0;
+
+        try
+        {
+            var result = await DataSourceApi.TestConnectionAsync(_dataSource.Id);
+
+            if (result.Success)
+            {
+                _connectionStatus = ConnectionStatus.Connected;
+                _connectionTime = result.ConnectionTime;
+                _lastConnectionTest = DateTimeOffset.Now;
+                Snackbar.Add($"Connection successful ({result.ConnectionTime}ms)", Severity.Success);
+            }
+            else
+            {
+                _connectionStatus = ConnectionStatus.Failed;
+                _connectionMessage = result.Message;
+                Snackbar.Add("Connection failed", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _connectionStatus = ConnectionStatus.Failed;
+            _connectionMessage = ex.Message;
+            Logger.LogError(ex, "Error testing connection for data source {DataSourceId}", _dataSource.Id);
+            Snackbar.Add("Connection test failed", Severity.Error);
         }
     }
 
@@ -601,5 +806,32 @@
     {
         return _service?.OgcOptions != null &&
                (_service.OgcOptions.WfsEnabled || _service.OgcOptions.OgcApiEnabled);
+    }
+
+    // Data Source Helper Methods
+
+    private string GetProviderIcon(string provider)
+    {
+        return provider.ToLowerInvariant() switch
+        {
+            "postgis" or "postgresql" => Icons.Material.Filled.DataObject,
+            "sqlserver" => Icons.Material.Filled.Storage,
+            "mysql" => Icons.Material.Filled.Storage,
+            "sqlite" => Icons.Material.Filled.InsertDriveFile,
+            _ => Icons.Material.Filled.Storage
+        };
+    }
+
+    private string GetProviderDisplayName(string provider)
+    {
+        return provider.ToLowerInvariant() switch
+        {
+            "postgis" => "PostGIS",
+            "postgresql" => "PostgreSQL",
+            "sqlserver" => "SQL Server",
+            "mysql" => "MySQL",
+            "sqlite" => "SQLite",
+            _ => provider
+        };
     }
 }
