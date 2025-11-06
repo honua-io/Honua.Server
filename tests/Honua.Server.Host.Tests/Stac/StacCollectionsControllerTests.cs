@@ -477,6 +477,7 @@ public sealed class StacCollectionsControllerTests
             Id = "test-item",
             CollectionId = "test-collection",
             Properties = new JsonObject { ["datetime"] = "2024-01-01T00:00:00Z" },
+            Datetime = DateTimeOffset.Parse("2024-01-01T00:00:00Z"),
             ETag = "test-item-etag"
         };
 
@@ -509,7 +510,8 @@ public sealed class StacCollectionsControllerTests
         {
             Id = "existing-item",
             CollectionId = "test-collection",
-            Properties = new JsonObject()
+            Properties = new JsonObject(),
+            Datetime = DateTimeOffset.UtcNow
         };
 
         _mockValidationService.Setup(x => x.ValidateItem(It.IsAny<JsonObject>()))
@@ -843,7 +845,8 @@ public sealed class StacCollectionsControllerTests
         {
             Id = "test-item",
             CollectionId = "test-collection",
-            Properties = new JsonObject { ["datetime"] = "2024-01-01T00:00:00Z" }
+            Properties = new JsonObject { ["datetime"] = "2024-01-01T00:00:00Z" },
+            Datetime = DateTimeOffset.Parse("2024-01-01T00:00:00Z")
         };
 
         var patchJson = new JsonObject

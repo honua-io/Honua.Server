@@ -45,7 +45,7 @@ public sealed class WmtsCapabilitiesBuilder : OgcCapabilitiesBuilder
 
     protected override XName GetRootElementName() => Wmts + "Capabilities";
 
-    protected override string GetServiceName() => "WMTS";
+    protected override string GetServiceName() => "OGC WMTS";
 
     protected override string GetVersion() => "1.0.0";
 

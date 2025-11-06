@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Honua.Server.Core.Utilities;
@@ -13,7 +14,11 @@ namespace Honua.Server.Host.Ogc;
 /// <summary>
 /// OGC API link object.
 /// </summary>
-public sealed record OgcLink(string Href, string Rel, string? Type, string? Title);
+public sealed record OgcLink(
+    [property: JsonPropertyName("href")] string Href,
+    [property: JsonPropertyName("rel")] string Rel,
+    [property: JsonPropertyName("type")] string? Type,
+    [property: JsonPropertyName("title")] string? Title);
 
 /// <summary>
 /// OGC API response formats.

@@ -241,6 +241,7 @@ public sealed class StacParsingServiceTests
             Assets = new Dictionary<string, StacAsset>(),
             Links = Array.Empty<StacLink>(),
             Extensions = Array.Empty<string>(),
+            Datetime = DateTimeOffset.Parse("2021-05-01T00:00:00Z"),
             UpdatedAtUtc = DateTimeOffset.UtcNow
         };
 

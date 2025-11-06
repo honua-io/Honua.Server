@@ -222,6 +222,40 @@ public class StacItemBuilder
 
         var propertiesNode = JsonSerializer.SerializeToNode(_properties) as JsonObject;
 
+        // Extract datetime fields from properties to set on the record
+        // The StacApiMapper.MergeProperties method uses these record fields
+        // to build the datetime properties in the API response
+        DateTimeOffset? datetime = null;
+        DateTimeOffset? startDatetime = null;
+        DateTimeOffset? endDatetime = null;
+
+        if (_properties.TryGetValue("datetime", out var datetimeValue))
+        {
+            if (datetimeValue is string datetimeStr && !string.IsNullOrEmpty(datetimeStr))
+            {
+                if (DateTimeOffset.TryParse(datetimeStr, out var parsedDatetime))
+                {
+                    datetime = parsedDatetime;
+                }
+            }
+        }
+
+        if (_properties.TryGetValue("start_datetime", out var startValue))
+        {
+            if (startValue is string startStr && DateTimeOffset.TryParse(startStr, out var parsedStart))
+            {
+                startDatetime = parsedStart;
+            }
+        }
+
+        if (_properties.TryGetValue("end_datetime", out var endValue))
+        {
+            if (endValue is string endStr && DateTimeOffset.TryParse(endStr, out var parsedEnd))
+            {
+                endDatetime = parsedEnd;
+            }
+        }
+
         return new StacItemRecord
         {
             Id = _id,
@@ -230,7 +264,10 @@ public class StacItemBuilder
             Bbox = _bbox,
             Properties = propertiesNode,
             Assets = _assets,
-            Links = _links
+            Links = _links,
+            Datetime = datetime,
+            StartDatetime = startDatetime,
+            EndDatetime = endDatetime
         };
     }
 
