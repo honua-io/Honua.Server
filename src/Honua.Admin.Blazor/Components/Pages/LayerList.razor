@@ -104,7 +104,7 @@
                     </MudTd>
                 }
                 <MudTd DataLabel="Geometry Type">
-                    <MudChip Size="Size.Small" Color="@GetGeometryTypeColor(context.GeometryType)">
+                    <MudChip T="string" Size="Size.Small" Color="@GetGeometryTypeColor(context.GeometryType)">
                         @GeometryTypes.GetDisplayName(context.GeometryType)
                     </MudChip>
                 </MudTd>

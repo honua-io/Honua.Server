@@ -143,7 +143,7 @@ internal static class GeoservicesRESTGeometryConverter
                     throw new InvalidOperationException($"Cannot serialize invalid polygon: {validationResult.ErrorMessage}");
                 }
 
-                // Ensure correct Esri orientation (CW exterior, CCW holes)
+                // Ensure correct GeoServices ring orientation (CW exterior, CCW holes)
                 var esriPolygon = GeometryValidator.EnsureEsriOrientation(polygon);
                 AddPolygonRings(rings, esriPolygon);
                 break;
@@ -157,7 +157,7 @@ internal static class GeoservicesRESTGeometryConverter
 
                 foreach (Polygon poly in multi.Geometries)
                 {
-                    // Ensure correct Esri orientation for each polygon
+                    // Ensure correct GeoServices ring orientation for each polygon
                     var esriPoly = GeometryValidator.EnsureEsriOrientation(poly);
                     AddPolygonRings(rings, esriPoly);
                 }

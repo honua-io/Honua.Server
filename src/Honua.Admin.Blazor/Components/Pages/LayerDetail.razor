@@ -61,7 +61,7 @@
 
                 <MudItem xs="12" md="6">
                     <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Geometry Type</MudText>
-                    <MudChip Size="Size.Small" Color="@GetGeometryTypeColor(_layer.GeometryType)" Class="mb-3">
+                    <MudChip T="string" Size="Size.Small" Color="@GetGeometryTypeColor(_layer.GeometryType)" Class="mb-3">
                         @GeometryTypes.GetDisplayName(_layer.GeometryType)
                     </MudChip>
 

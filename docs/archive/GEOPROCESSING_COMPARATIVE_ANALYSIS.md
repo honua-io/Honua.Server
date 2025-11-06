@@ -610,7 +610,7 @@ Security > WPS Security > Process Groups
     * JTS:simplify [*] (all users)
 ```
 
-**Honua Insight**: This is better than Esri's service-level-only RBAC.
+**Honua Insight**: This is better than commercial GIS platforms's service-level-only RBAC.
 
 #### Complex Input Restrictions
 By default, WPS accepts input references to:
@@ -827,7 +827,7 @@ Neither platform designed for multi-tenant SaaS:
 ### 4.4 Compatibility Strategy
 
 #### GeoservicesREST GPServer Compliance (Priority 1)
-**CRITICAL**: Implement the **GeoservicesREST GPServer specification** for Esri ecosystem compatibility. This is an open specification (transferred to Open Web Foundation) and more widely adopted than OGC WPS.
+**CRITICAL**: Implement the **GeoservicesREST GPServer specification** for proprietary GIS platforms compatibility. This is an open specification (transferred to Open Web Foundation) and more widely adopted than OGC WPS.
 
 **Endpoints to Implement**:
 ```

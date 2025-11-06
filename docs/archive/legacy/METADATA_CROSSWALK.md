@@ -19,7 +19,7 @@ Honua uses a **semantic mapping approach** where:
 ```
 Single Metadata Definition → Multiple Protocol Outputs
                            ├─→ OGC API Features (JSON)
-                           ├─→ Esri REST API (JSON)
+                           ├─→ Geoservices REST a.k.a. Esri REST API (JSON)
                            ├─→ WMS 1.3 (XML)
                            ├─→ WFS 2.0 (GML/XML)
                            ├─→ CSW 2.0.2 (Dublin Core XML)
@@ -35,7 +35,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Identity & Descriptive Metadata
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.id` | `collection.id` | `layer.id` | `Layer/Name` | `FeatureType/Name` | `dc:identifier` | Universal unique identifier |
 | `layer.title` | `collection.title` | `layer.name` | `Layer/Title` | `FeatureType/Title` | `dc:title` | Human-readable name |
@@ -44,7 +44,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Geometry & Spatial Metadata
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.geometryType` | `collection.itemType` | `layer.geometryType` | - | `FeatureType/DefaultGeometryPropertyName` | `dc:type` | Point, LineString, Polygon, etc. |
 | `layer.geometryField` | `id_field` convention | `layer.geometryField` | - | Property in schema | - | Name of geometry column |
@@ -55,7 +55,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Temporal Metadata
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.extent.temporal` | `collection.extent.temporal.interval` | `layer.timeInfo` | `Layer/Dimension[@name="time"]` | - | - | Time extent |
 | `layer.temporal.startField` | Query parameter mapping | `timeInfo.startTimeField` | - | - | - | Start time column |
@@ -64,7 +64,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Attribute Schema
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.idField` | Primary feature identifier | `layer.objectIdField` | - | `gml:id` source | - | Primary key field |
 | `layer.displayField` | - | `layer.displayField` | - | - | - | Default label field |
@@ -77,7 +77,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Query & Access Control
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.query.maxRecordCount` | `limit` max value | `layer.maxRecordCount` | - | `maxFeatures` limit | `maxRecords` limit | Max features per request |
 | `layer.query.autoFilter.cql` | Injected into CQL2 filter | Server-side definition filter | - | Additional filter | - | Pre-filter all queries |
@@ -86,7 +86,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Editing Capabilities
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.editing.capabilities.allowAdd` | POST to `/items` enabled | `capabilities` includes "Create" | - | Insert operation | - | Can create features |
 | `layer.editing.capabilities.allowUpdate` | PUT/PATCH to `/items/{id}` | `capabilities` includes "Update" | - | Update operation | - | Can modify features |
@@ -96,16 +96,16 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Styling
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.defaultStyleId` | `collection.links[rel=styles]` default | `layer.drawingInfo` | `Layer/Style[@isDefault=true]` | - | - | Default rendering style |
 | `layer.styleIds` | Multiple style links | - | `Layer/Style` list | - | - | Available styles |
-| `style.format` | Determines output (SLD, Mapbox GL) | Converted to Esri renderer | SLD if requested | - | - | Style format |
+| `style.format` | Determines output (SLD, Mapbox GL) | Converted to GeoServices renderer format | SLD if requested | - | - | Style format |
 | `style.renderer` | - | Maps to `layer.drawingInfo.renderer.type` | - | - | - | Renderer type (simple, uniqueValue) |
 
 ### Attachments
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.attachments.enabled` | Links in feature if enabled | `layer.hasAttachments=true` | - | - | - | Supports file attachments |
 | `layer.attachments.maxSizeMiB` | - | Enforced on upload | - | - | - | Max attachment size |
@@ -113,7 +113,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Catalog & Discovery
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.catalog.summary` | `collection.description` | `layer.description` | `Layer/Abstract` | - | `dct:abstract` | Brief summary |
 | `layer.catalog.keywords` | `collection.keywords` | - | `Layer/KeywordList` | - | Multiple `dc:subject` | Keywords for search |
@@ -127,7 +127,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Service Identity
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `service.id` | Part of URL path | `/rest/services/{folderId}/{serviceId}` | - | - | - | Service identifier |
 | `service.title` | Landing page title | `service.serviceDescription` | `Service/Title` | `ServiceIdentification/Title` | - | Service name |
@@ -137,7 +137,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Protocol-Specific Configuration
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | WFS 2.0 | CSW 2.0.2 | Notes |
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `service.ogc.collectionsEnabled` | Collections listed | - | - | - | - | Show in OGC collections |
 | `service.ogc.itemLimit` | Default `limit` value | - | - | `maxFeatures` | - | Default page size |
@@ -152,7 +152,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Raster Identity & Source
 
-| Core Metadata | OGC API - Tiles | Esri REST (ImageServer) | WMS 1.3 | WCS 2.0.1 | STAC 1.0 | Notes |
+| Core Metadata | OGC API - Tiles | Geoservices REST a.k.a. Esri REST (ImageServer) | WMS 1.3 | WCS 2.0.1 | STAC 1.0 | Notes |
 |---------------|-----------------|-------------------------|---------|-----------|----------|-------|
 | `raster.id` | `tileset.id` | `layer.id` | `Layer/Name` | `coverageId` | `item.id` | Unique identifier |
 | `raster.title` | `tileset.title` | `layer.name` | `Layer/Title` | Coverage title | `item.properties.title` | Human-readable name |
@@ -162,14 +162,14 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Raster Spatial Properties
 
-| Core Metadata | OGC API - Tiles | Esri REST (ImageServer) | WMS 1.3 | WCS 2.0.1 | STAC 1.0 | Notes |
+| Core Metadata | OGC API - Tiles | Geoservices REST a.k.a. Esri REST (ImageServer) | WMS 1.3 | WCS 2.0.1 | STAC 1.0 | Notes |
 |---------------|-----------------|-------------------------|---------|-----------|----------|-------|
 | `raster.extent.bbox` | `tileset.bounds` | `layer.extent` | `Layer/BoundingBox` | `Envelope/lowerCorner`, `upperCorner` | `item.bbox` | Spatial extent |
 | `raster.crs` | `tileset.crs` | `layer.spatialReference` | `Layer/CRS` | Coverage CRS | `item.properties.proj:epsg` | Coordinate systems |
 
 ### Raster Cache & Performance
 
-| Core Metadata | OGC API - Tiles | Esri REST (ImageServer) | WMS 1.3 | WCS 2.0.1 | STAC 1.0 | Notes |
+| Core Metadata | OGC API - Tiles | Geoservices REST a.k.a. Esri REST (ImageServer) | WMS 1.3 | WCS 2.0.1 | STAC 1.0 | Notes |
 |---------------|-----------------|-------------------------|---------|-----------|----------|-------|
 | `raster.cache.enabled` | Tiles cached | - | - | - | - | Enable tile caching |
 | `raster.cache.zoomLevels` | `tileset.tileMatrixSetLimits` | `tileInfo.lods` | - | - | - | Cached zoom levels |
@@ -177,7 +177,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Raster Temporal Properties
 
-| Core Metadata | OGC API - Tiles | Esri REST (ImageServer) | WMS 1.3 | WCS 2.0.1 | STAC 1.0 | Notes |
+| Core Metadata | OGC API - Tiles | Geoservices REST a.k.a. Esri REST (ImageServer) | WMS 1.3 | WCS 2.0.1 | STAC 1.0 | Notes |
 |---------------|-----------------|-------------------------|---------|-----------|----------|-------|
 | `raster.temporal.defaultValue` | Default TIME param | `timeInfo.timeExtent[0]` | Default TIME dimension | - | `item.properties.datetime` | Default time |
 | `raster.temporal.minValue` | Earliest available | `timeInfo.timeExtent[0]` | TIME min | - | `item.properties.start_datetime` | Time range start |
@@ -189,7 +189,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 
 ### Catalog Discovery Metadata
 
-| Core Metadata | OGC API Features | Esri REST | WMS 1.3 | CSW 2.0.2 | STAC 1.0 | Notes |
+| Core Metadata | OGC API Features | Geoservices REST a.k.a. Esri REST | WMS 1.3 | CSW 2.0.2 | STAC 1.0 | Notes |
 |---------------|------------------|-----------|---------|-----------|----------|-------|
 | `catalog.id` | Landing page id | - | - | Catalog id | `catalog.id` | Catalog identifier |
 | `catalog.title` | Landing page title | - | `Service/Title` | `ows:Title` | `catalog.title` | Catalog name |
@@ -246,7 +246,7 @@ Data sources are **internal** metadata and don't directly map to API outputs, bu
 **Location:** `service.esri.*` (currently empty object, reserved for future use)
 
 **Current Behavior:**
-- Esri REST endpoints derive all metadata from core layer/service definitions
+- Geoservices REST a.k.a. Esri REST endpoints derive all metadata from core layer/service definitions
 - No Esri-specific metadata required currently
 - Planned: `esri.supportsCoordinatesQuantization`, `esri.supportedQueryFormats`, etc.
 
@@ -279,7 +279,7 @@ Data sources are **internal** metadata and don't directly map to API outputs, bu
 - `layer.fields` (for property schema)
 - `layer.crs` (defaults to CRS84 if omitted)
 
-#### Esri REST API (FeatureServer)
+#### Geoservices REST a.k.a. Esri REST API (FeatureServer)
 **Required:**
 - `layer.id`
 - `layer.title`
@@ -363,7 +363,7 @@ Data sources are **internal** metadata and don't directly map to API outputs, bu
 | Protocol | Projection Code Location | Key Mapping Function |
 |----------|-------------------------|---------------------|
 | OGC API Features | `OgcFeaturesHandlers.cs` | `BuildCollectionMetadata()` |
-| Esri REST API | `GeoservicesRESTMetadataMapper.cs` | `CreateFeatureServiceSummary()`, `CreateLayerDetail()` |
+| Geoservices REST a.k.a. Esri REST API | `GeoservicesRESTMetadataMapper.cs` | `CreateFeatureServiceSummary()`, `CreateLayerDetail()` |
 | WMS 1.3 | `WmsHandlers.cs` | `CreateLayerElement()` in GetCapabilities |
 | WFS 2.0 | `WfsHandlers.cs` | `CreateFeatureTypeElement()` |
 | CSW 2.0.2 | `CswHandlers.cs` | `CreateDublinCoreRecord()` |
@@ -508,7 +508,7 @@ Test suite that validates metadata crosswalk for each protocol:
 }
 ```
 
-**Esri REST (`/rest/services/transportation/roads/FeatureServer/0`):**
+**Geoservices REST a.k.a. Esri REST (`/rest/services/transportation/roads/FeatureServer/0`):**
 ```json
 {
   "id": 0,

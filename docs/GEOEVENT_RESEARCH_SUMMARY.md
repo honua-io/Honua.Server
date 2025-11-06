@@ -38,7 +38,7 @@ This document summarizes research on existing geoevent and complex event process
 - Proprietary, expensive (~$20k/year licensing)
 - Windows-only, limited cloud-native support
 - Complex deployment and maintenance
-- Vendor lock-in to Esri ecosystem
+- Vendor lock-in to proprietary GIS platforms
 - No ML/AI capabilities
 - Limited 3D support
 
@@ -182,7 +182,7 @@ This document summarizes research on existing geoevent and complex event process
 | **Ease of Use** | ⚠️ Medium | ✅ Easy | ❌ Difficult | ✅ Easy | ✅ Easy |
 | **Throughput** | 10k-50k/sec | 100k+/sec | 1M+/sec | 100k+/sec | 100k+/sec |
 | **Latency** | ~100ms | < 10ms | < 5ms | < 1ms | < 100ms |
-| **Community** | Esri users | Azure users | Large | Small | Growing |
+| **Community** | GIS professionals | Azure users | Large | Small | Growing |
 
 ---
 
@@ -576,7 +576,7 @@ IoT Devices → Azure Event Hub → Honua GeoEvent (consumer)
    - Multi-cloud support
    - Kubernetes-native
 
-5. **10x cost savings vs Esri**
+5. **10x cost savings vs commercial GIS platforms**
    - $499-1,499/month vs $20k/year
    - Pay-as-you-go cloud option
    - No vendor lock-in
@@ -716,7 +716,7 @@ The geospatial event processing market is mature but ripe for disruption. Esri G
 2. **Innovating where it matters** - 3D geofencing, AI, predictive analytics
 3. **Simplifying the complex** - Visual workflow designer, no-code
 4. **Deploying flexibly** - Cloud, on-prem, edge, hybrid
-5. **Pricing aggressively** - 10x cost savings vs Esri
+5. **Pricing aggressively** - 10x cost savings vs commercial GIS platforms
 
 **Recommended Next Steps:**
 

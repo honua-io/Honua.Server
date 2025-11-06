@@ -240,10 +240,10 @@ public class PostgresEntityStateRepositoryTests : IAsyncLifetime
         });
 
         // Act
-        var deletedCount = await _repository.CleanupStaleStatesAsync(days: 7);
+        var deletedCount = await _repository.CleanupStaleStatesAsync(TimeSpan.FromDays(7));
 
         // Assert
-        deletedCount.Should().BeGreaterOrEqualTo(1);
+        deletedCount.Should().BeGreaterThanOrEqualTo(1);
 
         // Verify state was deleted
         var state = await _repository.GetStateAsync(entityId, geofenceId, null);
@@ -268,7 +268,7 @@ public class PostgresEntityStateRepositoryTests : IAsyncLifetime
         });
 
         // Act
-        await _repository.CleanupStaleStatesAsync(days: 7);
+        await _repository.CleanupStaleStatesAsync(TimeSpan.FromDays(7));
 
         // Assert - State should still exist
         var state = await _repository.GetStateAsync(entityId, geofenceId, null);

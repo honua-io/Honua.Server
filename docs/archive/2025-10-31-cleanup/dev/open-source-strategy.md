@@ -294,7 +294,7 @@ MapServer:
 Honua:
 - ✅ Open source core
 - ✅ Free core
-- ✅ Modern APIs (OGC, Esri REST)
+- ✅ Modern APIs (OGC, Geoservices REST a.k.a. Esri REST)
 - ✅ Optional AI assistance
 - ✅ Simple YAML config
 - ✅ GitOps deployment

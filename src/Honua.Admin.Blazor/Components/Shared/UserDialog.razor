@@ -67,7 +67,7 @@
                 }
             </MudSelect>
 
-            <MudSwitch @bind-Value="_isEnabled"
+            <MudSwitch T="bool" @bind-Value="_isEnabled"
                        Label="Enabled"
                        Color="Color.Success"
                        HelperText="User can log in when enabled" />
@@ -90,7 +90,7 @@
 
 @code {
     [CascadingParameter]
-    private MudDialogInstance MudDialog { get; set; } = default!;
+    private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter]
     public bool IsEditMode { get; set; }

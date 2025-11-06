@@ -32,7 +32,7 @@ app.Run();
 ### 3. Request Pipeline (`ConfigureHonuaRequestPipeline`)
 - Error handling (DeveloperExceptionPage vs ExceptionHandler).
 - JWT auth/authorization middleware (skipped in QuickStart mode).
-- `app.MapControllers()` (Esri REST, authentication endpoints, etc.) and `app.MapRazorPages()` (metadata UI).
+- `app.MapControllers()` (Geoservices REST a.k.a. Esri REST, authentication endpoints, etc.) and `app.MapRazorPages()` (metadata UI).
 - Endpoint mappers:
   - `app.MapOgcApi()` – OGC API Features handlers.
   - `app.MapWfs()` – conditionally registers WFS endpoints.

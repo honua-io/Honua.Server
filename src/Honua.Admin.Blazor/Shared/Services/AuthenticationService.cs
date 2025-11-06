@@ -49,6 +49,14 @@ public sealed class AuthenticationService
                                     _tokenExpiration.Value > DateTimeOffset.UtcNow;
 
     /// <summary>
+    /// Gets the current access token for API calls.
+    /// </summary>
+    public Task<string?> GetAccessTokenAsync()
+    {
+        return Task.FromResult(_currentToken);
+    }
+
+    /// <summary>
     /// Authenticates a user with username and password.
     /// </summary>
     public async Task<AuthenticationResult> LoginAsync(string username, string password, CancellationToken cancellationToken = default)

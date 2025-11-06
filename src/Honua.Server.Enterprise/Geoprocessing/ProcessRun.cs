@@ -52,6 +52,13 @@ public class ProcessRun
     /// <summary>Execution tier used (NTS, PostGIS, CloudBatch)</summary>
     public ProcessExecutionTier? ExecutedTier { get; set; }
 
+    /// <summary>Alias for backward compatibility (Actual tier used)</summary>
+    public ProcessExecutionTier? ActualTier
+    {
+        get => ExecutedTier;
+        set => ExecutedTier = value;
+    }
+
     /// <summary>Worker/instance ID that processed this job</summary>
     public string? WorkerId { get; set; }
 

@@ -5,6 +5,7 @@ using Honua.Admin.Blazor.Shared.Models;
 using Honua.Admin.Blazor.Shared.Services;
 using Honua.Admin.Blazor.Tests.Infrastructure;
 using System.Net;
+using Moq;
 
 namespace Honua.Admin.Blazor.Tests.Services;
 
@@ -22,16 +23,18 @@ public class CacheApiClientTests
             TotalHits = 10000,
             TotalMisses = 2000,
             TotalEvictions = 500,
-            CurrentSize = 1024 * 1024 * 100, // 100MB
+            TotalSizeBytes = 1024 * 1024 * 100, // 100MB
             HitRate = 0.833,
-            EntryCount = 5000
+            TotalEntries = 5000
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/raster-cache/statistics", expectedStats);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetStatisticsAsync();
@@ -40,7 +43,7 @@ public class CacheApiClientTests
         result.Should().NotBeNull();
         result.TotalHits.Should().Be(10000);
         result.HitRate.Should().Be(0.833);
-        result.CurrentSize.Should().Be(1024 * 1024 * 100);
+        result.TotalSizeBytes.Should().Be(1024 * 1024 * 100);
     }
 
     [Fact]
@@ -54,8 +57,8 @@ public class CacheApiClientTests
                 DatasetId = "dataset1",
                 Hits = 5000,
                 Misses = 1000,
-                Size = 50 * 1024 * 1024,
-                EntryCount = 2500,
+                SizeBytes = 50 * 1024 * 1024,
+                Entries = 2500,
                 LastAccessed = DateTimeOffset.UtcNow.AddMinutes(-5)
             },
             new DatasetCacheStatistics
@@ -63,17 +66,19 @@ public class CacheApiClientTests
                 DatasetId = "dataset2",
                 Hits = 5000,
                 Misses = 1000,
-                Size = 50 * 1024 * 1024,
-                EntryCount = 2500,
+                SizeBytes = 50 * 1024 * 1024,
+                Entries = 2500,
                 LastAccessed = DateTimeOffset.UtcNow.AddMinutes(-10)
             }
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockGetJson("/admin/raster-cache/datasets/statistics", expectedStats);
+            .MockGetJson("/admin/raster-cache/statistics/datasets", expectedStats);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetAllDatasetStatisticsAsync();
@@ -92,10 +97,10 @@ public class CacheApiClientTests
         var request = new CreatePreseedJobRequest
         {
             DatasetIds = new List<string> { "dataset1", "dataset2" },
-            TileMatrixSet = "WorldWebMercatorQuad",
+            TileMatrixSetId = "WorldWebMercatorQuad",
             MinZoom = 0,
             MaxZoom = 10,
-            Format = "PNG",
+            Format = "image/png",
             Transparent = true,
             Overwrite = false
         };
@@ -106,16 +111,17 @@ public class CacheApiClientTests
             Status = "Running",
             DatasetIds = new List<string> { "dataset1", "dataset2" },
             TotalTiles = 10000,
-            ProcessedTiles = 0,
-            FailedTiles = 0,
+            TilesGenerated = 0,
             StartedAt = DateTimeOffset.UtcNow
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockPostJson("/admin/raster-cache/preseed", expectedJob, HttpStatusCode.Created);
+            .MockPostJson("/admin/raster-cache/jobs", new { job = expectedJob }, HttpStatusCode.OK);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.CreatePreseedJobAsync(request);
@@ -138,24 +144,24 @@ public class CacheApiClientTests
                 JobId = Guid.NewGuid(),
                 Status = "Completed",
                 TotalTiles = 5000,
-                ProcessedTiles = 5000,
-                FailedTiles = 0
+                TilesGenerated = 5000
             },
             new PreseedJobSnapshot
             {
                 JobId = Guid.NewGuid(),
                 Status = "Running",
                 TotalTiles = 10000,
-                ProcessedTiles = 3000,
-                FailedTiles = 10
+                TilesGenerated = 3000
             }
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockGetJson("/admin/raster-cache/preseed", expectedJobs);
+            .MockGetJson("/admin/raster-cache/jobs", new { jobs = expectedJobs });
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.ListPreseedJobsAsync();
@@ -164,26 +170,28 @@ public class CacheApiClientTests
         result.Should().NotBeNull();
         result.Should().HaveCount(2);
         result[0].Status.Should().Be("Completed");
-        result[1].ProcessedTiles.Should().Be(3000);
+        result[1].TilesGenerated.Should().Be(3000);
     }
 
     [Fact]
-    public async Task CancelPreseedJobAsync_Success_CompletesWithoutException()
+    public async Task CancelPreseedJobAsync_Success_ReturnsTrue()
     {
         // Arrange
         var jobId = Guid.NewGuid();
 
         var mockFactory = new MockHttpClientFactory()
-            .MockPostJson($"/admin/raster-cache/preseed/{jobId}/cancel", new { success = true });
+            .MockDelete($"/admin/raster-cache/jobs/{jobId}", HttpStatusCode.OK);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var act = async () => await apiClient.CancelPreseedJobAsync(jobId);
+        var result = await apiClient.CancelPreseedJobAsync(jobId);
 
         // Assert
-        await act.Should().NotThrowAsync();
+        result.Should().BeTrue();
     }
 
     [Fact]
@@ -197,23 +205,24 @@ public class CacheApiClientTests
 
         var expectedResult = new PurgeCacheResult
         {
-            PurgedEntries = 2500,
-            FreedBytes = 50 * 1024 * 1024
+            Purged = new List<string> { "dataset1" },
+            Failed = new List<string>()
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockPostJson("/admin/raster-cache/purge", expectedResult);
+            .MockPostJson("/admin/raster-cache/datasets/purge", expectedResult);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.PurgeCacheAsync(request);
 
         // Assert
         result.Should().NotBeNull();
-        result.PurgedEntries.Should().Be(2500);
-        result.FreedBytes.Should().Be(50 * 1024 * 1024);
+        result.Purged.Should().Contain("dataset1");
     }
 
     [Fact]
@@ -223,8 +232,10 @@ public class CacheApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockPostJson("/admin/raster-cache/statistics/reset", new { success = true });
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.ResetStatisticsAsync();
@@ -240,8 +251,10 @@ public class CacheApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Get, "/admin/raster-cache/statistics", HttpStatusCode.InternalServerError);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.GetStatisticsAsync();
@@ -259,15 +272,17 @@ public class CacheApiClientTests
             DatasetIds = new List<string> { "dataset1" },
             MinZoom = 10,
             MaxZoom = 5, // Invalid: max < min
-            TileMatrixSet = "WorldWebMercatorQuad"
+            TileMatrixSetId = "WorldWebMercatorQuad"
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockError(HttpMethod.Post, "/admin/raster-cache/preseed",
+            .MockError(HttpMethod.Post, "/admin/raster-cache/jobs",
                 HttpStatusCode.BadRequest, "Invalid zoom range");
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.CreatePreseedJobAsync(request);
@@ -277,22 +292,24 @@ public class CacheApiClientTests
     }
 
     [Fact]
-    public async Task CancelPreseedJobAsync_JobNotFound_ThrowsHttpRequestException()
+    public async Task CancelPreseedJobAsync_JobNotFound_ReturnsFalse()
     {
         // Arrange
         var jobId = Guid.NewGuid();
 
         var mockFactory = new MockHttpClientFactory()
-            .MockError(HttpMethod.Post, $"/admin/raster-cache/preseed/{jobId}/cancel",
+            .MockError(HttpMethod.Delete, $"/admin/raster-cache/jobs/{jobId}",
                 HttpStatusCode.NotFound, "Job not found");
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new CacheApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<CacheApiClient>>();
+        var apiClient = new CacheApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var act = async () => await apiClient.CancelPreseedJobAsync(jobId);
+        var result = await apiClient.CancelPreseedJobAsync(jobId);
 
         // Assert
-        await act.Should().ThrowAsync<HttpRequestException>();
+        result.Should().BeFalse();
     }
 }

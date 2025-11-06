@@ -121,6 +121,9 @@ public sealed class LayerListItem
     [JsonPropertyName("geometryType")]
     public required string GeometryType { get; set; }
 
+    [JsonPropertyName("crs")]
+    public List<string>? Crs { get; set; }
+
     [JsonPropertyName("updatedAt")]
     public DateTimeOffset? UpdatedAt { get; set; }
 }

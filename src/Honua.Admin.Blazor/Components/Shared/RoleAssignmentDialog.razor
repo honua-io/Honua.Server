@@ -32,7 +32,7 @@
                                     <MudText Typo="Typo.body1"><b>@role.DisplayName</b></MudText>
                                     @if (role.IsSystem)
                                     {
-                                        <MudChip Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Lock">System</MudChip>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Lock">System</MudChip>
                                     }
                                 </MudStack>
                                 @if (!string.IsNullOrEmpty(role.Description))
@@ -43,13 +43,13 @@
                                     <MudText Typo="Typo.caption">Permissions:</MudText>
                                     @if (role.Permissions.Count > 3)
                                     {
-                                        <MudChip Size="Size.Small" Variant="Variant.Text">@role.Permissions.Count permissions</MudChip>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@role.Permissions.Count permissions</MudChip>
                                     }
                                     else
                                     {
                                         @foreach (var permission in role.Permissions)
                                         {
-                                            <MudChip Size="Size.Small" Variant="Variant.Text">@permission</MudChip>
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@permission</MudChip>
                                         }
                                     }
                                 </MudStack>
@@ -87,7 +87,7 @@
 
 @code {
     [CascadingParameter]
-    private MudDialogInstance MudDialog { get; set; } = default!;
+    private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter]
     public UserResponse? User { get; set; }

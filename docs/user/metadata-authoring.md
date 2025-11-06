@@ -98,7 +98,7 @@ Honua CLI (`honua metadata validate`) emits warnings when a layer lacks both `st
 - Each rule may declare optional `filter`, `minScale`, and `maxScale` values to control visibility.
 - MVP styling supports simple point/line/polygon symbolizers—see `design/phases/mvp/styling-symbology.md`.
 - Set `geometryType` carefully: use `"raster"` for pure imagery styles, but specify `"point"`, `"line"`, or `"polygon"` when the raster render should include vector overlays (e.g., grid outlines or annotations). Honua only fetches overlay geometries when the style declares a non-raster geometry type.
-- Layers may also declare top-level `minScale`/`maxScale` values (scale denominators) to drive Esri clients and scale-aware queries; Honua will hide the layer outside the configured range when callers supply map extent/image display parameters.
+- Layers may also declare top-level `minScale`/`maxScale` values (scale denominators) to drive GeoServices REST clients and scale-aware queries; Honua will hide the layer outside the configured range when callers supply map extent/image display parameters.
 
 ## Validation Workflow
 1. Edit metadata files.

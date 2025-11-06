@@ -122,9 +122,8 @@ public class GeoEventController : ControllerBase
                 request.EntityId,
                 location,
                 eventTime,
-                request.EntityType,
                 request.Properties,
-                request.SensorThingsObservationId,
+                request.EntityType,
                 tenantId,
                 cancellationToken);
 
@@ -276,9 +275,8 @@ public class GeoEventController : ControllerBase
                         request.EntityId,
                         location,
                         eventTime,
-                        request.EntityType,
                         request.Properties,
-                        request.SensorThingsObservationId,
+                        request.EntityType,
                         tenantId,
                         cancellationToken);
 

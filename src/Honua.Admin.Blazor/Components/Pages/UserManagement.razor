@@ -114,7 +114,7 @@
                     @foreach (var role in context.Roles)
                     {
                         var roleInfo = RoleOptions.GetRoleInfo(role);
-                        <MudChip Size="Size.Small" Color="@GetRoleColor(role)">
+                        <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(role)">
                             @(roleInfo?.DisplayName ?? role)
                         </MudChip>
                     }
@@ -126,15 +126,15 @@
                 <MudTd DataLabel="Status">
                     @if (context.IsLockedOut)
                     {
-                        <MudChip Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Lock">Locked</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Lock">Locked</MudChip>
                     }
                     else if (!context.IsEnabled)
                     {
-                        <MudChip Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Block">Disabled</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Block">Disabled</MudChip>
                     }
                     else
                     {
-                        <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Active</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Active</MudChip>
                     }
                     @if (context.FailedLoginAttempts > 0)
                     {

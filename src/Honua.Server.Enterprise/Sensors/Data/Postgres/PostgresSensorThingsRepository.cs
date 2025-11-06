@@ -1,12 +1,18 @@
+using System;
 using System.Data;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using Dapper;
 using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Enterprise.Sensors.Query;
 using Microsoft.Extensions.Logging;
-using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using Npgsql;
+using NpgsqlTypes;
+using Geometry = NetTopologySuite.Geometries.Geometry;
+using StaLocation = Honua.Server.Enterprise.Sensors.Models.Location;
+using Honua.Server.Enterprise.Data;
 
 namespace Honua.Server.Enterprise.Sensors.Data.Postgres;
 
@@ -27,6 +33,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         SensorThingsServiceDefinition config,
         ILogger<PostgresSensorThingsRepository> logger)
     {
+        DapperBootstrapper.EnsureConfigured();
         _connection = connection;
         _config = config;
         _logger = logger;
@@ -42,23 +49,23 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
     {
         const string sql = """
             SELECT
-                id::text,
-                name,
-                description,
-                properties,
-                created_at,
-                updated_at
+                id::text AS Id,
+                name AS Name,
+                description AS Description,
+                properties::text AS PropertiesJson,
+                created_at AS CreatedAt,
+                updated_at AS UpdatedAt
             FROM sta_things
             WHERE id = @Id::uuid
             """;
 
-        var thing = await _connection.QuerySingleOrDefaultAsync<Thing>(
+        var row = await _connection.QuerySingleOrDefaultAsync<ThingRow>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
-        if (thing == null)
+        if (row == null)
             return null;
 
-        // Generate self-link dynamically
+        var thing = MapThing(row);
         thing = thing with { SelfLink = $"{_config.BasePath}/Things({thing.Id})" };
 
         // Handle expansions
@@ -77,7 +84,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 
     public async Task<PagedResult<Thing>> GetThingsAsync(QueryOptions options, CancellationToken ct = default)
     {
-        var sql = "SELECT id::text, name, description, properties, created_at, updated_at FROM sta_things";
+        var sql = "SELECT id::text AS Id, name AS Name, description AS Description, properties::text AS PropertiesJson, created_at AS CreatedAt, updated_at AS UpdatedAt FROM sta_things";
         var countSql = "SELECT COUNT(*) FROM sta_things";
         var parameters = new DynamicParameters();
 
@@ -106,11 +113,13 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         var offset = options.Skip ?? 0;
         sql += $" LIMIT {limit} OFFSET {offset}";
 
-        var things = await _connection.QueryAsync<Thing>(
+        var rows = await _connection.QueryAsync<ThingRow>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
-        // Generate self-links dynamically
-        var thingsWithLinks = things.Select(t => t with { SelfLink = $"{_config.BasePath}/Things({t.Id})" }).ToList();
+        var thingsWithLinks = rows
+            .Select(MapThing)
+            .Select(t => t with { SelfLink = $"{_config.BasePath}/Things({t.Id})" })
+            .ToList();
 
         long? totalCount = null;
         if (options.Count)
@@ -140,22 +149,24 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
     {
         const string sql = """
             SELECT
-                id::text,
-                name,
-                description,
-                properties,
-                created_at,
-                updated_at
+                id::text AS Id,
+                name AS Name,
+                description AS Description,
+                properties::text AS PropertiesJson,
+                created_at AS CreatedAt,
+                updated_at AS UpdatedAt
             FROM sta_things
             WHERE user_id = @UserId
             ORDER BY created_at DESC
             """;
 
-        var things = await _connection.QueryAsync<Thing>(
+        var rows = await _connection.QueryAsync<ThingRow>(
             new CommandDefinition(sql, new { UserId = userId }, cancellationToken: ct));
 
-        // Generate self-links dynamically
-        return things.Select(t => t with { SelfLink = $"{_config.BasePath}/Things({t.Id})" }).ToList();
+        return rows
+            .Select(MapThing)
+            .Select(t => t with { SelfLink = $"{_config.BasePath}/Things({t.Id})" })
+            .ToList();
     }
 
     public async Task<Thing> CreateThingAsync(Thing thing, CancellationToken ct = default)
@@ -163,10 +174,16 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         const string sql = """
             INSERT INTO sta_things (name, description, properties)
             VALUES (@Name, @Description, @Properties::jsonb)
-            RETURNING id::text, name, description, properties, created_at, updated_at
+            RETURNING
+                id::text AS Id,
+                name AS Name,
+                description AS Description,
+                properties::text AS PropertiesJson,
+                created_at AS CreatedAt,
+                updated_at AS UpdatedAt
             """;
 
-        var created = await _connection.QuerySingleAsync<Thing>(
+        var createdRow = await _connection.QuerySingleAsync<ThingRow>(
             new CommandDefinition(sql, new
             {
                 thing.Name,
@@ -174,7 +191,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 Properties = thing.Properties != null ? JsonSerializer.Serialize(thing.Properties) : null
             }, cancellationToken: ct));
 
-        // Generate self-link dynamically
+        var created = MapThing(createdRow);
         created = created with { SelfLink = $"{_config.BasePath}/Things({created.Id})" };
 
         _logger.LogInformation("Created Thing {ThingId} with name '{Name}'", created.Id, created.Name);
@@ -189,12 +206,19 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
             SET
                 name = COALESCE(@Name, name),
                 description = COALESCE(@Description, description),
-                properties = COALESCE(@Properties::jsonb, properties)
+                properties = COALESCE(@Properties::jsonb, properties),
+                updated_at = NOW()
             WHERE id = @Id::uuid
-            RETURNING id::text, name, description, properties, created_at, updated_at
+            RETURNING
+                id::text AS Id,
+                name AS Name,
+                description AS Description,
+                properties::text AS PropertiesJson,
+                created_at AS CreatedAt,
+                updated_at AS UpdatedAt
             """;
 
-        var updated = await _connection.QuerySingleAsync<Thing>(
+        var updatedRow = await _connection.QuerySingleAsync<ThingRow>(
             new CommandDefinition(sql, new
             {
                 Id = id,
@@ -203,7 +227,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 Properties = thing.Properties != null ? JsonSerializer.Serialize(thing.Properties) : null
             }, cancellationToken: ct));
 
-        // Generate self-link dynamically
+        var updated = MapThing(updatedRow);
         updated = updated with { SelfLink = $"{_config.BasePath}/Things({updated.Id})" };
 
         _logger.LogInformation("Updated Thing {ThingId}", id);
@@ -219,6 +243,37 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         _logger.LogInformation("Deleted Thing {ThingId}", id);
+    }
+
+    private Thing MapThing(ThingRow row)
+    {
+        return new Thing
+        {
+            Id = row.Id,
+            Name = row.Name,
+            Description = row.Description ?? string.Empty,
+            Properties = ParseProperties(row.PropertiesJson),
+            CreatedAt = row.CreatedAt,
+            UpdatedAt = row.UpdatedAt
+        };
+    }
+
+    private static Dictionary<string, object>? ParseProperties(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        return JsonSerializer.Deserialize<Dictionary<string, object>>(value);
+    }
+
+    private sealed class ThingRow
+    {
+        public string Id { get; init; } = string.Empty;
+        public string Name { get; init; } = string.Empty;
+        public string? Description { get; init; }
+        public string? PropertiesJson { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public DateTime UpdatedAt { get; init; }
     }
 
     // ============================================================================
@@ -422,18 +477,42 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         foreach (var obs in observations)
         {
             await writer.StartRowAsync(ct);
-            await writer.WriteAsync(obs.PhenomenonTime, ct);
-            await writer.WriteAsync(obs.ResultTime, NpgsqlTypes.NpgsqlDbType.TimestampTz, ct);
-            await writer.WriteAsync(JsonSerializer.Serialize(obs.Result), NpgsqlTypes.NpgsqlDbType.Jsonb, ct);
-            await writer.WriteAsync(obs.ResultQuality, ct);
-            await writer.WriteAsync(Guid.Parse(obs.DatastreamId), ct);
-            await writer.WriteAsync(obs.FeatureOfInterestId != null ? Guid.Parse(obs.FeatureOfInterestId) : DBNull.Value, ct);
-            await writer.WriteAsync(obs.ClientTimestamp, NpgsqlTypes.NpgsqlDbType.TimestampTz, ct);
-            await writer.WriteAsync(obs.SyncBatchId != null ? Guid.Parse(obs.SyncBatchId) : DBNull.Value, ct);
-            await writer.WriteAsync(
-                obs.Parameters != null ? JsonSerializer.Serialize(obs.Parameters) : DBNull.Value,
-                NpgsqlTypes.NpgsqlDbType.Jsonb,
-                ct);
+            await writer.WriteAsync(obs.PhenomenonTime, NpgsqlDbType.TimestampTz, ct);
+
+            if (obs.ResultTime.HasValue)
+                await writer.WriteAsync(obs.ResultTime.Value, NpgsqlDbType.TimestampTz, ct);
+            else
+                await writer.WriteNullAsync(ct);
+
+            var resultJson = JsonSerializer.Serialize(obs.Result);
+            await writer.WriteAsync(resultJson, NpgsqlDbType.Jsonb, ct);
+
+            if (!string.IsNullOrWhiteSpace(obs.ResultQuality))
+                await writer.WriteAsync(obs.ResultQuality, NpgsqlDbType.Text, ct);
+            else
+                await writer.WriteNullAsync(ct);
+
+            await writer.WriteAsync(Guid.Parse(obs.DatastreamId), NpgsqlDbType.Uuid, ct);
+
+            if (!string.IsNullOrWhiteSpace(obs.FeatureOfInterestId))
+                await writer.WriteAsync(Guid.Parse(obs.FeatureOfInterestId), NpgsqlDbType.Uuid, ct);
+            else
+                await writer.WriteNullAsync(ct);
+
+            if (obs.ClientTimestamp.HasValue)
+                await writer.WriteAsync(obs.ClientTimestamp.Value, NpgsqlDbType.TimestampTz, ct);
+            else
+                await writer.WriteNullAsync(ct);
+
+            if (!string.IsNullOrWhiteSpace(obs.SyncBatchId))
+                await writer.WriteAsync(Guid.Parse(obs.SyncBatchId), NpgsqlDbType.Uuid, ct);
+            else
+                await writer.WriteNullAsync(ct);
+
+            if (obs.Parameters != null && obs.Parameters.Count > 0)
+                await writer.WriteAsync(JsonSerializer.Serialize(obs.Parameters), NpgsqlDbType.Jsonb, ct);
+            else
+                await writer.WriteNullAsync(ct);
         }
 
         await writer.CompleteAsync(ct);
@@ -465,7 +544,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
     // Navigation property queries
     // ============================================================================
 
-    public async Task<PagedResult<Location>> GetThingLocationsAsync(
+    public async Task<PagedResult<StaLocation>> GetThingLocationsAsync(
         string thingId,
         QueryOptions options,
         CancellationToken ct = default)
@@ -489,20 +568,20 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         var locations = await _connection.QueryAsync<dynamic>(
             new CommandDefinition(sql, new { ThingId = thingId }, cancellationToken: ct));
 
-        var result = locations.Select(l => new Location
+        var result = locations.Select(l => new StaLocation
         {
             Id = l.id,
             Name = l.name,
             Description = l.description,
             EncodingType = l.encoding_type,
-            Location = _geoJsonReader.Read<Geometry>(l.location_geojson.ToString()),
+            Geometry = _geoJsonReader.Read<Geometry>(l.location_geojson.ToString()),
             Properties = l.properties,
             CreatedAt = l.created_at,
             UpdatedAt = l.updated_at,
             SelfLink = $"{_config.BasePath}/Locations({l.id})"
         }).ToList();
 
-        return new PagedResult<Location>
+        return new PagedResult<StaLocation>
         {
             Items = result
         };
@@ -525,6 +604,9 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 observed_property_id::text,
                 phenomenon_time_start,
                 phenomenon_time_end,
+                result_time_start,
+                result_time_end,
+                properties,
                 created_at,
                 updated_at
             FROM sta_datastreams
@@ -532,11 +614,41 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
             ORDER BY created_at DESC
             """;
 
-        var datastreams = await _connection.QueryAsync<Datastream>(
+        var rows = await _connection.QueryAsync<dynamic>(
             new CommandDefinition(sql, new { ThingId = thingId }, cancellationToken: ct));
 
-        // Generate self-links dynamically
-        var datastreamsWithLinks = datastreams.Select(d => d with { SelfLink = $"{_config.BasePath}/Datastreams({d.Id})" }).ToList();
+        var datastreamsWithLinks = rows.Select(row =>
+        {
+            var unit = row.unit_of_measurement != null
+                ? JsonSerializer.Deserialize<UnitOfMeasurement>(row.unit_of_measurement.ToString())!
+                : throw new InvalidOperationException("Datastream missing unit_of_measurement");
+
+            Dictionary<string, object>? properties = null;
+            if (row.properties != null)
+            {
+                properties = JsonSerializer.Deserialize<Dictionary<string, object>>(row.properties.ToString());
+            }
+
+            return new Datastream
+            {
+                Id = row.id,
+                Name = row.name,
+                Description = row.description,
+                ObservationType = row.observation_type,
+                UnitOfMeasurement = unit,
+                ThingId = row.thing_id,
+                SensorId = row.sensor_id,
+                ObservedPropertyId = row.observed_property_id,
+                PhenomenonTimeStart = row.phenomenon_time_start,
+                PhenomenonTimeEnd = row.phenomenon_time_end,
+                ResultTimeStart = row.result_time_start,
+                ResultTimeEnd = row.result_time_end,
+                Properties = properties,
+                CreatedAt = row.created_at,
+                UpdatedAt = row.updated_at,
+                SelfLink = $"{_config.BasePath}/Datastreams({row.id})"
+            };
+        }).ToList();
 
         return new PagedResult<Datastream>
         {
@@ -648,12 +760,12 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 
         var op = expr.Operator switch
         {
-            "eq" => "=",
-            "ne" => "!=",
-            "gt" => ">",
-            "ge" => ">=",
-            "lt" => "<",
-            "le" => "<=",
+            ComparisonOperator.Equals => "=",
+            ComparisonOperator.NotEquals => "!=",
+            ComparisonOperator.GreaterThan => ">",
+            ComparisonOperator.GreaterThanOrEqual => ">=",
+            ComparisonOperator.LessThan => "<",
+            ComparisonOperator.LessThanOrEqual => "<=",
             _ => throw new NotSupportedException($"Operator {expr.Operator} not supported")
         };
 
@@ -723,7 +835,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
     // Location operations
     // ============================================================================
 
-    public async Task<Location?> GetLocationAsync(string id, ExpandOptions? expand = null, CancellationToken ct = default)
+    public async Task<StaLocation?> GetLocationAsync(string id, ExpandOptions? expand = null, CancellationToken ct = default)
     {
         const string sql = """
             SELECT
@@ -745,13 +857,13 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         if (result == null)
             return null;
 
-        var location = new Location
+        var location = new StaLocation
         {
             Id = result.id,
             Name = result.name,
             Description = result.description,
             EncodingType = result.encoding_type,
-            Location = _geoJsonReader.Read<Geometry>(result.location_geojson.ToString()),
+            Geometry = _geoJsonReader.Read<Geometry>(result.location_geojson.ToString()),
             Properties = result.properties,
             CreatedAt = result.created_at,
             UpdatedAt = result.updated_at,
@@ -778,7 +890,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         return location;
     }
 
-    public async Task<PagedResult<Location>> GetLocationsAsync(QueryOptions options, CancellationToken ct = default)
+    public async Task<PagedResult<StaLocation>> GetLocationsAsync(QueryOptions options, CancellationToken ct = default)
     {
         var sql = """
             SELECT
@@ -823,13 +935,13 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         var results = await _connection.QueryAsync<dynamic>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
-        var locations = results.Select(r => new Location
+        var locations = results.Select(r => new StaLocation
         {
             Id = r.id,
             Name = r.name,
             Description = r.description,
             EncodingType = r.encoding_type,
-            Location = _geoJsonReader.Read<Geometry>(r.location_geojson.ToString()),
+            Geometry = _geoJsonReader.Read<Geometry>(r.location_geojson.ToString()),
             Properties = r.properties,
             CreatedAt = r.created_at,
             UpdatedAt = r.updated_at,
@@ -849,7 +961,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
             nextLink = $"{_config.BasePath}/Locations?$skip={offset + limit}&$top={limit}";
         }
 
-        return new PagedResult<Location>
+        return new PagedResult<StaLocation>
         {
             Items = locations,
             TotalCount = totalCount,
@@ -857,7 +969,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         };
     }
 
-    public async Task<Location> CreateLocationAsync(Location location, CancellationToken ct = default)
+    public async Task<StaLocation> CreateLocationAsync(StaLocation location, CancellationToken ct = default)
     {
         const string sql = """
             INSERT INTO sta_locations (name, description, encoding_type, location, properties)
@@ -871,17 +983,17 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 location.Name,
                 location.Description,
                 location.EncodingType,
-                Location = _geoJsonWriter.Write(location.Location),
+                Location = _geoJsonWriter.Write(location.Geometry),
                 Properties = location.Properties != null ? JsonSerializer.Serialize(location.Properties) : null
             }, cancellationToken: ct));
 
-        var created = new Location
+        var created = new StaLocation
         {
             Id = result.id,
             Name = result.name,
             Description = result.description,
             EncodingType = result.encoding_type,
-            Location = _geoJsonReader.Read<Geometry>(result.location_geojson.ToString()),
+            Geometry = _geoJsonReader.Read<Geometry>(result.location_geojson.ToString()),
             Properties = result.properties,
             CreatedAt = result.created_at,
             UpdatedAt = result.updated_at,
@@ -893,7 +1005,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         return created;
     }
 
-    public async Task<Location> UpdateLocationAsync(string id, Location location, CancellationToken ct = default)
+    public async Task<StaLocation> UpdateLocationAsync(string id, StaLocation location, CancellationToken ct = default)
     {
         const string sql = """
             UPDATE sta_locations
@@ -914,17 +1026,17 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 location.Name,
                 location.Description,
                 location.EncodingType,
-                Location = location.Location != null ? _geoJsonWriter.Write(location.Location) : null,
+                Location = location.Geometry != null ? _geoJsonWriter.Write(location.Geometry) : null,
                 Properties = location.Properties != null ? JsonSerializer.Serialize(location.Properties) : null
             }, cancellationToken: ct));
 
-        var updated = new Location
+        var updated = new StaLocation
         {
             Id = result.id,
             Name = result.name,
             Description = result.description,
             EncodingType = result.encoding_type,
-            Location = _geoJsonReader.Read<Geometry>(result.location_geojson.ToString()),
+            Geometry = _geoJsonReader.Read<Geometry>(result.location_geojson.ToString()),
             Properties = result.properties,
             CreatedAt = result.created_at,
             UpdatedAt = result.updated_at,
@@ -989,13 +1101,13 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 var results = await _connection.QueryAsync<dynamic>(
                     new CommandDefinition(locationsSql, new { HistoricalLocationId = id }, cancellationToken: ct));
 
-                var locations = results.Select(r => new Location
+                var locations = results.Select(r => new StaLocation
                 {
                     Id = r.id,
                     Name = r.name,
                     Description = r.description,
                     EncodingType = r.encoding_type,
-                    Location = _geoJsonReader.Read<Geometry>(r.location_geojson.ToString()),
+                    Geometry = _geoJsonReader.Read<Geometry>(r.location_geojson.ToString()),
                     Properties = r.properties,
                     CreatedAt = r.created_at,
                     UpdatedAt = r.updated_at,
@@ -1667,7 +1779,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
             var observations = await GetObservationsAsync(
                 new QueryOptions
                 {
-                    Filter = new FilterExpression
+                    Filter = new ComparisonExpression
                     {
                         Property = "FeatureOfInterestId",
                         Operator = ComparisonOperator.Equals,
@@ -1765,7 +1877,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         return new PagedResult<FeatureOfInterest>
         {
             Items = items,
-            Count = totalCount
+            TotalCount = totalCount
         };
     }
 
@@ -1947,11 +2059,12 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
 
         if (existing != null)
         {
-            _logger.LogDebug("Found existing FeatureOfInterest {FeatureOfInterestId} with matching geometry", existing.id);
+            var existingId = (string)existing.id;
+            _logger.LogDebug("Found existing FeatureOfInterest {FeatureOfInterestId} with matching geometry", existingId);
 
             return new FeatureOfInterest
             {
-                Id = existing.id,
+                Id = existingId,
                 Name = existing.name,
                 Description = existing.description,
                 EncodingType = existing.encoding_type,
@@ -1963,7 +2076,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                     : null,
                 CreatedAt = existing.created_at,
                 UpdatedAt = existing.updated_at,
-                SelfLink = $"{_config.BasePath}/FeaturesOfInterest({existing.id})"
+                SelfLink = $"{_config.BasePath}/FeaturesOfInterest({existingId})"
             };
         }
 
@@ -2001,11 +2114,12 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
             },
             cancellationToken: ct));
 
-        _logger.LogInformation("Created new FeatureOfInterest {FeatureOfInterestId}", created.id);
+        var createdId = (string)created.id;
+        _logger.LogInformation("Created new FeatureOfInterest {FeatureOfInterestId}", createdId);
 
         return new FeatureOfInterest
         {
-            Id = created.id,
+            Id = createdId,
             Name = created.name,
             Description = created.description,
             EncodingType = created.encoding_type,
@@ -2017,7 +2131,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
                 : null,
             CreatedAt = created.created_at,
             UpdatedAt = created.updated_at,
-            SelfLink = $"{_config.BasePath}/FeaturesOfInterest({created.id})"
+            SelfLink = $"{_config.BasePath}/FeaturesOfInterest({createdId})"
         };
     }
 
@@ -2127,7 +2241,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         return new PagedResult<Datastream>
         {
             Items = items,
-            Count = totalCount
+            TotalCount = totalCount
         };
     }
 
@@ -2236,7 +2350,7 @@ public sealed class PostgresSensorThingsRepository : ISensorThingsRepository
         return new PagedResult<Datastream>
         {
             Items = items,
-            Count = totalCount
+            TotalCount = totalCount
         };
     }
 }

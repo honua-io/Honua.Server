@@ -825,8 +825,8 @@ public static class GeometryValidator
     }
 
     /// <summary>
-    /// Ensures polygon rings use Esri orientation (CW exterior, CCW holes) - opposite of OGC.
-    /// Returns a new polygon with Esri orientation if needed.
+    /// Ensures polygon rings use GeoServices ring orientation (CW exterior, CCW holes) - opposite of OGC.
+    /// Returns a new polygon with GeoServices ring orientation if needed.
     /// </summary>
     public static Polygon EnsureEsriOrientation(Polygon polygon)
     {
@@ -834,7 +834,7 @@ public static class GeometryValidator
         var exteriorRing = (LinearRing)polygon.ExteriorRing;
         var needsReversal = false;
 
-        // Ensure exterior ring is CW (Esri standard, opposite of OGC)
+        // Ensure exterior ring is CW (GeoServices specification, opposite of OGC)
         LinearRing correctedExterior;
         if (!IsCounterClockwise(exteriorRing))
         {
@@ -846,7 +846,7 @@ public static class GeometryValidator
             needsReversal = true;
         }
 
-        // Ensure holes are CCW (Esri standard, opposite of OGC)
+        // Ensure holes are CCW (GeoServices specification, opposite of OGC)
         var correctedHoles = new LinearRing[polygon.NumInteriorRings];
         for (int i = 0; i < polygon.NumInteriorRings; i++)
         {

@@ -30,8 +30,6 @@
                             Supported formats: Shapefile (ZIP), GeoJSON, GeoPackage, KML, GML, CSV (with geometry)
                         </MudAlert>
 
-                        <InputFile id="fileInput" OnChange="@HandleFileSelected" hidden accept="@SupportedFileTypes.GetAcceptString()" />
-
                         @if (_wizardState.SelectedFile == null)
                         {
                             <MudPaper id="fileDropZone"
@@ -60,6 +58,7 @@
                                 <MudText Typo="Typo.body2" Color="Color.Secondary">or drag and drop</MudText>
                                 <MudText Typo="Typo.caption" Class="mt-2">Max file size: 500 MB</MudText>
                             </MudPaper>
+                            <InputFile id="fileInput" OnChange="@HandleFileSelected" hidden accept=".zip,.geojson,.json,.gpkg,.kml,.gml,.csv" />
                         }
                         else
                         {
@@ -80,15 +79,15 @@
                             </MudPaper>
                         }
                     </MudStack>
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-4">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => _activeStep++)"
+                                   Disabled="@(_wizardState.SelectedFile == null || _selectedFile == null)">
+                            Next
+                        </MudButton>
+                    </MudStack>
                 </ChildContent>
-                <ActionContent>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               OnClick="@(() => _stepper.ForceRender())"
-                               Disabled="@(_wizardState.SelectedFile == null || _selectedFile == null)">
-                        Next
-                    </MudButton>
-                </ActionContent>
             </MudStep>
 
             @* Step 2: Configure Target *@
@@ -113,7 +112,7 @@
 
                         <MudText Typo="Typo.subtitle1">Layer Configuration</MudText>
 
-                        <MudSwitch @bind-Checked="_wizardState.CreateNewLayer"
+                        <MudSwitch T="bool" @bind-Checked="_wizardState.CreateNewLayer"
                                    Color="Color.Primary"
                                    Label="Create new layer" />
 
@@ -137,16 +136,16 @@
                             </MudAlert>
                         }
                     </MudStack>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-4">
+                        <MudButton Variant="Variant.Text" OnClick="@(() => _activeStep--)">Back</MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => _activeStep++)"
+                                   Disabled="@(!IsConfigurationValid())">
+                            Next
+                        </MudButton>
+                    </MudStack>
                 </ChildContent>
-                <ActionContent>
-                    <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               OnClick="@(() => _stepper.ForceRender())"
-                               Disabled="@(!IsConfigurationValid())">
-                        Next
-                    </MudButton>
-                </ActionContent>
             </MudStep>
 
             @* Step 3: Review & Import *@
@@ -242,25 +241,25 @@
                             </MudButton>
                         }
                     </MudStack>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-4">
+                        @if (!_wizardState.JobId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Text" OnClick="@(() => _activeStep--)" Disabled="@_importing">Back</MudButton>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.CloudUpload"
+                                       OnClick="StartImport"
+                                       Disabled="@_importing">
+                                Start Import
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Text" OnClick="ResetWizard">Import Another File</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/import/jobs">View All Jobs</MudButton>
+                        }
+                    </MudStack>
                 </ChildContent>
-                <ActionContent>
-                    @if (!_wizardState.JobId.HasValue)
-                    {
-                        <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())" Disabled="@_importing">Back</MudButton>
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Success"
-                                   StartIcon="@Icons.Material.Filled.CloudUpload"
-                                   OnClick="StartImport"
-                                   Disabled="@_importing">
-                            Start Import
-                        </MudButton>
-                    }
-                    else
-                    {
-                        <MudButton Variant="Variant.Text" OnClick="ResetWizard">Import Another File</MudButton>
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/import/jobs">View All Jobs</MudButton>
-                    }
-                </ActionContent>
             </MudStep>
 
         </MudStepper>
@@ -331,7 +330,7 @@
 
         // Auto-advance to next step
         await Task.Delay(100);
-        _stepper?.ForceRender();
+        _activeStep++;
     }
 
     private void ClearSelectedFile()
@@ -446,7 +445,6 @@
         _wizardState = new ImportWizardState();
         _selectedFile = null;
         _activeStep = 0;
-        _stepper?.Reset();
     }
 
     public async ValueTask DisposeAsync()

@@ -399,7 +399,7 @@ public class ARViewHandler : ViewHandler<ARView, PlatformView>
 - BruTile integration for tile sources (OSM, custom tile servers)
 - NetTopologySuite integration for spatial operations
 - GeoJSON and WKB geometry support
-- **Better standards alignment than Esri (which uses proprietary formats)**
+- **Better standards alignment than commercial GIS platforms (which uses proprietary formats)**
 
 **4. Offline Capabilities: ✅ Strong**
 - MBTiles support for offline raster tiles
@@ -436,8 +436,8 @@ public class ARViewHandler : ViewHandler<ARView, PlatformView>
 **Reasoning:**
 1. **Mission Alignment:** Fully open source, no vendor lock-in - core to Honua's value proposition
 2. **Official MAUI Support:** Native .NET implementation, not WebView or custom bindings
-3. **OGC Standards:** Better standards support than Esri (WMS/WFS/WMTS native)
-4. **Cost Structure:** Zero licensing enables competitive pricing vs Esri
+3. **OGC Standards:** Better standards support than commercial GIS platforms (WMS/WFS/WMTS native)
+4. **Cost Structure:** Zero licensing enables competitive pricing vs commercial GIS platforms
 5. **Offline Support:** MBTiles and tile caching meet field requirements
 6. **Proven Technology:** 10+ years mature, multiple UI frameworks supported
 
@@ -457,10 +457,10 @@ public class ARViewHandler : ViewHandler<ARView, PlatformView>
   - Monitor Mapsui v5+ for production-ready vector tile support
   - Can switch to MapLibre Native if .NET MAUI bindings emerge (Phase 3 decision point)
 
-**3. Smaller Ecosystem vs Esri**
+**3. Smaller Ecosystem vs commercial GIS platforms**
 - **Impact:** Fewer third-party plugins, tutorials, and integrations
 - **Mitigation:**
-  - Mapsui API is simpler than Esri (less complexity needed)
+  - Mapsui API is simpler than commercial GIS platforms (less complexity needed)
   - NetTopologySuite provides spatial operations (buffer, intersection, etc.)
   - Custom renderers and styles supported via SkiaSharp
 
@@ -1062,7 +1062,7 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 - ✅ .NET MAUI reduces development cost by 40-50% (enables competitive pricing)
 - ✅ Offline-first architecture is competitive advantage
 - ✅ OGC standards prevent vendor lock-in (sales benefit)
-- ✅ Open-source mapping aligns with Honua mission (sales differentiation vs Esri)
+- ✅ Open-source mapping aligns with Honua mission (sales differentiation vs commercial GIS platforms)
 
 ---
 
@@ -1081,7 +1081,7 @@ public async Task<Feature> UpdateFeatureAsync(Feature feature)
 
 ### Market Strategy: ✅ ALIGNED
 
-**Goal:** Position as "Intelligent Field GIS Platform" vs Esri and open-source
+**Goal:** Position as "Intelligent Field GIS Platform" vs commercial GIS platforms and open-source
 
 **How Architecture Supports:**
 - ✅ AI features (differentiation vs Esri Field Maps, QField)

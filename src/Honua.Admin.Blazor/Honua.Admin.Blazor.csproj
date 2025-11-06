@@ -8,17 +8,23 @@
 
   <ItemGroup>
     <!-- MudBlazor for Material Design components -->
-    <PackageReference Include="MudBlazor" Version="7.17.2" />
+    <PackageReference Include="MudBlazor" Version="8.0.0" />
 
     <!-- HTTP client for API calls -->
-    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.1" />
+
+    <!-- SignalR client for real-time updates -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.0" />
 
     <!-- FluentValidation for form validation -->
     <PackageReference Include="FluentValidation" Version="11.11.0" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
 
     <!-- JSON handling -->
-    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+    <PackageReference Include="System.Text.Json" Version="9.0.9" />
+
+    <!-- Authorization -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>

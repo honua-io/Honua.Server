@@ -26,7 +26,7 @@
             </MudButton>
             <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                            Color="Color.Default"
-                           OnClick="LoadJobsAsync"
+                           OnClick="@(() => LoadJobsAsync())"
                            Title="Refresh" />
         </MudStack>
 
@@ -204,7 +204,7 @@
                         <MudText Typo="Typo.body2" Style="font-family: monospace; font-size: 0.85rem;">
                             @context.JobId.ToString().Substring(0, 8)...
                         </MudText>
-                        <MudChip Size="Size.Small" Variant="Variant.Outlined">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
                             @GetJobTypeLabel(context)
                         </MudChip>
                     </MudStack>
@@ -245,7 +245,7 @@
                     </MudStack>
                 </MudTd>
                 <MudTd DataLabel="Status">
-                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)" Icon="@GetStatusIcon(context.Status)">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Icon="@GetStatusIcon(context.Status)">
                         @context.Status
                     </MudChip>
                 </MudTd>
@@ -290,7 +290,7 @@
                     else if (context.Status == "Failed")
                     {
                         <MudTooltip Text="@context.ErrorMessage">
-                            <MudChip Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Error">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Error">
                                 Click for details
                             </MudChip>
                         </MudTooltip>
@@ -359,9 +359,9 @@
                                                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                                                             <MudIcon Icon="@GetGeometryIcon(layer.GeometryType)" Size="Size.Small" />
                                                             <MudText Typo="Typo.body1"><b>@layer.Name</b></MudText>
-                                                            <MudChip Size="Size.Small" Variant="Variant.Outlined">@layer.GeometryType</MudChip>
+                                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@layer.GeometryType</MudChip>
                                                         </MudStack>
-                                                        <MudChip Size="Size.Small" Color="@GetStatusColor(layer.Status)">
+                                                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(layer.Status)">
                                                             @layer.Status
                                                         </MudChip>
                                                     </MudStack>
@@ -567,8 +567,8 @@
 
     private async Task CancelJob(Guid jobId)
     {
-        var confirm = await Snackbar.ShowAsync("Are you sure you want to cancel this job?", Severity.Warning);
-        // Note: MudBlazor Snackbar doesn't have built-in confirmation, using simple approach
+        // Note: MudBlazor Snackbar doesn't have built-in confirmation in newer versions
+        // For now, directly cancel. Consider using IDialogService for confirmation.
 
         try
         {

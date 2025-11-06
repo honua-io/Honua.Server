@@ -132,7 +132,7 @@ public sealed class GeoservicesRestServiceClient : IGeoservicesRestServiceClient
         }
 
         var builder = new StringBuilder();
-        builder.AppendFormat(CultureInfo.InvariantCulture, "Esri REST request to '{0}' failed with status {1} ({2})", requestUri, (int)response.StatusCode, response.ReasonPhrase);
+        builder.AppendFormat(CultureInfo.InvariantCulture, "Geoservices REST a.k.a. Esri REST request to '{0}' failed with status {1} ({2})", requestUri, (int)response.StatusCode, response.ReasonPhrase);
 
         try
         {

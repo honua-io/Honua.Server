@@ -93,7 +93,7 @@
                         <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;" Class="mb-4">
                             @foreach (var keyword in _service.Keywords)
                             {
-                                <MudChip Size="Size.Small" Variant="Variant.Outlined">@keyword</MudChip>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@keyword</MudChip>
                             }
                         </MudStack>
                     }
@@ -104,7 +104,7 @@
                         <MudStack Spacing="2">
                             <MudStack Row="true" Justify="Justify.SpaceBetween">
                                 <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Type</MudText>
-                                <MudChip Size="Size.Small" Color="@GetServiceTypeColor(_service.ServiceType)">
+                                <MudChip T="string" Size="Size.Small" Color="@GetServiceTypeColor(_service.ServiceType)">
                                     @_service.ServiceType
                                 </MudChip>
                             </MudStack>
@@ -169,7 +169,7 @@
                                 @* Provider Type *@
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                                     <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Provider:</MudText>
-                                    <MudChip Icon="@GetProviderIcon(_dataSource.Provider)"
+                                    <MudChip T="string" Icon="@GetProviderIcon(_dataSource.Provider)"
                                              Color="Color.Info"
                                              Size="Size.Small">
                                         @GetProviderDisplayName(_dataSource.Provider)
@@ -181,18 +181,18 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Connection Status:</MudText>
                                     @if (_connectionStatus == ConnectionStatus.NotTested)
                                     {
-                                        <MudChip Color="Color.Default" Size="Size.Small">Not Tested</MudChip>
+                                        <MudChip T="string" Color="Color.Default" Size="Size.Small">Not Tested</MudChip>
                                     }
                                     else if (_connectionStatus == ConnectionStatus.Testing)
                                     {
-                                        <MudChip Color="Color.Info" Size="Size.Small">
+                                        <MudChip T="string" Color="Color.Info" Size="Size.Small">
                                             <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="width: 16px; height: 16px;" />
                                             Testing...
                                         </MudChip>
                                     }
                                     else if (_connectionStatus == ConnectionStatus.Connected)
                                     {
-                                        <MudChip Icon="@Icons.Material.Filled.CheckCircle"
+                                        <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle"
                                                  Color="Color.Success"
                                                  Size="Size.Small">
                                             Connected @(_connectionTime > 0 ? $"({_connectionTime}ms)" : "")
@@ -200,7 +200,7 @@
                                     }
                                     else if (_connectionStatus == ConnectionStatus.Failed)
                                     {
-                                        <MudChip Icon="@Icons.Material.Filled.Error"
+                                        <MudChip T="string" Icon="@Icons.Material.Filled.Error"
                                                  Color="Color.Error"
                                                  Size="Size.Small">
                                             Failed

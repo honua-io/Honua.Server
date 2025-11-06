@@ -98,7 +98,7 @@ public class EditorState
 public class ConfirmDialog : ComponentBase
 {
     [CascadingParameter]
-    private MudDialogInstance MudDialog { get; set; } = default!;
+    private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter]
     public string ContentText { get; set; } = "Are you sure?";

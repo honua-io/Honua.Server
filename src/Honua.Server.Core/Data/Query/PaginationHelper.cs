@@ -92,16 +92,16 @@ public static class PaginationHelper
         {
             foreach (var order in sortOrders)
             {
-                var direction = order.Direction == FeatureSortDirection.Descending ? "DESC" : "ASC";
+                var direction = order.Direction == FeatureSortDirection.Descending ? "desc" : "asc";
                 segments.Add($"{alias}.{quoteIdentifier(order.Field)} {direction}");
             }
         }
         else
         {
-            segments.Add($"{alias}.{quoteIdentifier(defaultSortColumn)} ASC");
+            segments.Add($"{alias}.{quoteIdentifier(defaultSortColumn)} asc");
         }
 
-        sql.Append(" ORDER BY ");
+        sql.Append(" order by ");
         sql.Append(string.Join(", ", segments));
     }
 
@@ -295,7 +295,7 @@ public static class PaginationHelper
     {
         if (limit.HasValue)
         {
-            sql.Append($" LIMIT {parameterPrefix}limit");
+            sql.Append($" limit {parameterPrefix}limit");
             parameters["limit"] = limit.Value;
         }
 
@@ -303,10 +303,10 @@ public static class PaginationHelper
         {
             if (!limit.HasValue)
             {
-                sql.Append(" LIMIT ALL");
+                sql.Append(" limit ALL");
             }
 
-            sql.Append($" OFFSET {parameterPrefix}offset");
+            sql.Append($" offset {parameterPrefix}offset");
             parameters["offset"] = offset.Value;
         }
     }
@@ -323,18 +323,18 @@ public static class PaginationHelper
     {
         if (limit.HasValue)
         {
-            sql.Append($" LIMIT {parameterPrefix}limit");
+            sql.Append($" limit {parameterPrefix}limit");
             parameters["limit"] = limit.Value;
         }
         else if (offset.HasValue)
         {
             // MySQL requires LIMIT when using OFFSET
-            sql.Append(" LIMIT 18446744073709551615");
+            sql.Append(" limit 18446744073709551615");
         }
 
         if (offset.HasValue)
         {
-            sql.Append($" OFFSET {parameterPrefix}offset");
+            sql.Append($" offset {parameterPrefix}offset");
             parameters["offset"] = offset.Value;
         }
     }
@@ -351,7 +351,7 @@ public static class PaginationHelper
     {
         if (limit.HasValue)
         {
-            sql.Append($" LIMIT {parameterPrefix}limit");
+            sql.Append($" limit {parameterPrefix}limit");
             parameters["limit"] = limit.Value;
         }
 
@@ -359,10 +359,10 @@ public static class PaginationHelper
         {
             if (!limit.HasValue)
             {
-                sql.Append(" LIMIT -1");
+                sql.Append(" limit -1");
             }
 
-            sql.Append($" OFFSET {parameterPrefix}offset");
+            sql.Append($" offset {parameterPrefix}offset");
             parameters["offset"] = offset.Value;
         }
     }
@@ -383,12 +383,12 @@ public static class PaginationHelper
         }
 
         var offsetValue = offset ?? 0;
-        sql.Append($" OFFSET {parameterPrefix}offset ROWS");
+        sql.Append($" offset {parameterPrefix}offset rows");
         parameters["offset"] = offsetValue;
 
         if (limit.HasValue)
         {
-            sql.Append($" FETCH NEXT {parameterPrefix}limit ROWS ONLY");
+            sql.Append($" fetch next {parameterPrefix}limit rows only");
             parameters["limit"] = limit.Value;
         }
     }
@@ -405,13 +405,13 @@ public static class PaginationHelper
     {
         if (limit.HasValue)
         {
-            sql.Append($" LIMIT {parameterPrefix}limit");
+            sql.Append($" limit {parameterPrefix}limit");
             parameters["limit"] = limit.Value;
         }
 
         if (offset.HasValue && offset.Value > 0)
         {
-            sql.Append($" OFFSET {parameterPrefix}offset");
+            sql.Append($" offset {parameterPrefix}offset");
             parameters["offset"] = offset.Value;
         }
     }

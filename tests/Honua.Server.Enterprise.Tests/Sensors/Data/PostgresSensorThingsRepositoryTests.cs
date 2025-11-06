@@ -162,7 +162,7 @@ public class PostgresSensorThingsRepositoryTests
             // Act
             var options = new QueryOptions
             {
-                Filter = new FilterExpression
+                Filter = new ComparisonExpression
                 {
                     Property = "name",
                     Operator = ComparisonOperator.Equals,
@@ -302,12 +302,12 @@ public class PostgresSensorThingsRepositoryTests
             var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
             var point = geometryFactory.CreatePoint(new Coordinate(-122.4194, 37.7749)); // San Francisco
 
-            var location = new Location
+            var location = new Honua.Server.Enterprise.Sensors.Models.Location
             {
                 Name = "SF Location",
                 Description = "A location in San Francisco",
                 EncodingType = "application/geo+json",
-                Location = point
+                Geometry = point
             };
 
             // Act
@@ -315,10 +315,10 @@ public class PostgresSensorThingsRepositoryTests
 
             // Assert
             created.Should().NotBeNull();
-            created.Location.Should().NotBeNull();
-            created.Location.SRID.Should().Be(4326);
-            created.Location.Coordinate.X.Should().BeApproximately(-122.4194, 0.0001);
-            created.Location.Coordinate.Y.Should().BeApproximately(37.7749, 0.0001);
+            created.Geometry.Should().NotBeNull();
+            created.Geometry.SRID.Should().Be(4326);
+            created.Geometry.Coordinate.X.Should().BeApproximately(-122.4194, 0.0001);
+            created.Geometry.Coordinate.Y.Should().BeApproximately(37.7749, 0.0001);
             created.SelfLink.Should().StartWith("/sta/v1.1/Locations(");
         }
         finally

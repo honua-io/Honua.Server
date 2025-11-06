@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Honua.Server.Core.Stac;
 using Honua.Server.Core.Stac.Storage;
 
 namespace Honua.Server.Core.Tests.Shared.Builders;
@@ -26,7 +29,6 @@ public class StacItemBuilder
 {
     private string _id = Guid.NewGuid().ToString();
     private string _collectionId = "default-collection";
-    private string _type = "Feature";
     private Dictionary<string, object> _geometry = CreateDefaultGeometry();
     private double[] _bbox = new[] { -122.5, 37.8, -122.4, 37.9 };
     private Dictionary<string, object> _properties = new();
@@ -218,14 +220,15 @@ public class StacItemBuilder
             _properties["datetime"] = DateTime.UtcNow.ToString("O");
         }
 
+        var propertiesNode = JsonSerializer.SerializeToNode(_properties) as JsonObject;
+
         return new StacItemRecord
         {
             Id = _id,
             CollectionId = _collectionId,
-            Type = _type,
-            Geometry = _geometry,
+            Geometry = JsonSerializer.Serialize(_geometry),
             Bbox = _bbox,
-            Properties = _properties,
+            Properties = propertiesNode,
             Assets = _assets,
             Links = _links
         };

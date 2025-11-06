@@ -43,9 +43,9 @@ public class CacheSettingsTests : ComponentTestBase
             TotalHits = 10000,
             TotalMisses = 2000,
             TotalEvictions = 500,
-            CurrentSize = 100 * 1024 * 1024,
+            TotalSizeBytes = 100 * 1024 * 1024,
             HitRate = 0.833,
-            EntryCount = 5000
+            TotalEntries = 5000
         };
 
         var datasetStats = new List<DatasetCacheStatistics>
@@ -55,8 +55,8 @@ public class CacheSettingsTests : ComponentTestBase
                 DatasetId = "dataset1",
                 Hits = 5000,
                 Misses = 1000,
-                Size = 50 * 1024 * 1024,
-                EntryCount = 2500,
+                SizeBytes = 50 * 1024 * 1024,
+                Entries = 2500,
                 LastAccessed = DateTimeOffset.UtcNow
             }
         };
@@ -91,9 +91,9 @@ public class CacheSettingsTests : ComponentTestBase
             TotalHits = 9000,
             TotalMisses = 1000,
             TotalEvictions = 100,
-            CurrentSize = 100 * 1024 * 1024,
+            TotalSizeBytes = 100 * 1024 * 1024,
             HitRate = 0.9, // 90% hit rate - should be green
-            EntryCount = 5000
+            TotalEntries = 5000
         };
 
         _mockCacheApiClient
@@ -123,9 +123,9 @@ public class CacheSettingsTests : ComponentTestBase
             TotalHits = 3000,
             TotalMisses = 7000,
             TotalEvictions = 500,
-            CurrentSize = 100 * 1024 * 1024,
+            TotalSizeBytes = 100 * 1024 * 1024,
             HitRate = 0.3, // 30% hit rate - should be warning/red
-            EntryCount = 5000
+            TotalEntries = 5000
         };
 
         _mockCacheApiClient
@@ -149,7 +149,7 @@ public class CacheSettingsTests : ComponentTestBase
     public async Task CacheSettings_LoadPreseedJobs_ShowsJobList()
     {
         // Arrange
-        var stats = new CacheStatistics { HitRate = 0.8, EntryCount = 1000 };
+        var stats = new CacheStatistics { HitRate = 0.8, TotalEntries = 1000 };
         var datasetStats = new List<DatasetCacheStatistics>();
         var preseedJobs = new List<PreseedJobSnapshot>
         {
@@ -159,8 +159,9 @@ public class CacheSettingsTests : ComponentTestBase
                 Status = "Running",
                 DatasetIds = new List<string> { "dataset1" },
                 TotalTiles = 10000,
-                ProcessedTiles = 5000,
-                FailedTiles = 0,
+                TilesGenerated = 5000,
+                PercentComplete = 50.0,
+                CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
                 StartedAt = DateTimeOffset.UtcNow
             },
             new PreseedJobSnapshot
@@ -169,8 +170,9 @@ public class CacheSettingsTests : ComponentTestBase
                 Status = "Completed",
                 DatasetIds = new List<string> { "dataset2" },
                 TotalTiles = 5000,
-                ProcessedTiles = 5000,
-                FailedTiles = 0,
+                TilesGenerated = 5000,
+                PercentComplete = 100.0,
+                CreatedAt = DateTimeOffset.UtcNow.AddHours(-3),
                 StartedAt = DateTimeOffset.UtcNow.AddHours(-2),
                 CompletedAt = DateTimeOffset.UtcNow.AddHours(-1)
             }
@@ -207,7 +209,7 @@ public class CacheSettingsTests : ComponentTestBase
     public async Task CacheSettings_DatasetStatistics_ShowsDatasetTable()
     {
         // Arrange
-        var stats = new CacheStatistics { HitRate = 0.8, EntryCount = 1000 };
+        var stats = new CacheStatistics { HitRate = 0.8, TotalEntries = 1000 };
         var datasetStats = new List<DatasetCacheStatistics>
         {
             new DatasetCacheStatistics
@@ -215,8 +217,8 @@ public class CacheSettingsTests : ComponentTestBase
                 DatasetId = "dataset1",
                 Hits = 5000,
                 Misses = 1000,
-                Size = 50 * 1024 * 1024,
-                EntryCount = 2500,
+                SizeBytes = 50 * 1024 * 1024,
+                Entries = 2500,
                 LastAccessed = DateTimeOffset.UtcNow.AddMinutes(-5)
             },
             new DatasetCacheStatistics
@@ -224,8 +226,8 @@ public class CacheSettingsTests : ComponentTestBase
                 DatasetId = "dataset2",
                 Hits = 3000,
                 Misses = 2000,
-                Size = 30 * 1024 * 1024,
-                EntryCount = 1500,
+                SizeBytes = 30 * 1024 * 1024,
+                Entries = 1500,
                 LastAccessed = DateTimeOffset.UtcNow.AddMinutes(-10)
             }
         };

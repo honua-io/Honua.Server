@@ -71,18 +71,18 @@
                         </MudLink>
                     </MudTd>
                     <MudTd DataLabel="Type">
-                        <MudChip Size="Size.Small" Color="Color.Primary">@context.ServiceType</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@context.ServiceType</MudChip>
                     </MudTd>
                     <MudTd DataLabel="Folder">@(context.FolderId ?? "Root")</MudTd>
                     <MudTd DataLabel="Layers">@context.LayerCount</MudTd>
                     <MudTd DataLabel="Status">
                         @if (context.Enabled)
                         {
-                            <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Running</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Running</MudChip>
                         }
                         else
                         {
-                            <MudChip Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Cancel">Stopped</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Cancel">Stopped</MudChip>
                         }
                     </MudTd>
                     <MudTd DataLabel="Actions">

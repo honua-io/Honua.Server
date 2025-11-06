@@ -356,7 +356,7 @@ Honua uses three built-in roles with hierarchical permissions:
 **Permissions:**
 - ✓ Read features (GET requests)
 - ✓ Export data (GeoJSON, KML, Shapefile, etc.)
-- ✓ Query OGC/Esri APIs
+- ✓ Query OGC/GeoServices REST APIs
 - ✓ View metadata
 - ✗ Create/update/delete features
 - ✗ Upload data

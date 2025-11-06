@@ -533,6 +533,50 @@ public static class TestDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_process_runs_status ON process_runs(status, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_process_catalog_enabled ON process_catalog(category, process_id) WHERE enabled = true;
         ");
+
+        // Create dequeue function used by control plane
+        await connection.ExecuteAsync(@"
+            CREATE OR REPLACE FUNCTION dequeue_process_run()
+            RETURNS TABLE(
+                job_id VARCHAR,
+                process_id VARCHAR,
+                tenant_id VARCHAR(100),
+                inputs JSONB
+            )
+            LANGUAGE plpgsql
+            AS $$
+            DECLARE
+                selected_job RECORD;
+            BEGIN
+                SELECT * INTO selected_job
+                FROM process_runs
+                WHERE status = 'pending'
+                ORDER BY priority DESC, created_at ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED;
+
+                IF selected_job IS NULL THEN
+                    RETURN;
+                END IF;
+
+                UPDATE process_runs
+                SET
+                    status = 'running',
+                    started_at = NOW(),
+                    progress = 0,
+                    progress_message = 'Job started',
+                    queue_wait_ms = EXTRACT(EPOCH FROM (NOW() - created_at)) * 1000
+                WHERE process_runs.job_id = selected_job.job_id;
+
+                RETURN QUERY
+                SELECT
+                    selected_job.job_id,
+                    selected_job.process_id,
+                    selected_job.tenant_id,
+                    selected_job.inputs;
+            END;
+            $$;
+        ");
     }
 
     public static async Task CleanupAsync(string connectionString)

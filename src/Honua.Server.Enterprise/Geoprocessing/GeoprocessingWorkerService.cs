@@ -172,7 +172,7 @@ public sealed class GeoprocessingWorkerService : BackgroundService
 
             // Execute the operation
             var result = await operation.ExecuteAsync(
-                job.Parameters ?? new Dictionary<string, object>(),
+                job.Inputs ?? new Dictionary<string, object>(),
                 inputs,
                 progress,
                 jobCts.Token);
@@ -186,13 +186,18 @@ public sealed class GeoprocessingWorkerService : BackgroundService
                 // Record completion
                 var processResult = new ProcessResult
                 {
+                    JobId = job.JobId,
+                    ProcessId = job.ProcessId,
+                    Status = ProcessRunStatus.Completed,
                     Success = true,
-                    Outputs = result.Data,
+                    Output = result.Data,
                     Metadata = new Dictionary<string, object>
                     {
                         { "features_processed", result.FeaturesProcessed },
                         { "duration_ms", result.DurationMs }
-                    }
+                    },
+                    DurationMs = result.DurationMs,
+                    FeaturesProcessed = result.FeaturesProcessed
                 };
 
                 await controlPlane.RecordCompletionAsync(

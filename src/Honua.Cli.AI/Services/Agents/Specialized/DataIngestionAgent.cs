@@ -170,7 +170,7 @@ public sealed class DataIngestionAgent
 
             responseBuilder.AppendLine("### Next Steps:");
             responseBuilder.AppendLine("1. Review the analysis and recommendations above");
-            responseBuilder.AppendLine("2. Prepare your source data (file path or Esri REST URL)");
+            responseBuilder.AppendLine("2. Prepare your source data (file path or Geoservices REST a.k.a. Esri REST URL)");
             responseBuilder.AppendLine("3. Run the ingestion command (or I can help generate it)");
             responseBuilder.AppendLine("4. Configure styling and metadata");
             responseBuilder.AppendLine("5. Test the published service");

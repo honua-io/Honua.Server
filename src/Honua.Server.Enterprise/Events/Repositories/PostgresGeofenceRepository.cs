@@ -1,6 +1,7 @@
 using System.Data;
 using Dapper;
 using Honua.Server.Enterprise.Events.Models;
+using Honua.Server.Enterprise.Data;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
@@ -22,6 +23,7 @@ public class PostgresGeofenceRepository : IGeofenceRepository
         string connectionString,
         ILogger<PostgresGeofenceRepository> logger)
     {
+        DapperBootstrapper.EnsureConfigured();
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -257,6 +259,7 @@ public class PostgresGeofenceRepository : IGeofenceRepository
     private Geofence MapToGeofence(GeofenceDto dto)
     {
         var geometry = (Polygon)_wkbReader.Read(dto.GeometryWkb);
+        geometry.SRID = 4326;
 
         Dictionary<string, object>? properties = null;
         if (!string.IsNullOrEmpty(dto.Properties))

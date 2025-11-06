@@ -676,7 +676,7 @@ IoT Devices                      ┌──────────────�
 
 ## 9. Innovation & Differentiation
 
-### 9.1 Unique Features vs. Esri GeoEvent Server
+### 9.1 Unique Features vs. commercial GIS platforms GeoEvent Server
 
 | Feature | Esri GeoEvent | Honua GeoEvent | Advantage |
 |---------|---------------|----------------|-----------|
@@ -1088,7 +1088,7 @@ Dashboard: Update conservation map
 
 ## 16. Competitive Advantages
 
-### 16.1 vs. Esri GeoEvent Server
+### 16.1 vs. commercial GIS platforms GeoEvent Server
 
 | Feature | Esri | Honua | Advantage |
 |---------|------|-------|-----------|
@@ -1149,7 +1149,7 @@ Honua GeoEvent Server delivers a modern, standards-based, cloud-native complex e
 3. ✅ 3D geofencing (underground utilities, airspace)
 4. ✅ AI-powered analytics (ML.NET, ONNX)
 5. ✅ Visual workflow designer (no-code)
-6. ✅ 10x cost savings vs. Esri
+6. ✅ 10x cost savings vs. commercial GIS platforms
 
 **Implementation:** 12 months, 3 phases
 **Investment:** Phase 1 (Months 1-4), Phase 2 (Months 5-8), Phase 3 (Months 9-12)

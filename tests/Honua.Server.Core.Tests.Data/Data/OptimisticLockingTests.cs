@@ -97,7 +97,7 @@ public class OptimisticLockingTests
         Assert.NotNull(etag);
         Assert.StartsWith("W/\"", etag);
         Assert.EndsWith("\"", etag);
-        Assert.Contains("AAAAAAAAASNE", etag); // Base64 of the byte array
+        Assert.Contains("AAAAAAABI0U", etag); // Base64 of the byte array
     }
 
     [Fact]

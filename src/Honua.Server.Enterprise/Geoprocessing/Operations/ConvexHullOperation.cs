@@ -142,7 +142,9 @@ public class ConvexHullOperation : GeoprocessingOperationBase
         {
             var geoJsonReader = new GeoJsonReader();
             var geometry = geoJsonReader.Read<Geometry>(input.Source);
-            return new List<Geometry> { geometry };
+            return geometry is GeometryCollection collection
+                ? collection.Geometries.ToList()
+                : new List<Geometry> { geometry };
         }
 
         throw new NotImplementedException($"Input type '{input.Type}' not yet implemented");

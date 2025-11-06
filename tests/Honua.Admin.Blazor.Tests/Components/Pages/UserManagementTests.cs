@@ -50,23 +50,25 @@ public class UserManagementTests : ComponentTestBase
         {
             new UserResponse
             {
+                Id = Guid.NewGuid().ToString(),
                 Username = "admin",
                 DisplayName = "Administrator",
                 Email = "admin@example.com",
                 Roles = new List<string> { "administrator" },
-                Enabled = true,
-                IsLocked = false,
+                IsEnabled = true,
+                IsLockedOut = false,
                 FailedLoginAttempts = 0,
                 LastLogin = DateTimeOffset.UtcNow
             },
             new UserResponse
             {
+                Id = Guid.NewGuid().ToString(),
                 Username = "publisher",
                 DisplayName = "Data Publisher",
                 Email = "publisher@example.com",
                 Roles = new List<string> { "datapublisher" },
-                Enabled = true,
-                IsLocked = false,
+                IsEnabled = true,
+                IsLockedOut = false,
                 FailedLoginAttempts = 0,
                 LastLogin = DateTimeOffset.UtcNow.AddDays(-1)
             }
@@ -81,7 +83,7 @@ public class UserManagementTests : ComponentTestBase
         };
 
         _mockUserApiClient
-            .Setup(x => x.ListUsersAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.ListUsersAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UserListResponse { Users = users });
 
         _mockUserApiClient
@@ -93,7 +95,7 @@ public class UserManagementTests : ComponentTestBase
         await Task.Delay(100); // Wait for async initialization
 
         // Assert
-        _mockUserApiClient.Verify(x => x.ListUsersAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserApiClient.Verify(x => x.ListUsersAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockUserApiClient.Verify(x => x.GetStatisticsAsync(It.IsAny<CancellationToken>()), Times.Once);
 
         // Verify statistics cards
@@ -113,7 +115,7 @@ public class UserManagementTests : ComponentTestBase
     {
         // Arrange
         _mockUserApiClient
-            .Setup(x => x.ListUsersAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.ListUsersAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Failed to load users"));
 
         _mockUserApiClient
@@ -142,18 +144,19 @@ public class UserManagementTests : ComponentTestBase
         {
             new UserResponse
             {
+                Id = Guid.NewGuid().ToString(),
                 Username = "testuser",
                 DisplayName = "Test User",
                 Email = "test@example.com",
                 Roles = new List<string> { "viewer" },
-                Enabled = true
+                IsEnabled = true
             }
         };
 
         var statistics = new UserStatistics { TotalUsers = 1, ActiveUsers = 1 };
 
         _mockUserApiClient
-            .Setup(x => x.ListUsersAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.ListUsersAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UserListResponse { Users = users });
 
         _mockUserApiClient
@@ -162,7 +165,7 @@ public class UserManagementTests : ComponentTestBase
 
         _mockUserApiClient
             .Setup(x => x.DeleteUserAsync("testuser", It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(true);
 
         var cut = Context.RenderComponent<UserManagement>();
         await Task.Delay(100);
@@ -184,12 +187,13 @@ public class UserManagementTests : ComponentTestBase
         {
             new UserResponse
             {
+                Id = Guid.NewGuid().ToString(),
                 Username = "lockeduser",
                 DisplayName = "Locked User",
                 Email = "locked@example.com",
                 Roles = new List<string> { "viewer" },
-                Enabled = true,
-                IsLocked = true,
+                IsEnabled = true,
+                IsLockedOut = true,
                 FailedLoginAttempts = 5,
                 LastLogin = DateTimeOffset.UtcNow.AddDays(-7)
             }
@@ -204,7 +208,7 @@ public class UserManagementTests : ComponentTestBase
         };
 
         _mockUserApiClient
-            .Setup(x => x.ListUsersAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.ListUsersAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UserListResponse { Users = users });
 
         _mockUserApiClient
@@ -232,34 +236,37 @@ public class UserManagementTests : ComponentTestBase
         {
             new UserResponse
             {
+                Id = Guid.NewGuid().ToString(),
                 Username = "admin",
                 DisplayName = "Admin",
                 Email = "admin@example.com",
                 Roles = new List<string> { "administrator" },
-                Enabled = true
+                IsEnabled = true
             },
             new UserResponse
             {
+                Id = Guid.NewGuid().ToString(),
                 Username = "publisher",
                 DisplayName = "Publisher",
                 Email = "pub@example.com",
                 Roles = new List<string> { "datapublisher" },
-                Enabled = true
+                IsEnabled = true
             },
             new UserResponse
             {
+                Id = Guid.NewGuid().ToString(),
                 Username = "viewer",
                 DisplayName = "Viewer",
                 Email = "view@example.com",
                 Roles = new List<string> { "viewer" },
-                Enabled = true
+                IsEnabled = true
             }
         };
 
         var statistics = new UserStatistics { TotalUsers = 3, ActiveUsers = 3 };
 
         _mockUserApiClient
-            .Setup(x => x.ListUsersAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.ListUsersAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new UserListResponse { Users = users });
 
         _mockUserApiClient

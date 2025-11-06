@@ -194,16 +194,20 @@ public static class AdvancedFilterSqlBuilder
         if (expr.Arguments.Count < 2)
             throw new ArgumentException("concat requires at least 2 arguments");
 
-        var parts = expr.Arguments.Select(arg =>
+        var parts = new List<string>();
+        foreach (var arg in expr.Arguments)
         {
             if (arg is string str && !str.StartsWith("@"))
             {
                 var paramName = $"p{paramCounter++}";
                 parameters[paramName] = str;
-                return $"@{paramName}";
+                parts.Add($"@{paramName}");
             }
-            return MapPropertyToColumn(arg.ToString()!);
-        });
+            else
+            {
+                parts.Add(MapPropertyToColumn(arg.ToString()!));
+            }
+        }
 
         return $"CONCAT({string.Join(", ", parts)})";
     }
