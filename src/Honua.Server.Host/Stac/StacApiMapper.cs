@@ -280,9 +280,9 @@ internal static class StacApiMapper
         }
         else
         {
-            // No temporal information available - set datetime to null
-            // This is allowed by STAC spec for items without known acquisition time
-            properties["datetime"] = null;
+            // No temporal information available - provide a default datetime
+            // Use Unix epoch as a fallback to indicate unknown acquisition time
+            properties["datetime"] = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero).ToString("O");
         }
 
         return properties;

@@ -71,7 +71,7 @@ public sealed class GeofenceToAlertBridgeService : IGeofenceToAlertBridgeService
                 geofenceEvent.GeofenceName,
                 geofenceEvent.EntityId,
                 geofenceEvent.EventType.ToString().ToLowerInvariant(),
-                DateTimeOffset.SpecifyKind(geofenceEvent.EventTime, DateTimeKind.Utc),
+                new DateTimeOffset(DateTime.SpecifyKind(geofenceEvent.EventTime, DateTimeKind.Utc)),
                 geofenceEvent.TenantId,
                 cancellationToken);
 
@@ -191,7 +191,7 @@ public sealed class GeofenceToAlertBridgeService : IGeofenceToAlertBridgeService
             Source = "geofence-system",
             Service = "geofence-events",
             Fingerprint = fingerprint,
-            Timestamp = DateTimeOffset.SpecifyKind(geofenceEvent.EventTime, DateTimeKind.Utc),
+            Timestamp = new DateTimeOffset(DateTime.SpecifyKind(geofenceEvent.EventTime, DateTimeKind.Utc)),
             Labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["geofence_id"] = geofenceEvent.GeofenceId.ToString(),
