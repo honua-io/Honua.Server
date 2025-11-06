@@ -1,5 +1,6 @@
 using Honua.Server.Enterprise.Events.Dto;
 using Honua.Server.Enterprise.Events.Services;
+using Honua.Server.Enterprise.Multitenancy;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NetTopologySuite.Geometries;
@@ -286,10 +287,26 @@ public class AzureStreamAnalyticsController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// Gets the tenant ID from the current HTTP context.
+    /// Extracts tenant from TenantMiddleware context (set by subdomain or X-Tenant-Id header).
+    /// Returns null for single-tenant deployments or when TenantMiddleware is not active.
+    /// </summary>
+    /// <returns>Tenant ID if available; null otherwise</returns>
     private string? GetTenantId()
     {
-        // TODO: Extract tenant ID from claims or context
-        // For now, return null (single-tenant mode)
+        // Extract tenant from TenantMiddleware context
+        // TenantMiddleware extracts tenant from subdomain or X-Tenant-Id header
+        var tenantContext = HttpContext.GetTenantContext();
+
+        if (tenantContext != null)
+        {
+            _logger.LogDebug("Request executing for tenant: {TenantId}", tenantContext.TenantId);
+            return tenantContext.TenantId;
+        }
+
+        // No tenant context - single-tenant mode or TenantMiddleware not active
+        _logger.LogDebug("No tenant context found - operating in single-tenant mode");
         return null;
     }
 }
