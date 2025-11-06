@@ -1,0 +1,255 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S001",
+        "name": "Downtown Sensor 1",
+        "type": "Air Quality",
+        "temperature": 68.5,
+        "airQuality": 42,
+        "humidity": 65,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Active",
+        "readings": [
+          {"time": "00:00", "temperature": 62.1, "airQuality": 38},
+          {"time": "04:00", "temperature": 58.3, "airQuality": 35},
+          {"time": "08:00", "temperature": 68.5, "airQuality": 42},
+          {"time": "12:00", "temperature": 75.2, "airQuality": 48},
+          {"time": "16:00", "temperature": 78.9, "airQuality": 55},
+          {"time": "20:00", "temperature": 70.4, "airQuality": 45}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4015, 37.7885]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S002",
+        "name": "Mission District Sensor",
+        "type": "Air Quality",
+        "temperature": 71.2,
+        "airQuality": 38,
+        "humidity": 62,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Active",
+        "readings": [
+          {"time": "00:00", "temperature": 64.5, "airQuality": 32},
+          {"time": "04:00", "temperature": 60.8, "airQuality": 30},
+          {"time": "08:00", "temperature": 71.2, "airQuality": 38},
+          {"time": "12:00", "temperature": 77.5, "airQuality": 42},
+          {"time": "16:00", "temperature": 80.1, "airQuality": 48},
+          {"time": "20:00", "temperature": 72.8, "airQuality": 40}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4195, 37.7615]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S003",
+        "name": "Financial District Sensor",
+        "type": "Air Quality",
+        "temperature": 69.8,
+        "airQuality": 45,
+        "humidity": 68,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Active",
+        "readings": [
+          {"time": "00:00", "temperature": 63.2, "airQuality": 40},
+          {"time": "04:00", "temperature": 59.5, "airQuality": 38},
+          {"time": "08:00", "temperature": 69.8, "airQuality": 45},
+          {"time": "12:00", "temperature": 76.1, "airQuality": 52},
+          {"time": "16:00", "temperature": 79.5, "airQuality": 58},
+          {"time": "20:00", "temperature": 71.2, "airQuality": 48}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3980, 37.7930]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S004",
+        "name": "SOMA Sensor",
+        "type": "Temperature",
+        "temperature": 72.5,
+        "airQuality": 50,
+        "humidity": 60,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Active",
+        "readings": [
+          {"time": "00:00", "temperature": 65.8, "airQuality": 45},
+          {"time": "04:00", "temperature": 62.1, "airQuality": 42},
+          {"time": "08:00", "temperature": 72.5, "airQuality": 50},
+          {"time": "12:00", "temperature": 78.8, "airQuality": 55},
+          {"time": "16:00", "temperature": 81.2, "airQuality": 60},
+          {"time": "20:00", "temperature": 73.5, "airQuality": 52}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3965, 37.7765]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S005",
+        "name": "Nob Hill Sensor",
+        "type": "Air Quality",
+        "temperature": 66.3,
+        "airQuality": 35,
+        "humidity": 70,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Active",
+        "readings": [
+          {"time": "00:00", "temperature": 60.5, "airQuality": 30},
+          {"time": "04:00", "temperature": 56.8, "airQuality": 28},
+          {"time": "08:00", "temperature": 66.3, "airQuality": 35},
+          {"time": "12:00", "temperature": 72.6, "airQuality": 40},
+          {"time": "16:00", "temperature": 75.2, "airQuality": 45},
+          {"time": "20:00", "temperature": 68.1, "airQuality": 38}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4125, 37.7925]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S006",
+        "name": "Marina Sensor",
+        "type": "Temperature",
+        "temperature": 64.8,
+        "airQuality": 32,
+        "humidity": 75,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Active",
+        "readings": [
+          {"time": "00:00", "temperature": 58.2, "airQuality": 28},
+          {"time": "04:00", "temperature": 54.5, "airQuality": 25},
+          {"time": "08:00", "temperature": 64.8, "airQuality": 32},
+          {"time": "12:00", "temperature": 70.1, "airQuality": 38},
+          {"time": "16:00", "temperature": 72.8, "airQuality": 42},
+          {"time": "20:00", "temperature": 66.5, "airQuality": 35}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4335, 37.8045]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S007",
+        "name": "Potrero Hill Sensor",
+        "type": "Air Quality",
+        "temperature": 73.1,
+        "airQuality": 55,
+        "humidity": 58,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Warning",
+        "readings": [
+          {"time": "00:00", "temperature": 66.5, "airQuality": 50},
+          {"time": "04:00", "temperature": 63.2, "airQuality": 48},
+          {"time": "08:00", "temperature": 73.1, "airQuality": 55},
+          {"time": "12:00", "temperature": 79.5, "airQuality": 62},
+          {"time": "16:00", "temperature": 82.1, "airQuality": 68},
+          {"time": "20:00", "temperature": 74.8, "airQuality": 58}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3895, 37.7625]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S008",
+        "name": "Richmond Sensor",
+        "type": "Temperature",
+        "temperature": 63.5,
+        "airQuality": 30,
+        "humidity": 78,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Active",
+        "readings": [
+          {"time": "00:00", "temperature": 57.8, "airQuality": 25},
+          {"time": "04:00", "temperature": 54.1, "airQuality": 22},
+          {"time": "08:00", "temperature": 63.5, "airQuality": 30},
+          {"time": "12:00", "temperature": 68.8, "airQuality": 35},
+          {"time": "16:00", "temperature": 71.2, "airQuality": 40},
+          {"time": "20:00", "temperature": 65.5, "airQuality": 32}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4685, 37.7795]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S009",
+        "name": "Hayes Valley Sensor",
+        "type": "Air Quality",
+        "temperature": 70.5,
+        "airQuality": 40,
+        "humidity": 63,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Active",
+        "readings": [
+          {"time": "00:00", "temperature": 63.8, "airQuality": 35},
+          {"time": "04:00", "temperature": 60.2, "airQuality": 32},
+          {"time": "08:00", "temperature": 70.5, "airQuality": 40},
+          {"time": "12:00", "temperature": 76.8, "airQuality": 45},
+          {"time": "16:00", "temperature": 79.5, "airQuality": 50},
+          {"time": "20:00", "temperature": 72.1, "airQuality": 42}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4245, 37.7745]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S010",
+        "name": "Civic Center Sensor",
+        "type": "Air Quality",
+        "temperature": 71.8,
+        "airQuality": 48,
+        "humidity": 61,
+        "timestamp": "2025-11-06T08:00:00Z",
+        "status": "Maintenance",
+        "readings": [
+          {"time": "00:00", "temperature": 64.2, "airQuality": 42},
+          {"time": "04:00", "temperature": 60.5, "airQuality": 40},
+          {"time": "08:00", "temperature": 71.8, "airQuality": 48},
+          {"time": "12:00", "temperature": 78.2, "airQuality": 52},
+          {"time": "16:00", "temperature": 80.8, "airQuality": 58},
+          {"time": "20:00", "temperature": 73.1, "airQuality": 50}
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4195, 37.7795]
+      }
+    }
+  ]
+}

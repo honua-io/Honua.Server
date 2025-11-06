@@ -1,0 +1,476 @@
+@page "/component-showcase"
+<PageTitle>Component Showcase - Honua MapSDK</PageTitle>
+
+<div class="dashboard-container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">
+                <MudIcon Icon="@Icons.Material.Filled.Widgets" Class="mr-2" />
+                Component Showcase
+            </h1>
+            <p class="dashboard-subtitle">
+                Comprehensive demonstration of all Honua MapSDK components and their capabilities.
+                Use this as a reference for building your own applications.
+            </p>
+        </div>
+    </div>
+
+    <!-- Tabbed Interface -->
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Color="Color.Primary">
+        <!-- Overview Tab -->
+        <MudTabPanel Icon="@Icons.Material.Filled.Info" Text="Overview">
+            <div style="max-width: 900px;">
+                <MudText Typo="Typo.h5" Class="mb-4">Welcome to Honua MapSDK</MudText>
+                <MudText Typo="Typo.body1" Class="mb-3">
+                    Honua MapSDK is a comprehensive mapping library for Blazor applications, providing a rich set
+                    of components that work seamlessly together through zero-configuration auto-sync.
+                </MudText>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" Class="mb-3">Available Components</MudText>
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.Map" IconColor="Color.Primary">
+                        <MudText><strong>HonuaMap</strong> - Interactive map with MapLibre GL</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.TableChart" IconColor="Color.Primary">
+                        <MudText><strong>HonuaDataGrid</strong> - Data table with auto-sync and export capabilities</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.BarChart" IconColor="Color.Primary">
+                        <MudText><strong>HonuaChart</strong> - Charts (histogram, bar, pie, line, doughnut)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Layers" IconColor="Color.Primary">
+                        <MudText><strong>HonuaLegend</strong> - Layer management and visibility control</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.FilterAlt" IconColor="Color.Primary">
+                        <MudText><strong>HonuaFilterPanel</strong> - Spatial, attribute, and temporal filtering</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Search" IconColor="Color.Secondary">
+                        <MudText><strong>HonuaSearch</strong> - Geocoding search (coming soon)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Timeline" IconColor="Color.Secondary">
+                        <MudText><strong>HonuaTimeline</strong> - Time-series playback (coming soon)</MudText>
+                    </MudListItem>
+                </MudList>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.h6" Class="mb-3">Key Features</MudText>
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudPaper Class="pa-4" Elevation="0" Style="background: rgba(33, 150, 243, 0.1);">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Primary">
+                                <MudIcon Icon="@Icons.Material.Filled.Sync" Size="Size.Small" /> Zero-Config Sync
+                            </MudText>
+                            <MudText Typo="Typo.body2" Class="mt-2">
+                                Components automatically communicate through ComponentBus. No manual wiring needed.
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudPaper Class="pa-4" Elevation="0" Style="background: rgba(76, 175, 80, 0.1);">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Success">
+                                <MudIcon Icon="@Icons.Material.Filled.Code" Size="Size.Small" /> Blazor Native
+                            </MudText>
+                            <MudText Typo="Typo.body2" Class="mt-2">
+                                Built entirely in C# and Blazor. Type-safe, IntelliSense-friendly development.
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudPaper Class="pa-4" Elevation="0" Style="background: rgba(255, 152, 0, 0.1);">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Warning">
+                                <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" /> High Performance
+                            </MudText>
+                            <MudText Typo="Typo.body2" Class="mt-2">
+                                Optimized for large datasets with lazy loading and efficient rendering.
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudPaper Class="pa-4" Elevation="0" Style="background: rgba(156, 39, 176, 0.1);">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">
+                                <MudIcon Icon="@Icons.Material.Filled.Devices" Size="Size.Small" /> Responsive
+                            </MudText>
+                            <MudText Typo="Typo.body2" Class="mt-2">
+                                Works beautifully on desktop, tablet, and mobile with adaptive layouts.
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </div>
+        </MudTabPanel>
+
+        <!-- HonuaMap Tab -->
+        <MudTabPanel Icon="@Icons.Material.Filled.Map" Text="Map">
+            <MudText Typo="Typo.h6" Class="mb-3">HonuaMap Component</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Interactive map powered by MapLibre GL with support for multiple basemaps, layers, and interactions.
+            </MudText>
+
+            <div style="height: 400px; margin-bottom: 24px;">
+                <HonuaMap Id="showcase-map"
+                          MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                          Center="new[] { -122.4194, 37.7749 }"
+                          Zoom="12"
+                          Style="width: 100%; height: 100%; border-radius: 8px;" />
+            </div>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Key Properties</MudText>
+            <MudSimpleTable Elevation="0" Dense="true">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Id</code></td>
+                        <td>string</td>
+                        <td>Unique identifier for the map component</td>
+                    </tr>
+                    <tr>
+                        <td><code>MapStyle</code></td>
+                        <td>string</td>
+                        <td>URL to the map style JSON</td>
+                    </tr>
+                    <tr>
+                        <td><code>Center</code></td>
+                        <td>double[]</td>
+                        <td>Initial center coordinates [longitude, latitude]</td>
+                    </tr>
+                    <tr>
+                        <td><code>Zoom</code></td>
+                        <td>double</td>
+                        <td>Initial zoom level (0-22)</td>
+                    </tr>
+                    <tr>
+                        <td><code>OnFeatureClicked</code></td>
+                        <td>EventCallback</td>
+                        <td>Fired when a feature is clicked</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+
+            <div class="code-example mt-4">
+                <pre><code>&lt;HonuaMap Id="my-map"
+          MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+          Center="new[] { -122.4194, 37.7749 }"
+          Zoom="13"
+          OnFeatureClicked="@OnFeatureClicked" /&gt;</code></pre>
+            </div>
+        </MudTabPanel>
+
+        <!-- HonuaDataGrid Tab -->
+        <MudTabPanel Icon="@Icons.Material.Filled.TableChart" Text="DataGrid">
+            <MudText Typo="Typo.h6" Class="mb-3">HonuaDataGrid Component</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Powerful data grid with sorting, filtering, pagination, and automatic synchronization with maps and charts.
+            </MudText>
+
+            <div style="margin-bottom: 24px;">
+                <HonuaDataGrid TItem="ShowcaseItem"
+                               Id="showcase-grid"
+                               SyncWith="showcase-map"
+                               DataSource="data/parcels.geojson"
+                               Title="Property Data"
+                               ShowToolbar="true"
+                               ShowSearch="true"
+                               ShowExport="true"
+                               Dense="true"
+                               PageSize="5" />
+            </div>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Key Properties</MudText>
+            <MudSimpleTable Elevation="0" Dense="true">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>SyncWith</code></td>
+                        <td>string</td>
+                        <td>Map ID to synchronize with</td>
+                    </tr>
+                    <tr>
+                        <td><code>DataSource</code></td>
+                        <td>string</td>
+                        <td>URL to GeoJSON data source</td>
+                    </tr>
+                    <tr>
+                        <td><code>ShowExport</code></td>
+                        <td>bool</td>
+                        <td>Enable export to JSON/CSV/GeoJSON</td>
+                    </tr>
+                    <tr>
+                        <td><code>Filterable</code></td>
+                        <td>bool</td>
+                        <td>Enable column filtering</td>
+                    </tr>
+                    <tr>
+                        <td><code>Sortable</code></td>
+                        <td>bool</td>
+                        <td>Enable column sorting</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+
+            <div class="code-example mt-4">
+                <pre><code>&lt;HonuaDataGrid TItem="PropertyFeature"
+               SyncWith="my-map"
+               DataSource="data/properties.geojson"
+               ShowExport="true"
+               Filterable="true"
+               Sortable="true" /&gt;</code></pre>
+            </div>
+        </MudTabPanel>
+
+        <!-- HonuaChart Tab -->
+        <MudTabPanel Icon="@Icons.Material.Filled.BarChart" Text="Charts">
+            <MudText Typo="Typo.h6" Class="mb-3">HonuaChart Component</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Interactive charts with multiple types: histogram, bar, pie, doughnut, and line charts.
+                Click on segments to filter data across all synchronized components.
+            </MudText>
+
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <div class="dashboard-chart-card" style="height: 300px;">
+                        <HonuaChart Id="showcase-histogram"
+                                    SyncWith="showcase-map"
+                                    Type="ChartType.Histogram"
+                                    Field="assessedValue"
+                                    Title="Value Histogram"
+                                    Bins="6"
+                                    ValueFormat="ValueFormat.Currency"
+                                    Style="width: 100%; height: 100%;" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="dashboard-chart-card" style="height: 300px;">
+                        <HonuaChart Id="showcase-pie"
+                                    SyncWith="showcase-map"
+                                    Type="ChartType.Pie"
+                                    Field="landUse"
+                                    Title="Land Use Pie Chart"
+                                    ShowLegend="true"
+                                    LegendPosition="bottom"
+                                    Style="width: 100%; height: 100%;" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="dashboard-chart-card" style="height: 300px;">
+                        <HonuaChart Id="showcase-bar"
+                                    SyncWith="showcase-map"
+                                    Type="ChartType.Bar"
+                                    Field="landUse"
+                                    Title="Land Use Bar Chart"
+                                    Aggregation="AggregationType.Count"
+                                    Style="width: 100%; height: 100%;" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <div class="dashboard-chart-card" style="height: 300px;">
+                        <HonuaChart Id="showcase-doughnut"
+                                    SyncWith="showcase-map"
+                                    Type="ChartType.Doughnut"
+                                    Field="landUse"
+                                    Title="Land Use Doughnut"
+                                    ShowLegend="true"
+                                    Style="width: 100%; height: 100%;" />
+                    </div>
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.h6" Class="mb-2 mt-4">Chart Types</MudText>
+            <MudList Dense="true">
+                <MudListItem Icon="@Icons.Material.Filled.BarChart">
+                    <strong>Histogram</strong> - Distribution of numeric values in bins
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.BarChart">
+                    <strong>Bar</strong> - Categorical data comparison
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.PieChart">
+                    <strong>Pie</strong> - Part-to-whole relationships
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.DonutSmall">
+                    <strong>Doughnut</strong> - Like pie chart with center hollow
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.ShowChart">
+                    <strong>Line</strong> - Trends over time (requires TimeField)
+                </MudListItem>
+            </MudList>
+
+            <div class="code-example mt-4">
+                <pre><code>&lt;HonuaChart SyncWith="my-map"
+            Type="ChartType.Histogram"
+            Field="price"
+            Title="Price Distribution"
+            Bins="10"
+            ValueFormat="ValueFormat.Currency"
+            EnableFilter="true" /&gt;</code></pre>
+            </div>
+        </MudTabPanel>
+
+        <!-- Integration Tab -->
+        <MudTabPanel Icon="@Icons.Material.Filled.DynamicFeed" Text="Integration">
+            <MudText Typo="Typo.h6" Class="mb-3">Component Integration</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                All components work together through the ComponentBus messaging system.
+                Simply set the <code>SyncWith</code> property to connect components.
+            </MudText>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <!-- Map -->
+                <div style="height: 300px;">
+                    <HonuaMap Id="integration-map"
+                              MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                              Center="new[] { -122.4194, 37.7749 }"
+                              Zoom="12"
+                              Style="width: 100%; height: 100%; border-radius: 8px;" />
+                </div>
+
+                <!-- Chart -->
+                <div class="dashboard-chart-card" style="height: 300px;">
+                    <HonuaChart Id="integration-chart"
+                                SyncWith="integration-map"
+                                Type="ChartType.Bar"
+                                Field="landUse"
+                                Title="Synchronized Chart"
+                                EnableFilter="true"
+                                AutoSync="true"
+                                Style="width: 100%; height: 100%;" />
+                </div>
+
+                <!-- Grid -->
+                <div style="grid-column: 1 / -1;">
+                    <HonuaDataGrid TItem="ShowcaseItem"
+                                   Id="integration-grid"
+                                   SyncWith="integration-map"
+                                   DataSource="data/parcels.geojson"
+                                   Title="Synchronized Grid"
+                                   ShowToolbar="true"
+                                   Dense="true"
+                                   PageSize="5" />
+                </div>
+            </div>
+
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                <strong>How it works:</strong> When you click on a map feature, the grid automatically highlights that row.
+                Click on a chart segment to filter all components to show only that category.
+                All changes propagate automatically through ComponentBus!
+            </MudAlert>
+
+            <div class="code-example mt-4">
+                <pre><code>@* Map is the sync source *@
+&lt;HonuaMap Id="my-map" ... /&gt;
+
+@* All other components sync with the map *@
+&lt;HonuaDataGrid SyncWith="my-map" ... /&gt;
+&lt;HonuaChart SyncWith="my-map" ... /&gt;
+&lt;HonuaFilterPanel SyncWith="my-map" ... /&gt;
+&lt;HonuaLegend SyncWith="my-map" ... /&gt;</code></pre>
+            </div>
+        </MudTabPanel>
+
+        <!-- Best Practices Tab -->
+        <MudTabPanel Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Best Practices">
+            <MudText Typo="Typo.h6" Class="mb-3">Best Practices & Tips</MudText>
+
+            <MudExpansionPanels MultiExpansion="true">
+                <MudExpansionPanel Text="Component Synchronization" IsInitiallyExpanded="true">
+                    <MudList Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Use a unique map ID as the sync source for all related components
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Set <code>SyncWith</code> to the map ID on all grids, charts, and filters
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Enable <code>AutoSync</code> on charts to update when map extent changes
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Close" IconColor="Color.Error">
+                            Don't create circular sync dependencies between components
+                        </MudListItem>
+                    </MudList>
+                </MudExpansionPanel>
+
+                <MudExpansionPanel Text="Performance Optimization">
+                    <MudList Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Use pagination on data grids for large datasets
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Set reasonable <code>MaxCategories</code> on charts (default: 20)
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Limit the number of bins on histograms to 10-15
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Use <code>Dense</code> mode on grids to show more data
+                        </MudListItem>
+                    </MudList>
+                </MudExpansionPanel>
+
+                <MudExpansionPanel Text="Data Sources">
+                    <MudList Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Use GeoJSON format for spatial data
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Include geometry in features for map visualization
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Use consistent field names across all components
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Pre-process large datasets server-side when possible
+                        </MudListItem>
+                    </MudList>
+                </MudExpansionPanel>
+
+                <MudExpansionPanel Text="User Experience">
+                    <MudList Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Enable search and filtering to help users find data
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Use appropriate chart types for your data
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Provide export capabilities for data download
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Use meaningful titles and labels on all components
+                        </MudListItem>
+                    </MudList>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudTabPanel>
+    </MudTabs>
+</div>
+
+@code {
+    public class ShowcaseItem
+    {
+        public string Type { get; set; } = "Feature";
+        public ShowcaseProperties Properties { get; set; } = new();
+        public object? Geometry { get; set; }
+    }
+
+    public class ShowcaseProperties
+    {
+        public string Id { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string LandUse { get; set; } = "";
+        public int AssessedValue { get; set; }
+        public int Sqft { get; set; }
+    }
+}

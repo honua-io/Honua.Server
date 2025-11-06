@@ -1,0 +1,644 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services.Print
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject IMapFishPrintService PrintService
+@inject ComponentBus Bus
+
+<div class="honua-print @_cssClass">
+    <!-- Print Button (trigger) -->
+    @if (!_dialogOpen)
+    {
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Print"
+                   OnClick="OpenDialog"
+                   Disabled="Disabled"
+                   Class="@ButtonClass">
+            @ButtonText
+        </MudButton>
+    }
+
+    <!-- Print Configuration Dialog -->
+    <MudDialog @bind-IsVisible="_dialogOpen"
+               Options="_dialogOptions">
+        <TitleContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.Print" Class="mr-1" />
+                Print Map
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <div class="print-dialog-content">
+                <!-- Left Panel: Configuration -->
+                <div class="print-config-panel">
+                    <MudTabs Elevation="0" Rounded="true" @bind-ActivePanelIndex="_activeTab">
+                        <!-- Basic Settings Tab -->
+                        <MudTabPanel Text="Basic" Icon="@Icons.Material.Filled.Settings">
+                            <div class="tab-content">
+                                <!-- Title -->
+                                <MudTextField @bind-Value="_config.Title"
+                                              Label="Title"
+                                              Variant="Variant.Outlined"
+                                              HelperText="Map title (optional)"
+                                              Class="mb-3" />
+
+                                <!-- Description -->
+                                <MudTextField @bind-Value="_config.Description"
+                                              Label="Description"
+                                              Variant="Variant.Outlined"
+                                              Lines="2"
+                                              HelperText="Map description (optional)"
+                                              Class="mb-3" />
+
+                                <!-- Author -->
+                                <MudTextField @bind-Value="_config.Author"
+                                              Label="Author"
+                                              Variant="Variant.Outlined"
+                                              HelperText="Creator name"
+                                              Class="mb-3" />
+
+                                <!-- Copyright -->
+                                <MudTextField @bind-Value="_config.Copyright"
+                                              Label="Copyright"
+                                              Variant="Variant.Outlined"
+                                              HelperText="Attribution text"
+                                              Class="mb-3" />
+                            </div>
+                        </MudTabPanel>
+
+                        <!-- Page Settings Tab -->
+                        <MudTabPanel Text="Page" Icon="@Icons.Material.Filled.Photo">
+                            <div class="tab-content">
+                                <!-- Paper Size -->
+                                <MudSelect @bind-Value="_config.PaperSize"
+                                           Label="Paper Size"
+                                           Variant="Variant.Outlined"
+                                           Class="mb-3">
+                                    @foreach (PaperSize size in Enum.GetValues<PaperSize>())
+                                    {
+                                        <MudSelectItem Value="size">@GetPaperSizeLabel(size)</MudSelectItem>
+                                    }
+                                </MudSelect>
+
+                                <!-- Orientation -->
+                                <MudSelect @bind-Value="_config.Orientation"
+                                           Label="Orientation"
+                                           Variant="Variant.Outlined"
+                                           Class="mb-3">
+                                    <MudSelectItem Value="PageOrientation.Portrait">Portrait</MudSelectItem>
+                                    <MudSelectItem Value="PageOrientation.Landscape">Landscape</MudSelectItem>
+                                </MudSelect>
+
+                                <!-- Format -->
+                                <MudSelect @bind-Value="_config.Format"
+                                           Label="Output Format"
+                                           Variant="Variant.Outlined"
+                                           Class="mb-3">
+                                    <MudSelectItem Value="PrintFormat.Pdf">PDF</MudSelectItem>
+                                    <MudSelectItem Value="PrintFormat.Png">PNG</MudSelectItem>
+                                    <MudSelectItem Value="PrintFormat.Jpeg">JPEG</MudSelectItem>
+                                </MudSelect>
+
+                                <!-- DPI -->
+                                <MudSelect @bind-Value="_config.Dpi"
+                                           Label="DPI / Quality"
+                                           Variant="Variant.Outlined"
+                                           Class="mb-3">
+                                    <MudSelectItem Value="72">72 DPI (Screen)</MudSelectItem>
+                                    <MudSelectItem Value="150">150 DPI (Draft)</MudSelectItem>
+                                    <MudSelectItem Value="300">300 DPI (Standard)</MudSelectItem>
+                                    <MudSelectItem Value="600">600 DPI (High)</MudSelectItem>
+                                </MudSelect>
+
+                                <!-- Layout Template -->
+                                @if (_capabilities?.Layouts.Any() == true)
+                                {
+                                    <MudSelect @bind-Value="_config.Layout"
+                                               Label="Layout Template"
+                                               Variant="Variant.Outlined"
+                                               Class="mb-3">
+                                        @foreach (var layout in _capabilities.Layouts)
+                                        {
+                                            <MudSelectItem Value="@layout.Name">@layout.Label</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                            </div>
+                        </MudTabPanel>
+
+                        <!-- Map Settings Tab -->
+                        <MudTabPanel Text="Map" Icon="@Icons.Material.Filled.Map">
+                            <div class="tab-content">
+                                <!-- Extent Mode -->
+                                <MudSelect @bind-Value="_config.ExtentMode"
+                                           Label="Map Extent"
+                                           Variant="Variant.Outlined"
+                                           Class="mb-3">
+                                    <MudSelectItem Value="PrintExtentMode.CurrentView">Current View</MudSelectItem>
+                                    <MudSelectItem Value="PrintExtentMode.Custom">Custom Extent</MudSelectItem>
+                                    <MudSelectItem Value="PrintExtentMode.FitFeatures">Fit All Features</MudSelectItem>
+                                </MudSelect>
+
+                                <!-- Scale -->
+                                <MudSelect @bind-Value="_config.Scale"
+                                           Label="Map Scale"
+                                           Variant="Variant.Outlined"
+                                           HelperText="1:X scale"
+                                           Class="mb-3">
+                                    <MudSelectItem Value="1000">1:1,000</MudSelectItem>
+                                    <MudSelectItem Value="2500">1:2,500</MudSelectItem>
+                                    <MudSelectItem Value="5000">1:5,000</MudSelectItem>
+                                    <MudSelectItem Value="10000">1:10,000</MudSelectItem>
+                                    <MudSelectItem Value="25000">1:25,000</MudSelectItem>
+                                    <MudSelectItem Value="50000">1:50,000</MudSelectItem>
+                                    <MudSelectItem Value="100000">1:100,000</MudSelectItem>
+                                    <MudSelectItem Value="250000">1:250,000</MudSelectItem>
+                                    <MudSelectItem Value="500000">1:500,000</MudSelectItem>
+                                </MudSelect>
+
+                                <!-- Bearing/Rotation -->
+                                <MudNumericField @bind-Value="_config.Bearing"
+                                                 Label="Rotation (degrees)"
+                                                 Variant="Variant.Outlined"
+                                                 Min="0"
+                                                 Max="360"
+                                                 HelperText="Map rotation angle"
+                                                 Class="mb-3" />
+                            </div>
+                        </MudTabPanel>
+
+                        <!-- Options Tab -->
+                        <MudTabPanel Text="Options" Icon="@Icons.Material.Filled.Tune">
+                            <div class="tab-content">
+                                <MudSwitch @bind-Checked="_config.IncludeLegend"
+                                           Color="Color.Primary"
+                                           Label="Include Legend"
+                                           Class="mb-2" />
+
+                                <MudSwitch @bind-Checked="_config.IncludeScaleBar"
+                                           Color="Color.Primary"
+                                           Label="Include Scale Bar"
+                                           Class="mb-2" />
+
+                                <MudSwitch @bind-Checked="_config.IncludeNorthArrow"
+                                           Color="Color.Primary"
+                                           Label="Include North Arrow"
+                                           Class="mb-2" />
+
+                                <MudSwitch @bind-Checked="_config.IncludeAttribution"
+                                           Color="Color.Primary"
+                                           Label="Include Attribution"
+                                           Class="mb-2" />
+                            </div>
+                        </MudTabPanel>
+                    </MudTabs>
+                </div>
+
+                <!-- Right Panel: Preview -->
+                <div class="print-preview-panel">
+                    <MudPaper Elevation="2" Class="preview-container">
+                        @if (_isGeneratingPreview)
+                        {
+                            <div class="preview-loading">
+                                <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+                                <MudText Typo="Typo.body2" Class="mt-3">Generating preview...</MudText>
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(_previewImageUrl))
+                        {
+                            <img src="@_previewImageUrl" alt="Print preview" class="preview-image" />
+                        }
+                        else
+                        {
+                            <div class="preview-placeholder">
+                                <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Large" Class="mb-2" />
+                                <MudText Typo="Typo.body2">Preview will appear here</MudText>
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           OnClick="GeneratePreview"
+                                           Class="mt-2">
+                                    Generate Preview
+                                </MudButton>
+                            </div>
+                        }
+                    </MudPaper>
+
+                    <!-- Preview Info -->
+                    <div class="preview-info mt-3">
+                        <MudText Typo="Typo.caption">
+                            <strong>Size:</strong> @GetPageDimensions()
+                        </MudText>
+                        <MudText Typo="Typo.caption">
+                            <strong>Orientation:</strong> @_config.Orientation
+                        </MudText>
+                        <MudText Typo="Typo.caption">
+                            <strong>Format:</strong> @_config.Format
+                        </MudText>
+                    </div>
+                </div>
+            </div>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseDialog" Variant="Variant.Text">
+                Cancel
+            </MudButton>
+            <MudButton OnClick="GeneratePreview"
+                       Variant="Variant.Text"
+                       Color="Color.Info"
+                       Disabled="_isGeneratingPreview || _isPrinting">
+                Refresh Preview
+            </MudButton>
+            <MudButton OnClick="StartPrint"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Print"
+                       Disabled="_isPrinting">
+                @if (_isPrinting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Printing...</span>
+                }
+                else
+                {
+                    <span>Print</span>
+                }
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+
+    <!-- Print Progress Dialog -->
+    <MudDialog @bind-IsVisible="_showProgressDialog" Options="_progressDialogOptions">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Print Job Progress</MudText>
+        </TitleContent>
+        <DialogContent>
+            <div class="print-progress-content">
+                @if (_currentJob != null)
+                {
+                    <MudProgressLinear Value="_currentJob.Progress"
+                                       Color="@GetProgressColor()"
+                                       Class="mb-3" />
+
+                    <MudText Typo="Typo.body1" Class="mb-2">
+                        <strong>Status:</strong> @_currentJob.Status
+                    </MudText>
+
+                    @if (!string.IsNullOrEmpty(_currentJob.Message))
+                    {
+                        <MudText Typo="Typo.body2" Class="mb-2">
+                            @_currentJob.Message
+                        </MudText>
+                    }
+
+                    @if (!string.IsNullOrEmpty(_currentJob.Error))
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mt-2">
+                            @_currentJob.Error
+                        </MudAlert>
+                    }
+
+                    @if (_currentJob.Status == PrintJobState.Completed)
+                    {
+                        <MudAlert Severity="Severity.Success" Class="mt-2">
+                            Print completed successfully! Download starting...
+                        </MudAlert>
+                    }
+                }
+            </div>
+        </DialogContent>
+        <DialogActions>
+            @if (_currentJob?.Status == PrintJobState.Processing || _currentJob?.Status == PrintJobState.Pending)
+            {
+                <MudButton OnClick="CancelPrintJob"
+                           Variant="Variant.Text"
+                           Color="Color.Error">
+                    Cancel
+                </MudButton>
+            }
+            <MudButton OnClick="CloseProgressDialog"
+                       Variant="Variant.Text"
+                       Disabled="@(_currentJob?.Status == PrintJobState.Processing || _currentJob?.Status == PrintJobState.Pending)">
+                Close
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</div>
+
+@code {
+    // Public parameters
+    [Parameter] public string? SyncWith { get; set; }
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string ButtonText { get; set; } = "Print";
+    [Parameter] public string ButtonClass { get; set; } = "";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string PrintServiceUrl { get; set; } = "/print";
+    [Parameter] public string PrintApp { get; set; } = "default";
+    [Parameter] public EventCallback<PrintJobStatus> OnPrintComplete { get; set; }
+    [Parameter] public EventCallback<string> OnPrintError { get; set; }
+
+    // Private fields
+    private string _cssClass => $"honua-print-{Id ?? "default"}";
+    private bool _dialogOpen;
+    private bool _showProgressDialog;
+    private bool _isPrinting;
+    private bool _isGeneratingPreview;
+    private int _activeTab;
+    private string? _previewImageUrl;
+    private PrintConfiguration _config = new();
+    private PrintCapabilities? _capabilities;
+    private PrintJobStatus? _currentJob;
+    private string? _currentJobId;
+    private System.Threading.Timer? _statusCheckTimer;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Large,
+        FullWidth = true,
+        CloseButton = true,
+        DisableBackdropClick = false
+    };
+
+    private readonly DialogOptions _progressDialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseButton = false,
+        DisableBackdropClick = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load capabilities from MapFish Print
+        _capabilities = await PrintService.GetCapabilitiesAsync();
+
+        // Subscribe to map messages if synced
+        if (!string.IsNullOrEmpty(SyncWith))
+        {
+            Bus.Subscribe<MapExtentChangedMessage>(HandleMapExtentChanged);
+        }
+
+        await base.OnInitializedAsync();
+    }
+
+    private void OpenDialog()
+    {
+        _dialogOpen = true;
+        _activeTab = 0;
+        StateHasChanged();
+    }
+
+    private void CloseDialog()
+    {
+        _dialogOpen = false;
+        StateHasChanged();
+    }
+
+    private void CloseProgressDialog()
+    {
+        _showProgressDialog = false;
+        _currentJob = null;
+        _currentJobId = null;
+        StateHasChanged();
+    }
+
+    private async Task GeneratePreview()
+    {
+        _isGeneratingPreview = true;
+        StateHasChanged();
+
+        try
+        {
+            // Capture current map view as image
+            var mapId = SyncWith ?? Id ?? "map";
+            var imageData = await JS.InvokeAsync<string>("honuaPrint.captureMap", mapId);
+
+            if (!string.IsNullOrEmpty(imageData))
+            {
+                _previewImageUrl = imageData;
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnPrintError.InvokeAsync($"Failed to generate preview: {ex.Message}");
+        }
+        finally
+        {
+            _isGeneratingPreview = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StartPrint()
+    {
+        _isPrinting = true;
+        StateHasChanged();
+
+        try
+        {
+            // Get current map state
+            await CaptureCurrentMapState();
+
+            // Submit print job
+            var jobId = await PrintService.SubmitPrintJobAsync(_config);
+
+            if (string.IsNullOrEmpty(jobId))
+            {
+                await OnPrintError.InvokeAsync("Failed to submit print job");
+                return;
+            }
+
+            _currentJobId = jobId;
+            _currentJob = new PrintJobStatus
+            {
+                JobId = jobId,
+                Status = PrintJobState.Pending,
+                Progress = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            // Close config dialog, open progress dialog
+            _dialogOpen = false;
+            _showProgressDialog = true;
+            StateHasChanged();
+
+            // Start polling for status
+            StartStatusPolling();
+        }
+        catch (Exception ex)
+        {
+            await OnPrintError.InvokeAsync($"Print failed: {ex.Message}");
+        }
+        finally
+        {
+            _isPrinting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CaptureCurrentMapState()
+    {
+        try
+        {
+            var mapId = SyncWith ?? Id ?? "map";
+            var mapState = await JS.InvokeAsync<MapState>("honuaPrint.getMapState", mapId);
+
+            if (mapState != null)
+            {
+                _config.Center = mapState.Center;
+                _config.Zoom = mapState.Zoom;
+                _config.Bearing = mapState.Bearing;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail - use defaults
+            Console.WriteLine($"Failed to capture map state: {ex.Message}");
+        }
+    }
+
+    private void StartStatusPolling()
+    {
+        _statusCheckTimer?.Dispose();
+        _statusCheckTimer = new System.Threading.Timer(async _ =>
+        {
+            await CheckPrintStatus();
+        }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+    }
+
+    private async Task CheckPrintStatus()
+    {
+        if (string.IsNullOrEmpty(_currentJobId))
+            return;
+
+        var status = await PrintService.GetJobStatusAsync(_currentJobId);
+
+        if (status != null)
+        {
+            _currentJob = status;
+
+            if (status.Status == PrintJobState.Completed)
+            {
+                _statusCheckTimer?.Dispose();
+                await DownloadPrint();
+            }
+            else if (status.Status == PrintJobState.Failed)
+            {
+                _statusCheckTimer?.Dispose();
+                await OnPrintError.InvokeAsync(status.Error ?? "Print job failed");
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task DownloadPrint()
+    {
+        if (string.IsNullOrEmpty(_currentJobId))
+            return;
+
+        try
+        {
+            var data = await PrintService.DownloadPrintAsync(_currentJobId);
+
+            if (data != null)
+            {
+                // Trigger browser download
+                var extension = _config.Format switch
+                {
+                    PrintFormat.Pdf => "pdf",
+                    PrintFormat.Png => "png",
+                    PrintFormat.Jpeg => "jpg",
+                    _ => "pdf"
+                };
+
+                var fileName = $"map_{DateTime.Now:yyyyMMdd_HHmmss}.{extension}";
+                await JS.InvokeVoidAsync("honuaPrint.downloadFile", data, fileName);
+
+                await OnPrintComplete.InvokeAsync(_currentJob);
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnPrintError.InvokeAsync($"Failed to download print: {ex.Message}");
+        }
+    }
+
+    private async Task CancelPrintJob()
+    {
+        if (string.IsNullOrEmpty(_currentJobId))
+            return;
+
+        _statusCheckTimer?.Dispose();
+
+        var success = await PrintService.CancelPrintJobAsync(_currentJobId);
+
+        if (success && _currentJob != null)
+        {
+            _currentJob.Status = PrintJobState.Cancelled;
+            _currentJob.Message = "Print job cancelled by user";
+        }
+
+        StateHasChanged();
+    }
+
+    private void HandleMapExtentChanged(MapExtentChangedMessage message)
+    {
+        if (message.MapId != SyncWith)
+            return;
+
+        // Update config with current map state
+        _config.Center = new[] { message.Center[0], message.Center[1] };
+        _config.Zoom = message.Zoom;
+    }
+
+    private string GetPaperSizeLabel(PaperSize size) => size switch
+    {
+        PaperSize.A3 => "A3 (297 × 420 mm)",
+        PaperSize.A4 => "A4 (210 × 297 mm)",
+        PaperSize.A5 => "A5 (148 × 210 mm)",
+        PaperSize.Letter => "Letter (8.5 × 11 in)",
+        PaperSize.Legal => "Legal (8.5 × 14 in)",
+        PaperSize.Tabloid => "Tabloid (11 × 17 in)",
+        PaperSize.Custom => "Custom",
+        _ => size.ToString()
+    };
+
+    private string GetPageDimensions() => _config.PaperSize switch
+    {
+        PaperSize.A3 => "297 × 420 mm",
+        PaperSize.A4 => "210 × 297 mm",
+        PaperSize.A5 => "148 × 210 mm",
+        PaperSize.Letter => "8.5 × 11 in",
+        PaperSize.Legal => "8.5 × 14 in",
+        PaperSize.Tabloid => "11 × 17 in",
+        _ => "Custom"
+    };
+
+    private Color GetProgressColor() => _currentJob?.Status switch
+    {
+        PrintJobState.Completed => Color.Success,
+        PrintJobState.Failed => Color.Error,
+        PrintJobState.Cancelled => Color.Warning,
+        _ => Color.Primary
+    };
+
+    public void Dispose()
+    {
+        _statusCheckTimer?.Dispose();
+
+        if (!string.IsNullOrEmpty(SyncWith))
+        {
+            Bus.Unsubscribe<MapExtentChangedMessage>(HandleMapExtentChanged);
+        }
+    }
+
+    private class MapState
+    {
+        public double[] Center { get; set; } = Array.Empty<double>();
+        public double Zoom { get; set; }
+        public double Bearing { get; set; }
+    }
+}

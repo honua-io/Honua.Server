@@ -1,0 +1,305 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "H001",
+        "name": "SF General Hospital",
+        "type": "Hospital",
+        "address": "1001 Potrero Ave",
+        "capacity": 600,
+        "emergency": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4045, 37.7565]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "H002",
+        "name": "UCSF Medical Center",
+        "type": "Hospital",
+        "address": "505 Parnassus Ave",
+        "capacity": 789,
+        "emergency": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4585, 37.7625]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "H003",
+        "name": "St. Mary's Medical Center",
+        "type": "Hospital",
+        "address": "450 Stanyan St",
+        "capacity": 415,
+        "emergency": true
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4545, 37.7685]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F001",
+        "name": "Fire Station 1",
+        "type": "Fire Station",
+        "address": "676 Howard St",
+        "capacity": 20,
+        "units": 4
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3995, 37.7845]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F002",
+        "name": "Fire Station 3",
+        "type": "Fire Station",
+        "address": "1067 Post St",
+        "capacity": 18,
+        "units": 3
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4215, 37.7855]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F003",
+        "name": "Fire Station 5",
+        "type": "Fire Station",
+        "address": "1301 Turk St",
+        "capacity": 16,
+        "units": 3
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4285, 37.7795]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "F004",
+        "name": "Fire Station 13",
+        "type": "Fire Station",
+        "address": "530 Sansome St",
+        "capacity": 22,
+        "units": 4
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4015, 37.7965]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "P001",
+        "name": "Southern Police Station",
+        "type": "Police Station",
+        "address": "1251 3rd St",
+        "capacity": 50,
+        "officers": 120
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3895, 37.7725]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "P002",
+        "name": "Mission Police Station",
+        "type": "Police Station",
+        "address": "630 Valencia St",
+        "capacity": 45,
+        "officers": 100
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4215, 37.7605]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "P003",
+        "name": "Central Police Station",
+        "type": "Police Station",
+        "address": "766 Vallejo St",
+        "capacity": 40,
+        "officers": 95
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4095, 37.7985]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "P004",
+        "name": "Richmond Police Station",
+        "type": "Police Station",
+        "address": "461 6th Ave",
+        "capacity": 38,
+        "officers": 85
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4635, 37.7815]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S001",
+        "name": "George Washington High School",
+        "type": "School",
+        "address": "600 32nd Ave",
+        "capacity": 1800,
+        "students": 1650
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4885, 37.7765]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S002",
+        "name": "Mission High School",
+        "type": "School",
+        "address": "3750 18th St",
+        "capacity": 1200,
+        "students": 1050
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4265, 37.7615]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S003",
+        "name": "Galileo Academy",
+        "type": "School",
+        "address": "1150 Francisco St",
+        "capacity": 2200,
+        "students": 2100
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4255, 37.8025]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "S004",
+        "name": "Lincoln High School",
+        "type": "School",
+        "address": "2162 24th Ave",
+        "capacity": 1600,
+        "students": 1450
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4815, 37.7485]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "K001",
+        "name": "Golden Gate Park",
+        "type": "Park",
+        "address": "501 Stanyan St",
+        "capacity": 50000,
+        "acres": 1017
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4545, 37.7695]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "K002",
+        "name": "Dolores Park",
+        "type": "Park",
+        "address": "505 Dolores St",
+        "capacity": 5000,
+        "acres": 16
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4275, 37.7595]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "K003",
+        "name": "Washington Square Park",
+        "type": "Park",
+        "address": "655 Union St",
+        "capacity": 2000,
+        "acres": 4.5
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4105, 37.8005]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "K004",
+        "name": "Alamo Square Park",
+        "type": "Park",
+        "address": "1 Alamo Square",
+        "capacity": 3000,
+        "acres": 12.7
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4345, 37.7765]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "K005",
+        "name": "Corona Heights Park",
+        "type": "Park",
+        "address": "520 Roosevelt Way",
+        "capacity": 1500,
+        "acres": 15
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4385, 37.7655]
+      }
+    }
+  ]
+}

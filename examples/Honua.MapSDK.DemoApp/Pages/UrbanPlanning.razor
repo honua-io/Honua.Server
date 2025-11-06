@@ -1,0 +1,299 @@
+@page "/urban-planning"
+<PageTitle>Urban Planning - Honua MapSDK</PageTitle>
+
+<div class="dashboard-container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h1 class="dashboard-title">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="mr-2" />
+                    Urban Planning Dashboard
+                </h1>
+                <p class="dashboard-subtitle">
+                    Analyze city infrastructure, demographics, and land use patterns.
+                    Multiple basemaps and data layers for comprehensive urban analysis.
+                </p>
+            </div>
+            <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary">
+                <MudButton StartIcon="@Icons.Material.Filled.Map"
+                           OnClick="@(() => ChangeBasemap("streets"))">Streets</MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Satellite"
+                           OnClick="@(() => ChangeBasemap("satellite"))">Satellite</MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Terrain"
+                           OnClick="@(() => ChangeBasemap("terrain"))">Terrain</MudButton>
+            </MudButtonGroup>
+        </div>
+    </div>
+
+    <!-- Dashboard Layout -->
+    <div class="dashboard-with-sidebar">
+        <!-- Sidebar -->
+        <div class="dashboard-sidebar">
+            <!-- Data Layers -->
+            <div class="component-panel mb-3">
+                <div class="panel-header">
+                    <h3 class="panel-title">Data Layers</h3>
+                </div>
+                <MudList Dense="true">
+                    <MudListItem>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_showParcels" Color="Color.Primary" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.Crop" Color="Color.Primary" Size="Size.Small" />
+                            <MudText>Property Parcels</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_showSchools" Color="Color.Info" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.School" Color="Color.Info" Size="Size.Small" />
+                            <MudText>Schools</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_showParks" Color="Color.Success" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.Park" Color="Color.Success" Size="Size.Small" />
+                            <MudText>Parks & Recreation</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_showTransit" Color="Color.Warning" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.DirectionsBus" Color="Color.Warning" Size="Size.Small" />
+                            <MudText>Transit Stations</MudText>
+                        </div>
+                    </MudListItem>
+                </MudList>
+            </div>
+
+            <!-- Planning Zones Legend -->
+            <div class="component-panel mb-3">
+                <div class="panel-header">
+                    <h3 class="panel-title">Zoning</h3>
+                </div>
+                <MudList Dense="true">
+                    <MudListItem>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 24px; height: 24px; background: #4CAF50; border-radius: 4px;"></div>
+                            <MudText Typo="Typo.body2">Residential</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 24px; height: 24px; background: #2196F3; border-radius: 4px;"></div>
+                            <MudText Typo="Typo.body2">Commercial</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 24px; height: 24px; background: #00BCD4; border-radius: 4px;"></div>
+                            <MudText Typo="Typo.body2">Mixed-Use</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 24px; height: 24px; background: #FF9800; border-radius: 4px;"></div>
+                            <MudText Typo="Typo.body2">Industrial</MudText>
+                        </div>
+                    </MudListItem>
+                </MudList>
+            </div>
+
+            <!-- Urban Metrics -->
+            <div class="component-panel">
+                <div class="panel-header">
+                    <h3 class="panel-title">Urban Metrics</h3>
+                </div>
+                <MudStack Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total Land Area</MudText>
+                        <MudText Typo="Typo.h6">47.87 mi²</MudText>
+                    </div>
+                    <MudDivider />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Population</MudText>
+                        <MudText Typo="Typo.h6">874,961</MudText>
+                    </div>
+                    <MudDivider />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Density</MudText>
+                        <MudText Typo="Typo.h6">18,838 /mi²</MudText>
+                    </div>
+                    <MudDivider />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Median Home Value</MudText>
+                        <MudText Typo="Typo.h6">$1.35M</MudText>
+                    </div>
+                </MudStack>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="dashboard-content">
+            <!-- Map -->
+            <div class="dashboard-map-section" style="height: 400px;">
+                <HonuaMap Id="planning-map"
+                          @ref="_map"
+                          MapStyle="@_currentBasemap"
+                          Center="new[] { -122.4194, 37.7749 }"
+                          Zoom="12"
+                          OnFeatureClicked="@OnFeatureClicked"
+                          Style="width: 100%; height: 100%;" />
+            </div>
+
+            <!-- Charts Grid -->
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;">
+                <!-- Land Use Distribution -->
+                <div class="dashboard-chart-card" style="height: 300px;">
+                    <HonuaChart Id="landuse-chart"
+                                SyncWith="planning-map"
+                                Type="ChartType.Pie"
+                                Field="landUse"
+                                Title="Land Use Distribution"
+                                EnableFilter="true"
+                                AutoSync="true"
+                                ShowLegend="true"
+                                LegendPosition="right"
+                                Style="width: 100%; height: 100%;" />
+                </div>
+
+                <!-- Property Values -->
+                <div class="dashboard-chart-card" style="height: 300px;">
+                    <HonuaChart Id="value-chart"
+                                SyncWith="planning-map"
+                                Type="ChartType.Histogram"
+                                Field="assessedValue"
+                                Title="Property Value Distribution"
+                                Bins="10"
+                                ValueFormat="ValueFormat.Currency"
+                                EnableFilter="true"
+                                AutoSync="true"
+                                Style="width: 100%; height: 100%;" />
+                </div>
+
+                <!-- Building Age Distribution -->
+                <div class="dashboard-chart-card" style="height: 300px;">
+                    <HonuaChart Id="age-chart"
+                                SyncWith="planning-map"
+                                Type="ChartType.Histogram"
+                                Field="yearBuilt"
+                                Title="Building Age Distribution"
+                                Bins="8"
+                                EnableFilter="true"
+                                AutoSync="true"
+                                Style="width: 100%; height: 100%;" />
+                </div>
+
+                <!-- Square Footage Analysis -->
+                <div class="dashboard-chart-card" style="height: 300px;">
+                    <HonuaChart Id="sqft-chart"
+                                SyncWith="planning-map"
+                                Type="ChartType.Bar"
+                                Field="landUse"
+                                Title="Avg Square Footage by Land Use"
+                                Aggregation="AggregationType.Avg"
+                                EnableFilter="false"
+                                AutoSync="true"
+                                Style="width: 100%; height: 100%;" />
+                </div>
+            </div>
+
+            <!-- Data Grid -->
+            <div class="dashboard-grid-container">
+                <HonuaDataGrid TItem="PlanningFeature"
+                               Id="planning-grid"
+                               SyncWith="planning-map"
+                               DataSource="data/parcels.geojson"
+                               Title="Planning Analysis Data"
+                               ShowToolbar="true"
+                               ShowSearch="true"
+                               ShowExport="true"
+                               Dense="true"
+                               PageSize="10"
+                               Filterable="true"
+                               Sortable="true">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Properties.Id" Title="Parcel ID" Sortable="true" />
+                        <PropertyColumn Property="x => x.Properties.Address" Title="Address" Sortable="true" Filterable="true" />
+                        <PropertyColumn Property="x => x.Properties.LandUse" Title="Zoning" Sortable="true" Filterable="true">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@GetLandUseColor(context.Properties.LandUse)">
+                                    @context.Properties.LandUse
+                                </MudChip>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        <PropertyColumn Property="x => x.Properties.Sqft" Title="Sq Ft" Sortable="true">
+                            <CellTemplate>
+                                @context.Properties.Sqft.ToString("N0")
+                            </CellTemplate>
+                        </PropertyColumn>
+                        <PropertyColumn Property="x => x.Properties.AssessedValue" Title="Value" Sortable="true">
+                            <CellTemplate>
+                                @context.Properties.AssessedValue.ToString("C0")
+                            </CellTemplate>
+                        </PropertyColumn>
+                        <PropertyColumn Property="x => x.Properties.YearBuilt" Title="Year Built" Sortable="true" />
+                    </Columns>
+                </HonuaDataGrid>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private HonuaMap? _map;
+    private string _currentBasemap = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+
+    private bool _showParcels = true;
+    private bool _showSchools = true;
+    private bool _showParks = true;
+    private bool _showTransit = false;
+
+    private Dictionary<string, string> _basemaps = new()
+    {
+        { "streets", "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json" },
+        { "satellite", "https://api.maptiler.com/maps/hybrid/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL" },
+        { "terrain", "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json" }
+    };
+
+    private void ChangeBasemap(string basemap)
+    {
+        if (_basemaps.ContainsKey(basemap))
+        {
+            _currentBasemap = _basemaps[basemap];
+            StateHasChanged();
+        }
+    }
+
+    private void OnFeatureClicked(FeatureClickedMessage message)
+    {
+        // Handle feature click
+    }
+
+    private Color GetLandUseColor(string landUse) => landUse switch
+    {
+        "Residential" => Color.Success,
+        "Commercial" => Color.Primary,
+        "Mixed-Use" => Color.Info,
+        "Industrial" => Color.Warning,
+        _ => Color.Default
+    };
+
+    public class PlanningFeature
+    {
+        public string Type { get; set; } = "Feature";
+        public PlanningProperties Properties { get; set; } = new();
+        public object? Geometry { get; set; }
+    }
+
+    public class PlanningProperties
+    {
+        public string Id { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string LandUse { get; set; } = "";
+        public int Sqft { get; set; }
+        public int AssessedValue { get; set; }
+        public int YearBuilt { get; set; }
+    }
+}

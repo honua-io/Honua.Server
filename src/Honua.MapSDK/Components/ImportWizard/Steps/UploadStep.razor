@@ -1,0 +1,260 @@
+@using Honua.MapSDK.Models.Import
+
+<div class="import-step upload-step">
+    <MudText Typo="Typo.h6" Class="mb-4">Upload Data File</MudText>
+
+    @if (string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudPaper Class="drop-zone @(_isDragging ? "dragging" : "")"
+                  Elevation="0"
+                  ondragover="event.preventDefault();"
+                  @ondragenter="OnDragEnter"
+                  @ondragleave="OnDragLeave"
+                  @ondrop="OnDrop"
+                  @ondrop:preventDefault="true">
+            <div class="drop-zone-content">
+                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
+                <MudText Typo="Typo.h6" Class="mb-2">Drag & Drop File Here</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">or click to browse</MudText>
+
+                <MudFileUpload T="IBrowserFile"
+                               Accept=".geojson,.json,.csv,.tsv,.kml,.kmz,.gpx"
+                               OnFilesChanged="OnFileSelected"
+                               MaximumFileCount="1">
+                    <ButtonTemplate>
+                        <MudButton HtmlTag="label"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.FolderOpen"
+                                   for="@context">
+                            Browse Files
+                        </MudButton>
+                    </ButtonTemplate>
+                </MudFileUpload>
+            </div>
+
+            <MudDivider Class="my-4" />
+
+            <div class="supported-formats">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Supported formats:</MudText>
+                <div class="format-chips">
+                    <MudChip Size="Size.Small" Variant="Variant.Text">GeoJSON</MudChip>
+                    <MudChip Size="Size.Small" Variant="Variant.Text">CSV</MudChip>
+                    <MudChip Size="Size.Small" Variant="Variant.Text">KML/KMZ</MudChip>
+                    <MudChip Size="Size.Small" Variant="Variant.Text">GPX</MudChip>
+                </div>
+            </div>
+        </MudPaper>
+
+        <div class="alternative-options mt-4">
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Or import from:</MudText>
+            <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary">
+                <MudButton StartIcon="@Icons.Material.Filled.ContentPaste" OnClick="OnPasteDataClicked">
+                    Paste Data
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Link" OnClick="OnUrlClicked">
+                    URL
+                </MudButton>
+            </MudButtonGroup>
+        </div>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            @_errorMessage
+        </MudAlert>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Reset">
+            Try Again
+        </MudButton>
+    }
+
+    @if (_isLoading)
+    {
+        <MudOverlay Visible="true" DarkBackground="true">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            <MudText Typo="Typo.h6" Class="mt-3">Loading file...</MudText>
+        </MudOverlay>
+    }
+
+    @* Paste Data Dialog *@
+    <MudDialog @bind-IsVisible="_showPasteDialog" Options="_dialogOptions">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Paste Data</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField @bind-Value="_pastedData"
+                          Label="Paste GeoJSON or coordinates"
+                          Variant="Variant.Outlined"
+                          Lines="10"
+                          Placeholder="Paste your data here..."
+                          FullWidth="true" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _showPasteDialog = false)">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="OnPasteDataSubmit">Import</MudButton>
+        </DialogActions>
+    </MudDialog>
+
+    @* URL Dialog *@
+    <MudDialog @bind-IsVisible="_showUrlDialog" Options="_dialogOptions">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Import from URL</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField @bind-Value="_dataUrl"
+                          Label="Data URL"
+                          Variant="Variant.Outlined"
+                          Placeholder="https://example.com/data.geojson"
+                          FullWidth="true"
+                          HelperText="Supports GeoJSON, CSV, KML" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _showUrlDialog = false)">Cancel</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="OnUrlSubmit">Import</MudButton>
+        </DialogActions>
+    </MudDialog>
+</div>
+
+@code {
+    [Parameter] public EventCallback<(byte[] Content, string FileName)> OnFileLoaded { get; set; }
+
+    private bool _isDragging = false;
+    private bool _isLoading = false;
+    private string? _errorMessage;
+    private bool _showPasteDialog = false;
+    private bool _showUrlDialog = false;
+    private string _pastedData = string.Empty;
+    private string _dataUrl = string.Empty;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true
+    };
+
+    private void OnDragEnter()
+    {
+        _isDragging = true;
+    }
+
+    private void OnDragLeave()
+    {
+        _isDragging = false;
+    }
+
+    private async Task OnDrop(DragEventArgs e)
+    {
+        _isDragging = false;
+        // Note: File drop handling would need additional JS interop
+        // For now, users can use the file picker
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _errorMessage = null;
+        _isLoading = true;
+
+        try
+        {
+            var file = e.File;
+
+            // Check file size (10 MB limit)
+            if (file.Size > 10 * 1024 * 1024)
+            {
+                _errorMessage = "File size exceeds 10 MB limit";
+                return;
+            }
+
+            // Read file content
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var content = ms.ToArray();
+
+            await OnFileLoaded.InvokeAsync((content, file.Name));
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading file: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnPasteDataClicked()
+    {
+        _pastedData = string.Empty;
+        _showPasteDialog = true;
+    }
+
+    private void OnUrlClicked()
+    {
+        _dataUrl = string.Empty;
+        _showUrlDialog = true;
+    }
+
+    private async Task OnPasteDataSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(_pastedData))
+        {
+            return;
+        }
+
+        _showPasteDialog = false;
+        _isLoading = true;
+
+        try
+        {
+            var content = System.Text.Encoding.UTF8.GetBytes(_pastedData);
+            await OnFileLoaded.InvokeAsync((content, "pasted-data.json"));
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error processing pasted data: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnUrlSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(_dataUrl))
+        {
+            return;
+        }
+
+        _showUrlDialog = false;
+        _isLoading = true;
+
+        try
+        {
+            using var httpClient = new HttpClient();
+            var content = await httpClient.GetByteArrayAsync(_dataUrl);
+            var fileName = Path.GetFileName(new Uri(_dataUrl).LocalPath);
+
+            await OnFileLoaded.InvokeAsync((content, fileName));
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading data from URL: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Reset()
+    {
+        _errorMessage = null;
+        _isDragging = false;
+        _isLoading = false;
+    }
+}
