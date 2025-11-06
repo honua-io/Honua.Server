@@ -42,7 +42,7 @@ class TestOGCAPI:
 
     def test_conformance(self, server_url):
         """Verify conformance declaration."""
-        response = requests.get(f"{server_url}/conformance")
+        response = requests.get(f"{server_url}/v1/conformance")
         assert response.status_code == 200
         data = response.json()
         assert "conformsTo" in data
@@ -58,7 +58,7 @@ class TestWFS:
             "version": "2.0.0",
             "request": "GetCapabilities"
         }
-        response = requests.get(f"{server_url}/wfs", params=params)
+        response = requests.get(f"{server_url}/v1/wfs", params=params)
         assert response.status_code == 200
         assert b"WFS_Capabilities" in response.content
 
@@ -73,7 +73,7 @@ class TestWMS:
             "version": "1.3.0",
             "request": "GetCapabilities"
         }
-        response = requests.get(f"{server_url}/wms", params=params)
+        response = requests.get(f"{server_url}/v1/wms", params=params)
         assert response.status_code == 200
         assert b"WMS_Capabilities" in response.content
 
@@ -98,7 +98,7 @@ class TestSTAC:
 
     def test_catalog_root(self, server_url):
         """Verify STAC catalog is accessible."""
-        response = requests.get(f"{server_url}/stac")
+        response = requests.get(f"{server_url}/v1/stac")
         assert response.status_code == 200
         data = response.json()
         assert data.get("type") in ["Catalog", "Collection"]
