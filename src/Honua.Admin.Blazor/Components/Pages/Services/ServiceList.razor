@@ -54,7 +54,7 @@
                     <MudLink Href="@($"/services/{context.Id}")">@context.Name</MudLink>
                 </MudTd>
                 <MudTd DataLabel="Type">
-                    <MudChip Size="Size.Small" Color="Color.Primary">@context.Type</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@context.Type</MudChip>
                 </MudTd>
                 <MudTd DataLabel="Folder">@(context.Folder ?? "Root")</MudTd>
                 <MudTd DataLabel="Layers">@context.LayerCount</MudTd>
@@ -135,7 +135,7 @@
             { "Color", Color.Error }
         };
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var dialog = await DialogService.ShowAsync<Components.Shared.ConfirmDialog>("Confirm Delete", parameters);
         var result = await dialog.Result;
 
         if (!result.Canceled)

@@ -26,7 +26,7 @@ namespace Honua.Server.Core.Tests.Shared.TestBases;
 /// </list>
 /// </remarks>
 public abstract class OgcProtocolTestBase<TFactory> : IClassFixture<TFactory>
-    where TFactory : WebApplicationFactory<Host.Program>
+    where TFactory : WebApplicationFactory<Program>
 {
     /// <summary>
     /// Gets the test factory for creating HTTP clients.
@@ -74,7 +74,7 @@ public abstract class OgcProtocolTestBase<TFactory> : IClassFixture<TFactory>
         var response = await Client.GetAsync($"{ServiceEndpoint}?service={ServiceType}&request=GetCapabilities");
 
         // Assert
-        response.Should().BeSuccessful("GetCapabilities should succeed");
+        response.IsSuccessStatusCode.Should().BeTrue("GetCapabilities should succeed");
 
         var content = await response.Content.ReadAsStringAsync();
         content.Should().NotBeNullOrEmpty("GetCapabilities should return content");
@@ -201,7 +201,7 @@ public abstract class OgcProtocolTestBase<TFactory> : IClassFixture<TFactory>
     /// </summary>
     protected async Task<XDocument> ParseXmlResponseAsync(HttpResponseMessage response)
     {
-        response.Should().BeSuccessful("Response should succeed");
+        response.IsSuccessStatusCode.Should().BeTrue("Response should succeed");
 
         var content = await response.Content.ReadAsStringAsync();
         content.Should().NotBeNullOrEmpty("Response should have content");
@@ -246,7 +246,7 @@ public abstract class OgcProtocolTestBase<TFactory> : IClassFixture<TFactory>
         var response = await Client.GetAsync($"{ServiceEndpoint}?service={ServiceType}&request=GetCapabilities");
 
         // Assert
-        response.Should().BeSuccessful("GetCapabilities without version should succeed");
+        response.IsSuccessStatusCode.Should().BeTrue("GetCapabilities without version should succeed");
 
         var xml = await ParseXmlResponseAsync(response);
         var version = xml.Root?.Attribute("version")?.Value;
@@ -266,7 +266,7 @@ public abstract class OgcProtocolTestBase<TFactory> : IClassFixture<TFactory>
         var response = await Client.GetAsync($"{ServiceEndpoint}?service={ServiceType}&request={requestCase}");
 
         // Assert
-        response.Should().BeSuccessful($"GetCapabilities with case '{requestCase}' should succeed");
+        response.IsSuccessStatusCode.Should().BeTrue($"GetCapabilities with case '{requestCase}' should succeed");
     }
 
     /// <summary>

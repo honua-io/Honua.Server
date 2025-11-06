@@ -94,6 +94,9 @@ public sealed class ServiceListItem
     [JsonPropertyName("title")]
     public required string Title { get; set; }
 
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
     [JsonPropertyName("serviceType")]
     public required string ServiceType { get; set; }
 

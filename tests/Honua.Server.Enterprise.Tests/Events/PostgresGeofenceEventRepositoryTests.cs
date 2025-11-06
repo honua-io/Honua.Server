@@ -89,10 +89,12 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
 
         // Assert - Query to verify all were persisted
         var retrieved = await _repository.QueryEventsAsync(
-            entityIds: new[] { "entity-1", "entity-2" },
-            limit: 10);
+            new GeofenceEventQuery
+            {
+                Limit = 10
+            });
 
-        retrieved.Should().HaveCountGreaterOrEqualTo(3);
+        retrieved.Count.Should().BeGreaterThanOrEqualTo(3);
     }
 
     [Fact]
@@ -132,10 +134,15 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
         await _repository.CreateAsync(CreateTestEvent("other-entity", GeofenceEventType.Enter));
 
         // Act
-        var results = await _repository.QueryEventsAsync(entityIds: new[] { entityId }, limit: 100);
+        var results = await _repository.QueryEventsAsync(
+            new GeofenceEventQuery
+            {
+                EntityId = entityId,
+                Limit = 100
+            });
 
         // Assert
-        results.Should().HaveCountGreaterOrEqualTo(2);
+        results.Count.Should().BeGreaterThanOrEqualTo(2);
         results.Should().OnlyContain(e => e.EntityId == entityId);
     }
 
@@ -149,10 +156,15 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
         await _repository.CreateAsync(CreateTestEvent("entity-7", GeofenceEventType.Enter, Guid.NewGuid()));
 
         // Act
-        var results = await _repository.QueryEventsAsync(geofenceIds: new[] { geofenceId }, limit: 100);
+        var results = await _repository.QueryEventsAsync(
+            new GeofenceEventQuery
+            {
+                GeofenceId = geofenceId,
+                Limit = 100
+            });
 
         // Assert
-        results.Should().HaveCountGreaterOrEqualTo(2);
+        results.Count.Should().BeGreaterThanOrEqualTo(2);
         results.Should().OnlyContain(e => e.GeofenceId == geofenceId);
     }
 
@@ -167,12 +179,15 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
 
         // Act
         var results = await _repository.QueryEventsAsync(
-            eventTypes: new[] { GeofenceEventType.Enter },
-            tenantId: tenantId,
-            limit: 100);
+            new GeofenceEventQuery
+            {
+                EventType = GeofenceEventType.Enter,
+                TenantId = tenantId,
+                Limit = 100
+            });
 
         // Assert
-        results.Should().HaveCountGreaterOrEqualTo(2);
+        results.Count.Should().BeGreaterThanOrEqualTo(2);
         results.Should().OnlyContain(e => e.EventType == GeofenceEventType.Enter);
     }
 
@@ -191,8 +206,11 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
 
         // Act - Query for events in last hour
         var results = await _repository.QueryEventsAsync(
-            startTime: now.AddHours(-1),
-            limit: 100);
+            new GeofenceEventQuery
+            {
+                StartTime = now.AddHours(-1),
+                Limit = 100
+            });
 
         // Assert
         results.Should().Contain(e => e.Id == recentEvent.Id);
@@ -210,8 +228,18 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
         }
 
         // Act
-        var page1 = await _repository!.QueryEventsAsync(tenantId: tenantId, limit: 2, offset: 0);
-        var page2 = await _repository.QueryEventsAsync(tenantId: tenantId, limit: 2, offset: 2);
+        var page1 = await _repository!.QueryEventsAsync(new GeofenceEventQuery
+        {
+            TenantId = tenantId,
+            Limit = 2,
+            Offset = 0
+        });
+        var page2 = await _repository.QueryEventsAsync(new GeofenceEventQuery
+        {
+            TenantId = tenantId,
+            Limit = 2,
+            Offset = 2
+        });
 
         // Assert
         page1.Should().HaveCount(2);
@@ -240,10 +268,14 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
         await _repository.CreateAsync(event3);
 
         // Act
-        var results = await _repository.QueryEventsAsync(tenantId: tenantId, limit: 3);
+        var results = await _repository.QueryEventsAsync(new GeofenceEventQuery
+        {
+            TenantId = tenantId,
+            Limit = 3
+        });
 
         // Assert
-        results.Should().HaveCountGreaterOrEqualTo(3);
+        results.Count.Should().BeGreaterThanOrEqualTo(3);
         var orderedResults = results.Take(3).ToList();
         orderedResults[0].EventTime.Should().BeAfter(orderedResults[1].EventTime);
         orderedResults[1].EventTime.Should().BeAfter(orderedResults[2].EventTime);
@@ -260,7 +292,11 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
         await _repository.CreateAsync(tenant2Event);
 
         // Act
-        var tenant1Results = await _repository.QueryEventsAsync(tenantId: "tenant-1", limit: 100);
+        var tenant1Results = await _repository.QueryEventsAsync(new GeofenceEventQuery
+        {
+            TenantId = "tenant-1",
+            Limit = 100
+        });
 
         // Assert
         tenant1Results.Should().Contain(e => e.Id == tenant1Event.Id);
@@ -299,10 +335,12 @@ public class PostgresGeofenceEventRepositoryTests : IAsyncLifetime
                 entity_id VARCHAR(255) NOT NULL,
                 entity_type VARCHAR(100),
                 location geometry(Point, 4326) NOT NULL,
+                boundary_point geometry(Point, 4326),
                 properties JSONB,
                 dwell_time_seconds INT,
                 sensorthings_observation_id UUID,
                 tenant_id VARCHAR(100),
+                processed_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
 

@@ -354,7 +354,9 @@ EXECUTE FUNCTION trg_create_historical_location();
 CREATE OR REPLACE FUNCTION trg_update_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = now();
+    NEW.updated_at = GREATEST(
+        clock_timestamp(),
+        COALESCE(OLD.updated_at, clock_timestamp()) + INTERVAL '1 microsecond');
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

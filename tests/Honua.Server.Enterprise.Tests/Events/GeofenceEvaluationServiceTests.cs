@@ -65,8 +65,7 @@ public class GeofenceEvaluationServiceTests
         result.Events[0].EventType.Should().Be(GeofenceEventType.Enter);
         result.Events[0].GeofenceId.Should().Be(geofence.Id);
         result.Events[0].EntityId.Should().Be(entityId);
-        result.CurrentGeofences.Should().ContainSingle()
-            .Which.Id.Should().Be(geofence.Id);
+        result.CurrentGeofences.Should().ContainSingle(g => g.Id == geofence.Id);
 
         // Verify state was updated
         _mockStateRepo.Verify(r => r.UpsertStateAsync(
@@ -126,9 +125,13 @@ public class GeofenceEvaluationServiceTests
         result.Events[0].DwellTimeSeconds.Should().BeGreaterThan(0);
         result.CurrentGeofences.Should().BeEmpty();
 
-        // Verify state was deleted
-        _mockStateRepo.Verify(r => r.DeleteStateAsync(
-            entityId, geofenceId, It.IsAny<CancellationToken>()), Times.Once);
+        // Verify state was marked as outside
+        _mockStateRepo.Verify(r => r.UpsertStateAsync(
+            It.Is<EntityGeofenceState>(s =>
+                s.EntityId == entityId &&
+                s.GeofenceId == geofenceId &&
+                s.IsInside == false),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -158,7 +161,7 @@ public class GeofenceEvaluationServiceTests
         result.Should().NotBeNull();
         result.Events.Should().HaveCount(2);
         result.Events.Should().OnlyContain(e => e.EventType == GeofenceEventType.Enter);
-        result.CurrentGeofences.Should().HaveCount(2);
+        result.CurrentGeofences.Select(g => g.Id).Should().BeEquivalentTo(new[] { geofence1.Id, geofence2.Id });
 
         // Verify state was updated for both geofences
         _mockStateRepo.Verify(r => r.UpsertStateAsync(
@@ -201,7 +204,7 @@ public class GeofenceEvaluationServiceTests
         // Assert
         result.Should().NotBeNull();
         result.Events.Should().BeEmpty(); // No events generated
-        result.CurrentGeofences.Should().ContainSingle();
+        result.CurrentGeofences.Should().ContainSingle(g => g.Id == geofence.Id);
 
         // Verify state was updated (timestamp)
         _mockStateRepo.Verify(r => r.UpsertStateAsync(
@@ -350,7 +353,11 @@ public class GeofenceEvaluationServiceTests
 
     private Geofence CreateGeofence(string idString, string name, Polygon geometry)
     {
-        return CreateGeofence(Guid.Parse(idString.PadRight(32, '0')), name, geometry);
+        var fullHash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(idString));
+        Span<byte> guidBytes = stackalloc byte[16];
+        fullHash.AsSpan(0, 16).CopyTo(guidBytes);
+        var guid = new Guid(guidBytes);
+        return CreateGeofence(guid, name, geometry);
     }
 
     private Polygon CreateSquarePolygon(double centerLon, double centerLat, double size)

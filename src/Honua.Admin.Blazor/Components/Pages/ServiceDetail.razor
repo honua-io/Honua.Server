@@ -41,7 +41,7 @@
                     <MudText Typo="Typo.body1" Class="mb-3 text-monospace">@_service.Id</MudText>
 
                     <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Service Type</MudText>
-                    <MudChip Size="Size.Small" Color="@GetServiceTypeColor(_service.ServiceType)" Class="mb-3">
+                    <MudChip T="string" Size="Size.Small" Color="@GetServiceTypeColor(_service.ServiceType)" Class="mb-3">
                         @_service.ServiceType
                     </MudChip>
 

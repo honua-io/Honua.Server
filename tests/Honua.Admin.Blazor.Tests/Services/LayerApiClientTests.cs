@@ -5,6 +5,7 @@ using Honua.Admin.Blazor.Shared.Models;
 using Honua.Admin.Blazor.Shared.Services;
 using Honua.Admin.Blazor.Tests.Infrastructure;
 using System.Net;
+using Moq;
 
 namespace Honua.Admin.Blazor.Tests.Services;
 
@@ -22,17 +23,17 @@ public class LayerApiClientTests
             new LayerListItem
             {
                 Id = "layer1",
-                Name = "Test Layer 1",
+                Title = "Test Layer 1",
                 GeometryType = "Polygon",
-                Crs = "EPSG:4326",
+                Crs = new List<string> { "EPSG:4326" },
                 ServiceId = "wms-service"
             },
             new LayerListItem
             {
                 Id = "layer2",
-                Name = "Test Layer 2",
+                Title = "Test Layer 2",
                 GeometryType = "Point",
-                Crs = "EPSG:3857",
+                Crs = new List<string> { "EPSG:3857" },
                 ServiceId = "wfs-service"
             }
         };
@@ -40,8 +41,10 @@ public class LayerApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/metadata/layers", expectedLayers);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetLayersAsync();
@@ -50,11 +53,11 @@ public class LayerApiClientTests
         result.Should().NotBeNull();
         result.Should().HaveCount(2);
         result[0].GeometryType.Should().Be("Polygon");
-        result[1].Crs.Should().Be("EPSG:3857");
+        result[1].Crs.Should().Contain("EPSG:3857");
     }
 
     [Fact]
-    public async Task GetLayersByServiceAsync_Success_ReturnsFilteredLayers()
+    public async Task GetLayersAsync_WithServiceId_ReturnsFilteredLayers()
     {
         // Arrange
         var expectedLayers = new List<LayerListItem>
@@ -62,9 +65,9 @@ public class LayerApiClientTests
             new LayerListItem
             {
                 Id = "layer1",
-                Name = "Service Layer",
+                Title = "Service Layer",
                 GeometryType = "Polygon",
-                Crs = "EPSG:4326",
+                Crs = new List<string> { "EPSG:4326" },
                 ServiceId = "wms-service"
             }
         };
@@ -72,11 +75,13 @@ public class LayerApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/metadata/layers?serviceId=wms-service", expectedLayers);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var result = await apiClient.GetLayersByServiceAsync("wms-service");
+        var result = await apiClient.GetLayersAsync("wms-service");
 
         // Assert
         result.Should().NotBeNull();
@@ -91,26 +96,22 @@ public class LayerApiClientTests
         var expectedLayer = new LayerResponse
         {
             Id = "test-layer",
-            Name = "Test Layer",
             Title = "Test Layer Title",
-            Abstract = "Test layer description",
+            Description = "Test layer description",
             GeometryType = "LineString",
-            Crs = "EPSG:4326",
+            Crs = new List<string> { "EPSG:4326" },
             ServiceId = "wms-service",
-            BoundingBox = new BoundingBox
-            {
-                MinX = -180,
-                MinY = -90,
-                MaxX = 180,
-                MaxY = 90
-            }
+            IdField = "id",
+            GeometryField = "geom"
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/metadata/layers/test-layer", expectedLayer);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetLayerByIdAsync("test-layer");
@@ -119,7 +120,6 @@ public class LayerApiClientTests
         result.Should().NotBeNull();
         result.Id.Should().Be("test-layer");
         result.GeometryType.Should().Be("LineString");
-        result.BoundingBox.Should().NotBeNull();
     }
 
     [Fact]
@@ -129,28 +129,32 @@ public class LayerApiClientTests
         var request = new CreateLayerRequest
         {
             Id = "new-layer",
-            Name = "New Layer",
             Title = "New Layer Title",
             GeometryType = "Point",
-            Crs = "EPSG:4326",
-            ServiceId = "wms-service"
+            Crs = new List<string> { "EPSG:4326" },
+            ServiceId = "wms-service",
+            IdField = "id",
+            GeometryField = "geom"
         };
 
         var expectedResponse = new LayerResponse
         {
             Id = "new-layer",
-            Name = "New Layer",
             Title = "New Layer Title",
             GeometryType = "Point",
-            Crs = "EPSG:4326",
-            ServiceId = "wms-service"
+            Crs = new List<string> { "EPSG:4326" },
+            ServiceId = "wms-service",
+            IdField = "id",
+            GeometryField = "geom"
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockPostJson("/admin/metadata/layers", expectedResponse, HttpStatusCode.Created);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.CreateLayerAsync(request);
@@ -162,40 +166,31 @@ public class LayerApiClientTests
     }
 
     [Fact]
-    public async Task UpdateLayerAsync_Success_ReturnsUpdatedLayer()
+    public async Task UpdateLayerAsync_Success_CompletesWithoutException()
     {
         // Arrange
         var request = new UpdateLayerRequest
         {
-            Name = "Updated Layer",
             Title = "Updated Title",
-            Abstract = "Updated description"
-        };
-
-        var expectedResponse = new LayerResponse
-        {
-            Id = "test-layer",
-            Name = "Updated Layer",
-            Title = "Updated Title",
-            Abstract = "Updated description",
+            Description = "Updated description",
             GeometryType = "Polygon",
-            Crs = "EPSG:4326",
-            ServiceId = "wms-service"
+            IdField = "id",
+            GeometryField = "geom"
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockPutJson("/admin/metadata/layers/test-layer", expectedResponse);
+            .MockPutJson("/admin/metadata/layers/test-layer", new { success = true });
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var result = await apiClient.UpdateLayerAsync("test-layer", request);
+        var act = async () => await apiClient.UpdateLayerAsync("test-layer", request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Name.Should().Be("Updated Layer");
-        result.Title.Should().Be("Updated Title");
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]
@@ -205,8 +200,10 @@ public class LayerApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockDelete("/admin/metadata/layers/test-layer");
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.DeleteLayerAsync("test-layer");
@@ -222,8 +219,10 @@ public class LayerApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Get, "/admin/metadata/layers", HttpStatusCode.InternalServerError);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.GetLayersAsync();
@@ -239,8 +238,10 @@ public class LayerApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Get, "/admin/metadata/layers/nonexistent", HttpStatusCode.NotFound);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.GetLayerByIdAsync("nonexistent");
@@ -256,17 +257,21 @@ public class LayerApiClientTests
         var request = new CreateLayerRequest
         {
             Id = "invalid-layer",
-            Name = "Invalid Layer",
+            Title = "Invalid Layer",
             GeometryType = "InvalidType", // Invalid geometry type
-            Crs = "EPSG:4326",
-            ServiceId = "wms-service"
+            Crs = new List<string> { "EPSG:4326" },
+            ServiceId = "wms-service",
+            IdField = "id",
+            GeometryField = "geom"
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Post, "/admin/metadata/layers", HttpStatusCode.BadRequest, "Invalid geometry type");
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new LayerApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<LayerApiClient>>();
+        var apiClient = new LayerApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.CreateLayerAsync(request);

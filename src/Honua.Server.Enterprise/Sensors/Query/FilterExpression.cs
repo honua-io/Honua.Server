@@ -59,7 +59,7 @@ public sealed record ComparisonExpression : FilterExpression
     /// <summary>
     /// The value to compare against.
     /// </summary>
-    public object Value { get; init} = default!;
+    public object Value { get; init; } = default!;
 }
 
 /// <summary>

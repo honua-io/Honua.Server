@@ -47,7 +47,7 @@ public class GeofenceEvaluationResult
     /// <summary>
     /// Current geofences the entity is inside
     /// </summary>
-    public List<Guid> CurrentGeofences { get; set; } = new();
+    public List<Geofence> CurrentGeofences { get; set; } = new();
 
     /// <summary>
     /// Processing time in milliseconds

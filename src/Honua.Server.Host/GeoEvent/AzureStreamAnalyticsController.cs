@@ -161,9 +161,8 @@ public class AzureStreamAnalyticsController : ControllerBase
                     asaEvent.EntityId,
                     location,
                     eventTime,
-                    asaEvent.EntityType,
                     asaEvent.Properties,
-                    null, // SensorThings observation ID (could be added later)
+                    asaEvent.EntityType,
                     tenantId,
                     cancellationToken);
 
@@ -252,9 +251,8 @@ public class AzureStreamAnalyticsController : ControllerBase
             asaEvent.EntityId,
             location,
             eventTime,
-            asaEvent.EntityType,
             asaEvent.Properties,
-            null,
+            asaEvent.EntityType,
             tenantId,
             cancellationToken);
 

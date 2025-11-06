@@ -33,8 +33,7 @@ services:
       - ConnectionStrings__HonuaDb=Data Source=/app/data/ogc-sample.db
 
       # Metadata Configuration
-      - Metadata__Provider=File
-      - Metadata__FilePath=/app/data/test-metadata.json
+      - HONUA__METADATA__PATH=/app/data/test-metadata.json
 
       # Authentication (SQLite)
       - Authentication__Provider=SQLite
@@ -50,8 +49,8 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_HTTP_PORTS=8080
     volumes:
-      # Mount test data as read-only
-      - ./TestData:/app/data:ro
+      # Mount test data (writable to allow cache directory creation)
+      - ./TestData:/app/data
       # Cache directory for any runtime-generated files
       - ./shared-cache:/app/cache
     ports:

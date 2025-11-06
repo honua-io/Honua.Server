@@ -218,7 +218,7 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
             {
                 EntityId = entityId,
                 Events = events,
-                CurrentGeofences = containingGeofenceIds.ToList(),
+                CurrentGeofences = containingGeofences,
                 ProcessingTimeMs = stopwatch.Elapsed.TotalMilliseconds,
                 GeofencesEvaluated = containingGeofences.Count
             };

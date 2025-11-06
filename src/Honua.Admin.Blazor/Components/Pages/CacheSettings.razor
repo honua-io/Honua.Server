@@ -98,7 +98,7 @@
                         <MudTd DataLabel="Hits">@context.Hits.ToString("N0")</MudTd>
                         <MudTd DataLabel="Misses">@context.Misses.ToString("N0")</MudTd>
                         <MudTd DataLabel="Hit Rate">
-                            <MudChip Size="Size.Small" Color="@GetHitRateColor(context.HitRate)">
+                            <MudChip T="string" Size="Size.Small" Color="@GetHitRateColor(context.HitRate)">
                                 @context.HitRate.ToString("P1")
                             </MudChip>
                         </MudTd>
@@ -174,7 +174,7 @@
                             <MudText Typo="Typo.body2" Class="text-monospace">@context.JobId.ToString().Substring(0, 8)...</MudText>
                         </MudTd>
                         <MudTd DataLabel="Status">
-                            <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">@context.Status</MudChip>
                         </MudTd>
                         <MudTd DataLabel="Datasets">
                             <MudText Typo="Typo.body2">@string.Join(", ", context.DatasetIds.Take(2))</MudText>

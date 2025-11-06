@@ -46,9 +46,9 @@ public class GeoEventApiIntegrationTests : IAsyncLifetime, IClassFixture<GeoEven
             Geometry = new GeoJsonGeometry
             {
                 Type = "Polygon",
-                Coordinates = new List<List<double[]>>
+                Coordinates = new[]
                 {
-                    new List<double[]>
+                    new[]
                     {
                         new[] { -122.5, 37.7 },
                         new[] { -122.3, 37.7 },
@@ -91,9 +91,9 @@ public class GeoEventApiIntegrationTests : IAsyncLifetime, IClassFixture<GeoEven
             Geometry = new GeoJsonGeometry
             {
                 Type = "Polygon",
-                Coordinates = new List<List<double[]>>
+                Coordinates = new[]
                 {
-                    new List<double[]>
+                    new[]
                     {
                         new[] { -122.5, 37.7 },
                         new[] { -122.3, 37.7 }
@@ -419,9 +419,9 @@ public class GeoEventApiIntegrationTests : IAsyncLifetime, IClassFixture<GeoEven
         return new GeoJsonGeometry
         {
             Type = "Polygon",
-            Coordinates = new List<List<double[]>>
+            Coordinates = new[]
             {
-                new List<double[]>
+                new[]
                 {
                     new[] { centerLon - halfSize, centerLat - halfSize },
                     new[] { centerLon + halfSize, centerLat - halfSize },

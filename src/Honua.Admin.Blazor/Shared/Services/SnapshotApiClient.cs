@@ -181,7 +181,7 @@ public sealed class SnapshotApiClient
             return false;
 
         // Simple string comparison - could be enhanced with semantic diff
-        return oldEntity.GetRawText() != newEntity.GetRawText();
+        return oldEntity.Value.GetRawText() != newEntity.Value.GetRawText();
     }
 
     private JsonElement? FindEntity(JsonDocument doc, string entityType, string id)

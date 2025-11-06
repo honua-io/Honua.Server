@@ -13,25 +13,26 @@ public class QueryOptionsParserTests
 {
     [Theory]
     [InlineData("name eq 'Weather Station'", "name", ComparisonOperator.Equals, "Weather Station")]
-    [InlineData("temperature gt 20", "temperature", ComparisonOperator.GreaterThan, "20")]
-    [InlineData("temperature ge 20.5", "temperature", ComparisonOperator.GreaterThanOrEqual, "20.5")]
-    [InlineData("temperature lt 30", "temperature", ComparisonOperator.LessThan, "30")]
-    [InlineData("temperature le 30.0", "temperature", ComparisonOperator.LessThanOrEqual, "30.0")]
+    [InlineData("temperature gt 20", "temperature", ComparisonOperator.GreaterThan, 20d)]
+    [InlineData("temperature ge 20.5", "temperature", ComparisonOperator.GreaterThanOrEqual, 20.5d)]
+    [InlineData("temperature lt 30", "temperature", ComparisonOperator.LessThan, 30d)]
+    [InlineData("temperature le 30.0", "temperature", ComparisonOperator.LessThanOrEqual, 30d)]
     [InlineData("status ne 'inactive'", "status", ComparisonOperator.NotEquals, "inactive")]
     public void Parse_WithValidFilter_ReturnsCorrectFilterExpression(
         string filter,
         string expectedProperty,
         ComparisonOperator expectedOperator,
-        string expectedValue)
+        object expectedValue)
     {
         // Act
         var options = QueryOptionsParser.Parse(filter, null, null, null, null, null, false);
 
         // Assert
-        options.Filter.Should().NotBeNull();
-        options.Filter!.Property.Should().Be(expectedProperty);
-        options.Filter.Operator.Should().Be(expectedOperator);
-        options.Filter.Value.Should().Be(expectedValue);
+        options.Filter.Should().BeOfType<ComparisonExpression>();
+        var comparison = (ComparisonExpression)options.Filter!;
+        comparison.Property.Should().Be(expectedProperty);
+        comparison.Operator.Should().Be(expectedOperator);
+        comparison.Value.Should().Be(expectedValue);
     }
 
     [Theory]

@@ -1,0 +1,41 @@
+<Project>
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <Target Name="CopyHostRuntimeForTests"
+          AfterTargets="Build"
+          Condition="'$(IsTestProject)' == 'true'">
+    <ItemGroup>
+      <_HostRuntimeFiles Include="$(MSBuildThisFileDirectory)..\src\Honua.Server.Host\bin\$(Configuration)\net9.0\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_HostRuntimeFiles)"
+          DestinationFiles="@(_HostRuntimeFiles->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="GenerateTestHostRuntimeConfig"
+          AfterTargets="Build"
+          Condition="'$(IsTestProject)' == 'true'">
+    <PropertyGroup>
+      <_NormalizedNuGetRoot>$([System.IO.Path]::GetFullPath('$(NuGetPackageRoot)'))</_NormalizedNuGetRoot>
+    </PropertyGroup>
+    <ItemGroup>
+      <_RuntimeConfigLines Include="{" />
+      <_RuntimeConfigLines Include="  &quot;runtimeOptions&quot;: {" />
+      <_RuntimeConfigLines Include="    &quot;tfm&quot;: &quot;net9.0&quot;," />
+      <_RuntimeConfigLines Include="    &quot;framework&quot;: {" />
+      <_RuntimeConfigLines Include="      &quot;name&quot;: &quot;Microsoft.NETCore.App&quot;," />
+      <_RuntimeConfigLines Include="      &quot;version&quot;: &quot;9.0.0&quot;" />
+      <_RuntimeConfigLines Include="    }," />
+      <_RuntimeConfigLines Include="    &quot;additionalProbingPaths&quot;: [" />
+      <_RuntimeConfigLines Include="      &quot;$(_NormalizedNuGetRoot)&quot;" />
+      <_RuntimeConfigLines Include="    ]" />
+      <_RuntimeConfigLines Include="  }" />
+      <_RuntimeConfigLines Include="}" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(OutDir)testhost.runtimeconfig.json"
+                      Lines="@(_RuntimeConfigLines)"
+                      Overwrite="true" />
+  </Target>
+</Project>

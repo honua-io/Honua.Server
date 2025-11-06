@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using Honua.Server.Enterprise.Data;
 
 namespace Honua.Server.Enterprise.Geoprocessing;
 
@@ -43,6 +44,7 @@ public partial class PostgresControlPlane : IControlPlane
         ITierExecutor tierExecutor,
         ILogger<PostgresControlPlane> logger)
     {
+        DapperBootstrapper.EnsureConfigured();
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         _processRegistry = processRegistry ?? throw new ArgumentNullException(nameof(processRegistry));
         _tierExecutor = tierExecutor ?? throw new ArgumentNullException(nameof(tierExecutor));
@@ -472,10 +474,13 @@ public partial class PostgresControlPlane : IControlPlane
             return null;
         }
 
-        _logger.LogInformation("Dequeued job {JobId} for process {ProcessId}", row.job_id, row.process_id);
+        var jobId = ToStringField((object)row.job_id, "job_id");
+        var processId = ToStringField((object)row.process_id, "process_id");
+        var tenantId = ToGuidField((object)row.tenant_id, "tenant_id");
+        _logger.LogInformation("Dequeued job {JobId} for process {ProcessId}", jobId, processId);
 
         // Fetch full ProcessRun details
-        var processRun = await GetJobStatusAsync(row.job_id, Guid.Parse(row.tenant_id), ct);
+        var processRun = await GetJobStatusAsync(jobId, tenantId, ct);
         return processRun;
     }
 
@@ -606,14 +611,20 @@ public partial class PostgresControlPlane : IControlPlane
 
     private static ProcessRun MapToProcessRun(dynamic row)
     {
+        var jobId = ToStringField((object)row.job_id, "job_id");
+        var processId = ToStringField((object)row.process_id, "process_id");
+        var tenantId = ToGuidField((object)row.tenant_id, "tenant_id");
+        var userId = ToGuidField((object)row.user_id, "user_id");
+        var statusValue = ToStringField((object)row.status, "status");
+
         return new ProcessRun
         {
-            JobId = row.job_id,
-            ProcessId = row.process_id,
-            TenantId = Guid.Parse((string)row.tenant_id),
-            UserId = row.user_id,
+            JobId = jobId,
+            ProcessId = processId,
+            TenantId = tenantId,
+            UserId = userId,
             UserEmail = row.user_email,
-            Status = Enum.Parse<ProcessRunStatus>(row.status, true),
+            Status = Enum.Parse<ProcessRunStatus>(statusValue, true),
             CreatedAt = row.created_at,
             StartedAt = row.started_at,
             CompletedAt = row.completed_at,
@@ -651,6 +662,37 @@ public partial class PostgresControlPlane : IControlPlane
             WebhookSentAt = row.webhook_sent_at,
             WebhookResponseStatus = row.webhook_response_status
         };
+    }
+
+    private static string ToStringField(object? value, string fieldName)
+    {
+        if (value == null)
+            throw new InvalidOperationException($"Expected '{fieldName}' to be non-null.");
+
+        var text = Convert.ToString(value);
+        if (string.IsNullOrWhiteSpace(text))
+            throw new InvalidOperationException($"Expected '{fieldName}' to contain a value.");
+
+        return text;
+    }
+
+    private static Guid ToGuidField(object? value, string fieldName)
+    {
+        if (value == null)
+            throw new InvalidOperationException($"Expected '{fieldName}' to be non-null.");
+
+        switch (value)
+        {
+            case Guid guid:
+                return guid;
+            case string s when Guid.TryParse(s, out var parsed):
+                return parsed;
+            default:
+                var text = ToStringField(value, fieldName);
+                if (Guid.TryParse(text, out var fallback))
+                    return fallback;
+                throw new InvalidOperationException($"Value '{text}' for '{fieldName}' is not a valid Guid.");
+        }
     }
 
     private static string GenerateJobId()

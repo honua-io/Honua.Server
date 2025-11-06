@@ -31,68 +31,55 @@ public static class SensorThingsEndpoints
         // ========================================
 
         endpoints.MapGet(basePath, SensorThingsHandlers.GetServiceRoot)
-            .WithName("SensorThings_GetServiceRoot")
-            .WithTags("SensorThings");
+            .WithName("SensorThings_GetServiceRoot");
 
         // ========================================
         // Things
         // ========================================
 
         endpoints.MapGet($"{basePath}/Things", SensorThingsHandlers.GetThings)
-            .WithName("SensorThings_GetThings")
-            .WithTags("Things");
+            .WithName("SensorThings_GetThings");
 
         endpoints.MapGet($"{basePath}/Things({{id}})", SensorThingsHandlers.GetThing)
-            .WithName("SensorThings_GetThing")
-            .WithTags("Things");
+            .WithName("SensorThings_GetThing");
 
         endpoints.MapPost($"{basePath}/Things", SensorThingsHandlers.CreateThing)
-            .WithName("SensorThings_CreateThing")
-            .WithTags("Things");
+            .WithName("SensorThings_CreateThing");
 
         endpoints.MapPatch($"{basePath}/Things({{id}})", SensorThingsHandlers.UpdateThing)
-            .WithName("SensorThings_UpdateThing")
-            .WithTags("Things");
+            .WithName("SensorThings_UpdateThing");
 
         endpoints.MapDelete($"{basePath}/Things({{id}})", SensorThingsHandlers.DeleteThing)
-            .WithName("SensorThings_DeleteThing")
-            .WithTags("Things");
+            .WithName("SensorThings_DeleteThing");
 
         // ========================================
         // Locations
         // ========================================
 
         endpoints.MapGet($"{basePath}/Locations", SensorThingsHandlers.GetLocations)
-            .WithName("SensorThings_GetLocations")
-            .WithTags("Locations");
+            .WithName("SensorThings_GetLocations");
 
         endpoints.MapGet($"{basePath}/Locations({{id}})", SensorThingsHandlers.GetLocation)
-            .WithName("SensorThings_GetLocation")
-            .WithTags("Locations");
+            .WithName("SensorThings_GetLocation");
 
         endpoints.MapPost($"{basePath}/Locations", SensorThingsHandlers.CreateLocation)
-            .WithName("SensorThings_CreateLocation")
-            .WithTags("Locations");
+            .WithName("SensorThings_CreateLocation");
 
         endpoints.MapPatch($"{basePath}/Locations({{id}})", SensorThingsHandlers.UpdateLocation)
-            .WithName("SensorThings_UpdateLocation")
-            .WithTags("Locations");
+            .WithName("SensorThings_UpdateLocation");
 
         endpoints.MapDelete($"{basePath}/Locations({{id}})", SensorThingsHandlers.DeleteLocation)
-            .WithName("SensorThings_DeleteLocation")
-            .WithTags("Locations");
+            .WithName("SensorThings_DeleteLocation");
 
         // ========================================
         // HistoricalLocations
         // ========================================
 
         endpoints.MapGet($"{basePath}/HistoricalLocations", SensorThingsHandlers.GetHistoricalLocations)
-            .WithName("SensorThings_GetHistoricalLocations")
-            .WithTags("HistoricalLocations");
+            .WithName("SensorThings_GetHistoricalLocations");
 
         endpoints.MapGet($"{basePath}/HistoricalLocations({{id}})", SensorThingsHandlers.GetHistoricalLocation)
-            .WithName("SensorThings_GetHistoricalLocation")
-            .WithTags("HistoricalLocations");
+            .WithName("SensorThings_GetHistoricalLocation");
 
         // HistoricalLocations are read-only (created automatically via trigger)
 
@@ -101,123 +88,93 @@ public static class SensorThingsEndpoints
         // ========================================
 
         endpoints.MapGet($"{basePath}/Sensors", SensorThingsHandlers.GetSensors)
-            .WithName("SensorThings_GetSensors")
-            .WithTags("Sensors");
+            .WithName("SensorThings_GetSensors");
 
         endpoints.MapGet($"{basePath}/Sensors({{id}})", SensorThingsHandlers.GetSensor)
-            .WithName("SensorThings_GetSensor")
-            .WithTags("Sensors");
+            .WithName("SensorThings_GetSensor");
 
         endpoints.MapPost($"{basePath}/Sensors", SensorThingsHandlers.CreateSensor)
-            .WithName("SensorThings_CreateSensor")
-            .WithTags("Sensors");
+            .WithName("SensorThings_CreateSensor");
 
         endpoints.MapPatch($"{basePath}/Sensors({{id}})", SensorThingsHandlers.UpdateSensor)
-            .WithName("SensorThings_UpdateSensor")
-            .WithTags("Sensors");
+            .WithName("SensorThings_UpdateSensor");
 
         endpoints.MapDelete($"{basePath}/Sensors({{id}})", SensorThingsHandlers.DeleteSensor)
-            .WithName("SensorThings_DeleteSensor")
-            .WithTags("Sensors");
+            .WithName("SensorThings_DeleteSensor");
 
         // ========================================
         // ObservedProperties
         // ========================================
 
         endpoints.MapGet($"{basePath}/ObservedProperties", SensorThingsHandlers.GetObservedProperties)
-            .WithName("SensorThings_GetObservedProperties")
-            .WithTags("ObservedProperties");
+            .WithName("SensorThings_GetObservedProperties");
 
         endpoints.MapGet($"{basePath}/ObservedProperties({{id}})", SensorThingsHandlers.GetObservedProperty)
-            .WithName("SensorThings_GetObservedProperty")
-            .WithTags("ObservedProperties");
+            .WithName("SensorThings_GetObservedProperty");
 
         endpoints.MapPost($"{basePath}/ObservedProperties", SensorThingsHandlers.CreateObservedProperty)
-            .WithName("SensorThings_CreateObservedProperty")
-            .WithTags("ObservedProperties");
+            .WithName("SensorThings_CreateObservedProperty");
 
         endpoints.MapPatch($"{basePath}/ObservedProperties({{id}})", SensorThingsHandlers.UpdateObservedProperty)
-            .WithName("SensorThings_UpdateObservedProperty")
-            .WithTags("ObservedProperties");
+            .WithName("SensorThings_UpdateObservedProperty");
 
         endpoints.MapDelete($"{basePath}/ObservedProperties({{id}})", SensorThingsHandlers.DeleteObservedProperty)
-            .WithName("SensorThings_DeleteObservedProperty")
-            .WithTags("ObservedProperties");
+            .WithName("SensorThings_DeleteObservedProperty");
 
         // ========================================
         // Datastreams
         // ========================================
 
         endpoints.MapGet($"{basePath}/Datastreams", SensorThingsHandlers.GetDatastreams)
-            .WithName("SensorThings_GetDatastreams")
-            .WithTags("Datastreams");
+            .WithName("SensorThings_GetDatastreams");
 
         endpoints.MapGet($"{basePath}/Datastreams({{id}})", SensorThingsHandlers.GetDatastream)
-            .WithName("SensorThings_GetDatastream")
-            .WithTags("Datastreams");
+            .WithName("SensorThings_GetDatastream");
 
         endpoints.MapPost($"{basePath}/Datastreams", SensorThingsHandlers.CreateDatastream)
-            .WithName("SensorThings_CreateDatastream")
-            .WithTags("Datastreams");
+            .WithName("SensorThings_CreateDatastream");
 
         endpoints.MapPatch($"{basePath}/Datastreams({{id}})", SensorThingsHandlers.UpdateDatastream)
-            .WithName("SensorThings_UpdateDatastream")
-            .WithTags("Datastreams");
+            .WithName("SensorThings_UpdateDatastream");
 
         endpoints.MapDelete($"{basePath}/Datastreams({{id}})", SensorThingsHandlers.DeleteDatastream)
-            .WithName("SensorThings_DeleteDatastream")
-            .WithTags("Datastreams");
+            .WithName("SensorThings_DeleteDatastream");
 
         // ========================================
         // Observations (with DataArray detection)
         // ========================================
 
         endpoints.MapGet($"{basePath}/Observations", SensorThingsHandlers.GetObservations)
-            .WithName("SensorThings_GetObservations")
-            .WithTags("Observations");
+            .WithName("SensorThings_GetObservations");
 
         endpoints.MapGet($"{basePath}/Observations({{id}})", SensorThingsHandlers.GetObservation)
-            .WithName("SensorThings_GetObservation")
-            .WithTags("Observations");
+            .WithName("SensorThings_GetObservation");
 
         // Standards-compliant: Automatically detects DataArray in POST body
         endpoints.MapPost($"{basePath}/Observations", SensorThingsHandlers.CreateObservation)
-            .WithName("SensorThings_CreateObservation")
-            .WithTags("Observations")
-            .Accepts<Models.Observation>("application/json")
-            .Accepts<DataArrayRequest>("application/json");
-
-        endpoints.MapPatch($"{basePath}/Observations({{id}})", SensorThingsHandlers.UpdateObservation)
-            .WithName("SensorThings_UpdateObservation")
-            .WithTags("Observations");
+            .WithName("SensorThings_CreateObservation");
 
         endpoints.MapDelete($"{basePath}/Observations({{id}})", SensorThingsHandlers.DeleteObservation)
-            .WithName("SensorThings_DeleteObservation")
-            .WithTags("Observations");
+            .WithName("SensorThings_DeleteObservation");
 
         // ========================================
         // FeaturesOfInterest
         // ========================================
 
         endpoints.MapGet($"{basePath}/FeaturesOfInterest", SensorThingsHandlers.GetFeaturesOfInterest)
-            .WithName("SensorThings_GetFeaturesOfInterest")
-            .WithTags("FeaturesOfInterest");
+            .WithName("SensorThings_GetFeaturesOfInterest");
 
         endpoints.MapGet($"{basePath}/FeaturesOfInterest({{id}})", SensorThingsHandlers.GetFeatureOfInterest)
-            .WithName("SensorThings_GetFeatureOfInterest")
-            .WithTags("FeaturesOfInterest");
+            .WithName("SensorThings_GetFeatureOfInterest");
 
         endpoints.MapPost($"{basePath}/FeaturesOfInterest", SensorThingsHandlers.CreateFeatureOfInterest)
-            .WithName("SensorThings_CreateFeatureOfInterest")
-            .WithTags("FeaturesOfInterest");
+            .WithName("SensorThings_CreateFeatureOfInterest");
 
         endpoints.MapPatch($"{basePath}/FeaturesOfInterest({{id}})", SensorThingsHandlers.UpdateFeatureOfInterest)
-            .WithName("SensorThings_UpdateFeatureOfInterest")
-            .WithTags("FeaturesOfInterest");
+            .WithName("SensorThings_UpdateFeatureOfInterest");
 
         endpoints.MapDelete($"{basePath}/FeaturesOfInterest({{id}})", SensorThingsHandlers.DeleteFeatureOfInterest)
-            .WithName("SensorThings_DeleteFeatureOfInterest")
-            .WithTags("FeaturesOfInterest");
+            .WithName("SensorThings_DeleteFeatureOfInterest");
 
         // ========================================
         // Navigation Properties
@@ -225,26 +182,16 @@ public static class SensorThingsEndpoints
 
         // Thing navigation properties
         endpoints.MapGet($"{basePath}/Things({{id}})/Datastreams", SensorThingsHandlers.GetThingDatastreams)
-            .WithName("SensorThings_GetThingDatastreams")
-            .WithTags("Things", "Navigation");
+            .WithName("SensorThings_GetThingDatastreams");
 
         endpoints.MapGet($"{basePath}/Things({{id}})/Locations", SensorThingsHandlers.GetThingLocations)
-            .WithName("SensorThings_GetThingLocations")
-            .WithTags("Things", "Navigation");
-
-        endpoints.MapGet($"{basePath}/Things({{id}})/HistoricalLocations", SensorThingsHandlers.GetThingHistoricalLocations)
-            .WithName("SensorThings_GetThingHistoricalLocations")
-            .WithTags("Things", "Navigation");
+            .WithName("SensorThings_GetThingLocations");
 
         // Datastream navigation properties
         endpoints.MapGet($"{basePath}/Datastreams({{id}})/Observations", SensorThingsHandlers.GetDatastreamObservations)
-            .WithName("SensorThings_GetDatastreamObservations")
-            .WithTags("Datastreams", "Navigation");
+            .WithName("SensorThings_GetDatastreamObservations");
 
         // Location navigation properties
-        endpoints.MapGet($"{basePath}/Locations({{id}})/Things", SensorThingsHandlers.GetLocationThings)
-            .WithName("SensorThings_GetLocationThings")
-            .WithTags("Locations", "Navigation");
 
         // ========================================
         // Mobile-Optimized Extensions
@@ -255,7 +202,6 @@ public static class SensorThingsEndpoints
         {
             endpoints.MapPost($"{basePath}/Sync", SensorThingsHandlers.SyncObservations)
                 .WithName("SensorThings_SyncObservations")
-                .WithTags("Mobile", "Sync")
                 .RequireAuthorization(); // Requires authenticated user
         }
 

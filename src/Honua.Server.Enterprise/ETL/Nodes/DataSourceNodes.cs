@@ -78,7 +78,7 @@ public class PostGisDataSourceNode : WorkflowNodeBase
                     ? $"SELECT COUNT(*) FROM {table} WHERE {filter}"
                     : $"SELECT reltuples::bigint FROM pg_class WHERE relname = @table";
 
-                var param = filter != null ? new { } : new { table };
+                object? param = filter != null ? null : new { table };
                 estimatedRows = await connection.ExecuteScalarAsync<long>(countQuery, param);
             }
 

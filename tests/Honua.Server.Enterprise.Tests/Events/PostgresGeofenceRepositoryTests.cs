@@ -115,18 +115,18 @@ public class PostgresGeofenceRepositoryTests : IAsyncLifetime
         geofence.IsActive = false;
 
         // Act
-        var result = await _repository!.UpdateAsync(geofence);
+        var updated = await _repository!.UpdateAsync(geofence);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Name.Should().Be("Updated Name");
-        result.Description.Should().Be("Updated Description");
-        result.IsActive.Should().BeFalse();
-        result.UpdatedAt.Should().BeAfter(result.CreatedAt);
+        updated.Should().BeTrue();
 
         // Verify persistence
         var retrieved = await _repository.GetByIdAsync(geofence.Id, geofence.TenantId);
+        retrieved.Should().NotBeNull();
         retrieved!.Name.Should().Be("Updated Name");
+        retrieved.Description.Should().Be("Updated Description");
+        retrieved.IsActive.Should().BeFalse();
+        retrieved.UpdatedAt.Should().BeAfter(retrieved.CreatedAt);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class PostgresGeofenceRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ListAsync_WithFilters_ShouldReturnFiltered()
+    public async Task GetAllAsync_WithFilters_ShouldReturnFiltered()
     {
         // Arrange
         await CreateTestGeofenceAsync("Active 1", isActive: true, tenantId: "tenant-1");
@@ -166,16 +166,16 @@ public class PostgresGeofenceRepositoryTests : IAsyncLifetime
         await CreateTestGeofenceAsync("Other Tenant", isActive: true, tenantId: "tenant-2");
 
         // Act - Get active geofences for tenant-1
-        var result = await _repository!.ListAsync(isActive: true, tenantId: "tenant-1", limit: 100, offset: 0);
+        var result = await _repository!.GetAllAsync(isActive: true, tenantId: "tenant-1", limit: 100, offset: 0);
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().HaveCountGreaterOrEqualTo(2);
+        result.Count.Should().BeGreaterThanOrEqualTo(2);
         result.Should().OnlyContain(g => g.IsActive && g.TenantId == "tenant-1");
     }
 
     [Fact]
-    public async Task ListAsync_WithPagination_ShouldRespectLimitAndOffset()
+    public async Task GetAllAsync_WithPagination_ShouldRespectLimitAndOffset()
     {
         // Arrange
         for (int i = 0; i < 5; i++)
@@ -184,10 +184,10 @@ public class PostgresGeofenceRepositoryTests : IAsyncLifetime
         }
 
         // Act - Get page 1 (first 2)
-        var page1 = await _repository!.ListAsync(null, "page-test", limit: 2, offset: 0);
+        var page1 = await _repository!.GetAllAsync(null, "page-test", limit: 2, offset: 0);
 
         // Act - Get page 2 (next 2)
-        var page2 = await _repository.ListAsync(null, "page-test", limit: 2, offset: 2);
+        var page2 = await _repository.GetAllAsync(null, "page-test", limit: 2, offset: 2);
 
         // Assert
         page1.Should().HaveCount(2);
@@ -246,7 +246,7 @@ public class PostgresGeofenceRepositoryTests : IAsyncLifetime
         var result = await _repository!.FindGeofencesAtPointAsync(-122.4, 37.8, tenantId);
 
         // Assert
-        result.Should().HaveCountGreaterOrEqualTo(2);
+        result.Count.Should().BeGreaterThanOrEqualTo(2);
         result.Should().Contain(g => g.Id == geofence1.Id);
         result.Should().Contain(g => g.Id == geofence2.Id);
     }

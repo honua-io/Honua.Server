@@ -37,7 +37,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.9" />
 
     <!-- MudBlazor (for component testing) -->
-    <PackageReference Include="MudBlazor" Version="7.17.2" />
+    <PackageReference Include="MudBlazor" Version="8.0.0" />
 
     <!-- HTTP Testing -->
     <PackageReference Include="RichardSzalay.MockHttp" Version="7.0.0" />

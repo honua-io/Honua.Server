@@ -40,16 +40,16 @@
             <MudGrid>
                 <MudItem xs="12" md="6">
                     <MudText Typo="Typo.h6" Class="mb-4">Folder Tree</MudText>
-                    <MudTreeView T="FolderTreeNode" Items="@_treeNodes" @bind-SelectedValue="_selectedNode">
+                    <MudTreeView T="FolderTreeNode" Items="@_treeNodes" SelectedValue="_selectedNode" SelectedValueChanged="OnFolderSelected">
                         <ItemTemplate Context="item">
-                            <MudTreeViewItem @bind-Expanded="@item.IsExpanded" Value="@item" Items="@item.Children">
+                            <MudTreeViewItem Value="@item.Value" Items="@item.Children">
                                 <Content>
                                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                                         <MudIcon Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Small" />
-                                        <MudText>@GetFolderDisplayName(item)</MudText>
-                                        @if (item.ServiceCount > 0)
+                                        <MudText>@GetFolderDisplayName(item.Value)</MudText>
+                                        @if (item.Value != null && item.Value.ServiceCount > 0)
                                         {
-                                            <MudChip Size="Size.Small" Color="Color.Info">@item.ServiceCount</MudChip>
+                                            <MudChip Size="Size.Small" Color="Color.Info">@item.Value.ServiceCount</MudChip>
                                         }
                                     </MudStack>
                                 </Content>
@@ -99,10 +99,10 @@
                         @if (_selectedNodeServices.Any())
                         {
                             <MudText Typo="Typo.h6" Class="mt-4 mb-2">Services in this Folder</MudText>
-                            <MudList>
+                            <MudList T="string">
                                 @foreach (var service in _selectedNodeServices)
                                 {
-                                    <MudListItem>
+                                    <MudListItem T="string">
                                         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                                                 <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" />
@@ -111,7 +111,7 @@
                                                     <MudText Typo="Typo.body2" Class="text-monospace text-muted">@service.Id</MudText>
                                                 </div>
                                             </MudStack>
-                                            <MudChip Size="Size.Small" Color="@GetServiceTypeColor(service.ServiceType)">
+                                            <MudChip T="string" Size="Size.Small" Color="@GetServiceTypeColor(service.ServiceType)">
                                                 @service.ServiceType
                                             </MudChip>
                                         </MudStack>
@@ -146,7 +146,7 @@
     private bool _loading = true;
     private string? _errorMessage;
     private List<FolderResponse> _folders = new();
-    private List<FolderTreeNode> _treeNodes = new();
+    private HashSet<TreeItemData<FolderTreeNode>> _treeNodes = new();
     private FolderTreeNode? _selectedNode;
     private List<ServiceListItem> _allServices = new();
     private List<ServiceListItem> _selectedNodeServices = new();
@@ -191,21 +191,30 @@
         _treeNodes = _folders
             .OrderBy(f => f.Order ?? int.MaxValue)
             .ThenBy(f => f.Title ?? f.Id)
-            .Select(f => new FolderTreeNode
+            .Select(f => new TreeItemData<FolderTreeNode>
             {
-                Id = f.Id,
-                Title = f.Title,
-                ServiceCount = f.ServiceCount,
-                IsExpanded = false
+                Value = new FolderTreeNode
+                {
+                    Id = f.Id,
+                    Title = f.Title,
+                    ServiceCount = f.ServiceCount
+                },
+                Expanded = false
             })
-            .ToList();
+            .ToHashSet();
 
         // Select first node by default
         if (_treeNodes.Any())
         {
-            _selectedNode = _treeNodes.First();
+            _selectedNode = _treeNodes.First().Value;
             UpdateSelectedNodeServices();
         }
+    }
+
+    private void OnFolderSelected(FolderTreeNode? node)
+    {
+        _selectedNode = node;
+        UpdateSelectedNodeServices();
     }
 
     private void UpdateSelectedNodeServices()

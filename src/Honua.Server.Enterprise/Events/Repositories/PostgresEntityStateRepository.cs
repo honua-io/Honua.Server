@@ -1,5 +1,6 @@
 using Dapper;
 using Honua.Server.Enterprise.Events.Models;
+using Honua.Server.Enterprise.Data;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -17,6 +18,7 @@ public class PostgresEntityStateRepository : IEntityStateRepository
         string connectionString,
         ILogger<PostgresEntityStateRepository> logger)
     {
+        DapperBootstrapper.EnsureConfigured();
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -53,8 +55,7 @@ public class PostgresEntityStateRepository : IEntityStateRepository
         var sql = @"
             SELECT entity_id, geofence_id, is_inside, entered_at, last_updated, tenant_id
             FROM entity_geofence_state
-            WHERE entity_id = @EntityId
-            AND is_inside = true";
+            WHERE entity_id = @EntityId";
 
         if (!string.IsNullOrEmpty(tenantId))
         {

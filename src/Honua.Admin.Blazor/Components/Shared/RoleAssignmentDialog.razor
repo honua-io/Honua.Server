@@ -25,7 +25,7 @@
                                 <MudText Typo="Typo.caption">Permissions:</MudText>
                                 @foreach (var permission in role.Permissions)
                                 {
-                                    <MudChip Size="Size.Small" Variant="Variant.Text">@permission</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@permission</MudChip>
                                 }
                             </MudStack>
                         </MudStack>
@@ -54,7 +54,7 @@
 
 @code {
     [CascadingParameter]
-    private MudDialogInstance MudDialog { get; set; } = default!;
+    private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter]
     public UserResponse? User { get; set; }

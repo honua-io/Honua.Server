@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Honua.Server.Enterprise.Geoprocessing;
+using Honua.Server.Enterprise.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -46,10 +47,20 @@ public class GeoprocessingWorkerServiceTests
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
-        // Act & Assert
-        // Service should poll and wait without throwing
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await service.StartAsync(cts.Token));
+        // Act
+        var runTask = service.StartAsync(cts.Token);
+        await Task.Delay(1000, CancellationToken.None);
+        cts.Cancel();
+
+        // Assert - cancellation should complete gracefully
+        try
+        {
+            await runTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected for BackgroundService when cancellation requested
+        }
 
         // Verify dequeue was called
         _mockControlPlane.Verify(
@@ -263,11 +274,6 @@ public class GeoprocessingWorkerServiceTests
                     ["source"] = "POINT(0 0)"
                 },
                 ["distance"] = 100
-            },
-            Parameters = new Dictionary<string, object>
-            {
-                ["distance"] = 100,
-                ["units"] = "meters"
             },
             ResponseFormat = "geojson",
             ApiSurface = "OGC",

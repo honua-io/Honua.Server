@@ -24,7 +24,7 @@
             </MudButton>
             <MudIconButton Icon="@Icons.Material.Filled.Refresh"
                            Color="Color.Default"
-                           OnClick="LoadJobsAsync"
+                           OnClick="@(() => LoadJobsAsync())"
                            Title="Refresh" />
         </MudStack>
 
@@ -63,7 +63,7 @@
                     <MudText Typo="Typo.body2">@context.ServiceId / @context.LayerId</MudText>
                 </MudTd>
                 <MudTd DataLabel="Status">
-                    <MudChip Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
                         @context.Status
                     </MudChip>
                 </MudTd>
@@ -227,8 +227,8 @@
 
     private async Task CancelJob(Guid jobId)
     {
-        var confirm = await Snackbar.ShowAsync("Are you sure you want to cancel this job?", Severity.Warning);
-        // Note: MudBlazor Snackbar doesn't have built-in confirmation, using simple approach
+        // Note: MudBlazor Snackbar doesn't have built-in confirmation in newer versions
+        // For now, directly cancel. Consider using IDialogService for confirmation.
 
         try
         {

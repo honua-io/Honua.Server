@@ -73,19 +73,19 @@
                 </MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudCheckBox @bind-Checked="_model.OgcOptions.WmsEnabled"
+                    <MudCheckBox T="bool" @bind-Checked="_model.OgcOptions.WmsEnabled"
                                  Label="Enable WMS"
                                  Color="Color.Primary" />
-                    <MudCheckBox @bind-Checked="_model.OgcOptions.WfsEnabled"
+                    <MudCheckBox T="bool" @bind-Checked="_model.OgcOptions.WfsEnabled"
                                  Label="Enable WFS"
                                  Color="Color.Primary" />
                 </MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudCheckBox @bind-Checked="_model.OgcOptions.WmtsEnabled"
+                    <MudCheckBox T="bool" @bind-Checked="_model.OgcOptions.WmtsEnabled"
                                  Label="Enable WMTS"
                                  Color="Color.Primary" />
-                    <MudCheckBox @bind-Checked="_model.OgcOptions.OgcApiEnabled"
+                    <MudCheckBox T="bool" @bind-Checked="_model.OgcOptions.OgcApiEnabled"
                                  Label="Enable OGC API Features"
                                  Color="Color.Primary" />
                 </MudItem>
@@ -288,7 +288,7 @@
             ["Color"] = Color.Error
         };
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Service", parameters);
+        var dialog = await DialogService.ShowAsync<Components.Shared.ConfirmDialog>("Delete Service", parameters);
         var result = await dialog.Result;
 
         if (result.Canceled)

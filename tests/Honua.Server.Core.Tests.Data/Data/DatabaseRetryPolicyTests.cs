@@ -95,7 +95,7 @@ public sealed class DatabaseRetryPolicyTests
         var attemptCount = 0;
 
         // Act & Assert
-        await Assert.ThrowsAsync<NpgsqlException>(async () =>
+        await Assert.ThrowsAnyAsync<NpgsqlException>(async () =>
         {
             await pipeline.ExecuteAsync(ct =>
             {

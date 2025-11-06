@@ -5,6 +5,7 @@ using Honua.Admin.Blazor.Shared.Models;
 using Honua.Admin.Blazor.Shared.Services;
 using Honua.Admin.Blazor.Tests.Infrastructure;
 using System.Net;
+using Moq;
 
 namespace Honua.Admin.Blazor.Tests.Services;
 
@@ -22,18 +23,16 @@ public class ServiceApiClientTests
             new ServiceListItem
             {
                 Id = "wms-service",
-                Name = "WMS Service",
+                Title = "WMS Service",
                 ServiceType = "WMS",
-                Enabled = true,
                 LayerCount = 5,
                 FolderId = null
             },
             new ServiceListItem
             {
                 Id = "wfs-service",
-                Name = "WFS Service",
+                Title = "WFS Service",
                 ServiceType = "WFS",
-                Enabled = true,
                 LayerCount = 3,
                 FolderId = "folder1"
             }
@@ -42,8 +41,10 @@ public class ServiceApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/metadata/services", expectedServices);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetServicesAsync();
@@ -63,21 +64,20 @@ public class ServiceApiClientTests
         var expectedService = new ServiceResponse
         {
             Id = "test-service",
-            Name = "Test Service",
-            ServiceType = "WMS",
             Title = "Test WMS Service",
-            Abstract = "Service for testing",
-            Keywords = new List<string> { "test", "wms" },
-            Enabled = true,
+            ServiceType = "WMS",
+            Description = "Service for testing",
             FolderId = null,
-            Layers = new List<string> { "layer1", "layer2" }
+            LayerCount = 2
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/metadata/services/test-service", expectedService);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetServiceByIdAsync("test-service");
@@ -86,7 +86,7 @@ public class ServiceApiClientTests
         result.Should().NotBeNull();
         result.Id.Should().Be("test-service");
         result.ServiceType.Should().Be("WMS");
-        result.Layers.Should().HaveCount(2);
+        result.LayerCount.Should().Be(2);
     }
 
     [Fact]
@@ -96,30 +96,27 @@ public class ServiceApiClientTests
         var request = new CreateServiceRequest
         {
             Id = "new-service",
-            Name = "New Service",
-            ServiceType = "WMTS",
             Title = "New WMTS Service",
-            Abstract = "New service for testing",
-            Keywords = new List<string> { "test", "wmts" },
-            Enabled = true
+            ServiceType = "WMTS",
+            Description = "New service for testing"
         };
 
         var expectedResponse = new ServiceResponse
         {
             Id = "new-service",
-            Name = "New Service",
-            ServiceType = "WMTS",
             Title = "New WMTS Service",
-            Abstract = "New service for testing",
-            Enabled = true,
-            Layers = new List<string>()
+            ServiceType = "WMTS",
+            Description = "New service for testing",
+            LayerCount = 0
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockPostJson("/admin/metadata/services", expectedResponse, HttpStatusCode.Created);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.CreateServiceAsync(request);
@@ -131,41 +128,29 @@ public class ServiceApiClientTests
     }
 
     [Fact]
-    public async Task UpdateServiceAsync_Success_ReturnsUpdatedService()
+    public async Task UpdateServiceAsync_Success_CompletesWithoutException()
     {
         // Arrange
         var request = new UpdateServiceRequest
         {
-            Name = "Updated Service",
             Title = "Updated Title",
-            Abstract = "Updated description",
-            Enabled = false
-        };
-
-        var expectedResponse = new ServiceResponse
-        {
-            Id = "test-service",
-            Name = "Updated Service",
             ServiceType = "WMS",
-            Title = "Updated Title",
-            Abstract = "Updated description",
-            Enabled = false,
-            Layers = new List<string>()
+            Description = "Updated description"
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockPutJson("/admin/metadata/services/test-service", expectedResponse);
+            .MockPutJson("/admin/metadata/services/test-service", new { success = true });
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var result = await apiClient.UpdateServiceAsync("test-service", request);
+        var act = async () => await apiClient.UpdateServiceAsync("test-service", request);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Name.Should().Be("Updated Service");
-        result.Enabled.Should().BeFalse();
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]
@@ -175,8 +160,10 @@ public class ServiceApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockDelete("/admin/metadata/services/test-service");
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.DeleteServiceAsync("test-service");
@@ -191,27 +178,28 @@ public class ServiceApiClientTests
         // Arrange
         var expectedStats = new DashboardStats
         {
-            TotalServices = 10,
-            TotalLayers = 50,
-            TotalFolders = 5,
-            EnabledServices = 8,
-            DisabledServices = 2
+            ServiceCount = 10,
+            LayerCount = 50,
+            FolderCount = 5,
+            DataSourceCount = 8
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/metadata/stats", expectedStats);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetDashboardStatsAsync();
 
         // Assert
         result.Should().NotBeNull();
-        result.TotalServices.Should().Be(10);
-        result.TotalLayers.Should().Be(50);
-        result.EnabledServices.Should().Be(8);
+        result.ServiceCount.Should().Be(10);
+        result.LayerCount.Should().Be(50);
+        result.DataSourceCount.Should().Be(8);
     }
 
     [Fact]
@@ -221,8 +209,10 @@ public class ServiceApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Get, "/admin/metadata/services", HttpStatusCode.InternalServerError);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.GetServicesAsync();
@@ -238,8 +228,10 @@ public class ServiceApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Get, "/admin/metadata/services/nonexistent", HttpStatusCode.NotFound);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.GetServiceByIdAsync("nonexistent");
@@ -255,15 +247,17 @@ public class ServiceApiClientTests
         var request = new CreateServiceRequest
         {
             Id = "existing-service",
-            Name = "Duplicate Service",
+            Title = "Duplicate Service",
             ServiceType = "WMS"
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Post, "/admin/metadata/services", HttpStatusCode.Conflict, "Service ID already exists");
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.CreateServiceAsync(request);
@@ -280,8 +274,10 @@ public class ServiceApiClientTests
             .MockError(HttpMethod.Delete, "/admin/metadata/services/service-with-layers",
                 HttpStatusCode.BadRequest, "Cannot delete service with attached layers");
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new ServiceApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        var apiClient = new ServiceApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.DeleteServiceAsync("service-with-layers");

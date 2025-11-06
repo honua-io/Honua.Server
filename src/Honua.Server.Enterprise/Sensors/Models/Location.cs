@@ -35,9 +35,9 @@ public sealed record Location
     public string EncodingType { get; init; } = "application/geo+json";
 
     /// <summary>
-    /// The location as a NetTopologySuite Geometry object.
+    /// The geometry for this Location.
     /// </summary>
-    public Geometry Location { get; init; } = default!;
+    public Geometry Geometry { get; init; } = default!;
 
     /// <summary>
     /// A JSON Object containing user-annotated properties as key-value pairs.

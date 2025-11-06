@@ -166,7 +166,7 @@ public class WebhookNotifier : IGeofenceEventNotifier
             properties = geofenceEvent.Properties,
             dwell_time_seconds = geofenceEvent.DwellTimeSeconds,
             tenant_id = geofenceEvent.TenantId,
-            created_at = geofenceEvent.CreatedAt
+            processed_at = geofenceEvent.ProcessedAt
         };
     }
 }

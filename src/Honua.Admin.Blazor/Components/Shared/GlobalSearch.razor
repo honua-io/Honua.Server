@@ -84,7 +84,7 @@
         }
     }
 
-    private async Task<IEnumerable<GlobalSearchResult>> SearchAsync(string searchText)
+    private async Task<IEnumerable<GlobalSearchResult>> SearchAsync(string searchText, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < 2)
             return Enumerable.Empty<GlobalSearchResult>();

@@ -351,6 +351,11 @@ public static class QueryOptionsParser
                 _position++;
             }
 
+            if (_position == start)
+            {
+                throw new InvalidOperationException("Expected comparison operator in filter expression.");
+            }
+
             var operatorStr = _input.Substring(start, _position - start).ToLowerInvariant();
 
             return operatorStr switch
@@ -410,6 +415,11 @@ public static class QueryOptionsParser
                    _input[_position] != ',')
             {
                 _position++;
+            }
+
+            if (_position == tokenStart)
+            {
+                throw new InvalidOperationException("Expected value in filter expression.");
             }
 
             var token = _input.Substring(tokenStart, _position - tokenStart);

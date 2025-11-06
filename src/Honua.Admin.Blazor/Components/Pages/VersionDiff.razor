@@ -69,10 +69,10 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Success" Class="mt-2">
                                         <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" /> Added (@_diff.AddedServices.Count)
                                     </MudText>
-                                    <MudList Dense="true">
+                                    <MudList T="string" Dense="true">
                                         @foreach (var id in _diff.AddedServices)
                                         {
-                                            <MudListItem>
+                                            <MudListItem T="string">
                                                 <MudText Typo="Typo.body2" Class="text-monospace">@id</MudText>
                                             </MudListItem>
                                         }
@@ -84,10 +84,10 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Error" Class="mt-2">
                                         <MudIcon Icon="@Icons.Material.Filled.Remove" Size="Size.Small" /> Removed (@_diff.RemovedServices.Count)
                                     </MudText>
-                                    <MudList Dense="true">
+                                    <MudList T="string" Dense="true">
                                         @foreach (var id in _diff.RemovedServices)
                                         {
-                                            <MudListItem>
+                                            <MudListItem T="string">
                                                 <MudText Typo="Typo.body2" Class="text-monospace">@id</MudText>
                                             </MudListItem>
                                         }
@@ -99,10 +99,10 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Warning" Class="mt-2">
                                         <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" /> Modified (@_diff.ModifiedServices.Count)
                                     </MudText>
-                                    <MudList Dense="true">
+                                    <MudList T="string" Dense="true">
                                         @foreach (var id in _diff.ModifiedServices)
                                         {
-                                            <MudListItem>
+                                            <MudListItem T="string">
                                                 <MudText Typo="Typo.body2" Class="text-monospace">@id</MudText>
                                             </MudListItem>
                                         }
@@ -126,10 +126,10 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Success" Class="mt-2">
                                         <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" /> Added (@_diff.AddedLayers.Count)
                                     </MudText>
-                                    <MudList Dense="true">
+                                    <MudList T="string" Dense="true">
                                         @foreach (var id in _diff.AddedLayers)
                                         {
-                                            <MudListItem>
+                                            <MudListItem T="string">
                                                 <MudText Typo="Typo.body2" Class="text-monospace">@id</MudText>
                                             </MudListItem>
                                         }
@@ -141,10 +141,10 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Error" Class="mt-2">
                                         <MudIcon Icon="@Icons.Material.Filled.Remove" Size="Size.Small" /> Removed (@_diff.RemovedLayers.Count)
                                     </MudText>
-                                    <MudList Dense="true">
+                                    <MudList T="string" Dense="true">
                                         @foreach (var id in _diff.RemovedLayers)
                                         {
-                                            <MudListItem>
+                                            <MudListItem T="string">
                                                 <MudText Typo="Typo.body2" Class="text-monospace">@id</MudText>
                                             </MudListItem>
                                         }
@@ -156,10 +156,10 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Warning" Class="mt-2">
                                         <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" /> Modified (@_diff.ModifiedLayers.Count)
                                     </MudText>
-                                    <MudList Dense="true">
+                                    <MudList T="string" Dense="true">
                                         @foreach (var id in _diff.ModifiedLayers)
                                         {
-                                            <MudListItem>
+                                            <MudListItem T="string">
                                                 <MudText Typo="Typo.body2" Class="text-monospace">@id</MudText>
                                             </MudListItem>
                                         }
@@ -183,10 +183,10 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Success" Class="mt-2">
                                         <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" /> Added (@_diff.AddedFolders.Count)
                                     </MudText>
-                                    <MudList Dense="true">
+                                    <MudList T="string" Dense="true">
                                         @foreach (var id in _diff.AddedFolders)
                                         {
-                                            <MudListItem>
+                                            <MudListItem T="string">
                                                 <MudText Typo="Typo.body2" Class="text-monospace">@id</MudText>
                                             </MudListItem>
                                         }
@@ -198,10 +198,10 @@
                                     <MudText Typo="Typo.subtitle2" Color="Color.Error" Class="mt-2">
                                         <MudIcon Icon="@Icons.Material.Filled.Remove" Size="Size.Small" /> Removed (@_diff.RemovedFolders.Count)
                                     </MudText>
-                                    <MudList Dense="true">
+                                    <MudList T="string" Dense="true">
                                         @foreach (var id in _diff.RemovedFolders)
                                         {
-                                            <MudListItem>
+                                            <MudListItem T="string">
                                                 <MudText Typo="Typo.body2" Class="text-monospace">@id</MudText>
                                             </MudListItem>
                                         }

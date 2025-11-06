@@ -120,10 +120,10 @@
                         {
                             @if (!_model.Crs.Contains(code))
                             {
-                                <MudSelectItem T="string" Value="@code">@code - @name</MudSelectItem>
+                                <MudSelectItem T="string" Value="@(code)">@(code) - @(name)</MudSelectItem>
                             }
                         }
-                        <MudSelectItem T="string" Value="custom">Custom CRS...</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("custom")">Custom CRS...</MudSelectItem>
                     </MudSelect>
                 </MudItem>
 
@@ -134,7 +134,7 @@
                         <MudStack Spacing="1">
                             @foreach (var crs in _model.Crs)
                             {
-                                <MudChip Color="Color.Primary"
+                                <MudChip T="string" Color="Color.Primary"
                                          OnClose="@(() => RemoveCrs(crs))"
                                          CloseIcon="@Icons.Material.Filled.Cancel">
                                     @crs
@@ -385,7 +385,7 @@
             ["Color"] = Color.Error
         };
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Layer", parameters);
+        var dialog = await DialogService.ShowAsync<Components.Shared.ConfirmDialog>("Delete Layer", parameters);
         var result = await dialog.Result;
 
         if (result.Canceled)

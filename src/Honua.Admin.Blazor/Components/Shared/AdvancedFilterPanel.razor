@@ -17,7 +17,7 @@
                            Variant="Variant.Outlined"
                            AnchorOrigin="Origin.BottomCenter"
                            Dense="true">
-                    @foreach (var type in FilterOptions.ServiceTypes)
+                    @foreach (var type in Honua.Admin.Blazor.Shared.Models.FilterOptions.ServiceTypes)
                     {
                         <MudSelectItem Value="@type">@type</MudSelectItem>
                     }
@@ -34,7 +34,7 @@
                            Variant="Variant.Outlined"
                            AnchorOrigin="Origin.BottomCenter"
                            Dense="true">
-                    @foreach (var type in FilterOptions.GeometryTypes)
+                    @foreach (var type in Honua.Admin.Blazor.Shared.Models.FilterOptions.GeometryTypes)
                     {
                         <MudSelectItem Value="@type">@type</MudSelectItem>
                     }
@@ -51,7 +51,7 @@
                            Variant="Variant.Outlined"
                            AnchorOrigin="Origin.BottomCenter"
                            Dense="true">
-                    @foreach (var crs in FilterOptions.CommonCrs)
+                    @foreach (var crs in Honua.Admin.Blazor.Shared.Models.FilterOptions.CommonCrs)
                     {
                         <MudSelectItem Value="@crs">@crs</MudSelectItem>
                     }
@@ -78,7 +78,7 @@
             @* Has Layers Filter *@
             @if (ShowHasLayersFilter)
             {
-                <MudSwitch @bind-Checked="_hasLayers"
+                <MudSwitch T="bool" @bind-Checked="_hasLayers"
                            Color="Color.Primary"
                            Label="Only services with layers" />
             }

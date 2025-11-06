@@ -59,5 +59,4 @@ public sealed class FolderTreeNode
     public string? Title { get; set; }
     public int ServiceCount { get; set; }
     public List<FolderTreeNode> Children { get; set; } = new();
-    public bool IsExpanded { get; set; } = false;
 }

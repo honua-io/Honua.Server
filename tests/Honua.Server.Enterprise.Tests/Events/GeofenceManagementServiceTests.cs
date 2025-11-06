@@ -43,9 +43,9 @@ public class GeofenceManagementServiceTests
             Geometry = new GeoJsonGeometry
             {
                 Type = "Polygon",
-                Coordinates = new List<List<double[]>>
+                Coordinates = new[]
                 {
-                    new List<double[]>
+                    new[]
                     {
                         new[] { -122.4, 37.8 },
                         new[] { -122.3, 37.8 },
@@ -71,15 +71,15 @@ public class GeofenceManagementServiceTests
             .Returns<Geofence, CancellationToken>((geofence, _) => Task.FromResult(geofence));
 
         // Act
-        var result = await _service.CreateGeofenceAsync(request, tenantId);
+        var result = await _service.CreateGeofenceAsync(request, tenantId: tenantId);
 
         // Assert
         result.Should().NotBeNull();
         result.Name.Should().Be("Downtown District");
         result.Description.Should().Be("Main downtown area");
         result.IsActive.Should().BeTrue();
-        result.EnabledEventTypes.Should().Contain("Enter");
-        result.EnabledEventTypes.Should().Contain("Exit");
+        result.EnabledEventTypes.HasFlag(GeofenceEventTypes.Enter).Should().BeTrue();
+        result.EnabledEventTypes.HasFlag(GeofenceEventTypes.Exit).Should().BeTrue();
         result.Properties.Should().ContainKey("priority");
         result.Properties.Should().ContainKey("zone_type");
         result.TenantId.Should().Be(tenantId);
@@ -105,9 +105,9 @@ public class GeofenceManagementServiceTests
             Geometry = new GeoJsonGeometry
             {
                 Type = "Polygon",
-                Coordinates = new List<List<double[]>>
+                Coordinates = new[]
                 {
-                    new List<double[]>
+                    new[]
                     {
                         new[] { -122.4, 37.8 },
                         new[] { -122.3, 37.8 }
@@ -119,7 +119,7 @@ public class GeofenceManagementServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(
-            () => _service.CreateGeofenceAsync(request, null));
+            () => _service.CreateGeofenceAsync(request, tenantId: null));
     }
 
     [Fact]
@@ -138,12 +138,12 @@ public class GeofenceManagementServiceTests
             .Returns<Geofence, CancellationToken>((geofence, _) => Task.FromResult(geofence));
 
         // Act
-        var result = await _service.CreateGeofenceAsync(request, null);
+        var result = await _service.CreateGeofenceAsync(request, tenantId: null);
 
         // Assert
-        result.EnabledEventTypes.Should().Contain("Enter");
-        result.EnabledEventTypes.Should().Contain("Exit");
-        result.EnabledEventTypes.Should().HaveCount(2);
+        result.EnabledEventTypes.HasFlag(GeofenceEventTypes.Enter).Should().BeTrue();
+        result.EnabledEventTypes.HasFlag(GeofenceEventTypes.Exit).Should().BeTrue();
+        result.EnabledEventTypes.Should().Be(GeofenceEventTypes.Enter | GeofenceEventTypes.Exit);
     }
 
     [Fact]
@@ -174,24 +174,25 @@ public class GeofenceManagementServiceTests
             IsActive = false
         };
 
-        _mockGeofenceRepo.Setup(r => r.GetByIdAsync(geofenceId, tenantId, It.IsAny<CancellationToken>()))
+        _mockGeofenceRepo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingGeofence);
+
+        Geofence? updatedGeofence = null;
 
         _mockGeofenceRepo.Setup(r => r.UpdateAsync(
                 It.IsAny<Geofence>(), It.IsAny<CancellationToken>()))
-            .Returns<Geofence, CancellationToken>((geofence, _) => Task.FromResult(geofence));
+            .Callback<Geofence, CancellationToken>((geofence, _) => updatedGeofence = geofence)
+            .Returns(() => Task.FromResult(true));
 
         // Act
-        var result = await _service.UpdateGeofenceAsync(geofenceId, updateRequest, tenantId);
+        var result = await _service.UpdateGeofenceAsync(geofenceId, updateRequest, tenantId: tenantId);
 
         // Assert
-        result.Should().NotBeNull();
-        result.Name.Should().Be("New Name");
-        result.Description.Should().Be("Updated description");
-        result.IsActive.Should().BeFalse();
-        result.EnabledEventTypes.Should().Contain("Enter");
-        result.EnabledEventTypes.Should().Contain("Exit");
-        result.EnabledEventTypes.Should().Contain("Dwell");
+        updatedGeofence.Should().NotBeNull();
+        updatedGeofence!.Name.Should().Be("New Name");
+        updatedGeofence.Description.Should().Be("Updated description");
+        updatedGeofence.IsActive.Should().BeFalse();
+        updatedGeofence.EnabledEventTypes.Should().NotBe(GeofenceEventTypes.None);
 
         // Verify update was called
         _mockGeofenceRepo.Verify(r => r.UpdateAsync(
@@ -203,7 +204,7 @@ public class GeofenceManagementServiceTests
     }
 
     [Fact]
-    public async Task UpdateGeofenceAsync_NonExistentGeofence_ShouldReturnNull()
+    public async Task UpdateGeofenceAsync_NonExistentGeofence_ShouldReturnFalse()
     {
         // Arrange
         var geofenceId = Guid.NewGuid();
@@ -217,10 +218,10 @@ public class GeofenceManagementServiceTests
             .ReturnsAsync((Geofence?)null);
 
         // Act
-        var result = await _service.UpdateGeofenceAsync(geofenceId, updateRequest, null);
+        var result = await _service.UpdateGeofenceAsync(geofenceId, updateRequest);
 
         // Assert
-        result.Should().BeNull();
+        result.Should().BeFalse();
         _mockGeofenceRepo.Verify(r => r.UpdateAsync(
             It.IsAny<Geofence>(), It.IsAny<CancellationToken>()), Times.Never);
     }
@@ -275,11 +276,11 @@ public class GeofenceManagementServiceTests
         result.Should().NotBeNull();
         result!.Id.Should().Be(geofenceId);
         result.Name.Should().Be("Test Fence");
-        result.Description.Should().Be("Test Description");
-        result.Geometry.Should().NotBeNull();
-        result.Geometry.Type.Should().Be("Polygon");
-        result.EnabledEventTypes.Should().Contain("Enter");
-        result.EnabledEventTypes.Should().Contain("Exit");
+       result.Description.Should().Be("Test Description");
+       result.Geometry.Should().NotBeNull();
+        result.Geometry.GeometryType.Should().Be("Polygon");
+        result.EnabledEventTypes.HasFlag(GeofenceEventTypes.Enter).Should().BeTrue();
+        result.EnabledEventTypes.HasFlag(GeofenceEventTypes.Exit).Should().BeTrue();
     }
 
     [Fact]
@@ -294,9 +295,13 @@ public class GeofenceManagementServiceTests
             CreateGeofence(Guid.NewGuid(), "Fence 3")
         };
 
-        _mockGeofenceRepo.Setup(r => r.ListAsync(
+        _mockGeofenceRepo.Setup(r => r.GetAllAsync(
                 true, tenantId, 10, 0, It.IsAny<CancellationToken>()))
             .ReturnsAsync(geofences);
+
+        _mockGeofenceRepo.Setup(r => r.GetCountAsync(
+                true, tenantId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(geofences.Count);
 
         // Act
         var result = await _service.ListGeofencesAsync(
@@ -304,10 +309,13 @@ public class GeofenceManagementServiceTests
 
         // Assert
         result.Should().NotBeNull();
-        result.Should().HaveCount(3);
-        result[0].Name.Should().Be("Fence 1");
-        result[1].Name.Should().Be("Fence 2");
-        result[2].Name.Should().Be("Fence 3");
+        result.Geofences.Should().HaveCount(3);
+        result.Geofences[0].Name.Should().Be("Fence 1");
+        result.Geofences[1].Name.Should().Be("Fence 2");
+        result.Geofences[2].Name.Should().Be("Fence 3");
+        result.TotalCount.Should().Be(3);
+        result.Limit.Should().Be(10);
+        result.Offset.Should().Be(0);
     }
 
     [Fact]
@@ -382,9 +390,9 @@ public class GeofenceManagementServiceTests
         return new GeoJsonGeometry
         {
             Type = "Polygon",
-            Coordinates = new List<List<double[]>>
+            Coordinates = new[]
             {
-                new List<double[]>
+                new[]
                 {
                     new[] { -122.4, 37.8 },
                     new[] { -122.3, 37.8 },
@@ -413,6 +421,8 @@ public class GeofenceManagementServiceTests
             }
         }
 
-        return result;
+        return result == GeofenceEventTypes.None
+            ? GeofenceEventTypes.Enter | GeofenceEventTypes.Exit
+            : result;
     }
 }

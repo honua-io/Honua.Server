@@ -8,7 +8,7 @@
                 Configure a preseed job to pre-generate tiles for faster initial access. Tiles will be generated in the background.
             </MudAlert>
 
-            <MudTextField @bind-Value="_request.DatasetIds"
+            <MudTextField @bind-Value="_datasetIdsInput"
                           Label="Dataset IDs (comma-separated)"
                           Variant="Variant.Outlined"
                           Required="true"
@@ -67,11 +67,11 @@
                              Min="128"
                              Max="1024" />
 
-            <MudSwitch @bind-Value="_transparent"
+            <MudSwitch T="bool" @bind-Value="_transparent"
                        Label="Transparent Background"
                        Color="Color.Primary" />
 
-            <MudSwitch @bind-Value="_overwrite"
+            <MudSwitch T="bool" @bind-Value="_overwrite"
                        Label="Overwrite Existing Tiles"
                        Color="Color.Warning" />
 
@@ -93,9 +93,9 @@
 
 @code {
     [CascadingParameter]
-    private MudDialogInstance MudDialog { get; set; } = default!;
+    private IMudDialogInstance MudDialog { get; set; } = default!;
 
-    private CreatePreseedJobRequest _request = new();
+    private string _datasetIdsInput = string.Empty;
     private string? _selectedTileMatrixSet = "WorldWebMercatorQuad";
     private string? _selectedFormat = "image/png";
     private string? _styleId;
@@ -111,7 +111,7 @@
         _errorMessage = null;
 
         // Validate
-        if (string.IsNullOrWhiteSpace(_request.DatasetIds))
+        if (string.IsNullOrWhiteSpace(_datasetIdsInput))
         {
             _errorMessage = "Please enter at least one dataset ID";
             return;
@@ -124,7 +124,7 @@
         }
 
         // Parse dataset IDs
-        var datasetIds = _request.DatasetIds
+        var datasetIds = _datasetIdsInput
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();
 

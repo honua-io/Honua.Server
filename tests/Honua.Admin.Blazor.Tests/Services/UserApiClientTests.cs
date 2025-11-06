@@ -5,6 +5,7 @@ using Honua.Admin.Blazor.Shared.Models;
 using Honua.Admin.Blazor.Shared.Services;
 using Honua.Admin.Blazor.Tests.Infrastructure;
 using System.Net;
+using Moq;
 
 namespace Honua.Admin.Blazor.Tests.Services;
 
@@ -24,23 +25,29 @@ public class UserApiClientTests
             {
                 new UserResponse
                 {
+                    Id = "user1",
                     Username = "testuser",
                     DisplayName = "Test User",
                     Email = "test@example.com",
                     Roles = new List<string> { "administrator" },
-                    Enabled = true,
-                    IsLocked = false,
+                    IsEnabled = true,
+                    IsLockedOut = false,
                     FailedLoginAttempts = 0,
                     LastLogin = DateTimeOffset.UtcNow
                 }
-            }
+            },
+            TotalCount = 1,
+            Page = 1,
+            PageSize = 50
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockGetJson("/admin/users", expectedUsers);
+            .MockGetJson("/admin/users?page=1&pageSize=50", expectedUsers);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.ListUsersAsync();
@@ -59,12 +66,13 @@ public class UserApiClientTests
         // Arrange
         var expectedUser = new UserResponse
         {
+            Id = "user1",
             Username = "testuser",
             DisplayName = "Test User",
             Email = "test@example.com",
             Roles = new List<string> { "datapublisher", "viewer" },
-            Enabled = true,
-            IsLocked = false,
+            IsEnabled = true,
+            IsLockedOut = false,
             FailedLoginAttempts = 0,
             LastLogin = DateTimeOffset.UtcNow
         };
@@ -72,8 +80,10 @@ public class UserApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/users/testuser", expectedUser);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetUserAsync("testuser");
@@ -96,26 +106,30 @@ public class UserApiClientTests
             DisplayName = "New User",
             Email = "new@example.com",
             Password = "SecurePassword123",
-            Roles = new List<string> { "viewer" }
+            Roles = new List<string> { "viewer" },
+            IsEnabled = true
         };
 
         var expectedResponse = new UserResponse
         {
+            Id = "user2",
             Username = "newuser",
             DisplayName = "New User",
             Email = "new@example.com",
             Roles = new List<string> { "viewer" },
-            Enabled = true,
-            IsLocked = false,
+            IsEnabled = true,
+            IsLockedOut = false,
             FailedLoginAttempts = 0,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
         var mockFactory = new MockHttpClientFactory()
-            .MockPostJson("/admin/users", expectedResponse, HttpStatusCode.Created);
+            .MockPostJson("/admin/users", expectedResponse, HttpStatusCode.OK);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.CreateUserAsync(request);
@@ -125,7 +139,7 @@ public class UserApiClientTests
         result.Username.Should().Be("newuser");
         result.DisplayName.Should().Be("New User");
         result.Email.Should().Be("new@example.com");
-        result.Enabled.Should().BeTrue();
+        result.IsEnabled.Should().BeTrue();
     }
 
     [Fact]
@@ -137,24 +151,27 @@ public class UserApiClientTests
             DisplayName = "Updated Name",
             Email = "updated@example.com",
             Roles = new List<string> { "administrator", "datapublisher" },
-            Enabled = true
+            IsEnabled = true
         };
 
         var expectedResponse = new UserResponse
         {
+            Id = "user1",
             Username = "testuser",
             DisplayName = "Updated Name",
             Email = "updated@example.com",
             Roles = new List<string> { "administrator", "datapublisher" },
-            Enabled = true,
-            IsLocked = false
+            IsEnabled = true,
+            IsLockedOut = false
         };
 
         var mockFactory = new MockHttpClientFactory()
             .MockPutJson("/admin/users/testuser", expectedResponse);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.UpdateUserAsync("testuser", request);
@@ -167,24 +184,26 @@ public class UserApiClientTests
     }
 
     [Fact]
-    public async Task DeleteUserAsync_Success_CompletesWithoutException()
+    public async Task DeleteUserAsync_Success_ReturnsTrue()
     {
         // Arrange
         var mockFactory = new MockHttpClientFactory()
-            .MockDelete("/admin/users/testuser");
+            .MockDelete("/admin/users/testuser", HttpStatusCode.OK);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var act = async () => await apiClient.DeleteUserAsync("testuser");
+        var result = await apiClient.DeleteUserAsync("testuser");
 
         // Assert
-        await act.Should().NotThrowAsync();
+        result.Should().BeTrue();
     }
 
     [Fact]
-    public async Task ChangePasswordAsync_Success_CompletesWithoutException()
+    public async Task ChangePasswordAsync_Success_ReturnsTrue()
     {
         // Arrange
         var request = new ChangePasswordRequest
@@ -195,14 +214,16 @@ public class UserApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockPostJson("/admin/users/testuser/password", new { success = true });
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var act = async () => await apiClient.ChangePasswordAsync("testuser", request);
+        var result = await apiClient.ChangePasswordAsync("testuser", request);
 
         // Assert
-        await act.Should().NotThrowAsync();
+        result.Should().BeTrue();
     }
 
     [Fact]
@@ -220,8 +241,10 @@ public class UserApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockGetJson("/admin/users/statistics", expectedStats);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
         var result = await apiClient.GetStatisticsAsync();
@@ -239,10 +262,12 @@ public class UserApiClientTests
     {
         // Arrange
         var mockFactory = new MockHttpClientFactory()
-            .MockError(HttpMethod.Get, "/admin/users", HttpStatusCode.InternalServerError);
+            .MockError(HttpMethod.Get, "/admin/users?page=1&pageSize=50", HttpStatusCode.InternalServerError);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.ListUsersAsync();
@@ -258,8 +283,10 @@ public class UserApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Get, "/admin/users/nonexistent", HttpStatusCode.NotFound);
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.GetUserAsync("nonexistent");
@@ -283,8 +310,10 @@ public class UserApiClientTests
         var mockFactory = new MockHttpClientFactory()
             .MockError(HttpMethod.Post, "/admin/users", HttpStatusCode.BadRequest, "Validation failed");
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
         var act = async () => await apiClient.CreateUserAsync(request);
@@ -294,53 +323,59 @@ public class UserApiClientTests
     }
 
     [Fact]
-    public async Task UnlockUserAsync_Success_CompletesWithoutException()
+    public async Task UnlockUserAsync_Success_ReturnsTrue()
     {
         // Arrange
         var mockFactory = new MockHttpClientFactory()
             .MockPostJson("/admin/users/testuser/unlock", new { success = true });
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var act = async () => await apiClient.UnlockUserAsync("testuser");
+        var result = await apiClient.UnlockUserAsync("testuser");
 
         // Assert
-        await act.Should().NotThrowAsync();
+        result.Should().BeTrue();
     }
 
     [Fact]
-    public async Task EnableUserAsync_Success_CompletesWithoutException()
+    public async Task EnableUserAsync_Success_ReturnsTrue()
     {
         // Arrange
         var mockFactory = new MockHttpClientFactory()
             .MockPostJson("/admin/users/testuser/enable", new { success = true });
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var act = async () => await apiClient.EnableUserAsync("testuser");
+        var result = await apiClient.EnableUserAsync("testuser");
 
         // Assert
-        await act.Should().NotThrowAsync();
+        result.Should().BeTrue();
     }
 
     [Fact]
-    public async Task DisableUserAsync_Success_CompletesWithoutException()
+    public async Task DisableUserAsync_Success_ReturnsTrue()
     {
         // Arrange
         var mockFactory = new MockHttpClientFactory()
             .MockPostJson("/admin/users/testuser/disable", new { success = true });
 
-        var httpClient = mockFactory.CreateClient();
-        var apiClient = new UserApiClient(httpClient);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(f => f.CreateClient("AdminApi")).Returns(mockFactory.CreateClient());
+        var logger = Mock.Of<ILogger<UserApiClient>>();
+        var apiClient = new UserApiClient(httpClientFactory.Object, logger);
 
         // Act
-        var act = async () => await apiClient.DisableUserAsync("testuser");
+        var result = await apiClient.DisableUserAsync("testuser");
 
         // Assert
-        await act.Should().NotThrowAsync();
+        result.Should().BeTrue();
     }
 }

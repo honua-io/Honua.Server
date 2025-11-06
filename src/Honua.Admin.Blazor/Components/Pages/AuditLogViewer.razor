@@ -181,7 +181,7 @@
                     <MudText Typo="Typo.caption">@GetRelativeTime(context.Timestamp)</MudText>
                 </MudTd>
                 <MudTd DataLabel="Category">
-                    <MudChip Size="Size.Small" Color="GetCategoryColor(context.Category)">@context.Category</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="GetCategoryColor(context.Category)">@context.Category</MudChip>
                 </MudTd>
                 <MudTd DataLabel="Action">
                     <MudText Typo="Typo.body2">@context.Action</MudText>
@@ -220,7 +220,7 @@
                     }
                     @if (context.RiskScore.HasValue && context.RiskScore >= 80)
                     {
-                        <MudChip Size="Size.Small" Color="Color.Warning">High Risk</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">High Risk</MudChip>
                     }
                 </MudTd>
                 <MudTd DataLabel="IP Address">

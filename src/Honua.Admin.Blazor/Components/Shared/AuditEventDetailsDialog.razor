@@ -19,7 +19,7 @@
                         </tr>
                         <tr>
                             <td><strong>Category:</strong></td>
-                            <td><MudChip Size="Size.Small">@Event.Category</MudChip></td>
+                            <td><MudChip T="string" Size="Size.Small">@Event.Category</MudChip></td>
                         </tr>
                         <tr>
                             <td><strong>Action:</strong></td>
@@ -147,7 +147,7 @@
                             <tr>
                                 <td><strong>Risk Score:</strong></td>
                                 <td>
-                                    <MudChip Size="Size.Small" Color="@(Event.RiskScore >= 80 ? Color.Error : Event.RiskScore >= 50 ? Color.Warning : Color.Success)">
+                                    <MudChip T="string" Size="Size.Small" Color="@(Event.RiskScore >= 80 ? Color.Error : Event.RiskScore >= 50 ? Color.Warning : Color.Success)">
                                         @Event.RiskScore
                                     </MudChip>
                                 </td>
@@ -160,7 +160,7 @@
                                 <td>
                                     @foreach (var tag in Event.Tags)
                                     {
-                                        <MudChip Size="Size.Small">@tag</MudChip>
+                                        <MudChip T="string" Size="Size.Small">@tag</MudChip>
                                     }
                                 </td>
                             </tr>
@@ -218,7 +218,7 @@
 
 @code {
     [CascadingParameter]
-    private MudDialogInstance MudDialog { get; set; } = default!;
+    private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter]
     public AuditEvent? Event { get; set; }

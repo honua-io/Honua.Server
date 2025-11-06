@@ -27,9 +27,16 @@
 
     <!-- Data Formats -->
     <PackageReference Include="ParquetSharp" Version="21.0.0" />
-    <PackageReference Include="Apache.Arrow" Version="22.1.0" />
+    <PackageReference Include="Apache.Arrow" Version="22.1.0" GeneratePathProperty="true" />
 
     <!-- Git Operations -->
     <PackageReference Include="LibGit2Sharp" Version="0.30.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Apache.Arrow">
+      <HintPath>$(PkgApache_Arrow)\lib\net8.0\Apache.Arrow.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 </Project>

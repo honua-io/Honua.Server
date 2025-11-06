@@ -1,5 +1,6 @@
 using Dapper;
 using Honua.Server.Enterprise.Events.Models;
+using Honua.Server.Enterprise.Data;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
@@ -21,6 +22,7 @@ public class PostgresGeofenceEventRepository : IGeofenceEventRepository
         string connectionString,
         ILogger<PostgresGeofenceEventRepository> logger)
     {
+        DapperBootstrapper.EnsureConfigured();
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 

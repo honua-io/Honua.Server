@@ -72,7 +72,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Things",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -160,7 +160,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Locations",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -192,7 +192,7 @@ public static class SensorThingsHandlers
         if (string.IsNullOrWhiteSpace(location.Description))
             return Results.BadRequest(new { error = "Description is required" });
 
-        if (location.Location == null)
+        if (location.Geometry == null)
             return Results.BadRequest(new { error = "Location geometry is required" });
 
         var created = await repository.CreateLocationAsync(location, ct);
@@ -240,7 +240,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#HistoricalLocations",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -283,7 +283,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Sensors",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -363,7 +363,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#ObservedProperties",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -443,7 +443,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Datastreams",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -535,7 +535,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Observations",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -547,8 +547,7 @@ public static class SensorThingsHandlers
         [FromQuery(Name = "$expand")] string? expand,
         CancellationToken ct = default)
     {
-        var expandOptions = string.IsNullOrEmpty(expand) ? null : ExpandOptions.Parse(expand);
-        var observation = await repository.GetObservationAsync(id, expandOptions, ct);
+        var observation = await repository.GetObservationAsync(id, ct);
 
         if (observation == null)
             return Results.NotFound(new { error = $"Observation {id} not found" });
@@ -592,16 +591,6 @@ public static class SensorThingsHandlers
         return Results.Created(created.SelfLink, created);
     }
 
-    public static async Task<IResult> UpdateObservation(
-        ISensorThingsRepository repository,
-        string id,
-        Observation observation,
-        CancellationToken ct = default)
-    {
-        var updated = await repository.UpdateObservationAsync(id, observation, ct);
-        return Results.Ok(updated);
-    }
-
     public static async Task<IResult> DeleteObservation(
         ISensorThingsRepository repository,
         string id,
@@ -633,7 +622,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#FeaturesOfInterest",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -712,7 +701,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Datastreams",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -734,29 +723,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Locations",
-            count = count ? result.Count : null,
-            value = result.Items
-        }, CreateJsonOptions());
-    }
-
-    public static async Task<IResult> GetThingHistoricalLocations(
-        HttpContext context,
-        ISensorThingsRepository repository,
-        string id,
-        [FromQuery(Name = "$filter")] string? filter,
-        [FromQuery(Name = "$orderby")] string? orderby,
-        [FromQuery(Name = "$top")] int? top,
-        [FromQuery(Name = "$skip")] int? skip,
-        [FromQuery(Name = "$count")] bool count = false,
-        CancellationToken ct = default)
-    {
-        var options = QueryOptionsParser.Parse(filter, null, null, orderby, top, skip, count);
-        var result = await repository.GetThingHistoricalLocationsAsync(id, options, ct);
-
-        return Results.Json(new
-        {
-            context = $"{GetBaseUrl(context)}/$metadata#HistoricalLocations",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }
@@ -778,29 +745,7 @@ public static class SensorThingsHandlers
         return Results.Json(new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Observations",
-            count = count ? result.Count : null,
-            value = result.Items
-        }, CreateJsonOptions());
-    }
-
-    public static async Task<IResult> GetLocationThings(
-        HttpContext context,
-        ISensorThingsRepository repository,
-        string id,
-        [FromQuery(Name = "$filter")] string? filter,
-        [FromQuery(Name = "$orderby")] string? orderby,
-        [FromQuery(Name = "$top")] int? top,
-        [FromQuery(Name = "$skip")] int? skip,
-        [FromQuery(Name = "$count")] bool count = false,
-        CancellationToken ct = default)
-    {
-        var options = QueryOptionsParser.Parse(filter, null, null, orderby, top, skip, count);
-        var result = await repository.GetLocationThingsAsync(id, options, ct);
-
-        return Results.Json(new
-        {
-            context = $"{GetBaseUrl(context)}/$metadata#Things",
-            count = count ? result.Count : null,
+            count = count ? result.TotalCount : null,
             value = result.Items
         }, CreateJsonOptions());
     }

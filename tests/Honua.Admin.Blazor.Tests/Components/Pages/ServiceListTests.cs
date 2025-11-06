@@ -23,7 +23,9 @@ public class ServiceListTests : ComponentTestBase
 
     public ServiceListTests()
     {
-        _mockServiceApiClient = new Mock<ServiceApiClient>(MockBehavior.Strict, new HttpClient());
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        var logger = Mock.Of<ILogger<ServiceApiClient>>();
+        _mockServiceApiClient = new Mock<ServiceApiClient>(MockBehavior.Strict, httpClientFactory.Object, logger);
         _mockSnackbar = new Mock<ISnackbar>();
 
         Context.Services.AddSingleton(_mockServiceApiClient.Object);
@@ -43,18 +45,16 @@ public class ServiceListTests : ComponentTestBase
             new ServiceListItem
             {
                 Id = "wms-service",
-                Name = "WMS Service",
+                Title = "WMS Service",
                 ServiceType = "WMS",
-                Enabled = true,
                 LayerCount = 5,
                 FolderId = null
             },
             new ServiceListItem
             {
                 Id = "wfs-service",
-                Name = "WFS Service",
+                Title = "WFS Service",
                 ServiceType = "WFS",
-                Enabled = false,
                 LayerCount = 3,
                 FolderId = "folder1"
             }
@@ -108,17 +108,15 @@ public class ServiceListTests : ComponentTestBase
             new ServiceListItem
             {
                 Id = "wms-service",
-                Name = "WMS Service",
+                Title = "WMS Service",
                 ServiceType = "WMS",
-                Enabled = true,
                 LayerCount = 5
             },
             new ServiceListItem
             {
                 Id = "wfs-service",
-                Name = "WFS Service",
+                Title = "WFS Service",
                 ServiceType = "WFS",
-                Enabled = true,
                 LayerCount = 3
             }
         };
@@ -150,17 +148,15 @@ public class ServiceListTests : ComponentTestBase
             new ServiceListItem
             {
                 Id = "enabled-service",
-                Name = "Enabled Service",
+                Title = "Enabled Service",
                 ServiceType = "WMS",
-                Enabled = true,
                 LayerCount = 5
             },
             new ServiceListItem
             {
                 Id = "disabled-service",
-                Name = "Disabled Service",
+                Title = "Disabled Service",
                 ServiceType = "WFS",
-                Enabled = false,
                 LayerCount = 3
             }
         };
@@ -208,25 +204,22 @@ public class ServiceListTests : ComponentTestBase
             new ServiceListItem
             {
                 Id = "wms",
-                Name = "WMS",
+                Title = "WMS",
                 ServiceType = "WMS",
-                Enabled = true,
                 LayerCount = 1
             },
             new ServiceListItem
             {
                 Id = "wfs",
-                Name = "WFS",
+                Title = "WFS",
                 ServiceType = "WFS",
-                Enabled = true,
                 LayerCount = 1
             },
             new ServiceListItem
             {
                 Id = "wmts",
-                Name = "WMTS",
+                Title = "WMTS",
                 ServiceType = "WMTS",
-                Enabled = true,
                 LayerCount = 1
             }
         };
