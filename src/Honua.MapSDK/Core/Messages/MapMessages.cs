@@ -194,3 +194,21 @@ public class ClearHighlightsRequestMessage
 {
     public required string MapId { get; init; }
 }
+
+/// <summary>
+/// Request for data from a component (e.g., chart requesting data from map)
+/// </summary>
+public class DataRequestMessage
+{
+    public required string ComponentId { get; init; }
+    public required string MapId { get; init; }
+}
+
+/// <summary>
+/// Response with data to requesting component
+/// </summary>
+public class DataResponseMessage
+{
+    public required string RequesterId { get; init; }
+    public required List<Dictionary<string, object>> Features { get; init; }
+}

@@ -38,7 +38,7 @@ builder.Services.AddHonuaMapSDK();
 <HonuaDataGrid Source="grpc://api.honua.io/parcels" SyncWith="map1" />
 
 <!-- Chart automatically updates with filtered data -->
-<HonuaChart Type="Histogram" Source="grpc://api.honua.io/parcels" SyncWith="map1" />
+<HonuaChart Type="ChartType.Histogram" Field="value" SyncWith="map1" Title="Property Values" />
 ```
 
 That's it! No manual wiring - the ComponentBus handles everything.
@@ -122,14 +122,35 @@ protected override void OnInitialized()
 }
 ```
 
+## Components
+
+### HonuaMap
+Core map component with MapLibre GL integration. See main documentation above.
+
+### HonuaChart
+Interactive charting component with auto-sync capabilities.
+
+```razor
+<HonuaChart Type="ChartType.Histogram"
+            SyncWith="map1"
+            Field="propertyValue"
+            Title="Property Value Distribution"
+            Bins="20"
+            ValueFormat="ValueFormat.Currency"
+            EnableFilter="true" />
+```
+
+[Full HonuaChart Documentation](Components/Chart/README.md)
+
 ## Roadmap
 
 - ✅ Core MapSDK with ComponentBus
 - ✅ Map configuration save/load/export
-- 🚧 Additional components (Grid, Chart, Legend, Filter)
+- ✅ HonuaChart component (Histogram, Bar, Pie, Line charts)
+- 🚧 Additional components (Grid, Legend, Filter)
 - 🚧 gRPC streaming data sources
 - 🚧 WebGPU compute acceleration
-- 🚧 Visual map designer UI
+- ✅ Visual map designer UI
 - 🚧 PMTiles + FlatGeobuf support
 
 ## License

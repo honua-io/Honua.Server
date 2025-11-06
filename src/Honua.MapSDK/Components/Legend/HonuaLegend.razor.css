@@ -1,0 +1,409 @@
+/* Base legend container */
+.honua-legend {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    min-width: 250px;
+    max-width: 400px;
+}
+
+/* Embedded legend (in a sidebar or container) */
+.legend-embedded {
+    width: 100%;
+    max-width: none;
+    box-shadow: none;
+    border: 1px solid #e0e0e0;
+}
+
+/* Floating legend positioning */
+.legend-floating {
+    position: absolute;
+    z-index: 1000;
+    margin: 10px;
+}
+
+.legend-top-right {
+    top: 0;
+    right: 0;
+}
+
+.legend-top-left {
+    top: 0;
+    left: 0;
+}
+
+.legend-bottom-right {
+    bottom: 0;
+    right: 0;
+}
+
+.legend-bottom-left {
+    bottom: 0;
+    left: 0;
+}
+
+/* Legend header */
+.legend-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f5f5f5;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.legend-embedded .legend-header {
+    border-radius: 0;
+}
+
+.legend-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+    flex: 1;
+}
+
+.layer-count {
+    font-size: 12px;
+    color: #666;
+    font-weight: 400;
+}
+
+/* Legend content */
+.legend-content {
+    overflow-y: auto;
+    max-height: 400px;
+    padding: 8px;
+}
+
+.legend-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.legend-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.legend-content::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.legend-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Empty state */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 12px;
+    color: #666;
+}
+
+/* Layer groups */
+.layer-group {
+    margin-bottom: 12px;
+}
+
+.group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #f9f9f9;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    color: #555;
+    transition: background 0.2s ease;
+}
+
+.group-header:hover {
+    background: #f0f0f0;
+}
+
+.group-content {
+    padding: 8px 0 0 0;
+}
+
+/* Layer list (flat, no groups) */
+.layer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Individual layer item */
+.layer-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: white;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.layer-item:hover {
+    border-color: #d0d0d0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Layer info section (checkbox, symbol, name) */
+.layer-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.layer-visibility-toggle {
+    flex-shrink: 0;
+    margin-top: -4px;
+}
+
+/* Layer symbol/icon */
+.layer-symbol {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.symbol-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+.symbol-line {
+    height: 4px;
+    border-radius: 2px;
+    border: none;
+}
+
+.symbol-fill {
+    border-radius: 4px;
+}
+
+.symbol-point {
+    border-radius: 50%;
+}
+
+.symbol-heatmap {
+    background: linear-gradient(to right, #0000ff, #00ff00, #ffff00, #ff0000);
+    border: none;
+}
+
+.symbol-generic {
+    background: #4A90E2;
+}
+
+/* Layer details (name and type) */
+.layer-details {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.layer-name {
+    font-weight: 500;
+    font-size: 13px;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.layer-type {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Layer opacity controls */
+.layer-opacity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 36px;
+}
+
+.layer-opacity-slider {
+    flex: 1;
+}
+
+.opacity-value {
+    min-width: 40px;
+    text-align: right;
+    font-size: 11px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* Drag handle (for future reordering feature) */
+.drag-handle {
+    cursor: grab;
+    color: #999;
+    padding: 4px;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Animations */
+.layer-item {
+    animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.legend-content {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .honua-legend {
+        min-width: 200px;
+        max-width: 300px;
+    }
+
+    .legend-floating {
+        margin: 5px;
+    }
+
+    .legend-content {
+        max-height: 300px;
+    }
+
+    .layer-item {
+        padding: 10px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .honua-legend {
+        background: #2d2d2d;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .legend-embedded {
+        border-color: #444;
+    }
+
+    .legend-header {
+        background: #3a3a3a;
+        border-bottom-color: #444;
+    }
+
+    .legend-title {
+        color: #e0e0e0;
+    }
+
+    .layer-count {
+        color: #aaa;
+    }
+
+    .group-header {
+        background: #333;
+        color: #ccc;
+    }
+
+    .group-header:hover {
+        background: #3a3a3a;
+    }
+
+    .layer-item {
+        background: #333;
+        border-color: #444;
+    }
+
+    .layer-item:hover {
+        border-color: #555;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .layer-name {
+        color: #e0e0e0;
+    }
+
+    .symbol-swatch {
+        border-color: #555;
+    }
+
+    .legend-content::-webkit-scrollbar-track {
+        background: #2d2d2d;
+    }
+
+    .legend-content::-webkit-scrollbar-thumb {
+        background: #555;
+    }
+
+    .legend-content::-webkit-scrollbar-thumb:hover {
+        background: #666;
+    }
+}
+
+/* Print styles */
+@media print {
+    .honua-legend {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        page-break-inside: avoid;
+    }
+
+    .legend-floating {
+        position: relative;
+        margin: 10px 0;
+    }
+
+    .legend-content {
+        max-height: none;
+        overflow: visible;
+    }
+
+    .layer-opacity-slider {
+        display: none;
+    }
+}
