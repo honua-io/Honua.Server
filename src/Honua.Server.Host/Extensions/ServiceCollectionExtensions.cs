@@ -204,11 +204,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IRasterTileCacheMetrics, RasterTileCacheMetrics>();
 
         // Register raster source providers (required by IRasterSourceProviderRegistry)
+        // Only register providers without external dependencies for now
         services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.FileSystemRasterSourceProvider>();
         services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.HttpRasterSourceProvider>();
-        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.S3RasterSourceProvider>();
-        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.AzureBlobRasterSourceProvider>();
-        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.GcsRasterSourceProvider>();
+        // Cloud providers (S3, Azure, GCS) require their respective cloud SDK services to be registered first
+        // TODO: Register cloud raster source providers when cloud storage is configured
 
         // Register raster source provider registry (required by IRasterRenderer)
         services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProviderRegistry, Honua.Server.Core.Raster.Sources.RasterSourceProviderRegistry>();
