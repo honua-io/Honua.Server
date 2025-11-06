@@ -61,8 +61,15 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
         return Task.CompletedTask;
     }
 
-    private async void OnMetadataChanged(
+    private void OnMetadataChanged(
         object? sender,
+        Honua.Server.Host.Admin.Hubs.MetadataChangedEventArgs e)
+    {
+        // Fire and forget with proper exception handling
+        _ = OnMetadataChangedAsync(e);
+    }
+
+    private async Task OnMetadataChangedAsync(
         Honua.Server.Host.Admin.Hubs.MetadataChangedEventArgs e)
     {
         try

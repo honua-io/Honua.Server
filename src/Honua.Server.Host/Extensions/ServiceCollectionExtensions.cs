@@ -66,6 +66,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Ogc.Services.OgcLinkBuilder>();
         services.AddSingleton<Ogc.Services.OgcParameterParser>();
 
+        // Register additional OGC service layer components (Phase 1 refactoring)
+        services.AddSingleton<Ogc.Services.IOgcCollectionResolver, Ogc.Services.OgcCollectionResolver>();
+
         // Register WMS options with validation for memory management and limits
         services.AddOptions<WmsOptions>()
             .Bind(configuration.GetSection(WmsOptions.SectionName))

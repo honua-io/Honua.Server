@@ -325,7 +325,8 @@ function createTimelineAPI(timelineId) {
             const bookmarksContainer = timelineData.container.querySelector('.timeline-bookmarks');
             if (!bookmarksContainer) return;
 
-            bookmarksContainer.innerHTML = '';
+            // Use replaceChildren() instead of innerHTML = '' for better practice
+            bookmarksContainer.replaceChildren();
         },
 
         /**

@@ -282,7 +282,8 @@ class HonuaCompare {
                     font-size: 20px;
                     color: #666;
                 `;
-                handle.innerHTML = '⇄';
+                // Use textContent instead of innerHTML to prevent XSS
+                handle.textContent = '⇄';
             } else {
                 handle.style.cssText = `
                     position: absolute;
@@ -300,7 +301,8 @@ class HonuaCompare {
                     font-size: 20px;
                     color: #666;
                 `;
-                handle.innerHTML = '⇅';
+                // Use textContent instead of innerHTML to prevent XSS
+                handle.textContent = '⇅';
             }
 
             this.divider.appendChild(handle);

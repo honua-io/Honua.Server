@@ -292,13 +292,16 @@ async function setPostgresPassword(secretValue) {
   }).promise();
   const masterValue = JSON.parse(masterSecret.SecretString);
 
+  // SECURITY: SSL certificate verification is enabled to prevent man-in-the-middle attacks
+  // and ensure we're connecting to the legitimate database server. This protects sensitive
+  // credentials during transmission.
   const client = new Client({
     host,
     port: port || 5432,
     database: database || 'postgres',
     user: masterValue.username,
     password: masterValue.password,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: true }
   });
 
   try {
@@ -309,6 +312,18 @@ async function setPostgresPassword(secretValue) {
     await client.query(query, [password]);
 
     console.log(`Password updated for user: ${username}`);
+  } catch (error) {
+    // Provide helpful error message for SSL certificate issues
+    if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        error.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+        error.code === 'CERT_HAS_EXPIRED') {
+      throw new Error(
+        `SSL certificate verification failed: ${error.message}. ` +
+        `Ensure your database has a valid SSL certificate. ` +
+        `For RDS, verify the RDS CA certificate is properly configured.`
+      );
+    }
+    throw error;
   } finally {
     await client.end();
   }
@@ -320,13 +335,16 @@ async function setPostgresPassword(secretValue) {
 async function testPostgresConnection(secretValue) {
   const { host, port, database, username, password } = secretValue;
 
+  // SECURITY: SSL certificate verification is enabled to prevent man-in-the-middle attacks
+  // and ensure we're connecting to the legitimate database server. This protects sensitive
+  // credentials during transmission.
   const client = new Client({
     host,
     port: port || 5432,
     database: database || 'honua',
     user: username,
     password,
-    ssl: { rejectUnauthorized: false },
+    ssl: { rejectUnauthorized: true },
     connectionTimeoutMillis: 5000
   });
 
@@ -339,6 +357,18 @@ async function testPostgresConnection(secretValue) {
     }
 
     console.log('PostgreSQL connection test successful');
+  } catch (error) {
+    // Provide helpful error message for SSL certificate issues
+    if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        error.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+        error.code === 'CERT_HAS_EXPIRED') {
+      throw new Error(
+        `SSL certificate verification failed during connection test: ${error.message}. ` +
+        `Ensure your database has a valid SSL certificate. ` +
+        `For RDS, verify the RDS CA certificate is properly configured.`
+      );
+    }
+    throw error;
   } finally {
     await client.end();
   }
@@ -373,13 +403,16 @@ async function setApiKey(secretValue) {
   }).promise();
   const dbValue = JSON.parse(dbSecret.SecretString);
 
+  // SECURITY: SSL certificate verification is enabled to prevent man-in-the-middle attacks
+  // and ensure we're connecting to the legitimate database server. This protects sensitive
+  // credentials during transmission.
   const client = new Client({
     host: dbValue.host,
     port: dbValue.port || 5432,
     database: dbValue.database,
     user: dbValue.username,
     password: dbValue.password,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: true }
   });
 
   try {
@@ -396,6 +429,18 @@ async function setApiKey(secretValue) {
     await client.query(query, [secretValue.apiKey, secretValue.keyId]);
 
     console.log(`API key updated for keyId: ${secretValue.keyId}`);
+  } catch (error) {
+    // Provide helpful error message for SSL certificate issues
+    if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        error.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+        error.code === 'CERT_HAS_EXPIRED') {
+      throw new Error(
+        `SSL certificate verification failed while updating API key: ${error.message}. ` +
+        `Ensure your database has a valid SSL certificate. ` +
+        `For RDS, verify the RDS CA certificate is properly configured.`
+      );
+    }
+    throw error;
   } finally {
     await client.end();
   }

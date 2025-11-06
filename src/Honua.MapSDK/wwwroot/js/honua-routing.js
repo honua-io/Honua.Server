@@ -410,12 +410,21 @@ function createWaypointMarker(waypoint) {
     const icon = getWaypointIcon(waypoint.type);
     const label = waypoint.label || '';
 
-    el.innerHTML = `
-        <div class="waypoint-marker-inner">
-            <div class="waypoint-icon">${icon}</div>
-            <div class="waypoint-label">${label}</div>
-        </div>
-    `;
+    // Create elements safely without innerHTML to prevent XSS
+    const innerDiv = document.createElement('div');
+    innerDiv.className = 'waypoint-marker-inner';
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'waypoint-icon';
+    iconDiv.textContent = icon;
+
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'waypoint-label';
+    labelDiv.textContent = label;
+
+    innerDiv.appendChild(iconDiv);
+    innerDiv.appendChild(labelDiv);
+    el.appendChild(innerDiv);
 
     return el;
 }
@@ -425,7 +434,12 @@ function createInstructionMarker(instruction) {
     el.className = 'instruction-marker';
 
     const icon = getManeuverIcon(instruction.maneuver);
-    el.innerHTML = `<div class="instruction-icon">${icon}</div>`;
+
+    // Create element safely without innerHTML to prevent XSS
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'instruction-icon';
+    iconDiv.textContent = icon;
+    el.appendChild(iconDiv);
 
     return el;
 }
