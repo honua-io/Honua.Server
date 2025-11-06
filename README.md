@@ -40,142 +40,15 @@ Honua provides a complete OGC-compliant geospatial server with:
 
 ## Platform Components
 
-The Honua Platform provides a complete geospatial solution with multiple integrated components:
-
-### 🗺️ Honua MapSDK
-
-**Visual map builder and interactive mapping SDK** - Create production-ready maps without code.
-
-- **No-Code Map Builder**: Visual editor for creating interactive maps
-- **Live Preview**: Real-time updates as you configure map settings
-- **Multi-Format Export**: JSON, YAML, HTML embed, Blazor code
-- **Component Sync**: Zero-config pub/sub message bus for component communication
-- **MapLibre Integration**: Full-featured mapping with WebGL rendering
-- **Flexible Data Sources**: GeoJSON, WFS, gRPC, PMTiles, FlatGeobuf
-- **Built on Blazor**: Reusable .NET components with JavaScript interop
-
-**Quick Start:**
-```razor
-<HonuaMap Id="map1"
-          MapStyle="maplibre://honua/dark"
-          Center="@(new[] { -122.4194, 37.7749 })"
-          Zoom="12" />
-```
-
-See [MapSDK Documentation](docs/mapsdk/) for details.
-
-### 📱 Honua Field Mobile
-
-**Cross-platform mobile field data collection app** - Collect geospatial data offline in the field.
-
-- **Multi-Platform**: iOS, Android, Windows, macOS support via .NET MAUI
-- **Offline-First**: SQLite storage with NetTopologySuite spatial support
-- **Map Integration**: Built with Mapsui for native mapping
-- **Biometric Auth**: Secure authentication on mobile devices
-- **AI-Powered**: ML.NET and ONNX Runtime for edge AI capabilities
-- **Sync & Share**: Sync field data back to Honua Server
-- **OpenRosa Compatible**: Supports ODK/OpenRosa form standards
-
-**Features:**
-- Create and edit features with GPS location
-- Attach photos and documents
-- Work offline and sync later
-- Track changes and conflicts
-- Export to GeoPackage, Shapefile
-
-See [HonuaField Documentation](docs/field/) for details.
-
-### ⚡ GeoEvent Server
-
-**Real-time geofencing and event processing** - Monitor assets and trigger alerts based on location.
-
-- **Real-Time Geofencing**: Track entities entering/exiting geographic boundaries
-- **Event Types**: Enter, Exit events with dwell time calculation
-- **High Performance**: < 100ms P95 latency, 100+ events/second
-- **Batch Processing**: Process up to 1000 locations per request
-- **State Management**: Automatic tracking of entity positions
-- **Alert Integration**: Cloud event delivery (AWS SNS, Azure Event Grid)
-- **REST API**: Simple HTTP API for location evaluation
-- **SignalR Hub**: Real-time WebSocket updates
-
-**Quick Start:**
-```bash
-# Create a geofence
-POST /api/v1/geofences
-{
-  "name": "Delivery Zone",
-  "geometry": { "type": "Polygon", "coordinates": [...] },
-  "enabled_event_types": ["Enter", "Exit"]
-}
-
-# Evaluate location
-POST /api/v1/geoevent/evaluate
-{
-  "entity_id": "vehicle-123",
-  "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] }
-}
-```
-
-See [GeoEvent API Guide](docs/GEOEVENT_API_GUIDE.md) for details.
-
-### 🔄 GeoETL (Honua.Server.Intake)
-
-**Container registry provisioning and build delivery** - Automated distribution of custom builds.
-
-- **Multi-Registry Support**: GHCR, AWS ECR, Azure ACR, GCP Artifact Registry
-- **Automated Provisioning**: Creates isolated namespaces per customer
-- **License-Based Access**: Validates licenses before granting access
-- **Build Caching**: Checks if builds exist before rebuilding
-- **Efficient Distribution**: Registry-to-registry copying with crane/skopeo
-- **Token Management**: Short-lived access tokens with auto-expiration
-- **Audit Logging**: Comprehensive logging for compliance
-
-**Use Cases:**
-- Multi-tenant SaaS deployments
-- Custom builds per customer
-- Enterprise container distribution
-- Secure registry access management
-
-See [Intake Documentation](src/Honua.Server.Intake/README.md) for details.
-
-### 🎛️ Honua Admin Portal
-
-**Web-based administration UI** - Manage all Honua platform components.
-
-- **Map Builder**: Visual editor with live preview
-- **Layer Management**: Configure data sources and styling
-- **User Management**: RBAC and authentication settings
-- **Geofence Editor**: Create and manage geofences visually
-- **Analytics Dashboard**: View usage metrics and performance
-- **Built with Blazor**: Server-side rendering with MudBlazor UI
-
-### ⚙️ Cloud-Native Geoprocessing
-
-**Distributed spatial analysis engine** - Enterprise-grade geoprocessing with auto-scaling workers.
-
-- **3-Tier Architecture**: In-process (NTS), database (PostGIS), cloud batch (AWS/Azure/GCP)
-- **40+ Operations**: Buffer, intersection, union, dissolve, simplify, spatial joins, heatmaps, clustering
-- **Vector & Raster**: Both vector operations and raster analysis (hillshade, slope, zonal stats)
-- **Distributed Processing**: Horizontal scaling with auto-scaling workers
-- **Job Queue**: Priority-based queue with progress tracking
-- **Webhook Notifications**: Callback on job completion
-- **OGC Processes API**: Standards-compliant REST API
-- **Result Formats**: GeoJSON, Shapefile, GeoPackage
-
-**Supported Operations:**
-- **Vector**: Buffer, Intersection, Union, Difference, Dissolve, Clip, Centroid, Convex Hull, Simplify
-- **Analysis**: Area, Length, Distance, Nearest Feature, Spatial Relationships
-- **Raster**: Mosaic, Hillshade, Slope, Aspect, Zonal Statistics
-- **Advanced**: Voronoi diagrams, Delaunay triangulation, Density analysis, Clustering
-
-**Use Cases:**
-- Large-scale buffer analysis (thousands of features)
-- Overlay analysis (intersecting multiple layers)
-- Terrain analysis from elevation data
-- Batch geocoding and spatial joins
-- Automated report generation
-
-Available in **Professional** and **Enterprise** tiers.
+| Component | Description |
+|-----------|-------------|
+| **🗺️ MapSDK** | Visual map builder with no-code editor, live preview, and export to JSON/YAML/HTML/Blazor. [Docs](docs/mapsdk/) |
+| **📱 HonuaField Mobile** | Cross-platform field data collection app for iOS/Android/Windows/macOS with offline support. [Docs](docs/field/) |
+| **⚡ GeoEvent Server** | Real-time geofencing with <100ms latency, batch processing, and webhook notifications. [API Guide](docs/GEOEVENT_API_GUIDE.md) |
+| **🔄 GeoETL** | Container registry provisioning and build delivery for multi-tenant deployments. [Docs](src/Honua.Server.Intake/README.md) |
+| **⚙️ Geoprocessing** | Distributed spatial analysis with 40+ operations (buffer, union, dissolve, heatmaps). Enterprise tier. |
+| **🔔 Alert Receiver** | Cloud event webhook receiver for AWS SNS and Azure Event Grid notifications. |
+| **🎛️ Admin Portal** | Web-based UI for managing maps, layers, geofences, users, and analytics. Built with Blazor. |
 
 ---
 
@@ -464,46 +337,6 @@ Vector: GeoJSON, GeoJSON-Seq (streaming), GeoPackage, Shapefile, KML/KMZ, CSV, T
 Raster: PNG, JPEG, WebP, GeoTIFF, COG
 
 Tiles: MVT (Mapbox Vector Tiles), PBF
-
-### Platform Features
-
-**Real-Time Geofencing (GeoEvent):**
-- Enter/Exit event detection with < 100ms latency
-- Batch processing (1000 locations/request)
-- Automatic state tracking and dwell time calculation
-- SignalR WebSocket hub for real-time updates
-- Cloud event delivery (AWS SNS, Azure Event Grid)
-
-**Visual Map Builder (MapSDK):**
-- No-code map creation with live preview
-- Multi-format export (JSON, YAML, HTML, Blazor)
-- Component message bus for auto-synchronization
-- MapLibre GL integration with WebGL rendering
-- Template system for reusable map configurations
-
-**Mobile Field Collection (HonuaField):**
-- Cross-platform: iOS, Android, Windows, macOS
-- Offline-first with SQLite + spatial extensions
-- Biometric authentication
-- Photo/document attachments
-- Change tracking and conflict resolution
-- ODK/OpenRosa form compatibility
-
-**Container Distribution (GeoETL):**
-- Multi-registry support (GHCR, ECR, ACR, GCR)
-- Automated namespace provisioning
-- License-based access control
-- Efficient registry-to-registry image copying
-- Short-lived token generation
-
-**Cloud-Native Geoprocessing:**
-- Distributed spatial analysis with 40+ operations
-- 3-tier architecture (NTS, PostGIS, Cloud Batch)
-- Auto-scaling worker pools
-- Vector and raster processing
-- OGC Processes API compliance
-- Priority job queue with progress tracking
-- Webhook notifications on completion
 
 ### Authentication & Security
 
