@@ -1,0 +1,149 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+<div class="demo-layout @(_isDarkMode ? "dark-mode" : "")">
+    <MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="@_isDarkMode" Theme="_theme" />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+
+    <header class="demo-header">
+        <MudAppBar Elevation="0" Dense="true">
+            <MudIconButton Icon="@Icons.Material.Filled.Map" Color="Color.Primary" Edge="Edge.Start" OnClick="@(() => Navigation.NavigateTo("/"))" />
+            <MudText Typo="Typo.h6" Class="ml-3">Honua MapSDK</MudText>
+            <MudSpacer />
+
+            <MudMenu Icon="@Icons.Material.Filled.Apps" Color="Color.Inherit" Dense="true" AnchorOrigin="Origin.BottomCenter">
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" /> Home
+                </MudMenuItem>
+                <MudDivider />
+
+                <!-- Original Dashboards -->
+                <MudText Typo="Typo.caption" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">SCENARIO DASHBOARDS</MudText>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/property-dashboard"))">
+                    <MudIcon Icon="@Icons.Material.Filled.HomeWork" Class="mr-2" /> Property Analysis
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/environmental-monitoring"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Co2" Class="mr-2" /> Environmental Monitoring
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/vehicle-tracking"))">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Class="mr-2" /> Vehicle Tracking
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/emergency-response"))">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Class="mr-2" /> Emergency Response
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/urban-planning"))">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="mr-2" /> Urban Planning
+                </MudMenuItem>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Comprehensive Dashboards -->
+                <MudText Typo="Typo.caption" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">COMPREHENSIVE DASHBOARDS</MudText>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/dashboards/city-planning"))">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="mr-2" /> City Planning
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/dashboards/asset-management"))">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="mr-2" /> Asset Management
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/dashboards/emergency-response"))">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Class="mr-2" /> Emergency Response
+                </MudMenuItem>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Component Demos -->
+                <MudText Typo="Typo.caption" Class="px-4 mt-2" Style="color: var(--mud-palette-text-secondary);">COMPONENT DEMOS</MudText>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/layer-list"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Layers" Class="mr-2" /> LayerList
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/popup"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" /> Popup
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/editor"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" /> Editor
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/coordinate-display"))">
+                    <MudIcon Icon="@Icons.Material.Filled.GpsFixed" Class="mr-2" /> CoordinateDisplay
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/attribute-table"))">
+                    <MudIcon Icon="@Icons.Material.Filled.TableView" Class="mr-2" /> AttributeTable
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/components/print"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Print" Class="mr-2" /> Print
+                </MudMenuItem>
+
+                <MudDivider Class="my-2" />
+
+                <!-- Other Pages -->
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/component-showcase"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Widgets" Class="mr-2" /> Component Showcase
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => Navigation.NavigateTo("/playground"))">
+                    <MudIcon Icon="@Icons.Material.Filled.Science" Class="mr-2" /> Playground
+                </MudMenuItem>
+            </MudMenu>
+
+            <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit"
+                           OnClick="@ToggleDarkMode"
+                           Title="Toggle dark mode" />
+
+            <MudIconButton Icon="@Icons.Material.Filled.GitHub"
+                           Color="Color.Inherit"
+                           Href="https://github.com/honua-io/Honua.Server"
+                           Target="_blank"
+                           Title="View on GitHub" />
+        </MudAppBar>
+    </header>
+
+    <main class="demo-main">
+        @Body
+    </main>
+</div>
+
+@code {
+    private MudThemeProvider? _mudThemeProvider;
+    private bool _isDarkMode = false;
+
+    private MudTheme _theme = new MudTheme()
+    {
+        Palette = new PaletteLight()
+        {
+            Primary = "#2196F3",
+            Secondary = "#FF5722",
+            Success = "#4CAF50",
+            Warning = "#FF9800",
+            Error = "#F44336",
+            Info = "#00BCD4",
+            AppbarBackground = "#FFFFFF"
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#2196F3",
+            Secondary = "#FF5722",
+            Success = "#4CAF50",
+            Warning = "#FF9800",
+            Error = "#F44336",
+            Info = "#00BCD4",
+            AppbarBackground = "#1E1E1E",
+            Background = "#1E1E1E",
+            Surface = "#252525",
+            DrawerBackground = "#252525",
+            DrawerText = "rgba(255,255,255, 0.7)",
+            AppbarText = "rgba(255,255,255, 0.7)"
+        },
+        Typography = new Typography()
+        {
+            Default = new Default()
+            {
+                FontFamily = new[] { "Inter", "Helvetica", "Arial", "sans-serif" }
+            }
+        }
+    };
+
+    private void ToggleDarkMode()
+    {
+        _isDarkMode = !_isDarkMode;
+    }
+}

@@ -1,0 +1,709 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Utilities
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-coordinate-display @CssClass @GetPositionClass()" style="@GetContainerStyle()">
+    <div class="coordinate-container">
+        @if (_currentCoordinates != null)
+        {
+            <div class="coordinate-row">
+                <div class="coordinate-value">
+                    <span class="coordinate-text" title="@_currentCoordinates.Formatted">
+                        @_currentCoordinates.Formatted
+                    </span>
+
+                    @if (_isPinned && _pinnedCoordinates != null)
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                                 OnClose="@UnpinCoordinates" Class="pinned-chip">
+                            Pinned
+                        </MudChip>
+                    }
+                </div>
+
+                <div class="coordinate-actions">
+                    @if (AllowPinning)
+                    {
+                        <MudTooltip Text="@(_isPinned ? "Unpin coordinates" : "Pin coordinates")">
+                            <MudIconButton
+                                Icon="@(_isPinned ? Icons.Material.Filled.PushPin : Icons.Material.Outlined.PushPin)"
+                                Color="@(_isPinned ? Color.Primary : Color.Default)"
+                                Size="Size.Small"
+                                OnClick="@TogglePin"
+                                Disabled="@(!_mapReady)"
+                                Class="action-button"
+                                aria-label="Pin coordinates" />
+                        </MudTooltip>
+                    }
+
+                    @if (AllowCopy)
+                    {
+                        <MudTooltip Text="Copy coordinates">
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.ContentCopy"
+                                Color="Color.Default"
+                                Size="Size.Small"
+                                OnClick="@CopyCoordinates"
+                                Disabled="@(!_mapReady || _currentCoordinates == null)"
+                                Class="action-button"
+                                aria-label="Copy coordinates" />
+                        </MudTooltip>
+                    }
+
+                    @if (AllowFormatSwitch)
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.SwapHoriz" Color="Color.Default" Size="Size.Small"
+                                 Dense="true" aria-label="Change coordinate format" Disabled="@(!_mapReady)"
+                                 Class="format-menu">
+                            @foreach (CoordinateFormat format in Enum.GetValues(typeof(CoordinateFormat)))
+                            {
+                                <MudMenuItem OnClick="@(() => ChangeFormat(format))">
+                                    @if (CoordinateFormat == format)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="menu-check" />
+                                    }
+                                    <span class="menu-item-text">
+                                        <strong>@CoordinateConverter.GetFormatName(format)</strong>
+                                        <span class="format-description">@CoordinateConverter.GetFormatDescription(format)</span>
+                                    </span>
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+
+                    @if (AllowPrecisionChange && CoordinateFormat == Models.CoordinateFormat.DecimalDegrees)
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.Tune" Color="Color.Default" Size="Size.Small"
+                                 Dense="true" aria-label="Change precision" Disabled="@(!_mapReady)"
+                                 Class="precision-menu">
+                            @for (int i = 0; i <= 8; i++)
+                            {
+                                var precision = i;
+                                <MudMenuItem OnClick="@(() => ChangePrecision(precision))">
+                                    @if (Precision == precision)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="menu-check" />
+                                    }
+                                    @precision @(precision == 1 ? "decimal" : "decimals")
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+                </div>
+            </div>
+
+            @if (ShowScale || ShowZoom || ShowElevation || ShowBearing || ShowDistance)
+            {
+                <div class="info-row">
+                    @if (ShowScale && _currentCoordinates.Scale.HasValue)
+                    {
+                        <div class="info-item">
+                            <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" Class="info-icon" />
+                            <span>Scale: @CoordinateConverter.FormatScale(_currentCoordinates.Scale.Value)</span>
+                        </div>
+                    }
+
+                    @if (ShowZoom && _currentCoordinates.ZoomLevel.HasValue)
+                    {
+                        <div class="info-item">
+                            <MudIcon Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Small" Class="info-icon" />
+                            <span>Zoom: @(_currentCoordinates.ZoomLevel.Value.ToString("F1"))</span>
+                        </div>
+                    }
+
+                    @if (ShowElevation && _currentCoordinates.Elevation.HasValue)
+                    {
+                        <div class="info-item">
+                            <MudIcon Icon="@Icons.Material.Filled.Terrain" Size="Size.Small" Class="info-icon" />
+                            <span>@CoordinateConverter.FormatElevation(_currentCoordinates.Elevation.Value, Unit)</span>
+                        </div>
+                    }
+
+                    @if (ShowBearing && _currentCoordinates.Bearing.HasValue && Math.Abs(_currentCoordinates.Bearing.Value) > 0.1)
+                    {
+                        <div class="info-item">
+                            <MudIcon Icon="@Icons.Material.Filled.Explore" Size="Size.Small" Class="info-icon" />
+                            <span>@CoordinateConverter.FormatBearing(_currentCoordinates.Bearing.Value)</span>
+                        </div>
+                    }
+
+                    @if (ShowDistance && _distanceFromPinned.HasValue && _isPinned)
+                    {
+                        <div class="info-item">
+                            <MudIcon Icon="@Icons.Material.Filled.StraightLine" Size="Size.Small" Class="info-icon" />
+                            <span>Distance: @FormatDistance(_distanceFromPinned.Value)</span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else if (_mapReady)
+        {
+            <div class="coordinate-placeholder">
+                <MudIcon Icon="@Icons.Material.Filled.MyLocation" Size="Size.Small" Color="Color.Secondary" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Move cursor over map</MudText>
+            </div>
+        }
+        else
+        {
+            <div class="coordinate-placeholder">
+                <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate="true" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Initializing...</MudText>
+            </div>
+        }
+    </div>
+
+    @if (_showCopySuccess)
+    {
+        <div class="copy-notification">
+            <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Success" />
+            <span>Copied!</span>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the coordinate display component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"coordinate-display-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Coordinate format to display
+    /// </summary>
+    [Parameter]
+    public CoordinateFormat CoordinateFormat { get; set; } = CoordinateFormat.DecimalDegrees;
+
+    /// <summary>
+    /// Number of decimal places for decimal degrees
+    /// </summary>
+    [Parameter]
+    public int Precision { get; set; } = 6;
+
+    /// <summary>
+    /// Show scale information
+    /// </summary>
+    [Parameter]
+    public bool ShowScale { get; set; } = true;
+
+    /// <summary>
+    /// Show zoom level
+    /// </summary>
+    [Parameter]
+    public bool ShowZoom { get; set; } = true;
+
+    /// <summary>
+    /// Show elevation at cursor (requires terrain)
+    /// </summary>
+    [Parameter]
+    public bool ShowElevation { get; set; } = false;
+
+    /// <summary>
+    /// Show bearing/heading if map is rotated
+    /// </summary>
+    [Parameter]
+    public bool ShowBearing { get; set; } = false;
+
+    /// <summary>
+    /// Show distance from pinned coordinate
+    /// </summary>
+    [Parameter]
+    public bool ShowDistance { get; set; } = true;
+
+    /// <summary>
+    /// Measurement unit system
+    /// </summary>
+    [Parameter]
+    public MeasurementUnit Unit { get; set; } = MeasurementUnit.Metric;
+
+    /// <summary>
+    /// Allow user to switch coordinate formats
+    /// </summary>
+    [Parameter]
+    public bool AllowFormatSwitch { get; set; } = true;
+
+    /// <summary>
+    /// Allow user to change precision
+    /// </summary>
+    [Parameter]
+    public bool AllowPrecisionChange { get; set; } = true;
+
+    /// <summary>
+    /// Allow pinning coordinates
+    /// </summary>
+    [Parameter]
+    public bool AllowPinning { get; set; } = true;
+
+    /// <summary>
+    /// Allow copying coordinates to clipboard
+    /// </summary>
+    [Parameter]
+    public bool AllowCopy { get; set; } = true;
+
+    /// <summary>
+    /// Position on the map: top-right, top-left, bottom-right, bottom-left, or null for embedded
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; } = "bottom-left";
+
+    /// <summary>
+    /// Width of coordinate display
+    /// </summary>
+    [Parameter]
+    public string? Width { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Event callback when coordinates are clicked/pinned
+    /// </summary>
+    [Parameter]
+    public EventCallback<double[]> OnCoordinateClick { get; set; }
+
+    /// <summary>
+    /// Event callback when coordinates are copied
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnCoordinateCopy { get; set; }
+
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaCoordinateDisplay>? _dotNetRef;
+    private CoordinateInfo? _currentCoordinates;
+    private CoordinateInfo? _pinnedCoordinates;
+    private bool _isPinned = false;
+    private bool _mapReady = false;
+    private bool _showCopySuccess = false;
+    private double? _distanceFromPinned;
+    private System.Threading.Timer? _copySuccessTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-coordinates.js"
+                );
+
+                _dotNetRef = DotNetObjectReference.Create(this);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading coordinate display JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                InvokeAsync(async () =>
+                {
+                    await InitializeTracking(args.Message.MapId);
+                    StateHasChanged();
+                });
+            }
+        });
+    }
+
+    private async Task InitializeTracking(string mapId)
+    {
+        try
+        {
+            if (_jsModule != null && _dotNetRef != null)
+            {
+                await _jsModule.InvokeVoidAsync("initializeCoordinateTracking", mapId, _dotNetRef);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing coordinate tracking: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// JavaScript callback when coordinates are updated (mouse move)
+    /// </summary>
+    [JSInvokable]
+    public async Task OnCoordinateUpdate(CoordinateUpdateData data)
+    {
+        try
+        {
+            if (_isPinned && _pinnedCoordinates != null)
+            {
+                // Calculate distance from pinned coordinate
+                if (_jsModule != null)
+                {
+                    _distanceFromPinned = await _jsModule.InvokeAsync<double>(
+                        "calculateDistance",
+                        _pinnedCoordinates.Longitude,
+                        _pinnedCoordinates.Latitude,
+                        data.Longitude,
+                        data.Latitude
+                    );
+                }
+            }
+            else
+            {
+                _distanceFromPinned = null;
+            }
+
+            _currentCoordinates = new CoordinateInfo
+            {
+                Longitude = data.Longitude,
+                Latitude = data.Latitude,
+                Elevation = data.Elevation,
+                ZoomLevel = data.Zoom,
+                Bearing = data.Bearing,
+                Scale = data.Scale,
+                Formatted = CoordinateConverter.Format(data.Longitude, data.Latitude, CoordinateFormat, Precision)
+            };
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating coordinates: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// JavaScript callback when map info is updated (zoom, bearing, scale)
+    /// </summary>
+    [JSInvokable]
+    public async Task OnMapInfoUpdate(MapInfoData data)
+    {
+        try
+        {
+            if (_currentCoordinates != null)
+            {
+                _currentCoordinates.ZoomLevel = data.Zoom;
+                _currentCoordinates.Bearing = data.Bearing;
+                _currentCoordinates.Scale = data.Scale;
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating map info: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// JavaScript callback when coordinates are clicked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnCoordinateClick(CoordinateClickData data)
+    {
+        try
+        {
+            if (AllowPinning)
+            {
+                await PinCurrentCoordinates();
+            }
+
+            // Publish coordinate clicked message
+            await Bus.PublishAsync(new CoordinateClickedMessage
+            {
+                DisplayId = Id,
+                Longitude = data.Longitude,
+                Latitude = data.Latitude,
+                Elevation = data.Elevation,
+                Formatted = _currentCoordinates?.Formatted ?? ""
+            }, Id);
+
+            // Invoke callback
+            await OnCoordinateClick.InvokeAsync(new[] { data.Longitude, data.Latitude });
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error handling coordinate click: {ex.Message}");
+        }
+    }
+
+    private async Task TogglePin()
+    {
+        if (_isPinned)
+        {
+            UnpinCoordinates();
+        }
+        else
+        {
+            await PinCurrentCoordinates();
+        }
+    }
+
+    private async Task PinCurrentCoordinates()
+    {
+        if (_currentCoordinates != null)
+        {
+            _pinnedCoordinates = new CoordinateInfo
+            {
+                Longitude = _currentCoordinates.Longitude,
+                Latitude = _currentCoordinates.Latitude,
+                Elevation = _currentCoordinates.Elevation,
+                Formatted = _currentCoordinates.Formatted
+            };
+
+            _isPinned = true;
+            _distanceFromPinned = null;
+
+            // Publish pinned message
+            await Bus.PublishAsync(new CoordinatePinnedMessage
+            {
+                DisplayId = Id,
+                Longitude = _pinnedCoordinates.Longitude,
+                Latitude = _pinnedCoordinates.Latitude,
+                Elevation = _pinnedCoordinates.Elevation,
+                Formatted = _pinnedCoordinates.Formatted
+            }, Id);
+
+            StateHasChanged();
+        }
+    }
+
+    private void UnpinCoordinates()
+    {
+        _pinnedCoordinates = null;
+        _isPinned = false;
+        _distanceFromPinned = null;
+        StateHasChanged();
+    }
+
+    private async Task CopyCoordinates()
+    {
+        if (_currentCoordinates != null && _jsModule != null)
+        {
+            try
+            {
+                var textToCopy = _isPinned && _pinnedCoordinates != null
+                    ? _pinnedCoordinates.Formatted
+                    : _currentCoordinates.Formatted;
+
+                var success = await _jsModule.InvokeAsync<bool>("copyToClipboard", textToCopy);
+
+                if (success)
+                {
+                    _showCopySuccess = true;
+                    StateHasChanged();
+
+                    // Hide success message after 2 seconds
+                    _copySuccessTimer?.Dispose();
+                    _copySuccessTimer = new System.Threading.Timer(_ =>
+                    {
+                        _showCopySuccess = false;
+                        InvokeAsync(StateHasChanged);
+                    }, null, 2000, Timeout.Infinite);
+
+                    // Invoke callback
+                    await OnCoordinateCopy.InvokeAsync(textToCopy);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error copying coordinates: {ex.Message}");
+            }
+        }
+    }
+
+    private void ChangeFormat(CoordinateFormat newFormat)
+    {
+        CoordinateFormat = newFormat;
+
+        // Update formatted coordinates
+        if (_currentCoordinates != null)
+        {
+            _currentCoordinates.Formatted = CoordinateConverter.Format(
+                _currentCoordinates.Longitude,
+                _currentCoordinates.Latitude,
+                CoordinateFormat,
+                Precision
+            );
+        }
+
+        if (_pinnedCoordinates != null)
+        {
+            _pinnedCoordinates.Formatted = CoordinateConverter.Format(
+                _pinnedCoordinates.Longitude,
+                _pinnedCoordinates.Latitude,
+                CoordinateFormat,
+                Precision
+            );
+        }
+
+        StateHasChanged();
+    }
+
+    private void ChangePrecision(int newPrecision)
+    {
+        Precision = newPrecision;
+
+        // Update formatted coordinates
+        if (_currentCoordinates != null)
+        {
+            _currentCoordinates.Formatted = CoordinateConverter.Format(
+                _currentCoordinates.Longitude,
+                _currentCoordinates.Latitude,
+                CoordinateFormat,
+                Precision
+            );
+        }
+
+        if (_pinnedCoordinates != null)
+        {
+            _pinnedCoordinates.Formatted = CoordinateConverter.Format(
+                _pinnedCoordinates.Longitude,
+                _pinnedCoordinates.Latitude,
+                CoordinateFormat,
+                Precision
+            );
+        }
+
+        StateHasChanged();
+    }
+
+    private string FormatDistance(double meters)
+    {
+        if (_jsModule != null)
+        {
+            // Use JavaScript formatting for consistency
+            var unitStr = Unit switch
+            {
+                MeasurementUnit.Imperial => "imperial",
+                MeasurementUnit.Nautical => "nautical",
+                _ => "metric"
+            };
+
+            // Note: This is a simplified version. Ideally, we'd call the JS function,
+            // but for simplicity, we'll do it here
+            if (Unit == MeasurementUnit.Imperial)
+            {
+                var feet = meters * 3.28084;
+                return feet < 5280 ? $"{feet:F0} ft" : $"{(feet / 5280):F2} mi";
+            }
+            else if (Unit == MeasurementUnit.Nautical)
+            {
+                var nauticalMiles = meters / 1852;
+                return nauticalMiles < 0.1 ? $"{meters:F0} m" : $"{nauticalMiles:F2} nm";
+            }
+            else
+            {
+                return meters < 1000 ? $"{meters:F0} m" : $"{(meters / 1000):F2} km";
+            }
+        }
+
+        return $"{meters:F0} m";
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "display-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "display-floating display-top-right",
+            "top-left" => "display-floating display-top-left",
+            "bottom-right" => "display-floating display-bottom-right",
+            "bottom-left" => "display-floating display-bottom-left",
+            _ => "display-embedded"
+        };
+    }
+
+    private string GetContainerStyle()
+    {
+        var styles = new List<string>();
+
+        if (!string.IsNullOrEmpty(Width))
+        {
+            styles.Add($"width: {Width}");
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(SyncWith))
+                {
+                    await _jsModule.InvokeVoidAsync("stopTracking", SyncWith);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error stopping coordinate tracking: {ex.Message}");
+            }
+
+            await _jsModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+        _copySuccessTimer?.Dispose();
+    }
+
+    /// <summary>
+    /// Data structure for coordinate updates from JavaScript
+    /// </summary>
+    public class CoordinateUpdateData
+    {
+        public double Longitude { get; set; }
+        public double Latitude { get; set; }
+        public double? Elevation { get; set; }
+        public double Zoom { get; set; }
+        public double Bearing { get; set; }
+        public double Scale { get; set; }
+    }
+
+    /// <summary>
+    /// Data structure for map info updates from JavaScript
+    /// </summary>
+    public class MapInfoData
+    {
+        public double Zoom { get; set; }
+        public double Bearing { get; set; }
+        public double Scale { get; set; }
+    }
+
+    /// <summary>
+    /// Data structure for coordinate clicks from JavaScript
+    /// </summary>
+    public class CoordinateClickData
+    {
+        public double Longitude { get; set; }
+        public double Latitude { get; set; }
+        public double? Elevation { get; set; }
+    }
+}

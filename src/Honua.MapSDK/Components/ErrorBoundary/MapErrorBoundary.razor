@@ -1,0 +1,146 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Honua.MapSDK.Logging
+@inject MapSdkLogger Logger
+
+@if (_hasError)
+{
+    <div class="map-error-boundary">
+        <div class="error-content">
+            <div class="error-icon">⚠️</div>
+            <h3>Something went wrong</h3>
+            <p class="error-message">@_errorMessage</p>
+
+            @if (_showDetails && _exception != null)
+            {
+                <details class="error-details">
+                    <summary>Technical Details</summary>
+                    <pre>@_exception.ToString()</pre>
+                </details>
+            }
+
+            <div class="error-actions">
+                <button class="btn-retry" @onclick="Retry">Retry</button>
+                @if (ShowResetButton)
+                {
+                    <button class="btn-reset" @onclick="Reset">Reset</button>
+                }
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <ErrorBoundary @ref="_errorBoundary">
+        <ChildContent>
+            @ChildContent
+        </ChildContent>
+        <ErrorContent Context="exception">
+            @{
+                HandleError(exception);
+            }
+        </ErrorContent>
+    </ErrorBoundary>
+}
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+    private bool _hasError;
+    private string _errorMessage = "An unexpected error occurred.";
+    private Exception? _exception;
+    private bool _showDetails;
+
+    /// <summary>
+    /// Gets or sets the child content to render.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to show the reset button.
+    /// </summary>
+    [Parameter]
+    public bool ShowResetButton { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether to show technical details in development mode.
+    /// </summary>
+    [Parameter]
+    public bool ShowTechnicalDetails { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the callback when an error occurs.
+    /// </summary>
+    [Parameter]
+    public EventCallback<Exception> OnError { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback when retry is clicked.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnRetry { get; set; }
+
+    /// <summary>
+    /// Gets or sets custom error message formatter.
+    /// </summary>
+    [Parameter]
+    public Func<Exception, string>? ErrorMessageFormatter { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _showDetails = ShowTechnicalDetails;
+    }
+
+    private void HandleError(Exception exception)
+    {
+        _hasError = true;
+        _exception = exception;
+
+        // Format error message
+        if (ErrorMessageFormatter != null)
+        {
+            _errorMessage = ErrorMessageFormatter(exception);
+        }
+        else
+        {
+            _errorMessage = GetFriendlyErrorMessage(exception);
+        }
+
+        // Log the error
+        Logger.Error("Error in MapErrorBoundary", exception);
+
+        // Invoke callback
+        OnError.InvokeAsync(exception);
+
+        StateHasChanged();
+    }
+
+    private string GetFriendlyErrorMessage(Exception exception)
+    {
+        return exception switch
+        {
+            HttpRequestException => "Failed to load data. Please check your internet connection.",
+            TimeoutException => "The request took too long. Please try again.",
+            UnauthorizedAccessException => "You don't have permission to access this resource.",
+            ArgumentException => "Invalid input. Please check your data.",
+            InvalidOperationException => "An invalid operation was attempted.",
+            _ => "An unexpected error occurred. Please try again."
+        };
+    }
+
+    private void Retry()
+    {
+        _hasError = false;
+        _exception = null;
+        _errorMessage = string.Empty;
+
+        OnRetry.InvokeAsync();
+
+        _errorBoundary?.Recover();
+        StateHasChanged();
+    }
+
+    private void Reset()
+    {
+        Retry();
+    }
+}

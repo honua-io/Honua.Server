@@ -1,0 +1,406 @@
+@page "/chart-examples"
+@using Honua.MapSDK.Components.Chart
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@inject ComponentBus Bus
+
+<PageTitle>HonuaChart Examples</PageTitle>
+
+<div class="examples-container">
+    <h1>HonuaChart Examples</h1>
+
+    <!-- Example 1: Basic Charts -->
+    <section class="example-section">
+        <h2>Example 1: Basic Charts</h2>
+        <div class="chart-grid">
+            <div class="chart-item">
+                <HonuaChart @ref="_barChart"
+                            Type="ChartType.Bar"
+                            Field="category"
+                            Title="Sales by Category"
+                            Style="height: 300px;" />
+            </div>
+
+            <div class="chart-item">
+                <HonuaChart @ref="_pieChart"
+                            Type="ChartType.Pie"
+                            Field="region"
+                            Title="Sales by Region"
+                            Style="height: 300px;" />
+            </div>
+
+            <div class="chart-item">
+                <HonuaChart @ref="_histogramChart"
+                            Type="ChartType.Histogram"
+                            Field="price"
+                            Title="Price Distribution"
+                            Bins="15"
+                            ValueFormat="ValueFormat.Currency"
+                            Style="height: 300px;" />
+            </div>
+
+            <div class="chart-item">
+                <HonuaChart @ref="_lineChart"
+                            Type="ChartType.Line"
+                            Field="revenue"
+                            TimeField="date"
+                            Title="Revenue Trend"
+                            Aggregation="AggregationType.Sum"
+                            ValueFormat="ValueFormat.Currency"
+                            Style="height: 300px;" />
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" @onclick="LoadSampleData">Load Sample Data</button>
+            <button class="btn" @onclick="ExportCharts">Export Charts</button>
+        </div>
+    </section>
+
+    <!-- Example 2: Map-Synced Dashboard -->
+    <section class="example-section">
+        <h2>Example 2: Map-Synced Dashboard</h2>
+        <p>Move the map to see charts update automatically</p>
+
+        <div class="dashboard">
+            <div class="map-panel">
+                <HonuaMap Id="dashboardMap"
+                          Center="@(new[] { -122.4194, 37.7749 })"
+                          Zoom="12"
+                          Style="height: 600px;" />
+            </div>
+
+            <div class="charts-panel">
+                <HonuaChart Type="ChartType.Histogram"
+                            SyncWith="dashboardMap"
+                            Field="assessedValue"
+                            Title="Property Values (Visible Area)"
+                            Bins="20"
+                            ValueFormat="ValueFormat.Currency"
+                            AutoSync="true"
+                            EnableFilter="true"
+                            ColorScheme="cool"
+                            Style="height: 250px;" />
+
+                <HonuaChart Type="ChartType.Pie"
+                            SyncWith="dashboardMap"
+                            Field="landUse"
+                            Title="Land Use Distribution"
+                            EnableFilter="true"
+                            MaxCategories="8"
+                            ColorScheme="default"
+                            Style="height: 250px;" />
+
+                <HonuaChart Type="ChartType.Bar"
+                            SyncWith="dashboardMap"
+                            Field="yearBuilt"
+                            Title="Buildings by Decade"
+                            Aggregation="AggregationType.Count"
+                            EnableFilter="true"
+                            MaxCategories="12"
+                            ColorScheme="warm"
+                            Style="height: 250px;" />
+            </div>
+        </div>
+    </section>
+
+    <!-- Example 3: Interactive Filtering -->
+    <section class="example-section">
+        <h2>Example 3: Interactive Filtering</h2>
+        <p>Click chart segments to filter the map</p>
+
+        <div class="filter-demo">
+            <div class="chart-row">
+                <HonuaChart Type="ChartType.Bar"
+                            SyncWith="filterMap"
+                            Field="type"
+                            Title="Property Type (Click to Filter)"
+                            EnableFilter="true"
+                            OnSegmentClicked="HandleSegmentClick"
+                            Style="height: 300px; width: 48%;" />
+
+                <HonuaChart Type="ChartType.Pie"
+                            SyncWith="filterMap"
+                            Field="status"
+                            Title="Property Status"
+                            EnableFilter="true"
+                            Style="height: 300px; width: 48%;" />
+            </div>
+
+            <HonuaMap Id="filterMap"
+                      Center="@(new[] { -122.4, 37.7 })"
+                      Zoom="11"
+                      Style="height: 400px; margin-top: 20px;" />
+
+            <div class="filter-info">
+                @if (!string.IsNullOrEmpty(_lastClickedSegment))
+                {
+                    <p>Last clicked: <strong>@_lastClickedSegment</strong></p>
+                    <button class="btn" @onclick="ClearFilters">Clear All Filters</button>
+                }
+            </div>
+        </div>
+    </section>
+
+    <!-- Example 4: Theme Switching -->
+    <section class="example-section">
+        <h2>Example 4: Theme Switching</h2>
+
+        <div class="theme-controls">
+            <button class="btn" @onclick='() => SwitchTheme("light")'>Light Theme</button>
+            <button class="btn" @onclick='() => SwitchTheme("dark")'>Dark Theme</button>
+        </div>
+
+        <div class="themed-chart" data-theme="@_currentTheme">
+            <HonuaChart @ref="_themedChart"
+                        Type="ChartType.Bar"
+                        Field="metric"
+                        Title="Themed Chart"
+                        Theme="@_currentTheme"
+                        ColorScheme="cool"
+                        Style="height: 400px;" />
+        </div>
+    </section>
+
+    <!-- Example 5: Aggregations -->
+    <section class="example-section">
+        <h2>Example 5: Different Aggregations</h2>
+
+        <div class="chart-grid">
+            <div class="chart-item">
+                <HonuaChart Type="ChartType.Bar"
+                            Field="category"
+                            Title="Count by Category"
+                            Aggregation="AggregationType.Count"
+                            Style="height: 250px;" />
+            </div>
+
+            <div class="chart-item">
+                <HonuaChart Type="ChartType.Bar"
+                            Field="category"
+                            Title="Sum of Values"
+                            Aggregation="AggregationType.Sum"
+                            ValueFormat="ValueFormat.Currency"
+                            Style="height: 250px;" />
+            </div>
+
+            <div class="chart-item">
+                <HonuaChart Type="ChartType.Bar"
+                            Field="category"
+                            Title="Average Value"
+                            Aggregation="AggregationType.Avg"
+                            ValueFormat="ValueFormat.Currency"
+                            Style="height: 250px;" />
+            </div>
+
+            <div class="chart-item">
+                <HonuaChart Type="ChartType.Bar"
+                            Field="category"
+                            Title="Max Value"
+                            Aggregation="AggregationType.Max"
+                            ValueFormat="ValueFormat.Currency"
+                            Style="height: 250px;" />
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private HonuaChart? _barChart;
+    private HonuaChart? _pieChart;
+    private HonuaChart? _histogramChart;
+    private HonuaChart? _lineChart;
+    private HonuaChart? _themedChart;
+
+    private string _currentTheme = "light";
+    private string _lastClickedSegment = "";
+
+    private async Task LoadSampleData()
+    {
+        // Sample data for demonstration
+        var sampleData = new List<Dictionary<string, object>>
+        {
+            new() { ["category"] = "Electronics", ["region"] = "West", ["price"] = 299.99, ["date"] = "2024-01", ["revenue"] = 15000.0 },
+            new() { ["category"] = "Clothing", ["region"] = "East", ["price"] = 49.99, ["date"] = "2024-01", ["revenue"] = 8000.0 },
+            new() { ["category"] = "Electronics", ["region"] = "East", ["price"] = 599.99, ["date"] = "2024-02", ["revenue"] = 25000.0 },
+            new() { ["category"] = "Home", ["region"] = "West", ["price"] = 149.99, ["date"] = "2024-02", ["revenue"] = 12000.0 },
+            new() { ["category"] = "Clothing", ["region"] = "West", ["price"] = 79.99, ["date"] = "2024-03", ["revenue"] = 18000.0 },
+            new() { ["category"] = "Electronics", ["region"] = "North", ["price"] = 399.99, ["date"] = "2024-03", ["revenue"] = 30000.0 },
+            new() { ["category"] = "Home", ["region"] = "East", ["price"] = 199.99, ["date"] = "2024-04", ["revenue"] = 14000.0 },
+            new() { ["category"] = "Clothing", ["region"] = "North", ["price"] = 59.99, ["date"] = "2024-04", ["revenue"] = 20000.0 }
+        };
+
+        if (_barChart != null) await _barChart.UpdateData(sampleData);
+        if (_pieChart != null) await _pieChart.UpdateData(sampleData);
+        if (_histogramChart != null) await _histogramChart.UpdateData(sampleData);
+        if (_lineChart != null) await _lineChart.UpdateData(sampleData);
+    }
+
+    private async Task ExportCharts()
+    {
+        if (_barChart != null)
+        {
+            var image = await _barChart.ExportAsPngAsync();
+            // In real app, download the image
+            Console.WriteLine("Bar chart exported");
+        }
+    }
+
+    private async Task SwitchTheme(string theme)
+    {
+        _currentTheme = theme;
+        if (_themedChart != null)
+        {
+            await _themedChart.SetThemeAsync(theme);
+        }
+    }
+
+    private void HandleSegmentClick(ChartSegmentClickedEventArgs args)
+    {
+        _lastClickedSegment = $"{args.Field}: {args.Label} (Value: {args.Value})";
+        StateHasChanged();
+    }
+
+    private async Task ClearFilters()
+    {
+        await Bus.PublishAsync(new AllFiltersClearedMessage
+        {
+            Source = "Examples"
+        }, "UI");
+
+        _lastClickedSegment = "";
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Load sample data after first render
+            await Task.Delay(500); // Give charts time to initialize
+            await LoadSampleData();
+        }
+    }
+}
+
+<style>
+    .examples-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .example-section {
+        margin-bottom: 60px;
+        padding: 20px;
+        background: #f9fafb;
+        border-radius: 8px;
+    }
+
+    .example-section h2 {
+        margin-top: 0;
+        color: #1f2937;
+    }
+
+    .chart-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .chart-item {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .dashboard {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .charts-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .filter-demo {
+        margin-top: 20px;
+    }
+
+    .chart-row {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+    }
+
+    .filter-info {
+        margin-top: 15px;
+        padding: 15px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .controls {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+    }
+
+    .theme-controls {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+    }
+
+    .themed-chart {
+        padding: 20px;
+        border-radius: 8px;
+        transition: background-color 0.3s;
+    }
+
+    .themed-chart[data-theme="light"] {
+        background: white;
+    }
+
+    .themed-chart[data-theme="dark"] {
+        background: #1f2937;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+        background: #2563eb;
+    }
+
+    @media (max-width: 1024px) {
+        .dashboard {
+            grid-template-columns: 1fr;
+        }
+
+        .chart-row {
+            flex-direction: column;
+        }
+
+        .chart-row .honua-chart {
+            width: 100% !important;
+        }
+    }
+</style>

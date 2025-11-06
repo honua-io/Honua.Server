@@ -1,0 +1,1148 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-draw @CssClass @GetPositionClass()" style="@GetContainerStyle()">
+    @if (ShowToolbar)
+    {
+        <div class="draw-toolbar">
+            <div class="toolbar-section">
+                <MudTooltip Text="Select">
+                    <MudIconButton
+                        Icon="@Icons.Material.Filled.NearMe"
+                        Color="@(_currentMode == DrawMode.Select ? Color.Primary : Color.Default)"
+                        Size="Size.Small"
+                        OnClick="@(() => SetDrawMode(DrawMode.Select))"
+                        Disabled="@(!_mapReady)"
+                        Class="tool-button"
+                        aria-label="Select mode" />
+                </MudTooltip>
+
+                <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                <MudMenu Icon="@Icons.Material.Filled.Edit" Color="Color.Default" Size="Size.Small"
+                         Dense="true" Label="Draw" aria-label="Drawing tools" Disabled="@(!_mapReady)">
+                    <MudMenuItem Icon="@Icons.Material.Filled.Place" OnClick="@(() => SetDrawMode(DrawMode.Point))">
+                        Point
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Timeline" OnClick="@(() => SetDrawMode(DrawMode.Line))">
+                        Line
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Pentagon" OnClick="@(() => SetDrawMode(DrawMode.Polygon))">
+                        Polygon
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Circle" OnClick="@(() => SetDrawMode(DrawMode.Circle))">
+                        Circle
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Rectangle" OnClick="@(() => SetDrawMode(DrawMode.Rectangle))">
+                        Rectangle
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Gesture" OnClick="@(() => SetDrawMode(DrawMode.Freehand))">
+                        Freehand
+                    </MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.TextFields" OnClick="@(() => SetDrawMode(DrawMode.Text))">
+                        Text
+                    </MudMenuItem>
+                </MudMenu>
+
+                @if (AllowEdit && _selectedFeature != null)
+                {
+                    <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                    <MudTooltip Text="Edit selected">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Edit"
+                            Color="Color.Primary"
+                            Size="Size.Small"
+                            OnClick="@(() => SetDrawMode(DrawMode.Edit))"
+                            Class="tool-button"
+                            aria-label="Edit mode" />
+                    </MudTooltip>
+
+                    <MudTooltip Text="Delete selected">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Delete"
+                            Color="Color.Error"
+                            Size="Size.Small"
+                            OnClick="@DeleteSelectedFeature"
+                            Class="tool-button"
+                            aria-label="Delete feature" />
+                    </MudTooltip>
+                }
+
+                <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                <MudTooltip Text="Measurement unit">
+                    <MudMenu Icon="@Icons.Material.Filled.Straighten" Color="Color.Default" Size="Size.Small"
+                             Dense="true" aria-label="Measurement unit" Disabled="@(!_mapReady)">
+                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnit.Metric))">
+                            @(_measurementUnit == MeasurementUnit.Metric ? "✓ " : "")Metric
+                        </MudMenuItem>
+                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnit.Imperial))">
+                            @(_measurementUnit == MeasurementUnit.Imperial ? "✓ " : "")Imperial
+                        </MudMenuItem>
+                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnit.Nautical))">
+                            @(_measurementUnit == MeasurementUnit.Nautical ? "✓ " : "")Nautical
+                        </MudMenuItem>
+                    </MudMenu>
+                </MudTooltip>
+
+                @if (EnableUndo && _historyIndex >= 0)
+                {
+                    <MudTooltip Text="Undo">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Undo"
+                            Color="Color.Default"
+                            Size="Size.Small"
+                            OnClick="@Undo"
+                            Class="tool-button"
+                            aria-label="Undo" />
+                    </MudTooltip>
+                }
+
+                @if (EnableUndo && _historyIndex < _history.Count - 1)
+                {
+                    <MudTooltip Text="Redo">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Redo"
+                            Color="Color.Default"
+                            Size="Size.Small"
+                            OnClick="@Redo"
+                            Class="tool-button"
+                            aria-label="Redo" />
+                    </MudTooltip>
+                }
+
+                @if (_features.Count > 0)
+                {
+                    <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                    <MudTooltip Text="Clear all">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Clear"
+                            Color="Color.Default"
+                            Size="Size.Small"
+                            OnClick="@ClearAll"
+                            Class="tool-button"
+                            aria-label="Clear all features" />
+                    </MudTooltip>
+
+                    @if (EnableExport)
+                    {
+                        <MudTooltip Text="Export">
+                            <MudMenu Icon="@Icons.Material.Filled.FileDownload" Color="Color.Default" Size="Size.Small" Dense="true">
+                                <MudMenuItem Icon="@Icons.Material.Filled.Code" OnClick="@(() => ExportFeatures("geojson"))">
+                                    GeoJSON
+                                </MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.TableChart" OnClick="@(() => ExportFeatures("csv"))">
+                                    CSV
+                                </MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Filled.Public" OnClick="@(() => ExportFeatures("kml"))">
+                                    KML
+                                </MudMenuItem>
+                            </MudMenu>
+                        </MudTooltip>
+                    }
+                }
+            </div>
+        </div>
+    }
+
+    @if (_currentMode != DrawMode.None && _currentMode != DrawMode.Select)
+    {
+        <div class="draw-instructions">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Color="Color.Info" />
+            <MudText Typo="Typo.caption">@GetDrawInstructions()</MudText>
+        </div>
+    }
+
+    @if (ShowMeasurements && _activeMeasurement != null)
+    {
+        <div class="measurement-panel">
+            <div class="panel-header">
+                <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" />
+                <MudText Typo="Typo.body2" Class="panel-title">Live Measurement</MudText>
+            </div>
+            <div class="measurement-values">
+                @if (_activeMeasurement.Distance.HasValue)
+                {
+                    <div class="measurement-item">
+                        <span class="measurement-label">Distance:</span>
+                        <span class="measurement-value">@FormatDistance(_activeMeasurement.Distance.Value)</span>
+                    </div>
+                }
+                @if (_activeMeasurement.Area.HasValue)
+                {
+                    <div class="measurement-item">
+                        <span class="measurement-label">Area:</span>
+                        <span class="measurement-value">@FormatArea(_activeMeasurement.Area.Value)</span>
+                    </div>
+                }
+                @if (_activeMeasurement.Perimeter.HasValue)
+                {
+                    <div class="measurement-item">
+                        <span class="measurement-label">Perimeter:</span>
+                        <span class="measurement-value">@FormatDistance(_activeMeasurement.Perimeter.Value)</span>
+                    </div>
+                }
+                @if (_activeMeasurement.Radius.HasValue)
+                {
+                    <div class="measurement-item">
+                        <span class="measurement-label">Radius:</span>
+                        <span class="measurement-value">@FormatDistance(_activeMeasurement.Radius.Value)</span>
+                    </div>
+                }
+                @if (_activeMeasurement.Bearing.HasValue)
+                {
+                    <div class="measurement-item">
+                        <span class="measurement-label">Bearing:</span>
+                        <span class="measurement-value">@_activeMeasurement.Bearing.Value.ToString("F1")°</span>
+                    </div>
+                }
+                @if (_activeMeasurement.Coordinates != null)
+                {
+                    <div class="measurement-item coordinates">
+                        <span class="measurement-label">Coordinates:</span>
+                        <span class="measurement-value">@FormatCoordinates(_activeMeasurement.Coordinates)</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (ShowFeatureList && _features.Count > 0)
+    {
+        <div class="feature-list">
+            <div class="panel-header">
+                <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" />
+                <MudText Typo="Typo.body2" Class="panel-title">Drawn Features (@_features.Count)</MudText>
+                @if (Collapsible)
+                {
+                    <MudIconButton
+                        Icon="@(_isFeatureListCollapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)"
+                        Size="Size.Small"
+                        OnClick="@(() => _isFeatureListCollapsed = !_isFeatureListCollapsed)"
+                        aria-label="Toggle feature list" />
+                }
+            </div>
+
+            @if (!_isFeatureListCollapsed)
+            {
+                <div class="feature-items">
+                    @foreach (var feature in _features.OrderByDescending(f => f.CreatedAt))
+                    {
+                        <div class="feature-item @(feature.IsSelected ? "selected" : "")"
+                             @onclick="@(() => SelectFeature(feature.Id))">
+                            <MudIcon Icon="@GetFeatureIcon(feature.GeometryType)" Size="Size.Small" Color="@(feature.IsSelected ? Color.Primary : Color.Default)" />
+                            <div class="feature-info">
+                                <div class="feature-name">@GetFeatureName(feature)</div>
+                                @if (feature.Measurements != null && ShowMeasurements)
+                                {
+                                    <div class="feature-measurement">
+                                        @GetFeatureMeasurementSummary(feature)
+                                    </div>
+                                }
+                            </div>
+                            <div class="feature-actions">
+                                <MudIconButton
+                                    Icon="@(feature.IsVisible ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                    Size="Size.Small"
+                                    OnClick="@((e) => { e.StopPropagation(); ToggleFeatureVisibility(feature.Id); })"
+                                    aria-label="Toggle visibility" />
+                                @if (AllowEdit && !feature.IsLocked)
+                                {
+                                    <MudIconButton
+                                        Icon="@Icons.Material.Filled.Edit"
+                                        Size="Size.Small"
+                                        Color="Color.Primary"
+                                        OnClick="@((e) => { e.StopPropagation(); EditFeature(feature.Id); })"
+                                        aria-label="Edit feature" />
+                                }
+                                <MudIconButton
+                                    Icon="@Icons.Material.Filled.Delete"
+                                    Size="Size.Small"
+                                    Color="Color.Error"
+                                    OnClick="@((e) => { e.StopPropagation(); DeleteFeature(feature.Id); })"
+                                    aria-label="Delete feature" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (_errorMessage != null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="draw-error" CloseIconClicked="@(() => _errorMessage = null)">
+            @_errorMessage
+        </MudAlert>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the draw component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"draw-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Show toolbar with drawing tools
+    /// </summary>
+    [Parameter]
+    public bool ShowToolbar { get; set; } = true;
+
+    /// <summary>
+    /// Show live measurements while drawing
+    /// </summary>
+    [Parameter]
+    public bool ShowMeasurements { get; set; } = true;
+
+    /// <summary>
+    /// Show list of drawn features
+    /// </summary>
+    [Parameter]
+    public bool ShowFeatureList { get; set; } = true;
+
+    /// <summary>
+    /// Allow editing of drawn features
+    /// </summary>
+    [Parameter]
+    public bool AllowEdit { get; set; } = true;
+
+    /// <summary>
+    /// Enable undo/redo functionality
+    /// </summary>
+    [Parameter]
+    public bool EnableUndo { get; set; } = true;
+
+    /// <summary>
+    /// Enable export functionality
+    /// </summary>
+    [Parameter]
+    public bool EnableExport { get; set; } = true;
+
+    /// <summary>
+    /// Feature list can be collapsed
+    /// </summary>
+    [Parameter]
+    public bool Collapsible { get; set; } = true;
+
+    /// <summary>
+    /// Default stroke color
+    /// </summary>
+    [Parameter]
+    public string DefaultStrokeColor { get; set; } = "#3B82F6";
+
+    /// <summary>
+    /// Default fill color
+    /// </summary>
+    [Parameter]
+    public string DefaultFillColor { get; set; } = "#3B82F6";
+
+    /// <summary>
+    /// Default stroke width
+    /// </summary>
+    [Parameter]
+    public double DefaultStrokeWidth { get; set; } = 2.0;
+
+    /// <summary>
+    /// Default fill opacity
+    /// </summary>
+    [Parameter]
+    public double DefaultFillOpacity { get; set; } = 0.2;
+
+    /// <summary>
+    /// Measurement unit system
+    /// </summary>
+    [Parameter]
+    public MeasurementUnit MeasurementUnit { get; set; } = MeasurementUnit.Metric;
+
+    /// <summary>
+    /// Position on the map
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Width of the component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "350px";
+
+    /// <summary>
+    /// Event callback when feature is drawn
+    /// </summary>
+    [Parameter]
+    public EventCallback<DrawingFeature> OnFeatureDrawn { get; set; }
+
+    /// <summary>
+    /// Event callback when feature is measured
+    /// </summary>
+    [Parameter]
+    public EventCallback<FeatureMeasurements> OnFeatureMeasured { get; set; }
+
+    /// <summary>
+    /// Event callback when feature is edited
+    /// </summary>
+    [Parameter]
+    public EventCallback<DrawingFeature> OnFeatureEdited { get; set; }
+
+    /// <summary>
+    /// Event callback when feature is deleted
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnFeatureDeleted { get; set; }
+
+    private DrawMode _currentMode = DrawMode.None;
+    private MeasurementUnit _measurementUnit = MeasurementUnit.Metric;
+    private List<DrawingFeature> _features = new();
+    private DrawingFeature? _selectedFeature;
+    private FeatureMeasurements? _activeMeasurement;
+    private bool _mapReady = false;
+    private bool _isFeatureListCollapsed = false;
+    private string? _errorMessage;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaDraw>? _dotNetRef;
+
+    // Undo/Redo history
+    private List<List<DrawingFeature>> _history = new();
+    private int _historyIndex = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _measurementUnit = MeasurementUnit;
+        SetupSubscriptions();
+        _dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-draw.js"
+                );
+
+                if (_mapReady && SyncWith != null)
+                {
+                    await InitializeDrawing();
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Error loading drawing module: {ex.Message}";
+                Console.Error.WriteLine($"Error loading draw JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                _ = InitializeDrawing();
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for start drawing requests
+        Bus.Subscribe<StartDrawingRequestMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                var mode = args.Message.Mode.ToLowerInvariant() switch
+                {
+                    "point" => DrawMode.Point,
+                    "line" => DrawMode.Line,
+                    "polygon" => DrawMode.Polygon,
+                    "circle" => DrawMode.Circle,
+                    "rectangle" => DrawMode.Rectangle,
+                    "freehand" => DrawMode.Freehand,
+                    "text" => DrawMode.Text,
+                    _ => DrawMode.None
+                };
+
+                _ = SetDrawMode(mode);
+            }
+        });
+
+        // Listen for stop drawing requests
+        Bus.Subscribe<StopDrawingRequestMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _ = SetDrawMode(DrawMode.None);
+            }
+        });
+    }
+
+    private async Task InitializeDrawing()
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        try
+        {
+            var config = new
+            {
+                mapId = SyncWith,
+                componentId = Id,
+                strokeColor = DefaultStrokeColor,
+                fillColor = DefaultFillColor,
+                strokeWidth = DefaultStrokeWidth,
+                fillOpacity = DefaultFillOpacity,
+                showMeasurements = ShowMeasurements,
+                measurementUnit = _measurementUnit.ToString().ToLower()
+            };
+
+            await _jsModule.InvokeVoidAsync("initializeDrawing", SyncWith, Id, config, _dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error initializing drawing: {ex.Message}";
+            Console.Error.WriteLine($"Error initializing drawing: {ex.Message}");
+        }
+    }
+
+    private async Task SetDrawMode(DrawMode mode)
+    {
+        if (!_mapReady || _jsModule == null) return;
+
+        try
+        {
+            _currentMode = mode;
+            _activeMeasurement = null;
+
+            var modeString = mode switch
+            {
+                DrawMode.Point => "point",
+                DrawMode.Line => "line_string",
+                DrawMode.Polygon => "polygon",
+                DrawMode.Circle => "circle",
+                DrawMode.Rectangle => "rectangle",
+                DrawMode.Freehand => "freehand",
+                DrawMode.Text => "text",
+                DrawMode.Select => "simple_select",
+                DrawMode.Edit => "direct_select",
+                _ => null
+            };
+
+            await _jsModule.InvokeVoidAsync("setDrawMode", SyncWith, modeString);
+
+            // Publish mode changed message
+            await Bus.PublishAsync(new DrawModeChangedMessage
+            {
+                Mode = modeString ?? "none",
+                ComponentId = Id
+            }, Id);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error setting draw mode: {ex.Message}";
+            Console.Error.WriteLine($"Error setting draw mode: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a feature is drawn
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureDrawnFromJS(string featureJson)
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var geoJsonFeature = JsonSerializer.Deserialize<Dictionary<string, object>>(featureJson, options);
+
+            if (geoJsonFeature == null) return;
+
+            var feature = CreateFeatureFromGeoJson(geoJsonFeature);
+            _features.Add(feature);
+
+            // Add to history
+            if (EnableUndo)
+            {
+                AddToHistory();
+            }
+
+            // Publish message
+            await Bus.PublishAsync(new FeatureDrawnMessage
+            {
+                FeatureId = feature.Id,
+                GeometryType = feature.GeometryType,
+                Geometry = feature.Geometry,
+                Properties = feature.Properties,
+                ComponentId = Id
+            }, Id);
+
+            // Invoke callback
+            await OnFeatureDrawn.InvokeAsync(feature);
+
+            // Calculate and publish measurements
+            if (feature.Measurements != null)
+            {
+                await Bus.PublishAsync(new FeatureMeasuredMessage
+                {
+                    FeatureId = feature.Id,
+                    Distance = feature.Measurements.Distance,
+                    Area = feature.Measurements.Area,
+                    Perimeter = feature.Measurements.Perimeter,
+                    Radius = feature.Measurements.Radius,
+                    Unit = _measurementUnit.ToString(),
+                    ComponentId = Id
+                }, Id);
+
+                await OnFeatureMeasured.InvokeAsync(feature.Measurements);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error processing drawn feature: {ex.Message}";
+            Console.Error.WriteLine($"Error in OnFeatureDrawnFromJS: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when measurements are updated
+    /// </summary>
+    [JSInvokable]
+    public Task OnMeasurementUpdate(double? distance, double? area, double? perimeter, double? radius, double? bearing, double[]? coordinates)
+    {
+        _activeMeasurement = new FeatureMeasurements
+        {
+            Distance = distance,
+            Area = area,
+            Perimeter = perimeter,
+            Radius = radius,
+            Bearing = bearing,
+            Coordinates = coordinates
+        };
+
+        InvokeAsync(StateHasChanged);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a feature is edited
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureEditedFromJS(string featureId, string geometryJson)
+    {
+        try
+        {
+            var feature = _features.FirstOrDefault(f => f.Id == featureId);
+            if (feature == null) return;
+
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var geometry = JsonSerializer.Deserialize<object>(geometryJson, options);
+
+            feature.Geometry = geometry!;
+            feature.ModifiedAt = DateTime.UtcNow;
+
+            // Recalculate measurements
+            feature.Measurements = await CalculateMeasurements(feature);
+
+            // Add to history
+            if (EnableUndo)
+            {
+                AddToHistory();
+            }
+
+            // Publish message
+            await Bus.PublishAsync(new FeatureEditedMessage
+            {
+                FeatureId = featureId,
+                Geometry = geometry!,
+                EditType = "reshape",
+                ComponentId = Id
+            }, Id);
+
+            await OnFeatureEdited.InvokeAsync(feature);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error processing edited feature: {ex.Message}";
+            Console.Error.WriteLine($"Error in OnFeatureEditedFromJS: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a feature is selected
+    /// </summary>
+    [JSInvokable]
+    public Task OnFeatureSelectedFromJS(string? featureId)
+    {
+        if (string.IsNullOrEmpty(featureId))
+        {
+            _selectedFeature = null;
+        }
+        else
+        {
+            SelectFeature(featureId);
+        }
+
+        InvokeAsync(StateHasChanged);
+        return Task.CompletedTask;
+    }
+
+    private DrawingFeature CreateFeatureFromGeoJson(Dictionary<string, object> geoJsonFeature)
+    {
+        var id = geoJsonFeature.ContainsKey("id") ? geoJsonFeature["id"].ToString() ?? Guid.NewGuid().ToString() : Guid.NewGuid().ToString();
+        var geometry = geoJsonFeature["geometry"];
+        var geometryDict = JsonSerializer.Deserialize<Dictionary<string, object>>(JsonSerializer.Serialize(geometry));
+        var geometryType = geometryDict?["type"]?.ToString() ?? "Unknown";
+
+        var properties = new Dictionary<string, object>();
+        if (geoJsonFeature.ContainsKey("properties") && geoJsonFeature["properties"] is JsonElement propsElement)
+        {
+            properties = JsonSerializer.Deserialize<Dictionary<string, object>>(propsElement.GetRawText()) ?? new();
+        }
+
+        var feature = new DrawingFeature
+        {
+            Id = id,
+            GeometryType = geometryType,
+            Geometry = geometry,
+            Properties = properties,
+            Style = GetDefaultStyle(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Calculate measurements asynchronously (will be set later)
+        _ = Task.Run(async () =>
+        {
+            feature.Measurements = await CalculateMeasurements(feature);
+            await InvokeAsync(StateHasChanged);
+        });
+
+        return feature;
+    }
+
+    private async Task<FeatureMeasurements?> CalculateMeasurements(DrawingFeature feature)
+    {
+        if (_jsModule == null) return null;
+
+        try
+        {
+            var result = await _jsModule.InvokeAsync<Dictionary<string, object>>(
+                "calculateMeasurements",
+                JsonSerializer.Serialize(feature.Geometry),
+                _measurementUnit.ToString().ToLower()
+            );
+
+            return new FeatureMeasurements
+            {
+                Distance = result.ContainsKey("distance") ? Convert.ToDouble(result["distance"]) : null,
+                Area = result.ContainsKey("area") ? Convert.ToDouble(result["area"]) : null,
+                Perimeter = result.ContainsKey("perimeter") ? Convert.ToDouble(result["perimeter"]) : null,
+                Radius = result.ContainsKey("radius") ? Convert.ToDouble(result["radius"]) : null,
+                Bearing = result.ContainsKey("bearing") ? Convert.ToDouble(result["bearing"]) : null
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error calculating measurements: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task SelectFeature(string featureId)
+    {
+        // Deselect all
+        foreach (var f in _features)
+        {
+            f.IsSelected = false;
+        }
+
+        // Select the target
+        _selectedFeature = _features.FirstOrDefault(f => f.Id == featureId);
+        if (_selectedFeature != null)
+        {
+            _selectedFeature.IsSelected = true;
+
+            if (_jsModule != null)
+            {
+                await _jsModule.InvokeVoidAsync("selectFeature", SyncWith, featureId);
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task DeleteSelectedFeature()
+    {
+        if (_selectedFeature != null)
+        {
+            await DeleteFeature(_selectedFeature.Id);
+        }
+    }
+
+    private async Task DeleteFeature(string featureId)
+    {
+        var feature = _features.FirstOrDefault(f => f.Id == featureId);
+        if (feature == null) return;
+
+        _features.Remove(feature);
+
+        if (feature == _selectedFeature)
+        {
+            _selectedFeature = null;
+        }
+
+        // Add to history
+        if (EnableUndo)
+        {
+            AddToHistory();
+        }
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("deleteFeature", SyncWith, featureId);
+        }
+
+        // Publish message
+        await Bus.PublishAsync(new FeatureDeletedMessage
+        {
+            FeatureId = featureId,
+            ComponentId = Id
+        }, Id);
+
+        await OnFeatureDeleted.InvokeAsync(featureId);
+
+        StateHasChanged();
+    }
+
+    private async Task EditFeature(string featureId)
+    {
+        await SelectFeature(featureId);
+        await SetDrawMode(DrawMode.Edit);
+    }
+
+    private async Task ToggleFeatureVisibility(string featureId)
+    {
+        var feature = _features.FirstOrDefault(f => f.Id == featureId);
+        if (feature == null || _jsModule == null) return;
+
+        feature.IsVisible = !feature.IsVisible;
+
+        await _jsModule.InvokeVoidAsync("setFeatureVisibility", SyncWith, featureId, feature.IsVisible);
+
+        StateHasChanged();
+    }
+
+    private async Task ClearAll()
+    {
+        if (_features.Count == 0) return;
+
+        _features.Clear();
+        _selectedFeature = null;
+        _activeMeasurement = null;
+
+        // Clear history
+        _history.Clear();
+        _historyIndex = -1;
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("clearAll", SyncWith);
+        }
+
+        await SetDrawMode(DrawMode.None);
+
+        StateHasChanged();
+    }
+
+    private void AddToHistory()
+    {
+        // Remove any forward history
+        if (_historyIndex < _history.Count - 1)
+        {
+            _history.RemoveRange(_historyIndex + 1, _history.Count - _historyIndex - 1);
+        }
+
+        // Add current state
+        _history.Add(_features.Select(f => CloneFeature(f)).ToList());
+        _historyIndex = _history.Count - 1;
+
+        // Limit history size
+        if (_history.Count > 50)
+        {
+            _history.RemoveAt(0);
+            _historyIndex--;
+        }
+    }
+
+    private async Task Undo()
+    {
+        if (_historyIndex > 0)
+        {
+            _historyIndex--;
+            _features = _history[_historyIndex].Select(f => CloneFeature(f)).ToList();
+            await RefreshMap();
+            StateHasChanged();
+        }
+    }
+
+    private async Task Redo()
+    {
+        if (_historyIndex < _history.Count - 1)
+        {
+            _historyIndex++;
+            _features = _history[_historyIndex].Select(f => CloneFeature(f)).ToList();
+            await RefreshMap();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshMap()
+    {
+        if (_jsModule == null) return;
+
+        try
+        {
+            var featuresJson = JsonSerializer.Serialize(_features.Select(f => new
+            {
+                type = "Feature",
+                id = f.Id,
+                geometry = f.Geometry,
+                properties = f.Properties
+            }));
+
+            await _jsModule.InvokeVoidAsync("setFeatures", SyncWith, featuresJson);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error refreshing map: {ex.Message}");
+        }
+    }
+
+    private DrawingFeature CloneFeature(DrawingFeature feature)
+    {
+        return new DrawingFeature
+        {
+            Id = feature.Id,
+            Name = feature.Name,
+            GeometryType = feature.GeometryType,
+            Geometry = feature.Geometry,
+            Properties = new Dictionary<string, object>(feature.Properties),
+            Style = feature.Style?.Clone(),
+            Measurements = feature.Measurements,
+            IsSelected = feature.IsSelected,
+            IsVisible = feature.IsVisible,
+            IsLocked = feature.IsLocked,
+            CreatedAt = feature.CreatedAt,
+            ModifiedAt = feature.ModifiedAt,
+            Annotation = feature.Annotation
+        };
+    }
+
+    private async Task SetMeasurementUnit(MeasurementUnit unit)
+    {
+        _measurementUnit = unit;
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("setMeasurementUnit", SyncWith, unit.ToString().ToLower());
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ExportFeatures(string format)
+    {
+        if (_features.Count == 0 || _jsModule == null) return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("exportFeatures", SyncWith, format);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error exporting features: {ex.Message}";
+            Console.Error.WriteLine($"Error exporting: {ex.Message}");
+        }
+    }
+
+    private DrawingStyle GetDefaultStyle()
+    {
+        return new DrawingStyle
+        {
+            StrokeColor = DefaultStrokeColor,
+            FillColor = DefaultFillColor,
+            StrokeWidth = DefaultStrokeWidth,
+            FillOpacity = DefaultFillOpacity,
+            ShowMeasurements = ShowMeasurements
+        };
+    }
+
+    private string GetDrawInstructions()
+    {
+        return _currentMode switch
+        {
+            DrawMode.Point => "Click to place a point",
+            DrawMode.Line => "Click to add points, double-click to finish",
+            DrawMode.Polygon => "Click to add points, double-click to close polygon",
+            DrawMode.Circle => "Click center, drag to set radius",
+            DrawMode.Rectangle => "Click corner, drag to opposite corner",
+            DrawMode.Freehand => "Click and drag to draw",
+            DrawMode.Text => "Click to place text annotation",
+            DrawMode.Edit => "Drag vertices to reshape, click feature to select",
+            _ => ""
+        };
+    }
+
+    private string GetFeatureIcon(string geometryType)
+    {
+        return geometryType.ToLowerInvariant() switch
+        {
+            "point" or "multipoint" => Icons.Material.Filled.Place,
+            "linestring" or "multilinestring" => Icons.Material.Filled.Timeline,
+            "polygon" or "multipolygon" => Icons.Material.Filled.Pentagon,
+            "circle" => Icons.Material.Filled.Circle,
+            "rectangle" => Icons.Material.Filled.Rectangle,
+            _ => Icons.Material.Filled.Layers
+        };
+    }
+
+    private string GetFeatureName(DrawingFeature feature)
+    {
+        if (!string.IsNullOrEmpty(feature.Name))
+            return feature.Name;
+
+        var index = _features.IndexOf(feature) + 1;
+        return $"{feature.GeometryType} #{index}";
+    }
+
+    private string GetFeatureMeasurementSummary(DrawingFeature feature)
+    {
+        if (feature.Measurements == null) return "";
+
+        if (feature.Measurements.Distance.HasValue)
+            return FormatDistance(feature.Measurements.Distance.Value);
+
+        if (feature.Measurements.Area.HasValue)
+            return FormatArea(feature.Measurements.Area.Value);
+
+        if (feature.Measurements.Coordinates != null)
+            return FormatCoordinates(feature.Measurements.Coordinates);
+
+        return "";
+    }
+
+    private string FormatDistance(double meters)
+    {
+        return _measurementUnit switch
+        {
+            MeasurementUnit.Imperial => meters >= 1609.34
+                ? $"{(meters / 1609.34):F2} mi"
+                : $"{(meters * 3.28084):F1} ft",
+            MeasurementUnit.Nautical => $"{(meters / 1852):F2} nm",
+            _ => meters >= 1000
+                ? $"{(meters / 1000):F2} km"
+                : $"{meters:F1} m"
+        };
+    }
+
+    private string FormatArea(double sqMeters)
+    {
+        return _measurementUnit switch
+        {
+            MeasurementUnit.Imperial => sqMeters >= 4046.86
+                ? $"{(sqMeters / 4046.86):F2} acres"
+                : $"{(sqMeters * 10.7639):F1} ft²",
+            _ => sqMeters >= 10000
+                ? $"{(sqMeters / 10000):F2} ha"
+                : $"{sqMeters:F1} m²"
+        };
+    }
+
+    private string FormatCoordinates(double[] coords)
+    {
+        if (coords.Length < 2) return "";
+        return $"{coords[1]:F5}°, {coords[0]:F5}°";
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "draw-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "draw-floating draw-top-right",
+            "top-left" => "draw-floating draw-top-left",
+            "bottom-right" => "draw-floating draw-bottom-right",
+            "bottom-left" => "draw-floating draw-bottom-left",
+            _ => "draw-embedded"
+        };
+    }
+
+    private string GetContainerStyle()
+    {
+        var styles = new List<string>();
+
+        if (!string.IsNullOrEmpty(Width))
+        {
+            styles.Add($"width: {Width}");
+        }
+
+        if (!string.IsNullOrEmpty(Style))
+        {
+            styles.Add(Style);
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("cleanup", SyncWith);
+                await _jsModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

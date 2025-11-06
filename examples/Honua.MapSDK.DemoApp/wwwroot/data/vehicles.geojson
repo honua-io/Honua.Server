@@ -1,0 +1,209 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V001",
+        "name": "Truck 15",
+        "vehicleType": "Delivery Truck",
+        "status": "Active",
+        "speed": 25,
+        "driver": "John Smith",
+        "route": "Downtown Route A",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4015, 37.7885]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V002",
+        "name": "Van 23",
+        "vehicleType": "Service Van",
+        "status": "Active",
+        "speed": 18,
+        "driver": "Maria Garcia",
+        "route": "Mission District Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4195, 37.7615]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V003",
+        "name": "Truck 42",
+        "vehicleType": "Delivery Truck",
+        "status": "Idle",
+        "speed": 0,
+        "driver": "Robert Johnson",
+        "route": "Financial District Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3980, 37.7930]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V004",
+        "name": "Car 07",
+        "vehicleType": "Sedan",
+        "status": "Active",
+        "speed": 35,
+        "driver": "Lisa Chen",
+        "route": "Highway 101 North",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3965, 37.7765]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V005",
+        "name": "Van 31",
+        "vehicleType": "Service Van",
+        "status": "Active",
+        "speed": 22,
+        "driver": "Michael Brown",
+        "route": "Nob Hill Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4125, 37.7925]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V006",
+        "name": "Truck 18",
+        "vehicleType": "Delivery Truck",
+        "status": "Maintenance",
+        "speed": 0,
+        "driver": "Sarah Wilson",
+        "route": "Marina Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4335, 37.8045]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V007",
+        "name": "Car 12",
+        "vehicleType": "Sedan",
+        "status": "Active",
+        "speed": 28,
+        "driver": "David Martinez",
+        "route": "Potrero Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3895, 37.7625]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V008",
+        "name": "Van 45",
+        "vehicleType": "Service Van",
+        "status": "Active",
+        "speed": 15,
+        "driver": "Emily Taylor",
+        "route": "Richmond Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4685, 37.7795]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V009",
+        "name": "Truck 29",
+        "vehicleType": "Delivery Truck",
+        "status": "Active",
+        "speed": 32,
+        "driver": "James Anderson",
+        "route": "Hayes Valley Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4245, 37.7745]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V010",
+        "name": "Car 19",
+        "vehicleType": "Sedan",
+        "status": "Idle",
+        "speed": 0,
+        "driver": "Jennifer Lee",
+        "route": "Civic Center Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4195, 37.7795]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V011",
+        "name": "Van 52",
+        "vehicleType": "Service Van",
+        "status": "Active",
+        "speed": 20,
+        "driver": "Christopher Davis",
+        "route": "SOMA Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3945, 37.7815]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "V012",
+        "name": "Truck 61",
+        "vehicleType": "Delivery Truck",
+        "status": "Active",
+        "speed": 26,
+        "driver": "Amanda White",
+        "route": "Waterfront Route",
+        "timestamp": "2025-11-06T08:30:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3885, 37.7995]
+      }
+    }
+  ]
+}

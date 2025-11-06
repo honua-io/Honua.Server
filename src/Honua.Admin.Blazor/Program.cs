@@ -3,6 +3,7 @@
 
 using Honua.Admin.Blazor.Components;
 using Honua.Admin.Blazor.Shared.Services;
+using Honua.MapSDK;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 
@@ -64,6 +65,9 @@ builder.Services.AddScoped<NavigationState>();
 builder.Services.AddScoped<EditorState>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SearchStateService>();
+
+// Register MapSDK services (visual map builder)
+builder.Services.AddHonuaMapSDK();
 
 // Register API clients
 builder.Services.AddScoped<ServiceApiClient>();

@@ -1,0 +1,400 @@
+/* Honua Heatmap Component Styles */
+
+.honua-heatmap {
+    position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    color: #333;
+}
+
+/* Controls Container */
+.honua-heatmap-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    padding: 16px;
+    width: 300px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+/* Header */
+.honua-heatmap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.honua-heatmap-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.honua-heatmap-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.honua-heatmap-close:hover {
+    background: #f3f4f6;
+    color: #111827;
+}
+
+/* Control Groups */
+.honua-heatmap-control-group {
+    margin-bottom: 16px;
+}
+
+.honua-heatmap-control-group label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #374151;
+    font-size: 13px;
+}
+
+.honua-heatmap-value {
+    font-weight: 600;
+    color: #3b82f6;
+    font-size: 12px;
+}
+
+/* Sliders */
+.honua-heatmap-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #e5e7eb;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.honua-heatmap-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    transition: all 0.2s ease;
+}
+
+.honua-heatmap-slider::-webkit-slider-thumb:hover {
+    background: #2563eb;
+    transform: scale(1.1);
+    box-shadow: 0 3px 6px rgba(59, 130, 246, 0.4);
+}
+
+.honua-heatmap-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+    transition: all 0.2s ease;
+}
+
+.honua-heatmap-slider::-moz-range-thumb:hover {
+    background: #2563eb;
+    transform: scale(1.1);
+    box-shadow: 0 3px 6px rgba(59, 130, 246, 0.4);
+}
+
+/* Select Dropdown */
+.honua-heatmap-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    font-size: 13px;
+    color: #374151;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.honua-heatmap-select:hover {
+    border-color: #9ca3af;
+}
+
+.honua-heatmap-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Gradient Preview */
+.honua-heatmap-gradient-preview {
+    width: 100%;
+    height: 30px;
+    border-radius: 6px;
+    margin-top: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+/* Statistics */
+.honua-heatmap-statistics {
+    background: #f9fafb;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.honua-heatmap-statistics h4 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.honua-heatmap-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 12px;
+}
+
+.honua-heatmap-stat .label {
+    color: #6b7280;
+}
+
+.honua-heatmap-stat .value {
+    font-weight: 600;
+    color: #111827;
+}
+
+/* Actions */
+.honua-heatmap-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.honua-heatmap-button {
+    flex: 1;
+    min-width: 80px;
+    padding: 8px 12px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.honua-heatmap-button:hover {
+    background: #2563eb;
+}
+
+.honua-heatmap-button:active {
+    transform: scale(0.98);
+}
+
+/* Toggle Button (when controls are hidden) */
+.honua-heatmap-toggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    background: white;
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3b82f6;
+    transition: all 0.2s ease;
+    z-index: 1000;
+}
+
+.honua-heatmap-toggle:hover {
+    background: #f3f4f6;
+    transform: scale(1.05);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.honua-heatmap-toggle svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Dark Mode */
+.honua-heatmap.dark-mode .honua-heatmap-controls {
+    background: #1f2937;
+    color: #f3f4f6;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-header {
+    border-bottom-color: #374151;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-header h3 {
+    color: #f9fafb;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-close {
+    color: #9ca3af;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-close:hover {
+    background: #374151;
+    color: #f3f4f6;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-control-group label {
+    color: #d1d5db;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-slider {
+    background: #374151;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-select {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-select:hover {
+    border-color: #6b7280;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-select:focus {
+    border-color: #3b82f6;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-gradient-preview {
+    border-color: #4b5563;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-statistics {
+    background: #111827;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-statistics h4 {
+    color: #d1d5db;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-stat .label {
+    color: #9ca3af;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-stat .value {
+    color: #f9fafb;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-toggle {
+    background: #1f2937;
+    color: #3b82f6;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-toggle:hover {
+    background: #374151;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .honua-heatmap-controls {
+        width: calc(100vw - 40px);
+        max-width: 350px;
+        right: 20px;
+        left: 20px;
+        margin: 0 auto;
+    }
+}
+
+/* Scrollbar Styling */
+.honua-heatmap-controls::-webkit-scrollbar {
+    width: 6px;
+}
+
+.honua-heatmap-controls::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.honua-heatmap-controls::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.honua-heatmap-controls::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-controls::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-controls::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.honua-heatmap.dark-mode .honua-heatmap-controls::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.honua-heatmap-controls {
+    animation: slideIn 0.3s ease;
+}
+
+/* Focus Styles for Accessibility */
+.honua-heatmap-slider:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+.honua-heatmap-button:focus,
+.honua-heatmap-close:focus,
+.honua-heatmap-toggle:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}

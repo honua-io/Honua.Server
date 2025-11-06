@@ -1,0 +1,317 @@
+/* Honua Overview Map Scoped Styles */
+
+.honua-overview-map {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+}
+
+/* Position variants */
+.honua-overview-map.overview-top-left {
+    top: 10px;
+    left: 10px;
+}
+
+.honua-overview-map.overview-top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.honua-overview-map.overview-bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+.honua-overview-map.overview-bottom-right {
+    bottom: 10px;
+    right: 10px;
+}
+
+.honua-overview-map.overview-custom {
+    /* Position set via inline styles */
+}
+
+/* Collapsed state */
+.honua-overview-map.collapsed {
+    width: 48px !important;
+    height: 48px !important;
+}
+
+/* Overview map container */
+.overview-map-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Toggle button */
+.overview-toggle {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    z-index: 10;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.overview-toggle:hover {
+    background-color: rgba(255, 255, 255, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transform: scale(1.05);
+}
+
+.overview-toggle:active {
+    transform: scale(0.95);
+}
+
+.overview-toggle:focus {
+    outline: 2px solid #4A90E2;
+    outline-offset: 2px;
+}
+
+.overview-toggle.collapsed {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.overview-toggle.collapsed:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.overview-toggle.collapsed:active {
+    transform: translate(-50%, -50%) scale(0.9);
+}
+
+.toggle-icon {
+    display: inline-block;
+    line-height: 1;
+    pointer-events: none;
+}
+
+/* Title */
+.overview-title {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    padding: 4px 8px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    text-align: center;
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Loading state */
+.overview-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.95);
+    z-index: 100;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-top-color: #4A90E2;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-text {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .overview-toggle {
+        background-color: rgba(40, 40, 40, 0.95);
+        color: #fff;
+    }
+
+    .overview-toggle:hover {
+        background-color: rgba(50, 50, 50, 1);
+    }
+
+    .overview-loading {
+        background-color: rgba(30, 30, 30, 0.95);
+    }
+
+    .loading-text {
+        color: #ccc;
+    }
+
+    .honua-overview-map {
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6) !important;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .honua-overview-map {
+        width: 150px !important;
+        height: 150px !important;
+    }
+
+    .honua-overview-map.collapsed {
+        width: 40px !important;
+        height: 40px !important;
+    }
+
+    .overview-toggle {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+    }
+
+    .overview-title {
+        font-size: 10px;
+        padding: 2px 6px;
+    }
+}
+
+@media (max-width: 480px) {
+    .honua-overview-map {
+        width: 120px !important;
+        height: 120px !important;
+    }
+
+    .honua-overview-map.overview-bottom-right,
+    .honua-overview-map.overview-bottom-left {
+        bottom: 60px; /* Avoid overlapping with mobile controls */
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .overview-toggle {
+        border: 2px solid #000;
+    }
+
+    .overview-toggle:focus {
+        outline-width: 3px;
+    }
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+    .honua-overview-map,
+    .overview-toggle {
+        transition: none;
+    }
+
+    .loading-spinner {
+        animation: none;
+        border-top-color: transparent;
+    }
+}
+
+/* Accessibility - keyboard focus */
+.honua-overview-map:focus-within {
+    outline: 2px solid #4A90E2;
+    outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+    .honua-overview-map {
+        display: none;
+    }
+}
+
+/* Hover effects for interactive mode */
+.honua-overview-map:not(.collapsed) .overview-map-container {
+    cursor: default;
+}
+
+/* Animation for expand/collapse */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.overview-map-container {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Shadow variants for different positions */
+.honua-overview-map.overview-top-left,
+.honua-overview-map.overview-top-right {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.honua-overview-map.overview-bottom-left,
+.honua-overview-map.overview-bottom-right {
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Prevent text selection during drag */
+.honua-overview-map {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Smooth appearance */
+.honua-overview-map {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* Custom scrollbar for future use */
+.overview-map-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overview-map-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.overview-map-container::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 3px;
+}
+
+.overview-map-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5);
+}

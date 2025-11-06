@@ -1,292 +1,438 @@
 # Honua.MapSDK Test Suite
 
-Comprehensive test coverage for the Honua MapSDK - a Blazor component library for interactive web mapping.
+Comprehensive test coverage for the Honua MapSDK - a Blazor component library for interactive web mapping, providing unit tests, integration tests, and documentation for maintaining code quality and preventing regressions.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Test Organization](#test-organization)
+- [Running Tests](#running-tests)
+- [Writing New Tests](#writing-new-tests)
+- [Test Patterns](#test-patterns)
+- [Coverage Goals](#coverage-goals)
+- [CI/CD Integration](#cicd-integration)
+- [Troubleshooting](#troubleshooting)
+
+## Overview
+
+This test suite covers all major components of the Honua.MapSDK:
+
+- **23+ UI Components**: Map, MapLibre, DataGrid, Chart, Legend, FilterPanel, Search, Timeline, Editor, CoordinateDisplay, AttributeTable, and more
+- **Core Services**: ComponentBus, MapConfigurationService, FeatureEditService
+- **Models**: FilterDefinition, MapConfiguration
+- **Integration**: Component communication, provider integration, and synchronization
+
+### Testing Stack
+
+- **xUnit** - Test framework
+- **bUnit** - Blazor component testing
+- **FluentAssertions** - Expressive assertions
+- **Moq** - Mocking framework
+- **NSubstitute** - Alternative mocking framework
+- **Coverlet** - Code coverage
 
 ## Test Organization
 
-### Components/ - Component Tests
-- **HonuaMapTests.cs** - Tests for the main HonuaMap component (MapLibre integration)
-  - Component initialization and configuration
-  - Event handling (OnMapReady, OnExtentChanged, OnFeatureClicked)
-  - Message bus integration
-  - Public API methods (FlyToAsync, FitBoundsAsync)
-  - Accessibility and responsive behavior
-  - Disposal and cleanup
+```
+tests/Honua.MapSDK.Tests/
+├── Components/              # Component tests (bUnit)
+│   ├── HonuaMapTests.cs
+│   ├── HonuaEditorTests.cs
+│   ├── HonuaCoordinateDisplayTests.cs
+│   ├── HonuaAttributeTableTests.cs
+│   ├── HonuaDataGridTests.cs
+│   ├── HonuaChartTests.cs
+│   ├── HonuaLegendTests.cs
+│   ├── HonuaFilterPanelTests.cs
+│   ├── HonuaSearchTests.cs
+│   └── HonuaTimelineTests.cs
+├── Services/                # Service tests
+│   ├── ComponentBusTests.cs
+│   ├── MapConfigurationServiceTests.cs
+│   ├── FeatureEditServiceTests.cs
+│   └── ...
+├── Integration/             # Integration tests
+│   ├── MapProviderIntegrationTests.cs
+│   ├── ComponentBusIntegrationTests.cs
+│   ├── MapDataGridSyncTests.cs
+│   ├── FilteringIntegrationTests.cs
+│   └── TimelineIntegrationTests.cs
+├── Infrastructure/          # Test infrastructure
+│   └── MapTestContext.cs
+├── Utilities/               # Test utilities
+│   ├── MockJSRuntime.cs
+│   ├── MapTestFixture.cs
+│   ├── GeometryTestHelpers.cs
+│   └── CoordinateConverterTests.cs
+└── TestHelpers/             # Shared test utilities
+    ├── TestComponentBus.cs
+    ├── MockHttpMessageHandler.cs
+    ├── TestData.cs
+    └── BunitTestContext.cs
+```
 
-### Services/ - Service Tests
-- **ComponentBusTests.cs** - Tests for the message bus (pub/sub pattern)
-  - Basic publish/subscribe functionality
-  - Multiple subscribers and handlers
-  - Message args (source, timestamp, correlation ID)
-  - Different message types
-  - Unsubscribe and clear operations
-  - Error handling
-  - Complex workflows
+### Test Categories
 
-- **MapConfigurationServiceTests.cs** - Tests for configuration management
-  - Export as JSON (formatted and compact)
-  - Export as YAML
-  - Export as HTML embed code
-  - Export as Blazor component
-  - Import from JSON and YAML
-  - Configuration validation (required fields, value ranges, duplicates)
+#### Component Tests
+- Test individual Blazor components in isolation
+- Verify rendering, parameters, and events
+- Use bUnit for component testing
+- Mock dependencies via TestComponentBus
 
-### Integration/ - Integration Tests
-- **MapProviderIntegrationTests.cs** - Integration with external providers
-  - Geocoding provider integration (search, autocomplete, reverse geocoding)
-  - Routing provider integration (route calculation, alternatives, waypoints)
-  - Basemap tile provider integration (tilesets, URL templates, switching)
-  - End-to-end workflows (search + navigate, route + visualize, click + geocode)
+#### Integration Tests
+- Test interactions between multiple components
+- Verify ComponentBus message flow
+- Test data synchronization
+- Validate filtering across components
+- Test provider integrations (geocoding, routing, basemap)
 
-### Infrastructure/ - Test Infrastructure
-- **MapTestContext.cs** - Base test context for bUnit component tests
-  - Registers MapSDK services
-  - Configures JSInterop for testing
-  - Provides fresh context per test
-
-### Utilities/ - Test Utilities
-- **MockJSRuntime.cs** - Mock JavaScript interop for testing
-  - Tracks JS invocations
-  - Configurable return values
-  - Mock JSObjectReference for module imports
-
-- **MapTestFixture.cs** - Shared test data and fixtures
-  - Map configuration builders
-  - Test geometry (points, polygons, routes)
-  - Test feature properties
-  - Test bounds and coordinates
-
-- **GeometryTestHelpers.cs** - Geometry validation and utilities
-  - GeoJSON validation (points, polygons)
-  - Coordinate validation (lon/lat, bounds, zoom, bearing, pitch)
-  - Distance calculation (Haversine formula)
-  - Bounds calculations
-  - Polyline encoding/decoding
+#### Service Tests
+- Test business logic and utilities
+- Verify data transformations
+- Test validation logic
+- Mock external dependencies
 
 ## Running Tests
 
-### Run All Tests
+### Quick Start
+
 ```bash
-dotnet test /home/user/Honua.Server/tests/Honua.MapSDK.Tests
+# From repository root
+dotnet test
+
+# From test project directory
+cd tests/Honua.MapSDK.Tests
+dotnet test
 ```
 
-### Run Unit Tests Only
+### Run Specific Test Category
+
 ```bash
-dotnet test /home/user/Honua.Server/tests/Honua.MapSDK.Tests --filter "Category=Unit"
+# Component tests only
+dotnet test --filter "FullyQualifiedName~ComponentTests"
+
+# Integration tests only
+dotnet test --filter "FullyQualifiedName~IntegrationTests"
+dotnet test --filter "Category=Integration"
+
+# Service tests only
+dotnet test --filter "FullyQualifiedName~ServiceTests"
+
+# Unit tests only
+dotnet test --filter "Category=Unit"
 ```
 
-### Run Integration Tests Only
+### Run Single Test Class
+
 ```bash
-dotnet test /home/user/Honua.Server/tests/Honua.MapSDK.Tests --filter "Category=Integration"
+dotnet test --filter "FullyQualifiedName~ComponentBusTests"
 ```
 
-### Run with Coverage
+### Run with Code Coverage
+
 ```bash
-dotnet test /home/user/Honua.Server/tests/Honua.MapSDK.Tests --collect:"XPlat Code Coverage"
+dotnet test --collect:"XPlat Code Coverage"
+
+# Generate HTML report (requires reportgenerator)
+dotnet tool install -g dotnet-reportgenerator-globaltool
+reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:"coveragereport" -reporttypes:Html
 ```
 
-## Test Patterns
+### Development Workflow
 
-### Arrange-Act-Assert (AAA)
-All tests follow the AAA pattern:
+```bash
+# Watch mode - auto-run tests on file changes
+dotnet watch test
+
+# Verbose output
+dotnet test -v detailed
+
+# Run tests in parallel (default)
+dotnet test --parallel
+
+# Run tests sequentially
+dotnet test --parallel none
+```
+
+## Writing New Tests
+
+### Test Class Template
+
 ```csharp
-[Fact]
-public void Component_ShouldRenderWithDefaultParameters()
+using Bunit;
+using FluentAssertions;
+using Honua.MapSDK.Tests.TestHelpers;
+using Xunit;
+
+namespace Honua.MapSDK.Tests.ComponentTests;
+
+/// <summary>
+/// Tests for NewComponent
+/// </summary>
+public class NewComponentTests : IDisposable
 {
-    // Arrange
-    var cut = Context.RenderComponent<HonuaMap>();
+    private readonly BunitTestContext _testContext;
 
-    // Act
-    // (rendering happens in Arrange for component tests)
+    public NewComponentTests()
+    {
+        _testContext = new BunitTestContext();
+    }
 
-    // Assert
-    cut.Should().NotBeNull();
-    cut.Markup.Should().Contain("class=\"honua-map");
+    public void Dispose()
+    {
+        _testContext.Dispose();
+    }
+
+    [Fact]
+    public void NewComponent_ShouldRenderWithDefaultSettings()
+    {
+        // Arrange & Act
+        var cut = _testContext.RenderComponent<NewComponent>(parameters => parameters
+            .Add(p => p.Id, "test-component"));
+
+        // Assert
+        cut.Should().NotBeNull();
+        cut.Markup.Should().NotBeNullOrEmpty();
+    }
 }
 ```
 
-### Given-When-Then Naming
-Test names follow the Given-When-Then pattern:
-- **Given**: Initial state or context (e.g., "Component", "ValidConfiguration")
-- **When**: Action being tested (e.g., "ShouldRender", "ShouldValidate")
-- **Then**: Expected outcome (e.g., "WithDefaultParameters", "Successfully")
+### Test Method Template (AAA Pattern)
 
-### Parameterized Tests
-Use `[Theory]` and `[InlineData]` for testing multiple scenarios:
+```csharp
+[Fact]
+public void MethodUnderTest_Scenario_ExpectedBehavior()
+{
+    // Arrange - Setup test data and dependencies
+    var testData = TestData.SampleCities;
+    var expectedResult = "expected value";
+
+    // Act - Execute the code under test
+    var actualResult = MethodUnderTest(testData);
+
+    // Assert - Verify the results
+    actualResult.Should().Be(expectedResult);
+}
+```
+
+### Theory Tests (Data-Driven)
+
 ```csharp
 [Theory]
-[InlineData(0, true)]
-[InlineData(10, true)]
-[InlineData(22, true)]
-[InlineData(-1, false)]
-[InlineData(23, false)]
-public void IsValidZoom_ShouldValidateCorrectly(double zoom, bool expected)
+[InlineData(0, "zero")]
+[InlineData(1, "one")]
+[InlineData(5, "five")]
+public void ConvertToWord_WithNumber_ReturnsWord(int input, string expected)
 {
-    // Act
-    var result = GeometryTestHelpers.IsValidZoom(zoom);
+    // Arrange & Act
+    var result = NumberConverter.ToWord(input);
 
     // Assert
     result.Should().Be(expected);
 }
 ```
 
-## Test Coverage Goals
+### Async Tests
 
-- **Component Tests**: >80% code coverage
-  - All public properties and parameters
-  - All event callbacks
-  - All message subscriptions
-  - Lifecycle methods (initialization, disposal)
-
-- **Service Tests**: >80% code coverage
-  - All public methods
-  - All validation rules
-  - Error handling paths
-  - Edge cases
-
-- **Integration Tests**: Key workflows
-  - Provider connectivity
-  - End-to-end scenarios
-  - Cross-component communication
-
-## Dependencies
-
-### Testing Frameworks
-- **xUnit** - Test framework
-- **bUnit** - Blazor component testing
-- **FluentAssertions** - Fluent assertion library
-- **Moq** - Mocking framework
-- **NSubstitute** - Alternative mocking framework
-
-### UI Libraries
-- **MudBlazor** - UI component library (used by tested components)
-
-### Test Utilities
-- **Microsoft.AspNetCore.TestHost** - ASP.NET Core testing
-- **RichardSzalay.MockHttp** - HTTP mocking
-- **coverlet.collector** - Code coverage
-
-## Writing New Tests
-
-### Component Tests
-1. Inherit from `MapComponentTestBase`
-2. Use `Context.RenderComponent<T>()` to render components
-3. Test markup with `cut.Markup.Should().Contain()`
-4. Test instance properties with `cut.Instance.PropertyName`
-5. Dispose context automatically (handled by base class)
-
-Example:
 ```csharp
-public class MyComponentTests : MapComponentTestBase
+[Fact]
+public async Task PublishAsync_ShouldInvokeSubscribers()
 {
-    [Fact]
-    public void MyComponent_ShouldRender()
+    // Arrange
+    var bus = new TestComponentBus();
+    var messageReceived = false;
+
+    bus.Subscribe<TestMessage>(args =>
     {
-        var cut = Context.RenderComponent<MyComponent>();
-        cut.Markup.Should().Contain("expected-class");
-    }
+        messageReceived = true;
+        return Task.CompletedTask;
+    });
+
+    // Act
+    await bus.PublishAsync(new TestMessage(), "source");
+
+    // Assert
+    messageReceived.Should().BeTrue();
 }
 ```
 
-### Service Tests
-1. Create instance of service in constructor or test method
-2. Test all public methods
-3. Test validation and error cases
-4. Use FluentAssertions for readable assertions
+## Test Patterns
 
-Example:
+### Component Testing Pattern
+
 ```csharp
-public class MyServiceTests
+[Fact]
+public void Component_WithParameter_ShouldApplyParameter()
 {
-    private readonly MyService _service = new();
+    // Arrange & Act
+    var cut = _testContext.RenderComponent<HonuaMap>(parameters => parameters
+        .Add(p => p.Id, "test-map")
+        .Add(p => p.Zoom, 10)
+        .Add(p => p.Center, new[] { -122.4194, 37.7749 }));
 
-    [Fact]
-    public void MyMethod_WithValidInput_ShouldSucceed()
-    {
-        var result = _service.MyMethod(validInput);
-        result.Should().NotBeNull();
-    }
+    // Assert
+    cut.Should().NotBeNull();
+    // Verify parameter was applied (implementation specific)
 }
 ```
 
-### Integration Tests
-1. Mock external dependencies (providers)
-2. Test cross-component communication via ComponentBus
-3. Test end-to-end workflows
-4. Mark with `[Trait("Category", "Integration")]`
+### ComponentBus Testing Pattern
 
-## Code Coverage Report
+```csharp
+[Fact]
+public async Task Component_OnAction_ShouldPublishMessage()
+{
+    // Arrange
+    var cut = _testContext.RenderComponent<TestComponent>(parameters => parameters
+        .Add(p => p.Id, "test"));
 
-Generate HTML coverage report:
+    // Act - Trigger action (implementation specific)
+
+    // Assert
+    var messages = _testContext.ComponentBus.GetMessages<TestMessage>();
+    messages.Should().HaveCount(1);
+    messages[0].Property.Should().Be("expected value");
+}
+```
+
+### Mocking HTTP Requests
+
+```csharp
+[Fact]
+public async Task Service_WithHttpCall_ShouldReturnData()
+{
+    // Arrange
+    var handler = MockHttpMessageHandler.CreateJsonHandler(TestData.SampleGeoJson);
+    var httpClient = new HttpClient(handler);
+    var service = new GeocodingService(httpClient);
+
+    // Act
+    var result = await service.SearchAsync("San Francisco");
+
+    // Assert
+    result.Should().NotBeNull();
+    handler.Requests.Should().HaveCount(1);
+}
+```
+
+## Coverage Goals
+
+### Overall Targets
+
+- **80%+ overall code coverage**
+- **90%+ for critical paths** (ComponentBus, filters, core services)
+- **70%+ for UI components**
+- **100% for utility functions**
+
+### Checking Coverage
+
 ```bash
-cd /home/user/Honua.Server/tests/Honua.MapSDK.Tests
+# Generate coverage report
 dotnet test --collect:"XPlat Code Coverage"
-reportgenerator -reports:TestResults/*/coverage.cobertura.xml -targetdir:CoverageReport -reporttypes:Html
+
+# View coverage percentage
+reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:"coverage" -reporttypes:Html
+
+# Open coverage/index.html in browser
 ```
 
-View report: `CoverageReport/index.html`
+## CI/CD Integration
 
-## Continuous Integration
+Tests run automatically on:
+- **Pull Requests** - All tests must pass
+- **Commits to main** - Full test suite + coverage report
+- **Nightly builds** - Extended test suite
 
-Tests are run automatically on:
-- Pull requests
-- Main branch commits
-- Release builds
+### GitHub Actions
 
-CI configuration ensures:
-- All tests pass
-- Code coverage meets threshold (>80%)
-- No test warnings or errors
+See `.github/workflows/test.yml` for the CI configuration.
+
+```yaml
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet restore
+      - run: dotnet build --no-restore
+      - run: dotnet test --no-build --collect:"XPlat Code Coverage"
+      - uses: codecov/codecov-action@v3
+```
 
 ## Troubleshooting
 
-### JS Interop Errors
-If you see JS interop errors, ensure:
-- `Context.JSInterop.Mode = JSRuntimeMode.Loose` is set
-- Mock JS runtime is configured for expected calls
+### Common Issues
 
-### Component Rendering Errors
-If components fail to render:
-- Check that required services are registered in `MapTestContext`
-- Verify all required parameters are provided
-- Check for null reference exceptions in component code
+#### Tests Fail Intermittently
 
-### Test Isolation Issues
-If tests interfere with each other:
-- Ensure each test gets fresh `Context` (provided by `MapComponentTestBase`)
-- Clear ComponentBus subscriptions if needed
-- Avoid static state in components
+**Problem**: Async tests sometimes fail due to timing issues.
 
-## Performance
+**Solution**: Use `WaitForMessageAsync` or add appropriate delays:
+```csharp
+await Task.Delay(100); // Give component time to update
+var message = await bus.WaitForMessageAsync<TestMessage>();
+```
 
-- Unit tests should complete in milliseconds
-- Integration tests may take longer (seconds)
-- Total test suite should complete in <30 seconds
+#### ComponentBus Messages Not Received
+
+**Problem**: Subscriber not receiving published messages.
+
+**Solution**: Ensure subscriber is registered before publishing:
+```csharp
+// Subscribe first
+bus.Subscribe<TestMessage>(handler);
+
+// Then publish
+await bus.PublishAsync(message, "source");
+```
+
+#### bUnit Tests Throw Exceptions
+
+**Problem**: JSInterop not configured properly.
+
+**Solution**: Use BunitTestContext which configures JSInterop:
+```csharp
+var _testContext = new BunitTestContext();
+// JSInterop is configured automatically
+```
+
+#### Coverage Not Generating
+
+**Problem**: Coverage reports not created.
+
+**Solution**: Install coverlet.collector package:
+```bash
+dotnet add package coverlet.collector
+```
 
 ## Best Practices
 
-1. **Test Behavior, Not Implementation** - Test what components do, not how they do it
-2. **One Assert Per Test** - Each test should verify one thing (with FluentAssertions, multiple assertions are OK if they relate to the same behavior)
-3. **Independent Tests** - Tests should not depend on execution order
-4. **Clear Test Names** - Test names should describe what is being tested
-5. **Use Test Fixtures** - Reuse common test data from `MapTestFixture`
-6. **Mock External Dependencies** - Don't call real services in unit tests
-7. **Test Error Cases** - Don't just test the happy path
-8. **Keep Tests Fast** - Avoid unnecessary delays or waits
+1. **One Assertion Per Test** (or closely related assertions)
+2. **Descriptive Test Names** - MethodUnderTest_Scenario_ExpectedBehavior
+3. **AAA Pattern** - Arrange, Act, Assert
+4. **No Test Interdependencies** - Tests should run in any order
+5. **Use Test Helpers** - Share common setup via TestData and helpers
+6. **Mock External Dependencies** - Use MockHttpMessageHandler for HTTP calls
+7. **Clean Up Resources** - Implement IDisposable for test contexts
+8. **Test Both Success and Failure Paths**
+9. **Keep Tests Fast** - Avoid unnecessary delays
+10. **Document Complex Tests** - Add comments explaining non-obvious logic
 
-## Future Test Additions
+## Contributing
 
-Components to add when implemented:
-- **HonuaLeafletTests** - Leaflet component tests
-- **LayerControlTests** - Layer switcher tests
-- **DrawingToolbarTests** - Drawing tools tests
-- **GeocodingSearchTests** - Search control tests
-- **RoutePanelTests** - Routing panel tests
-- **LayerManagerTests** - Layer service tests
-- **DrawingManagerTests** - Drawing service tests
-- **MeasurementManagerTests** - Measurement tests
-- **RouteVisualizationServiceTests** - Route rendering tests
+When adding new features to MapSDK:
 
-## Contact
+1. Write tests first (TDD approach recommended)
+2. Ensure all tests pass
+3. Maintain or improve code coverage
+4. Update test documentation if needed
+5. Follow existing test patterns
 
-For questions about tests, contact the Honua MapSDK team.
+## License
+
+Copyright (c) Honua.io. All rights reserved.

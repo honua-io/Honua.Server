@@ -1,0 +1,270 @@
+/* HonuaImportWizard Styles */
+
+.honua-import-wizard {
+    width: 100%;
+}
+
+.import-wizard-paper {
+    padding: 24px;
+}
+
+.wizard-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+.wizard-content {
+    min-height: 400px;
+}
+
+.wizard-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--mud-palette-divider);
+}
+
+/* Upload Step */
+.import-step.upload-step {
+    padding: 24px 0;
+}
+
+.drop-zone {
+    border: 2px dashed var(--mud-palette-divider);
+    border-radius: 8px;
+    padding: 48px 24px;
+    text-align: center;
+    transition: all 0.3s ease;
+    background-color: var(--mud-palette-surface);
+    cursor: pointer;
+}
+
+.drop-zone:hover {
+    border-color: var(--mud-palette-primary);
+    background-color: var(--mud-palette-action-hover);
+}
+
+.drop-zone.dragging {
+    border-color: var(--mud-palette-primary);
+    background-color: var(--mud-palette-action-selected);
+    border-width: 3px;
+}
+
+.drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.supported-formats {
+    text-align: center;
+    margin-top: 16px;
+}
+
+.format-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.alternative-options {
+    text-align: center;
+}
+
+/* Preview Step */
+.import-step.preview-step {
+    padding: 24px 0;
+}
+
+.preview-summary {
+    background-color: var(--mud-palette-background-grey);
+    border-radius: 8px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.stat-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.preview-table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.field-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cell-value {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/* Configure Step */
+.import-step.configure-step {
+    padding: 24px 0;
+}
+
+.radio-option {
+    padding: 8px 0;
+}
+
+.sample-value {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/* Import Step */
+.import-step.import-progress-step {
+    padding: 48px 24px;
+    text-align: center;
+}
+
+.import-progress {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.import-complete {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.success-content,
+.error-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.result-stat {
+    text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 960px) {
+    .import-wizard-paper {
+        padding: 16px;
+    }
+
+    .drop-zone {
+        padding: 32px 16px;
+    }
+
+    .wizard-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .wizard-actions button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 600px) {
+    .stat-item {
+        justify-content: center;
+    }
+
+    .preview-table {
+        font-size: 0.875rem;
+    }
+
+    .cell-value {
+        max-width: 100px;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .drop-zone {
+        background-color: var(--mud-palette-dark-surface);
+    }
+
+    .drop-zone:hover {
+        background-color: var(--mud-palette-dark-action-hover);
+    }
+
+    .drop-zone.dragging {
+        background-color: var(--mud-palette-dark-action-selected);
+    }
+
+    .preview-summary {
+        background-color: var(--mud-palette-dark-background-grey);
+    }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.import-step {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Loading States */
+.import-progress :deep(.mud-progress-linear) {
+    height: 8px;
+    border-radius: 4px;
+}
+
+/* Success/Error Icons */
+.success-content > :deep(.mud-icon-root),
+.error-content > :deep(.mud-icon-root) {
+    font-size: 72px;
+}
+
+/* Field Mapping Table */
+.configure-step :deep(.mud-table) {
+    background-color: transparent;
+}
+
+.configure-step :deep(.mud-table-cell) {
+    padding: 8px;
+}
+
+/* Progress List */
+.import-progress :deep(.mud-list-item) {
+    padding: 8px 16px;
+}
+
+.import-progress :deep(.mud-list-item .mud-icon-root) {
+    margin-right: 12px;
+}

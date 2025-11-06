@@ -1,0 +1,953 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-layerlist @CssClass @GetPositionClass() @($"view-{ViewMode}")" style="@GetContainerStyle()">
+    <MudPaper Class="layerlist-container" Elevation="2">
+        @if (ShowHeader)
+        {
+            <div class="layerlist-header">
+                <div class="header-left">
+                    <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" />
+                    <span class="layerlist-title">@Title</span>
+                    @if (ShowLayerCount)
+                    {
+                        <span class="layer-count">(@_layers.Count)</span>
+                    }
+                </div>
+                <div class="header-actions">
+                    @if (ShowSearch && _layers.Count > 3)
+                    {
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Search"
+                            Size="Size.Small"
+                            OnClick="@(() => _showSearch = !_showSearch)"
+                            aria-label="Toggle search" />
+                    }
+                    @if (ShowViewToggle)
+                    {
+                        <MudIconButton
+                            Icon="@(_viewMode == "compact" ? Icons.Material.Filled.ViewList : Icons.Material.Filled.ViewCompact)"
+                            Size="Size.Small"
+                            OnClick="ToggleViewMode"
+                            aria-label="Toggle view mode" />
+                    }
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@(_allVisible ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                     OnClick="ToggleAllVisibility">
+                            @(_allVisible ? "Hide All" : "Show All")
+                        </MudMenuItem>
+                        @if (AllowGrouping)
+                        {
+                            <MudMenuItem Icon="@(_showGroups ? Icons.Material.Filled.FolderOff : Icons.Material.Filled.Folder)"
+                                         OnClick="@(() => { _showGroups = !_showGroups; StateHasChanged(); })">
+                                @(_showGroups ? "Flat View" : "Group View")
+                            </MudMenuItem>
+                        }
+                        <MudDivider />
+                        <MudMenuItem Icon="@Icons.Material.Filled.ExpandLess" OnClick="CollapseAll">
+                            Collapse All
+                        </MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Filled.ExpandMore" OnClick="ExpandAll">
+                            Expand All
+                        </MudMenuItem>
+                    </MudMenu>
+                </div>
+            </div>
+        }
+
+        @if (_showSearch && ShowSearch)
+        {
+            <div class="layerlist-search">
+                <MudTextField @bind-Value="_searchQuery"
+                              Placeholder="Search layers..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Immediate="true"
+                              OnDebounceIntervalElapsed="PerformSearch"
+                              DebounceInterval="300"
+                              Clearable="true"
+                              Class="search-field" />
+            </div>
+        }
+
+        <div class="layerlist-content">
+            @if (_isLoading)
+            {
+                <div class="loading-state">
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">Loading layers...</MudText>
+                </div>
+            }
+            else if (_filteredLayers.Count == 0)
+            {
+                <div class="empty-state">
+                    <MudIcon Icon="@Icons.Material.Filled.LayersClear" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        @(string.IsNullOrEmpty(_searchQuery) ? "No layers available" : "No layers found")
+                    </MudText>
+                </div>
+            }
+            else
+            {
+                @if (_showGroups && AllowGrouping && _groups.Count > 0)
+                {
+                    @* Grouped view *@
+                    @foreach (var group in GetSortedGroups())
+                    {
+                        var groupLayers = _filteredLayers.Where(l => l.GroupId == group.Id).OrderByDescending(l => l.Order).ToList();
+                        if (groupLayers.Any())
+                        {
+                            @RenderLayerGroup(group, groupLayers)
+                        }
+                    }
+
+                    @* Ungrouped layers *@
+                    var ungrouped = _filteredLayers.Where(l => string.IsNullOrEmpty(l.GroupId)).OrderByDescending(l => l.Order).ToList();
+                    if (ungrouped.Any())
+                    {
+                        <div class="layer-group">
+                            <div class="group-header" @onclick="@(() => ToggleGroup("_ungrouped"))">
+                                <MudIcon Icon="@(_expandedGroups.Contains("_ungrouped") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)"
+                                         Size="Size.Small" />
+                                <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" Color="Color.Default" />
+                                <span class="group-name">Ungrouped</span>
+                                <span class="group-count">(@ungrouped.Count)</span>
+                            </div>
+                            @if (_expandedGroups.Contains("_ungrouped"))
+                            {
+                                <div class="group-content">
+                                    @foreach (var layer in ungrouped)
+                                    {
+                                        @RenderLayerItem(layer, 0)
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    @* Flat list view *@
+                    <div class="layer-list">
+                        @foreach (var layer in _filteredLayers.OrderByDescending(l => l.Order))
+                        {
+                            @RenderLayerItem(layer, 0)
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </MudPaper>
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the layer list component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"layerlist-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Title displayed in header
+    /// </summary>
+    [Parameter]
+    public string Title { get; set; } = "Layers";
+
+    /// <summary>
+    /// Show header with title and controls
+    /// </summary>
+    [Parameter]
+    public bool ShowHeader { get; set; } = true;
+
+    /// <summary>
+    /// Show layer count in header
+    /// </summary>
+    [Parameter]
+    public bool ShowLayerCount { get; set; } = true;
+
+    /// <summary>
+    /// Show opacity slider for each layer
+    /// </summary>
+    [Parameter]
+    public bool ShowOpacitySlider { get; set; } = true;
+
+    /// <summary>
+    /// Show search box
+    /// </summary>
+    [Parameter]
+    public bool ShowSearch { get; set; } = true;
+
+    /// <summary>
+    /// Allow drag and drop reordering
+    /// </summary>
+    [Parameter]
+    public bool AllowReorder { get; set; } = true;
+
+    /// <summary>
+    /// Allow layer grouping/folders
+    /// </summary>
+    [Parameter]
+    public bool AllowGrouping { get; set; } = true;
+
+    /// <summary>
+    /// Show legend preview swatches
+    /// </summary>
+    [Parameter]
+    public bool ShowLegend { get; set; } = true;
+
+    /// <summary>
+    /// Show view mode toggle button
+    /// </summary>
+    [Parameter]
+    public bool ShowViewToggle { get; set; } = true;
+
+    /// <summary>
+    /// Layers can be collapsed/expanded
+    /// </summary>
+    [Parameter]
+    public bool Collapsible { get; set; } = true;
+
+    /// <summary>
+    /// View mode: compact or detailed
+    /// </summary>
+    [Parameter]
+    public string ViewMode { get; set; } = "detailed";
+
+    /// <summary>
+    /// Position on map: top-right, top-left, bottom-right, bottom-left, or null for embedded
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Width of component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "320px";
+
+    /// <summary>
+    /// Maximum height
+    /// </summary>
+    [Parameter]
+    public string? MaxHeight { get; set; }
+
+    /// <summary>
+    /// Event callback when layer visibility changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<LayerInfo> OnLayerVisibilityChanged { get; set; }
+
+    /// <summary>
+    /// Event callback when layer opacity changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<LayerInfo> OnLayerOpacityChanged { get; set; }
+
+    /// <summary>
+    /// Event callback when layers are reordered
+    /// </summary>
+    [Parameter]
+    public EventCallback<List<LayerInfo>> OnLayerReordered { get; set; }
+
+    /// <summary>
+    /// Event callback when layer is removed
+    /// </summary>
+    [Parameter]
+    public EventCallback<LayerInfo> OnLayerRemoved { get; set; }
+
+    /// <summary>
+    /// Event callback when layer is selected
+    /// </summary>
+    [Parameter]
+    public EventCallback<LayerInfo> OnLayerSelected { get; set; }
+
+    private List<LayerInfo> _layers = new();
+    private List<LayerInfo> _filteredLayers = new();
+    private List<LayerGroup> _groups = new();
+    private HashSet<string> _expandedGroups = new();
+    private HashSet<string> _expandedLayers = new();
+    private string _searchQuery = string.Empty;
+    private string _viewMode = "detailed";
+    private bool _showSearch = false;
+    private bool _showGroups = true;
+    private bool _isLoading = false;
+    private bool _mapReady = false;
+    private bool _allVisible = true;
+    private LayerInfo? _selectedLayer;
+    private IJSObjectReference? _jsModule;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _viewMode = ViewMode;
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-layerlist.js"
+                );
+
+                if (_mapReady && SyncWith != null)
+                {
+                    await LoadMapLayers();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading LayerList JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready
+        Bus.Subscribe<MapReadyMessage>(async args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                await LoadMapLayers();
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for layer added
+        Bus.Subscribe<LayerAddedMessage>(async args =>
+        {
+            await LoadMapLayers();
+            await InvokeAsync(StateHasChanged);
+        });
+
+        // Listen for layer removed
+        Bus.Subscribe<LayerRemovedMessage>(async args =>
+        {
+            var layer = _layers.FirstOrDefault(l => l.Id == args.Message.LayerId);
+            if (layer != null)
+            {
+                _layers.Remove(layer);
+                await ApplySearchFilter();
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for external visibility changes
+        Bus.Subscribe<LayerVisibilityChangedMessage>(async args =>
+        {
+            var layer = _layers.FirstOrDefault(l => l.Id == args.Message.LayerId);
+            if (layer != null)
+            {
+                layer.Visible = args.Message.Visible;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for external opacity changes
+        Bus.Subscribe<LayerOpacityChangedMessage>(async args =>
+        {
+            var layer = _layers.FirstOrDefault(l => l.Id == args.Message.LayerId);
+            if (layer != null)
+            {
+                layer.Opacity = args.Message.Opacity;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private async Task LoadMapLayers()
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var layersJson = await _jsModule.InvokeAsync<string>("getMapLayers", SyncWith);
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var layers = JsonSerializer.Deserialize<List<LayerInfo>>(layersJson, options);
+
+            if (layers != null)
+            {
+                _layers = layers;
+
+                // Expand all groups by default
+                _expandedGroups = _groups.Select(g => g.Id).ToHashSet();
+                _expandedGroups.Add("_ungrouped");
+
+                await ApplySearchFilter();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading map layers: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ApplySearchFilter()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            _filteredLayers = _layers;
+        }
+        else
+        {
+            var query = _searchQuery.ToLowerInvariant();
+            _filteredLayers = _layers.Where(l =>
+                l.Name.ToLowerInvariant().Contains(query) ||
+                (l.Description != null && l.Description.ToLowerInvariant().Contains(query)) ||
+                (l.SourceLayer != null && l.SourceLayer.ToLowerInvariant().Contains(query))
+            ).ToList();
+        }
+
+        UpdateVisibilityState();
+    }
+
+    private async Task PerformSearch()
+    {
+        await ApplySearchFilter();
+        StateHasChanged();
+    }
+
+    private void UpdateVisibilityState()
+    {
+        _allVisible = _layers.All(l => l.Visible);
+    }
+
+    private async Task ToggleLayerVisibility(LayerInfo layer)
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        layer.Visible = !layer.Visible;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("setLayerVisibility", SyncWith, layer.Id, layer.Visible);
+
+            // Publish message
+            await Bus.PublishAsync(new LayerVisibilityChangedMessage
+            {
+                LayerId = layer.Id,
+                Visible = layer.Visible
+            }, Id);
+
+            await OnLayerVisibilityChanged.InvokeAsync(layer);
+            UpdateVisibilityState();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error toggling layer visibility: {ex.Message}");
+            layer.Visible = !layer.Visible; // Revert on error
+        }
+    }
+
+    private async Task SetLayerOpacity(LayerInfo layer, double opacity)
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        layer.Opacity = opacity;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("setLayerOpacity", SyncWith, layer.Id, opacity);
+
+            // Publish message
+            await Bus.PublishAsync(new LayerOpacityChangedMessage
+            {
+                LayerId = layer.Id,
+                Opacity = opacity
+            }, Id);
+
+            await OnLayerOpacityChanged.InvokeAsync(layer);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error setting layer opacity: {ex.Message}");
+        }
+    }
+
+    private async Task ZoomToLayer(LayerInfo layer)
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("zoomToLayer", SyncWith, layer.Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error zooming to layer: {ex.Message}");
+        }
+    }
+
+    private async Task RemoveLayer(LayerInfo layer)
+    {
+        if (_jsModule == null || SyncWith == null || !layer.CanRemove) return;
+
+        try
+        {
+            _layers.Remove(layer);
+            await ApplySearchFilter();
+
+            await _jsModule.InvokeVoidAsync("removeLayer", SyncWith, layer.Id);
+
+            // Publish message
+            await Bus.PublishAsync(new LayerRemovedMessage
+            {
+                LayerId = layer.Id
+            }, Id);
+
+            await OnLayerRemoved.InvokeAsync(layer);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error removing layer: {ex.Message}");
+        }
+    }
+
+    private void SelectLayer(LayerInfo layer)
+    {
+        _selectedLayer = layer;
+        _ = OnLayerSelected.InvokeAsync(layer);
+        StateHasChanged();
+    }
+
+    private void ToggleGroup(string groupId)
+    {
+        if (_expandedGroups.Contains(groupId))
+        {
+            _expandedGroups.Remove(groupId);
+        }
+        else
+        {
+            _expandedGroups.Add(groupId);
+        }
+    }
+
+    private void ToggleLayerExpand(string layerId)
+    {
+        if (_expandedLayers.Contains(layerId))
+        {
+            _expandedLayers.Remove(layerId);
+        }
+        else
+        {
+            _expandedLayers.Add(layerId);
+        }
+    }
+
+    private async Task ToggleAllVisibility()
+    {
+        _allVisible = !_allVisible;
+
+        foreach (var layer in _layers.Where(l => !l.IsLocked))
+        {
+            layer.Visible = _allVisible;
+            if (_jsModule != null && SyncWith != null)
+            {
+                await _jsModule.InvokeVoidAsync("setLayerVisibility", SyncWith, layer.Id, _allVisible);
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private void CollapseAll()
+    {
+        _expandedGroups.Clear();
+        _expandedLayers.Clear();
+        StateHasChanged();
+    }
+
+    private void ExpandAll()
+    {
+        _expandedGroups = _groups.Select(g => g.Id).ToHashSet();
+        _expandedGroups.Add("_ungrouped");
+        _expandedLayers = _layers.Select(l => l.Id).ToHashSet();
+        StateHasChanged();
+    }
+
+    private void ToggleViewMode()
+    {
+        _viewMode = _viewMode == "compact" ? "detailed" : "compact";
+        StateHasChanged();
+    }
+
+    private List<LayerGroup> GetSortedGroups()
+    {
+        return _groups.OrderBy(g => g.Order).ToList();
+    }
+
+    private RenderFragment RenderLayerGroup(LayerGroup group, List<LayerInfo> layers) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "layer-group");
+
+        // Group header
+        builder.OpenElement(2, "div");
+        builder.AddAttribute(3, "class", "group-header");
+        builder.AddAttribute(4, "onclick", EventCallback.Factory.Create(this, () => ToggleGroup(group.Id)));
+
+        builder.OpenComponent<MudIcon>(5);
+        builder.AddAttribute(6, "Icon", _expandedGroups.Contains(group.Id) ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight);
+        builder.AddAttribute(7, "Size", Size.Small);
+        builder.CloseComponent();
+
+        builder.OpenComponent<MudIcon>(8);
+        builder.AddAttribute(9, "Icon", group.Icon ?? Icons.Material.Filled.Folder);
+        builder.AddAttribute(10, "Size", Size.Small);
+        builder.AddAttribute(11, "Color", Color.Primary);
+        builder.CloseComponent();
+
+        builder.OpenElement(12, "span");
+        builder.AddAttribute(13, "class", "group-name");
+        builder.AddContent(14, group.Name);
+        builder.CloseElement();
+
+        builder.OpenElement(15, "span");
+        builder.AddAttribute(16, "class", "group-count");
+        builder.AddContent(17, $"({layers.Count})");
+        builder.CloseElement();
+
+        // Group visibility toggle
+        builder.OpenComponent<MudCheckBox<bool>>(18);
+        builder.AddAttribute(19, "Checked", group.Visible);
+        builder.AddAttribute(20, "CheckedChanged", EventCallback.Factory.Create<bool>(this, async (value) =>
+        {
+            group.Visible = value;
+            foreach (var layer in layers)
+            {
+                await ToggleLayerVisibility(layer);
+            }
+        }));
+        builder.AddAttribute(21, "Size", Size.Small);
+        builder.AddAttribute(22, "onclick", "event.stopPropagation()");
+        builder.CloseComponent();
+
+        builder.CloseElement(); // group-header
+
+        // Group content
+        if (_expandedGroups.Contains(group.Id))
+        {
+            builder.OpenElement(23, "div");
+            builder.AddAttribute(24, "class", "group-content");
+
+            foreach (var layer in layers)
+            {
+                builder.AddContent(25, RenderLayerItem(layer, 1));
+            }
+
+            builder.CloseElement(); // group-content
+        }
+
+        builder.CloseElement(); // layer-group
+    };
+
+    private RenderFragment RenderLayerItem(LayerInfo layer, int indent) => builder =>
+    {
+        var isExpanded = _expandedLayers.Contains(layer.Id);
+        var isSelected = _selectedLayer?.Id == layer.Id;
+
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", $"layer-item {(_viewMode == "compact" ? "compact" : "")} {(isSelected ? "selected" : "")}");
+        builder.AddAttribute(2, "style", $"padding-left: {(indent * 20) + 8}px");
+
+        // Main layer row
+        builder.OpenElement(3, "div");
+        builder.AddAttribute(4, "class", "layer-main");
+
+        // Drag handle
+        if (AllowReorder && !layer.IsLocked)
+        {
+            builder.OpenElement(5, "div");
+            builder.AddAttribute(6, "class", "drag-handle");
+            builder.OpenComponent<MudIcon>(7);
+            builder.AddAttribute(8, "Icon", Icons.Material.Filled.DragIndicator);
+            builder.AddAttribute(9, "Size", Size.Small);
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+
+        // Visibility checkbox
+        builder.OpenComponent<MudCheckBox<bool>>(10);
+        builder.AddAttribute(11, "Checked", layer.Visible);
+        builder.AddAttribute(12, "CheckedChanged", EventCallback.Factory.Create<bool>(this, async (value) =>
+        {
+            await ToggleLayerVisibility(layer);
+        }));
+        builder.AddAttribute(13, "Size", Size.Small);
+        builder.AddAttribute(14, "Disabled", layer.IsLocked);
+        builder.AddAttribute(15, "Class", "visibility-checkbox");
+        builder.CloseComponent();
+
+        // Layer icon
+        builder.OpenComponent<MudIcon>(16);
+        builder.AddAttribute(17, "Icon", GetLayerIcon(layer.Type));
+        builder.AddAttribute(18, "Size", Size.Small);
+        builder.AddAttribute(19, "Color", layer.Visible ? Color.Default : Color.Secondary);
+        builder.AddAttribute(20, "Class", "layer-icon");
+        builder.CloseComponent();
+
+        // Layer info
+        builder.OpenElement(21, "div");
+        builder.AddAttribute(22, "class", "layer-info");
+        builder.AddAttribute(23, "onclick", EventCallback.Factory.Create(this, () => SelectLayer(layer)));
+
+        builder.OpenComponent<MudText>(24);
+        builder.AddAttribute(25, "Typo", Typo.body2);
+        builder.AddAttribute(26, "Class", "layer-name");
+        builder.AddAttribute(27, "ChildContent", (RenderFragment)(b => b.AddContent(28, layer.Name)));
+        builder.CloseComponent();
+
+        if (_viewMode == "detailed" && layer.FeatureCount.HasValue)
+        {
+            builder.OpenComponent<MudText>(29);
+            builder.AddAttribute(30, "Typo", Typo.caption);
+            builder.AddAttribute(31, "Color", Color.Secondary);
+            builder.AddAttribute(32, "Class", "layer-meta");
+            builder.AddAttribute(33, "ChildContent", (RenderFragment)(b =>
+            {
+                b.AddContent(34, $"{layer.FeatureCount.Value:N0} features");
+            }));
+            builder.CloseComponent();
+        }
+
+        builder.CloseElement(); // layer-info
+
+        // Layer actions
+        builder.OpenElement(35, "div");
+        builder.AddAttribute(36, "class", "layer-actions");
+
+        if (layer.IsLocked)
+        {
+            builder.OpenComponent<MudIcon>(37);
+            builder.AddAttribute(38, "Icon", Icons.Material.Filled.Lock);
+            builder.AddAttribute(39, "Size", Size.Small);
+            builder.AddAttribute(40, "Color", Color.Secondary);
+            builder.CloseComponent();
+        }
+
+        if (Collapsible && (_viewMode == "detailed" || layer.LegendItems.Any()))
+        {
+            builder.OpenComponent<MudIconButton>(41);
+            builder.AddAttribute(42, "Icon", isExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore);
+            builder.AddAttribute(43, "Size", Size.Small);
+            builder.AddAttribute(44, "OnClick", EventCallback.Factory.Create(this, () => ToggleLayerExpand(layer.Id)));
+            builder.CloseComponent();
+        }
+
+        builder.OpenComponent<MudMenu>(45);
+        builder.AddAttribute(46, "Icon", Icons.Material.Filled.MoreVert);
+        builder.AddAttribute(47, "Size", Size.Small);
+        builder.AddAttribute(48, "Dense", true);
+        builder.AddAttribute(49, "ChildContent", (RenderFragment)(menuBuilder =>
+        {
+            if (layer.Extent != null)
+            {
+                menuBuilder.OpenComponent<MudMenuItem>(0);
+                menuBuilder.AddAttribute(1, "Icon", Icons.Material.Filled.ZoomIn);
+                menuBuilder.AddAttribute(2, "OnClick", EventCallback.Factory.Create(this, () => ZoomToLayer(layer)));
+                menuBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(4, "Zoom to Layer")));
+                menuBuilder.CloseComponent();
+            }
+
+            if (layer.CanRemove)
+            {
+                menuBuilder.OpenComponent<MudMenuItem>(5);
+                menuBuilder.AddAttribute(6, "Icon", Icons.Material.Filled.Delete);
+                menuBuilder.AddAttribute(7, "OnClick", EventCallback.Factory.Create(this, () => RemoveLayer(layer)));
+                menuBuilder.AddAttribute(8, "ChildContent", (RenderFragment)(b => b.AddContent(9, "Remove Layer")));
+                menuBuilder.CloseComponent();
+            }
+        }));
+        builder.CloseComponent();
+
+        builder.CloseElement(); // layer-actions
+
+        builder.CloseElement(); // layer-main
+
+        // Expanded details
+        if (isExpanded && _viewMode == "detailed")
+        {
+            builder.OpenElement(50, "div");
+            builder.AddAttribute(51, "class", "layer-details");
+
+            // Opacity slider
+            if (ShowOpacitySlider && !layer.IsLocked)
+            {
+                builder.OpenElement(52, "div");
+                builder.AddAttribute(53, "class", "opacity-control");
+
+                builder.OpenComponent<MudText>(54);
+                builder.AddAttribute(55, "Typo", Typo.caption);
+                builder.AddAttribute(56, "Class", "opacity-label");
+                builder.AddAttribute(57, "ChildContent", (RenderFragment)(b => b.AddContent(58, $"Opacity: {layer.Opacity * 100:F0}%")));
+                builder.CloseComponent();
+
+                builder.OpenComponent<MudSlider<double>>(59);
+                builder.AddAttribute(60, "Value", layer.Opacity * 100);
+                builder.AddAttribute(61, "ValueChanged", EventCallback.Factory.Create<double>(this, async (value) =>
+                {
+                    await SetLayerOpacity(layer, value / 100.0);
+                }));
+                builder.AddAttribute(62, "Min", 0.0);
+                builder.AddAttribute(63, "Max", 100.0);
+                builder.AddAttribute(64, "Step", 5.0);
+                builder.AddAttribute(65, "Color", Color.Primary);
+                builder.AddAttribute(66, "Size", Size.Small);
+                builder.AddAttribute(67, "Class", "opacity-slider");
+                builder.CloseComponent();
+
+                builder.CloseElement(); // opacity-control
+            }
+
+            // Legend items
+            if (ShowLegend && layer.LegendItems.Any())
+            {
+                builder.OpenElement(68, "div");
+                builder.AddAttribute(69, "class", "layer-legend");
+
+                foreach (var item in layer.LegendItems)
+                {
+                    builder.OpenElement(70, "div");
+                    builder.AddAttribute(71, "class", "legend-item");
+
+                    if (!string.IsNullOrEmpty(item.Color))
+                    {
+                        builder.OpenElement(72, "div");
+                        builder.AddAttribute(73, "class", "legend-swatch");
+                        builder.AddAttribute(74, "style", $"background-color: {item.Color}; border: 1px solid {item.StrokeColor ?? "#ccc"};");
+                        builder.CloseElement();
+                    }
+
+                    builder.OpenComponent<MudText>(75);
+                    builder.AddAttribute(76, "Typo", Typo.caption);
+                    builder.AddAttribute(77, "Class", "legend-label");
+                    builder.AddAttribute(78, "ChildContent", (RenderFragment)(b => b.AddContent(79, item.Label)));
+                    builder.CloseComponent();
+
+                    builder.CloseElement(); // legend-item
+                }
+
+                builder.CloseElement(); // layer-legend
+            }
+
+            // Description
+            if (!string.IsNullOrEmpty(layer.Description))
+            {
+                builder.OpenComponent<MudText>(80);
+                builder.AddAttribute(81, "Typo", Typo.caption);
+                builder.AddAttribute(82, "Color", Color.Secondary);
+                builder.AddAttribute(83, "Class", "layer-description");
+                builder.AddAttribute(84, "ChildContent", (RenderFragment)(b => b.AddContent(85, layer.Description)));
+                builder.CloseComponent();
+            }
+
+            builder.CloseElement(); // layer-details
+        }
+
+        builder.CloseElement(); // layer-item
+    };
+
+    private string GetLayerIcon(string type)
+    {
+        return type.ToLowerInvariant() switch
+        {
+            "fill" or "fill-extrusion" => Icons.Material.Filled.Crop32,
+            "line" => Icons.Material.Filled.Timeline,
+            "circle" or "symbol" => Icons.Material.Filled.Place,
+            "raster" => Icons.Material.Filled.Image,
+            "heatmap" => Icons.Material.Filled.Whatshot,
+            "background" => Icons.Material.Filled.Wallpaper,
+            _ => Icons.Material.Filled.Layers
+        };
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "layerlist-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "layerlist-floating layerlist-top-right",
+            "top-left" => "layerlist-floating layerlist-top-left",
+            "bottom-right" => "layerlist-floating layerlist-bottom-right",
+            "bottom-left" => "layerlist-floating layerlist-bottom-left",
+            _ => "layerlist-embedded"
+        };
+    }
+
+    private string GetContainerStyle()
+    {
+        var styles = new List<string>();
+
+        if (!string.IsNullOrEmpty(Width))
+        {
+            styles.Add($"width: {Width}");
+        }
+
+        if (!string.IsNullOrEmpty(MaxHeight))
+        {
+            styles.Add($"max-height: {MaxHeight}");
+        }
+
+        if (!string.IsNullOrEmpty(Style))
+        {
+            styles.Add(Style);
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.DisposeAsync();
+            }
+            catch { }
+        }
+    }
+}
