@@ -203,6 +203,9 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IRasterTileCacheMetrics, RasterTileCacheMetrics>();
 
+        // Register raster renderer (required by WMS/WCS)
+        services.AddSingleton<Honua.Server.Core.Raster.Rendering.IRasterRenderer, Honua.Server.Core.Raster.Rendering.SkiaSharpRasterRenderer>();
+
         // Register data ingestion service (BackgroundService)
         services.AddSingleton<Honua.Server.Core.Raster.Import.DataIngestionService>();
         services.AddSingleton<Honua.Server.Core.Raster.Import.IDataIngestionService>(sp =>
@@ -210,7 +213,7 @@ public static class ServiceCollectionExtensions
         services.AddHostedService(sp =>
             sp.GetRequiredService<Honua.Server.Core.Raster.Import.DataIngestionService>());
 
-        // TODO: RasterTilePreseedService has unregistered dependencies (IRasterRenderer, IRasterTileCacheProvider)
+        // TODO: RasterTilePreseedService has unregistered dependencies (IRasterTileCacheProvider)
         // Commenting out until Core.Raster services are properly registered
         // services.AddSingleton<RasterTilePreseedService>();
         // services.AddSingleton<IRasterTilePreseedService>(sp => sp.GetRequiredService<RasterTilePreseedService>());
