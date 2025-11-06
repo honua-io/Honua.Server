@@ -385,6 +385,9 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
         // Map RBAC endpoints (roles and permissions)
         group.MapAdminRbacEndpoints();
 
+        // Map alert management endpoints (rules, channels, history, routing)
+        group.MapAdminAlertEndpoints();
+
         return group;
     }
 

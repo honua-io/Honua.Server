@@ -81,6 +81,9 @@ internal static class HonuaHostConfigurationExtensions
         // Admin UI SignalR for real-time updates
         builder.Services.AddAdminSignalR();
 
+        // Alert management services
+        builder.Services.AddAlertManagementServices(builder.Configuration);
+
         // OData (conditional)
         var odataEnabled = builder.Configuration.GetValue<bool?>("honua:services:odata:enabled") ?? true;
         if (odataEnabled)

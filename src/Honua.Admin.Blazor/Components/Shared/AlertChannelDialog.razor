@@ -1,0 +1,216 @@
+@using Honua.Admin.Blazor.Shared.Models
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_formValid">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Name"
+                                  Label="Channel Name"
+                                  Required="true"
+                                  RequiredError="Name is required"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSwitch T="bool"
+                               @bind-Checked="_model.Enabled"
+                               Label="Enabled"
+                               Color="Color.Primary" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="NotificationChannelType"
+                               @bind-Value="_model.Type"
+                               Label="Channel Type"
+                               Required="true"
+                               Variant="Variant.Outlined"
+                               ValueChanged="OnChannelTypeChanged">
+                        <MudSelectItem Value="@NotificationChannelType.Email">Email</MudSelectItem>
+                        <MudSelectItem Value="@NotificationChannelType.Slack">Slack</MudSelectItem>
+                        <MudSelectItem Value="@NotificationChannelType.SNS">AWS SNS</MudSelectItem>
+                        <MudSelectItem Value="@NotificationChannelType.Webhook">Webhook</MudSelectItem>
+                        <MudSelectItem Value="@NotificationChannelType.PagerDuty">PagerDuty</MudSelectItem>
+                        <MudSelectItem Value="@NotificationChannelType.Teams">Microsoft Teams</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                @if (_model.Type == NotificationChannelType.Email)
+                {
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("recipients")"
+                                      ValueChanged="@((string v) => SetConfigValue("recipients", v))"
+                                      Label="Recipients (comma-separated)"
+                                      Required="true"
+                                      RequiredError="Recipients are required"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Example: admin@example.com, ops@example.com" />
+                    </MudItem>
+                }
+                else if (_model.Type == NotificationChannelType.Slack)
+                {
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("webhookUrl")"
+                                      ValueChanged="@((string v) => SetConfigValue("webhookUrl", v))"
+                                      Label="Slack Webhook URL"
+                                      Required="true"
+                                      RequiredError="Webhook URL is required"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Get this from Slack app settings" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("channel")"
+                                      ValueChanged="@((string v) => SetConfigValue("channel", v))"
+                                      Label="Channel (optional)"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Override default channel, e.g., #alerts" />
+                    </MudItem>
+                }
+                else if (_model.Type == NotificationChannelType.SNS)
+                {
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("topicArn")"
+                                      ValueChanged="@((string v) => SetConfigValue("topicArn", v))"
+                                      Label="SNS Topic ARN"
+                                      Required="true"
+                                      RequiredError="Topic ARN is required"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Example: arn:aws:sns:us-east-1:123456789012:alerts" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("region")"
+                                      ValueChanged="@((string v) => SetConfigValue("region", v))"
+                                      Label="AWS Region"
+                                      Required="true"
+                                      RequiredError="Region is required"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Example: us-east-1" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("accessKeyId")"
+                                      ValueChanged="@((string v) => SetConfigValue("accessKeyId", v))"
+                                      Label="Access Key ID (optional)"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Leave empty to use IAM role" />
+                    </MudItem>
+                }
+                else if (_model.Type == NotificationChannelType.Webhook)
+                {
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("url")"
+                                      ValueChanged="@((string v) => SetConfigValue("url", v))"
+                                      Label="Webhook URL"
+                                      Required="true"
+                                      RequiredError="URL is required"
+                                      Variant="Variant.Outlined"
+                                      HelperText="POST endpoint to receive alerts" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("authHeader")"
+                                      ValueChanged="@((string v) => SetConfigValue("authHeader", v))"
+                                      Label="Authorization Header (optional)"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Example: Bearer your-token" />
+                    </MudItem>
+                }
+                else if (_model.Type == NotificationChannelType.PagerDuty)
+                {
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("integrationKey")"
+                                      ValueChanged="@((string v) => SetConfigValue("integrationKey", v))"
+                                      Label="Integration Key"
+                                      Required="true"
+                                      RequiredError="Integration key is required"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Get this from PagerDuty service settings" />
+                    </MudItem>
+                }
+                else if (_model.Type == NotificationChannelType.Teams)
+                {
+                    <MudItem xs="12">
+                        <MudTextField T="string"
+                                      Value="@GetConfigValue("webhookUrl")"
+                                      ValueChanged="@((string v) => SetConfigValue("webhookUrl", v))"
+                                      Label="Teams Webhook URL"
+                                      Required="true"
+                                      RequiredError="Webhook URL is required"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Get this from Teams connector settings" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@(!_formValid)">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public NotificationChannelModel? Channel { get; set; }
+
+    private MudForm? _form;
+    private bool _formValid;
+    private CreateNotificationChannelRequest _model = new()
+    {
+        Name = string.Empty,
+        Type = NotificationChannelType.Email,
+        Configuration = new()
+    };
+
+    protected override void OnInitialized()
+    {
+        if (Channel != null)
+        {
+            _model = new CreateNotificationChannelRequest
+            {
+                Name = Channel.Name,
+                Type = Channel.Type,
+                Enabled = Channel.Enabled,
+                Configuration = new Dictionary<string, string>(Channel.Configuration)
+            };
+        }
+    }
+
+    private void OnChannelTypeChanged(NotificationChannelType newType)
+    {
+        _model.Type = newType;
+        _model.Configuration.Clear();
+    }
+
+    private string GetConfigValue(string key)
+    {
+        return _model.Configuration.TryGetValue(key, out var value) ? value : string.Empty;
+    }
+
+    private void SetConfigValue(string key, string value)
+    {
+        _model.Configuration[key] = value;
+    }
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(_model));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

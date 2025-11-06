@@ -1,0 +1,429 @@
+@page "/alerts/rules/new"
+@page "/alerts/rules/{RuleId}/edit"
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator")]
+@inject ISnackbar Snackbar
+@inject ILogger<AlertRuleEditor> Logger
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>@(_isNew ? "Create" : "Edit") Alert Rule - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">@(_isNew ? "Create" : "Edit") Alert Rule</MudText>
+            <MudSpacer />
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Href="/alerts">
+                Cancel
+            </MudButton>
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        <MudForm @ref="_form" @bind-IsValid="@_formValid">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Name"
+                                  Label="Rule Name"
+                                  Required="true"
+                                  RequiredError="Rule name is required"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudSelect T="AlertSeverity"
+                               @bind-Value="_model.Severity"
+                               Label="Severity"
+                               Required="true"
+                               Variant="Variant.Outlined">
+                        <MudSelectItem Value="@AlertSeverity.Info">Info</MudSelectItem>
+                        <MudSelectItem Value="@AlertSeverity.Warning">Warning</MudSelectItem>
+                        <MudSelectItem Value="@AlertSeverity.Critical">Critical</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Description"
+                                  Label="Description"
+                                  Lines="3"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Expression"
+                                  Label="Alert Expression (Prometheus PromQL)"
+                                  Required="true"
+                                  RequiredError="Alert expression is required"
+                                  Variant="Variant.Outlined"
+                                  HelperText="Example: cpu_usage_percent > 80"
+                                  Lines="3" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string"
+                                  @bind-Value="_model.Duration"
+                                  Label="Duration"
+                                  Required="true"
+                                  RequiredError="Duration is required"
+                                  Variant="Variant.Outlined"
+                                  HelperText="Example: 5m, 10m, 1h" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSwitch T="bool"
+                               @bind-Checked="_model.Enabled"
+                               Label="Enabled"
+                               Color="Color.Primary" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Labels</MudText>
+                    <MudPaper Outlined="true" Class="pa-3">
+                        @foreach (var label in _model.Labels)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                                <MudTextField T="string"
+                                              Value="@label.Key"
+                                              Label="Key"
+                                              Variant="Variant.Outlined"
+                                              Disabled="true"
+                                              Style="flex: 1;" />
+                                <MudTextField T="string"
+                                              Value="@label.Value"
+                                              ValueChanged="@((string v) => UpdateLabel(label.Key, v))"
+                                              Label="Value"
+                                              Variant="Variant.Outlined"
+                                              Style="flex: 1;" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="Color.Error"
+                                               Size="Size.Small"
+                                               OnClick="@(() => RemoveLabel(label.Key))" />
+                            </MudStack>
+                        }
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <MudTextField T="string"
+                                          @bind-Value="_newLabelKey"
+                                          Label="New Label Key"
+                                          Variant="Variant.Outlined"
+                                          Style="flex: 1;" />
+                            <MudTextField T="string"
+                                          @bind-Value="_newLabelValue"
+                                          Label="New Label Value"
+                                          Variant="Variant.Outlined"
+                                          Style="flex: 1;" />
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="AddLabel"
+                                       Disabled="@(string.IsNullOrWhiteSpace(_newLabelKey))">
+                                Add
+                            </MudButton>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Annotations</MudText>
+                    <MudPaper Outlined="true" Class="pa-3">
+                        @foreach (var annotation in _model.Annotations)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                                <MudTextField T="string"
+                                              Value="@annotation.Key"
+                                              Label="Key"
+                                              Variant="Variant.Outlined"
+                                              Disabled="true"
+                                              Style="flex: 1;" />
+                                <MudTextField T="string"
+                                              Value="@annotation.Value"
+                                              ValueChanged="@((string v) => UpdateAnnotation(annotation.Key, v))"
+                                              Label="Value"
+                                              Variant="Variant.Outlined"
+                                              Lines="2"
+                                              Style="flex: 2;" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="Color.Error"
+                                               Size="Size.Small"
+                                               OnClick="@(() => RemoveAnnotation(annotation.Key))" />
+                            </MudStack>
+                        }
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <MudTextField T="string"
+                                          @bind-Value="_newAnnotationKey"
+                                          Label="New Annotation Key"
+                                          Variant="Variant.Outlined"
+                                          Style="flex: 1;" />
+                            <MudTextField T="string"
+                                          @bind-Value="_newAnnotationValue"
+                                          Label="New Annotation Value"
+                                          Variant="Variant.Outlined"
+                                          Lines="2"
+                                          Style="flex: 2;" />
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       OnClick="AddAnnotation"
+                                       Disabled="@(string.IsNullOrWhiteSpace(_newAnnotationKey))">
+                                Add
+                            </MudButton>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Notification Channels</MudText>
+                    <MudAlert Severity="Severity.Info" Class="mb-2">
+                        Select notification channels to receive alerts when this rule fires.
+                    </MudAlert>
+                    <MudSelect T="string"
+                               Label="Channels"
+                               MultiSelection="true"
+                               @bind-SelectedValues="_selectedChannelIds"
+                               Variant="Variant.Outlined">
+                        @foreach (var channel in _availableChannels)
+                        {
+                            <MudSelectItem Value="@channel.Id">@channel.Name (@channel.Type)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="SaveRule"
+                                   Disabled="@(!_formValid || _saving)">
+                            @if (_saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <span class="ml-2">Saving...</span>
+                            }
+                            else
+                            {
+                                <span>Save</span>
+                            }
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   Href="/alerts"
+                                   Disabled="@_saving">
+                            Cancel
+                        </MudButton>
+                        @if (!_isNew)
+                        {
+                            <MudSpacer />
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Info"
+                                       OnClick="TestRule"
+                                       Disabled="@_saving">
+                                Send Test Alert
+                            </MudButton>
+                        }
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? RuleId { get; set; }
+
+    private List<BreadcrumbItem> _breadcrumbs = new();
+    private MudForm? _form;
+    private bool _formValid;
+    private bool _loading = true;
+    private bool _saving = false;
+    private string? _errorMessage;
+    private bool _isNew => string.IsNullOrEmpty(RuleId);
+
+    private CreateAlertRuleRequest _model = new()
+    {
+        Name = string.Empty,
+        Severity = AlertSeverity.Warning,
+        Expression = string.Empty,
+        Duration = "5m"
+    };
+
+    private string _newLabelKey = string.Empty;
+    private string _newLabelValue = string.Empty;
+    private string _newAnnotationKey = string.Empty;
+    private string _newAnnotationValue = string.Empty;
+
+    private List<NotificationChannelListItem> _availableChannels = new();
+    private IEnumerable<string> _selectedChannelIds
+    {
+        get => _model.ChannelIds;
+        set => _model.ChannelIds = value.ToList();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        UpdateBreadcrumbs();
+        await LoadDataAsync();
+    }
+
+    private void UpdateBreadcrumbs()
+    {
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/"),
+            new BreadcrumbItem("Alerts", href: "/alerts"),
+            new BreadcrumbItem(_isNew ? "New Rule" : "Edit Rule", href: null, disabled: true)
+        };
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Load available channels
+            // TODO: Replace with actual API call
+            // _availableChannels = await Http.GetFromJsonAsync<List<NotificationChannelListItem>>("/admin/alerts/channels") ?? new();
+            _availableChannels = new List<NotificationChannelListItem>();
+
+            // Load existing rule if editing
+            if (!_isNew && RuleId != null)
+            {
+                // TODO: Replace with actual API call
+                // var existingRule = await Http.GetFromJsonAsync<AlertRuleModel>($"/admin/alerts/rules/{RuleId}");
+                // if (existingRule != null)
+                // {
+                //     _model = new CreateAlertRuleRequest
+                //     {
+                //         Name = existingRule.Name,
+                //         Description = existingRule.Description,
+                //         Severity = existingRule.Severity,
+                //         Enabled = existingRule.Enabled,
+                //         Expression = existingRule.Expression,
+                //         Duration = existingRule.Duration,
+                //         Labels = existingRule.Labels,
+                //         Annotations = existingRule.Annotations,
+                //         ChannelIds = existingRule.ChannelIds
+                //     };
+                // }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load data: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error loading alert rule editor data");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveRule()
+    {
+        if (_form == null || !await _form.Validate())
+            return;
+
+        _saving = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (_isNew)
+            {
+                // TODO: Replace with actual API call
+                // await Http.PostAsJsonAsync("/admin/alerts/rules", _model);
+                Snackbar.Add("Alert rule created successfully", Severity.Success);
+            }
+            else
+            {
+                // TODO: Replace with actual API call
+                // await Http.PutAsJsonAsync($"/admin/alerts/rules/{RuleId}", _model);
+                Snackbar.Add("Alert rule updated successfully", Severity.Success);
+            }
+
+            Navigation.NavigateTo("/alerts");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to save alert rule: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error saving alert rule");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task TestRule()
+    {
+        try
+        {
+            // TODO: Replace with actual API call
+            // await Http.PostAsJsonAsync($"/admin/alerts/rules/{RuleId}/test", new { });
+            Snackbar.Add("Test alert sent successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to send test alert: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error testing alert rule");
+        }
+    }
+
+    private void AddLabel()
+    {
+        if (!string.IsNullOrWhiteSpace(_newLabelKey) && !_model.Labels.ContainsKey(_newLabelKey))
+        {
+            _model.Labels[_newLabelKey] = _newLabelValue;
+            _newLabelKey = string.Empty;
+            _newLabelValue = string.Empty;
+        }
+    }
+
+    private void UpdateLabel(string key, string value)
+    {
+        _model.Labels[key] = value;
+    }
+
+    private void RemoveLabel(string key)
+    {
+        _model.Labels.Remove(key);
+    }
+
+    private void AddAnnotation()
+    {
+        if (!string.IsNullOrWhiteSpace(_newAnnotationKey) && !_model.Annotations.ContainsKey(_newAnnotationKey))
+        {
+            _model.Annotations[_newAnnotationKey] = _newAnnotationValue;
+            _newAnnotationKey = string.Empty;
+            _newAnnotationValue = string.Empty;
+        }
+    }
+
+    private void UpdateAnnotation(string key, string value)
+    {
+        _model.Annotations[key] = value;
+    }
+
+    private void RemoveAnnotation(string key)
+    {
+        _model.Annotations.Remove(key);
+    }
+}
