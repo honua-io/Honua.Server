@@ -1,0 +1,222 @@
+@using Honua.MapSDK.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="Layer.Name"
+                         Label="Layer Name"
+                         Required="true"
+                         Variant="Variant.Outlined" />
+
+            <MudSelect @bind-Value="Layer.Type"
+                      Label="Layer Type"
+                      Variant="Variant.Outlined">
+                <MudSelectItem Value="LayerType.Vector">Vector</MudSelectItem>
+                <MudSelectItem Value="LayerType.Raster">Raster</MudSelectItem>
+                <MudSelectItem Value="LayerType.ThreeD">3D Buildings</MudSelectItem>
+                <MudSelectItem Value="LayerType.Heatmap">Heatmap</MudSelectItem>
+                <MudSelectItem Value="LayerType.Cluster">Cluster</MudSelectItem>
+                <MudSelectItem Value="LayerType.Line">Line</MudSelectItem>
+                <MudSelectItem Value="LayerType.Fill">Fill (Polygon)</MudSelectItem>
+                <MudSelectItem Value="LayerType.Symbol">Symbol</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField @bind-Value="Layer.Source"
+                         Label="Data Source URL"
+                         Required="true"
+                         Variant="Variant.Outlined"
+                         HelperText="GeoJSON URL, WFS endpoint, or gRPC source" />
+
+            <MudDivider />
+
+            <MudText Typo="Typo.subtitle2">Visibility</MudText>
+
+            <MudSwitch @bind-Value="Layer.Visible"
+                      Label="Layer Visible"
+                      Color="Color.Primary" />
+
+            <MudSlider @bind-Value="Layer.Opacity"
+                      Min="0"
+                      Max="1"
+                      Step="0.05"
+                      Variant="Variant.Filled">
+                Opacity: @Layer.Opacity.ToString("F2")
+            </MudSlider>
+
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="Layer.MinZoom"
+                                   Label="Min Zoom (optional)"
+                                   Variant="Variant.Outlined"
+                                   Min="0"
+                                   Max="22"
+                                   Clearable="true" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="Layer.MaxZoom"
+                                   Label="Max Zoom (optional)"
+                                   Variant="Variant.Outlined"
+                                   Min="0"
+                                   Max="22"
+                                   Clearable="true" />
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider />
+
+            <MudText Typo="Typo.subtitle2">Style</MudText>
+
+            @if (Layer.Type == LayerType.Fill)
+            {
+                <MudTextField @bind-Value="_fillColor"
+                             Label="Fill Color"
+                             Variant="Variant.Outlined"
+                             HelperText="CSS color or MapLibre expression" />
+
+                <MudNumericField @bind-Value="_fillOpacity"
+                               Label="Fill Opacity"
+                               Variant="Variant.Outlined"
+                               Min="0"
+                               Max="1"
+                               Step="0.1" />
+            }
+
+            @if (Layer.Type == LayerType.Line)
+            {
+                <MudTextField @bind-Value="_lineColor"
+                             Label="Line Color"
+                             Variant="Variant.Outlined" />
+
+                <MudNumericField @bind-Value="_lineWidth"
+                               Label="Line Width"
+                               Variant="Variant.Outlined"
+                               Min="0"
+                               Max="20" />
+            }
+
+            @if (Layer.Type == LayerType.Vector || Layer.Type == LayerType.Symbol)
+            {
+                <MudTextField @bind-Value="_circleColor"
+                             Label="Circle Color"
+                             Variant="Variant.Outlined" />
+
+                <MudNumericField @bind-Value="_circleRadius"
+                               Label="Circle Radius"
+                               Variant="Variant.Outlined"
+                               Min="0"
+                               Max="50" />
+            }
+
+            @if (Layer.Type == LayerType.Heatmap)
+            {
+                <MudNumericField @bind-Value="_heatmapRadius"
+                               Label="Heatmap Radius"
+                               Variant="Variant.Outlined"
+                               Min="1"
+                               Max="100" />
+
+                <MudNumericField @bind-Value="_heatmapIntensity"
+                               Label="Heatmap Intensity"
+                               Variant="Variant.Outlined"
+                               Min="0"
+                               Max="5"
+                               Step="0.1" />
+            }
+
+            <MudTextField @bind-Value="Layer.PopupTemplate"
+                         Label="Popup Template (optional)"
+                         Lines="3"
+                         Variant="Variant.Outlined"
+                         HelperText="Use {{property}} syntax for dynamic values" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance? MudDialog { get; set; }
+
+    [Parameter]
+    public LayerConfiguration Layer { get; set; } = new()
+    {
+        Name = "New Layer",
+        Type = LayerType.Vector,
+        Source = "https://example.com/data.geojson",
+        Visible = true,
+        Opacity = 1.0,
+        Style = new LayerStyle()
+    };
+
+    // Helper properties for style binding
+    private string _fillColor
+    {
+        get => Layer.Style.FillColor?.ToString() ?? "#3b82f6";
+        set => Layer.Style.FillColor = value;
+    }
+
+    private double _fillOpacity
+    {
+        get => Layer.Style.FillOpacity ?? 0.7;
+        set => Layer.Style.FillOpacity = value;
+    }
+
+    private string _lineColor
+    {
+        get => Layer.Style.LineColor?.ToString() ?? "#000000";
+        set => Layer.Style.LineColor = value;
+    }
+
+    private double _lineWidth
+    {
+        get => Layer.Style.LineWidth ?? 2;
+        set => Layer.Style.LineWidth = value;
+    }
+
+    private string _circleColor
+    {
+        get => Layer.Style.CircleColor?.ToString() ?? "#3b82f6";
+        set => Layer.Style.CircleColor = value;
+    }
+
+    private double _circleRadius
+    {
+        get => Layer.Style.CircleRadius ?? 5;
+        set => Layer.Style.CircleRadius = value;
+    }
+
+    private double _heatmapRadius
+    {
+        get => Layer.Style.Heatmap?.Radius ?? 20;
+        set
+        {
+            if (Layer.Style.Heatmap == null)
+                Layer.Style.Heatmap = new HeatmapStyle();
+            Layer.Style.Heatmap.Radius = value;
+        }
+    }
+
+    private double _heatmapIntensity
+    {
+        get => Layer.Style.Heatmap?.Intensity ?? 1.0;
+        set
+        {
+            if (Layer.Style.Heatmap == null)
+                Layer.Style.Heatmap = new HeatmapStyle();
+            Layer.Style.Heatmap.Intensity = value;
+        }
+    }
+
+    private void Submit()
+    {
+        MudDialog?.Close(DialogResult.Ok(Layer));
+    }
+
+    private void Cancel()
+    {
+        MudDialog?.Cancel();
+    }
+}
