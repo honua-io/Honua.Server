@@ -10,11 +10,11 @@ on:
       - 'Dockerfile'
       - 'src/**'
       - '.github/workflows/container-security.yml'
-  pull_request:
-    branches: [ master, main ]
-    paths:
-      - 'Dockerfile'
-      - 'src/**'
+  # pull_request:
+  #   branches: [ master, main ]
+  #   paths:
+  #     - 'Dockerfile'
+  #     - 'src/**'
   workflow_dispatch:
 
 env:

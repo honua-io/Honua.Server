@@ -13,12 +13,12 @@ on:
       - 'src/Honua.Admin.Blazor/**'
       - 'tests/Honua.Admin.Blazor.Tests/**'
       - '.github/workflows/admin-ui-tests.yml'
-  pull_request:
-    branches: [ master, main ]
-    paths:
-      - 'src/Honua.Admin.Blazor/**'
-      - 'tests/Honua.Admin.Blazor.Tests/**'
-      - '.github/workflows/admin-ui-tests.yml'
+  # pull_request:
+  #   branches: [ master, main ]
+  #   paths:
+  #     - 'src/Honua.Admin.Blazor/**'
+  #     - 'tests/Honua.Admin.Blazor.Tests/**'
+  #     - '.github/workflows/admin-ui-tests.yml'
 
 env:
   DOTNET_VERSION: '9.0.x'
