@@ -32,8 +32,7 @@ internal static class WebApplicationExtensions
     public static WebApplication UseHonuaSecurity(this WebApplication app)
     {
         // Security headers - apply early in pipeline
-        // TODO: Implement UseSecurityHeaders middleware extension method
-        // app.UseSecurityHeaders();
+        app.UseSecurityHeaders();
 
         // HSTS and HTTPS redirection - enforce HTTPS in production
         if (!app.Environment.IsDevelopment())
