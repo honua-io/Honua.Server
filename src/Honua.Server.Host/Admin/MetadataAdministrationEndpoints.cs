@@ -177,6 +177,7 @@ public static class MetadataAdministrationEndpoints
             Title = s.Title,
             FolderId = s.FolderId,
             ServiceType = s.ServiceType,
+            DataSourceId = s.DataSourceId,
             Enabled = s.Enabled,
             LayerCount = s.Layers.Count
         }).ToList();

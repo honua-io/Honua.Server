@@ -121,6 +121,9 @@ public sealed class ServiceListItem
     [JsonPropertyName("folderId")]
     public string? FolderId { get; set; }
 
+    [JsonPropertyName("dataSourceId")]
+    public string? DataSourceId { get; set; }
+
     [JsonPropertyName("enabled")]
     public bool Enabled { get; set; }
 

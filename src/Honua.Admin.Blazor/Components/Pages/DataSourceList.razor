@@ -3,6 +3,7 @@
 @using Honua.Admin.Blazor.Shared.Models
 @attribute [Authorize(Roles = "administrator,datapublisher")]
 @inject DataSourceApiClient DataSourceApi
+@inject ServiceApiClient ServiceApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 
@@ -43,6 +44,7 @@
                     <MudTh>ID</MudTh>
                     <MudTh>Provider</MudTh>
                     <MudTh>Connection</MudTh>
+                    <MudTh>Usage</MudTh>
                     <MudTh>Status</MudTh>
                     <MudTh Style="text-align: right;">Actions</MudTh>
                 </HeaderContent>
@@ -60,6 +62,27 @@
                     </MudTd>
                     <MudTd DataLabel="Connection">
                         <MudText Typo="Typo.caption">@GetConnectionPreview(context.ConnectionString)</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Usage">
+                        @{
+                            var serviceCount = GetServiceCount(context.Id);
+                        }
+                        @if (serviceCount > 0)
+                        {
+                            <MudChip Size="Size.Small"
+                                     Color="Color.Info"
+                                     Icon="@Icons.Material.Filled.Cloud"
+                                     OnClick="@(() => ViewServices(context.Id))"
+                                     Clickable="true">
+                                @serviceCount service(s)
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip Size="Size.Small" Color="Color.Default">
+                                Unused
+                            </MudChip>
+                        }
                     </MudTd>
                     <MudTd DataLabel="Status">
                         @if (_connectionStatus.TryGetValue(context.Id, out var status))
@@ -92,6 +115,17 @@
                     </MudTd>
                     <MudTd DataLabel="Actions" Style="text-align: right;">
                         <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                            @{
+                                var count = GetServiceCount(context.Id);
+                            }
+                            @if (count > 0)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Cloud"
+                                             OnClick="@(() => ViewServices(context.Id))">
+                                    View Services (@count)
+                                </MudMenuItem>
+                                <MudDivider />
+                            }
                             <MudMenuItem Icon="@Icons.Material.Filled.PlayArrow"
                                          OnClick="@(() => TestConnection(context.Id))">
                                 Test Connection
@@ -125,6 +159,7 @@
     };
 
     private List<DataSourceListItem> _dataSources = new();
+    private List<ServiceListItem> _services = new();
     private Dictionary<string, TestConnectionResponse> _connectionStatus = new();
     private HashSet<string> _testingConnections = new();
     private bool _loading = true;
@@ -133,6 +168,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadDataSourcesAsync();
+        await LoadServicesAsync();
     }
 
     private async Task LoadDataSourcesAsync()
@@ -246,6 +282,46 @@
     {
         // TODO: Implement table browser dialog
         Snackbar.Add("Table browser coming soon", Severity.Info);
+    }
+
+    private async Task LoadServicesAsync()
+    {
+        try
+        {
+            _services = await ServiceApi.GetServicesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Don't fail the whole page if services can't be loaded
+            // Just log and continue with empty services list
+            Snackbar.Add("Warning: Could not load services for usage tracking", Severity.Warning);
+            _services = new List<ServiceListItem>();
+        }
+    }
+
+    private int GetServiceCount(string dataSourceId)
+    {
+        return _services.Count(s => s.DataSourceId != null &&
+                                   s.DataSourceId.Equals(dataSourceId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task ViewServices(string dataSourceId)
+    {
+        var servicesUsingDataSource = _services
+            .Where(s => s.DataSourceId != null &&
+                       s.DataSourceId.Equals(dataSourceId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var parameters = new DialogParameters<DataSourceServicesDialog>
+        {
+            { x => x.DataSourceId, dataSourceId },
+            { x => x.Services, servicesUsingDataSource }
+        };
+
+        await DialogService.ShowAsync<DataSourceServicesDialog>(
+            $"Services Using Data Source",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
     }
 
     private string GetProviderIcon(string provider)
