@@ -101,7 +101,7 @@ public class GeofenceAlertIntegrationTests
         // Setup event repository
         _mockEventRepo.Setup(r => r.CreateBatchAsync(
                 It.IsAny<List<GeofenceEvent>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((List<GeofenceEvent> events, CancellationToken _) => events);
 
         // Setup alert repository
         _mockAlertRepo.Setup(r => r.ShouldSilenceAlertAsync(
@@ -196,7 +196,7 @@ public class GeofenceAlertIntegrationTests
 
         _mockEventRepo.Setup(r => r.CreateBatchAsync(
                 It.IsAny<List<GeofenceEvent>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((List<GeofenceEvent> events, CancellationToken _) => events);
 
         _mockAlertRepo.Setup(r => r.ShouldSilenceAlertAsync(
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -254,7 +254,7 @@ public class GeofenceAlertIntegrationTests
 
         _mockEventRepo.Setup(r => r.CreateBatchAsync(
                 It.IsAny<List<GeofenceEvent>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((List<GeofenceEvent> events, CancellationToken _) => events);
 
         // Alert is silenced
         _mockAlertRepo.Setup(r => r.ShouldSilenceAlertAsync(
@@ -308,7 +308,7 @@ public class GeofenceAlertIntegrationTests
 
         _mockEventRepo.Setup(r => r.CreateBatchAsync(
                 It.IsAny<List<GeofenceEvent>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((List<GeofenceEvent> events, CancellationToken _) => events);
 
         _mockAlertRepo.Setup(r => r.ShouldSilenceAlertAsync(
                 It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(),

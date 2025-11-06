@@ -5,6 +5,7 @@
     <ProjectReference Include="..\Honua.Server.Core.Cloud\Honua.Server.Core.Cloud.csproj" />
     <ProjectReference Include="..\Honua.Server.Enterprise\Honua.Server.Enterprise.csproj" />
     <ProjectReference Include="..\Honua.Server.Observability\Honua.Server.Observability.csproj" />
+    <ProjectReference Include="..\Honua.Server.AlertReceiver\Honua.Server.AlertReceiver.csproj" />
   </ItemGroup>
 
   <!-- Optional OData support - only included when EnableOData=true -->
