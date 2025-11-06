@@ -31,9 +31,14 @@ services:
     environment:
       # Database Configuration (SQLite for speed)
       - ConnectionStrings__HonuaDb=Data Source=/app/data/ogc-sample.db
+      - ConnectionStrings__StacCatalogDb=Data Source=/tmp/stac-catalog.db
 
       # Metadata Configuration
       - HONUA__METADATA__PATH=/app/data/test-metadata.json
+
+      # Disable STAC catalog synchronization for testing
+      - honua__services__stac__enabled=false
+      - Honua__Services__Stac__Enabled=false
 
       # Authentication (SQLite)
       - Authentication__Provider=SQLite
