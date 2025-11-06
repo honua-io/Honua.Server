@@ -41,12 +41,12 @@ public static class AlertServicesExtensions
             services.AddScoped<IAlertConfigurationService, AlertConfigurationService>();
             services.AddScoped<INotificationChannelService, NotificationChannelService>();
 
-            var logger = services.BuildServiceProvider().GetService<ILogger<AlertServicesExtensions>>();
+            var logger = services.BuildServiceProvider().GetService<ILogger<PostgresAlertConfigurationDbConnectionFactory>>();
             logger?.LogInformation("Alert management services registered with PostgreSQL connection");
         }
         else
         {
-            var logger = services.BuildServiceProvider().GetService<ILogger<AlertServicesExtensions>>();
+            var logger = services.BuildServiceProvider().GetService<ILogger<PostgresAlertConfigurationDbConnectionFactory>>();
             logger?.LogWarning("Alert management services not registered - PostgreSQL connection string not configured");
         }
 

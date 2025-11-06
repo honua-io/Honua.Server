@@ -144,9 +144,17 @@ public static class RbacEndpoints
         var updatedRoles = snapshot.Server.Rbac.Roles.Append(newRole).ToList();
         var updatedRbac = snapshot.Server.Rbac with { Roles = updatedRoles };
         var updatedServer = snapshot.Server with { Rbac = updatedRbac };
-        var updatedSnapshot = snapshot with { Server = updatedServer };
+        var updatedSnapshot = new MetadataSnapshot(
+            snapshot.Catalog,
+            snapshot.Folders,
+            snapshot.DataSources,
+            snapshot.Services,
+            snapshot.Layers,
+            snapshot.RasterDatasets,
+            snapshot.Styles,
+            updatedServer);
 
-        await registry.UpdateSnapshotAsync(updatedSnapshot, cancellationToken);
+        await registry.UpdateAsync(updatedSnapshot, cancellationToken);
 
         logger.LogInformation("Created role '{RoleName}' with {PermissionCount} permissions", request.Name, request.Permissions.Count);
 
@@ -209,9 +217,17 @@ public static class RbacEndpoints
             .ToList();
         var updatedRbac = snapshot.Server.Rbac with { Roles = updatedRoles };
         var updatedServer = snapshot.Server with { Rbac = updatedRbac };
-        var updatedSnapshot = snapshot with { Server = updatedServer };
+        var updatedSnapshot = new MetadataSnapshot(
+            snapshot.Catalog,
+            snapshot.Folders,
+            snapshot.DataSources,
+            snapshot.Services,
+            snapshot.Layers,
+            snapshot.RasterDatasets,
+            snapshot.Styles,
+            updatedServer);
 
-        await registry.UpdateSnapshotAsync(updatedSnapshot, cancellationToken);
+        await registry.UpdateAsync(updatedSnapshot, cancellationToken);
 
         logger.LogInformation("Updated role '{RoleId}'", id);
 
@@ -254,9 +270,17 @@ public static class RbacEndpoints
             .ToList();
         var updatedRbac = snapshot.Server.Rbac with { Roles = updatedRoles };
         var updatedServer = snapshot.Server with { Rbac = updatedRbac };
-        var updatedSnapshot = snapshot with { Server = updatedServer };
+        var updatedSnapshot = new MetadataSnapshot(
+            snapshot.Catalog,
+            snapshot.Folders,
+            snapshot.DataSources,
+            snapshot.Services,
+            snapshot.Layers,
+            snapshot.RasterDatasets,
+            snapshot.Styles,
+            updatedServer);
 
-        await registry.UpdateSnapshotAsync(updatedSnapshot, cancellationToken);
+        await registry.UpdateAsync(updatedSnapshot, cancellationToken);
 
         logger.LogInformation("Deleted role '{RoleId}'", id);
 
@@ -320,9 +344,17 @@ public static class RbacEndpoints
         var updatedPermissions = snapshot.Server.Rbac.Permissions.Append(newPermission).ToList();
         var updatedRbac = snapshot.Server.Rbac with { Permissions = updatedPermissions };
         var updatedServer = snapshot.Server with { Rbac = updatedRbac };
-        var updatedSnapshot = snapshot with { Server = updatedServer };
+        var updatedSnapshot = new MetadataSnapshot(
+            snapshot.Catalog,
+            snapshot.Folders,
+            snapshot.DataSources,
+            snapshot.Services,
+            snapshot.Layers,
+            snapshot.RasterDatasets,
+            snapshot.Styles,
+            updatedServer);
 
-        await registry.UpdateSnapshotAsync(updatedSnapshot, cancellationToken);
+        await registry.UpdateAsync(updatedSnapshot, cancellationToken);
 
         logger.LogInformation("Created permission '{PermissionName}' in category '{Category}'", request.Name, request.Category);
 

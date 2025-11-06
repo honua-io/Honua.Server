@@ -50,14 +50,40 @@ internal static partial class OgcFeaturesHandlers
         var stopwatch = Stopwatch.StartNew();
         var collections = OgcSharedHandlers.ParseCollectionsParameter(request.Query["collections"]);
 
+        // If no collections specified, search across all enabled collections
         if (collections.Count == 0)
         {
-            logger.LogWarning("Search request failed: no collections specified from {RemoteIp}", request.HttpContext.Connection.RemoteIpAddress);
-            return OgcSharedHandlers.CreateValidationProblem("collections parameter is required.", "collections");
-        }
+            var snapshot = await metadataRegistry.GetInitializedSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var allCollections = new List<string>();
 
-        logger.LogInformation("Initiating OGC search for {Count} collections: {Collections} from {RemoteIp}",
-            collections.Count, string.Join(",", collections), request.HttpContext.Connection.RemoteIpAddress);
+            foreach (var service in snapshot.Services)
+            {
+                if (!service.Enabled || !service.Ogc.CollectionsEnabled)
+                {
+                    continue;
+                }
+
+                foreach (var layer in service.Layers)
+                {
+                    allCollections.Add(OgcSharedHandlers.BuildCollectionId(service, layer));
+                }
+            }
+
+            if (allCollections.Count == 0)
+            {
+                logger.LogWarning("Search request failed: no collections available from {RemoteIp}", request.HttpContext.Connection.RemoteIpAddress);
+                return OgcSharedHandlers.CreateValidationProblem("No collections available for search.", "collections");
+            }
+
+            collections = allCollections;
+            logger.LogInformation("Initiating OGC search across all {Count} collections from {RemoteIp}",
+                collections.Count, request.HttpContext.Connection.RemoteIpAddress);
+        }
+        else
+        {
+            logger.LogInformation("Initiating OGC search for {Count} collections: {Collections} from {RemoteIp}",
+                collections.Count, string.Join(",", collections), request.HttpContext.Connection.RemoteIpAddress);
+        }
 
         try
         {
@@ -132,31 +158,54 @@ internal static partial class OgcFeaturesHandlers
         }
 
         var root = document.RootElement;
-        if (!root.TryGetProperty("collections", out var collectionsElement) || collectionsElement.ValueKind != JsonValueKind.Array)
-        {
-            logger.LogWarning("POST search request rejected: missing or invalid 'collections' array from {RemoteIp}",
-                request.HttpContext.Connection.RemoteIpAddress);
-            return OgcSharedHandlers.CreateValidationProblem("Payload must include a 'collections' array.", "collections");
-        }
-
         var collections = new List<string>();
-        foreach (var element in collectionsElement.EnumerateArray())
+
+        // Parse collections array if present
+        if (root.TryGetProperty("collections", out var collectionsElement) && collectionsElement.ValueKind == JsonValueKind.Array)
         {
-            if (element.ValueKind == JsonValueKind.String && !element.GetString().IsNullOrWhiteSpace())
+            foreach (var element in collectionsElement.EnumerateArray())
             {
-                collections.Add(element.GetString()!.Trim());
+                if (element.ValueKind == JsonValueKind.String && !element.GetString().IsNullOrWhiteSpace())
+                {
+                    collections.Add(element.GetString()!.Trim());
+                }
             }
         }
 
+        // If no collections specified, search across all enabled collections
         if (collections.Count == 0)
         {
-            logger.LogWarning("POST search request rejected: empty 'collections' array from {RemoteIp}",
-                request.HttpContext.Connection.RemoteIpAddress);
-            return OgcSharedHandlers.CreateValidationProblem("Collections array must contain at least one identifier.", "collections");
-        }
+            var snapshot = await metadataRegistry.GetInitializedSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var allCollections = new List<string>();
 
-        logger.LogInformation("Initiating POST OGC search for {Count} collections: {Collections} from {RemoteIp}",
-            collections.Count, string.Join(",", collections), request.HttpContext.Connection.RemoteIpAddress);
+            foreach (var service in snapshot.Services)
+            {
+                if (!service.Enabled || !service.Ogc.CollectionsEnabled)
+                {
+                    continue;
+                }
+
+                foreach (var layer in service.Layers)
+                {
+                    allCollections.Add(OgcSharedHandlers.BuildCollectionId(service, layer));
+                }
+            }
+
+            if (allCollections.Count == 0)
+            {
+                logger.LogWarning("POST search request failed: no collections available from {RemoteIp}", request.HttpContext.Connection.RemoteIpAddress);
+                return OgcSharedHandlers.CreateValidationProblem("No collections available for search.", "collections");
+            }
+
+            collections = allCollections;
+            logger.LogInformation("Initiating POST OGC search across all {Count} collections from {RemoteIp}",
+                collections.Count, request.HttpContext.Connection.RemoteIpAddress);
+        }
+        else
+        {
+            logger.LogInformation("Initiating POST OGC search for {Count} collections: {Collections} from {RemoteIp}",
+                collections.Count, string.Join(",", collections), request.HttpContext.Connection.RemoteIpAddress);
+        }
 
         var parameters = new Dictionary<string, StringValues>(StringComparer.OrdinalIgnoreCase)
         {
