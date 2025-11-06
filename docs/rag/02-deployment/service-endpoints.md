@@ -2070,7 +2070,7 @@ curl "https://localhost:5000/records/collections/transportation/items/roads"
 
 ## Geometry Service
 
-Esri-compatible geometry service for spatial operations.
+GeoServices REST compatible geometry service for spatial operations.
 
 ### Service Metadata
 

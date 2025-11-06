@@ -871,7 +871,7 @@ HAVING AVG(pm25) > 35
 - **Professional:** $199 + ~$95 (Azure) = **$294/month**
 - **Enterprise:** $799 + ~$200 (Azure) = **$999/month**
 
-**vs Esri GeoEvent Server:**
+**vs commercial GIS platforms GeoEvent Server:**
 - Esri: ~$1,667/month ($20k/year)
 - Honua Professional: $294/month
 - **Savings: 82% cost reduction**
@@ -1012,7 +1012,7 @@ This **cloud-native MVP approach** delivers:
 2. Focus Honua on advanced geofencing (the gap in market)
 3. Provide visual workflow designer (ease of use)
 4. Integrate with OGC SensorThings (standards compliance)
-5. Price aggressively (10x cheaper than Esri)
+5. Price aggressively (10x more affordable than commercial GIS platforms)
 
 **Expected Outcome:**
 - MVP in 4 months

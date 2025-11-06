@@ -405,7 +405,7 @@ services.AddHonua()
 
 ### Honua Core Server (Open Source)
 **No AI required. Just solid GIS server.**
-- Fast OGC/Esri APIs
+- Fast OGC/GeoServices REST APIs
 - Standards-compliant
 - Simple deployment
 - Predictable performance

@@ -1,7 +1,7 @@
 # GeoServices REST quantizationParameters Implementation Notes
 
 ## Overview
-The `quantizationParameters` parameter is an advanced geometry optimization feature in Esri's GeoServices REST API. It provides an alternative to `maxAllowableOffset` for reducing coordinate precision and payload size.
+The `quantizationParameters` parameter is an advanced geometry optimization feature in the GeoServices REST API. It provides an alternative to `maxAllowableOffset` for reducing coordinate precision and payload size.
 
 ## Status
 **NOT IMPLEMENTED** - Deferred due to complexity. `maxAllowableOffset` and `geometryPrecision` provide sufficient optimization for most use cases.

@@ -94,7 +94,7 @@ Once running, you'll have access to:
 | WMS 1.3.0 | `http://localhost:8080/wms` | Web Map Service |
 | WCS 2.0 | `http://localhost:8080/wcs` | Web Coverage Service |
 | STAC 1.0 | `http://localhost:8080/stac` | SpatioTemporal Asset Catalog |
-| GeoServices REST | `http://localhost:8080/rest` | Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API |
+| GeoServices REST | `http://localhost:8080/rest` | Geoservices REST a.k.a. Esri REST API |
 | Health Checks | `http://localhost:8080/health` | Service health status |
 
 ## Management Commands

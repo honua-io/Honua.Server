@@ -855,4 +855,4 @@ Formalizing STAC integration in Honua:
 ✅ **Competitive advantage** - Native vector STAC support rare in industry
 ✅ **Modern discovery** - STAC emerging as standard for cloud-native geospatial
 
-**Recommendation:** Implement in Phase 2 after core OGC/Esri protocols are stable. Prioritize vector STAC support to differentiate from competitors.
+**Recommendation:** Implement in Phase 2 after core OGC/GeoServices REST protocols are stable. Prioritize vector STAC support to differentiate from competitors.

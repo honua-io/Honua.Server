@@ -548,7 +548,7 @@ When Honua adds support for new API versions:
 
 This integration testing strategy ensures Honua's API implementations are validated against real-world client libraries and desktop GIS applications. By focusing on QGIS/PyQGIS as the primary comprehensive reference client, supplemented with specialized Python libraries (rasterio, pystac-client, OWSLib, arcpy), we achieve:
 
-1. **Specification Compliance**: Real client libraries enforce OGC/STAC/Esri specifications
+1. **Specification Compliance**: Real client libraries enforce OGC/STAC/GeoServices REST specifications
 2. **Real-World Validation**: Tests match actual user workflows
 3. **Breaking Change Detection**: Client tests catch subtle compatibility issues
 4. **Cross-Platform Coverage**: Python, .NET, desktop application tests

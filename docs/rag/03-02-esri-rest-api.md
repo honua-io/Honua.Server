@@ -27,9 +27,9 @@ Comprehensive guide to Honua's Esri ArcGIS REST API compatibility layer for Feat
 
 ## Overview
 
-Honua implements Esri's GeoServices REST API specification, providing compatibility with ArcGIS clients and applications.
+Honua implements the GeoServices REST API specification, providing compatibility with ArcGIS clients and applications.
 
-### Why Esri Compatibility?
+### Why GeoServices REST Compatibility?
 
 - **Legacy systems**: Integrate with existing ArcGIS infrastructure
 - **Client apps**: Use ArcGIS Online, ArcGIS Pro, Field Maps
@@ -909,4 +909,4 @@ honua config show | grep maxBodySize
 
 **Last Updated**: 2025-10-15
 **Honua Version**: 1.0.0-rc1
-**Esri Compatibility**: GeoServices REST API 10.81
+**GeoServices REST Compatibility**: GeoServices REST API 10.81

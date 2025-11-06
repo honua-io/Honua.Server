@@ -348,7 +348,7 @@ public sealed class MetadataCrosswalkTests
 
     #endregion
 
-    #region Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API Crosswalk Tests
+    #region Geoservices REST a.k.a. Esri REST API Crosswalk Tests
 
     [Fact]
     public void Layer_WithEsriRestRequiredFields_ShouldValidateForEsri()
@@ -386,7 +386,7 @@ public sealed class MetadataCrosswalkTests
         var snapshot = JsonMetadataProvider.Parse(layer);
         var layerDef = snapshot.Layers[0];
 
-        // Assert - Verify Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API compatible fields
+        // Assert - Verify Geoservices REST a.k.a. Esri REST API compatible fields
         layerDef.IdField.Should().NotBeNullOrEmpty(); // Required for objectIdField
         layerDef.DisplayField.Should().NotBeNullOrEmpty(); // displayField
         layerDef.Storage!.Srid.Should().NotBeNull(); // Required for spatialReference
@@ -445,7 +445,7 @@ public sealed class MetadataCrosswalkTests
         ogcResults.IsValid.Should().BeTrue("OGC API Features validation failed: " + string.Join("; ", ogcResults.Errors));
 
         var esriResults = ProtocolMetadataValidator.ValidateForEsriRest(layerDef);
-        esriResults.IsValid.Should().BeTrue("Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API validation failed: " + string.Join("; ", esriResults.Errors));
+        esriResults.IsValid.Should().BeTrue("Geoservices REST a.k.a. Esri REST API validation failed: " + string.Join("; ", esriResults.Errors));
 
         var wfsResults = ProtocolMetadataValidator.ValidateForWfs(layerDef);
         wfsResults.IsValid.Should().BeTrue("WFS validation failed: " + string.Join("; ", wfsResults.Errors));

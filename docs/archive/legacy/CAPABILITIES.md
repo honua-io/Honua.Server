@@ -300,7 +300,7 @@ All Geoservices REST a.k.a. Esri REST implementations verified in `src/Honua.Ser
 | Download attachment | GET | `/rest/services/.../FeatureServer/{layer}/{oid}/attachments/{id}` | Viewer | Download file |
 
 **Features:**
-- **Formats:** Esri JSON, GeoJSON, Shapefile
+- **Formats:** GeoServices JSON format, GeoJSON, Shapefile
 - **Spatial queries:** geometry + spatialRel (intersects, contains, etc.)
 - **Related records:** Query relationships
 - **Cloud storage:** S3/Azure Blob integration for attachments
@@ -489,7 +489,7 @@ All export formats verified via implementation inspection.
 | **Shapefile** | `ShapefileExporter.cs` | `application/zip` | ✅ >10k | Unlimited |
 | **CSV** | `CsvExporter.cs` | `text/csv` | ❌ | 100,000 |
 | **GML 3.2** | Via WFS | `application/gml+xml; version=3.2` | ❌ | 10,000 |
-| **Esri JSON** | Via Geoservices REST a.k.a. Esri REST | `application/json` | ❌ | 10,000 |
+| **GeoServices JSON format** | Via Geoservices REST a.k.a. Esri REST | `application/json` | ❌ | 10,000 |
 | **HTML** | Built-in | `text/html` | ❌ | N/A (view only) |
 
 **Evidence:** `src/Honua.Server.Core/Export/`, `src/Honua.Server.Core/Serialization/`
@@ -532,7 +532,7 @@ All export formats verified via implementation inspection.
 | Role | Policy | Permissions | Used By |
 |------|--------|-------------|---------|
 | **Viewer** | RequireViewer | Read-only access | OGC API GET, WFS GetFeature, WMS, WMTS, STAC, OData GET, Carto SQL |
-| **DataPublisher** | RequireDataPublisher | Read + Write | OGC API POST/PUT/PATCH/DELETE, WFS-T, Esri applyEdits, OData POST/PUT/PATCH/DELETE |
+| **DataPublisher** | RequireDataPublisher | Read + Write | OGC API POST/PUT/PATCH/DELETE, WFS-T, applyEdits, OData POST/PUT/PATCH/DELETE |
 | **Admin** | RequireAdmin | Administrative | Metadata management, cache control, configuration |
 | **Owner** | RequireOwner | Full control | System-level operations |
 
@@ -643,7 +643,7 @@ All export formats verified via implementation inspection.
 **Style Formats:**
 - Legacy JSON format
 - SLD (Styled Layer Descriptor) export
-- Esri JSON renderer format
+- GeoServices JSON format renderer format
 - Mapbox GL styles (for vector tiles)
 
 **Features:**
@@ -696,7 +696,7 @@ All export formats verified via implementation inspection.
 **Features:**
 - One-to-many relationships
 - Foreign key relationships
-- Related record queries (Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API `queryRelatedRecords`)
+- Related record queries (Geoservices REST a.k.a. Esri REST API `queryRelatedRecords`)
 - Composite relationships
 
 **Configuration:**
@@ -719,7 +719,7 @@ All export formats verified via implementation inspection.
 - GlobalID requirement option
 - Pre-signed URL generation
 - OGC API link exposure (`ExposeAsOgcApiLinks`)
-- Full CRUD via Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
+- Full CRUD via Geoservices REST a.k.a. Esri REST API
 
 **Operations:**
 - Query attachments
@@ -918,7 +918,7 @@ Based on comprehensive code scan (zero matches):
 | **Industry APIs** | 5 | Geoservices REST a.k.a. Esri REST (3 servers), OData, Carto SQL, OpenRosa |
 | **Data Providers (OSS)** | 4 | PostgreSQL, SQLite, SQL Server, MySQL |
 | **Data Providers (Enterprise)** | 6 | Oracle, Snowflake, BigQuery, MongoDB, Redshift, Cosmos DB |
-| **Export Formats** | 11 | GeoJSON, GeoJSON-Seq, KML, KMZ, TopoJSON, GeoPackage, Shapefile, CSV, GML, Esri JSON, HTML |
+| **Export Formats** | 11 | GeoJSON, GeoJSON-Seq, KML, KMZ, TopoJSON, GeoPackage, Shapefile, CSV, GML, GeoServices JSON format, HTML |
 | **Authentication Modes** | 3 | QuickStart, Local JWT, OIDC |
 | **RBAC Roles** | 4 | Viewer, DataPublisher, Admin, Owner |
 | **Major Gaps** | 7 | 3D, WPS, Real-time, Analytics, Printing, Geocoding, Routing |

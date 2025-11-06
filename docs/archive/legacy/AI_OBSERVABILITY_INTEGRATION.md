@@ -549,7 +549,7 @@ GET /stac
 Expected: { "type": "Catalog", ... }
 ```
 
-#### 7. Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
+#### 7. Geoservices REST a.k.a. Esri REST API
 ```
 GET /rest/services?f=json
 Expected: { "folders": [...], "services": [...] }

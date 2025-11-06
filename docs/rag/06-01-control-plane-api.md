@@ -874,7 +874,7 @@ POST /admin/metadata/snapshots/{label}/restore
 
 ### Create Migration Job
 
-Migrate an Esri FeatureServer or MapServer to Honua.
+Migrate a GeoServices REST FeatureServer or MapServer to Honua.
 
 ```bash
 POST /admin/migrations/jobs

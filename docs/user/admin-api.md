@@ -5,7 +5,7 @@ Complete reference for administrative endpoints used to manage metadata, migrati
 ## Table of Contents
 - [Authentication](#authentication)
 - [Metadata Management](#metadata-management)
-- [Esri Service Migration](#esri-service-migration)
+- [GeoServices REST Service Migration](#esri-service-migration)
 - [Raster Tile Cache](#raster-tile-cache)
 - [Error Responses](#error-responses)
 
@@ -327,7 +327,7 @@ Authorization: Bearer {token}
 
 **Warning:** Restoring a snapshot replaces **all** current metadata.
 
-## Esri Service Migration
+## GeoServices REST Service Migration
 
 Migrate layers and data from ArcGIS Server / ArcGIS Online to Honua.
 
@@ -338,7 +338,7 @@ Migrate layers and data from ArcGIS Server / ArcGIS Online to Honua.
 
 ### Create Migration Job
 
-Start a new migration from an Esri service.
+Start a new migration from a GeoServices REST service.
 
 ```http
 POST /admin/migrations/jobs
@@ -368,8 +368,8 @@ Authorization: Bearer {token}
 
 | Parameter | Description | Required |
 |-----------|-------------|----------|
-| `sourceUrl` | Esri FeatureServer URL | Yes |
-| `sourceToken` | Esri token (if secured) | No |
+| `sourceUrl` | FeatureServer URL | Yes |
+| `sourceToken` | authentication token (if secured) | No |
 | `targetProvider` | Target database (`postgis`, `sqlite`, `sqlserver`) | Yes |
 | `targetConnectionString` | Database connection (supports `env:VAR`) | Yes |
 | `targetSchema` | Database schema | Yes (except SQLite) |
@@ -393,7 +393,7 @@ Authorization: Bearer {token}
 ```
 
 **Migration Process:**
-1. Query Esri service metadata
+1. Query GeoServices REST service metadata
 2. Create target tables/schemas
 3. Migrate features in batches
 4. Download attachments (if enabled)

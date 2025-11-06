@@ -103,7 +103,7 @@ Comprehensive metadata validation test suite implemented for the Honua geospatia
 - WFS 2.0 crosswalk (1 test)
 - WMS 1.3 crosswalk (1 test)
 - CSW 2.0.2 crosswalk (1 test)
-- Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API crosswalk (1 test)
+- Geoservices REST a.k.a. Esri REST API crosswalk (1 test)
 - Multi-protocol validation (1 test)
 
 **Standards Coverage**:
@@ -133,7 +133,7 @@ Comprehensive metadata validation test suite implemented for the Honua geospatia
 - Recommended: description/summary, keywords, bbox, links
 - Tests validate Dublin Core and ISO 19115 mapping
 
-#### Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (FeatureServer)
+#### Geoservices REST a.k.a. Esri REST API (FeatureServer)
 - Required: id, title, geometryType, idField, geometryField, bbox, srid
 - Recommended: displayField, fields
 - Tests validate layer metadata for Esri services
@@ -232,7 +232,7 @@ Comprehensive metadata validation test suite implemented for the Honua geospatia
 - ✅ WFS 2.0 compatibility
 - ✅ WMS 1.3 compatibility
 - ✅ CSW 2.0.2 compatibility
-- ✅ Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API compatibility
+- ✅ Geoservices REST a.k.a. Esri REST API compatibility
 - ✅ Multi-protocol validation
 
 ### Error Reporting

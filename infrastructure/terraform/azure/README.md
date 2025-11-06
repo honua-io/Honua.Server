@@ -221,11 +221,11 @@ func azure functionapp publish $(terraform output -raw function_app_name)
 1. **Direct Azure consumption**: $195/month (AI services)
 2. **Customer infrastructure driven**: $1.25M/month (VMs, DBs, Storage, Networking)
 3. **Microsoft's ROI**: Invest $12K/year → Drive $15M/year consumption = **1,250x return**
-4. **Competitive advantage**: Moving Esri customers from on-premises/AWS to Azure
-5. **Market opportunity**: 350K+ Esri customers, 80% still on-premises
+4. **Competitive advantage**: Moving enterprise GIS organizations from on-premises/AWS to Azure
+5. **Market opportunity**: 350K+ enterprise GIS organizations, 80% still on-premises
 
 **Traction to highlight:**
-- Open-source geospatial server (competitive with Esri's $100K product)
+- Open-source geospatial server (competitive with commercial GIS platforms)
 - AI consultant MVP launching Q2 2025
 - Target: 10 paying customers by end of Year 1
 

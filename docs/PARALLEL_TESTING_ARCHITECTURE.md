@@ -191,7 +191,7 @@ Visual guide to the HonuaIO parallel testing infrastructure.
 │  • OGC API Features: Collection access, item retrieval              │
 │  • OGC API Tiles: Vector tile rendering                             │
 │  • STAC: Catalog browsing, asset loading                            │
-│  • GeoServices: Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API compatibility                         │
+│  • GeoServices: Geoservices REST a.k.a. Esri REST API compatibility                         │
 │                                                                     │
 │  Isolation Strategy:                                                │
 │  • Separate QGIS instances per worker                               │

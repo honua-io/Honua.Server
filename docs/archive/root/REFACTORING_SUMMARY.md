@@ -201,7 +201,7 @@ python3 /tmp/extract_services.py
 - `tests/Honua.Server.Core.Tests/Hosting/GeoservicesRestEditingTests.cs`
 - `tests/Honua.Server.Core.Tests/Hosting/GeoservicesRestLeafletTests.cs`
 
-These tests MUST continue to pass - Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API compatibility is critical.
+These tests MUST continue to pass - Geoservices REST a.k.a. Esri REST API compatibility is critical.
 
 ### New Tests (To Be Added)
 - Unit tests for each service
@@ -212,7 +212,7 @@ These tests MUST continue to pass - Geoservices REST a.k.a. Geoservices REST a.k
 ## Constraints & Requirements
 
 MUST maintain:
-- **Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API compatibility** (exact behavior)
+- **Geoservices REST a.k.a. Esri REST API compatibility** (exact behavior)
 - **Existing endpoint routes**
 - **Query parameter handling**
 - **Authorization logic**

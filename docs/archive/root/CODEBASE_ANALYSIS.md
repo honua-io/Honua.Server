@@ -190,7 +190,7 @@ Key Components:
 - `Cql2/Cql2Parser.cs` - Filter expression parsing
 - Storage backends: PostgreSQL, MySQL, SQLite, SQL Server, in-memory
 
-#### **Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API** (`/GeoservicesREST/`)
+#### **Geoservices REST a.k.a. Esri REST API** (`/GeoservicesREST/`)
 - FeatureServer (query, add, update, delete, applyEdits)
 - MapServer (identify, export, layer definitions)
 - GeometryService (buffer, simplify, project, union, difference)

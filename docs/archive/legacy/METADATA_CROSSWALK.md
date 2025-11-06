@@ -19,7 +19,7 @@ Honua uses a **semantic mapping approach** where:
 ```
 Single Metadata Definition → Multiple Protocol Outputs
                            ├─→ OGC API Features (JSON)
-                           ├─→ Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (JSON)
+                           ├─→ Geoservices REST a.k.a. Esri REST API (JSON)
                            ├─→ WMS 1.3 (XML)
                            ├─→ WFS 2.0 (GML/XML)
                            ├─→ CSW 2.0.2 (Dublin Core XML)
@@ -100,7 +100,7 @@ Single Metadata Definition → Multiple Protocol Outputs
 |---------------|------------------|-----------|---------|---------|-----------|-------|
 | `layer.defaultStyleId` | `collection.links[rel=styles]` default | `layer.drawingInfo` | `Layer/Style[@isDefault=true]` | - | - | Default rendering style |
 | `layer.styleIds` | Multiple style links | - | `Layer/Style` list | - | - | Available styles |
-| `style.format` | Determines output (SLD, Mapbox GL) | Converted to Esri renderer | SLD if requested | - | - | Style format |
+| `style.format` | Determines output (SLD, Mapbox GL) | Converted to GeoServices renderer format | SLD if requested | - | - | Style format |
 | `style.renderer` | - | Maps to `layer.drawingInfo.renderer.type` | - | - | - | Renderer type (simple, uniqueValue) |
 
 ### Attachments
@@ -279,7 +279,7 @@ Data sources are **internal** metadata and don't directly map to API outputs, bu
 - `layer.fields` (for property schema)
 - `layer.crs` (defaults to CRS84 if omitted)
 
-#### Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (FeatureServer)
+#### Geoservices REST a.k.a. Esri REST API (FeatureServer)
 **Required:**
 - `layer.id`
 - `layer.title`
@@ -363,7 +363,7 @@ Data sources are **internal** metadata and don't directly map to API outputs, bu
 | Protocol | Projection Code Location | Key Mapping Function |
 |----------|-------------------------|---------------------|
 | OGC API Features | `OgcFeaturesHandlers.cs` | `BuildCollectionMetadata()` |
-| Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API | `GeoservicesRESTMetadataMapper.cs` | `CreateFeatureServiceSummary()`, `CreateLayerDetail()` |
+| Geoservices REST a.k.a. Esri REST API | `GeoservicesRESTMetadataMapper.cs` | `CreateFeatureServiceSummary()`, `CreateLayerDetail()` |
 | WMS 1.3 | `WmsHandlers.cs` | `CreateLayerElement()` in GetCapabilities |
 | WFS 2.0 | `WfsHandlers.cs` | `CreateFeatureTypeElement()` |
 | CSW 2.0.2 | `CswHandlers.cs` | `CreateDublinCoreRecord()` |

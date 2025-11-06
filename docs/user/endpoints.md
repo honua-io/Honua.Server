@@ -8,7 +8,7 @@
 - OGC WMS: https://{host}/wms
 - OGC API Records: https://{host}/records
 - STAC API: https://{host}/stac
-- Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST Services Directory: https://{host}/rest/services
+- Geoservices REST a.k.a. Esri REST Services Directory: https://{host}/rest/services
 - Esri Geometry Service: https://{host}/rest/services/Geometry/GeometryServer
 - OData (metadata query): https://{host}/odata
 - Carto-compatible API: https://{host}/carto
@@ -51,7 +51,7 @@
 
 > WFS gaps: only the first entry in `typeNames` is evaluated (multi-type joins and ad-hoc stored queries are not implemented yet). Supported output formats are GeoJSON (`application/geo+json`) and GML 3.2 (`application/gml+xml; version=3.2`); other encodings and `GetPropertyValue` are not exposed. Locking and transactions require the target layer to publish a stable `idField` value. Bounding boxes and `srsName` arguments accept plain `EPSG:{code}` strings or full OGC URNs; responses advertise normalized URN identifiers (`http://www.opengis.net/def/crs/...`).
 
-## Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST Feature Services
+## Geoservices REST a.k.a. Esri REST Feature Services
 | Operation | Endpoint | Example |
 |-----------|----------|---------|
 | Service directories | /rest/services | curl "https://localhost:5000/rest/services?f=pjson" |
@@ -134,7 +134,7 @@
 ## Geometry Service
 | Operation | Endpoint | Example | Notes |
 |-----------|----------|---------|-------|
-| Service metadata | /rest/services/Geometry/GeometryServer | curl "https://localhost:5000/rest/services/Geometry/GeometryServer?f=json" | Esri-compatible geometry service |
+| Service metadata | /rest/services/Geometry/GeometryServer | curl "https://localhost:5000/rest/services/Geometry/GeometryServer?f=json" | GeoServices REST compatible geometry service |
 | Project | /rest/services/Geometry/GeometryServer/project | curl -X POST -d '{"geometries":[...],"inSR":4326,"outSR":3857}' "https://localhost:5000/rest/services/Geometry/GeometryServer/project?f=json" | Reproject geometries |
 | Buffer | /rest/services/Geometry/GeometryServer/buffer | curl -X POST -d '{"geometries":[...],"distances":[100],"unit":"meters"}' "https://localhost:5000/rest/services/Geometry/GeometryServer/buffer?f=json" | Buffer geometries |
 | Simplify | /rest/services/Geometry/GeometryServer/simplify | curl -X POST -d '{"geometries":[...]}' "https://localhost:5000/rest/services/Geometry/GeometryServer/simplify?f=json" | Simplify geometries |

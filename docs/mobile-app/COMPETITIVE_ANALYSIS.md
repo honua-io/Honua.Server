@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The mobile GIS data collection market is mature with several established players, ranging from enterprise solutions (Esri) to open-source alternatives (QField, Mergin Maps) and commercial SaaS platforms (Fulcrum, GIS Cloud). The market is evolving rapidly with the integration of AI, AR, and edge computing technologies.
+The mobile GIS data collection market is mature with several established players, ranging from enterprise solutions (proprietary GIS platforms) to open-source alternatives (QField, Mergin Maps) and commercial SaaS platforms (Fulcrum, GIS Cloud). The market is evolving rapidly with the integration of AI, AR, and edge computing technologies.
 
 **Key Findings:**
 - 📊 Market dominated by Esri (ArcGIS Field Maps) in enterprise
@@ -99,11 +99,11 @@ The mobile GIS data collection market is mature with several established players
 #### Weaknesses
 ❌ **Form-only** - Not suitable for general map-based editing
 ❌ **Limited mapping** - Basic map view, not full GIS
-❌ **Esri ecosystem** - Requires ArcGIS investment
+❌ **proprietary GIS platforms** - Requires ArcGIS investment
 ❌ **Offline concerns** - Some users report sync issues
 
 #### Market Share
-~10-15% (within Esri customer base)
+~10-15% (within enterprise GIS customer base)
 
 ---
 
@@ -168,7 +168,7 @@ The mobile GIS data collection market is mature with several established players
 **Market Position:** Affordable cloud alternative
 
 #### Strengths
-✅ **Affordable** - Lower cost than Esri
+✅ **Affordable** - Lower cost than commercial GIS platforms
 ✅ **Offline maps** - Built-in offline support
 ✅ **Plugin support** - QGIS and ArcGIS plugins
 ✅ **Diverse formats** - Multiple data type support
@@ -177,7 +177,7 @@ The mobile GIS data collection market is mature with several established players
 
 #### Weaknesses
 ❌ **Less known** - Smaller market presence
-❌ **Limited features** - Fewer capabilities than Esri
+❌ **Limited features** - Fewer capabilities than commercial GIS platforms
 ❌ **Smaller ecosystem** - Fewer integrations
 
 #### Market Share
@@ -315,7 +315,7 @@ The mobile GIS data collection market is mature with several established players
 - Sync models when online, use offline
 
 ### 🎯 Gap 4: Developer-Friendly Platform
-**Current State:** Esri = closed, open-source = complex setup
+**Current State:** proprietary GIS = closed, open-source = complex setup
 **Opportunity:** Modern developer experience:
 - REST/GraphQL APIs
 - SDK for custom extensions
@@ -324,10 +324,10 @@ The mobile GIS data collection market is mature with several established players
 - Webhooks and event streams
 
 ### 🎯 Gap 5: Cost-Effective Enterprise Solution
-**Current State:** Esri expensive, open-source lacks enterprise features
+**Current State:** commercial GIS expensive, open-source lacks enterprise features
 **Opportunity:** Middle ground:
 - Enterprise features (SSO, RBAC, audit logs)
-- Reasonable pricing (not Esri-level)
+- Reasonable pricing (not enterprise GIS-level)
 - Self-hosted option for data sovereignty
 - SaaS option for convenience
 
@@ -475,7 +475,7 @@ The mobile GIS data collection market is mature with several established players
 - Cost justifiable
 
 **Current Solution:** Field Maps (locked in)
-**Pain Points:** Cost, limited to Esri ecosystem
+**Pain Points:** Cost, limited to proprietary GIS platforms
 **Opportunity:** Vendor-neutral, standards-based, lower cost
 
 ---
@@ -495,7 +495,7 @@ The mobile GIS data collection market is mature with several established players
 
 **Phase 1: Early Adopters (Months 1-6)**
 - Target: Open-source users frustrated with complexity
-- Target: Small-medium organizations priced out of Esri
+- Target: Small-medium organizations priced out of commercial GIS platforms
 - Strategy: Free tier, excellent documentation, active community
 
 **Phase 2: Professional Market (Months 6-18)**
@@ -597,7 +597,7 @@ The mobile GIS data collection market is mature with several established players
 - **General Purpose:** Not just surveys
 - **Map-Centric:** Full map editing capabilities
 - **Openness:** Works with any GIS backend
-- **Cost:** Standalone pricing, not Esri requirement
+- **Cost:** Standalone pricing, not commercial GIS platform requirement
 
 ---
 
@@ -608,8 +608,8 @@ The mobile GIS data collection market is mature with several established players
 1. **Market Saturation:** Crowded market with established players
    - **Mitigation:** Focus on innovation gaps (AI, AR)
 
-2. **Esri Dominance:** Hard to compete with market leader
-   - **Mitigation:** Target Esri's weaknesses (price, lock-in)
+2. **Market Leader Dominance:** Hard to compete with market leader
+   - **Mitigation:** Target commercial GIS weaknesses (price, lock-in)
 
 3. **Open Source Competition:** Hard to compete with "free"
    - **Mitigation:** Offer superior UX, enterprise features, support

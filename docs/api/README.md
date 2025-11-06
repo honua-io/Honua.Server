@@ -15,7 +15,7 @@ Complete API documentation for all Honua endpoints.
 | WMTS | `/wmts` | OGC WMTS | 1.0 |
 | WCS | `/wcs` | OGC WCS | 2.0 |
 | CSW | `/csw` | OGC CSW | 2.0 |
-| Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST | `/rest/services` | Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API | 10.x |
+| Geoservices REST a.k.a. Esri REST | `/rest/services` | Geoservices REST a.k.a. Esri REST API | 10.x |
 | STAC | `/stac` | STAC | 1.0 |
 | OData | `/odata` | OData | v4 |
 | Carto SQL | `/carto/api/v1/sql` | Carto SQL API | - |
@@ -171,7 +171,7 @@ GET /wms?service=WMS&version=1.3.0&request=GetFeatureInfo&layers={layer}&query_l
 
 Returns feature information for a specific pixel location.
 
-## Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
+## Geoservices REST a.k.a. Esri REST API
 
 ### Service Directory
 ```

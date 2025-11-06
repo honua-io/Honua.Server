@@ -21,7 +21,7 @@ Field data collection is a critical use case for geospatial platforms. Organizat
 
 **ODK Collect** (Android) and other compatible clients (KoBoCollect, Survey123) implement OpenRosa and are widely deployed in humanitarian, conservation, and field survey domains.
 
-Honua currently supports OGC Transactions and Esri applyEdits for programmatic feature editing, but lacks:
+Honua currently supports OGC Transactions and applyEdits for programmatic feature editing, but lacks:
 - Form-based data collection workflows
 - Offline-first mobile clients
 - Staging/review processes for field submissions
@@ -31,7 +31,7 @@ Honua currently supports OGC Transactions and Esri applyEdits for programmatic f
 
 ### 1. Architecture: Dual-Mode Integration
 
-Implement OpenRosa API endpoints alongside existing OGC/Esri APIs, with two operational modes:
+Implement OpenRosa API endpoints alongside existing OGC/GeoServices REST APIs, with two operational modes:
 
 **Mode A: Direct Publication (Simple)**
 - Mobile submissions map directly to feature layers

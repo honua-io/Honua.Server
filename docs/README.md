@@ -24,7 +24,7 @@ Honua (Hawaiian for "Earth") is a modern geospatial server designed to serve vec
 **Key Features**:
 - OGC Standards (WFS, WMS, WMTS, WCS, CSW)
 - OGC API (Features, Tiles, Records)
-- Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API compatibility
+- Geoservices REST a.k.a. Esri REST API compatibility
 - STAC 1.0 catalog
 - 12+ export formats
 - OpenTelemetry observability
@@ -44,7 +44,7 @@ Get Honua running in 5 minutes:
 #### [API Reference](api/)
 Complete endpoint documentation:
 - OGC API Features, WFS, WMS, WMTS, WCS, CSW
-- Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (FeatureServer, MapServer)
+- Geoservices REST a.k.a. Esri REST API (FeatureServer, MapServer)
 - STAC 1.0 catalog and search
 - Authentication and authorization
 - Export formats
@@ -148,7 +148,7 @@ Step-by-step incident response:
 
 **API Reference** (5 docs):
 - OGC API Features with CQL2 filtering
-- Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API complete reference
+- Geoservices REST a.k.a. Esri REST API complete reference
 - STAC 1.0 catalog implementation
 - Export formats (GeoJSON, Shapefile, GeoPackage, etc.)
 - Control Plane API (admin endpoints)
@@ -184,7 +184,7 @@ Each document includes:
 ### API Documentation
 - [OGC API Features](api/README.md#ogc-api-features)
 - [WFS/WMS/WMTS](api/README.md#wfs-20)
-- [Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API](api/README.md#esri-rest-api)
+- [Geoservices REST a.k.a. Esri REST API](api/README.md#esri-rest-api)
 - [STAC Catalog](api/README.md#stac-10)
 - [Export Formats](api/README.md#export-formats)
 
@@ -215,7 +215,7 @@ Each document includes:
 
 ✅ **Complete Coverage**:
 - All OGC protocols (WFS, WMS, WMTS, WCS, CSW)
-- All modern APIs (OGC API Features, STAC, Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST)
+- All modern APIs (OGC API Features, STAC, Geoservices REST a.k.a. Esri REST)
 - All authentication modes (Local, JWT, OIDC, API Keys)
 - All 12+ export formats
 - Docker, Kubernetes, and cloud deployment

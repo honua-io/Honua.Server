@@ -88,7 +88,7 @@ curl "http://localhost:8080/wms?service=WMS&version=1.3.0&request=GetCapabilitie
 curl "http://localhost:8080/wms?service=WMS&version=1.3.0&request=GetMap&layers={layer}&bbox=-120,36,-109,46&width=800&height=600&crs=EPSG:4326&format=image/png" -o map.png
 ```
 
-### Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API
+### Geoservices REST a.k.a. Esri REST API
 
 ```bash
 curl http://localhost:8080/rest/services | jq
@@ -132,7 +132,7 @@ Access:
 | WFS 2.0 | `/wfs` | Web Feature Service |
 | WMS 1.3 | `/wms` | Web Map Service |
 | STAC 1.0 | `/stac` | SpatioTemporal Asset Catalog |
-| Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST | `/rest/services` | ArcGIS-compatible API |
+| Geoservices REST a.k.a. Esri REST | `/rest/services` | ArcGIS-compatible API |
 | OData v4 | `/odata` | Query with OData |
 | Swagger | `/swagger` | Interactive API docs |
 | Metrics | `/metrics` | Prometheus metrics |

@@ -2,7 +2,7 @@
 
 **Keywords:** metadata, schema, configuration, json, services, layers, folders, dataSources, catalog, ogc, raster, styles, feature-services, wfs, wms, esri-rest
 
-This document provides a comprehensive reference for the Honua metadata schema. The metadata JSON file defines all spatial services, layers, data sources, and styling that Honua exposes through OGC APIs, Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST APIs, and other geospatial protocols.
+This document provides a comprehensive reference for the Honua metadata schema. The metadata JSON file defines all spatial services, layers, data sources, and styling that Honua exposes through OGC APIs, Geoservices REST a.k.a. Esri REST APIs, and other geospatial protocols.
 
 ## Overview
 
@@ -256,7 +256,7 @@ Data sources define database connections used by services and layers.
 
 ## Services
 
-Services represent logical groupings of layers, exposed via OGC APIs and Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST APIs.
+Services represent logical groupings of layers, exposed via OGC APIs and Geoservices REST a.k.a. Esri REST APIs.
 
 ### Service Definition
 
@@ -1394,7 +1394,7 @@ Honua performs comprehensive validation when loading metadata:
 ## Related Topics
 
 - **OGC API Features**: See OGC API implementation documentation
-- **Geoservices REST a.k.a. Esri REST Services**: See Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API compatibility guide
+- **Geoservices REST a.k.a. Esri REST Services**: See Geoservices REST a.k.a. Esri REST API compatibility guide
 - **Data Source Configuration**: See database provider setup guides
 - **Styling and Symbology**: See styling documentation for advanced rendering
 - **Security and Authentication**: See authentication and authorization guide

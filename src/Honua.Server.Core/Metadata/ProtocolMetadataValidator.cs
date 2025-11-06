@@ -75,7 +75,7 @@ public sealed class ProtocolMetadataValidator
     }
 
     /// <summary>
-    /// Validates metadata requirements for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (FeatureServer) protocol.
+    /// Validates metadata requirements for Geoservices REST a.k.a. Esri REST API (FeatureServer) protocol.
     /// </summary>
     public static ProtocolValidationResult ValidateForEsriRest(LayerDefinition layer)
     {
@@ -87,48 +87,48 @@ public sealed class ProtocolMetadataValidator
         // Required fields
         if (layer.Id.IsNullOrWhiteSpace())
         {
-            errors.Add("layer.id is required for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API");
+            errors.Add("layer.id is required for Geoservices REST a.k.a. Esri REST API");
         }
 
         if (layer.Title.IsNullOrWhiteSpace())
         {
-            errors.Add("layer.title is required for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API");
+            errors.Add("layer.title is required for Geoservices REST a.k.a. Esri REST API");
         }
 
         if (layer.GeometryType.IsNullOrWhiteSpace())
         {
-            errors.Add("layer.geometryType is required for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API");
+            errors.Add("layer.geometryType is required for Geoservices REST a.k.a. Esri REST API");
         }
 
         if (layer.IdField.IsNullOrWhiteSpace())
         {
-            errors.Add("layer.idField is required for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (used as objectIdField)");
+            errors.Add("layer.idField is required for Geoservices REST a.k.a. Esri REST API (used as objectIdField)");
         }
 
         if (layer.GeometryField.IsNullOrWhiteSpace())
         {
-            errors.Add("layer.geometryField is required for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API");
+            errors.Add("layer.geometryField is required for Geoservices REST a.k.a. Esri REST API");
         }
 
         if (layer.Extent?.Bbox == null || layer.Extent.Bbox.Count == 0)
         {
-            errors.Add("layer.extent.bbox is required for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API");
+            errors.Add("layer.extent.bbox is required for Geoservices REST a.k.a. Esri REST API");
         }
 
         if (layer.Storage?.Srid == null)
         {
-            errors.Add("layer.storage.srid is required for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (used for spatialReference)");
+            errors.Add("layer.storage.srid is required for Geoservices REST a.k.a. Esri REST API (used for spatialReference)");
         }
 
         // Recommended fields
         if (layer.DisplayField.IsNullOrWhiteSpace())
         {
-            warnings.Add("layer.displayField is recommended for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (used for default label field)");
+            warnings.Add("layer.displayField is recommended for Geoservices REST a.k.a. Esri REST API (used for default label field)");
         }
 
         if (layer.Fields.Count == 0)
         {
-            warnings.Add("layer.fields is recommended for Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (provides full field schema)");
+            warnings.Add("layer.fields is recommended for Geoservices REST a.k.a. Esri REST API (provides full field schema)");
         }
 
         if (layer.Editing.Capabilities.AllowAdd || layer.Editing.Capabilities.AllowUpdate || layer.Editing.Capabilities.AllowDelete)
@@ -139,7 +139,7 @@ public sealed class ProtocolMetadataValidator
             }
         }
 
-        return new ProtocolValidationResult("Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API", errors, warnings);
+        return new ProtocolValidationResult("Geoservices REST a.k.a. Esri REST API", errors, warnings);
     }
 
     /// <summary>
@@ -416,7 +416,7 @@ public sealed class ProtocolMetadataValidator
             results.Add(ValidateForOgcApiFeatures(layer));
         }
 
-        // Always validate Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API (core protocol)
+        // Always validate Geoservices REST a.k.a. Esri REST API (core protocol)
         results.Add(ValidateForEsriRest(layer));
 
         // WMS validation (if layer has styling or is meant for visualization)
@@ -484,7 +484,7 @@ public sealed record ProtocolValidationResult
     }
 
     /// <summary>
-    /// The protocol being validated (e.g., "OGC API Features", "Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API").
+    /// The protocol being validated (e.g., "OGC API Features", "Geoservices REST a.k.a. Esri REST API").
     /// </summary>
     public string Protocol { get; }
 

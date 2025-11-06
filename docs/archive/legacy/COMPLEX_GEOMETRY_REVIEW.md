@@ -11,7 +11,7 @@
 
 The HonuaIO codebase demonstrates **EXCEPTIONAL** handling of complex geometries including polygons with interior rings (holes), MultiPolygons, GeometryCollections, and all OGC geometry types. The implementation follows best practices for:
 
-- ✅ Ring orientation validation (OGC and Esri standards)
+- ✅ Ring orientation validation (OGC and GeoServices specifications)
 - ✅ Interior ring (hole) topology validation
 - ✅ Ring closure validation (2D and 3D)
 - ✅ Self-intersection detection
@@ -112,7 +112,7 @@ private static bool IsRingClosed(LineString ring)
    - Only creates new geometry if correction needed (performance)
 
 2. **`EnsureEsriOrientation()`** (lines 298-342)
-   - Converts to Esri standard (CW exterior, CCW holes)
+   - Converts to GeoServices specification (CW exterior, CCW holes)
    - Used for ArcGIS REST API compatibility
    - Opposite of OGC standard
 
@@ -252,7 +252,7 @@ if (!validationResult.IsValid)
 #### ✅ **Orientation Conversion**
 
 ```csharp
-// Line 382: Ensure Esri orientation before serialization
+// Line 382: Ensure GeoServices ring orientation before serialization
 var esriPolygon = GeometryValidator.EnsureEsriOrientation(polygon);
 
 // Lines 384-388: Serialize exterior ring + all interior rings
@@ -480,7 +480,7 @@ public void EnsureCorrectOrientation_ShouldFixHoleOrientation()
 }
 ```
 
-4. **Lines 440-471:** Test Esri orientation conversion:
+4. **Lines 440-471:** Test GeoServices ring orientation conversion:
 ```csharp
 [Fact]
 public void EnsureEsriOrientation_ShouldConvertHolesToCounterClockwise()
@@ -544,7 +544,7 @@ The codebase correctly handles the fact that **Esri and OGC use OPPOSITE ring or
 
 **Implementation:**
 - Internal storage: OGC standard (CCW exterior, CW holes)
-- Geoservices REST a.k.a. Geoservices REST a.k.a. Esri REST API: Automatic conversion via `EnsureEsriOrientation()`
+- Geoservices REST a.k.a. Esri REST API: Automatic conversion via `EnsureEsriOrientation()`
 - GeoJSON/WKT: Uses OGC standard (native)
 - Clear documentation in code comments (GeometryValidator.cs lines 232-236)
 
@@ -798,7 +798,7 @@ The HonuaIO codebase demonstrates **production-grade** handling of complex geome
 #### ✅ **Strengths:**
 
 1. **Comprehensive Validation**
-   - Ring orientation (both OGC and Esri standards)
+   - Ring orientation (both OGC and GeoServices specifications)
    - Ring closure (2D and 3D)
    - Topology validation
    - All interior rings validated
@@ -854,7 +854,7 @@ The HonuaIO codebase demonstrates **production-grade** handling of complex geome
 
 All complex methods have comprehensive XML comments explaining:
 - Purpose
-- OGC vs Esri orientation differences
+- OGC vs commercial GIS platforms orientation differences
 - Edge cases
 - Return values
 

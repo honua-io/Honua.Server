@@ -237,7 +237,7 @@ Following `/docs/features/GEOPROCESSING_ARCHITECTURE.md` (2252 lines):
 - Event-driven completion (cloud batch)
 
 ### 🚧 Pending
-- GeoservicesREST GPServer API (Esri-compatible)
+- GeoservicesREST GPServer API (GeoServices REST compatible)
 - Worker service (BackgroundService/Hangfire)
 - Additional process definitions (20+ more operations)
 - Integration tests with real databases
