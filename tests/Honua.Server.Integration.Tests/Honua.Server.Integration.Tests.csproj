@@ -40,6 +40,9 @@
 
     <!-- ASP.NET Core Testing -->
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.1" />
+
+    <!-- SignalR Client for hub testing -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.1" />
   </ItemGroup>
 
   <ItemGroup>
