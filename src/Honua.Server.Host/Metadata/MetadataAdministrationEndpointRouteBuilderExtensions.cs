@@ -378,6 +378,9 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
         // Map feature flag endpoints
         group.MapAdminFeatureFlagEndpoints();
 
+        // Map server configuration endpoints (CORS, etc.)
+        group.MapAdminServerEndpoints();
+
         return group;
     }
 
