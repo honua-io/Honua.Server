@@ -43,9 +43,10 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
-        [FromServices] ILogger logger,
+        [FromServices] ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("Honua.Server.Host.Ogc.OgcFeaturesHandlers");
         var stopwatch = Stopwatch.StartNew();
         var collections = OgcSharedHandlers.ParseCollectionsParameter(request.Query["collections"]);
 
@@ -116,9 +117,10 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
-        [FromServices] ILogger logger,
+        [FromServices] ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("Honua.Server.Host.Ogc.OgcFeaturesHandlers");
         var stopwatch = Stopwatch.StartNew();
 
         using var document = await OgcSharedHandlers.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
