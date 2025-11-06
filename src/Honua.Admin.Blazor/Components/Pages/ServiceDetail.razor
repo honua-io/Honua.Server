@@ -3,12 +3,14 @@
 @using Honua.Admin.Blazor.Shared.Models
 @attribute [Authorize]
 @inject ServiceApiClient ServiceApi
+@inject LayerApiClient LayerApi
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject ILogger<ServiceDetail> Logger
 
-<PageTitle>Service Details - Honua Admin</PageTitle>
+<PageTitle>@(_service?.Title ?? "Service Details") - Honua Admin</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
     <MudBreadcrumbs Items="_breadcrumbs" />
 
     @if (_loading)
@@ -23,101 +25,201 @@
 
     @if (_service != null)
     {
+        @* Overview Section *@
         <MudPaper Elevation="2" Class="pa-6 mt-4">
             <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-                <MudText Typo="Typo.h4">@_service.Title</MudText>
-                <MudSpacer />
+                <MudIcon Icon="@Icons.Material.Filled.Cloud" Size="Size.Large" Color="@GetServiceTypeColor(_service.ServiceType)" />
+                <MudStack Row="false" Spacing="0" Style="flex: 1">
+                    <MudText Typo="Typo.h4">@_service.Title</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@_service.Id</MudText>
+                </MudStack>
+                <MudSwitch @bind-Value="_service.Enabled"
+                           Color="Color.Success"
+                           Label="@(_service.Enabled ? "Running" : "Stopped")"
+                           OnChange="ToggleServiceEnabled" />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Edit"
                            Href="@($"/services/{_service.Id}/edit")">
-                    Edit Service
+                    Edit
                 </MudButton>
             </MudStack>
 
+            <MudDivider Class="mb-4" />
+
             <MudGrid>
-                <MudItem xs="12" md="6">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Service ID</MudText>
-                    <MudText Typo="Typo.body1" Class="mb-3 text-monospace">@_service.Id</MudText>
-
-                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Service Type</MudText>
-                    <MudChip Size="Size.Small" Color="@GetServiceTypeColor(_service.ServiceType)" Class="mb-3">
-                        @_service.ServiceType
-                    </MudChip>
-
+                <MudItem xs="12" md="8">
                     @if (!string.IsNullOrEmpty(_service.Description))
                     {
                         <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Description</MudText>
-                        <MudText Typo="Typo.body1" Class="mb-3">@_service.Description</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-4">@_service.Description</MudText>
+                    }
+
+                    @if (_service.Keywords.Any())
+                    {
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Keywords</MudText>
+                        <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;" Class="mb-4">
+                            @foreach (var keyword in _service.Keywords)
+                            {
+                                <MudChip Size="Size.Small" Variant="Variant.Outlined">@keyword</MudChip>
+                            }
+                        </MudStack>
                     }
                 </MudItem>
 
-                <MudItem xs="12" md="6">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Layer Count</MudText>
-                    <MudText Typo="Typo.body1" Class="mb-3">@_service.LayerCount layers</MudText>
-
-                    @if (_service.CreatedAt.HasValue)
-                    {
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Created</MudText>
-                        <MudText Typo="Typo.body1" Class="mb-3">@_service.CreatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
-                    }
-
-                    @if (_service.UpdatedAt.HasValue)
-                    {
-                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Last Updated</MudText>
-                        <MudText Typo="Typo.body1" Class="mb-3">@_service.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
-                    }
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="pa-3" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Type</MudText>
+                                <MudChip Size="Size.Small" Color="@GetServiceTypeColor(_service.ServiceType)">
+                                    @_service.ServiceType
+                                </MudChip>
+                            </MudStack>
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Folder</MudText>
+                                <MudText Typo="Typo.body2">@(_service.FolderId ?? "Root")</MudText>
+                            </MudStack>
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Data Source</MudText>
+                                <MudText Typo="Typo.body2">@(_service.DataSourceId ?? "N/A")</MudText>
+                            </MudStack>
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Layers</MudText>
+                                <MudText Typo="Typo.body2">@_service.LayerCount</MudText>
+                            </MudStack>
+                            @if (_service.CreatedAt.HasValue)
+                            {
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Created</MudText>
+                                    <MudText Typo="Typo.caption">@_service.CreatedAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                                </MudStack>
+                            }
+                            @if (_service.UpdatedAt.HasValue)
+                            {
+                                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Updated</MudText>
+                                    <MudText Typo="Typo.caption">@_service.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    </MudPaper>
                 </MudItem>
             </MudGrid>
         </MudPaper>
 
+        @* OGC Protocols Section *@
         @if (_service.OgcOptions != null)
         {
             <MudPaper Elevation="2" Class="pa-6 mt-4">
-                <MudText Typo="Typo.h5" Class="mb-4">OGC Service Options</MudText>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Api" Size="Size.Medium" Color="Color.Info" />
+                    <MudText Typo="Typo.h5">OGC Protocols</MudText>
+                    <MudSpacer />
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small"
+                                   Title="Edit Protocols"
+                                   OnClick="() => _showOgcEdit = !_showOgcEdit" />
+                </MudStack>
+
                 <MudGrid>
                     <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Map Services</MudText>
                         <MudStack Spacing="2">
-                            <MudStack Row="true" AlignItems="AlignItems.Center">
-                                <MudIcon Icon="@(_service.OgcOptions.WmsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                         Color="@(_service.OgcOptions.WmsEnabled ? Color.Success : Color.Default)" />
-                                <MudText>WMS (Web Map Service)</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@(_service.OgcOptions.WmsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                             Color="@(_service.OgcOptions.WmsEnabled ? Color.Success : Color.Default)"
+                                             Size="Size.Small" />
+                                    <MudText>WMS (Web Map Service)</MudText>
+                                </MudStack>
+                                @if (_showOgcEdit)
+                                {
+                                    <MudSwitch @bind-Value="_service.OgcOptions.WmsEnabled" Color="Color.Primary" Dense="true" />
+                                }
                             </MudStack>
-                            <MudStack Row="true" AlignItems="AlignItems.Center">
-                                <MudIcon Icon="@(_service.OgcOptions.WfsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                         Color="@(_service.OgcOptions.WfsEnabled ? Color.Success : Color.Default)" />
-                                <MudText>WFS (Web Feature Service)</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@(_service.OgcOptions.WmtsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                             Color="@(_service.OgcOptions.WmtsEnabled ? Color.Success : Color.Default)"
+                                             Size="Size.Small" />
+                                    <MudText>WMTS (Web Map Tile Service)</MudText>
+                                </MudStack>
+                                @if (_showOgcEdit)
+                                {
+                                    <MudSwitch @bind-Value="_service.OgcOptions.WmtsEnabled" Color="Color.Primary" Dense="true" />
+                                }
                             </MudStack>
                         </MudStack>
                     </MudItem>
+
                     <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Feature Services</MudText>
                         <MudStack Spacing="2">
-                            <MudStack Row="true" AlignItems="AlignItems.Center">
-                                <MudIcon Icon="@(_service.OgcOptions.WmtsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                         Color="@(_service.OgcOptions.WmtsEnabled ? Color.Success : Color.Default)" />
-                                <MudText>WMTS (Web Map Tile Service)</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@(_service.OgcOptions.WfsEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                             Color="@(_service.OgcOptions.WfsEnabled ? Color.Success : Color.Default)"
+                                             Size="Size.Small" />
+                                    <MudText>WFS (Web Feature Service)</MudText>
+                                </MudStack>
+                                @if (_showOgcEdit)
+                                {
+                                    <MudSwitch @bind-Value="_service.OgcOptions.WfsEnabled" Color="Color.Primary" Dense="true" />
+                                }
                             </MudStack>
-                            <MudStack Row="true" AlignItems="AlignItems.Center">
-                                <MudIcon Icon="@(_service.OgcOptions.OgcApiEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
-                                         Color="@(_service.OgcOptions.OgcApiEnabled ? Color.Success : Color.Default)" />
-                                <MudText>OGC API Features</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@(_service.OgcOptions.OgcApiEnabled ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                             Color="@(_service.OgcOptions.OgcApiEnabled ? Color.Success : Color.Default)"
+                                             Size="Size.Small" />
+                                    <MudText>OGC API Features</MudText>
+                                </MudStack>
+                                @if (_showOgcEdit)
+                                {
+                                    <MudSwitch @bind-Value="_service.OgcOptions.OgcApiEnabled" Color="Color.Primary" Dense="true" />
+                                }
                             </MudStack>
                         </MudStack>
                     </MudItem>
-                    @if (_service.OgcOptions.MaxFeatures.HasValue)
+
+                    @if (_service.OgcOptions.MaxFeatures.HasValue || _showOgcEdit)
                     {
-                        <MudItem xs="12">
-                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Max Features</MudText>
-                            <MudText Typo="Typo.body1">@_service.OgcOptions.MaxFeatures.Value.ToString("N0")</MudText>
+                        <MudItem xs="12" Class="mt-4">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Configuration</MudText>
+                            <MudStack Row="true" Spacing="4">
+                                <MudTextField @bind-Value="_service.OgcOptions.MaxFeatures"
+                                              Label="Max Features"
+                                              Variant="Variant.Outlined"
+                                              Disabled="@(!_showOgcEdit)"
+                                              HelperText="Maximum number of features to return per request"
+                                              Style="max-width: 300px" />
+                            </MudStack>
+                        </MudItem>
+                    }
+
+                    @if (_showOgcEdit)
+                    {
+                        <MudItem xs="12" Class="mt-4">
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveOgcOptions">
+                                    Save Changes
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" OnClick="CancelOgcEdit">
+                                    Cancel
+                                </MudButton>
+                            </MudStack>
                         </MudItem>
                     }
                 </MudGrid>
             </MudPaper>
         }
 
+        @* Layers Section *@
         <MudPaper Elevation="2" Class="pa-6 mt-4">
             <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-                <MudText Typo="Typo.h5">Layers</MudText>
+                <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Medium" Color="Color.Primary" />
+                <MudText Typo="Typo.h5">Layers (@_service.LayerCount)</MudText>
                 <MudSpacer />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
@@ -129,23 +231,95 @@
 
             @if (_service.LayerCount > 0)
             {
-                <MudText Color="Color.Secondary">
-                    This service has @_service.LayerCount layer@(_service.LayerCount == 1 ? "" : "s").
-                </MudText>
                 <MudButton Variant="Variant.Outlined"
                            Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.Layers"
-                           Href="@($"/services/{_service.Id}/layers")"
-                           Class="mt-2">
-                    Manage Layers
+                           StartIcon="@Icons.Material.Filled.ViewList"
+                           Href="@($"/services/{_service.Id}/layers")">
+                    Manage All Layers
                 </MudButton>
+                <MudText Color="Color.Secondary" Class="mt-2">
+                    View and manage all @_service.LayerCount layer@(_service.LayerCount == 1 ? "" : "s") for this service
+                </MudText>
             }
             else
             {
-                <MudText Color="Color.Secondary">
-                    No layers have been added to this service yet.
-                </MudText>
+                <MudAlert Severity="Severity.Info">
+                    No layers have been added to this service yet. Click "Add Layer" to create your first layer.
+                </MudAlert>
             }
+        </MudPaper>
+
+        @* Export Formats Section *@
+        <MudPaper Elevation="2" Class="pa-6 mt-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Medium" Color="Color.Secondary" />
+                <MudText Typo="Typo.h5">Export Formats</MudText>
+                <MudSpacer />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Available export formats for this service
+                </MudText>
+            </MudStack>
+
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Export formats configuration will be available in a future update. Formats are currently managed globally.
+            </MudAlert>
+
+            <MudGrid Class="mt-4">
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Standard Formats</MudText>
+                    <MudStack Spacing="1">
+                        <MudText><MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" /> GeoJSON</MudText>
+                        <MudText><MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" /> HTML</MudText>
+                        <MudText Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" /> CSV</MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">GIS Formats</MudText>
+                    <MudStack Spacing="1">
+                        <MudText Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" /> Shapefile</MudText>
+                        <MudText Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" /> GeoPackage</MudText>
+                        <MudText Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" /> KML/KMZ</MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Modern Formats</MudText>
+                    <MudStack Spacing="1">
+                        <MudText Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" /> FlatGeobuf</MudText>
+                        <MudText Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" /> GeoParquet</MudText>
+                        <MudText Color="Color.Secondary"><MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" /> PMTiles</MudText>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @* Metadata & Catalog Section *@
+        <MudPaper Elevation="2" Class="pa-6 mt-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Medium" Color="Color.Warning" />
+                <MudText Typo="Typo.h5">Metadata & Catalog</MudText>
+                <MudSpacer />
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Catalog information and metadata for discovery
+                </MudText>
+            </MudStack>
+
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Advanced catalog metadata including spatial extents, temporal information, contacts, and themes will be configurable in a future update.
+            </MudAlert>
+
+            <MudGrid Class="mt-4">
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Coming Soon</MudText>
+                    <MudList Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.Public">Spatial Extent Configuration</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Schedule">Temporal Extent Configuration</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Person">Contact Information</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Image">Thumbnail Upload</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Link">External Links</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Label">Themes & Categories</MudListItem>
+                    </MudList>
+                </MudItem>
+            </MudGrid>
         </MudPaper>
     }
 </MudContainer>
@@ -158,6 +332,8 @@
     private bool _loading = true;
     private string? _errorMessage;
     private List<BreadcrumbItem> _breadcrumbs = new();
+    private bool _showOgcEdit = false;
+    private ServiceOgcOptions? _originalOgcOptions;
 
     protected override async Task OnInitializedAsync()
     {
@@ -185,6 +361,7 @@
         {
             _errorMessage = $"Error loading service: {ex.Message}";
             Snackbar.Add(_errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error loading service {ServiceId}", Id);
         }
         finally
         {
@@ -200,6 +377,48 @@
             new BreadcrumbItem("Services", href: "/services"),
             new BreadcrumbItem(_service?.Title ?? Id, href: null, disabled: true)
         };
+    }
+
+    private async Task ToggleServiceEnabled()
+    {
+        if (_service == null) return;
+
+        try
+        {
+            if (_service.Enabled)
+            {
+                await ServiceApi.EnableServiceAsync(_service.Id);
+                Snackbar.Add($"Service '{_service.Title}' started", Severity.Success);
+            }
+            else
+            {
+                await ServiceApi.DisableServiceAsync(_service.Id);
+                Snackbar.Add($"Service '{_service.Title}' stopped", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Revert toggle on error
+            _service.Enabled = !_service.Enabled;
+            Snackbar.Add($"Failed to toggle service: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error toggling service {ServiceId}", _service.Id);
+        }
+    }
+
+    private void SaveOgcOptions()
+    {
+        _showOgcEdit = false;
+        // TODO: Implement save to backend
+        Snackbar.Add("OGC options updated (save to backend not yet implemented)", Severity.Info);
+    }
+
+    private void CancelOgcEdit()
+    {
+        if (_service != null && _originalOgcOptions != null)
+        {
+            _service.OgcOptions = _originalOgcOptions;
+        }
+        _showOgcEdit = false;
     }
 
     private Color GetServiceTypeColor(string serviceType)
