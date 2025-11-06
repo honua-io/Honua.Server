@@ -4,6 +4,7 @@ using Honua.Server.Core.Authentication;
 using Honua.Server.Core.Configuration;
 using Honua.Server.Core.GeometryValidation;
 using Honua.Server.Core.Security;
+using Honua.Server.Host.Middleware;
 using Honua.Server.Host.Observability;
 using Honua.Server.Host.Wfs.Filters;
 using Microsoft.AspNetCore.Builder;
@@ -398,8 +399,7 @@ internal static class WebApplicationExtensions
         app.UseHonuaRequestLogging();
 
         // 8. Legacy API redirect (BEFORE routing to intercept non-versioned URLs)
-        // TODO: Implement UseLegacyApiRedirect middleware extension method
-        // app.UseLegacyApiRedirect();
+        app.UseLegacyApiRedirect();
 
         // 9. Routing (required before CORS, output cache, and rate limiting)
         app.UseRouting();

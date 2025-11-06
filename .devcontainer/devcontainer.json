@@ -1,36 +1,99 @@
 {
-    "name": "Honua Development",
-    "dockerComposeFile": ["docker-compose.yml"],
-    "service": "honua-dev",
-    "workspaceFolder": "/workspaces/HonuaCore",
-    "postCreateCommand": "bash .devcontainer/post-create.sh",
-    "features": {
-        "ghcr.io/devcontainers/features/dotnet:2": {
-            "version": "9.0",
-            "installUsingApt": true
+  "name": "Honua Server Development",
+  "dockerComposeFile": "../tests/docker-compose.shared-test-env.yml",
+  "service": "honua-test",
+  "workspaceFolder": "/workspace",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-azuretools.vscode-docker",
+        "humao.rest-client",
+        "redhat.vscode-yaml",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/tests/python/.venv/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "tests/python",
+          "-v",
+          "-n",
+          "auto"
+        ],
+        "python.analysis.extraPaths": [
+          "${workspaceFolder}/tests/python"
+        ],
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
         },
-        "ghcr.io/devcontainers/features/git:1": {},
-        "ghcr.io/devcontainers/features/github-cli:1": {}
-    },
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-dotnettools.csharp",
-                "ms-dotnettools.vscode-dotnet-runtime",
-                "ms-vscode.test-adapter-converter",
-                "ms-vscode.powershell",
-                "EditorConfig.EditorConfig",
-                "streetsidesoftware.code-spell-checker"
-            ],
-            "settings": {
-                "dotnet.defaultSolution": "Honua.sln",
-                "omnisharp.enableEditorConfigSupport": true,
-                "omnisharp.enableRoslynAnalyzers": true
-            }
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true
+        },
+        "[csharp]": {
+          "editor.defaultFormatter": "ms-dotnettools.csharp"
         }
+      }
+    }
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "9.0"
     },
-    "remoteUser": "vscode",
-    "mounts": [
-        "source=${localWorkspaceFolder}/.devcontainer/gdal-data,target=/usr/share/gdal,type=bind,consistency=cached"
-    ]
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    }
+  },
+
+  "forwardPorts": [5100, 5433, 6380, 6334],
+  "portsAttributes": {
+    "5100": {
+      "label": "Honua API",
+      "onAutoForward": "notify"
+    },
+    "5433": {
+      "label": "PostgreSQL"
+    },
+    "6380": {
+      "label": "Redis"
+    },
+    "6334": {
+      "label": "Qdrant"
+    }
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "remoteEnv": {
+    "ASPNETCORE_ENVIRONMENT": "Testing",
+    "HONUA_API_BASE_URL": "http://localhost:5100",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1"
+  },
+
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "source=honua-nuget-cache,target=/root/.nuget/packages,type=volume",
+    "source=honua-python-cache,target=/root/.cache/pip,type=volume"
+  ],
+
+  "runArgs": [
+    "--cpus=8",
+    "--memory=16g",
+    "--network=honua-test-network"
+  ]
 }
