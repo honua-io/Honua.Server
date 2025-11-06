@@ -1,0 +1,339 @@
+@using Honua.MapSDK.Services.Drawing
+@using Honua.MapSDK.Models
+@inject IDrawingManager DrawingManager
+
+<div class="honua-drawing-toolbar @CssClass" style="@Style">
+    <div class="toolbar-section">
+        <h4 class="toolbar-title">Draw</h4>
+        <div class="tool-buttons">
+            <button class="tool-button @GetActiveClass(DrawingMode.Point)"
+                    @onclick="() => StartDrawing(DrawingMode.Point)"
+                    title="Draw Point (P)"
+                    aria-label="Draw point">
+                <span class="tool-icon">📍</span>
+                <span class="tool-label">Point</span>
+            </button>
+
+            <button class="tool-button @GetActiveClass(DrawingMode.Line)"
+                    @onclick="() => StartDrawing(DrawingMode.Line)"
+                    title="Draw Line (L)"
+                    aria-label="Draw line">
+                <span class="tool-icon">📏</span>
+                <span class="tool-label">Line</span>
+            </button>
+
+            <button class="tool-button @GetActiveClass(DrawingMode.Polygon)"
+                    @onclick="() => StartDrawing(DrawingMode.Polygon)"
+                    title="Draw Polygon (O)"
+                    aria-label="Draw polygon">
+                <span class="tool-icon">⬟</span>
+                <span class="tool-label">Polygon</span>
+            </button>
+
+            <button class="tool-button @GetActiveClass(DrawingMode.Rectangle)"
+                    @onclick="() => StartDrawing(DrawingMode.Rectangle)"
+                    title="Draw Rectangle (R)"
+                    aria-label="Draw rectangle">
+                <span class="tool-icon">▭</span>
+                <span class="tool-label">Rectangle</span>
+            </button>
+
+            <button class="tool-button @GetActiveClass(DrawingMode.Circle)"
+                    @onclick="() => StartDrawing(DrawingMode.Circle)"
+                    title="Draw Circle (C)"
+                    aria-label="Draw circle">
+                <span class="tool-icon">◯</span>
+                <span class="tool-label">Circle</span>
+            </button>
+
+            <button class="tool-button @GetActiveClass(DrawingMode.Freehand)"
+                    @onclick="() => StartDrawing(DrawingMode.Freehand)"
+                    title="Freehand Draw (F)"
+                    aria-label="Freehand draw">
+                <span class="tool-icon">✏️</span>
+                <span class="tool-label">Freehand</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-section">
+        <h4 class="toolbar-title">Edit</h4>
+        <div class="tool-buttons">
+            <button class="tool-button @(IsEditMode ? "active" : "")"
+                    @onclick="ToggleEditMode"
+                    title="Edit Geometry (E)"
+                    aria-label="Edit geometry">
+                <span class="tool-icon">✂️</span>
+                <span class="tool-label">Edit</span>
+            </button>
+
+            <button class="tool-button @(IsDeleteMode ? "active" : "")"
+                    @onclick="ToggleDeleteMode"
+                    title="Delete Geometry (D)"
+                    aria-label="Delete geometry"
+                    disabled="@(!HasSelection)">
+                <span class="tool-icon">🗑️</span>
+                <span class="tool-label">Delete</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-section">
+        <h4 class="toolbar-title">Actions</h4>
+        <div class="tool-buttons">
+            <button class="tool-button"
+                    @onclick="Undo"
+                    title="Undo (Ctrl+Z)"
+                    aria-label="Undo"
+                    disabled="@(!DrawingManager.CanUndo)">
+                <span class="tool-icon">↶</span>
+                <span class="tool-label">Undo</span>
+            </button>
+
+            <button class="tool-button"
+                    @onclick="Redo"
+                    title="Redo (Ctrl+Y)"
+                    aria-label="Redo"
+                    disabled="@(!DrawingManager.CanRedo)">
+                <span class="tool-icon">↷</span>
+                <span class="tool-label">Redo</span>
+            </button>
+
+            <button class="tool-button"
+                    @onclick="ClearAll"
+                    title="Clear All"
+                    aria-label="Clear all geometries"
+                    disabled="@(!HasGeometries)">
+                <span class="tool-icon">🗑️</span>
+                <span class="tool-label">Clear All</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="toolbar-separator"></div>
+
+    <div class="toolbar-section">
+        <h4 class="toolbar-title">Snap</h4>
+        <div class="tool-toggles">
+            <label class="toggle-option">
+                <input type="checkbox" @bind="DrawingManager.SnapToGrid" />
+                <span>Snap to Grid</span>
+            </label>
+            <label class="toggle-option">
+                <input type="checkbox" @bind="DrawingManager.SnapToVertices" />
+                <span>Snap to Vertices</span>
+            </label>
+        </div>
+    </div>
+
+    @if (ShowStylePicker)
+    {
+        <div class="toolbar-separator"></div>
+        <div class="toolbar-section">
+            <h4 class="toolbar-title">Style</h4>
+            <div class="style-controls">
+                <div class="style-control">
+                    <label>Stroke Color</label>
+                    <input type="color" @bind="CurrentStyle.StrokeColor" />
+                </div>
+                <div class="style-control">
+                    <label>Fill Color</label>
+                    <input type="color" @bind="CurrentStyle.FillColor" />
+                </div>
+                <div class="style-control">
+                    <label>Stroke Width</label>
+                    <input type="range" min="1" max="10" step="1" @bind="CurrentStyle.StrokeWidth" />
+                    <span>@CurrentStyle.StrokeWidth px</span>
+                </div>
+                <div class="style-control">
+                    <label>Fill Opacity</label>
+                    <input type="range" min="0" max="1" step="0.1" @bind="CurrentStyle.FillOpacity" />
+                    <span>@(CurrentStyle.FillOpacity * 100)%</span>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (ShowExport)
+    {
+        <div class="toolbar-separator"></div>
+        <div class="toolbar-section">
+            <h4 class="toolbar-title">Export</h4>
+            <div class="tool-buttons">
+                <button class="tool-button" @onclick="ExportGeoJson" disabled="@(!HasGeometries)">
+                    <span class="tool-label">GeoJSON</span>
+                </button>
+                <button class="tool-button" @onclick="ExportWkt" disabled="@(!HasGeometries)">
+                    <span class="tool-label">WKT</span>
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    [Parameter]
+    public string? Style { get; set; }
+
+    [Parameter]
+    public bool ShowStylePicker { get; set; } = true;
+
+    [Parameter]
+    public bool ShowExport { get; set; } = true;
+
+    [Parameter]
+    public EventCallback<DrawingMode> OnDrawingModeChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnExport { get; set; }
+
+    private DrawingStyle CurrentStyle { get; set; } = DrawingStyle.Defaults.Polygon;
+    private bool IsEditMode { get; set; }
+    private bool IsDeleteMode { get; set; }
+    private bool HasSelection => DrawingManager.SelectedGeometry != null;
+    private bool HasGeometries => DrawingManager.Geometries.Count > 0;
+
+    protected override void OnInitialized()
+    {
+        DrawingManager.DrawingStarted += OnDrawingStarted;
+        DrawingManager.DrawingCompleted += OnDrawingCompleted;
+        DrawingManager.DrawingCancelled += OnDrawingCancelled;
+        DrawingManager.GeometrySelected += OnGeometrySelected;
+        DrawingManager.GeometryDeselected += OnGeometryDeselected;
+    }
+
+    private string GetActiveClass(DrawingMode mode)
+    {
+        return DrawingManager.CurrentMode == mode ? "active" : "";
+    }
+
+    private async Task StartDrawing(DrawingMode mode)
+    {
+        if (DrawingManager.CurrentMode == mode)
+        {
+            // Toggle off if same mode clicked
+            await DrawingManager.StopDrawingAsync();
+        }
+        else
+        {
+            // Apply current style
+            await DrawingManager.StartDrawingAsync(mode, CurrentStyle);
+            IsEditMode = false;
+            IsDeleteMode = false;
+        }
+
+        await OnDrawingModeChanged.InvokeAsync(mode);
+        StateHasChanged();
+    }
+
+    private async Task ToggleEditMode()
+    {
+        IsEditMode = !IsEditMode;
+        if (IsEditMode)
+        {
+            await DrawingManager.StopDrawingAsync();
+            IsDeleteMode = false;
+        }
+        StateHasChanged();
+    }
+
+    private async Task ToggleDeleteMode()
+    {
+        IsDeleteMode = !IsDeleteMode;
+        if (IsDeleteMode)
+        {
+            await DrawingManager.StopDrawingAsync();
+            IsEditMode = false;
+
+            if (HasSelection && DrawingManager.SelectedGeometry != null)
+            {
+                await DrawingManager.DeleteGeometryAsync(DrawingManager.SelectedGeometry.Id);
+                IsDeleteMode = false;
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task Undo()
+    {
+        await DrawingManager.UndoAsync();
+        StateHasChanged();
+    }
+
+    private async Task Redo()
+    {
+        await DrawingManager.RedoAsync();
+        StateHasChanged();
+    }
+
+    private async Task ClearAll()
+    {
+        if (await ConfirmClearAll())
+        {
+            await DrawingManager.ClearAllAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task<bool> ConfirmClearAll()
+    {
+        // In a real implementation, show a confirmation dialog
+        // For now, return true
+        return true;
+    }
+
+    private async Task ExportGeoJson()
+    {
+        var geoJson = DrawingManager.ExportToGeoJson(formatted: true);
+        await OnExport.InvokeAsync(geoJson);
+        // In a real implementation, trigger download or copy to clipboard
+    }
+
+    private async Task ExportWkt()
+    {
+        var wkt = DrawingManager.ExportToWkt();
+        await OnExport.InvokeAsync(wkt);
+        // In a real implementation, trigger download or copy to clipboard
+    }
+
+    private void OnDrawingStarted(object? sender, DrawingStartedEventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    private void OnDrawingCompleted(object? sender, DrawingCompletedEventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    private void OnDrawingCancelled(object? sender, DrawingCancelledEventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    private void OnGeometrySelected(object? sender, GeometrySelectedEventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    private void OnGeometryDeselected(object? sender, GeometryDeselectedEventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        DrawingManager.DrawingStarted -= OnDrawingStarted;
+        DrawingManager.DrawingCompleted -= OnDrawingCompleted;
+        DrawingManager.DrawingCancelled -= OnDrawingCancelled;
+        DrawingManager.GeometrySelected -= OnGeometrySelected;
+        DrawingManager.GeometryDeselected -= OnGeometryDeselected;
+    }
+}

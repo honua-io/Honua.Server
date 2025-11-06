@@ -1,0 +1,317 @@
+@using Honua.MapSDK.Services.Drawing
+@inject MeasurementManager MeasurementManager
+
+<div class="honua-measurement-display @CssClass" style="@Style">
+    @if (ShowMeasurement && CurrentMeasurement != null)
+    {
+        <div class="measurement-panel">
+            <div class="measurement-header">
+                <h4>@GetMeasurementTitle()</h4>
+                <button class="close-button" @onclick="ClearMeasurement" aria-label="Close">×</button>
+            </div>
+
+            <div class="measurement-content">
+                @if (CurrentMeasurement.Type == MeasurementType.Distance)
+                {
+                    <div class="measurement-item">
+                        <span class="measurement-label">Distance:</span>
+                        <span class="measurement-value">@CurrentMeasurement.FormattedValue</span>
+                    </div>
+
+                    @if (CurrentMeasurement.SegmentCount.HasValue && CurrentMeasurement.SegmentCount > 1)
+                    {
+                        <div class="measurement-item">
+                            <span class="measurement-label">Segments:</span>
+                            <span class="measurement-value">@CurrentMeasurement.SegmentCount</span>
+                        </div>
+                    }
+
+                    @if (ShowBearing && Bearing != null)
+                    {
+                        <div class="measurement-item">
+                            <span class="measurement-label">Bearing:</span>
+                            <span class="measurement-value">@Bearing.FormattedValue (@Bearing.CardinalDirection)</span>
+                        </div>
+                    }
+                }
+                else if (CurrentMeasurement.Type == MeasurementType.Area)
+                {
+                    <div class="measurement-item">
+                        <span class="measurement-label">Area:</span>
+                        <span class="measurement-value">@CurrentMeasurement.FormattedValue</span>
+                    </div>
+
+                    @if (Perimeter != null)
+                    {
+                        <div class="measurement-item">
+                            <span class="measurement-label">Perimeter:</span>
+                            <span class="measurement-value">@Perimeter.FormattedValue</span>
+                        </div>
+                    }
+                }
+
+                @if (ShowUnitSelector)
+                {
+                    <div class="measurement-item unit-selector">
+                        <label>Unit:</label>
+                        <select @bind="SelectedUnit" @bind:after="OnUnitChanged">
+                            @if (CurrentMeasurement.Type == MeasurementType.Distance)
+                            {
+                                <option value="@MeasurementUnit.Meters">Meters</option>
+                                <option value="@MeasurementUnit.Kilometers">Kilometers</option>
+                                <option value="@MeasurementUnit.Feet">Feet</option>
+                                <option value="@MeasurementUnit.Miles">Miles</option>
+                                <option value="@MeasurementUnit.NauticalMiles">Nautical Miles</option>
+                            }
+                            else if (CurrentMeasurement.Type == MeasurementType.Area)
+                            {
+                                <option value="@MeasurementUnit.SquareMeters">Square Meters</option>
+                                <option value="@MeasurementUnit.SquareKilometers">Square Kilometers</option>
+                                <option value="@MeasurementUnit.SquareFeet">Square Feet</option>
+                                <option value="@MeasurementUnit.SquareMiles">Square Miles</option>
+                                <option value="@MeasurementUnit.Acres">Acres</option>
+                                <option value="@MeasurementUnit.Hectares">Hectares</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (ShowCopyButton)
+                {
+                    <div class="measurement-actions">
+                        <button class="copy-button" @onclick="CopyToClipboard" title="Copy to clipboard">
+                            <span>📋</span> Copy
+                        </button>
+                    </div>
+                }
+            </div>
+
+            @if (LiveMeasurement && IsDrawing)
+            {
+                <div class="measurement-footer">
+                    <small class="measurement-hint">Click to add points. Double-click or press Enter to finish.</small>
+                </div>
+            }
+        </div>
+    }
+
+    @if (ShowElevationProfile && ElevationProfile != null)
+    {
+        <div class="elevation-profile-panel">
+            <div class="profile-header">
+                <h4>Elevation Profile</h4>
+                <button class="close-button" @onclick="ClearElevationProfile" aria-label="Close">×</button>
+            </div>
+
+            <div class="profile-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Min Elevation:</span>
+                    <span class="stat-value">@ElevationProfile.MinElevation.ToString("F1") m</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Max Elevation:</span>
+                    <span class="stat-value">@ElevationProfile.MaxElevation.ToString("F1") m</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Elevation Gain:</span>
+                    <span class="stat-value">@ElevationProfile.ElevationGain.ToString("F1") m</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Elevation Loss:</span>
+                    <span class="stat-value">@ElevationProfile.ElevationLoss.ToString("F1") m</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Distance:</span>
+                    <span class="stat-value">@((ElevationProfile.TotalDistance / 1000).ToString("F2")) km</span>
+                </div>
+            </div>
+
+            <div class="profile-chart">
+                <!-- Elevation profile chart would be rendered here -->
+                <!-- Using a charting library like Chart.js or similar -->
+                <canvas id="elevation-chart"></canvas>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    [Parameter]
+    public string? Style { get; set; }
+
+    [Parameter]
+    public List<double[]>? Coordinates { get; set; }
+
+    [Parameter]
+    public MeasurementType MeasurementType { get; set; } = MeasurementType.Distance;
+
+    [Parameter]
+    public bool LiveMeasurement { get; set; } = true;
+
+    [Parameter]
+    public bool ShowUnitSelector { get; set; } = true;
+
+    [Parameter]
+    public bool ShowCopyButton { get; set; } = true;
+
+    [Parameter]
+    public bool ShowBearing { get; set; } = true;
+
+    [Parameter]
+    public bool ShowElevationProfile { get; set; } = false;
+
+    [Parameter]
+    public bool IsDrawing { get; set; }
+
+    [Parameter]
+    public EventCallback<MeasurementResult> OnMeasurementChanged { get; set; }
+
+    private MeasurementResult? CurrentMeasurement { get; set; }
+    private MeasurementResult? Perimeter { get; set; }
+    private BearingResult? Bearing { get; set; }
+    private ElevationProfile? ElevationProfile { get; set; }
+    private MeasurementUnit SelectedUnit { get; set; } = MeasurementUnit.Meters;
+    private bool ShowMeasurement => CurrentMeasurement != null;
+
+    protected override void OnParametersSet()
+    {
+        if (Coordinates != null && Coordinates.Count > 0)
+        {
+            UpdateMeasurement();
+        }
+    }
+
+    private void UpdateMeasurement()
+    {
+        if (Coordinates == null || Coordinates.Count == 0)
+        {
+            CurrentMeasurement = null;
+            return;
+        }
+
+        try
+        {
+            if (MeasurementType == MeasurementType.Distance && Coordinates.Count >= 2)
+            {
+                CurrentMeasurement = MeasurementManager.MeasureLineDistance(Coordinates, SelectedUnit);
+
+                // Calculate bearing for 2-point lines
+                if (Coordinates.Count == 2)
+                {
+                    Bearing = MeasurementManager.CalculateBearing(Coordinates[0], Coordinates[1]);
+                }
+                else
+                {
+                    Bearing = null;
+                }
+            }
+            else if (MeasurementType == MeasurementType.Area && Coordinates.Count >= 3)
+            {
+                CurrentMeasurement = MeasurementManager.MeasureArea(Coordinates, SelectedUnit);
+
+                // Calculate perimeter
+                var perimeterCoords = new List<double[]>(Coordinates);
+                if (perimeterCoords[0] != perimeterCoords[^1])
+                {
+                    perimeterCoords.Add(perimeterCoords[0]);
+                }
+                Perimeter = MeasurementManager.MeasureLineDistance(perimeterCoords, SelectedUnit);
+            }
+
+            OnMeasurementChanged.InvokeAsync(CurrentMeasurement);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error calculating measurement: {ex.Message}");
+            CurrentMeasurement = null;
+        }
+    }
+
+    private void OnUnitChanged()
+    {
+        UpdateMeasurement();
+        StateHasChanged();
+    }
+
+    private string GetMeasurementTitle()
+    {
+        return MeasurementType switch
+        {
+            MeasurementType.Distance => "Distance Measurement",
+            MeasurementType.Area => "Area Measurement",
+            MeasurementType.Bearing => "Bearing",
+            _ => "Measurement"
+        };
+    }
+
+    private async Task CopyToClipboard()
+    {
+        if (CurrentMeasurement == null)
+            return;
+
+        var text = CurrentMeasurement.FormattedValue;
+
+        if (MeasurementType == MeasurementType.Area && Perimeter != null)
+        {
+            text += $"\nPerimeter: {Perimeter.FormattedValue}";
+        }
+
+        if (Bearing != null)
+        {
+            text += $"\nBearing: {Bearing.FormattedValue} ({Bearing.CardinalDirection})";
+        }
+
+        // In a real implementation, use JS Interop to copy to clipboard
+        // await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+        Console.WriteLine($"Copied to clipboard: {text}");
+    }
+
+    private void ClearMeasurement()
+    {
+        CurrentMeasurement = null;
+        Perimeter = null;
+        Bearing = null;
+        Coordinates = null;
+        StateHasChanged();
+    }
+
+    private void ClearElevationProfile()
+    {
+        ElevationProfile = null;
+        StateHasChanged();
+    }
+
+    public async Task LoadElevationProfile(List<double[]> coordinates, Func<double, double, Task<double>> elevationProvider)
+    {
+        if (coordinates.Count < 2)
+            return;
+
+        try
+        {
+            ElevationProfile = await MeasurementManager.GenerateElevationProfileAsync(
+                coordinates,
+                elevationProvider,
+                samplePoints: 100
+            );
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading elevation profile: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Public method to update measurement from parent component
+    /// </summary>
+    public void UpdateMeasurementFromCoordinates(List<double[]> coords, MeasurementType type)
+    {
+        Coordinates = coords;
+        MeasurementType = type;
+        UpdateMeasurement();
+        StateHasChanged();
+    }
+}

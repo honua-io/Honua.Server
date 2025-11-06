@@ -1,0 +1,760 @@
+@*
+  Copyright (c) 2025 HonuaIO
+  Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+@using Honua.Server.Core.LocationServices.Models
+@using Honua.MapSDK.Models.Routing
+@using Honua.MapSDK.Services.Routing
+@inject RouteVisualizationService VisualizationService
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<div class="route-display" role="region" aria-label="Route Visualization">
+    @if (Route != null)
+    {
+        <div class="route-summary">
+            <div class="route-summary-header">
+                <h4>@RouteTitle</h4>
+                @if (ShowActions)
+                {
+                    <div class="route-actions">
+                        <button class="btn-icon" @onclick="ZoomToRoute" title="Zoom to route">
+                            🔍
+                        </button>
+                        <button class="btn-icon" @onclick="ToggleElevationProfile" title="Toggle elevation profile">
+                            📈
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <div class="route-summary-stats">
+                <div class="stat">
+                    <span class="stat-icon">📏</span>
+                    <div>
+                        <div class="stat-value">@FormatDistance(Route.DistanceMeters)</div>
+                        <div class="stat-label">Distance</div>
+                    </div>
+                </div>
+                <div class="stat">
+                    <span class="stat-icon">⏱</span>
+                    <div>
+                        <div class="stat-value">@FormatDuration(Route.DurationSeconds)</div>
+                        <div class="stat-label">Duration</div>
+                    </div>
+                </div>
+                @if (Route.DurationWithTrafficSeconds.HasValue)
+                {
+                    <div class="stat">
+                        <span class="stat-icon">🚦</span>
+                        <div>
+                            <div class="stat-value">@FormatDuration(Route.DurationWithTrafficSeconds.Value)</div>
+                            <div class="stat-label">With Traffic</div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (Route.Warnings?.Count > 0)
+            {
+                <div class="route-warnings">
+                    @foreach (var warning in Route.Warnings)
+                    {
+                        <div class="warning-item">
+                            <span class="warning-icon">⚠️</span>
+                            <span>@warning</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (Route.Summary != null)
+            {
+                <div class="route-description">
+                    @Route.Summary
+                </div>
+            }
+        </div>
+
+        @if (ShowElevationProfile && ElevationData.Count > 0)
+        {
+            <div class="elevation-profile">
+                <h5>Elevation Profile</h5>
+                <div class="elevation-chart" @ref="elevationChartRef">
+                    <svg width="100%" height="150" viewBox="0 0 @ChartWidth 150" preserveAspectRatio="xMidYMid meet">
+                        @* Grid lines *@
+                        <g class="grid">
+                            @for (int i = 0; i <= 4; i++)
+                            {
+                                var y = 20 + (i * 30);
+                                <line x1="0" y1="@y" x2="@ChartWidth" y2="@y" stroke="#e0e0e0" stroke-width="1"/>
+                            }
+                        </g>
+
+                        @* Elevation path *@
+                        <path d="@GenerateElevationPath()"
+                              fill="rgba(66, 133, 244, 0.2)"
+                              stroke="#4285F4"
+                              stroke-width="2"
+                              vector-effect="non-scaling-stroke"/>
+
+                        @* Labels *@
+                        <text x="5" y="15" font-size="10" fill="#666">@MaxElevation m</text>
+                        <text x="5" y="145" font-size="10" fill="#666">@MinElevation m</text>
+                    </svg>
+                </div>
+                <div class="elevation-stats">
+                    <div class="elevation-stat">
+                        <strong>Max:</strong> @MaxElevation m
+                    </div>
+                    <div class="elevation-stat">
+                        <strong>Min:</strong> @MinElevation m
+                    </div>
+                    <div class="elevation-stat">
+                        <strong>Gain:</strong> @ElevationGain m
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (ShowRouteLegs && Route.Legs?.Count > 0)
+        {
+            <div class="route-legs">
+                <h5>Route Segments</h5>
+                @foreach (var (leg, index) in Route.Legs.Select((l, i) => (l, i)))
+                {
+                    <div class="route-leg" @onclick="() => HighlightLeg(index)">
+                        <div class="leg-header">
+                            <strong>Segment @(index + 1)</strong>
+                            <span class="leg-distance">@FormatDistance(leg.DistanceMeters)</span>
+                        </div>
+                        @if (leg.StartAddress != null && leg.EndAddress != null)
+                        {
+                            <div class="leg-addresses">
+                                <div>📍 @leg.StartAddress</div>
+                                <div>🏁 @leg.EndAddress</div>
+                            </div>
+                        }
+                        <div class="leg-duration">
+                            @FormatDuration(leg.DurationSeconds)
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (ShowAnimationControls)
+        {
+            <div class="animation-controls">
+                <h5>Route Preview</h5>
+                <div class="animation-buttons">
+                    <button class="btn btn-sm" @onclick="PlayAnimation" disabled="@IsAnimating">
+                        ▶️ Play
+                    </button>
+                    <button class="btn btn-sm" @onclick="PauseAnimation" disabled="@(!IsAnimating)">
+                        ⏸ Pause
+                    </button>
+                    <button class="btn btn-sm" @onclick="ResetAnimation">
+                        ⏹ Reset
+                    </button>
+                </div>
+                @if (IsAnimating)
+                {
+                    <div class="animation-progress">
+                        <div class="progress-bar" style="width: @(AnimationProgress)%"></div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (AlternativeRoutes.Count > 0)
+        {
+            <div class="alternative-routes">
+                <h5>Alternative Routes</h5>
+                @foreach (var (altRoute, index) in AlternativeRoutes.Select((r, i) => (r, i)))
+                {
+                    <div class="alternative-route"
+                         @onclick="() => SelectAlternativeRoute(index)"
+                         @onmouseenter="() => HighlightAlternativeRoute(index, true)"
+                         @onmouseleave="() => HighlightAlternativeRoute(index, false)">
+                        <div class="alt-route-header">
+                            <strong>Alternative @(index + 1)</strong>
+                        </div>
+                        <div class="alt-route-stats">
+                            <span>@FormatDistance(altRoute.DistanceMeters)</span>
+                            <span>@FormatDuration(altRoute.DurationSeconds)</span>
+                        </div>
+                        @if (ShowRouteComparison)
+                        {
+                            var comparison = CompareToMainRoute(altRoute);
+                            <div class="route-comparison">
+                                <small class="@(comparison.IsFaster ? "text-success" : "text-danger")">
+                                    @comparison.TimeDifference
+                                </small>
+                                <small class="@(comparison.IsShorter ? "text-success" : "text-danger")">
+                                    @comparison.DistanceDifference
+                                </small>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="route-display-empty">
+            <p>No route to display</p>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Route? Route { get; set; }
+
+    [Parameter]
+    public string RouteTitle { get; set; } = "Route";
+
+    [Parameter]
+    public string MapId { get; set; } = "map";
+
+    [Parameter]
+    public bool ShowElevationProfile { get; set; } = true;
+
+    [Parameter]
+    public bool ShowRouteLegs { get; set; } = true;
+
+    [Parameter]
+    public bool ShowAnimationControls { get; set; } = true;
+
+    [Parameter]
+    public bool ShowActions { get; set; } = true;
+
+    [Parameter]
+    public bool ShowRouteComparison { get; set; } = true;
+
+    [Parameter]
+    public List<Route> AlternativeRoutes { get; set; } = new();
+
+    [Parameter]
+    public RouteStyle? RouteStyle { get; set; }
+
+    [Parameter]
+    public EventCallback<Route> OnAlternativeRouteSelected { get; set; }
+
+    private ElementReference elevationChartRef;
+    private List<ElevationPoint> ElevationData { get; set; } = new();
+    private int ChartWidth { get; set; } = 400;
+    private bool IsAnimating { get; set; }
+    private double AnimationProgress { get; set; }
+    private int MaxElevation { get; set; }
+    private int MinElevation { get; set; }
+    private int ElevationGain { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Route != null)
+        {
+            await DisplayRouteOnMap();
+            await LoadElevationData();
+        }
+    }
+
+    private async Task DisplayRouteOnMap()
+    {
+        if (Route == null) return;
+
+        try
+        {
+            var style = RouteStyle ?? new RouteStyle();
+
+            await VisualizationService.AddRouteToMapAsync(
+                MapId,
+                "display-route",
+                Route,
+                style,
+                new RouteAnimationOptions { Enabled = true });
+
+            // Display alternative routes with different styling
+            for (int i = 0; i < AlternativeRoutes.Count; i++)
+            {
+                await VisualizationService.AddRouteToMapAsync(
+                    MapId,
+                    $"alt-route-{i}",
+                    AlternativeRoutes[i],
+                    new RouteStyle
+                    {
+                        Color = style.AlternativeColor,
+                        Opacity = 0.5,
+                        ZIndex = 900
+                    },
+                    new RouteAnimationOptions { Enabled = false });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to display route: {ex.Message}");
+        }
+    }
+
+    private async Task LoadElevationData()
+    {
+        // In a real implementation, you would fetch elevation data from a service
+        // For now, generate sample data
+        if (Route == null) return;
+
+        var coordinates = VisualizationService.ParseRouteGeometry(Route);
+        var sampleCount = Math.Min(100, coordinates.Count);
+        var step = coordinates.Count / sampleCount;
+
+        ElevationData.Clear();
+        var distance = 0.0;
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            var index = i * step;
+            if (index >= coordinates.Count) break;
+
+            // Generate sample elevation (in real app, call elevation API)
+            var elevation = 100 + Math.Sin(i * 0.1) * 50;
+
+            ElevationData.Add(new ElevationPoint
+            {
+                DistanceMeters = distance,
+                ElevationMeters = elevation,
+                Location = coordinates[index]
+            });
+
+            if (i < sampleCount - 1 && index + step < coordinates.Count)
+            {
+                distance += CalculateDistance(coordinates[index], coordinates[index + step]);
+            }
+        }
+
+        if (ElevationData.Count > 0)
+        {
+            MaxElevation = (int)ElevationData.Max(e => e.ElevationMeters);
+            MinElevation = (int)ElevationData.Min(e => e.ElevationMeters);
+            ElevationGain = CalculateElevationGain();
+        }
+    }
+
+    private string GenerateElevationPath()
+    {
+        if (ElevationData.Count == 0) return "";
+
+        var minElev = ElevationData.Min(e => e.ElevationMeters);
+        var maxElev = ElevationData.Max(e => e.ElevationMeters);
+        var elevRange = maxElev - minElev;
+        if (elevRange == 0) elevRange = 1;
+
+        var path = new System.Text.StringBuilder();
+        path.Append($"M 0 150 ");
+
+        for (int i = 0; i < ElevationData.Count; i++)
+        {
+            var x = (i / (double)(ElevationData.Count - 1)) * ChartWidth;
+            var normalizedElev = (ElevationData[i].ElevationMeters - minElev) / elevRange;
+            var y = 130 - (normalizedElev * 110); // Map to chart height (leave space for labels)
+
+            path.Append($"L {x:F1} {y:F1} ");
+        }
+
+        path.Append($"L {ChartWidth} 150 Z");
+        return path.ToString();
+    }
+
+    private int CalculateElevationGain()
+    {
+        var gain = 0.0;
+        for (int i = 1; i < ElevationData.Count; i++)
+        {
+            var diff = ElevationData[i].ElevationMeters - ElevationData[i - 1].ElevationMeters;
+            if (diff > 0) gain += diff;
+        }
+        return (int)gain;
+    }
+
+    private double CalculateDistance(double[] coord1, double[] coord2)
+    {
+        // Haversine formula
+        const double R = 6371000; // Earth radius in meters
+        var lat1 = coord1[1] * Math.PI / 180;
+        var lat2 = coord2[1] * Math.PI / 180;
+        var dLat = (coord2[1] - coord1[1]) * Math.PI / 180;
+        var dLon = (coord2[0] - coord1[0]) * Math.PI / 180;
+
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(lat1) * Math.Cos(lat2) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return R * c;
+    }
+
+    private async Task ZoomToRoute()
+    {
+        if (Route?.BoundingBox != null)
+        {
+            await VisualizationService.FitMapToBoundsAsync(MapId, Route.BoundingBox);
+        }
+    }
+
+    private void ToggleElevationProfile()
+    {
+        ShowElevationProfile = !ShowElevationProfile;
+    }
+
+    private async Task PlayAnimation()
+    {
+        IsAnimating = true;
+        AnimationProgress = 0;
+
+        await VisualizationService.AnimateRouteDrawingAsync(MapId, "display-route", 3000);
+
+        // Simulate progress
+        for (int i = 0; i <= 100 && IsAnimating; i += 2)
+        {
+            AnimationProgress = i;
+            StateHasChanged();
+            await Task.Delay(60);
+        }
+
+        IsAnimating = false;
+    }
+
+    private void PauseAnimation()
+    {
+        IsAnimating = false;
+    }
+
+    private void ResetAnimation()
+    {
+        IsAnimating = false;
+        AnimationProgress = 0;
+    }
+
+    private async Task HighlightLeg(int legIndex)
+    {
+        // Highlight specific leg on map
+        if (Route?.Legs != null && legIndex < Route.Legs.Count)
+        {
+            var highlight = new RouteHighlight
+            {
+                RouteId = "display-route",
+                StartSegmentIndex = legIndex,
+                EndSegmentIndex = legIndex
+            };
+            // Would need to implement highlight functionality in visualization service
+        }
+    }
+
+    private async Task SelectAlternativeRoute(int index)
+    {
+        if (index >= 0 && index < AlternativeRoutes.Count)
+        {
+            await OnAlternativeRouteSelected.InvokeAsync(AlternativeRoutes[index]);
+        }
+    }
+
+    private async Task HighlightAlternativeRoute(int index, bool highlight)
+    {
+        await VisualizationService.HighlightRouteAsync(MapId, $"alt-route-{index}", highlight);
+    }
+
+    private (string TimeDifference, string DistanceDifference, bool IsFaster, bool IsShorter) CompareToMainRoute(Route altRoute)
+    {
+        if (Route == null)
+            return ("", "", false, false);
+
+        var timeDiff = altRoute.DurationSeconds - Route.DurationSeconds;
+        var distDiff = altRoute.DistanceMeters - Route.DistanceMeters;
+
+        return (
+            timeDiff > 0 ? $"+{FormatDuration(Math.Abs(timeDiff))}" : $"-{FormatDuration(Math.Abs(timeDiff))}",
+            distDiff > 0 ? $"+{FormatDistance(Math.Abs(distDiff))}" : $"-{FormatDistance(Math.Abs(distDiff))}",
+            timeDiff < 0,
+            distDiff < 0
+        );
+    }
+
+    private string FormatDistance(double meters)
+    {
+        if (meters < 1000)
+            return $"{meters:F0} m";
+        return $"{meters / 1000:F1} km";
+    }
+
+    private string FormatDuration(double seconds)
+    {
+        var timeSpan = TimeSpan.FromSeconds(seconds);
+        if (timeSpan.TotalHours >= 1)
+            return $"{(int)timeSpan.TotalHours}h {timeSpan.Minutes}m";
+        return $"{(int)timeSpan.TotalMinutes} min";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await VisualizationService.ClearRouteAsync(MapId, "display-route");
+        for (int i = 0; i < AlternativeRoutes.Count; i++)
+        {
+            await VisualizationService.ClearRouteAsync(MapId, $"alt-route-{i}");
+        }
+    }
+}
+
+<style>
+    .route-display {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .route-summary {
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .route-summary-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .route-summary-header h4 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .route-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-icon {
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 4px;
+    }
+
+    .route-summary-stats {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 15px;
+    }
+
+    .stat {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .stat-icon {
+        font-size: 24px;
+    }
+
+    .stat-value {
+        font-size: 18px;
+        font-weight: 600;
+        color: #202124;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        color: #5f6368;
+    }
+
+    .route-warnings {
+        background: #fff3cd;
+        border-left: 3px solid #ffc107;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+    .warning-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 5px;
+    }
+
+    .warning-icon {
+        font-size: 16px;
+    }
+
+    .route-description {
+        color: #5f6368;
+        font-size: 14px;
+    }
+
+    .elevation-profile {
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .elevation-profile h5 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .elevation-chart {
+        margin-bottom: 10px;
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    .elevation-stats {
+        display: flex;
+        gap: 15px;
+        font-size: 13px;
+    }
+
+    .route-legs {
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .route-legs h5 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .route-leg {
+        padding: 10px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .route-leg:hover {
+        background: #f8f9fa;
+        border-color: #4285F4;
+    }
+
+    .leg-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+
+    .leg-addresses {
+        font-size: 13px;
+        color: #5f6368;
+        margin-bottom: 5px;
+    }
+
+    .leg-duration {
+        font-size: 12px;
+        color: #5f6368;
+    }
+
+    .animation-controls {
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .animation-controls h5 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .animation-buttons {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .animation-progress {
+        height: 4px;
+        background: #e0e0e0;
+        border-radius: 2px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background: #4285F4;
+        transition: width 0.1s linear;
+    }
+
+    .alternative-routes {
+        padding: 15px;
+    }
+
+    .alternative-routes h5 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .alternative-route {
+        padding: 10px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .alternative-route:hover {
+        background: #f8f9fa;
+        border-color: #4285F4;
+    }
+
+    .alt-route-stats {
+        display: flex;
+        gap: 15px;
+        font-size: 13px;
+        color: #5f6368;
+    }
+
+    .route-comparison {
+        display: flex;
+        gap: 10px;
+        margin-top: 5px;
+    }
+
+    .text-success {
+        color: #4CAF50;
+    }
+
+    .text-danger {
+        color: #f44336;
+    }
+
+    .route-display-empty {
+        padding: 40px;
+        text-align: center;
+        color: #5f6368;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-sm {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+</style>
