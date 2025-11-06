@@ -6,7 +6,7 @@
 
 A cloud-native geospatial server built on .NET 9, implementing OGC standards and Geoservices REST a.k.a. Esri REST APIs with first-class support for modern cloud infrastructure.
 
-**Part of the Honua Platform** - A comprehensive geospatial ecosystem including Honua Server, Honua Mobile, Honua Web, and more.
+**Part of the Honua Platform** - A comprehensive geospatial ecosystem including Honua Server, Honua Field Mobile, Honua MapSDK, GeoEvent Server, and GeoETL.
 
 [![Build](https://github.com/honua-io/Honua.Server/workflows/build/badge.svg)](https://github.com/honua-io/Honua.Server/actions)
 [![Tests](https://github.com/honua-io/Honua.Server/workflows/tests/badge.svg)](https://github.com/honua-io/Honua.Server/actions)
@@ -35,6 +35,119 @@ Honua provides a complete OGC-compliant geospatial server with:
 3. **Performance**: Leverage .NET's performance characteristics for geospatial workloads
 4. **Flexibility**: Support both traditional databases and cloud data warehouses
 5. **Observability**: Built-in metrics, tracing, and logging via OpenTelemetry
+
+---
+
+## Platform Components
+
+The Honua Platform provides a complete geospatial solution with multiple integrated components:
+
+### 🗺️ Honua MapSDK
+
+**Visual map builder and interactive mapping SDK** - Create production-ready maps without code.
+
+- **No-Code Map Builder**: Visual editor for creating interactive maps
+- **Live Preview**: Real-time updates as you configure map settings
+- **Multi-Format Export**: JSON, YAML, HTML embed, Blazor code
+- **Component Sync**: Zero-config pub/sub message bus for component communication
+- **MapLibre Integration**: Full-featured mapping with WebGL rendering
+- **Flexible Data Sources**: GeoJSON, WFS, gRPC, PMTiles, FlatGeobuf
+- **Built on Blazor**: Reusable .NET components with JavaScript interop
+
+**Quick Start:**
+```razor
+<HonuaMap Id="map1"
+          MapStyle="maplibre://honua/dark"
+          Center="@(new[] { -122.4194, 37.7749 })"
+          Zoom="12" />
+```
+
+See [MapSDK Documentation](docs/mapsdk/) for details.
+
+### 📱 Honua Field Mobile
+
+**Cross-platform mobile field data collection app** - Collect geospatial data offline in the field.
+
+- **Multi-Platform**: iOS, Android, Windows, macOS support via .NET MAUI
+- **Offline-First**: SQLite storage with NetTopologySuite spatial support
+- **Map Integration**: Built with Mapsui for native mapping
+- **Biometric Auth**: Secure authentication on mobile devices
+- **AI-Powered**: ML.NET and ONNX Runtime for edge AI capabilities
+- **Sync & Share**: Sync field data back to Honua Server
+- **OpenRosa Compatible**: Supports ODK/OpenRosa form standards
+
+**Features:**
+- Create and edit features with GPS location
+- Attach photos and documents
+- Work offline and sync later
+- Track changes and conflicts
+- Export to GeoPackage, Shapefile
+
+See [HonuaField Documentation](docs/field/) for details.
+
+### ⚡ GeoEvent Server
+
+**Real-time geofencing and event processing** - Monitor assets and trigger alerts based on location.
+
+- **Real-Time Geofencing**: Track entities entering/exiting geographic boundaries
+- **Event Types**: Enter, Exit events with dwell time calculation
+- **High Performance**: < 100ms P95 latency, 100+ events/second
+- **Batch Processing**: Process up to 1000 locations per request
+- **State Management**: Automatic tracking of entity positions
+- **Alert Integration**: Cloud event delivery (AWS SNS, Azure Event Grid)
+- **REST API**: Simple HTTP API for location evaluation
+- **SignalR Hub**: Real-time WebSocket updates
+
+**Quick Start:**
+```bash
+# Create a geofence
+POST /api/v1/geofences
+{
+  "name": "Delivery Zone",
+  "geometry": { "type": "Polygon", "coordinates": [...] },
+  "enabled_event_types": ["Enter", "Exit"]
+}
+
+# Evaluate location
+POST /api/v1/geoevent/evaluate
+{
+  "entity_id": "vehicle-123",
+  "location": { "type": "Point", "coordinates": [-122.4194, 37.7749] }
+}
+```
+
+See [GeoEvent API Guide](docs/GEOEVENT_API_GUIDE.md) for details.
+
+### 🔄 GeoETL (Honua.Server.Intake)
+
+**Container registry provisioning and build delivery** - Automated distribution of custom builds.
+
+- **Multi-Registry Support**: GHCR, AWS ECR, Azure ACR, GCP Artifact Registry
+- **Automated Provisioning**: Creates isolated namespaces per customer
+- **License-Based Access**: Validates licenses before granting access
+- **Build Caching**: Checks if builds exist before rebuilding
+- **Efficient Distribution**: Registry-to-registry copying with crane/skopeo
+- **Token Management**: Short-lived access tokens with auto-expiration
+- **Audit Logging**: Comprehensive logging for compliance
+
+**Use Cases:**
+- Multi-tenant SaaS deployments
+- Custom builds per customer
+- Enterprise container distribution
+- Secure registry access management
+
+See [Intake Documentation](src/Honua.Server.Intake/README.md) for details.
+
+### 🎛️ Honua Admin Portal
+
+**Web-based administration UI** - Manage all Honua platform components.
+
+- **Map Builder**: Visual editor with live preview
+- **Layer Management**: Configure data sources and styling
+- **User Management**: RBAC and authentication settings
+- **Geofence Editor**: Create and manage geofences visually
+- **Analytics Dashboard**: View usage metrics and performance
+- **Built with Blazor**: Server-side rendering with MudBlazor UI
 
 ---
 
@@ -224,25 +337,51 @@ See [deployment documentation](docs/DEPLOYMENT.md) for production configurations
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│  API Layer                                   │
-│  OGC API Features · WFS/WMS/WCS             │
-│  STAC · Geoservices REST a.k.a. Esri REST · OData · GraphQL         │
-└──────────────────┬──────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────┐
-│  Core Services (.NET 9)                     │
-│  • Query Engine (CQL2, SQL)                 │
-│  • Geometry Processing (NTS)                │
-│  • Export Pipeline                          │
-│  • Transaction Manager                      │
-│  • Cache Layer (Redis + Memory)             │
-└──────────────────┬──────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────┐
-│  Data Provider Layer                        │
-│  Relational · Cloud DW · NoSQL · Search     │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  Client Applications                                                │
+│  Web Apps · Mobile Apps (iOS/Android) · Desktop · IoT Devices      │
+└────────┬────────────────────┬───────────────────┬───────────────────┘
+         │                    │                   │
+    ┌────▼─────┐      ┌──────▼──────┐      ┌────▼─────────┐
+    │ MapSDK   │      │ HonuaField  │      │ Custom Apps  │
+    │ (Blazor) │      │ (.NET MAUI) │      │ (Any Client) │
+    └────┬─────┘      └──────┬──────┘      └────┬─────────┘
+         │                   │                   │
+         └───────────────────┴───────────────────┘
+                             │
+┌────────────────────────────▼──────────────────────────────┐
+│  Honua Platform APIs                                      │
+├───────────────────────────────────────────────────────────┤
+│  • OGC API Features/Tiles/Records                         │
+│  • WFS/WMS/WCS                                            │
+│  • STAC · Geoservices REST · OData · GraphQL              │
+│  • GeoEvent API (Geofencing & Alerts)                     │
+│  • Admin API (Map Configs, Users, Settings)               │
+└────────────────────────────┬──────────────────────────────┘
+                             │
+┌────────────────────────────▼──────────────────────────────┐
+│  Core Services (.NET 9)                                   │
+├───────────────────────────────────────────────────────────┤
+│  • Query Engine (CQL2, SQL)                               │
+│  • Geometry Processing (NetTopologySuite)                 │
+│  • GeoEvent Engine (Geofencing, State Tracking)           │
+│  • Export Pipeline (Multi-format)                         │
+│  • Transaction Manager (WFS-T)                            │
+│  • GeoETL/Intake (Container Distribution)                 │
+│  • Cache Layer (Redis + Memory)                           │
+│  • SignalR Hub (Real-time Events)                         │
+└────────────────────────────┬──────────────────────────────┘
+                             │
+┌────────────────────────────▼──────────────────────────────┐
+│  Data & Storage Layer                                     │
+├───────────────────────────────────────────────────────────┤
+│  Relational DB (PostgreSQL, MySQL, SQL Server, Oracle)    │
+│  Cloud DW (Snowflake, BigQuery, Redshift)                 │
+│  NoSQL (MongoDB, Cosmos DB)                               │
+│  Object Storage (S3, Azure Blob, GCS)                     │
+│  Search (Elasticsearch)                                   │
+│  Container Registries (GHCR, ECR, ACR, GCR)               │
+└───────────────────────────────────────────────────────────┘
 ```
 
 **Key Components:**
@@ -267,6 +406,7 @@ See [deployment documentation](docs/DEPLOYMENT.md) for production configurations
 | WMS | 1.3.0 | GetMap, GetFeatureInfo, GetLegendGraphic |
 | WCS | 2.0.1 | GetCoverage with subsetting, CRS transform |
 | STAC | 1.0 | Collections, items, search API |
+| OpenRosa | 1.0 | ODK/KoboToolbox form compatibility |
 
 ### Data Providers
 
@@ -295,6 +435,37 @@ Vector: GeoJSON, GeoJSON-Seq (streaming), GeoPackage, Shapefile, KML/KMZ, CSV, T
 Raster: PNG, JPEG, WebP, GeoTIFF, COG
 
 Tiles: MVT (Mapbox Vector Tiles), PBF
+
+### Platform Features
+
+**Real-Time Geofencing (GeoEvent):**
+- Enter/Exit event detection with < 100ms latency
+- Batch processing (1000 locations/request)
+- Automatic state tracking and dwell time calculation
+- SignalR WebSocket hub for real-time updates
+- Cloud event delivery (AWS SNS, Azure Event Grid)
+
+**Visual Map Builder (MapSDK):**
+- No-code map creation with live preview
+- Multi-format export (JSON, YAML, HTML, Blazor)
+- Component message bus for auto-synchronization
+- MapLibre GL integration with WebGL rendering
+- Template system for reusable map configurations
+
+**Mobile Field Collection (HonuaField):**
+- Cross-platform: iOS, Android, Windows, macOS
+- Offline-first with SQLite + spatial extensions
+- Biometric authentication
+- Photo/document attachments
+- Change tracking and conflict resolution
+- ODK/OpenRosa form compatibility
+
+**Container Distribution (GeoETL):**
+- Multi-registry support (GHCR, ECR, ACR, GCR)
+- Automated namespace provisioning
+- License-based access control
+- Efficient registry-to-registry image copying
+- Short-lived token generation
 
 ### Authentication & Security
 
@@ -421,12 +592,26 @@ Annual pricing available (20% discount).
 
 ## Documentation
 
-- [Getting Started](docs/user/getting-started.md)
-- [API Reference](docs/api/)
+**Getting Started:**
+- [Quick Start Guide](docs/user/getting-started.md)
 - [Configuration Guide](docs/configuration/)
 - [Deployment Guides](docs/deployment/)
+
+**Platform Components:**
+- [MapSDK Documentation](docs/mapsdk/) - Visual map builder
+- [HonuaField Guide](docs/field/) - Mobile field collection
+- [GeoEvent API Guide](docs/GEOEVENT_API_GUIDE.md) - Real-time geofencing
+- [GeoETL/Intake README](src/Honua.Server.Intake/README.md) - Container distribution
+
+**API References:**
+- [OGC API Reference](docs/api/)
+- [GeoEvent API](docs/GEOEVENT_API_GUIDE.md)
+- [Admin API](docs/api/admin/)
+
+**Operations:**
 - [Performance Tuning](docs/operations/performance.md)
 - [Security Best Practices](docs/SECURITY.md)
+- [Monitoring & Observability](docs/operations/)
 
 ---
 
@@ -478,15 +663,45 @@ src/
 ├── Honua.Server.Core.OData/        # OData protocol (both)
 ├── Honua.Server.Core.Cloud/        # Cloud SDKs (Full only)
 ├── Honua.Server.Host/              # Full-featured entry point
-├── Honua.Server.Host.Lite/         # Lightweight entry point
 ├── Honua.Server.Enterprise/        # Enterprise features
+│
+├── Honua.MapSDK/                   # Map SDK & visual builder
+│   ├── Components/                 # Blazor map components
+│   ├── Core/                       # Message bus & coordination
+│   ├── Models/                     # Map configuration models
+│   └── Services/                   # Export & configuration services
+│
+├── Honua.Admin.Blazor/             # Admin portal UI
+│   └── Components/
+│       └── Pages/
+│           └── Maps/               # Map builder pages
+│
+├── HonuaField/                     # Mobile field app (.NET MAUI)
+│   └── HonuaField/                 # iOS, Android, Windows, macOS
+│       ├── Models/                 # Feature, Collection models
+│       ├── Data/                   # SQLite repositories
+│       ├── Services/               # Sync, GPS, biometric
+│       └── Platforms/              # Platform-specific code
+│
+├── Honua.Server.Intake/            # GeoETL/Container registry system
+│   ├── Services/                   # Registry provisioning
+│   ├── Controllers/                # Intake API endpoints
+│   └── Models/                     # Build delivery models
+│
+├── Honua.Server.AlertReceiver/     # Cloud event receiver
+│   └── Controllers/                # SNS, Event Grid webhooks
+│
+├── Honua.Server.Gateway/           # API gateway
+├── Honua.Server.Observability/     # Metrics & monitoring
 ├── Honua.Cli/                      # Command-line tools
 └── Honua.Cli.AI/                   # AI-powered deployment agents
 
 tests/
 ├── Honua.Server.Core.Tests/
-├── Honua.Server.Host.Tests/
 ├── Honua.Server.Integration.Tests/
+│   └── GeoEvent/                   # GeoEvent & geofencing tests
+├── Honua.MapSDK.Tests/             # MapSDK tests
+├── HonuaField.Tests/               # Mobile app tests
 └── Honua.Server.Benchmarks/
 ```
 
@@ -534,11 +749,31 @@ Commercial licensing available for specific use cases.
 ## Acknowledgments
 
 Built with:
+
+**Core Platform:**
 - [NetTopologySuite](https://github.com/NetTopologySuite/NetTopologySuite) - Geometry operations
 - [Polly](https://github.com/App-vNext/Polly) - Resilience policies
 - [Serilog](https://serilog.net/) - Structured logging
 - [Dapper](https://github.com/DapperLib/Dapper) - Data access
 - [MaxRev.Gdal.Core](https://github.com/MaxRev-Dev/gdal.netcore) - Raster processing
+
+**MapSDK:**
+- [MapLibre GL](https://github.com/maplibre/maplibre-gl-js) - WebGL mapping
+- [MudBlazor](https://mudblazor.com/) - Blazor component library
+- [Blazor](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor) - .NET web framework
+
+**HonuaField Mobile:**
+- [.NET MAUI](https://dotnet.microsoft.com/apps/maui) - Cross-platform framework
+- [Mapsui](https://github.com/Mapsui/Mapsui) - Native mapping library
+- [SkiaSharp](https://github.com/mono/SkiaSharp) - 2D graphics
+- [ML.NET](https://dotnet.microsoft.com/apps/machinelearning-ai/ml-dotnet) - Machine learning
+- [SQLite](https://www.sqlite.org/) - Embedded database
+
+**GeoETL:**
+- [crane](https://github.com/google/go-containerregistry) - Container image operations
+- [Octokit](https://github.com/octokit/octokit.net) - GitHub API
+- [AWS SDK](https://aws.amazon.com/sdk-for-net/) - AWS integrations
+- [Azure SDK](https://azure.github.io/azure-sdk/) - Azure integrations
 
 ---
 
