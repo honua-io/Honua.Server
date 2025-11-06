@@ -25,6 +25,15 @@ public sealed class CreateServiceRequest
     [JsonPropertyName("folderId")]
     public string? FolderId { get; set; }
 
+    [JsonPropertyName("dataSourceId")]
+    public required string DataSourceId { get; set; }
+
+    [JsonPropertyName("keywords")]
+    public List<string> Keywords { get; set; } = new();
+
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; } = true;
+
     [JsonPropertyName("ogcOptions")]
     public ServiceOgcOptions? OgcOptions { get; set; }
 }
@@ -40,11 +49,14 @@ public sealed class UpdateServiceRequest
     [JsonPropertyName("description")]
     public string? Description { get; set; }
 
-    [JsonPropertyName("serviceType")]
-    public required string ServiceType { get; set; }
-
     [JsonPropertyName("folderId")]
-    public string? FolderId { get; set; }
+    public required string FolderId { get; set; }
+
+    [JsonPropertyName("keywords")]
+    public List<string> Keywords { get; set; } = new();
+
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
 
     [JsonPropertyName("ogcOptions")]
     public ServiceOgcOptions? OgcOptions { get; set; }
@@ -67,8 +79,17 @@ public sealed class ServiceResponse
     [JsonPropertyName("serviceType")]
     public required string ServiceType { get; set; }
 
+    [JsonPropertyName("dataSourceId")]
+    public string? DataSourceId { get; set; }
+
     [JsonPropertyName("folderId")]
     public string? FolderId { get; set; }
+
+    [JsonPropertyName("keywords")]
+    public List<string> Keywords { get; set; } = new();
+
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
 
     [JsonPropertyName("layerCount")]
     public int LayerCount { get; set; }
@@ -99,6 +120,9 @@ public sealed class ServiceListItem
 
     [JsonPropertyName("folderId")]
     public string? FolderId { get; set; }
+
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
 
     [JsonPropertyName("layerCount")]
     public int LayerCount { get; set; }

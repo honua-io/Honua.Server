@@ -58,6 +58,14 @@ public static class MetadataAdministrationEndpoints
             .WithName("DeleteService")
             .WithSummary("Delete a service");
 
+        group.MapPost("/services/{id}/enable", EnableService)
+            .WithName("EnableService")
+            .WithSummary("Enable a service");
+
+        group.MapPost("/services/{id}/disable", DisableService)
+            .WithName("DisableService")
+            .WithSummary("Disable a service");
+
         // Layers
         group.MapGet("/layers", GetLayers)
             .WithName("GetLayers")
@@ -432,6 +440,82 @@ public static class MetadataAdministrationEndpoints
                 title: "Internal server error",
                 statusCode: StatusCodes.Status500InternalServerError,
                 detail: "An error occurred while deleting the service");
+        }
+    }
+
+    private static async Task<IResult> EnableService(
+        string id,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        return await ToggleServiceEnabledState(id, true, metadataProvider, logger, ct);
+    }
+
+    private static async Task<IResult> DisableService(
+        string id,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        return await ToggleServiceEnabledState(id, false, metadataProvider, logger, ct);
+    }
+
+    private static async Task<IResult> ToggleServiceEnabledState(
+        string id,
+        bool enabled,
+        IMutableMetadataProvider metadataProvider,
+        ILogger<MetadataSnapshot> logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var existingService = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (existingService is null)
+            {
+                return Results.Problem(
+                    title: "Service not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Service with ID '{id}' does not exist");
+            }
+
+            // Update only the Enabled property
+            var updatedService = existingService with
+            {
+                Enabled = enabled
+            };
+
+            // Build new snapshot
+            var updatedServices = snapshot.Services
+                .Select(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase) ? updatedService : s)
+                .ToList();
+
+            var newSnapshot = new MetadataSnapshot(
+                snapshot.Catalog,
+                snapshot.Folders,
+                snapshot.DataSources,
+                updatedServices,
+                snapshot.Layers,
+                snapshot.RasterDatasets,
+                snapshot.Styles,
+                snapshot.Server
+            );
+
+            await metadataProvider.SaveAsync(newSnapshot, ct);
+
+            logger.LogInformation("{Action} service {ServiceId}", enabled ? "Enabled" : "Disabled", id);
+
+            return Results.Ok(new { Id = id, Enabled = enabled });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to {Action} service {ServiceId}", enabled ? "enable" : "disable", id);
+            return Results.Problem(
+                title: "Internal server error",
+                statusCode: StatusCodes.Status500InternalServerError,
+                detail: $"An error occurred while {(enabled ? "enabling" : "disabling")} the service");
         }
     }
 

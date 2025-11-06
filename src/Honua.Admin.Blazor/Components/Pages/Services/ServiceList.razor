@@ -1,124 +1,168 @@
 @page "/services"
-@rendermode InteractiveServer
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject ServiceApiClient ServiceApi
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationState NavState
+@inject ILogger<ServiceList> Logger
 
 <PageTitle>Services - Honua Admin</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Services</MudText>
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
 
-<MudPaper Elevation="2" Class="pa-4">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudTextField @bind-Value="_searchText"
-                      Placeholder="Search services..."
-                      Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true"
-                      Style="max-width: 400px" />
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">Services</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_searchText"
+                          Placeholder="Search services..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          Style="max-width: 400px" />
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="/services/new">
+                Create Service
+            </MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           Color="Color.Default"
+                           OnClick="LoadServicesAsync"
+                           Title="Refresh" />
+        </MudStack>
 
-        <MudButton Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   Href="/services/new">
-            Create Service
-        </MudButton>
-    </MudStack>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
 
-    @if (_loading)
-    {
-        <MudProgressCircular Indeterminate="true" />
-        <MudText>Loading services...</MudText>
-    }
-    else if (!_services.Any())
-    {
-        <MudAlert Severity="Severity.Info">
-            No services found. Create your first service to get started!
-        </MudAlert>
-    }
-    else
-    {
-        <MudTable Items="@_filteredServices"
-                  Hover="true"
-                  Striped="true"
-                  Dense="true"
-                  FixedHeader="true"
-                  Height="600px">
-            <HeaderContent>
-                <MudTh>Name</MudTh>
-                <MudTh>Type</MudTh>
-                <MudTh>Folder</MudTh>
-                <MudTh>Layers</MudTh>
-                <MudTh>Status</MudTh>
-                <MudTh>Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Name">
-                    <MudLink Href="@($"/services/{context.Id}")">@context.Name</MudLink>
-                </MudTd>
-                <MudTd DataLabel="Type">
-                    <MudChip Size="Size.Small" Color="Color.Primary">@context.Type</MudChip>
-                </MudTd>
-                <MudTd DataLabel="Folder">@(context.Folder ?? "Root")</MudTd>
-                <MudTd DataLabel="Layers">@context.LayerCount</MudTd>
-                <MudTd DataLabel="Status">
-                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
-                </MudTd>
-                <MudTd DataLabel="Actions">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                   Size="Size.Small"
-                                   Href="@($"/services/{context.Id}/edit")" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                   Size="Size.Small"
-                                   Color="Color.Error"
-                                   OnClick="@(() => DeleteService(context.Id))" />
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
-    }
-</MudPaper>
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        @if (!_services.Any())
+        {
+            <MudAlert Severity="Severity.Info">
+                No services found. Create your first service to get started!
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@_filteredServices"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Folder</MudTh>
+                    <MudTh>Layers</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">
+                        <MudLink Href="@($"/services/{context.Id}")">
+                            <b>@context.Title</b>
+                        </MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudChip Size="Size.Small" Color="Color.Primary">@context.ServiceType</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Folder">@(context.FolderId ?? "Root")</MudTd>
+                    <MudTd DataLabel="Layers">@context.LayerCount</MudTd>
+                    <MudTd DataLabel="Status">
+                        @if (context.Enabled)
+                        {
+                            <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Running</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Cancel">Stopped</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudStack Row="true" Spacing="1">
+                            @if (context.Enabled)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Stop"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               Title="Stop Service"
+                                               OnClick="@(() => StopService(context))" />
+                            }
+                            else
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                               Size="Size.Small"
+                                               Color="Color.Success"
+                                               Title="Start Service"
+                                               OnClick="@(() => StartService(context))" />
+                            }
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Size="Size.Small"
+                                           Title="Edit"
+                                           Href="@($"/services/{context.Id}/edit")" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           Title="Delete"
+                                           OnClick="@(() => DeleteService(context))" />
+                        </MudStack>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Align="Align.Center" Class="py-4">
+                        No services found matching your search.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
 
 @code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Services", href: null, disabled: true)
+    };
+
     private bool _loading = true;
+    private string? _errorMessage;
     private string _searchText = string.Empty;
     private List<ServiceListItem> _services = new();
+
     private IEnumerable<ServiceListItem> _filteredServices =>
         string.IsNullOrWhiteSpace(_searchText)
             ? _services
-            : _services.Where(s => s.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
-
-    [Inject] private HttpClient Http { get; set; } = default!;
-    [Inject] private NavigationState NavState { get; set; } = default!;
-    [Inject] private NotificationService Notifications { get; set; } = default!;
-    [Inject] private IDialogService DialogService { get; set; } = default!;
+            : _services.Where(s => s.Title.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                                    s.ServiceType.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
-        NavState.SetBreadcrumbs(
-            new BreadcrumbItem("Services", "/services", icon: Icons.Material.Filled.Layers)
-        );
-
+        NavState.SetBreadcrumbs(_breadcrumbs.ToArray());
         await LoadServicesAsync();
     }
 
     private async Task LoadServicesAsync()
     {
+        _loading = true;
+        _errorMessage = null;
+
         try
         {
-            _loading = true;
-
-            // TODO: Replace with actual API call
-            // _services = await Http.GetFromJsonAsync<List<ServiceListItem>>("/admin/metadata/services") ?? new();
-
-            // Placeholder data for now
-            _services = new List<ServiceListItem>
-            {
-                new ServiceListItem { Id = "sample-wms", Name = "Sample WMS Service", Type = "WMS", Folder = "Maps", LayerCount = 3 },
-                new ServiceListItem { Id = "sample-wfs", Name = "Sample WFS Service", Type = "WFS", Folder = "Data", LayerCount = 5 }
-            };
-
-            await Task.CompletedTask;
+            _services = await ServiceApi.GetServicesAsync();
         }
         catch (Exception ex)
         {
-            Notifications.Error($"Failed to load services: {ex.Message}");
+            _errorMessage = $"Failed to load services: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+            Logger.LogError(ex, "Error loading services");
         }
         finally
         {
@@ -126,42 +170,66 @@
         }
     }
 
-    private async Task DeleteService(string serviceId)
+    private async Task StartService(ServiceListItem service)
     {
-        var parameters = new DialogParameters
+        try
         {
-            { "ContentText", $"Are you sure you want to delete service '{serviceId}'? This action cannot be undone." },
-            { "ButtonText", "Delete" },
-            { "Color", Color.Error }
-        };
+            await ServiceApi.EnableServiceAsync(service.Id);
+            Snackbar.Add($"Service '{service.Title}' started successfully", Severity.Success);
+            await LoadServicesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to start service: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error starting service {ServiceId}", service.Id);
+        }
+    }
 
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
-        var result = await dialog.Result;
+    private async Task StopService(ServiceListItem service)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Stop Service",
+            $"Are you sure you want to stop service '{service.Title}'? It will no longer be accessible.",
+            yesText: "Stop",
+            cancelText: "Cancel");
 
-        if (!result.Canceled)
+        if (confirm == true)
         {
             try
             {
-                // TODO: Call delete API
-                // await Http.DeleteAsync($"/admin/metadata/services/{serviceId}");
-
-                Notifications.Success($"Service '{serviceId}' deleted successfully");
+                await ServiceApi.DisableServiceAsync(service.Id);
+                Snackbar.Add($"Service '{service.Title}' stopped successfully", Severity.Success);
                 await LoadServicesAsync();
             }
             catch (Exception ex)
             {
-                Notifications.Error($"Failed to delete service: {ex.Message}");
+                Snackbar.Add($"Failed to stop service: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error stopping service {ServiceId}", service.Id);
             }
         }
     }
 
-    // Placeholder DTO
-    private class ServiceListItem
+    private async Task DeleteService(ServiceListItem service)
     {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string Type { get; set; } = string.Empty;
-        public string? Folder { get; set; }
-        public int LayerCount { get; set; }
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Delete",
+            $"Are you sure you want to delete service '{service.Title}'? This action cannot be undone.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            try
+            {
+                await ServiceApi.DeleteServiceAsync(service.Id);
+                Snackbar.Add($"Service '{service.Title}' deleted successfully", Severity.Success);
+                await LoadServicesAsync();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Failed to delete service: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error deleting service {ServiceId}", service.Id);
+            }
+        }
     }
 }
