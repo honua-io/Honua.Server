@@ -7,6 +7,8 @@
 @inject ServiceApiClient ServiceApi
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
 
 <PageTitle>Import Data - Honua Admin</PageTitle>
 
@@ -32,9 +34,29 @@
 
                         @if (_wizardState.SelectedFile == null)
                         {
-                            <MudPaper Outlined="true" Class="pa-8 text-center cursor-pointer" @onclick="@(() => document.getElementById("fileInput").click())" Style="border: 2px dashed #ccc;">
-                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
-                                <MudText Typo="Typo.h6">Click to select a file</MudText>
+                            <MudPaper id="fileDropZone"
+                                      Outlined="true"
+                                      Class="pa-8 text-center cursor-pointer @(_isDraggingOver ? "drag-over" : "")"
+                                      @onclick="@(() => document.getElementById("fileInput").click())"
+                                      @ondragenter="HandleDragEnter"
+                                      @ondragover="HandleDragOver"
+                                      @ondragleave="HandleDragLeave"
+                                      @ondrop="HandleDrop"
+                                      Style="border: 2px dashed @(_isDraggingOver ? "var(--mud-palette-primary)" : "#ccc"); background-color: @(_isDraggingOver ? "var(--mud-palette-primary-lighten)" : "transparent"); transition: all 0.2s ease;">
+                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload"
+                                         Size="Size.Large"
+                                         Color="@(_isDraggingOver ? Color.Primary : Color.Default)"
+                                         Class="mb-2" />
+                                <MudText Typo="Typo.h6" Color="@(_isDraggingOver ? Color.Primary : Color.Default)">
+                                    @if (_isDraggingOver)
+                                    {
+                                        <text>Drop file here</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Click to select a file</text>
+                                    }
+                                </MudText>
                                 <MudText Typo="Typo.body2" Color="Color.Secondary">or drag and drop</MudText>
                                 <MudText Typo="Typo.caption" Class="mt-2">Max file size: 500 MB</MudText>
                             </MudPaper>
@@ -223,10 +245,33 @@
     private IBrowserFile? _selectedFile;
     private List<ServiceListItem> _services = new();
     private bool _importing = false;
+    private bool _isDraggingOver = false;
+    private IJSObjectReference? _dragDropModule;
+    private bool _dragDropInitialized = false;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadServicesAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_dragDropInitialized)
+        {
+            try
+            {
+                _dragDropModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "initializeDragAndDrop",
+                    "fileDropZone",
+                    "fileInput");
+                _dragDropInitialized = true;
+            }
+            catch (Exception ex)
+            {
+                // Silently fail - drag and drop is an enhancement, not critical
+                Console.WriteLine($"Failed to initialize drag and drop: {ex.Message}");
+            }
+        }
     }
 
     private async Task LoadServicesAsync()
@@ -257,6 +302,29 @@
         _selectedFile = null;
         _wizardState.SelectedFile = null;
         _wizardState.FileSize = 0;
+    }
+
+    // Drag and drop event handlers
+    private void HandleDragEnter(DragEventArgs e)
+    {
+        _isDraggingOver = true;
+    }
+
+    private void HandleDragOver(DragEventArgs e)
+    {
+        // Prevent default to allow drop
+        _isDraggingOver = true;
+    }
+
+    private void HandleDragLeave(DragEventArgs e)
+    {
+        _isDraggingOver = false;
+    }
+
+    private void HandleDrop(DragEventArgs e)
+    {
+        _isDraggingOver = false;
+        // JavaScript handles the actual file transfer to InputFile component
     }
 
     private bool IsConfigurationValid()
@@ -336,5 +404,21 @@
         _selectedFile = null;
         _activeStep = 0;
         _stepper?.Reset();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dragDropModule != null)
+        {
+            try
+            {
+                await _dragDropModule.InvokeVoidAsync("dispose");
+                await _dragDropModule.DisposeAsync();
+            }
+            catch
+            {
+                // Ignore disposal errors
+            }
+        }
     }
 }

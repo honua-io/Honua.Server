@@ -16,6 +16,69 @@ window.downloadFile = function(filename, contentType, base64Data) {
     document.body.removeChild(linkElement);
 };
 
+/**
+ * Initialize drag-and-drop file upload for an element
+ * @param {string} dropZoneId - The ID of the drop zone element
+ * @param {string} fileInputId - The ID of the file input element
+ * @returns {object} Cleanup function
+ */
+window.initializeDragAndDrop = function(dropZoneId, fileInputId) {
+    const dropZone = document.getElementById(dropZoneId);
+    const fileInput = document.getElementById(fileInputId);
+
+    if (!dropZone || !fileInput) {
+        console.error('Drop zone or file input not found');
+        return null;
+    }
+
+    // Prevent default drag behaviors
+    const preventDefaults = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    // Handle file drop
+    const handleDrop = (e) => {
+        preventDefaults(e);
+
+        const dt = e.dataTransfer;
+        const files = dt.files;
+
+        // Transfer files to the InputFile component
+        if (files && files.length > 0) {
+            // Create a new FileList from dropped files
+            const dataTransfer = new DataTransfer();
+            for (let i = 0; i < files.length; i++) {
+                dataTransfer.items.add(files[i]);
+            }
+
+            // Assign to file input
+            fileInput.files = dataTransfer.files;
+
+            // Trigger change event
+            const event = new Event('change', { bubbles: true });
+            fileInput.dispatchEvent(event);
+        }
+    };
+
+    // Add event listeners
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    // Return cleanup function
+    return {
+        dispose: () => {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.removeEventListener(eventName, preventDefaults);
+            });
+            dropZone.removeEventListener('drop', handleDrop);
+        }
+    };
+};
+
 // MapLibre GL Map Management
 window.honuaMapLibre = {
     maps: {},
