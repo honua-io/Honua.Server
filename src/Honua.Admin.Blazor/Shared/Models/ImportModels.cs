@@ -37,6 +37,12 @@ public sealed class ImportJobSnapshot
     [JsonPropertyName("fileName")]
     public string? FileName { get; set; }
 
+    [JsonPropertyName("fileSizeBytes")]
+    public long? FileSizeBytes { get; set; }
+
+    [JsonPropertyName("sourceUrl")]
+    public string? SourceUrl { get; set; }
+
     [JsonPropertyName("status")]
     public string? Status { get; set; }
 
@@ -45,6 +51,9 @@ public sealed class ImportJobSnapshot
 
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
+
+    [JsonPropertyName("startedAt")]
+    public DateTime? StartedAt { get; set; }
 
     [JsonPropertyName("completedAt")]
     public DateTime? CompletedAt { get; set; }
@@ -56,7 +65,40 @@ public sealed class ImportJobSnapshot
     public long RecordsProcessed { get; set; }
 
     [JsonPropertyName("recordsTotal")]
-    public long RecordsTotal { get; set; }
+    public long? RecordsTotal { get; set; }
+
+    [JsonPropertyName("layers")]
+    public List<ImportLayerProgress>? Layers { get; set; }
+}
+
+/// <summary>
+/// Progress information for a layer within an import job (for multi-layer Esri imports).
+/// </summary>
+public sealed class ImportLayerProgress
+{
+    [JsonPropertyName("layerId")]
+    public string? LayerId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("geometryType")]
+    public string? GeometryType { get; set; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    [JsonPropertyName("progress")]
+    public double Progress { get; set; }
+
+    [JsonPropertyName("featuresImported")]
+    public long FeaturesImported { get; set; }
+
+    [JsonPropertyName("totalFeatures")]
+    public long TotalFeatures { get; set; }
+
+    [JsonPropertyName("errorMessage")]
+    public string? ErrorMessage { get; set; }
 }
 
 /// <summary>
