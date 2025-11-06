@@ -1,0 +1,255 @@
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudStack Spacing="4" Class="mt-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <div>
+            <MudText Typo="Typo.h6">Data Filter (Optional)</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Add a WHERE clause to filter which rows are included in the layer
+            </MudText>
+        </div>
+        <MudSwitch @bind-Value="_useFilter"
+                   Label="Enable Filter"
+                   Color="Color.Primary" />
+    </MudStack>
+
+    @if (_useFilter)
+    {
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                <MudText Typo="Typo.caption">
+                    Build filter conditions or write SQL directly. Only rows matching the filter will be included.
+                </MudText>
+            </MudAlert>
+
+            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+                <MudTabPanel Text="Builder" Icon="@Icons.Material.Filled.Build">
+                    <MudStack Spacing="3" Class="pa-4">
+                        @for (int i = 0; i < _conditions.Count; i++)
+                        {
+                            var index = i;
+                            var condition = _conditions[index];
+
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                @if (index > 0)
+                                {
+                                    <MudSelect @bind-Value="condition.LogicalOperator"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense"
+                                               Style="max-width: 100px;">
+                                        <MudSelectItem Value="@("AND")">AND</MudSelectItem>
+                                        <MudSelectItem Value="@("OR")">OR</MudSelectItem>
+                                    </MudSelect>
+                                }
+
+                                <MudSelect @bind-Value="condition.Field"
+                                           Label="Field"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Style="flex: 1;">
+                                    @if (TableInfo != null)
+                                    {
+                                        @foreach (var column in TableInfo.Columns.Where(c => c.Name != TableInfo.GeometryColumn))
+                                        {
+                                            <MudSelectItem Value="@column.Name">@column.Name</MudSelectItem>
+                                        }
+                                    }
+                                </MudSelect>
+
+                                <MudSelect @bind-Value="condition.Operator"
+                                           Label="Operator"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Style="max-width: 150px;">
+                                    <MudSelectItem Value="@("=")">Equals (=)</MudSelectItem>
+                                    <MudSelectItem Value="@("!=")">Not Equals (!=)</MudSelectItem>
+                                    <MudSelectItem Value="@(">")">Greater Than (&gt;)</MudSelectItem>
+                                    <MudSelectItem Value="@("<")">Less Than (&lt;)</MudSelectItem>
+                                    <MudSelectItem Value="@(">=")">Greater or Equal (&gt;=)</MudSelectItem>
+                                    <MudSelectItem Value="@("<=")">Less or Equal (&lt;=)</MudSelectItem>
+                                    <MudSelectItem Value="@("LIKE")">Like</MudSelectItem>
+                                    <MudSelectItem Value="@("IN")">In</MudSelectItem>
+                                    <MudSelectItem Value="@("IS NULL")">Is Null</MudSelectItem>
+                                    <MudSelectItem Value="@("IS NOT NULL")">Is Not Null</MudSelectItem>
+                                </MudSelect>
+
+                                @if (condition.Operator != "IS NULL" && condition.Operator != "IS NOT NULL")
+                                {
+                                    <MudTextField @bind-Value="condition.Value"
+                                                  Label="Value"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Style="flex: 1;"
+                                                  HelperText="@GetValueHelper(condition.Operator)" />
+                                }
+
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="Color.Error"
+                                               Size="Size.Small"
+                                               OnClick="@(() => RemoveCondition(index))" />
+                            </MudStack>
+                        }
+
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Outlined"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddCondition">
+                            Add Condition
+                        </MudButton>
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="SQL" Icon="@Icons.Material.Filled.Code">
+                    <MudStack Spacing="2" Class="pa-4">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Write the WHERE clause manually (without the WHERE keyword)
+                        </MudText>
+
+                        <MudTextField @bind-Value="_manualSql"
+                                      Label="WHERE Clause"
+                                      Variant="Variant.Outlined"
+                                      Lines="5"
+                                      HelperText="Example: status = 'active' AND category IN ('A', 'B')" />
+                    </MudStack>
+                </MudTabPanel>
+            </MudTabs>
+
+            <MudPaper Outlined="true" Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">SQL Preview:</MudText>
+                <MudText Typo="Typo.body2" Style="font-family: monospace; word-break: break-all;">
+                    <code>WHERE @GetWhereClause()</code>
+                </MudText>
+            </MudPaper>
+        </MudStack>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Dense="true">
+            No filter applied. All rows from the table will be included in the layer.
+        </MudAlert>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public TableInfo? TableInfo { get; set; }
+
+    [Parameter]
+    public string WhereClause { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> WhereClauseChanged { get; set; }
+
+    private bool _useFilter;
+    private List<FilterCondition> _conditions = new();
+    private string _manualSql = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(WhereClause) && !_useFilter)
+        {
+            _useFilter = true;
+            _manualSql = WhereClause;
+        }
+    }
+
+    private void AddCondition()
+    {
+        _conditions.Add(new FilterCondition());
+        UpdateWhereClause();
+    }
+
+    private void RemoveCondition(int index)
+    {
+        _conditions.RemoveAt(index);
+        UpdateWhereClause();
+    }
+
+    private void UpdateWhereClause()
+    {
+        var clause = GetWhereClause();
+        WhereClause = clause;
+        WhereClauseChanged.InvokeAsync(clause);
+    }
+
+    private string GetWhereClause()
+    {
+        if (!_useFilter)
+            return string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(_manualSql))
+            return _manualSql;
+
+        if (!_conditions.Any())
+            return string.Empty;
+
+        var parts = new List<string>();
+
+        for (int i = 0; i < _conditions.Count; i++)
+        {
+            var condition = _conditions[i];
+
+            if (string.IsNullOrWhiteSpace(condition.Field))
+                continue;
+
+            var part = string.Empty;
+
+            if (i > 0 && !string.IsNullOrEmpty(condition.LogicalOperator))
+            {
+                part += $"{condition.LogicalOperator} ";
+            }
+
+            if (condition.Operator == "IS NULL" || condition.Operator == "IS NOT NULL")
+            {
+                part += $"{condition.Field} {condition.Operator}";
+            }
+            else if (condition.Operator == "IN")
+            {
+                var value = string.IsNullOrWhiteSpace(condition.Value) ? "()" : $"({condition.Value})";
+                part += $"{condition.Field} IN {value}";
+            }
+            else if (condition.Operator == "LIKE")
+            {
+                var value = string.IsNullOrWhiteSpace(condition.Value) ? "'%%'" : $"'%{condition.Value}%'";
+                part += $"{condition.Field} LIKE {value}";
+            }
+            else
+            {
+                var value = string.IsNullOrWhiteSpace(condition.Value) ? "NULL" : QuoteValue(condition.Value);
+                part += $"{condition.Field} {condition.Operator} {value}";
+            }
+
+            parts.Add(part);
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    private string QuoteValue(string value)
+    {
+        // Simple heuristic: if it's a number, don't quote
+        if (double.TryParse(value, out _))
+            return value;
+
+        // Otherwise quote as string
+        return $"'{value.Replace("'", "''")}'";
+    }
+
+    private string GetValueHelper(string op)
+    {
+        return op switch
+        {
+            "LIKE" => "Enter search term (% wildcards added automatically)",
+            "IN" => "Enter comma-separated values: 1, 2, 3 or 'A', 'B', 'C'",
+            _ => "Enter value"
+        };
+    }
+
+    private class FilterCondition
+    {
+        public string LogicalOperator { get; set; } = "AND";
+        public string Field { get; set; } = string.Empty;
+        public string Operator { get; set; } = "=";
+        public string Value { get; set; } = string.Empty;
+    }
+}

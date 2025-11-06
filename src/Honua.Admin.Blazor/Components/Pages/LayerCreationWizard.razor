@@ -1,0 +1,421 @@
+@page "/layers/create"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@attribute [Authorize(Roles = "administrator,datapublisher")]
+@inject DataSourceApiClient DataSourceApi
+@inject ServiceApiClient ServiceApi
+@inject LayerApiClient LayerApi
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Create Layer - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-6 mt-4">
+        <MudText Typo="Typo.h4" Class="mb-6">Create New Layer</MudText>
+
+        <MudStepper @ref="_stepper" Linear="true" HeaderTextView="HeaderTextView.All">
+
+            @* Step 1: Choose Source Type *@
+            <MudStep Title="Choose Source" Icon="@Icons.Material.Filled.Source">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudText Typo="Typo.h6">How would you like to create this layer?</MudText>
+
+                        <MudRadioGroup @bind-Value="_sourceType">
+                            <MudPaper Outlined="true" Class="pa-4 mb-3 cursor-pointer" @onclick="@(() => _sourceType = LayerSourceType.DatabaseTable)">
+                                <MudRadio Value="@LayerSourceType.DatabaseTable" Color="Color.Primary">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                        <MudIcon Icon="@Icons.Material.Filled.Storage" Color="Color.Primary" Size="Size.Large" />
+                                        <div>
+                                            <MudText Typo="Typo.h6">From Database Table</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                Connect to an existing table in PostgreSQL, SQL Server, MySQL, or SQLite
+                                            </MudText>
+                                        </div>
+                                    </MudStack>
+                                </MudRadio>
+                            </MudPaper>
+
+                            <MudPaper Outlined="true" Class="pa-4 mb-3 cursor-pointer" @onclick="@(() => _sourceType = LayerSourceType.FileUpload)">
+                                <MudRadio Value="@LayerSourceType.FileUpload" Color="Color.Info">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                        <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Color="Color.Info" Size="Size.Large" />
+                                        <div>
+                                            <MudText Typo="Typo.h6">Upload Spatial File</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                Import from Shapefile, GeoJSON, GeoPackage, KML, GML, or CSV
+                                            </MudText>
+                                        </div>
+                                    </MudStack>
+                                </MudRadio>
+                            </MudPaper>
+
+                            <MudPaper Outlined="true" Class="pa-4 cursor-pointer" @onclick="@(() => _sourceType = LayerSourceType.EsriService)">
+                                <MudRadio Value="@LayerSourceType.EsriService" Color="Color.Success">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                        <MudIcon Icon="@Icons.Material.Filled.Public" Color="Color.Success" Size="Size.Large" />
+                                        <div>
+                                            <MudText Typo="Typo.h6">Import from Esri Service</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                Import layers from ArcGIS Server, ArcGIS Online, or Feature Services
+                                            </MudText>
+                                        </div>
+                                    </MudStack>
+                                </MudRadio>
+                            </MudPaper>
+                        </MudRadioGroup>
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="@(() => _stepper.ForceRender())"
+                               Disabled="@(_sourceType == LayerSourceType.None)">
+                        Next
+                    </MudButton>
+                </ActionContent>
+            </MudStep>
+
+            @* Conditional Steps Based on Source Type *@
+            @if (_sourceType == LayerSourceType.DatabaseTable)
+            {
+                @* Database Table Workflow *@
+                <MudStep Title="Select Data Source" Icon="@Icons.Material.Filled.Storage">
+                    <ChildContent>
+                        <MudStack Spacing="4" Class="mt-4">
+                            <MudText Typo="Typo.h6">Select Database Connection</MudText>
+
+                            @if (_dataSources.Any())
+                            {
+                                <MudSelect @bind-Value="_selectedDataSourceId"
+                                           Label="Data Source"
+                                           Variant="Variant.Outlined"
+                                           Required="true">
+                                    @foreach (var ds in _dataSources)
+                                    {
+                                        <MudSelectItem Value="@ds.Id">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />
+                                                <MudText>@ds.Id</MudText>
+                                                <MudChip Size="Size.Small" Variant="Variant.Outlined">@ds.Provider</MudChip>
+                                            </MudStack>
+                                        </MudSelectItem>
+                                    }
+                                </MudSelect>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Warning">
+                                    No data sources configured.
+                                    <MudLink Href="/datasources" Color="Color.Primary">Create a data source</MudLink> first.
+                                </MudAlert>
+                            }
+                        </MudStack>
+                    </ChildContent>
+                    <ActionContent>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="LoadTables"
+                                   Disabled="@string.IsNullOrEmpty(_selectedDataSourceId)">
+                            Next
+                        </MudButton>
+                    </ActionContent>
+                </MudStep>
+
+                <MudStep Title="Select Table" Icon="@Icons.Material.Filled.TableChart">
+                    <ChildContent>
+                        <DatabaseTableBrowser DataSourceId="@_selectedDataSourceId"
+                                              OnTableSelected="HandleTableSelected" />
+                    </ChildContent>
+                    <ActionContent>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => _stepper.ForceRender())"
+                                   Disabled="@(_selectedTable == null)">
+                            Next
+                        </MudButton>
+                    </ActionContent>
+                </MudStep>
+
+                <MudStep Title="Configure Columns" Icon="@Icons.Material.Filled.ViewColumn">
+                    <ChildContent>
+                        <ColumnConfiguration TableInfo="@_selectedTable"
+                                             @bind-SelectedColumns="_selectedColumns"
+                                             @bind-ColumnAliases="_columnAliases"
+                                             @bind-CodedValueDomains="_codedValueDomains" />
+                    </ChildContent>
+                    <ActionContent>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => _stepper.ForceRender())">
+                            Next
+                        </MudButton>
+                    </ActionContent>
+                </MudStep>
+
+                <MudStep Title="Data Filter (Optional)" Icon="@Icons.Material.Filled.FilterAlt">
+                    <ChildContent>
+                        <WhereClauseBuilder TableInfo="@_selectedTable"
+                                            @bind-WhereClause="_whereClause" />
+                    </ChildContent>
+                    <ActionContent>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => _stepper.ForceRender())">
+                            Next
+                        </MudButton>
+                    </ActionContent>
+                </MudStep>
+            }
+            else if (_sourceType == LayerSourceType.FileUpload)
+            {
+                @* File Upload Workflow - Redirect to existing wizard *@
+                <MudStep Title="Upload File" Icon="@Icons.Material.Filled.CloudUpload">
+                    <ChildContent>
+                        <MudAlert Severity="Severity.Info">
+                            Redirecting to file upload wizard...
+                        </MudAlert>
+                    </ChildContent>
+                </MudStep>
+            }
+            else if (_sourceType == LayerSourceType.EsriService)
+            {
+                @* Esri Import Workflow *@
+                <MudStep Title="Service URL" Icon="@Icons.Material.Filled.Link">
+                    <ChildContent>
+                        <MudAlert Severity="Severity.Info">
+                            Esri service import coming soon...
+                        </MudAlert>
+                    </ChildContent>
+                </MudStep>
+            }
+
+            @* Final Step: Review & Create *@
+            <MudStep Title="Review & Create" Icon="@Icons.Material.Filled.CheckCircle">
+                <ChildContent>
+                    <MudStack Spacing="4" Class="mt-4">
+                        <MudText Typo="Typo.h6">Review Layer Configuration</MudText>
+
+                        <MudTextField @bind-Value="_layerId"
+                                      Label="Layer ID"
+                                      Required="true"
+                                      Variant="Variant.Outlined"
+                                      HelperText="Unique identifier (e.g., 'parcels', 'buildings')" />
+
+                        <MudTextField @bind-Value="_layerTitle"
+                                      Label="Layer Title"
+                                      Required="true"
+                                      Variant="Variant.Outlined" />
+
+                        <MudSelect @bind-Value="_targetServiceId"
+                                   Label="Target Service"
+                                   Variant="Variant.Outlined"
+                                   Required="true">
+                            @foreach (var service in _services)
+                            {
+                                <MudSelectItem Value="@service.Id">@service.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        @if (_sourceType == LayerSourceType.DatabaseTable && _selectedTable != null)
+                        {
+                            <MudPaper Outlined="true" Class="pa-4">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Source Information:</MudText>
+                                <MudSimpleTable Dense="true">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Data Source:</strong></td>
+                                            <td>@_selectedDataSourceId</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Table:</strong></td>
+                                            <td>@_selectedTable.Schema.@_selectedTable.Table</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Geometry Column:</strong></td>
+                                            <td>@_selectedTable.GeometryColumn</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Geometry Type:</strong></td>
+                                            <td>@_selectedTable.GeometryType</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>SRID:</strong></td>
+                                            <td>@_selectedTable.Srid</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Selected Columns:</strong></td>
+                                            <td>@_selectedColumns.Count / @_selectedTable.Columns.Count</td>
+                                        </tr>
+                                        @if (!string.IsNullOrEmpty(_whereClause))
+                                        {
+                                            <tr>
+                                                <td><strong>Filter:</strong></td>
+                                                <td><code>@_whereClause</code></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </ChildContent>
+                <ActionContent>
+                    <MudButton Variant="Variant.Text" OnClick="@(() => _stepper.Previous())">Back</MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               OnClick="CreateLayer"
+                               Disabled="@_creating">
+                        @if (_creating)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <MudText Class="ml-2">Creating...</MudText>
+                        }
+                        else
+                        {
+                            <text>Create Layer</text>
+                        }
+                    </MudButton>
+                </ActionContent>
+            </MudStep>
+
+        </MudStepper>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Layers", href: "/layers"),
+        new BreadcrumbItem("Create", href: null, disabled: true)
+    };
+
+    private MudStepper? _stepper;
+    private LayerSourceType _sourceType = LayerSourceType.None;
+
+    // Common
+    private List<DataSourceListItem> _dataSources = new();
+    private List<ServiceListItem> _services = new();
+    private string _layerId = string.Empty;
+    private string _layerTitle = string.Empty;
+    private string _targetServiceId = string.Empty;
+    private bool _creating;
+
+    // Database table workflow
+    private string _selectedDataSourceId = string.Empty;
+    private TableInfo? _selectedTable;
+    private HashSet<string> _selectedColumns = new();
+    private Dictionary<string, string> _columnAliases = new();
+    private Dictionary<string, CodedValueDomain> _codedValueDomains = new();
+    private string _whereClause = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(
+            LoadDataSourcesAsync(),
+            LoadServicesAsync()
+        );
+    }
+
+    private async Task LoadDataSourcesAsync()
+    {
+        try
+        {
+            _dataSources = await DataSourceApi.GetDataSourcesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data sources: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadServicesAsync()
+    {
+        try
+        {
+            _services = await ServiceApi.GetServicesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading services: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadTables()
+    {
+        // Will trigger table loading in next step
+        _stepper?.ForceRender();
+    }
+
+    private void HandleTableSelected(TableInfo table)
+    {
+        _selectedTable = table;
+
+        // Pre-select all columns
+        _selectedColumns = table.Columns.Select(c => c.Name).ToHashSet();
+
+        // Auto-suggest layer ID from table name
+        if (string.IsNullOrEmpty(_layerId))
+        {
+            _layerId = table.Table.ToLowerInvariant().Replace(" ", "_");
+        }
+
+        // Auto-suggest title
+        if (string.IsNullOrEmpty(_layerTitle))
+        {
+            _layerTitle = table.Table;
+        }
+    }
+
+    private async Task CreateLayer()
+    {
+        _creating = true;
+
+        try
+        {
+            // TODO: Create layer with all configurations
+            await Task.Delay(1000); // Simulate API call
+
+            Snackbar.Add("Layer created successfully!", Severity.Success);
+            Navigation.NavigateTo("/layers");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating layer: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private enum LayerSourceType
+    {
+        None,
+        DatabaseTable,
+        FileUpload,
+        EsriService
+    }
+
+    // Placeholder classes - will be implemented
+    private class CodedValueDomain
+    {
+        public string Type { get; set; } = "codedValue";
+        public List<CodedValue> Values { get; set; } = new();
+    }
+
+    private class CodedValue
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+}
