@@ -236,6 +236,10 @@ public static class ServiceCollectionExtensions
         services.AddHostedService(sp =>
             sp.GetRequiredService<Honua.Server.Core.Raster.Import.DataIngestionService>());
 
+        // Register export services
+        services.AddSingleton<Honua.Server.Core.Raster.Export.IGeoArrowExporter, Honua.Server.Core.Raster.Export.GeoArrowExporter>();
+        services.AddSingleton<Honua.Server.Core.Raster.Export.IGeoParquetExporter, Honua.Server.Core.Raster.Export.GeoParquetExporter>();
+
         // TODO: RasterTilePreseedService has unregistered dependencies (IRasterTileCacheProvider)
         // Commenting out until Core.Raster services are properly registered
         // services.AddSingleton<RasterTilePreseedService>();

@@ -294,6 +294,47 @@ public sealed class CswTests
         int.Parse(searchResults!.Attribute("numberOfRecordsReturned")!.Value).Should().BeLessThanOrEqualTo(100);
     }
 
+    [Fact]
+    public async Task GetRecords_POST_XMLRequest_ParsesSuccessfully()
+    {
+        // Arrange
+        var xmlRequest = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <csw:GetRecords xmlns:csw="http://www.opengis.net/cat/csw/2.0.2"
+                            service="CSW"
+                            version="2.0.2"
+                            resultType="results"
+                            startPosition="1"
+                            maxRecords="10">
+              <csw:Query typeNames="csw:Record">
+                <csw:ElementSetName>full</csw:ElementSetName>
+              </csw:Query>
+            </csw:GetRecords>
+            """;
+
+        var (context, metadataRegistry, catalog) = CreateTestPostContext(xmlRequest);
+        catalog.Records = CreateMockRecords(5);
+
+        // Act
+        var result = await CswHandlers.HandleAsync(context, metadataRegistry, catalog, CancellationToken.None);
+
+        // Assert
+        var content = await GetResultContentAsync(result);
+        var doc = XDocument.Parse(content);
+
+        // Should not be an exception
+        var exception = doc.Descendants(Ows + "Exception").FirstOrDefault();
+        exception.Should().BeNull("XML POST request should be parsed successfully");
+
+        // Should be a GetRecordsResponse
+        doc.Root.Should().NotBeNull();
+        doc.Root!.Name.Should().Be(Csw + "GetRecordsResponse");
+
+        var searchResults = doc.Descendants(Csw + "SearchResults").FirstOrDefault();
+        searchResults.Should().NotBeNull();
+        searchResults!.Attribute("numberOfRecordsMatched")?.Value.Should().Be("5");
+    }
+
     private static (HttpContext context, IMetadataRegistry registry, TestCatalogService catalog) CreateTestContext(
         string requestType,
         Dictionary<string, StringValues>? additionalParams = null)
@@ -319,6 +360,42 @@ public sealed class CswTests
         }
 
         context.Request.Query = new QueryCollection(queryParams);
+
+        var metadata = new MetadataSnapshot(
+            new CatalogDefinition { Id = "test", Title = "Test Catalog", Description = "Test" },
+            Array.Empty<FolderDefinition>(),
+            Array.Empty<DataSourceDefinition>(),
+            Array.Empty<ServiceDefinition>(),
+            Array.Empty<LayerDefinition>(),
+            Array.Empty<RasterDatasetDefinition>(),
+            Array.Empty<StyleDefinition>(),
+            new ServerDefinition()
+        );
+
+        var metadataRegistry = new TestMetadataRegistry(metadata);
+        var catalog = new TestCatalogService();
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IMetadataRegistry>(metadataRegistry);
+        services.AddSingleton<ICatalogProjectionService>(catalog);
+        context.RequestServices = services.BuildServiceProvider();
+
+        return (context, metadataRegistry, catalog);
+    }
+
+    private static (HttpContext context, IMetadataRegistry registry, TestCatalogService catalog) CreateTestPostContext(
+        string xmlBody)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = "POST";
+        context.Request.Scheme = "http";
+        context.Request.Host = new HostString("localhost");
+        context.Request.PathBase = "";
+        context.Request.ContentType = "application/xml";
+
+        // Write XML to request body
+        var bodyBytes = System.Text.Encoding.UTF8.GetBytes(xmlBody);
+        context.Request.Body = new System.IO.MemoryStream(bodyBytes);
 
         var metadata = new MetadataSnapshot(
             new CatalogDefinition { Id = "test", Title = "Test Catalog", Description = "Test" },
