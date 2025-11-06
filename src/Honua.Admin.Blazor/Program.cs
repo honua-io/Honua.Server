@@ -75,6 +75,7 @@ builder.Services.AddScoped<AuditLogApiClient>();
 builder.Services.AddScoped<CacheApiClient>();
 builder.Services.AddScoped<UserApiClient>();
 builder.Services.AddScoped<CorsApiClient>();
+builder.Services.AddScoped<RbacApiClient>();
 builder.Services.AddScoped<FeatureFlagService>();
 
 // Register SignalR hub service for real-time updates

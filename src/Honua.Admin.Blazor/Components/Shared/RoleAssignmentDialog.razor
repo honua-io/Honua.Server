@@ -1,5 +1,8 @@
 @using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
 @using MudBlazor
+@inject RbacApiClient RbacApi
+@inject ISnackbar Snackbar
 
 <MudDialog>
     <DialogContent>
@@ -12,29 +15,58 @@
                 Users can have multiple roles. Each role grants specific permissions.
             </MudAlert>
 
-            @foreach (var role in RoleOptions.AvailableRoles)
+            @if (_loading)
             {
-                <MudPaper Elevation="1" Class="pa-3">
-                    <MudStack Row="true" AlignItems="AlignItems.Center">
-                        <MudCheckBox @bind-Value="@_roleSelections[role.Name]"
-                                     Color="Color.Primary" />
-                        <MudStack Row="false" Spacing="1" Style="flex: 1">
-                            <MudText Typo="Typo.body1"><b>@role.DisplayName</b></MudText>
-                            <MudText Typo="Typo.body2">@role.Description</MudText>
-                            <MudStack Row="true" Spacing="1">
-                                <MudText Typo="Typo.caption">Permissions:</MudText>
-                                @foreach (var permission in role.Permissions)
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_availableRoles.Any())
+            {
+                @foreach (var role in _availableRoles)
+                {
+                    <MudPaper Elevation="1" Class="pa-3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <MudCheckBox @bind-Value="@_roleSelections[role.Id]"
+                                         Color="Color.Primary" />
+                            <MudStack Row="false" Spacing="1" Style="flex: 1">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText Typo="Typo.body1"><b>@role.DisplayName</b></MudText>
+                                    @if (role.IsSystem)
+                                    {
+                                        <MudChip Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Lock">System</MudChip>
+                                    }
+                                </MudStack>
+                                @if (!string.IsNullOrEmpty(role.Description))
                                 {
-                                    <MudChip Size="Size.Small" Variant="Variant.Text">@permission</MudChip>
+                                    <MudText Typo="Typo.body2">@role.Description</MudText>
                                 }
+                                <MudStack Row="true" Spacing="1" Style="flex-wrap: wrap;">
+                                    <MudText Typo="Typo.caption">Permissions:</MudText>
+                                    @if (role.Permissions.Count > 3)
+                                    {
+                                        <MudChip Size="Size.Small" Variant="Variant.Text">@role.Permissions.Count permissions</MudChip>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var permission in role.Permissions)
+                                        {
+                                            <MudChip Size="Size.Small" Variant="Variant.Text">@permission</MudChip>
+                                        }
+                                    }
+                                </MudStack>
                             </MudStack>
+                            <MudIcon Icon="@GetRoleIcon(role.Name)" Color="@GetRoleColor(role.Name)" />
                         </MudStack>
-                        <MudIcon Icon="@GetRoleIcon(role.Name)" Color="@GetRoleColor(role.Name)" />
-                    </MudStack>
-                </MudPaper>
+                    </MudPaper>
+                }
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning">
+                    No roles available. Please create roles first.
+                </MudAlert>
             }
 
-            @if (_roleSelections.Values.All(v => !v))
+            @if (!_loading && _roleSelections.Values.All(v => !v))
             {
                 <MudAlert Severity="Severity.Warning">
                     Warning: User will have no roles assigned. They will not be able to access any resources.
@@ -46,7 +78,8 @@
         <MudButton OnClick="Cancel">Cancel</MudButton>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
-                   OnClick="Submit">
+                   OnClick="Submit"
+                   Disabled="_loading">
             Update Roles
         </MudButton>
     </DialogActions>
@@ -59,22 +92,43 @@
     [Parameter]
     public UserResponse? User { get; set; }
 
+    private bool _loading = true;
+    private List<RoleDefinition> _availableRoles = new();
     private Dictionary<string, bool> _roleSelections = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        // Initialize role selections
-        foreach (var role in RoleOptions.AvailableRoles)
+        await LoadRolesAsync();
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try
         {
-            _roleSelections[role.Name] = User?.Roles.Contains(role.Name, StringComparer.OrdinalIgnoreCase) == true;
+            var response = await RbacApi.ListRolesAsync();
+            _availableRoles = response?.Roles ?? new List<RoleDefinition>();
+
+            // Initialize role selections
+            foreach (var role in _availableRoles)
+            {
+                _roleSelections[role.Id] = User?.Roles.Contains(role.Name, StringComparer.OrdinalIgnoreCase) == true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading roles: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 
     private void Submit()
     {
-        var selectedRoles = _roleSelections
-            .Where(kvp => kvp.Value)
-            .Select(kvp => kvp.Key)
+        var selectedRoles = _availableRoles
+            .Where(r => _roleSelections.GetValueOrDefault(r.Id, false))
+            .Select(r => r.Name)
             .ToList();
 
         MudDialog.Close(DialogResult.Ok(selectedRoles));
