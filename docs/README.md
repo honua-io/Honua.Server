@@ -1,6 +1,6 @@
 # Honua Documentation
 
-**Last Updated**: 2025-10-17
+**Last Updated**: 2025-11-06
 **Status**: ✅ Comprehensive & Current
 
 Complete documentation for Honua - a cloud-native geospatial server built on .NET 9.
@@ -247,17 +247,11 @@ Each document includes:
 - **Configuration Snippets**: 150+
 - **Operational Procedures**: 8 detailed runbooks
 
-## Archive
-
-Previous documentation (2025-10-15 and earlier) archived at: [archive/](archive/)
-
 ## Maintenance
 
 Documentation is kept current with the codebase:
-- **Last Full Rebuild**: 2025-10-15
-- **Process Framework Addition**: 2025-10-17
+- **Last Documentation Cleanup**: 2025-11-06
 - **Update Policy**: Update when features change
-- **Version Control**: Timestamped archives
 - **Quality Assurance**: All examples tested
 
 ## Contributing
