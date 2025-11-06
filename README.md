@@ -21,7 +21,7 @@ A cloud-native geospatial server built on .NET 9, implementing OGC standards and
 
 Honua provides a complete OGC-compliant geospatial server with:
 
-- **Standards Implementation**: OGC API Features/Tiles/Records, WFS 2.0/3.0, WMS 1.3, WCS 2.0, STAC 1.0, Geoservices REST a.k.a. Esri REST API
+- **Standards Implementation**: OGC API Features/Tiles/Records, WFS 2.0/3.0, WMS 1.3, WCS 2.0, STAC 1.0, Geoservices REST (Esri), Carto SQL API
 - **Data Providers**: PostgreSQL/PostGIS, MySQL, SQLite, SQL Server, Oracle, Snowflake, BigQuery, Redshift, MongoDB, Cosmos DB
 - **Cloud-Native Architecture**: Docker, Kubernetes, multi-cloud deployment, OpenTelemetry observability
 - **High Performance**: Built on .NET 9 with NetTopologySuite for geometry operations
@@ -354,7 +354,7 @@ See [deployment documentation](docs/DEPLOYMENT.md) for production configurations
 ├───────────────────────────────────────────────────────────┤
 │  • OGC API Features/Tiles/Records                         │
 │  • WFS/WMS/WCS                                            │
-│  • STAC · Geoservices REST · OData · GraphQL              │
+│  • STAC · Geoservices REST · Carto SQL · OData · GraphQL  │
 │  • GeoEvent API (Geofencing & Alerts)                     │
 │  • Admin API (Map Configs, Users, Settings)               │
 └────────────────────────────┬──────────────────────────────┘
@@ -407,6 +407,7 @@ See [deployment documentation](docs/DEPLOYMENT.md) for production configurations
 | WCS | 2.0.1 | GetCoverage with subsetting, CRS transform |
 | STAC | 1.0 | Collections, items, search API |
 | OpenRosa | 1.0 | ODK/KoboToolbox form compatibility |
+| Carto SQL API | v3 | Dataset discovery, SQL queries (SELECT, WHERE, GROUP BY, aggregates) |
 
 ### Data Providers
 
