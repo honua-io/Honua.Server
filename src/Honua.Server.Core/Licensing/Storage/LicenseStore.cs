@@ -213,6 +213,26 @@ public sealed class LicenseStore : ILicenseStore
         return rows.Select(r => r.ToLicenseInfo()).ToArray();
     }
 
+    public async Task<LicenseInfo?> GetFirstActiveLicenseAsync(CancellationToken cancellationToken = default)
+    {
+        using var connection = await CreateConnectionAsync(cancellationToken);
+
+        const string sql = @"
+            SELECT id, customer_id, license_key, tier, status, issued_at, expires_at,
+                   features, revoked_at, email, metadata
+            FROM licenses
+            WHERE status = 'Active'
+              AND revoked_at IS NULL
+              AND expires_at > @Now
+            ORDER BY tier DESC, expires_at DESC
+            LIMIT 1";
+
+        var row = await connection.QueryFirstOrDefaultAsync<LicenseRow>(
+            new CommandDefinition(sql, new { Now = DateTimeOffset.UtcNow }, cancellationToken: cancellationToken));
+
+        return row?.ToLicenseInfo();
+    }
+
     private async Task<IDbConnection> CreateConnectionAsync(CancellationToken cancellationToken)
     {
         var opts = _options.CurrentValue;

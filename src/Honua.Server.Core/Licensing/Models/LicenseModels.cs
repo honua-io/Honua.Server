@@ -76,6 +76,20 @@ public sealed class LicenseFeatures
     /// <summary>Maximum storage in GB (0 = unlimited)</summary>
     public int MaxStorageGb { get; set; }
 
+    // Enterprise-only features
+
+    /// <summary>Whether GeoETL workflow engine is enabled</summary>
+    public bool GeoEtl { get; set; }
+
+    /// <summary>Whether versioning and branching features are enabled</summary>
+    public bool Versioning { get; set; }
+
+    /// <summary>Whether Oracle database support is enabled</summary>
+    public bool OracleSupport { get; set; }
+
+    /// <summary>Whether Elasticsearch support is enabled</summary>
+    public bool ElasticsearchSupport { get; set; }
+
     /// <summary>
     /// Gets default features for a specific tier.
     /// </summary>
@@ -94,7 +108,12 @@ public sealed class LicenseFeatures
                 VectorTiles = true,
                 PrioritySupport = false,
                 MaxApiRequestsPerDay = 10000,
-                MaxStorageGb = 5
+                MaxStorageGb = 5,
+                // No enterprise features
+                GeoEtl = false,
+                Versioning = false,
+                OracleSupport = false,
+                ElasticsearchSupport = false
             },
             LicenseTier.Professional => new LicenseFeatures
             {
@@ -107,7 +126,12 @@ public sealed class LicenseFeatures
                 VectorTiles = true,
                 PrioritySupport = false,
                 MaxApiRequestsPerDay = 100000,
-                MaxStorageGb = 100
+                MaxStorageGb = 100,
+                // No enterprise features in Professional
+                GeoEtl = false,
+                Versioning = false,
+                OracleSupport = false,
+                ElasticsearchSupport = false
             },
             LicenseTier.Enterprise => new LicenseFeatures
             {
@@ -120,7 +144,12 @@ public sealed class LicenseFeatures
                 VectorTiles = true,
                 PrioritySupport = true,
                 MaxApiRequestsPerDay = 0, // unlimited
-                MaxStorageGb = 0 // unlimited
+                MaxStorageGb = 0, // unlimited
+                // All enterprise features enabled
+                GeoEtl = true,
+                Versioning = true,
+                OracleSupport = true,
+                ElasticsearchSupport = true
             },
             _ => new LicenseFeatures()
         };
