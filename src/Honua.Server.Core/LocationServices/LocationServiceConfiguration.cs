@@ -34,6 +34,16 @@ public class LocationServiceConfiguration
     public AzureMapsConfiguration? AzureMaps { get; set; }
 
     /// <summary>
+    /// Google Maps configuration
+    /// </summary>
+    public GoogleMapsConfiguration? GoogleMaps { get; set; }
+
+    /// <summary>
+    /// AWS Location Service configuration
+    /// </summary>
+    public AwsLocationConfiguration? AwsLocation { get; set; }
+
+    /// <summary>
     /// Nominatim configuration
     /// </summary>
     public NominatimConfiguration? Nominatim { get; set; }
@@ -63,6 +73,27 @@ public class AzureMapsConfiguration
     /// Optional custom base URL (for sovereign clouds)
     /// </summary>
     public string BaseUrl { get; set; } = "https://atlas.microsoft.com";
+}
+
+/// <summary>
+/// Google Maps provider configuration
+/// </summary>
+public class GoogleMapsConfiguration
+{
+    /// <summary>
+    /// Google Maps API Key
+    /// </summary>
+    public required string ApiKey { get; set; }
+
+    /// <summary>
+    /// Optional client ID for Google Maps Premium Plan
+    /// </summary>
+    public string? ClientId { get; set; }
+
+    /// <summary>
+    /// Optional client signature for Google Maps Premium Plan
+    /// </summary>
+    public string? ClientSignature { get; set; }
 }
 
 /// <summary>
@@ -110,4 +141,40 @@ public class OsmTilesConfiguration
     /// Optional custom tile server URLs
     /// </summary>
     public Dictionary<string, string>? CustomTileUrls { get; set; }
+}
+
+/// <summary>
+/// AWS Location Service configuration
+/// </summary>
+public class AwsLocationConfiguration
+{
+    /// <summary>
+    /// AWS Access Key ID
+    /// </summary>
+    public required string AccessKeyId { get; set; }
+
+    /// <summary>
+    /// AWS Secret Access Key
+    /// </summary>
+    public required string SecretAccessKey { get; set; }
+
+    /// <summary>
+    /// AWS Region (e.g., "us-east-1", "eu-west-1")
+    /// </summary>
+    public required string Region { get; set; }
+
+    /// <summary>
+    /// Place Index Name for geocoding operations
+    /// </summary>
+    public required string PlaceIndexName { get; set; }
+
+    /// <summary>
+    /// Route Calculator Name for routing operations
+    /// </summary>
+    public required string RouteCalculatorName { get; set; }
+
+    /// <summary>
+    /// Map Name for basemap tile operations
+    /// </summary>
+    public required string MapName { get; set; }
 }

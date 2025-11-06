@@ -2,7 +2,9 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using System;
+using Honua.Server.Core.LocationServices.Providers.AwsLocation;
 using Honua.Server.Core.LocationServices.Providers.AzureMaps;
+using Honua.Server.Core.LocationServices.Providers.GoogleMaps;
 using Honua.Server.Core.LocationServices.Providers.OpenStreetMap;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,6 +62,42 @@ public static class LocationServiceExtensions
             });
         }
 
+        // Google Maps Geocoding
+        if (config.GoogleMaps?.ApiKey != null)
+        {
+            services.AddKeyedSingleton<IGeocodingProvider>("google-maps", (sp, key) =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var logger = sp.GetRequiredService<ILogger<GoogleMapsGeocodingProvider>>();
+                return new GoogleMapsGeocodingProvider(
+                    httpClient,
+                    config.GoogleMaps.ApiKey,
+                    logger,
+                    config.GoogleMaps.ClientId,
+                    config.GoogleMaps.ClientSignature);
+            });
+        }
+
+        // AWS Location Service Geocoding
+        if (config.AwsLocation?.AccessKeyId != null &&
+            config.AwsLocation?.SecretAccessKey != null &&
+            config.AwsLocation?.Region != null &&
+            config.AwsLocation?.PlaceIndexName != null)
+        {
+            services.AddKeyedSingleton<IGeocodingProvider>("aws-location", (sp, key) =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var logger = sp.GetRequiredService<ILogger<AwsLocationGeocodingProvider>>();
+                return new AwsLocationGeocodingProvider(
+                    httpClient,
+                    config.AwsLocation.AccessKeyId,
+                    config.AwsLocation.SecretAccessKey,
+                    config.AwsLocation.Region,
+                    config.AwsLocation.PlaceIndexName,
+                    logger);
+            });
+        }
+
         // Nominatim Geocoding (OpenStreetMap)
         services.AddKeyedSingleton<IGeocodingProvider>("nominatim", (sp, key) =>
         {
@@ -98,6 +136,42 @@ public static class LocationServiceExtensions
             });
         }
 
+        // Google Maps Routing
+        if (config.GoogleMaps?.ApiKey != null)
+        {
+            services.AddKeyedSingleton<IRoutingProvider>("google-maps", (sp, key) =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var logger = sp.GetRequiredService<ILogger<GoogleMapsRoutingProvider>>();
+                return new GoogleMapsRoutingProvider(
+                    httpClient,
+                    config.GoogleMaps.ApiKey,
+                    logger,
+                    config.GoogleMaps.ClientId,
+                    config.GoogleMaps.ClientSignature);
+            });
+        }
+
+        // AWS Location Service Routing
+        if (config.AwsLocation?.AccessKeyId != null &&
+            config.AwsLocation?.SecretAccessKey != null &&
+            config.AwsLocation?.Region != null &&
+            config.AwsLocation?.RouteCalculatorName != null)
+        {
+            services.AddKeyedSingleton<IRoutingProvider>("aws-location", (sp, key) =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var logger = sp.GetRequiredService<ILogger<AwsLocationRoutingProvider>>();
+                return new AwsLocationRoutingProvider(
+                    httpClient,
+                    config.AwsLocation.AccessKeyId,
+                    config.AwsLocation.SecretAccessKey,
+                    config.AwsLocation.Region,
+                    config.AwsLocation.RouteCalculatorName,
+                    logger);
+            });
+        }
+
         // OSRM Routing
         services.AddKeyedSingleton<IRoutingProvider>("osrm", (sp, key) =>
         {
@@ -131,6 +205,42 @@ public static class LocationServiceExtensions
                 return new AzureMapsBasemapTileProvider(
                     httpClient,
                     config.AzureMaps.SubscriptionKey,
+                    logger);
+            });
+        }
+
+        // Google Maps Basemap
+        if (config.GoogleMaps?.ApiKey != null)
+        {
+            services.AddKeyedSingleton<IBasemapTileProvider>("google-maps", (sp, key) =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var logger = sp.GetRequiredService<ILogger<GoogleMapsBasemapTileProvider>>();
+                return new GoogleMapsBasemapTileProvider(
+                    httpClient,
+                    config.GoogleMaps.ApiKey,
+                    logger,
+                    config.GoogleMaps.ClientId,
+                    config.GoogleMaps.ClientSignature);
+            });
+        }
+
+        // AWS Location Service Basemap
+        if (config.AwsLocation?.AccessKeyId != null &&
+            config.AwsLocation?.SecretAccessKey != null &&
+            config.AwsLocation?.Region != null &&
+            config.AwsLocation?.MapName != null)
+        {
+            services.AddKeyedSingleton<IBasemapTileProvider>("aws-location", (sp, key) =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient();
+                var logger = sp.GetRequiredService<ILogger<AwsLocationBasemapTileProvider>>();
+                return new AwsLocationBasemapTileProvider(
+                    httpClient,
+                    config.AwsLocation.AccessKeyId,
+                    config.AwsLocation.SecretAccessKey,
+                    config.AwsLocation.Region,
+                    config.AwsLocation.MapName,
                     logger);
             });
         }
