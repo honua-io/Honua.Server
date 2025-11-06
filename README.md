@@ -149,6 +149,34 @@ See [Intake Documentation](src/Honua.Server.Intake/README.md) for details.
 - **Analytics Dashboard**: View usage metrics and performance
 - **Built with Blazor**: Server-side rendering with MudBlazor UI
 
+### ⚙️ Cloud-Native Geoprocessing
+
+**Distributed spatial analysis engine** - Enterprise-grade geoprocessing with auto-scaling workers.
+
+- **3-Tier Architecture**: In-process (NTS), database (PostGIS), cloud batch (AWS/Azure/GCP)
+- **40+ Operations**: Buffer, intersection, union, dissolve, simplify, spatial joins, heatmaps, clustering
+- **Vector & Raster**: Both vector operations and raster analysis (hillshade, slope, zonal stats)
+- **Distributed Processing**: Horizontal scaling with auto-scaling workers
+- **Job Queue**: Priority-based queue with progress tracking
+- **Webhook Notifications**: Callback on job completion
+- **OGC Processes API**: Standards-compliant REST API
+- **Result Formats**: GeoJSON, Shapefile, GeoPackage
+
+**Supported Operations:**
+- **Vector**: Buffer, Intersection, Union, Difference, Dissolve, Clip, Centroid, Convex Hull, Simplify
+- **Analysis**: Area, Length, Distance, Nearest Feature, Spatial Relationships
+- **Raster**: Mosaic, Hillshade, Slope, Aspect, Zonal Statistics
+- **Advanced**: Voronoi diagrams, Delaunay triangulation, Density analysis, Clustering
+
+**Use Cases:**
+- Large-scale buffer analysis (thousands of features)
+- Overlay analysis (intersecting multiple layers)
+- Terrain analysis from elevation data
+- Batch geocoding and spatial joins
+- Automated report generation
+
+Available in **Professional** and **Enterprise** tiers.
+
 ---
 
 ## Docker Deployment
@@ -467,6 +495,15 @@ Tiles: MVT (Mapbox Vector Tiles), PBF
 - License-based access control
 - Efficient registry-to-registry image copying
 - Short-lived token generation
+
+**Cloud-Native Geoprocessing:**
+- Distributed spatial analysis with 40+ operations
+- 3-tier architecture (NTS, PostGIS, Cloud Batch)
+- Auto-scaling worker pools
+- Vector and raster processing
+- OGC Processes API compliance
+- Priority job queue with progress tracking
+- Webhook notifications on completion
 
 ### Authentication & Security
 
