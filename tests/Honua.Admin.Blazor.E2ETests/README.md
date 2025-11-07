@@ -4,16 +4,28 @@ End-to-end (E2E) integration tests for the Honua Admin Blazor application using 
 
 ## Overview
 
-This test project provides comprehensive E2E testing for the Blazor Admin UI, including:
+This test project provides **complete E2E testing coverage** for the Blazor Admin UI with **185+ comprehensive tests**, including:
 
-- **Authentication flows** - Login, logout, session management
+### Core Workflows
+- **Authentication flows** - Login, logout, session management, validation
 - **Complete workflows** - Full DataSource → Folder → Service → Layer journey
-- **Data Source management** - CRUD operations, connection testing, multiple providers
-- **Folder management** - Folder creation, hierarchy, organization
-- **Service CRUD operations** - Create, read, update, delete services
-- **Layer management** - Layer creation, geometry types, CRS configuration
+- **Data Source management** - CRUD operations, connection testing, multiple providers (PostGIS, SQL Server)
+- **Folder management** - Folder creation, hierarchy, organization, reordering
+- **Service CRUD operations** - Create, read, update, delete services with validation
+- **Layer management** - Layer creation, geometry types (Point, Polygon, LineString), CRS configuration
+
+### Advanced Features
+- **Alert Management** - Alert rules, configuration, notification channels, history
+- **Import Workflows** - Data import wizard, Esri service import, job monitoring
+- **Map Management** - Visual map builder, layer styling, map viewer, export functionality
+- **User & Access Management** - User CRUD, role management, permission configuration, RBAC
+- **Version Control** - Snapshots, version history, version diff, restore functionality
+- **Settings & Configuration** - Cache settings, CORS configuration, audit logs, licensing
+
+### Technical Features
 - **Navigation & UI** - Menu navigation, responsive design, keyboard accessibility
 - **Headless execution** - Runs in CI/CD pipelines without display
+- **Cross-browser support** - Chromium, Firefox, WebKit
 
 ## Technology Stack
 
@@ -95,8 +107,29 @@ dotnet test --filter "Category=LayerManagement"
 # Run navigation and UI tests
 dotnet test --filter "Category=Navigation"
 
+# Run alert management tests
+dotnet test --filter "Category=AlertManagement"
+
+# Run import workflow tests
+dotnet test --filter "Category=ImportWorkflow"
+
+# Run map management tests
+dotnet test --filter "Category=MapManagement"
+
+# Run user access management tests
+dotnet test --filter "Category=UserManagement"
+
+# Run version control tests
+dotnet test --filter "Category=VersionControl"
+
+# Run settings and configuration tests
+dotnet test --filter "Category=Settings"
+
 # Combine categories (OR)
 dotnet test --filter "Category=ServiceManagement|Category=LayerManagement"
+
+# Run all management tests
+dotnet test --filter "Category=DataSourceManagement|Category=FolderManagement|Category=LayerManagement|Category=ServiceManagement"
 ```
 
 ### Run with Custom Configuration
@@ -265,27 +298,203 @@ Tests for user interface and navigation:
 
 **Run**: `dotnet test --filter "Category=Navigation"`
 
+### Alert Management Tests (`AlertManagementTests.cs`)
+**Category**: `AlertManagement`
+
+Tests for alert rules, configuration, and history:
+- ✓ Navigate to alerts page
+- ✓ View alert configuration with statistics
+- ✓ View alert rules table with all columns
+- ✓ Create alert rule with basic fields (name, severity, expression, duration)
+- ✓ Create alert rule with labels and annotations
+- ✓ Validate alert rule required fields
+- ✓ Edit existing alert rule
+- ✓ Delete alert rule
+- ✓ Test alert rule (send test alert)
+- ✓ View notification channels tab
+- ✓ Navigate to alert history page
+- ✓ View alert history filter panel
+- ✓ Filter alerts by severity
+- ✓ Search alert history
+- ✓ Clear alert filters
+- ✓ View alert history table with all columns
+
+**Run**: `dotnet test --filter "Category=AlertManagement"`
+
+### Import Workflow Tests (`ImportWorkflowTests.cs`)
+**Category**: `ImportWorkflow`
+
+Tests for data and service import wizards:
+- ✓ Navigate to data import wizard
+- ✓ Display file upload area
+- ✓ Cancel import wizard
+- ✓ Show configuration options
+- ✓ Validate required fields
+- ✓ Back button navigation in wizard
+- ✓ Display supported file formats
+- ✓ Navigate to Esri import wizard
+- ✓ Enter Esri service URL
+- ✓ Validate Esri service URL
+- ✓ Show example URLs
+- ✓ Display layer selection controls
+- ✓ Show configuration settings
+- ✓ Display review step summary
+- ✓ Navigate to import jobs list
+- ✓ Display filter controls
+- ✓ Filter jobs by status (pending, running, completed, failed)
+- ✓ Search import jobs
+- ✓ Clear job filters
+- ✓ Refresh job list
+- ✓ Expand job details
+- ✓ Export jobs to CSV
+- ✓ New import button navigation
+- ✓ Display empty state
+
+**Run**: `dotnet test --filter "Category=ImportWorkflow"`
+
+### Map Management Tests (`MapManagementTests.cs`)
+**Category**: `MapManagement`
+
+Tests for visual map builder and viewer:
+- ✓ Navigate to maps list
+- ✓ Create new map with basic settings
+- ✓ Configure map title and description
+- ✓ Save map configuration
+- ✓ Update existing map
+- ✓ Delete map
+- ✓ Open map editor
+- ✓ Configure map settings (center, zoom, bounds)
+- ✓ Configure map projection (Mercator/Globe)
+- ✓ Configure MapLibre style URL
+- ✓ Add layers to map
+- ✓ Remove layers from map
+- ✓ Configure layer visibility
+- ✓ Configure layer opacity
+- ✓ Add map controls
+- ✓ Clone/duplicate map
+- ✓ View map in viewer
+- ✓ Search and filter maps
+- ✓ Export map dialog
+- ✓ Export to multiple formats (JSON, YAML, HTML, Blazor)
+
+**Run**: `dotnet test --filter "Category=MapManagement"`
+
+### User Access Management Tests (`UserAccessManagementTests.cs`)
+**Category**: `UserManagement`, `AccessControl`
+
+Tests for user management and RBAC:
+- ✓ Navigate to user management
+- ✓ Create user with valid data
+- ✓ Create user with all details (username, email, display name, password, status)
+- ✓ Set user password with confirmation
+- ✓ Edit existing user
+- ✓ Delete user
+- ✓ Deactivate and activate user
+- ✓ Assign roles to user
+- ✓ Remove roles from user
+- ✓ Search users
+- ✓ Filter users by role
+- ✓ Validate duplicate username prevention
+- ✓ Navigate to role management
+- ✓ Create custom role
+- ✓ Edit role
+- ✓ Delete custom role
+- ✓ Validate duplicate role prevention
+- ✓ Navigate to permission management
+- ✓ Assign permissions to role
+- ✓ Remove permissions from role
+
+**Run**: `dotnet test --filter "Category=UserManagement"`
+
+### Version Control Tests (`VersionControlTests.cs`)
+**Category**: `VersionControl`, `Snapshots`
+
+Tests for version history and snapshots:
+- ✓ Navigate to version history page
+- ✓ Create snapshot with label and notes
+- ✓ View snapshot list with metadata
+- ✓ View snapshot details
+- ✓ Compare snapshots (navigate to diff)
+- ✓ View version diff with changes
+- ✓ View version diff with no changes
+- ✓ Restore from snapshot
+- ✓ Refresh snapshot list
+- ✓ Validate snapshot metadata display
+- ✓ Order snapshots by newest first
+- ✓ Capture service in snapshot metadata
+- ✓ Navigate back from version diff
+- ✓ Create snapshot without notes
+- ✓ Display empty state with no snapshots
+
+**Run**: `dotnet test --filter "Category=VersionControl"`
+
+### Settings Configuration Tests (`SettingsConfigurationTests.cs`)
+**Category**: `Settings`
+
+Tests for cache, CORS, audit, and licensing settings:
+
+**Cache Settings:**
+- ✓ Navigate to cache settings
+- ✓ View cache statistics
+- ✓ Reset cache statistics
+- ✓ View preseed jobs tab
+- ✓ Create preseed job
+
+**CORS Settings:**
+- ✓ Navigate to CORS settings
+- ✓ Toggle CORS enabled/disabled
+- ✓ Add allowed origin
+- ✓ Remove allowed origin
+- ✓ Toggle HTTP methods
+- ✓ Add custom headers
+- ✓ Test CORS configuration
+- ✓ Save CORS configuration
+
+**Audit Log:**
+- ✓ Navigate to audit log viewer
+- ✓ Expand filter panel
+- ✓ Filter by search text
+- ✓ Filter by category
+- ✓ Filter by date range
+- ✓ Clear all filters
+- ✓ View event details
+
+**Licensing:**
+- ✓ Navigate to licensing page
+- ✓ Display current tier
+- ✓ Display available features
+- ✓ Display quotas and limits
+- ✓ Display enterprise features
+
+**Run**: `dotnet test --filter "Category=Settings"`
+
 ## Test Structure
 
 ```
 Honua.Admin.Blazor.E2ETests/
 ├── Infrastructure/
-│   ├── BaseE2ETest.cs                # Base class for all E2E tests
-│   └── TestConfiguration.cs          # Centralized test configuration
+│   ├── BaseE2ETest.cs                   # Base class for all E2E tests
+│   └── TestConfiguration.cs             # Centralized test configuration
 ├── Tests/
-│   ├── AuthenticationTests.cs        # Login/logout tests (6 tests)
-│   ├── CompleteWorkflowTests.cs      # Full workflow tests (4 tests)
-│   ├── ServiceCrudTests.cs           # Service management tests (7 tests)
-│   ├── DataSourceManagementTests.cs  # Data source tests (13 tests)
-│   ├── FolderManagementTests.cs      # Folder organization tests (10 tests)
-│   ├── LayerManagementTests.cs       # Layer configuration tests (11 tests)
-│   └── NavigationAndUITests.cs       # Navigation and UI tests (15 tests)
-├── playwright.runsettings            # Playwright configuration
-├── GlobalUsings.cs                   # Global using statements
-├── .gitignore                        # Excludes test artifacts
-└── README.md                         # This file
+│   ├── AuthenticationTests.cs           # Login/logout tests (6 tests)
+│   ├── CompleteWorkflowTests.cs         # Full workflow tests (4 tests)
+│   ├── ServiceCrudTests.cs              # Service management tests (7 tests)
+│   ├── DataSourceManagementTests.cs     # Data source tests (13 tests)
+│   ├── FolderManagementTests.cs         # Folder organization tests (10 tests)
+│   ├── LayerManagementTests.cs          # Layer configuration tests (11 tests)
+│   ├── NavigationAndUITests.cs          # Navigation and UI tests (15 tests)
+│   ├── AlertManagementTests.cs          # Alert rules and history tests (16 tests)
+│   ├── ImportWorkflowTests.cs           # Import wizards and jobs tests (24 tests)
+│   ├── MapManagementTests.cs            # Map editor and viewer tests (19 tests)
+│   ├── UserAccessManagementTests.cs     # User/role/permission tests (20 tests)
+│   ├── VersionControlTests.cs           # Snapshots and version diff tests (15 tests)
+│   └── SettingsConfigurationTests.cs    # Cache/CORS/Audit/License tests (25 tests)
+├── playwright.runsettings               # Playwright configuration
+├── GlobalUsings.cs                      # Global using statements
+├── .gitignore                           # Excludes test artifacts
+└── README.md                            # This file
 
-Total: 66+ E2E tests covering the complete Admin UI
+Total: 185+ comprehensive E2E tests covering ALL Admin UI pages and workflows
 ```
 
 ## Writing New Tests
