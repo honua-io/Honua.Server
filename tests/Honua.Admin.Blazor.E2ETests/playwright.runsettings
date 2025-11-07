@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <!-- Playwright Configuration -->
+  <Playwright>
+    <!-- Launch options for browsers -->
+    <LaunchOptions>
+      <!-- Run in headless mode by default (set to false for debugging) -->
+      <Headless>true</Headless>
+      <!-- Slow down operations for debugging (milliseconds) -->
+      <SlowMo>0</SlowMo>
+    </LaunchOptions>
+
+    <!-- Browser context options -->
+    <BrowserContextOptions>
+      <!-- Viewport size -->
+      <ViewportSize>
+        <Width>1920</Width>
+        <Height>1080</Height>
+      </ViewportSize>
+      <!-- Ignore HTTPS errors (useful for localhost testing) -->
+      <IgnoreHTTPSErrors>true</IgnoreHTTPSErrors>
+    </BrowserContextOptions>
+
+    <!-- Browser type (Chromium, Firefox, or WebKit) -->
+    <BrowserName>chromium</BrowserName>
+
+    <!-- Record video for failed tests -->
+    <RecordVideo>
+      <Mode>retain-on-failure</Mode>
+      <Dir>test-results/videos</Dir>
+    </RecordVideo>
+
+    <!-- Record trace for debugging -->
+    <RecordTrace>
+      <Mode>retain-on-failure</Mode>
+      <SnapshotsDir>test-results/traces</SnapshotsDir>
+    </RecordTrace>
+  </Playwright>
+
+  <!-- Test run configuration -->
+  <RunConfiguration>
+    <!-- Maximum number of parallel workers -->
+    <MaxCpuCount>4</MaxCpuCount>
+    <!-- Results directory -->
+    <ResultsDirectory>./test-results</ResultsDirectory>
+  </RunConfiguration>
+
+  <!-- Test timeout settings -->
+  <NUnit>
+    <DefaultTimeout>30000</DefaultTimeout>
+  </NUnit>
+</RunSettings>
