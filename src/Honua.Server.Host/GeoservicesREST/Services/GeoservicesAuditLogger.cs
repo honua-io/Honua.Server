@@ -33,6 +33,10 @@ public sealed class GeoservicesAuditLogger : IGeoservicesAuditLogger
         ClaimsPrincipal user,
         string? ipAddress)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(layerId);
+        ArgumentNullException.ThrowIfNull(user);
+
         var userId = ExtractUserId(user);
         var userName = ExtractUserName(user);
 
@@ -56,6 +60,11 @@ public sealed class GeoservicesAuditLogger : IGeoservicesAuditLogger
         ClaimsPrincipal user,
         string? ipAddress)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(layerId);
+        ArgumentNullException.ThrowIfNull(featureIds);
+        ArgumentNullException.ThrowIfNull(user);
+
         var userId = ExtractUserId(user);
         var userName = ExtractUserName(user);
         var featureIdList = featureIds.ToList();

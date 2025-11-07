@@ -359,7 +359,7 @@ public sealed class MigrationRunner
     public async Task<string?> GetCurrentVersionAsync(CancellationToken cancellationToken = default)
     {
         var applied = await GetAppliedMigrationsAsync(cancellationToken);
-        return applied.OrderByDescending(m => m.Version).FirstOrDefault()?.Version;
+        return applied.MaxBy(m => m.Version)?.Version;
     }
 
     private async Task<bool> CheckMigrationsTableExistsAsync(
