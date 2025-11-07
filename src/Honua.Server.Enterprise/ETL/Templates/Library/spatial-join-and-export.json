@@ -1,0 +1,124 @@
+{
+  "id": "spatial-join-and-export",
+  "name": "Spatial Join and Export",
+  "description": "Join attributes from one layer to another based on spatial relationship, then export results. Complete spatial join workflow.",
+  "category": "Overlay Operations",
+  "icon": "link",
+  "difficulty": 1,
+  "estimatedMinutes": 5,
+  "tags": ["spatial-join", "attributes", "export", "analysis"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "Target features",
+    "Source features with attributes to join"
+  ],
+  "expectedOutputs": [
+    "GeoPackage with joined attributes"
+  ],
+  "useCases": [
+    "Adding demographic data to service areas",
+    "Enriching points with polygon attributes",
+    "Combining spatial and attribute information"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Target Features",
+      "description": "Features receiving attributes",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "target_features",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 80
+      }
+    },
+    {
+      "id": "source_2",
+      "type": "postgis_source",
+      "name": "Load Join Features",
+      "description": "Features with attributes to join",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "join_features",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 180
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "spatial_join",
+      "name": "Spatial Join",
+      "description": "Join attributes spatially",
+      "parameters": {
+        "joinType": "intersects",
+        "aggregation": "first"
+      },
+      "position": {
+        "x": 350,
+        "y": 130
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "geopackage_sink",
+      "name": "Export Results",
+      "description": "Save joined data",
+      "parameters": {
+        "filePath": "/data/output/joined.gpkg",
+        "layerName": "spatial_join",
+        "overwrite": true
+      },
+      "position": {
+        "x": 550,
+        "y": 130
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1",
+      "toPort": "target"
+    },
+    {
+      "from": "source_2",
+      "to": "geo_1",
+      "toPort": "join"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "targetLayer": {
+      "name": "targetLayer",
+      "type": "string",
+      "description": "Target features table",
+      "defaultValue": "target_features",
+      "required": true
+    },
+    "joinLayer": {
+      "name": "joinLayer",
+      "type": "string",
+      "description": "Join features table",
+      "defaultValue": "join_features",
+      "required": true
+    },
+    "outputPath": {
+      "name": "outputPath",
+      "type": "string",
+      "description": "Output GeoPackage path",
+      "defaultValue": "/data/output/joined.gpkg",
+      "required": true
+    }
+  }
+}

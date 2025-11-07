@@ -1,0 +1,105 @@
+{
+  "id": "variable-buffer-by-attribute",
+  "name": "Variable Buffer by Attribute",
+  "description": "Create buffers with distances varying by feature attribute. Each feature gets its own buffer distance based on a field value.",
+  "category": "Buffer Operations",
+  "icon": "adjust",
+  "difficulty": 1,
+  "estimatedMinutes": 3,
+  "tags": ["buffer", "variable", "attribute"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "Features with numeric attribute for buffer distance"
+  ],
+  "expectedOutputs": [
+    "Variable-distance buffer polygons"
+  ],
+  "useCases": [
+    "Creating risk zones based on hazard levels",
+    "Modeling influence areas based on population",
+    "Variable protection zones by importance rating"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Features",
+      "description": "Read features with buffer attribute",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "facilities",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "buffer_by_attribute",
+      "name": "Variable Buffer",
+      "description": "Buffer using attribute values",
+      "parameters": {
+        "distanceField": "radius",
+        "units": "meters",
+        "quadrantSegments": 8
+      },
+      "position": {
+        "x": 300,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Results",
+      "description": "Store variable buffers",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "variable_buffers",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 500,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "Input feature table",
+      "defaultValue": "facilities",
+      "required": true
+    },
+    "distanceField": {
+      "name": "distanceField",
+      "type": "string",
+      "description": "Field containing buffer distances",
+      "defaultValue": "radius",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Output buffer table",
+      "defaultValue": "variable_buffers",
+      "required": true
+    }
+  }
+}

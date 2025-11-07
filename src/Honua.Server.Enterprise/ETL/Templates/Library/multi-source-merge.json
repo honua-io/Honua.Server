@@ -1,0 +1,183 @@
+{
+  "id": "multi-source-merge",
+  "name": "Multi-Source Data Merge",
+  "description": "Merge data from multiple sources (Shapefile, GeoPackage, PostGIS) into a unified dataset. Consolidate diverse data sources.",
+  "category": "Workflow Chains",
+  "icon": "merge",
+  "difficulty": 2,
+  "estimatedMinutes": 7,
+  "tags": ["merge", "multi-source", "integration", "consolidation"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "Multiple data sources (Shapefile, GeoPackage, PostGIS)"
+  ],
+  "expectedOutputs": [
+    "Unified PostGIS table",
+    "Merged GeoPackage export"
+  ],
+  "useCases": [
+    "Consolidating data from different departments",
+    "Creating master datasets from multiple sources",
+    "Data integration workflows"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "shapefile_source",
+      "name": "Load Shapefile Data",
+      "description": "First data source",
+      "parameters": {
+        "filePath": "/data/input/source1.shp",
+        "encoding": "UTF-8"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "source_2",
+      "type": "geopackage_source",
+      "name": "Load GeoPackage Data",
+      "description": "Second data source",
+      "parameters": {
+        "filePath": "/data/input/source2.gpkg",
+        "layerName": "features"
+      },
+      "position": {
+        "x": 100,
+        "y": 200
+      }
+    },
+    {
+      "id": "source_3",
+      "type": "postgis_source",
+      "name": "Load PostGIS Data",
+      "description": "Third data source",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "source3",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 300
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "merge",
+      "name": "Merge All Sources",
+      "description": "Combine all data",
+      "parameters": {
+        "attributeHandling": "union"
+      },
+      "position": {
+        "x": 350,
+        "y": 200
+      }
+    },
+    {
+      "id": "geo_2",
+      "type": "validate_geometry",
+      "name": "Validate Merged Data",
+      "description": "Ensure quality",
+      "parameters": {
+        "autoFix": true
+      },
+      "position": {
+        "x": 550,
+        "y": 200
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Unified Dataset",
+      "description": "Store in database",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "merged_dataset",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 750,
+        "y": 150
+      }
+    },
+    {
+      "id": "sink_2",
+      "type": "geopackage_sink",
+      "name": "Export Merged Data",
+      "description": "Portable backup",
+      "parameters": {
+        "filePath": "/data/output/merged.gpkg",
+        "layerName": "merged",
+        "overwrite": true
+      },
+      "position": {
+        "x": 750,
+        "y": 250
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "source_2",
+      "to": "geo_1"
+    },
+    {
+      "from": "source_3",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "geo_2"
+    },
+    {
+      "from": "geo_2",
+      "to": "sink_1"
+    },
+    {
+      "from": "geo_2",
+      "to": "sink_2"
+    }
+  ],
+  "parameters": {
+    "shapefilePath": {
+      "name": "shapefilePath",
+      "type": "string",
+      "description": "Shapefile source path",
+      "defaultValue": "/data/input/source1.shp",
+      "required": true
+    },
+    "geopackagePath": {
+      "name": "geopackagePath",
+      "type": "string",
+      "description": "GeoPackage source path",
+      "defaultValue": "/data/input/source2.gpkg",
+      "required": true
+    },
+    "postgisTable": {
+      "name": "postgisTable",
+      "type": "string",
+      "description": "PostGIS source table",
+      "defaultValue": "source3",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Merged dataset table name",
+      "defaultValue": "merged_dataset",
+      "required": true
+    }
+  }
+}

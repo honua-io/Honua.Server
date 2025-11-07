@@ -2,9 +2,11 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Enterprise.ETL.Models;
+using Honua.Server.Enterprise.ETL.Resilience;
 using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Enterprise.ETL.Nodes;
@@ -24,6 +26,11 @@ public abstract class WorkflowNodeBase : IWorkflowNode
     public abstract string NodeType { get; }
     public abstract string DisplayName { get; }
     public abstract string Description { get; }
+
+    /// <summary>
+    /// Override to provide custom retry policy for this node type
+    /// </summary>
+    protected virtual RetryPolicy GetRetryPolicy() => RetryPolicy.Default;
 
     public virtual Task<NodeValidationResult> ValidateAsync(
         WorkflowNode nodeDefinition,
@@ -56,7 +63,154 @@ public abstract class WorkflowNodeBase : IWorkflowNode
         });
     }
 
-    public abstract Task<NodeExecutionResult> ExecuteAsync(
+    /// <summary>
+    /// Execute with automatic retry logic
+    /// </summary>
+    public async Task<NodeExecutionResult> ExecuteAsync(
+        NodeExecutionContext context,
+        CancellationToken cancellationToken = default)
+    {
+        // Check if node has custom retry configuration
+        var retryPolicy = context.NodeDefinition.Execution?.MaxRetries.HasValue == true
+            ? new RetryPolicy { MaxAttempts = context.NodeDefinition.Execution.MaxRetries.Value }
+            : GetRetryPolicy();
+
+        // If no retries configured, execute directly
+        if (retryPolicy.MaxAttempts == 0)
+        {
+            return await ExecuteInternalAsync(context, cancellationToken);
+        }
+
+        // Execute with retry logic
+        return await ExecuteWithRetryAsync(context, retryPolicy, cancellationToken);
+    }
+
+    /// <summary>
+    /// Execute with retry logic
+    /// </summary>
+    private async Task<NodeExecutionResult> ExecuteWithRetryAsync(
+        NodeExecutionContext context,
+        RetryPolicy retryPolicy,
+        CancellationToken cancellationToken)
+    {
+        var attemptNumber = 0;
+        Exception? lastException = null;
+
+        while (attemptNumber <= retryPolicy.MaxAttempts)
+        {
+            try
+            {
+                if (attemptNumber > 0)
+                {
+                    Logger.LogInformation(
+                        "Retrying node {NodeId} ({NodeType}), attempt {Attempt}/{MaxAttempts}",
+                        context.NodeDefinition.Id,
+                        NodeType,
+                        attemptNumber,
+                        retryPolicy.MaxAttempts);
+                }
+
+                var result = await ExecuteInternalAsync(context, cancellationToken);
+
+                // Success!
+                if (result.Success)
+                {
+                    if (attemptNumber > 0)
+                    {
+                        Logger.LogInformation(
+                            "Node {NodeId} succeeded after {Attempts} retries",
+                            context.NodeDefinition.Id,
+                            attemptNumber);
+                    }
+                    return result;
+                }
+
+                // Failed - check if we should retry
+                lastException = new InvalidOperationException(result.ErrorMessage ?? "Node execution failed");
+                var errorCategory = ErrorCategorizer.CategorizeByMessage(result.ErrorMessage ?? "");
+
+                if (!retryPolicy.ShouldRetry(errorCategory, attemptNumber))
+                {
+                    Logger.LogWarning(
+                        "Node {NodeId} failed with non-retryable error category {Category}: {Error}",
+                        context.NodeDefinition.Id,
+                        errorCategory,
+                        result.ErrorMessage);
+                    return result;
+                }
+
+                attemptNumber++;
+
+                // Calculate delay before retry
+                if (attemptNumber <= retryPolicy.MaxAttempts)
+                {
+                    var delay = retryPolicy.GetDelay(attemptNumber);
+                    Logger.LogInformation(
+                        "Waiting {Delay}ms before retry attempt {Attempt}/{MaxAttempts}",
+                        delay.TotalMilliseconds,
+                        attemptNumber,
+                        retryPolicy.MaxAttempts);
+
+                    await Task.Delay(delay, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Don't retry cancellations
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                var errorCategory = ErrorCategorizer.Categorize(ex);
+
+                Logger.LogWarning(
+                    ex,
+                    "Node {NodeId} attempt {Attempt} failed with {Category} error",
+                    context.NodeDefinition.Id,
+                    attemptNumber,
+                    errorCategory);
+
+                // Check if we should retry this exception
+                if (!retryPolicy.ShouldRetry(errorCategory, attemptNumber))
+                {
+                    return NodeExecutionResult.Fail(
+                        ex.Message,
+                        ex.StackTrace);
+                }
+
+                attemptNumber++;
+
+                // Calculate delay before retry
+                if (attemptNumber <= retryPolicy.MaxAttempts)
+                {
+                    var delay = retryPolicy.GetDelay(attemptNumber);
+                    Logger.LogInformation(
+                        "Waiting {Delay}ms before retry attempt {Attempt}/{MaxAttempts}",
+                        delay.TotalMilliseconds,
+                        attemptNumber,
+                        retryPolicy.MaxAttempts);
+
+                    await Task.Delay(delay, cancellationToken);
+                }
+            }
+        }
+
+        // All retries exhausted
+        Logger.LogError(
+            lastException,
+            "Node {NodeId} failed after {Attempts} attempts",
+            context.NodeDefinition.Id,
+            attemptNumber);
+
+        return NodeExecutionResult.Fail(
+            lastException?.Message ?? "Unknown error after retries",
+            lastException?.StackTrace);
+    }
+
+    /// <summary>
+    /// Internal execution method to be implemented by derived classes
+    /// </summary>
+    protected abstract Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default);
 

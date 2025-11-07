@@ -86,6 +86,9 @@ builder.Services.AddScoped<FeatureFlagService>();
 // Register SignalR hub service for real-time updates
 builder.Services.AddScoped<MetadataHubService>();
 
+// Register GeoETL progress service for real-time workflow execution tracking
+builder.Services.AddScoped<Honua.Admin.Blazor.Services.GeoEtlProgressService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline

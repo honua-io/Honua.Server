@@ -3,6 +3,7 @@
 ﻿// using Honua.Server.Core.GitOps; // TODO: GitOps feature not yet implemented
 using Honua.Server.Core.Extensions;
 
+using Honua.Server.Enterprise.ETL;
 using Honua.Server.Enterprise.Events;
 using Honua.Server.Enterprise.Sensors.Extensions;
 using Honua.Server.Host.Extensions;
@@ -61,11 +62,22 @@ internal static class HonuaHostConfigurationExtensions
 
             // Register SignalR hub for real-time event streaming
             builder.Services.AddSingleton<IGeoEventBroadcaster, SignalRGeoEventBroadcaster>();
+
+            // Register GeoETL services (Enterprise feature)
+            builder.Services.AddGeoEtl(connectionString, usePostgresStore: true);
+
+            // Register AI-powered workflow generation (optional, requires OpenAI configuration)
+            builder.Services.AddGeoEtlAi(builder.Configuration);
+
+            // Register GeoETL progress broadcaster for real-time workflow execution tracking
+            builder.Services.AddSingleton<Honua.Server.Enterprise.ETL.Progress.IWorkflowProgressBroadcaster,
+                Honua.Server.Enterprise.ETL.Progress.SignalRWorkflowProgressBroadcaster>();
         }
         else
         {
             var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
             logger.LogWarning("GeoEvent services not registered - PostgreSQL connection string not configured");
+            logger.LogWarning("GeoETL services not registered - PostgreSQL connection string not configured");
         }
 
         // Health checks

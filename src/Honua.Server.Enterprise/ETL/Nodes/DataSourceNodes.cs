@@ -96,7 +96,7 @@ public class PostGisDataSourceNode : WorkflowNodeBase
         }
     }
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -235,7 +235,7 @@ public class FileDataSourceNode : WorkflowNodeBase
         return Task.FromResult(result);
     }
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {

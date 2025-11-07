@@ -48,7 +48,7 @@ public class PostGisDataSinkNode : WorkflowNodeBase
         return Task.FromResult(result);
     }
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -182,7 +182,7 @@ public class GeoJsonExportNode : WorkflowNodeBase
     public override string DisplayName => "GeoJSON Export";
     public override string Description => "Exports features to GeoJSON format";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -274,7 +274,7 @@ public class OutputNode : WorkflowNodeBase
     public override string DisplayName => "Output";
     public override string Description => "Stores workflow output for retrieval";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {

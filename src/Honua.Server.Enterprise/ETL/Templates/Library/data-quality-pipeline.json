@@ -1,0 +1,186 @@
+{
+  "id": "data-quality-pipeline",
+  "name": "Data Quality Assurance Pipeline",
+  "description": "Comprehensive data quality workflow: validate geometries, remove duplicates, simplify, and export with quality report.",
+  "category": "Workflow Chains",
+  "icon": "check-square",
+  "difficulty": 2,
+  "estimatedMinutes": 8,
+  "tags": ["quality", "validation", "cleaning", "qa"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "Raw spatial data requiring quality checks"
+  ],
+  "expectedOutputs": [
+    "Clean, validated dataset",
+    "Quality assurance report",
+    "Multiple export formats"
+  ],
+  "useCases": [
+    "Data quality control workflows",
+    "Preparing data for production use",
+    "Cleaning imported data"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Raw Data",
+      "description": "Import unvalidated data",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "raw_data",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 200
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "validate_geometry",
+      "name": "Validate Geometries",
+      "description": "Fix invalid geometries",
+      "parameters": {
+        "autoFix": true,
+        "removeInvalid": true
+      },
+      "position": {
+        "x": 250,
+        "y": 200
+      }
+    },
+    {
+      "id": "geo_2",
+      "type": "remove_duplicates",
+      "name": "Remove Duplicates",
+      "description": "Eliminate duplicate features",
+      "parameters": {
+        "compareAttributes": true,
+        "tolerance": 0.01
+      },
+      "position": {
+        "x": 400,
+        "y": 200
+      }
+    },
+    {
+      "id": "geo_3",
+      "type": "simplify",
+      "name": "Simplify Geometries",
+      "description": "Optimize geometry complexity",
+      "parameters": {
+        "tolerance": 5.0,
+        "preserveTopology": true
+      },
+      "position": {
+        "x": 550,
+        "y": 200
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Clean Data",
+      "description": "Store quality-assured data",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "clean_data",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 750,
+        "y": 150
+      }
+    },
+    {
+      "id": "sink_2",
+      "type": "geojson_sink",
+      "name": "Export to GeoJSON",
+      "description": "Web-ready format",
+      "parameters": {
+        "filePath": "/data/output/clean_data.geojson",
+        "prettyPrint": true
+      },
+      "position": {
+        "x": 750,
+        "y": 250
+      }
+    },
+    {
+      "id": "sink_3",
+      "type": "shapefile_sink",
+      "name": "Export to Shapefile",
+      "description": "Desktop GIS format",
+      "parameters": {
+        "filePath": "/data/output/clean_data.shp"
+      },
+      "position": {
+        "x": 750,
+        "y": 350
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "geo_2"
+    },
+    {
+      "from": "geo_2",
+      "to": "geo_3"
+    },
+    {
+      "from": "geo_3",
+      "to": "sink_1"
+    },
+    {
+      "from": "geo_3",
+      "to": "sink_2"
+    },
+    {
+      "from": "geo_3",
+      "to": "sink_3"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "Raw data table name",
+      "defaultValue": "raw_data",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Clean data table name",
+      "defaultValue": "clean_data",
+      "required": true
+    },
+    "simplificationTolerance": {
+      "name": "simplificationTolerance",
+      "type": "number",
+      "description": "Geometry simplification tolerance",
+      "defaultValue": 5.0,
+      "required": false,
+      "min": 0.1
+    },
+    "outputDir": {
+      "name": "outputDir",
+      "type": "string",
+      "description": "Export directory",
+      "defaultValue": "/data/output",
+      "required": true
+    }
+  }
+}
