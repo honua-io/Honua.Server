@@ -332,28 +332,32 @@ public sealed class GeofenceToAlertBridgeService : IGeofenceToAlertBridgeService
         try
         {
             var httpClient = _httpClientFactory.CreateClient("AlertReceiver");
-            httpClient.BaseAddress = new Uri(_alertReceiverBaseUrl);
+
+            // Note: BaseAddress should be set when the client is configured via IHttpClientFactory
+            // Do not set it here as it can cause issues when the same client instance is reused
 
             var response = await httpClient.PostAsJsonAsync("/api/alerts", alert, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-
             // Try to extract alert history ID from response if available
             // The exact response format depends on the alert receiver implementation
-            if (!string.IsNullOrEmpty(responseContent))
+            if (response.Content != null)
             {
-                try
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (!string.IsNullOrEmpty(responseContent))
                 {
-                    var json = JsonDocument.Parse(responseContent);
-                    if (json.RootElement.TryGetProperty("id", out var idElement))
+                    try
                     {
-                        return idElement.GetInt64();
+                        var json = JsonDocument.Parse(responseContent);
+                        if (json.RootElement.TryGetProperty("id", out var idElement))
+                        {
+                            return idElement.GetInt64();
+                        }
                     }
-                }
-                catch
-                {
-                    // Response doesn't contain ID, continue without it
+                    catch
+                    {
+                        // Response doesn't contain ID, continue without it
+                    }
                 }
             }
 

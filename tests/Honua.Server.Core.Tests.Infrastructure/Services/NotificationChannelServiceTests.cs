@@ -632,7 +632,7 @@ public class NotificationChannelServiceTests
 
     #region Helper Types (would normally be in separate files)
 
-    private interface INotificationChannelRepository
+    public interface INotificationChannelRepository
     {
         Task<NotificationChannel> CreateAsync(NotificationChannel channel, CancellationToken cancellationToken);
         Task<NotificationChannel?> GetByIdAsync(string id, CancellationToken cancellationToken);
@@ -641,20 +641,20 @@ public class NotificationChannelServiceTests
         Task DeleteAsync(string id, CancellationToken cancellationToken);
     }
 
-    private interface INotificationProvider
+    public interface INotificationProvider
     {
         Task SendNotificationAsync(NotificationChannel channel, Alert alert, CancellationToken cancellationToken);
         Task SendTestNotificationAsync(NotificationChannel channel, CancellationToken cancellationToken);
     }
 
-    private interface IEmailNotificationProvider : INotificationProvider { }
-    private interface ISlackNotificationProvider : INotificationProvider { }
-    private interface IPagerDutyNotificationProvider : INotificationProvider { }
-    private interface ISnsNotificationProvider : INotificationProvider { }
+    public interface IEmailNotificationProvider : INotificationProvider { }
+    public interface ISlackNotificationProvider : INotificationProvider { }
+    public interface IPagerDutyNotificationProvider : INotificationProvider { }
+    public interface ISnsNotificationProvider : INotificationProvider { }
 
-    private interface ILogger<T> { }
+    public interface ILogger<T> { }
 
-    private class NotificationChannelService
+    public class NotificationChannelService
     {
         private readonly INotificationChannelRepository _repository;
         private readonly Dictionary<string, INotificationProvider> _providers;
@@ -759,7 +759,7 @@ public class NotificationChannelServiceTests
         }
     }
 
-    private class NotificationChannel
+    public class NotificationChannel
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
@@ -769,7 +769,7 @@ public class NotificationChannelServiceTests
         public DateTime CreatedAt { get; set; }
     }
 
-    private class Alert
+    public class Alert
     {
         public string Id { get; set; } = string.Empty;
         public string RuleName { get; set; } = string.Empty;
@@ -777,14 +777,14 @@ public class NotificationChannelServiceTests
         public string Message { get; set; } = string.Empty;
     }
 
-    private class NotFoundException : Exception { }
-    private class NotificationException : Exception
+    public class NotFoundException : Exception { }
+    public class NotificationException : Exception
     {
         public NotificationException(string message) : base(message) { }
         public NotificationException(string message, Exception inner) : base(message, inner) { }
     }
 
-    private class ValidationResult
+    public class ValidationResult
     {
         public bool IsValid { get; set; }
         public List<string> Errors { get; set; } = new();

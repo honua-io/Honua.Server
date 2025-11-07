@@ -321,6 +321,10 @@ public class GeofenceAlertIntegrationTests
                 "enter", It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<GeofenceAlertRule> { criticalRule, infoRule });
 
+        _mockAlertRepo.Setup(r => r.CreateCorrelationAsync(
+                It.IsAny<GeofenceAlertCorrelation>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => Guid.NewGuid());
+
         _mockHttpMessageHandler.Protected()
             .Setup<Task<HttpResponseMessage>>(
                 "SendAsync",

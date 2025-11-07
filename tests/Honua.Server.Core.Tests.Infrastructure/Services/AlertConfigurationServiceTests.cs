@@ -499,7 +499,7 @@ public class AlertConfigurationServiceTests
 
     #region Helper Types (would normally be in separate files)
 
-    private interface IAlertRuleRepository
+    public interface IAlertRuleRepository
     {
         Task<AlertRule> CreateAsync(AlertRule rule, CancellationToken cancellationToken);
         Task<AlertRule?> GetByIdAsync(string id, CancellationToken cancellationToken);
@@ -512,11 +512,11 @@ public class AlertConfigurationServiceTests
         Task<bool> ExistsAsync(string name, CancellationToken cancellationToken);
     }
 
-    private interface ILogger<T>
+    public interface ILogger<T>
     {
     }
 
-    private class AlertConfigurationService
+    public class AlertConfigurationService
     {
         private readonly IAlertRuleRepository _repository;
         private readonly ILogger<AlertConfigurationService> _logger;
@@ -589,7 +589,7 @@ public class AlertConfigurationServiceTests
         }
     }
 
-    private class AlertRule
+    public class AlertRule
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
@@ -600,7 +600,7 @@ public class AlertConfigurationServiceTests
         public DateTime CreatedAt { get; set; }
     }
 
-    private class AlertCondition
+    public class AlertCondition
     {
         public string Metric { get; set; } = string.Empty;
         public ComparisonOperator Operator { get; set; }
@@ -608,7 +608,7 @@ public class AlertConfigurationServiceTests
         public TimeSpan? Duration { get; set; }
     }
 
-    private enum AlertSeverity
+    public enum AlertSeverity
     {
         Info,
         Warning,
@@ -616,7 +616,7 @@ public class AlertConfigurationServiceTests
         Critical
     }
 
-    private enum ComparisonOperator
+    public enum ComparisonOperator
     {
         GreaterThan,
         LessThan,
@@ -624,9 +624,9 @@ public class AlertConfigurationServiceTests
         NotEquals
     }
 
-    private class NotFoundException : Exception { }
+    public class NotFoundException : Exception { }
 
-    private class ValidationResult
+    public class ValidationResult
     {
         public bool IsValid { get; set; }
         public List<string> Errors { get; set; } = new();

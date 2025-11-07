@@ -288,6 +288,10 @@ public class GeofenceToAlertBridgeServiceTests
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<GeofenceAlertRule> { rule1, rule2 });
 
+        _mockRepository.Setup(r => r.CreateCorrelationAsync(
+                It.IsAny<GeofenceAlertCorrelation>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => Guid.NewGuid());
+
         _mockHttpMessageHandler.Protected()
             .Setup<Task<HttpResponseMessage>>(
                 "SendAsync",

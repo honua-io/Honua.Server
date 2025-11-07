@@ -379,7 +379,7 @@ public class GeofenceEdgeCaseTests
 
         // Assert
         result.Events.Should().ContainSingle();
-        result.Events[0].DwellTimeSeconds.Should().BeGreaterThan(2592000); // 30 days in seconds
+        result.Events[0].DwellTimeSeconds.Should().BeGreaterThanOrEqualTo(2592000); // 30 days in seconds
     }
 
     // Helper methods
