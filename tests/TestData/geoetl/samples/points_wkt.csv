@@ -1,0 +1,11 @@
+id,name,value,geometry
+0,Point 0,0,"POINT(-122.0 37.0)"
+1,Point 1,10,"POINT(-121.99 37.01)"
+2,Point 2,20,"POINT(-121.98 37.02)"
+3,Point 3,30,"POINT(-121.97 37.03)"
+4,Point 4,40,"POINT(-121.96 37.04)"
+5,Point 5,50,"POINT(-121.95 37.05)"
+6,Point 6,60,"POINT(-121.94 37.06)"
+7,Point 7,70,"POINT(-121.93 37.07)"
+8,Point 8,80,"POINT(-121.92 37.08)"
+9,Point 9,90,"POINT(-121.91 37.09)"

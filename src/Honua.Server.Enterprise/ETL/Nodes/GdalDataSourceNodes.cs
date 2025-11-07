@@ -35,7 +35,7 @@ public sealed class GeoPackageDataSourceNode : WorkflowNodeBase
     public override string Description => "Reads features from a GeoPackage (.gpkg) file";
     public override string Category => "Data Sources";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -166,7 +166,7 @@ public sealed class ShapefileDataSourceNode : WorkflowNodeBase
     public override string Description => "Reads features from a Shapefile (.shp) with associated files";
     public override string Category => "Data Sources";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -275,7 +275,7 @@ public sealed class KmlDataSourceNode : WorkflowNodeBase
     public override string Description => "Reads features from KML/KMZ files";
     public override string Category => "Data Sources";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -354,7 +354,7 @@ public sealed class CsvGeometryDataSourceNode : WorkflowNodeBase
     public override string Description => "Reads features from CSV files with WKT, WKB, or lat/lon columns";
     public override string Category => "Data Sources";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -578,7 +578,7 @@ public sealed class GpxDataSourceNode : WorkflowNodeBase
     public override string Description => "Reads waypoints, tracks, and routes from GPX files";
     public override string Category => "Data Sources";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -757,7 +757,7 @@ public sealed class GmlDataSourceNode : WorkflowNodeBase
     public override string Description => "Reads features from GML 2.0/3.0/3.2 files";
     public override string Category => "Data Sources";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -904,7 +904,7 @@ public sealed class WfsDataSourceNode : WorkflowNodeBase
     public override string Description => "Reads features from WFS (Web Feature Service) endpoints";
     public override string Category => "Data Sources";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {

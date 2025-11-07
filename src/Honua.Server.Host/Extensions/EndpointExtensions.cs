@@ -207,6 +207,7 @@ internal static class EndpointExtensions
         app.MapGeoEtlExecutionEndpoints();
         app.MapGeoEtlAiEndpoints();
         app.MapGeoEtlTemplateEndpoints();
+        app.MapGeoEtlScheduleEndpoints();
 
         // Map Admin UI SignalR hub for real-time updates
         app.MapHub<Honua.Server.Host.Admin.Hubs.MetadataChangeNotificationHub>("/admin/hub/metadata");

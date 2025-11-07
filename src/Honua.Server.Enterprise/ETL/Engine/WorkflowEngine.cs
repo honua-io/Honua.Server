@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Honua.Server.Enterprise.ETL.Models;
 using Honua.Server.Enterprise.ETL.Nodes;
 using Honua.Server.Enterprise.ETL.Progress;
+using Honua.Server.Enterprise.ETL.Resilience;
 using Honua.Server.Enterprise.ETL.Stores;
 using Microsoft.Extensions.Logging;
 
@@ -22,18 +23,24 @@ public class WorkflowEngine : IWorkflowEngine
     private readonly IWorkflowStore _workflowStore;
     private readonly IWorkflowNodeRegistry _nodeRegistry;
     private readonly IWorkflowProgressBroadcaster? _progressBroadcaster;
+    private readonly ICircuitBreakerService? _circuitBreakerService;
+    private readonly IDeadLetterQueueService? _deadLetterQueueService;
     private readonly ILogger<WorkflowEngine> _logger;
 
     public WorkflowEngine(
         IWorkflowStore workflowStore,
         IWorkflowNodeRegistry nodeRegistry,
         ILogger<WorkflowEngine> logger,
-        IWorkflowProgressBroadcaster? progressBroadcaster = null)
+        IWorkflowProgressBroadcaster? progressBroadcaster = null,
+        ICircuitBreakerService? circuitBreakerService = null,
+        IDeadLetterQueueService? deadLetterQueueService = null)
     {
         _workflowStore = workflowStore ?? throw new ArgumentNullException(nameof(workflowStore));
         _nodeRegistry = nodeRegistry ?? throw new ArgumentNullException(nameof(nodeRegistry));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _progressBroadcaster = progressBroadcaster;
+        _circuitBreakerService = circuitBreakerService;
+        _deadLetterQueueService = deadLetterQueueService;
     }
 
     public async Task<WorkflowValidationResult> ValidateAsync(
@@ -264,6 +271,32 @@ public class WorkflowEngine : IWorkflowEngine
                 // Get inputs from upstream nodes
                 var inputs = GetNodeInputs(workflow, nodeId, nodeResults);
 
+                // Check circuit breaker before executing
+                if (_circuitBreakerService != null)
+                {
+                    var isOpen = await _circuitBreakerService.IsOpenAsync(node.Type);
+                    if (isOpen)
+                    {
+                        var error = $"Circuit breaker is open for node type '{node.Type}' - too many recent failures";
+                        _logger.LogWarning(error);
+
+                        nodeRun.CompletedAt = DateTimeOffset.UtcNow;
+                        nodeRun.Status = NodeRunStatus.Failed;
+                        nodeRun.ErrorMessage = error;
+
+                        if (!options.ContinueOnError)
+                        {
+                            run.Status = WorkflowRunStatus.Failed;
+                            run.ErrorMessage = error;
+                            run.CompletedAt = DateTimeOffset.UtcNow;
+                            await _workflowStore.UpdateRunAsync(run, cancellationToken);
+                            return run;
+                        }
+
+                        continue;
+                    }
+                }
+
                 // Execute node
                 var nodeStopwatch = Stopwatch.StartNew();
                 var context = new NodeExecutionContext
@@ -295,8 +328,31 @@ public class WorkflowEngine : IWorkflowEngine
                     })
                 };
 
-                var result = await nodeImpl.ExecuteAsync(context, cancellationToken);
-                nodeStopwatch.Stop();
+                NodeExecutionResult result;
+                try
+                {
+                    result = await nodeImpl.ExecuteAsync(context, cancellationToken);
+                    nodeStopwatch.Stop();
+
+                    // Record success with circuit breaker
+                    if (result.Success && _circuitBreakerService != null)
+                    {
+                        await _circuitBreakerService.RecordSuccessAsync(node.Type);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    nodeStopwatch.Stop();
+                    _logger.LogError(ex, "Unhandled exception in node {NodeId}", nodeId);
+
+                    // Record failure with circuit breaker
+                    if (_circuitBreakerService != null)
+                    {
+                        await _circuitBreakerService.RecordFailureAsync(node.Type, ex);
+                    }
+
+                    result = NodeExecutionResult.Fail(ex.Message, ex.StackTrace);
+                }
 
                 // Update node run
                 nodeRun.CompletedAt = DateTimeOffset.UtcNow;
@@ -309,6 +365,14 @@ public class WorkflowEngine : IWorkflowEngine
                 if (!result.Success)
                 {
                     _logger.LogError("Node {NodeId} failed: {Error}", nodeId, result.ErrorMessage);
+
+                    // Record failure with circuit breaker
+                    if (_circuitBreakerService != null && result.ErrorMessage != null)
+                    {
+                        await _circuitBreakerService.RecordFailureAsync(
+                            node.Type,
+                            new InvalidOperationException(result.ErrorMessage));
+                    }
 
                     // Broadcast node failed
                     if (_progressBroadcaster != null)
@@ -325,6 +389,31 @@ public class WorkflowEngine : IWorkflowEngine
                         run.ErrorMessage = $"Node {nodeId} failed: {result.ErrorMessage}";
                         run.CompletedAt = DateTimeOffset.UtcNow;
                         await _workflowStore.UpdateRunAsync(run, cancellationToken);
+
+                        // Add to dead letter queue
+                        if (_deadLetterQueueService != null)
+                        {
+                            try
+                            {
+                                var workflowError = new WorkflowError
+                                {
+                                    WorkflowRunId = runId,
+                                    NodeId = nodeId,
+                                    NodeType = node.Type,
+                                    Category = ErrorCategorizer.CategorizeByMessage(result.ErrorMessage ?? ""),
+                                    Message = result.ErrorMessage ?? "Unknown error",
+                                    StackTrace = result.ErrorDetails,
+                                    Suggestion = ErrorCategorizer.GetSuggestion(
+                                        ErrorCategorizer.CategorizeByMessage(result.ErrorMessage ?? ""))
+                                };
+
+                                await _deadLetterQueueService.AddAsync(run, workflowError, cancellationToken);
+                            }
+                            catch (Exception dlqEx)
+                            {
+                                _logger.LogError(dlqEx, "Failed to add workflow to dead letter queue");
+                            }
+                        }
 
                         // Broadcast workflow failed
                         if (_progressBroadcaster != null)

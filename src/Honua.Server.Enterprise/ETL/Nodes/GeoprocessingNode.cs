@@ -119,7 +119,7 @@ public class GeoprocessingNode : WorkflowNodeBase
         }
     }
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {

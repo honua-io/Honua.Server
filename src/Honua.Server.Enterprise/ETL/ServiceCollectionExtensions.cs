@@ -3,6 +3,8 @@
 using Honua.Server.Enterprise.ETL.AI;
 using Honua.Server.Enterprise.ETL.Engine;
 using Honua.Server.Enterprise.ETL.Nodes;
+using Honua.Server.Enterprise.ETL.Resilience;
+using Honua.Server.Enterprise.ETL.Scheduling;
 using Honua.Server.Enterprise.ETL.Stores;
 using Honua.Server.Enterprise.ETL.Templates;
 using Honua.Server.Enterprise.Geoprocessing;
@@ -112,6 +114,31 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
+    /// Registers GeoETL workflow scheduling services
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <param name="connectionString">PostgreSQL connection string</param>
+    /// <param name="enableScheduleExecutor">Whether to enable the background schedule executor (default: true)</param>
+    /// <returns>Service collection for chaining</returns>
+    public static IServiceCollection AddGeoEtlScheduling(
+        this IServiceCollection services,
+        string connectionString,
+        bool enableScheduleExecutor = true)
+    {
+        // Register schedule store
+        services.AddSingleton<IWorkflowScheduleStore>(sp =>
+            new PostgresWorkflowScheduleStore(connectionString, sp.GetRequiredService<ILogger<PostgresWorkflowScheduleStore>>()));
+
+        // Register schedule executor as hosted service (optional)
+        if (enableScheduleExecutor)
+        {
+            services.AddHostedService<ScheduleExecutor>();
+        }
+
+        return services;
+    }
+
+    /// <summary>
     /// Registers GeoETL services with in-memory store (for testing)
     /// </summary>
     public static IServiceCollection AddGeoEtlInMemory(this IServiceCollection services, string connectionString)
@@ -183,6 +210,47 @@ public static class ServiceCollectionExtensions
             var logger = sp.GetRequiredService<ILogger<OpenAiGeoEtlService>>();
             return new OpenAiGeoEtlService(httpClient, config, logger);
         });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers GeoETL resilience and error handling services
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <param name="configuration">Configuration containing resilience settings</param>
+    /// <param name="connectionString">PostgreSQL connection string for dead letter queue</param>
+    /// <returns>Service collection for chaining</returns>
+    public static IServiceCollection AddGeoEtlResilience(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string connectionString)
+    {
+        // Configure circuit breaker options
+        services.Configure<CircuitBreakerOptions>(options =>
+        {
+            var config = configuration.GetSection("GeoETL:CircuitBreaker");
+            options.FailureThreshold = config.GetValue<int>("FailureThreshold", 5);
+            options.TimeoutSeconds = config.GetValue<int>("TimeoutSeconds", 60);
+        });
+
+        // Register circuit breaker service (if enabled)
+        var circuitBreakerEnabled = configuration.GetValue<bool>("GeoETL:CircuitBreaker:Enabled", true);
+        if (circuitBreakerEnabled)
+        {
+            services.AddSingleton<ICircuitBreakerService, InMemoryCircuitBreakerService>();
+        }
+
+        // Register dead letter queue service (if enabled)
+        var dlqEnabled = configuration.GetValue<bool>("GeoETL:DeadLetterQueue:Enabled", true);
+        if (dlqEnabled)
+        {
+            services.AddSingleton<IDeadLetterQueueService>(sp =>
+                new PostgresDeadLetterQueueService(
+                    connectionString,
+                    sp.GetRequiredService<IWorkflowEngine>(),
+                    sp.GetRequiredService<ILogger<PostgresDeadLetterQueueService>>()));
+        }
 
         return services;
     }

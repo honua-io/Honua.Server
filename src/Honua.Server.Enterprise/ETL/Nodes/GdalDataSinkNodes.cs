@@ -35,7 +35,7 @@ public sealed class GeoPackageSinkNode : WorkflowNodeBase
     public override string Description => "Exports features to GeoPackage (.gpkg) format";
     public override string Category => "Data Sinks";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -213,7 +213,7 @@ public sealed class ShapefileSinkNode : WorkflowNodeBase
     public override string Description => "Exports features to Shapefile (.shp) format as a ZIP archive";
     public override string Category => "Data Sinks";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -389,7 +389,7 @@ public sealed class CsvGeometrySinkNode : WorkflowNodeBase
     public override string Description => "Exports features to CSV files with WKT, WKB, or lat/lon columns";
     public override string Category => "Data Sinks";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -593,7 +593,7 @@ public sealed class GpxSinkNode : WorkflowNodeBase
     public override string Description => "Exports features as GPX waypoints, tracks, or routes";
     public override string Category => "Data Sinks";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
@@ -778,7 +778,7 @@ public sealed class GmlSinkNode : WorkflowNodeBase
     public override string Description => "Exports features to GML 3.2 format";
     public override string Category => "Data Sinks";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken)
     {
