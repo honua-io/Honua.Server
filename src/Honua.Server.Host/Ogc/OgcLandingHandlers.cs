@@ -25,7 +25,7 @@ internal static class OgcLandingHandlers
     /// <summary>
     /// OGC API landing page handler.
     /// </summary>
-    public static async Task<IResult> GetLanding(HttpRequest request, [FromServices] IMetadataRegistry registry, [FromServices] OgcCacheHeaderService cacheHeaderService, CancellationToken cancellationToken = default)
+    public static async Task<IResult> GetLanding(HttpRequest request, [FromServices] IMetadataRegistry registry, [FromServices] OgcCacheHeaderService cacheHeaderService, [FromServices] Services.IOgcFeaturesRenderingHandler renderingHandler, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
         Guard.NotNull(registry);
@@ -49,9 +49,9 @@ internal static class OgcLandingHandlers
                 "OGC API documentation")
         });
 
-        if (OgcSharedHandlers.WantsHtml(request))
+        if (renderingHandler.WantsHtml(request))
         {
-            var html = OgcSharedHandlers.RenderLandingHtml(request, snapshot, links);
+            var html = renderingHandler.RenderLandingHtml(request, snapshot, links);
             var htmlEtag = cacheHeaderService.GenerateETag(html);
             return Results.Content(html, OgcSharedHandlers.HtmlContentType)
                 .WithMetadataCacheHeaders(cacheHeaderService, htmlEtag);
@@ -135,7 +135,7 @@ internal static class OgcLandingHandlers
     /// <summary>
     /// OGC API collections handler.
     /// </summary>
-    public static async Task<IResult> GetCollections(HttpRequest request, IMetadataRegistry registry, OgcCacheHeaderService cacheHeaderService, CancellationToken cancellationToken = default)
+    public static async Task<IResult> GetCollections(HttpRequest request, IMetadataRegistry registry, OgcCacheHeaderService cacheHeaderService, Services.IOgcFeaturesRenderingHandler renderingHandler, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
         Guard.NotNull(registry);
@@ -192,9 +192,9 @@ internal static class OgcLandingHandlers
             OgcSharedHandlers.BuildLink(request, "/ogc", "alternate", "application/json", "Landing")
         };
 
-        if (OgcSharedHandlers.WantsHtml(request))
+        if (renderingHandler.WantsHtml(request))
         {
-            var html = OgcSharedHandlers.RenderCollectionsHtml(request, snapshot, summaries);
+            var html = renderingHandler.RenderCollectionsHtml(request, snapshot, summaries);
             var htmlEtag = cacheHeaderService.GenerateETag(html);
             return Results.Content(html, OgcSharedHandlers.HtmlContentType)
                 .WithMetadataCacheHeaders(cacheHeaderService, htmlEtag);
@@ -242,7 +242,7 @@ internal static class OgcLandingHandlers
             maxScale = layer.MaxScale
         };
 
-        if (OgcSharedHandlers.WantsHtml(request))
+        if (renderingHandler.WantsHtml(request))
         {
             var html = OgcSharedHandlers.RenderCollectionHtml(request, service, layer, id, crs, links);
             var htmlEtag = cacheHeaderService.GenerateETag(html);

@@ -1,14 +1,14 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Data.Common;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,484 +18,277 @@ using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Security;
 using Honua.Server.Core.Utilities;
 using MySqlConnector;
-using Polly;
 using Honua.Server.Core.Extensions;
 
 namespace Honua.Server.Core.Data.MySql;
 
-public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
+public sealed class MySqlDataStoreProvider : RelationalDataStoreProviderBase<MySqlConnection, MySqlTransaction, MySqlCommand, MySqlDataReader>
 {
-    private const int DefaultCommandTimeoutSeconds = 30;
     private const int BulkBatchSize = 1000;
 
     private readonly ConcurrentDictionary<string, Lazy<MySqlDataSource>> _dataSources = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, Task<string>> _decryptionCache = new(StringComparer.Ordinal);
-    private readonly ResiliencePipeline _retryPipeline;
-    private readonly IConnectionStringEncryptionService? _encryptionService;
 
     public const string ProviderKey = "mysql";
 
     public MySqlDataStoreProvider(IConnectionStringEncryptionService? encryptionService = null)
+        : base(ProviderKey, DatabaseRetryPolicy.CreateMySqlRetryPipeline(), encryptionService)
     {
-        _retryPipeline = DatabaseRetryPolicy.CreateMySqlRetryPipeline();
-        _encryptionService = encryptionService;
     }
 
-    public string Provider => ProviderKey;
+    public override string Provider => ProviderKey;
 
-    public IDataStoreCapabilities Capabilities => MySqlDataStoreCapabilities.Instance;
+    public override IDataStoreCapabilities Capabilities => MySqlDataStoreCapabilities.Instance;
 
-    public async IAsyncEnumerable<FeatureRecord> QueryAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureQuery? query,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    // ========================================
+    // ABSTRACT METHOD IMPLEMENTATIONS
+    // ========================================
+
+    protected override MySqlConnection CreateConnectionCore(string connectionString)
     {
-        ThrowIfDisposed();
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-
-        var normalizedQuery = query ?? new FeatureQuery();
-        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
-        var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
-
-        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        var builder = CreateQueryBuilder(service, layer, storageSrid, targetSrid);
-        var definition = builder.BuildSelect(normalizedQuery);
-
-        await using var command = CreateCommand(connection, definition);
-        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return CreateFeatureRecord(reader, layer);
-        }
+        var dataSource = new MySqlDataSource(connectionString);
+        return dataSource.CreateConnection();
     }
 
-    public async Task<long> CountAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default)
+    protected override string NormalizeConnectionString(string connectionString)
     {
-        ThrowIfDisposed();
+        // SECURITY: Validate connection string for SQL injection and malformed input
+        ConnectionStringValidator.Validate(connectionString, ProviderKey);
 
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-
-        var normalizedQuery = query ?? new FeatureQuery();
-        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
-        var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
-
-        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        var builder = CreateQueryBuilder(service, layer, storageSrid, targetSrid);
-        var definition = builder.BuildCount(normalizedQuery);
-
-        await using var command = CreateCommand(connection, definition);
-        var result = await _retryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-        if (result is null || result is DBNull)
+        var builder = new MySqlConnectionStringBuilder(connectionString);
+        if (builder.ApplicationName.IsNullOrWhiteSpace())
         {
-            return 0;
+            builder.ApplicationName = "Honua.Server";
         }
 
-        return Convert.ToInt64(result, CultureInfo.InvariantCulture);
+        return builder.ConnectionString;
     }
 
-    public async Task<FeatureRecord?> GetAsync(
-        DataSourceDefinition dataSource,
+    protected override QueryDefinition BuildSelectQuery(
         ServiceDefinition service,
         LayerDefinition layer,
-        string featureId,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default)
+        int storageSrid,
+        int targetSrid,
+        FeatureQuery query)
     {
-        ThrowIfDisposed();
+        var builder = new MySqlFeatureQueryBuilder(service, layer, storageSrid, targetSrid);
+        var definition = builder.BuildSelect(query);
+        return new QueryDefinition(definition.Sql, definition.Parameters);
+    }
 
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
+    protected override QueryDefinition BuildCountQuery(
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid,
+        FeatureQuery query)
+    {
+        var builder = new MySqlFeatureQueryBuilder(service, layer, storageSrid, targetSrid);
+        var definition = builder.BuildCount(query);
+        return new QueryDefinition(definition.Sql, definition.Parameters);
+    }
 
-        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
-        var targetSrid = CrsHelper.ParseCrs(query?.Crs ?? service.Ogc.DefaultCrs);
-
-        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        var builder = CreateQueryBuilder(service, layer, storageSrid, targetSrid);
+    protected override QueryDefinition BuildByIdQuery(
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid,
+        string featureId)
+    {
+        var builder = new MySqlFeatureQueryBuilder(service, layer, storageSrid, targetSrid);
         var definition = builder.BuildById(featureId);
-
-        await using var command = CreateCommand(connection, definition);
-        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return CreateFeatureRecord(reader, layer);
-        }
-
-        return null;
+        return new QueryDefinition(definition.Sql, definition.Parameters);
     }
 
-    public async Task<FeatureRecord> CreateAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureRecord record,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
+    protected override QueryDefinition BuildInsertQuery(LayerDefinition layer, FeatureRecord record)
     {
-        ThrowIfDisposed();
-        // BUG FIX #16: Flow transaction through CRUD operations
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNull(record);
-
         var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var normalized = NormalizeRecord(layer, record.Attributes, includeKey: true);
 
-        // Use base class helper to extract connection and transaction - eliminates 15 lines of boilerplate
-        var (connection, mySqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource,
-            transaction,
-            cancellationToken).ConfigureAwait(false);
-
-        try
+        if (normalized.Columns.Count == 0)
         {
-            var normalized = NormalizeRecord(layer, record.Attributes, includeKey: true);
-            if (normalized.Columns.Count == 0)
-            {
-                throw new InvalidOperationException($"Create operation for layer '{layer.Id}' did not include any columns.");
-            }
-
-            var columnList = string.Join(", ", normalized.Columns.Select(c => c.ColumnName));
-            var valueList = string.Join(", ", normalized.Columns.Select(c => BuildValueExpression(c, normalized.Srid)));
-
-            await using (var command = connection.CreateCommand())
-            {
-                command.Transaction = mySqlTransaction;
-                command.CommandText = $"insert into {table} ({columnList}) values ({valueList})";
-                AddParameters(command, normalized.Parameters);
-                command.CommandTimeout = DefaultCommandTimeoutSeconds;
-                await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-            }
-
-            var keyValue = TryResolveKey(record.Attributes, keyColumn);
-            if (keyValue.IsNullOrWhiteSpace())
-            {
-                await using var identityCommand = connection.CreateCommand();
-                identityCommand.Transaction = mySqlTransaction;
-                identityCommand.CommandText = "select last_insert_id()";
-                identityCommand.CommandTimeout = DefaultCommandTimeoutSeconds;
-                var identity = await _retryPipeline.ExecuteAsync(async ct =>
-                    await identityCommand.ExecuteScalarAsync(ct).ConfigureAwait(false),
-                    cancellationToken).ConfigureAwait(false);
-                keyValue = Convert.ToString(identity, CultureInfo.InvariantCulture);
-            }
-
-            if (keyValue.IsNullOrWhiteSpace())
-            {
-                throw new InvalidOperationException("Failed to obtain key for inserted feature.");
-            }
-
-            return await GetAsync(dataSource, service, layer, keyValue, null, cancellationToken).ConfigureAwait(false)
-                   ?? throw new InvalidOperationException("Failed to load feature after insert.");
+            throw new InvalidOperationException($"Create operation for layer '{layer.Id}' did not include any columns.");
         }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+
+        var columnList = string.Join(", ", normalized.Columns.Select(c => c.ColumnName));
+        var valueList = string.Join(", ", normalized.Columns.Select(c => BuildValueExpression(c, normalized.Srid)));
+        var sql = $"INSERT INTO {table} ({columnList}) VALUES ({valueList})";
+
+        return new QueryDefinition(sql, normalized.Parameters);
     }
 
-    public async Task<FeatureRecord?> UpdateAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        FeatureRecord record,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
+    protected override QueryDefinition BuildUpdateQuery(LayerDefinition layer, string featureId, FeatureRecord record)
     {
-        ThrowIfDisposed();
-        // BUG FIX #16: Flow transaction through CRUD operations
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-        Guard.NotNull(record);
-
         var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
         var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var normalized = NormalizeRecord(layer, record.Attributes, includeKey: false);
 
-        // Use helper to extract connection and transaction - eliminates 15 lines of boilerplate
-        var (connection, mySqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource,
-            transaction,
-            cancellationToken).ConfigureAwait(false);
-
-        try
+        if (normalized.Columns.Count == 0)
         {
-            var normalized = NormalizeRecord(layer, record.Attributes, includeKey: false);
-            if (normalized.Columns.Count == 0)
-            {
-                return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
-            }
+            // Return empty update that won't affect any rows
+            return new QueryDefinition($"SELECT 0", new Dictionary<string, object?>());
+        }
 
-            var assignments = string.Join(", ", normalized.Columns.Select(c => $"{c.ColumnName} = {BuildValueExpression(c, normalized.Srid)}"));
-            var parameters = new Dictionary<string, object?>(normalized.Parameters, StringComparer.Ordinal)
-            {
-                ["@key"] = NormalizeKeyParameter(layer, featureId)
-            };
+        var assignments = string.Join(", ", normalized.Columns.Select(c => $"{c.ColumnName} = {BuildValueExpression(c, normalized.Srid)}"));
+        var parameters = new Dictionary<string, object?>(normalized.Parameters, StringComparer.Ordinal)
+        {
+            ["@key"] = NormalizeKeyParameter(layer, featureId)
+        };
 
-            await using (var command = connection.CreateCommand())
+        var sql = $"UPDATE {table} SET {assignments} WHERE {QuoteIdentifier(keyColumn)} = @key";
+        return new QueryDefinition(sql, new ReadOnlyDictionary<string, object?>(parameters));
+    }
+
+    protected override QueryDefinition BuildDeleteQuery(LayerDefinition layer, string featureId)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var sql = $"DELETE FROM {table} WHERE {QuoteIdentifier(keyColumn)} = @key";
+        var parameters = new Dictionary<string, object?> { ["@key"] = NormalizeKeyParameter(layer, featureId) };
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildSoftDeleteQuery(LayerDefinition layer, string featureId, string? deletedBy)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var sql = $@"
+            UPDATE {table}
+            SET is_deleted = true,
+                deleted_at = NOW(),
+                deleted_by = @deletedBy
+            WHERE {QuoteIdentifier(keyColumn)} = @key
+              AND (is_deleted IS NULL OR is_deleted = false)";
+
+        var parameters = new Dictionary<string, object?>
+        {
+            ["@key"] = NormalizeKeyParameter(layer, featureId),
+            ["@deletedBy"] = (object?)deletedBy ?? DBNull.Value
+        };
+
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildRestoreQuery(LayerDefinition layer, string featureId)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var sql = $@"
+            UPDATE {table}
+            SET is_deleted = false,
+                deleted_at = NULL,
+                deleted_by = NULL
+            WHERE {QuoteIdentifier(keyColumn)} = @key
+              AND is_deleted = true";
+
+        var parameters = new Dictionary<string, object?> { ["@key"] = NormalizeKeyParameter(layer, featureId) };
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildHardDeleteQuery(LayerDefinition layer, string featureId)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var sql = $"DELETE FROM {table} WHERE {QuoteIdentifier(keyColumn)} = @key";
+        var parameters = new Dictionary<string, object?> { ["@key"] = NormalizeKeyParameter(layer, featureId) };
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override FeatureRecord CreateFeatureRecord(
+        MySqlDataReader reader,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid)
+    {
+        // MySQL uses ST_AsGeoJSON to return geometry as GeoJSON in a special column
+        var skipColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            MySqlFeatureQueryBuilder.GeoJsonColumnAlias,
+            layer.GeometryField
+        };
+
+        JsonNode? geometryNode = null;
+
+        // Extract geometry from the GeoJSON alias column if present
+        for (var index = 0; index < reader.FieldCount; index++)
+        {
+            var columnName = reader.GetName(index);
+            if (string.Equals(columnName, MySqlFeatureQueryBuilder.GeoJsonColumnAlias, StringComparison.OrdinalIgnoreCase))
             {
-                command.Transaction = mySqlTransaction;
-                command.CommandText = $"update {table} set {assignments} where {QuoteIdentifier(keyColumn)} = @key";
-                AddParameters(command, new ReadOnlyDictionary<string, object?>(parameters));
-                command.CommandTimeout = DefaultCommandTimeoutSeconds;
-                var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-                if (affected == 0)
+                if (!reader.IsDBNull(index))
                 {
-                    return null;
+                    var geoJsonText = reader.GetString(index);
+                    geometryNode = GeometryReader.ReadGeoJsonGeometry(geoJsonText);
                 }
+                break;
             }
+        }
 
-            return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+        return FeatureRecordReader.ReadFeatureRecordWithCustomGeometry(
+            reader,
+            layer,
+            layer.GeometryField,
+            skipColumns,
+            () => geometryNode);
     }
 
-    public async Task<bool> DeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
+    protected override async Task<string> ExecuteInsertAsync(
+        MySqlConnection connection,
+        MySqlTransaction? transaction,
         LayerDefinition layer,
-        string featureId,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
+        FeatureRecord record,
+        CancellationToken cancellationToken)
     {
-        ThrowIfDisposed();
-        // BUG FIX #16: Flow transaction through CRUD operations
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
         var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
         var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var normalized = NormalizeRecord(layer, record.Attributes, includeKey: true);
 
-        // Use helper to extract connection and transaction - eliminates 15 lines of boilerplate
-        var (connection, mySqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource,
-            transaction,
+        if (normalized.Columns.Count == 0)
+        {
+            throw new InvalidOperationException($"Create operation for layer '{layer.Id}' did not include any columns.");
+        }
+
+        var columnList = string.Join(", ", normalized.Columns.Select(c => c.ColumnName));
+        var valueList = string.Join(", ", normalized.Columns.Select(c => BuildValueExpression(c, normalized.Srid)));
+
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"INSERT INTO {table} ({columnList}) VALUES ({valueList})";
+        AddParameters(command, normalized.Parameters);
+        command.CommandTimeout = DefaultCommandTimeoutSeconds;
+
+        await RetryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
-        try
+        // Get inserted key
+        var keyValue = TryResolveKey(record.Attributes, keyColumn);
+        if (keyValue.IsNullOrWhiteSpace())
         {
-            await using var command = connection.CreateCommand();
-            command.Transaction = mySqlTransaction;
-            command.CommandText = $"delete from {table} where {QuoteIdentifier(keyColumn)} = @key";
-            command.Parameters.AddWithValue("@key", NormalizeKeyParameter(layer, featureId));
-            command.CommandTimeout = DefaultCommandTimeoutSeconds;
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
+            await using var identityCommand = connection.CreateCommand();
+            identityCommand.Transaction = transaction;
+            identityCommand.CommandText = "SELECT LAST_INSERT_ID()";
+            identityCommand.CommandTimeout = DefaultCommandTimeoutSeconds;
+            var identity = await RetryPipeline.ExecuteAsync(async ct =>
+                await identityCommand.ExecuteScalarAsync(ct).ConfigureAwait(false),
                 cancellationToken).ConfigureAwait(false);
-            return affected > 0;
+            keyValue = Convert.ToString(identity, CultureInfo.InvariantCulture);
         }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+
+        return keyValue ?? throw new InvalidOperationException("Failed to obtain key for inserted feature.");
     }
 
-    public async Task<bool> SoftDeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        string? deletedBy,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
+    protected override void AddParameters(DbCommand command, IReadOnlyDictionary<string, object?> parameters)
     {
-        ThrowIfDisposed();
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
-
-        // Use helper to extract connection and transaction - eliminates 15 lines of boilerplate
-        var (connection, mySqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource,
-            transaction,
-            cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.Transaction = mySqlTransaction;
-            command.CommandText = $@"
-                UPDATE {table}
-                SET is_deleted = true,
-                    deleted_at = NOW(),
-                    deleted_by = @deletedBy
-                WHERE {QuoteIdentifier(keyColumn)} = @key
-                  AND (is_deleted IS NULL OR is_deleted = false)";
-            command.Parameters.AddWithValue("@key", NormalizeKeyParameter(layer, featureId));
-            command.Parameters.AddWithValue("@deletedBy", (object?)deletedBy ?? DBNull.Value);
-            command.CommandTimeout = DefaultCommandTimeoutSeconds;
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-            return affected > 0;
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+        SqlParameterHelper.AddParameters(command, parameters);
     }
 
-    public async Task<bool> RestoreAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
+    protected override IsolationLevel GetDefaultIsolationLevel() => IsolationLevel.RepeatableRead;
 
-        var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+    // ========================================
+    // BULK OPERATIONS (Provider-specific)
+    // ========================================
 
-        // Use helper to extract connection and transaction - eliminates 15 lines of boilerplate
-        var (connection, mySqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource,
-            transaction,
-            cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.Transaction = mySqlTransaction;
-            command.CommandText = $@"
-                UPDATE {table}
-                SET is_deleted = false,
-                    deleted_at = NULL,
-                    deleted_by = NULL
-                WHERE {QuoteIdentifier(keyColumn)} = @key
-                  AND is_deleted = true";
-            command.Parameters.AddWithValue("@key", NormalizeKeyParameter(layer, featureId));
-            command.CommandTimeout = DefaultCommandTimeoutSeconds;
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-            return affected > 0;
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public async Task<bool> HardDeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        string? deletedBy,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
-
-        // Use helper to extract connection and transaction - eliminates 15 lines of boilerplate
-        var (connection, mySqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource,
-            transaction,
-            cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.Transaction = mySqlTransaction;
-            command.CommandText = $"DELETE FROM {table} WHERE {QuoteIdentifier(keyColumn)} = @key";
-            command.Parameters.AddWithValue("@key", NormalizeKeyParameter(layer, featureId));
-            command.CommandTimeout = DefaultCommandTimeoutSeconds;
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-            return affected > 0;
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public async Task<int> BulkInsertAsync(
+    public override async Task<int> BulkInsertAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -513,7 +306,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         var srid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -540,7 +333,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         return count;
     }
 
-    public async Task<int> BulkUpdateAsync(
+    public override async Task<int> BulkUpdateAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -559,7 +352,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         var srid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -586,7 +379,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         return count;
     }
 
-    public async Task<int> BulkDeleteAsync(
+    public override async Task<int> BulkDeleteAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -604,7 +397,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -682,7 +475,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         command.CommandTimeout = DefaultCommandTimeoutSeconds;
         AddParameters(command, new ReadOnlyDictionary<string, object?>(allParameters));
 
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await RetryPipeline.ExecuteAsync(async ct =>
             await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -730,7 +523,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
                 command.CommandTimeout = DefaultCommandTimeoutSeconds;
                 AddParameters(command, new ReadOnlyDictionary<string, object?>(parameters));
 
-                var rowsAffected = await _retryPipeline.ExecuteAsync(async ct =>
+                var rowsAffected = await RetryPipeline.ExecuteAsync(async ct =>
                     await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
                     cancellationToken).ConfigureAwait(false);
                 affected += rowsAffected;
@@ -777,62 +570,18 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         command.CommandTimeout = DefaultCommandTimeoutSeconds;
         AddParameters(command, new ReadOnlyDictionary<string, object?>(parameters));
 
-        var affected = await _retryPipeline.ExecuteAsync(async ct =>
+        var affected = await RetryPipeline.ExecuteAsync(async ct =>
             await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
         return affected;
     }
 
-    public Task<byte[]?> GenerateMvtTileAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        int zoom,
-        int x,
-        int y,
-        string? datetime = null,
-        CancellationToken cancellationToken = default)
-    {
-        // MySQL does not support native MVT generation
-        return Task.FromResult<byte[]?>(null);
-    }
+    // ========================================
+    // AGGREGATION OPERATIONS (Provider-specific)
+    // ========================================
 
-    public async Task<IDataStoreTransaction?> BeginTransactionAsync(
-        DataSourceDefinition dataSource,
-        CancellationToken cancellationToken = default)
-    {
-        // BUG FIX #16: Implement transaction support for MySQL following Postgres pattern
-        ThrowIfDisposed();
-
-        MySqlConnection? connection = null;
-        try
-        {
-            connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-            await _retryPipeline.ExecuteAsync(async ct =>
-                await connection.OpenAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-
-            // Use REPEATABLE READ isolation level for government data integrity
-            // This prevents non-repeatable reads and phantom reads during transaction execution
-            var transaction = await connection.BeginTransactionAsync(
-                System.Data.IsolationLevel.RepeatableRead,
-                cancellationToken).ConfigureAwait(false);
-
-            return new RelationalDataStoreTransaction<MySqlConnection, MySqlTransaction>(connection, transaction);
-        }
-        catch
-        {
-            // CRITICAL: Dispose connection on any failure to prevent connection pool exhaustion
-            if (connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-            throw;
-        }
-    }
-
-    public async Task<IReadOnlyList<StatisticsResult>> QueryStatisticsAsync(
+    public override async Task<IReadOnlyList<StatisticsResult>> QueryStatisticsAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -856,15 +605,15 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
-        var builder = CreateQueryBuilder(service, layer, storageSrid, targetSrid);
+        var builder = new MySqlFeatureQueryBuilder(service, layer, storageSrid, targetSrid);
         var definition = builder.BuildStatistics(normalizedQuery, statistics, groupByFields);
 
-        await using var command = CreateCommand(connection, definition);
-        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
+        await using var command = CreateCommand(connection, new QueryDefinition(definition.Sql, definition.Parameters));
+        await using var reader = await RetryPipeline.ExecuteAsync(async ct =>
             await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -896,7 +645,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         return results;
     }
 
-    public async Task<IReadOnlyList<DistinctResult>> QueryDistinctAsync(
+    public override async Task<IReadOnlyList<DistinctResult>> QueryDistinctAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -919,15 +668,15 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
-        var builder = CreateQueryBuilder(service, layer, storageSrid, targetSrid);
+        var builder = new MySqlFeatureQueryBuilder(service, layer, storageSrid, targetSrid);
         var definition = builder.BuildDistinct(normalizedQuery, fieldNames);
 
-        await using var command = CreateCommand(connection, definition);
-        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
+        await using var command = CreateCommand(connection, new QueryDefinition(definition.Sql, definition.Parameters));
+        await using var reader = await RetryPipeline.ExecuteAsync(async ct =>
             await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -946,7 +695,7 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         return results;
     }
 
-    public async Task<BoundingBox?> QueryExtentAsync(
+    public override async Task<BoundingBox?> QueryExtentAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -962,15 +711,15 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
-        var builder = CreateQueryBuilder(service, layer, storageSrid, targetSrid);
+        var builder = new MySqlFeatureQueryBuilder(service, layer, storageSrid, targetSrid);
         var definition = builder.BuildExtent(normalizedQuery, targetSrid);
 
-        await using var command = CreateCommand(connection, definition);
-        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
+        await using var command = CreateCommand(connection, new QueryDefinition(definition.Sql, definition.Parameters));
+        await using var reader = await RetryPipeline.ExecuteAsync(async ct =>
             await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -993,147 +742,23 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         return new BoundingBox(minX, minY, maxX, maxY, null, null, crs);
     }
 
-    public async Task TestConnectivityAsync(
+    public override Task<byte[]?> GenerateMvtTileAsync(
         DataSourceDefinition dataSource,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(dataSource);
-        SqlExceptionHelper.ValidateConnectionStringForHealthCheck(dataSource.ConnectionString, dataSource.Id);
-
-        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1";
-        command.CommandTimeout = 5; // 5 second timeout for health checks
-
-        await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    private FeatureRecord CreateFeatureRecord(MySqlDataReader reader, LayerDefinition layer)
-    {
-        // MySQL uses ST_AsGeoJSON to return geometry as GeoJSON in a special column
-        var skipColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            MySqlFeatureQueryBuilder.GeoJsonColumnAlias,
-            layer.GeometryField
-        };
-
-        JsonNode? geometryNode = null;
-
-        // Extract geometry from the GeoJSON alias column if present
-        for (var index = 0; index < reader.FieldCount; index++)
-        {
-            var columnName = reader.GetName(index);
-            if (string.Equals(columnName, MySqlFeatureQueryBuilder.GeoJsonColumnAlias, StringComparison.OrdinalIgnoreCase))
-            {
-                if (!reader.IsDBNull(index))
-                {
-                    var geoJsonText = reader.GetString(index);
-                    geometryNode = GeometryReader.ReadGeoJsonGeometry(geoJsonText);
-                }
-                break;
-            }
-        }
-
-        return FeatureRecordReader.ReadFeatureRecordWithCustomGeometry(
-            reader,
-            layer,
-            layer.GeometryField,
-            skipColumns,
-            () => geometryNode);
-    }
-
-    private async Task<MySqlConnection> CreateConnectionAsync(
-        DataSourceDefinition dataSource,
-        CancellationToken cancellationToken)
-    {
-        SqlExceptionHelper.ValidateConnectionString(dataSource.ConnectionString, dataSource.Id);
-
-        var dataSourceInstance = await GetOrCreateDataSourceAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        return dataSourceInstance.CreateConnection();
-    }
-
-    private async Task<MySqlDataSource> GetOrCreateDataSourceAsync(DataSourceDefinition dataSource, CancellationToken cancellationToken = default)
-    {
-        // BUG FIX #37: Decrypt connection string before caching/normalizing (mirroring Postgres pattern)
-        var decryptedConnectionString = await DecryptConnectionStringAsync(dataSource.ConnectionString, cancellationToken).ConfigureAwait(false);
-        var connectionString = NormalizeConnectionString(decryptedConnectionString);
-        var lazyDataSource = _dataSources.GetOrAdd(connectionString, key => new Lazy<MySqlDataSource>(
-            () => new MySqlDataSource(key),
-            LazyThreadSafetyMode.ExecutionAndPublication));
-
-        return lazyDataSource.Value;
-    }
-
-    private async Task<string> DecryptConnectionStringAsync(string connectionString, CancellationToken cancellationToken = default)
-    {
-        if (_encryptionService == null)
-        {
-            return connectionString;
-        }
-
-        return await _decryptionCache.GetOrAdd(connectionString,
-            async cs => await _encryptionService.DecryptAsync(cs, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
-    }
-
-    private static string NormalizeConnectionString(string connectionString)
-    {
-        // SECURITY: Validate connection string for SQL injection and malformed input
-        ConnectionStringValidator.Validate(connectionString, ProviderKey);
-
-        var builder = new MySqlConnectionStringBuilder(connectionString);
-        if (builder.ApplicationName.IsNullOrWhiteSpace())
-        {
-            builder.ApplicationName = "Honua.Server";
-        }
-
-        return builder.ConnectionString;
-    }
-
-    private static MySqlCommand CreateCommand(MySqlConnection connection, MySqlQueryDefinition definition)
-    {
-        var command = connection.CreateCommand();
-        command.CommandText = definition.Sql;
-        command.CommandTimeout = DefaultCommandTimeoutSeconds;
-        command.CommandType = CommandType.Text;
-        AddParameters(command, definition.Parameters);
-        return command;
-    }
-
-    /// <summary>
-    /// Extracts connection and transaction from an IDataStoreTransaction or creates a new connection.
-    /// This eliminates 15+ lines of boilerplate code in each CRUD method.
-    /// </summary>
-    private async Task<(MySqlConnection Connection, MySqlTransaction? Transaction, bool ShouldDispose)> GetConnectionAndTransactionAsync(
-        DataSourceDefinition dataSource,
-        IDataStoreTransaction? transaction,
-        CancellationToken cancellationToken)
-    {
-        if (transaction is RelationalDataStoreTransaction<MySqlConnection, MySqlTransaction> mysqlDataStoreTransaction)
-        {
-            // Transaction owns the connection - caller should NOT dispose it
-            return (mysqlDataStoreTransaction.Connection, mysqlDataStoreTransaction.Transaction, false);
-        }
-
-        // No transaction provided - create new connection, open it, caller MUST dispose it
-        var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await _retryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        return (connection, null, true);
-    }
-
-    private static MySqlFeatureQueryBuilder CreateQueryBuilder(
         ServiceDefinition service,
         LayerDefinition layer,
-        int storageSrid,
-        int targetSrid)
+        int zoom,
+        int x,
+        int y,
+        string? datetime = null,
+        CancellationToken cancellationToken = default)
     {
-        return new MySqlFeatureQueryBuilder(service, layer, storageSrid, targetSrid);
+        // MySQL does not support native MVT generation
+        return Task.FromResult<byte[]?>(null);
     }
 
+    // ========================================
+    // HELPER METHODS
+    // ========================================
 
     private static NormalizedRecord NormalizeRecord(LayerDefinition layer, IReadOnlyDictionary<string, object?> attributes, bool includeKey)
     {
@@ -1202,46 +827,48 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
         return SqlParameterHelper.TryResolveKey(attributes, keyColumn);
     }
 
-    private static void AddParameters(MySqlCommand command, IReadOnlyDictionary<string, object?> parameters)
-    {
-        SqlParameterHelper.AddParameters(command, parameters);
-    }
-
     private static string QuoteIdentifier(string identifier) => MySqlFeatureQueryBuilder.QuoteIdentifier(identifier);
 
-    protected override void DisposeCore()
+    // ========================================
+    // DISPOSAL (MySqlDataSource cleanup only)
+    // ========================================
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            foreach (var entry in _dataSources.Values)
+            {
+                if (entry.IsValueCreated)
+                {
+                    entry.Value.Dispose();
+                }
+            }
+
+            _dataSources.Clear();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    protected override async ValueTask DisposeAsyncCore()
     {
         foreach (var entry in _dataSources.Values)
         {
-            if (!entry.IsValueCreated)
+            if (entry.IsValueCreated)
             {
-                continue;
+                await entry.Value.DisposeAsync().ConfigureAwait(false);
             }
-
-            entry.Value.Dispose();
         }
 
         _dataSources.Clear();
-        _decryptionCache.Clear();
+
+        await base.DisposeAsyncCore().ConfigureAwait(false);
     }
 
-    protected override async ValueTask DisposeCoreAsync()
-    {
-        foreach (var entry in _dataSources.Values)
-        {
-            if (!entry.IsValueCreated)
-            {
-                continue;
-            }
-
-            await entry.Value.DisposeAsync().ConfigureAwait(false);
-        }
-
-        _dataSources.Clear();
-        _decryptionCache.Clear();
-
-        await base.DisposeCoreAsync().ConfigureAwait(false);
-    }
+    // ========================================
+    // INTERNAL RECORDS
+    // ========================================
 
     private sealed record NormalizedColumn(string ColumnName, string ParameterName, object? Value, bool IsGeometry)
     {
@@ -1250,4 +877,3 @@ public sealed class MySqlDataStoreProvider : DisposableBase, IDataStoreProvider
 
     private sealed record NormalizedRecord(IReadOnlyList<NormalizedColumn> Columns, IReadOnlyDictionary<string, object?> Parameters, int Srid);
 }
-

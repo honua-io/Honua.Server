@@ -82,6 +82,16 @@ internal interface IOgcTilesHandler
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Collects vector geometries for overlay on raster tiles using pre-fetched metadata snapshot.
+    /// </summary>
+    Task<IReadOnlyList<Geometry>> CollectVectorGeometriesAsync(
+        RasterDatasetDefinition dataset,
+        double[] bbox,
+        MetadataSnapshot snapshot,
+        IFeatureRepository repository,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Renders a vector tile (MVT format).
     /// </summary>
     Task<IResult> RenderVectorTileAsync(
