@@ -17,6 +17,7 @@ using Honua.Server.Core.Query.Filter;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Host.Carto;
 
@@ -27,15 +28,18 @@ internal sealed class CartoSqlQueryExecutor
     private readonly CartoDatasetResolver _datasetResolver;
     private readonly CartoSqlQueryParser _parser;
     private readonly IFeatureRepository _repository;
+    private readonly ILogger<CartoSqlQueryExecutor> _logger;
 
     public CartoSqlQueryExecutor(
         CartoDatasetResolver datasetResolver,
         CartoSqlQueryParser parser,
-        IFeatureRepository repository)
+        IFeatureRepository repository,
+        ILogger<CartoSqlQueryExecutor> logger)
     {
         _datasetResolver = Guard.NotNull(datasetResolver);
         _parser = Guard.NotNull(parser);
         _repository = Guard.NotNull(repository);
+        _logger = Guard.NotNull(logger);
     }
 
     public async Task<CartoSqlExecutionResult> ExecuteAsync(string sql, CancellationToken cancellationToken)
@@ -135,9 +139,10 @@ internal sealed class CartoSqlQueryExecutor
 
             return CartoSqlExecutionResult.Success(response);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute count query.", null);
+            _logger.LogError(ex, "Failed to execute count query for dataset {DatasetId}", dataset.ServiceId);
+            return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute count query.", ex.Message);
         }
     }
 
@@ -201,9 +206,10 @@ internal sealed class CartoSqlQueryExecutor
 
             return CartoSqlExecutionResult.Success(response);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute aggregate query.", null);
+            _logger.LogError(ex, "Failed to execute aggregate query for dataset {DatasetId}", dataset.ServiceId);
+            return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute aggregate query.", ex.Message);
         }
     }
 
@@ -225,9 +231,10 @@ internal sealed class CartoSqlQueryExecutor
                 rows.Add(ShapeRow(record, dataset, definition));
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute query.", null);
+            _logger.LogError(ex, "Failed to execute SELECT query for dataset {DatasetId}", dataset.ServiceId);
+            return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute query.", ex.Message);
         }
 
         long totalRows;
@@ -236,8 +243,9 @@ internal sealed class CartoSqlQueryExecutor
             var countQuery = featureQuery with { Limit = null, Offset = null, PropertyNames = null, SortOrders = null };
             totalRows = await _repository.CountAsync(dataset.ServiceId, dataset.LayerId, countQuery, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Failed to count records for dataset {DatasetId}, using rowset size as fallback", dataset.ServiceId);
             totalRows = rows.Count;
         }
 

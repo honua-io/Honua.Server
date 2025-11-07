@@ -36,6 +36,8 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogLoginSuccess(string username, string? ipAddress, string? userAgent)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
         _logger.LogInformation(
             "SECURITY_AUDIT: Login successful - Username={Username}, IP={IPAddress}, UserAgent={UserAgent}",
             username, ipAddress ?? "unknown", userAgent ?? "unknown");
@@ -43,6 +45,9 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogLoginFailure(string username, string? ipAddress, string? userAgent, string reason)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
         _logger.LogWarning(
             "SECURITY_AUDIT: Login failed - Username={Username}, IP={IPAddress}, UserAgent={UserAgent}, Reason={Reason}",
             username, ipAddress ?? "unknown", userAgent ?? "unknown", reason);
@@ -57,6 +62,9 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogAdminOperation(string operation, string username, string? resourceType, string? resourceId, string? ipAddress)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
         _logger.LogInformation(
             "SECURITY_AUDIT: Admin operation - Operation={Operation}, Username={Username}, ResourceType={ResourceType}, ResourceId={ResourceId}, IP={IPAddress}",
             operation, username, resourceType ?? "N/A", resourceId ?? "N/A", ipAddress ?? "unknown");
@@ -81,6 +89,9 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogUnauthorizedAccess(string? username, string resource, string? ipAddress, string reason)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resource);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
         _logger.LogWarning(
             "SECURITY_AUDIT: Unauthorized access attempt - Username={Username}, Resource={Resource}, IP={IPAddress}, Reason={Reason}",
             username ?? "anonymous", resource, ipAddress ?? "unknown", reason);
