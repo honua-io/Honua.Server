@@ -43,6 +43,7 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcFeaturesQueryHandler queryHandler,
         [FromServices] ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -60,7 +61,7 @@ internal static partial class OgcFeaturesHandlers
 
         try
         {
-            var result = await OgcSharedHandlers.ExecuteSearchAsync(
+            var result = await queryHandler.ExecuteSearchAsync(
                 request,
                 collections,
                 request.Query,
@@ -116,12 +117,14 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcFeaturesGeoJsonHandler geoJsonHandler,
+        [FromServices] Services.IOgcFeaturesQueryHandler queryHandler,
         [FromServices] ILogger logger,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
 
-        using var document = await OgcSharedHandlers.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
+        using var document = await geoJsonHandler.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
         if (document is null)
         {
             logger.LogWarning("POST search request rejected: invalid JSON payload from {RemoteIp}",
@@ -244,7 +247,7 @@ internal static partial class OgcFeaturesHandlers
 
         try
         {
-            var result = await OgcSharedHandlers.ExecuteSearchAsync(
+            var result = await queryHandler.ExecuteSearchAsync(
                 request,
                 collections,
                 queryCollection,

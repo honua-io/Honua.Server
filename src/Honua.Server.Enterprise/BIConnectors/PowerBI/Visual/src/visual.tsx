@@ -136,11 +136,21 @@ export class Visual implements IVisual {
             { name: "longitude", type: "real" }
         ];
 
-        if (categoryIdx !== -1) fields.push({ name: "category", type: "string" });
-        if (sizeIdx !== -1) fields.push({ name: "size", type: "real" });
-        if (colorIdx !== -1) fields.push({ name: "color", type: "real" });
-        if (tooltipIdx !== -1) fields.push({ name: "tooltip", type: "string" });
-        if (timeIdx !== -1) fields.push({ name: "time", type: "timestamp" });
+        if (categoryIdx !== -1) {
+fields.push({ name: "category", type: "string" });
+}
+        if (sizeIdx !== -1) {
+fields.push({ name: "size", type: "real" });
+}
+        if (colorIdx !== -1) {
+fields.push({ name: "color", type: "real" });
+}
+        if (tooltipIdx !== -1) {
+fields.push({ name: "tooltip", type: "string" });
+}
+        if (timeIdx !== -1) {
+fields.push({ name: "time", type: "timestamp" });
+}
 
         // Transform rows
         const processedRows = rows.map(row => {
@@ -149,11 +159,21 @@ export class Visual implements IVisual {
                 longitude: row[lonIdx]
             };
 
-            if (categoryIdx !== -1) processedRow.category = row[categoryIdx];
-            if (sizeIdx !== -1) processedRow.size = row[sizeIdx];
-            if (colorIdx !== -1) processedRow.color = row[colorIdx];
-            if (tooltipIdx !== -1) processedRow.tooltip = row[tooltipIdx];
-            if (timeIdx !== -1) processedRow.time = row[timeIdx];
+            if (categoryIdx !== -1) {
+processedRow.category = row[categoryIdx];
+}
+            if (sizeIdx !== -1) {
+processedRow.size = row[sizeIdx];
+}
+            if (colorIdx !== -1) {
+processedRow.color = row[colorIdx];
+}
+            if (tooltipIdx !== -1) {
+processedRow.tooltip = row[tooltipIdx];
+}
+            if (timeIdx !== -1) {
+processedRow.time = row[timeIdx];
+}
 
             return processedRow;
         });
@@ -179,7 +199,7 @@ export class Visual implements IVisual {
     /**
      * Render Kepler.gl map component
      */
-    private renderKeplerMap(config: any) {
+    private renderKeplerMap(_config: any) {
         const KeplerMap = () => (
             <Provider store={this.store}>
                 <KeplerGl
