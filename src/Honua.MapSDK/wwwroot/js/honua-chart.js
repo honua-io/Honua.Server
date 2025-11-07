@@ -320,9 +320,18 @@ function createChartAPI(chartId) {
             const chartData = charts.get(chartId);
             if (!chartData) return;
 
+            // Create loading overlay safely without innerHTML to prevent XSS
             const overlay = document.createElement('div');
             overlay.className = 'honua-chart-loading';
-            overlay.innerHTML = '<div class="spinner"></div><div>Loading...</div>';
+
+            const spinner = document.createElement('div');
+            spinner.className = 'spinner';
+
+            const loadingText = document.createElement('div');
+            loadingText.textContent = 'Loading...';
+
+            overlay.appendChild(spinner);
+            overlay.appendChild(loadingText);
             chartData.canvas.parentElement.appendChild(overlay);
         },
 

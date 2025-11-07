@@ -10,6 +10,7 @@ using Honua.Server.AlertReceiver.Data;
 using Honua.Server.AlertReceiver.Services;
 using Honua.Server.Core.Services;
 using Honua.Server.Host.Admin.Models;
+using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -29,11 +30,8 @@ public static class AlertAdministrationEndpoints
     {
         var group = endpoints.MapGroup("/admin/alerts")
             .WithTags("Admin - Alerts")
-            .WithOpenApi();
-
-        // TODO: Add authorization after auth integration
-        // .RequireAuthorization("RequireAdministrator")
-        // .RequireRateLimiting("admin-operations");
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // Alert Rules
         group.MapGet("/rules", GetAlertRules)
@@ -191,6 +189,7 @@ public static class AlertAdministrationEndpoints
 
     private static async Task<IResult> CreateAlertRule(
         CreateAlertRuleRequest request,
+        HttpContext context,
         IAlertConfigurationService configService,
         ILogger<AlertRule> logger,
         CancellationToken ct)
@@ -215,7 +214,7 @@ public static class AlertAdministrationEndpoints
                 NotificationChannelIds = request.NotificationChannelIds,
                 Enabled = request.Enabled,
                 Metadata = request.Metadata,
-                CreatedBy = "admin" // TODO: Get from authentication context
+                CreatedBy = UserIdentityHelper.GetUserIdentifier(context.User)
             };
 
             var id = await configService.CreateAlertRuleAsync(rule, ct);
@@ -251,6 +250,7 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> UpdateAlertRule(
         long id,
         UpdateAlertRuleRequest request,
+        HttpContext context,
         IAlertConfigurationService configService,
         ILogger<AlertRule> logger,
         CancellationToken ct)
@@ -286,7 +286,7 @@ public static class AlertAdministrationEndpoints
                 NotificationChannelIds = request.NotificationChannelIds,
                 Enabled = request.Enabled,
                 Metadata = request.Metadata,
-                ModifiedBy = "admin" // TODO: Get from authentication context
+                ModifiedBy = UserIdentityHelper.GetUserIdentifier(context.User)
             };
 
             await configService.UpdateAlertRuleAsync(id, updatedRule, ct);
@@ -343,6 +343,8 @@ public static class AlertAdministrationEndpoints
         long id,
         TestAlertRuleRequest? request,
         IAlertConfigurationService configService,
+        INotificationChannelService channelService,
+        IAlertPublishingService publishingService,
         ILogger<AlertRule> logger,
         CancellationToken ct)
     {
@@ -358,16 +360,34 @@ public static class AlertAdministrationEndpoints
                     detail: $"Alert rule with ID '{id}' does not exist");
             }
 
-            // TODO: Implement actual alert publishing logic
-            // This would use the existing IAlertPublisher infrastructure
             logger.LogInformation("Testing alert rule {RuleId}: {RuleName}", id, rule.Name);
+
+            // Get the notification channels for this rule
+            var allChannels = await channelService.GetNotificationChannelsAsync(ct);
+            var ruleChannels = allChannels
+                .Where(c => rule.NotificationChannelIds.Contains(c.Id))
+                .ToList();
+
+            if (ruleChannels.Count == 0)
+            {
+                return Results.Ok(new TestAlertRuleResponse
+                {
+                    Success = false,
+                    Message = "No notification channels configured for this alert rule",
+                    PublishedChannels = new List<string>(),
+                    FailedChannels = new List<string>()
+                });
+            }
+
+            // Publish test alert to configured channels
+            var result = await publishingService.PublishTestAlertAsync(rule, ruleChannels, ct);
 
             var response = new TestAlertRuleResponse
             {
-                Success = true,
-                Message = $"Test alert would be sent to {rule.NotificationChannelIds.Count} channel(s)",
-                PublishedChannels = rule.NotificationChannelIds.Select(cid => $"Channel {cid}").ToList(),
-                FailedChannels = new List<string>()
+                Success = result.Success,
+                Message = result.Message,
+                PublishedChannels = result.PublishedChannels,
+                FailedChannels = result.FailedChannels
             };
 
             return Results.Ok(response);
@@ -462,6 +482,7 @@ public static class AlertAdministrationEndpoints
 
     private static async Task<IResult> CreateNotificationChannel(
         CreateNotificationChannelRequest request,
+        HttpContext context,
         INotificationChannelService channelService,
         ILogger<NotificationChannel> logger,
         CancellationToken ct)
@@ -485,7 +506,7 @@ public static class AlertAdministrationEndpoints
                 Configuration = request.Configuration,
                 Enabled = request.Enabled,
                 SeverityFilter = request.SeverityFilter,
-                CreatedBy = "admin" // TODO: Get from authentication context
+                CreatedBy = UserIdentityHelper.GetUserIdentifier(context.User)
             };
 
             var id = await channelService.CreateNotificationChannelAsync(channel, ct);
@@ -521,6 +542,7 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> UpdateNotificationChannel(
         long id,
         UpdateNotificationChannelRequest request,
+        HttpContext context,
         INotificationChannelService channelService,
         ILogger<NotificationChannel> logger,
         CancellationToken ct)
@@ -546,7 +568,7 @@ public static class AlertAdministrationEndpoints
                 Configuration = request.Configuration,
                 Enabled = request.Enabled,
                 SeverityFilter = request.SeverityFilter,
-                ModifiedBy = "admin" // TODO: Get from authentication context
+                ModifiedBy = UserIdentityHelper.GetUserIdentifier(context.User)
             };
 
             await channelService.UpdateNotificationChannelAsync(id, updatedChannel, ct);
@@ -603,6 +625,7 @@ public static class AlertAdministrationEndpoints
         long id,
         TestNotificationChannelRequest? request,
         INotificationChannelService channelService,
+        IAlertPublishingService publishingService,
         ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
@@ -618,16 +641,27 @@ public static class AlertAdministrationEndpoints
                     detail: $"Notification channel with ID '{id}' does not exist");
             }
 
-            // TODO: Implement actual notification channel testing
-            // This would use the existing IAlertPublisher infrastructure
+            if (!channel.Enabled)
+            {
+                return Results.Ok(new TestNotificationChannelResponse
+                {
+                    Success = false,
+                    Message = "Notification channel is disabled. Enable it before testing.",
+                    LatencyMs = null
+                });
+            }
+
             logger.LogInformation("Testing notification channel {ChannelId}: {ChannelName} ({ChannelType})",
                 id, channel.Name, channel.Type);
 
+            // Test the notification channel
+            var result = await publishingService.TestNotificationChannelAsync(channel, ct);
+
             var response = new TestNotificationChannelResponse
             {
-                Success = true,
-                Message = $"Test notification sent successfully to {channel.Type} channel",
-                LatencyMs = 125
+                Success = result.Success,
+                Message = result.Message,
+                LatencyMs = result.LatencyMs
             };
 
             return Results.Ok(response);
@@ -831,6 +865,7 @@ public static class AlertAdministrationEndpoints
 
     private static async Task<IResult> UpdateAlertRouting(
         UpdateAlertRoutingConfigurationRequest request,
+        HttpContext context,
         IAlertConfigurationService configService,
         ILogger<AlertRoutingConfiguration> logger,
         CancellationToken ct)
@@ -853,7 +888,7 @@ public static class AlertAdministrationEndpoints
                     NotificationChannelIds = request.DefaultRoute.NotificationChannelIds,
                     Continue = request.DefaultRoute.Continue
                 } : null,
-                ModifiedBy = "admin" // TODO: Get from authentication context
+                ModifiedBy = UserIdentityHelper.GetUserIdentifier(context.User)
             };
 
             await configService.UpdateRoutingConfigurationAsync(config, ct);

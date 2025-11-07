@@ -23,10 +23,8 @@ public static class FeatureFlagEndpoints
     {
         var group = endpoints.MapGroup("/admin")
             .WithTags("Admin - Feature Flags")
-            .WithOpenApi();
-
-        // TODO: Add authorization after auth integration
-        // .RequireAuthorization()
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         group.MapGet("/feature-flags", GetFeatureFlags)
             .WithName("GetFeatureFlags")

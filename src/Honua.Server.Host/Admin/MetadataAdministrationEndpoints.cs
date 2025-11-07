@@ -26,11 +26,8 @@ public static class MetadataAdministrationEndpoints
     {
         var group = endpoints.MapGroup("/admin/metadata")
             .WithTags("Admin - Metadata")
-            .WithOpenApi();
-
-        // TODO: Add authorization after auth integration
-        // .RequireAuthorization("RequireAdministrator")
-        // .RequireRateLimiting("admin-operations");
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // Dashboard
         group.MapGet("/stats", GetDashboardStats)

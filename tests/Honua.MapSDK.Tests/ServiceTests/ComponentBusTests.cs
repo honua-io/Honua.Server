@@ -311,7 +311,7 @@ public class ComponentBusTests
     }
 
     [Fact]
-    public void Publish_SynchronousVersion_ShouldInvokeHandlers()
+    public async Task Publish_SynchronousVersion_ShouldInvokeHandlers()
     {
         // Arrange
         var bus = new ComponentBus();
@@ -332,7 +332,7 @@ public class ComponentBusTests
         bus.Publish(message, "sender");
 
         // Give it a moment for async operation to complete
-        Task.Delay(100).Wait();
+        await Task.Delay(100);
 
         // Assert
         messageReceived.Should().BeTrue();

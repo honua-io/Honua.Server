@@ -11,6 +11,7 @@ using Microsoft.Data.Sqlite;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Honua.Server.Core.OpenRosa;
 
@@ -189,11 +190,15 @@ public class SqliteSubmissionRepository : ISubmissionRepository
         }
 
         var attributesJson = reader["attributes_json"] as string ?? "{}";
-        var attributes = JsonConvert.DeserializeObject<Dictionary<string, object?>>(attributesJson)
-            ?? new Dictionary<string, object?>();
+        var attributes = DeserializeAttributesSafely(attributesJson);
 
         var attachmentsJson = reader["attachments_json"] as string ?? "[]";
-        var attachments = JsonConvert.DeserializeObject<List<SubmissionAttachment>>(attachmentsJson)
+        var attachmentSettings = new JsonSerializerSettings
+        {
+            TypeNameHandling = TypeNameHandling.None, // Prevent $type metadata exploitation
+            MetadataPropertyHandling = MetadataPropertyHandling.Ignore
+        };
+        var attachments = JsonConvert.DeserializeObject<List<SubmissionAttachment>>(attachmentsJson, attachmentSettings)
             ?? new List<SubmissionAttachment>();
 
         var xmlData = XDocument.Parse(reader["xml_data"] as string ?? "<data/>");
@@ -260,5 +265,66 @@ public class SqliteSubmissionRepository : ISubmissionRepository
 
         using var cmd = new SqliteCommand(sql, connection);
         await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Safely deserializes attributes JSON to a dictionary, ensuring only primitive types are allowed.
+    /// This prevents potential security vulnerabilities from deserializing arbitrary types.
+    /// </summary>
+    private static Dictionary<string, object?> DeserializeAttributesSafely(string json)
+    {
+        var settings = new JsonSerializerSettings
+        {
+            TypeNameHandling = TypeNameHandling.None, // Prevent $type metadata exploitation
+            MetadataPropertyHandling = MetadataPropertyHandling.Ignore,
+            MaxDepth = 32 // Prevent deep nesting attacks
+        };
+
+        var rawDict = JsonConvert.DeserializeObject<Dictionary<string, object?>>(json, settings)
+            ?? new Dictionary<string, object?>();
+
+        // Convert JToken values to primitive types and validate
+        var safeDict = new Dictionary<string, object?>();
+        foreach (var (key, value) in rawDict)
+        {
+            safeDict[key] = ConvertToSafePrimitive(value);
+        }
+
+        return safeDict;
+    }
+
+    /// <summary>
+    /// Converts a value to a safe primitive type, preventing complex object deserialization.
+    /// </summary>
+    private static object? ConvertToSafePrimitive(object? value)
+    {
+        if (value == null)
+            return null;
+
+        // Handle JToken types from JSON.NET
+        if (value is JValue jValue)
+            return jValue.Value;
+
+        if (value is JToken jToken)
+            return jToken.ToObject<object>();
+
+        // Validate that the value is a safe primitive type
+        return value switch
+        {
+            string s => s,
+            int i => i,
+            long l => l,
+            double d => d,
+            decimal dec => dec,
+            bool b => b,
+            DateTime dt => dt,
+            DateTimeOffset dto => dto,
+            // Allow numeric types that JSON.NET might use
+            float f => (double)f,
+            short sh => (int)sh,
+            byte by => (int)by,
+            _ => throw new InvalidOperationException(
+                $"Unsafe type '{value.GetType().Name}' detected in attributes. Only primitive types are allowed.")
+        };
     }
 }

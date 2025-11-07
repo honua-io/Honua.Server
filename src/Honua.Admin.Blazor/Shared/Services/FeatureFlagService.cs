@@ -94,9 +94,9 @@ public sealed class FeatureFlagService
     /// <summary>
     /// Clears the feature flag cache, forcing a reload on next access.
     /// </summary>
-    public void ClearCache()
+    public async Task ClearCacheAsync(CancellationToken cancellationToken = default)
     {
-        _cacheLock.Wait();
+        await _cacheLock.WaitAsync(cancellationToken);
         try
         {
             _cachedFlags = null;
