@@ -29,6 +29,8 @@ internal static partial class OgcFeaturesHandlers
         IFeatureContextResolver resolver,
         IFeatureRepository repository,
         IFeatureEditOrchestrator orchestrator,
+        Services.IOgcFeaturesGeoJsonHandler geoJsonHandler,
+        Services.IOgcFeaturesEditingHandler editingHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(request);
@@ -43,7 +45,7 @@ internal static partial class OgcFeaturesHandlers
         }
         var layer = context.Layer;
 
-        using var document = await OgcSharedHandlers.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
+        using var document = await geoJsonHandler.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
         if (document is null)
         {
             return OgcSharedHandlers.CreateValidationProblem("Request body must contain a valid GeoJSON feature or FeatureCollection.", "body");
@@ -53,14 +55,14 @@ internal static partial class OgcFeaturesHandlers
         var commands = new List<FeatureEditCommand>();
         var fallbackIds = new List<string?>();
 
-        foreach (var featureElement in OgcSharedHandlers.EnumerateGeoJsonFeatures(document.RootElement))
+        foreach (var featureElement in geoJsonHandler.EnumerateGeoJsonFeatures(document.RootElement))
         {
             if (featureElement.ValueKind != JsonValueKind.Object)
             {
                 continue;
             }
 
-            var attributes = OgcSharedHandlers.ReadGeoJsonAttributes(featureElement, layer, removeId: false, out var fallbackId);
+            var attributes = geoJsonHandler.ReadGeoJsonAttributes(featureElement, layer, removeId: false, out var fallbackId);
             if (attributes.Count == 0 && fallbackId is null)
             {
                 continue;
@@ -75,7 +77,7 @@ internal static partial class OgcFeaturesHandlers
             return OgcSharedHandlers.CreateValidationProblem("No features were supplied.", "features");
         }
 
-        var batch = OgcSharedHandlers.CreateFeatureEditBatch(commands, request);
+        var batch = editingHandler.CreateFeatureEditBatch(commands, request);
         var editResult = await orchestrator.ExecuteAsync(batch, cancellationToken).ConfigureAwait(false);
         if (editResult.Results.Count != commands.Count)
         {
@@ -85,11 +87,11 @@ internal static partial class OgcFeaturesHandlers
         var failure = editResult.Results.FirstOrDefault(result => !result.Success);
         if (failure is not null)
         {
-            return OgcSharedHandlers.CreateEditFailureProblem(failure.Error, StatusCodes.Status400BadRequest);
+            return editingHandler.CreateEditFailureProblem(failure.Error, StatusCodes.Status400BadRequest);
         }
 
         var featureQuery = new FeatureQuery(ResultType: FeatureResultType.Results);
-        var created = await OgcSharedHandlers.FetchCreatedFeaturesWithETags(
+        var created = await editingHandler.FetchCreatedFeaturesWithETags(
             repository,
             context,
             layer,
@@ -100,7 +102,7 @@ internal static partial class OgcFeaturesHandlers
             request,
             cancellationToken).ConfigureAwait(false);
 
-        return OgcSharedHandlers.BuildMutationResponse(created, collectionId, singleItemMode: true);
+        return editingHandler.BuildMutationResponse(created, collectionId, singleItemMode: true);
     }
 
     /// <summary>
@@ -115,6 +117,8 @@ internal static partial class OgcFeaturesHandlers
         IFeatureContextResolver resolver,
         IFeatureRepository repository,
         IFeatureEditOrchestrator orchestrator,
+        Services.IOgcFeaturesGeoJsonHandler geoJsonHandler,
+        Services.IOgcFeaturesEditingHandler editingHandler,
         CancellationToken cancellationToken)
     {
         var (context, contextError) = await OgcSharedHandlers.TryResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);
@@ -124,7 +128,7 @@ internal static partial class OgcFeaturesHandlers
         }
         var layer = context.Layer;
 
-        using var document = await OgcSharedHandlers.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
+        using var document = await geoJsonHandler.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
         if (document is null)
         {
             return OgcSharedHandlers.CreateValidationProblem("Request body must contain a valid GeoJSON feature.", "body");
@@ -138,7 +142,7 @@ internal static partial class OgcFeaturesHandlers
             return OgcSharedHandlers.CreateValidationProblem("FeatureCollection payloads are not supported for PUT operations.", "type");
         }
 
-        var attributes = OgcSharedHandlers.ReadGeoJsonAttributes(featureElement, layer, removeId: true, out var bodyFeatureId);
+        var attributes = geoJsonHandler.ReadGeoJsonAttributes(featureElement, layer, removeId: true, out var bodyFeatureId);
         if (attributes.Count == 0 && !featureElement.TryGetProperty("geometry", out _))
         {
             return OgcSharedHandlers.CreateValidationProblem("Feature update must contain properties or geometry.", "feature");
@@ -159,7 +163,7 @@ internal static partial class OgcFeaturesHandlers
             return OgcSharedHandlers.CreateNotFoundProblem($"Feature '{featureId}' was not found in collection '{collectionId}'.");
         }
 
-        if (!OgcSharedHandlers.ValidateIfMatch(request, layer, existingRecord, out var currentEtag))
+        if (!editingHandler.ValidateIfMatch(request, layer, existingRecord, out var currentEtag))
         {
             // If-Match header provided but doesn't match - return 412 Precondition Failed
             return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
@@ -176,7 +180,7 @@ internal static partial class OgcFeaturesHandlers
 
         // Create update command with version from existing record for optimistic locking
         var command = new UpdateFeatureCommand(context.Service.Id, layer.Id, featureId, attributes, existingRecord.Version);
-        var batch = OgcSharedHandlers.CreateFeatureEditBatch(new[] { command }, request);
+        var batch = editingHandler.CreateFeatureEditBatch(new[] { command }, request);
 
         try
         {
@@ -189,7 +193,7 @@ internal static partial class OgcFeaturesHandlers
 
             if (!result.Success)
             {
-                return OgcSharedHandlers.CreateEditFailureProblem(result.Error, string.Equals(result.Error?.Code, "not_found", StringComparison.OrdinalIgnoreCase) ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+                return editingHandler.CreateEditFailureProblem(result.Error, string.Equals(result.Error?.Code, "not_found", StringComparison.OrdinalIgnoreCase) ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
             }
         }
         catch (Core.Exceptions.ConcurrencyException)
@@ -198,7 +202,7 @@ internal static partial class OgcFeaturesHandlers
             var conflictRecord = await repository.GetAsync(context.Service.Id, layer.Id, featureId, featureQuery, cancellationToken).ConfigureAwait(false);
             if (conflictRecord is not null)
             {
-                var conflictEtag = OgcSharedHandlers.ComputeFeatureEtag(layer, conflictRecord);
+                var conflictEtag = editingHandler.ComputeFeatureEtag(layer, conflictRecord);
                 var conflictResponse = Results.StatusCode(StatusCodes.Status409Conflict);
                 conflictResponse = OgcSharedHandlers.WithResponseHeader(conflictResponse, HeaderNames.ETag, conflictEtag);
                 return conflictResponse;
@@ -213,8 +217,8 @@ internal static partial class OgcFeaturesHandlers
             return Results.NoContent();
         }
 
-        var feature = OgcSharedHandlers.ToFeature(request, collectionId, layer, record, featureQuery);
-        var etag = OgcSharedHandlers.ComputeFeatureEtag(layer, record);
+        var feature = geoJsonHandler.ToFeature(request, collectionId, layer, record, featureQuery);
+        var etag = editingHandler.ComputeFeatureEtag(layer, record);
         var response = Results.Ok(feature);
         return OgcSharedHandlers.WithResponseHeader(response, HeaderNames.ETag, etag);
     }
@@ -231,6 +235,8 @@ internal static partial class OgcFeaturesHandlers
         IFeatureContextResolver resolver,
         IFeatureRepository repository,
         IFeatureEditOrchestrator orchestrator,
+        Services.IOgcFeaturesGeoJsonHandler geoJsonHandler,
+        Services.IOgcFeaturesEditingHandler editingHandler,
         CancellationToken cancellationToken)
     {
         var (context, contextError) = await OgcSharedHandlers.TryResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);
@@ -240,7 +246,7 @@ internal static partial class OgcFeaturesHandlers
         }
         var layer = context.Layer;
 
-        using var document = await OgcSharedHandlers.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
+        using var document = await geoJsonHandler.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
         if (document is null)
         {
             return OgcSharedHandlers.CreateValidationProblem("Request body must contain a valid GeoJSON feature.", "body");
@@ -254,7 +260,7 @@ internal static partial class OgcFeaturesHandlers
             return OgcSharedHandlers.CreateValidationProblem("FeatureCollection payloads are not supported for PATCH operations.", "type");
         }
 
-        var attributes = OgcSharedHandlers.ReadGeoJsonAttributes(featureElement, layer, removeId: true, out var bodyFeatureId);
+        var attributes = geoJsonHandler.ReadGeoJsonAttributes(featureElement, layer, removeId: true, out var bodyFeatureId);
         if (attributes.Count == 0 && !featureElement.TryGetProperty("geometry", out _))
         {
             return OgcSharedHandlers.CreateValidationProblem("Feature update must contain properties or geometry.", "feature");
@@ -275,7 +281,7 @@ internal static partial class OgcFeaturesHandlers
             return OgcSharedHandlers.CreateNotFoundProblem($"Feature '{featureId}' was not found in collection '{collectionId}'.");
         }
 
-        if (!OgcSharedHandlers.ValidateIfMatch(request, layer, existingRecord, out var currentEtag))
+        if (!editingHandler.ValidateIfMatch(request, layer, existingRecord, out var currentEtag))
         {
             // If-Match header provided but doesn't match - return 412 Precondition Failed
             return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
@@ -292,7 +298,7 @@ internal static partial class OgcFeaturesHandlers
 
         // Create update command with version from existing record for optimistic locking
         var command = new UpdateFeatureCommand(context.Service.Id, layer.Id, featureId, attributes, existingRecord.Version);
-        var batch = OgcSharedHandlers.CreateFeatureEditBatch(new[] { command }, request);
+        var batch = editingHandler.CreateFeatureEditBatch(new[] { command }, request);
 
         try
         {
@@ -305,7 +311,7 @@ internal static partial class OgcFeaturesHandlers
 
             if (!result.Success)
             {
-                return OgcSharedHandlers.CreateEditFailureProblem(result.Error, string.Equals(result.Error?.Code, "not_found", StringComparison.OrdinalIgnoreCase) ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+                return editingHandler.CreateEditFailureProblem(result.Error, string.Equals(result.Error?.Code, "not_found", StringComparison.OrdinalIgnoreCase) ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
             }
         }
         catch (Core.Exceptions.ConcurrencyException)
@@ -314,7 +320,7 @@ internal static partial class OgcFeaturesHandlers
             var conflictRecord = await repository.GetAsync(context.Service.Id, layer.Id, featureId, featureQuery, cancellationToken).ConfigureAwait(false);
             if (conflictRecord is not null)
             {
-                var conflictEtag = OgcSharedHandlers.ComputeFeatureEtag(layer, conflictRecord);
+                var conflictEtag = editingHandler.ComputeFeatureEtag(layer, conflictRecord);
                 var conflictResponse = Results.StatusCode(StatusCodes.Status409Conflict);
                 conflictResponse = OgcSharedHandlers.WithResponseHeader(conflictResponse, HeaderNames.ETag, conflictEtag);
                 return conflictResponse;
@@ -329,8 +335,8 @@ internal static partial class OgcFeaturesHandlers
             return Results.NoContent();
         }
 
-        var feature = OgcSharedHandlers.ToFeature(request, collectionId, layer, record, featureQuery);
-        var etag = OgcSharedHandlers.ComputeFeatureEtag(layer, record);
+        var feature = geoJsonHandler.ToFeature(request, collectionId, layer, record, featureQuery);
+        var etag = editingHandler.ComputeFeatureEtag(layer, record);
         var response = Results.Ok(feature);
         return OgcSharedHandlers.WithResponseHeader(response, HeaderNames.ETag, etag);
     }
@@ -347,6 +353,7 @@ internal static partial class OgcFeaturesHandlers
         IFeatureContextResolver resolver,
         IFeatureRepository repository,
         IFeatureEditOrchestrator orchestrator,
+        Services.IOgcFeaturesEditingHandler editingHandler,
         CancellationToken cancellationToken)
     {
         var (context, contextError) = await OgcSharedHandlers.TryResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);
@@ -356,13 +363,13 @@ internal static partial class OgcFeaturesHandlers
         }
         var featureQuery = new FeatureQuery(ResultType: FeatureResultType.Results);
         var existingRecord = await repository.GetAsync(context.Service.Id, context.Layer.Id, featureId, featureQuery, cancellationToken).ConfigureAwait(false);
-        if (existingRecord is not null && !OgcSharedHandlers.ValidateIfMatch(request, context.Layer, existingRecord, out _))
+        if (existingRecord is not null && !editingHandler.ValidateIfMatch(request, context.Layer, existingRecord, out _))
         {
             return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
         }
 
         var command = new DeleteFeatureCommand(context.Service.Id, context.Layer.Id, featureId);
-        var batch = OgcSharedHandlers.CreateFeatureEditBatch(new[] { command }, request);
+        var batch = editingHandler.CreateFeatureEditBatch(new[] { command }, request);
         var editResult = await orchestrator.ExecuteAsync(batch, cancellationToken).ConfigureAwait(false);
         var result = editResult.Results.FirstOrDefault();
         if (result is null)
@@ -372,7 +379,7 @@ internal static partial class OgcFeaturesHandlers
 
         if (!result.Success)
         {
-            return OgcSharedHandlers.CreateEditFailureProblem(result.Error, string.Equals(result.Error?.Code, "not_found", StringComparison.OrdinalIgnoreCase) ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+            return editingHandler.CreateEditFailureProblem(result.Error, string.Equals(result.Error?.Code, "not_found", StringComparison.OrdinalIgnoreCase) ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
         }
 
         return Results.NoContent();

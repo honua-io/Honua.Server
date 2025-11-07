@@ -53,6 +53,7 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         CancellationToken cancellationToken)
         => ExecuteCollectionItemsAsync(
             collectionId,
@@ -68,6 +69,7 @@ internal static partial class OgcFeaturesHandlers
             metadataRegistry,
             apiMetrics,
             cacheHeaderService,
+            attachmentHandler,
             queryOverrides: null,
             cancellationToken);
 
@@ -88,6 +90,7 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         IQueryCollection? queryOverrides,
         CancellationToken cancellationToken)
     {
@@ -251,7 +254,7 @@ internal static partial class OgcFeaturesHandlers
             numberMatched = await repository.CountAsync(service.Id, layer.Id, query, cancellationToken).ConfigureAwait(false);
         }
 
-        var exposeAttachments = !isKmlLike && !isTopo && !isWkt && !isWkb && OgcSharedHandlers.ShouldExposeAttachmentLinks(service, layer);
+        var exposeAttachments = !isKmlLike && !isTopo && !isWkt && !isWkb && attachmentHandler.ShouldExposeAttachmentLinks(service, layer);
 
         var useStreaming = format == OgcSharedHandlers.OgcResponseFormat.GeoJson
             && !exposeAttachments
@@ -396,7 +399,7 @@ internal static partial class OgcFeaturesHandlers
                                 descriptorsForFeature = Array.Empty<AttachmentDescriptor>();
                             }
 
-                            attachmentLinks = await OgcSharedHandlers.CreateAttachmentLinksAsync(
+                            attachmentLinks = await attachmentHandler.CreateAttachmentLinksAsync(
                                 request,
                                 service,
                                 layer,
@@ -408,7 +411,7 @@ internal static partial class OgcFeaturesHandlers
                         }
                         else
                         {
-                            attachmentLinks = await OgcSharedHandlers.CreateAttachmentLinksAsync(
+                            attachmentLinks = await attachmentHandler.CreateAttachmentLinksAsync(
                                 request,
                                 service,
                                 layer,
@@ -684,6 +687,8 @@ internal static partial class OgcFeaturesHandlers
         IFeatureAttachmentOrchestrator attachmentOrchestrator,
         IMetadataRegistry metadataRegistry,
         OgcCacheHeaderService cacheHeaderService,
+        Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+        Services.IOgcFeaturesEditingHandler editingHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(attachmentOrchestrator);
@@ -830,12 +835,12 @@ internal static partial class OgcFeaturesHandlers
         FeatureComponents? componentsOverride = isHtml ? FeatureComponentBuilder.BuildComponents(layer, record, featureQuery) : null;
         IReadOnlyList<OgcLink>? attachmentLinks = null;
 
-        if (OgcSharedHandlers.ShouldExposeAttachmentLinks(service, layer))
+        if (attachmentHandler.ShouldExposeAttachmentLinks(service, layer))
         {
             componentsOverride ??= FeatureComponentBuilder.BuildComponents(layer, record, featureQuery);
             try
             {
-                var descriptors = await OgcSharedHandlers.CreateAttachmentLinksAsync(
+                var descriptors = await attachmentHandler.CreateAttachmentLinksAsync(
                     request,
                     service,
                     layer,
@@ -860,7 +865,7 @@ internal static partial class OgcFeaturesHandlers
         }
 
         var feature = OgcSharedHandlers.ToFeature(request, collectionId, layer, record, featureQuery, componentsOverride, attachmentLinks);
-        var etag = OgcSharedHandlers.ComputeFeatureEtag(layer, record);
+        var etag = editingHandler.ComputeFeatureEtag(layer, record);
         if (isHtml)
         {
             var effectiveComponents = componentsOverride ?? FeatureComponentBuilder.BuildComponents(layer, record, featureQuery);
