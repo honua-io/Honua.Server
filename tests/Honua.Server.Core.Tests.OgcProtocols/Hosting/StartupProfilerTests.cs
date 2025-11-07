@@ -4,6 +4,7 @@
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using FluentAssertions;
 using Honua.Server.Core.Hosting;
 using Microsoft.Extensions.Logging;
@@ -52,16 +53,16 @@ public class StartupProfilerTests
     }
 
     [Fact]
-    public void Checkpoint_RecordsIncreasingTimestamps()
+    public async Task Checkpoint_RecordsIncreasingTimestamps()
     {
         // Arrange
         var profiler = new StartupProfiler();
 
         // Act
         profiler.Checkpoint("First");
-        Thread.Sleep(50);
+        await Task.Delay(50);
         profiler.Checkpoint("Second");
-        Thread.Sleep(50);
+        await Task.Delay(50);
         profiler.Checkpoint("Third");
 
         // Assert
@@ -72,11 +73,11 @@ public class StartupProfilerTests
     }
 
     [Fact]
-    public void ElapsedMilliseconds_ReturnsCurrentElapsedTime()
+    public async Task ElapsedMilliseconds_ReturnsCurrentElapsedTime()
     {
         // Arrange
         var profiler = new StartupProfiler();
-        Thread.Sleep(10);
+        await Task.Delay(10);
 
         // Act
         var elapsed = profiler.ElapsedMilliseconds;
@@ -86,16 +87,16 @@ public class StartupProfilerTests
     }
 
     [Fact]
-    public void Checkpoints_ReturnsOrderedList()
+    public async Task Checkpoints_ReturnsOrderedList()
     {
         // Arrange
         var profiler = new StartupProfiler();
 
         // Act - Add checkpoints with delays to ensure different timestamps
         profiler.Checkpoint("First");
-        Thread.Sleep(10);
+        await Task.Delay(10);
         profiler.Checkpoint("Second");
-        Thread.Sleep(10);
+        await Task.Delay(10);
         profiler.Checkpoint("Third");
 
         // Assert
@@ -104,12 +105,12 @@ public class StartupProfilerTests
     }
 
     [Fact]
-    public void LogResults_LogsAllCheckpoints()
+    public async Task LogResults_LogsAllCheckpoints()
     {
         // Arrange
         var profiler = new StartupProfiler();
         profiler.Checkpoint("Step 1");
-        Thread.Sleep(20);
+        await Task.Delay(20);
         profiler.Checkpoint("Step 2");
 
         var loggerMock = new Mock<ILogger>();
@@ -129,11 +130,11 @@ public class StartupProfilerTests
     }
 
     [Fact]
-    public void LogResults_LogsTotalStartupTime()
+    public async Task LogResults_LogsTotalStartupTime()
     {
         // Arrange
         var profiler = new StartupProfiler();
-        Thread.Sleep(50);
+        await Task.Delay(50);
 
         var loggerMock = new Mock<ILogger>();
 
@@ -197,16 +198,16 @@ public class StartupProfilerTests
     }
 
     [Fact]
-    public void LogResults_LogsSlowestOperations()
+    public async Task LogResults_LogsSlowestOperations()
     {
         // Arrange
         var profiler = new StartupProfiler();
         profiler.Checkpoint("Fast");
-        Thread.Sleep(10);
+        await Task.Delay(10);
         profiler.Checkpoint("Slow");
-        Thread.Sleep(100);
+        await Task.Delay(100);
         profiler.Checkpoint("Medium");
-        Thread.Sleep(50);
+        await Task.Delay(50);
 
         var loggerMock = new Mock<ILogger>();
 

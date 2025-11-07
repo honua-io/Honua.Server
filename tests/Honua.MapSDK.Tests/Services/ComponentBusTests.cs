@@ -497,7 +497,7 @@ public class ComponentBusTests
     #region Synchronous Publish Tests
 
     [Fact]
-    public void Publish_ShouldInvokeAsyncPublish()
+    public async Task Publish_ShouldInvokeAsyncPublish()
     {
         // Arrange
         var received = false;
@@ -515,7 +515,7 @@ public class ComponentBusTests
 
         // Note: Synchronous publish uses fire-and-forget pattern
         // We need to wait a bit for async execution
-        Task.Delay(100).Wait();
+        await Task.Delay(100);
 
         // Assert
         received.Should().BeTrue();

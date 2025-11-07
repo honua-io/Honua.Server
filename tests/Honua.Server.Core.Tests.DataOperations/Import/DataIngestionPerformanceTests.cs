@@ -242,12 +242,12 @@ public sealed class DataIngestionPerformanceTests : IAsyncDisposable
         public string Provider => "stub";
         public IDataStoreCapabilities Capabilities => TestDataStoreCapabilities.Instance;
 
-        public Task<FeatureRecord> CreateAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, FeatureRecord record, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
+        public async Task<FeatureRecord> CreateAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, FeatureRecord record, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
         {
             // Simulate database latency for individual inserts
-            Thread.Sleep(1); // 1ms per insert to simulate network/DB overhead
+            await Task.Delay(1, cancellationToken); // 1ms per insert to simulate network/DB overhead
             Records.Add(record);
-            return Task.FromResult(record);
+            return record;
         }
 
         public async Task<int> BulkInsertAsync(DataSourceDefinition dataSource, ServiceDefinition service, LayerDefinition layer, IAsyncEnumerable<FeatureRecord> records, CancellationToken cancellationToken = default)

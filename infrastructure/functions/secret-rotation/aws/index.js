@@ -12,13 +12,24 @@
  * - Secrets Manager rotation schedule
  */
 
-const AWS = require('aws-sdk');
+// AWS SDK v3 - Modular imports
+const {
+  SecretsManagerClient,
+  GetSecretValueCommand,
+  PutSecretValueCommand,
+  DescribeSecretCommand,
+  UpdateSecretVersionStageCommand,
+  ListSecretsCommand,
+  RotateSecretCommand
+} = require('@aws-sdk/client-secrets-manager');
+const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
+const { SSMClient, PutParameterCommand } = require('@aws-sdk/client-ssm');
 const { Client } = require('pg');
 
-// AWS SDK Clients
-const secretsManager = new AWS.SecretsManager();
-const sns = new AWS.SNS();
-const eventBridge = new AWS.EventBridge();
+// AWS SDK v3 Clients
+const secretsManagerClient = new SecretsManagerClient({});
+const snsClient = new SNSClient({});
+const ssmClient = new SSMClient({});
 
 /**
  * Lambda handler - routes to appropriate rotation function
@@ -120,10 +131,12 @@ async function createSecret(secretId, token) {
   console.log(`Creating new secret version for: ${secretId}`);
 
   // Get current secret
-  const currentSecret = await secretsManager.getSecretValue({
-    SecretId: secretId,
-    VersionStage: 'AWSCURRENT'
-  }).promise();
+  const currentSecret = await secretsManagerClient.send(
+    new GetSecretValueCommand({
+      SecretId: secretId,
+      VersionStage: 'AWSCURRENT'
+    })
+  );
 
   const currentValue = JSON.parse(currentSecret.SecretString);
   const secretType = currentValue.type || 'postgresql';
@@ -148,12 +161,14 @@ async function createSecret(secretId, token) {
   }
 
   // Store new secret with AWSPENDING stage
-  await secretsManager.putSecretValue({
-    SecretId: secretId,
-    ClientRequestToken: token,
-    SecretString: JSON.stringify(newSecretValue),
-    VersionStages: ['AWSPENDING']
-  }).promise();
+  await secretsManagerClient.send(
+    new PutSecretValueCommand({
+      SecretId: secretId,
+      ClientRequestToken: token,
+      SecretString: JSON.stringify(newSecretValue),
+      VersionStages: ['AWSPENDING']
+    })
+  );
 
   console.log('New secret version created');
 }
@@ -165,11 +180,13 @@ async function setSecret(secretId, token) {
   console.log(`Setting new secret in target service: ${secretId}`);
 
   // Get pending secret
-  const pendingSecret = await secretsManager.getSecretValue({
-    SecretId: secretId,
-    VersionId: token,
-    VersionStage: 'AWSPENDING'
-  }).promise();
+  const pendingSecret = await secretsManagerClient.send(
+    new GetSecretValueCommand({
+      SecretId: secretId,
+      VersionId: token,
+      VersionStage: 'AWSPENDING'
+    })
+  );
 
   const secretValue = JSON.parse(pendingSecret.SecretString);
   const secretType = secretValue.type;
@@ -201,11 +218,13 @@ async function testSecret(secretId, token) {
   console.log(`Testing new secret: ${secretId}`);
 
   // Get pending secret
-  const pendingSecret = await secretsManager.getSecretValue({
-    SecretId: secretId,
-    VersionId: token,
-    VersionStage: 'AWSPENDING'
-  }).promise();
+  const pendingSecret = await secretsManagerClient.send(
+    new GetSecretValueCommand({
+      SecretId: secretId,
+      VersionId: token,
+      VersionStage: 'AWSPENDING'
+    })
+  );
 
   const secretValue = JSON.parse(pendingSecret.SecretString);
   const secretType = secretValue.type;
@@ -237,9 +256,11 @@ async function finishSecret(secretId, token) {
   console.log(`Finalizing rotation for: ${secretId}`);
 
   // Get current version
-  const metadata = await secretsManager.describeSecret({
-    SecretId: secretId
-  }).promise();
+  const metadata = await secretsManagerClient.send(
+    new DescribeSecretCommand({
+      SecretId: secretId
+    })
+  );
 
   let currentVersion;
   for (const [versionId, stages] of Object.entries(metadata.VersionIdsToStages)) {
@@ -250,12 +271,14 @@ async function finishSecret(secretId, token) {
   }
 
   // Move AWSCURRENT to AWSPREVIOUS
-  await secretsManager.updateSecretVersionStage({
-    SecretId: secretId,
-    VersionStage: 'AWSCURRENT',
-    MoveToVersionId: token,
-    RemoveFromVersionId: currentVersion
-  }).promise();
+  await secretsManagerClient.send(
+    new UpdateSecretVersionStageCommand({
+      SecretId: secretId,
+      VersionStage: 'AWSCURRENT',
+      MoveToVersionId: token,
+      RemoveFromVersionId: currentVersion
+    })
+  );
 
   console.log('Rotation completed successfully');
 
@@ -287,9 +310,11 @@ async function setPostgresPassword(secretValue) {
 
   // Connect with current master password
   const masterSecretId = process.env.POSTGRES_MASTER_SECRET_ID;
-  const masterSecret = await secretsManager.getSecretValue({
-    SecretId: masterSecretId
-  }).promise();
+  const masterSecret = await secretsManagerClient.send(
+    new GetSecretValueCommand({
+      SecretId: masterSecretId
+    })
+  );
   const masterValue = JSON.parse(masterSecret.SecretString);
 
   // SECURITY: SSL certificate verification is enabled to prevent man-in-the-middle attacks
@@ -398,9 +423,11 @@ async function generateApiKey(currentValue) {
 async function setApiKey(secretValue) {
   // Get database connection
   const dbSecretId = process.env.DATABASE_SECRET_ID;
-  const dbSecret = await secretsManager.getSecretValue({
-    SecretId: dbSecretId
-  }).promise();
+  const dbSecret = await secretsManagerClient.send(
+    new GetSecretValueCommand({
+      SecretId: dbSecretId
+    })
+  );
   const dbValue = JSON.parse(dbSecret.SecretString);
 
   // SECURITY: SSL certificate verification is enabled to prevent man-in-the-middle attacks
@@ -499,14 +526,14 @@ async function generateJwtKey(currentValue) {
  * Set new JWT signing key (update in Parameter Store)
  */
 async function setJwtKey(secretValue) {
-  const ssm = new AWS.SSM();
-
-  await ssm.putParameter({
-    Name: secretValue.parameterName || '/honua/jwt/signing-key',
-    Value: secretValue.signingKey,
-    Type: 'SecureString',
-    Overwrite: true
-  }).promise();
+  await ssmClient.send(
+    new PutParameterCommand({
+      Name: secretValue.parameterName || '/honua/jwt/signing-key',
+      Value: secretValue.signingKey,
+      Type: 'SecureString',
+      Overwrite: true
+    })
+  );
 
   console.log('JWT signing key updated in Parameter Store');
 }
@@ -529,18 +556,20 @@ async function testJwtKey(secretValue) {
  * List secrets tagged for automatic rotation
  */
 async function listSecretsForRotation() {
-  const secrets = await secretsManager.listSecrets({
-    Filters: [
-      {
-        Key: 'tag-key',
-        Values: ['AutoRotate']
-      },
-      {
-        Key: 'tag-value',
-        Values: ['true']
-      }
-    ]
-  }).promise();
+  const secrets = await secretsManagerClient.send(
+    new ListSecretsCommand({
+      Filters: [
+        {
+          Key: 'tag-key',
+          Values: ['AutoRotate']
+        },
+        {
+          Key: 'tag-value',
+          Values: ['true']
+        }
+      ]
+    })
+  );
 
   return secrets.SecretList;
 }
@@ -549,10 +578,12 @@ async function listSecretsForRotation() {
  * Rotate a secret by ID
  */
 async function rotateSecretById(secretId) {
-  await secretsManager.rotateSecret({
-    SecretId: secretId,
-    RotationLambdaARN: process.env.AWS_LAMBDA_FUNCTION_NAME
-  }).promise();
+  await secretsManagerClient.send(
+    new RotateSecretCommand({
+      SecretId: secretId,
+      RotationLambdaARN: process.env.AWS_LAMBDA_FUNCTION_NAME
+    })
+  );
 }
 
 /**
@@ -566,17 +597,19 @@ async function sendNotification(status, message) {
     return;
   }
 
-  await sns.publish({
-    TopicArn: topicArn,
-    Subject: `[HonuaIO] Secret Rotation ${status}`,
-    Message: `${message}\n\nTimestamp: ${new Date().toISOString()}`,
-    MessageAttributes: {
-      status: {
-        DataType: 'String',
-        StringValue: status
+  await snsClient.send(
+    new PublishCommand({
+      TopicArn: topicArn,
+      Subject: `[HonuaIO] Secret Rotation ${status}`,
+      Message: `${message}\n\nTimestamp: ${new Date().toISOString()}`,
+      MessageAttributes: {
+        status: {
+          DataType: 'String',
+          StringValue: status
+        }
       }
-    }
-  }).promise();
+    })
+  );
 
   console.log('Notification sent');
 }

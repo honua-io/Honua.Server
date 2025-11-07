@@ -241,7 +241,7 @@ public class DeploymentStateMachineTests
     }
 
     [Fact]
-    public void StateTransition_WhenTimestampRecorded_ShouldBeInOrder()
+    public async Task StateTransition_WhenTimestampRecorded_ShouldBeInOrder()
     {
         // Arrange
         var deployment = new Server.Core.Deployment.Deployment
@@ -260,9 +260,9 @@ public class DeploymentStateMachineTests
 
         // Act - Add transitions with small delays
         TransitionDeployment(deployment, DeploymentState.Validating, "Validating");
-        System.Threading.Thread.Sleep(10);
+        await Task.Delay(10);
         TransitionDeployment(deployment, DeploymentState.Planning, "Planning");
-        System.Threading.Thread.Sleep(10);
+        await Task.Delay(10);
         TransitionDeployment(deployment, DeploymentState.Applying, "Applying");
 
         // Assert - Timestamps should be in chronological order
