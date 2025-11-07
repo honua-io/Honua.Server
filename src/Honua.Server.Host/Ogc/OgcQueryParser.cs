@@ -102,7 +102,8 @@ internal static class OgcQueryParser
                     }
                 }
 
-                return (default, string.Empty, OgcProblemDetails.CreateNotAcceptableProblem("None of the requested media types are supported."));
+                // If no Accept header media types matched, fall back to default format (GeoJSON)
+                // This is more lenient than returning 406 and aligns with OGC best practices
             }
         }
 

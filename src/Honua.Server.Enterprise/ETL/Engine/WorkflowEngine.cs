@@ -61,14 +61,16 @@ public class WorkflowEngine : IWorkflowEngine
                 {
                     result.Errors.Add($"Workflow contains cycles: {string.Join(", ", result.DagValidation.Cycles.Select(c => string.Join(" → ", c)))}");
                 }
-                if (result.DagValidation.DisconnectedNodes?.Any() == true)
-                {
-                    result.Warnings.Add($"Disconnected nodes: {string.Join(", ", result.DagValidation.DisconnectedNodes)}");
-                }
                 if (result.DagValidation.MissingNodes?.Any() == true)
                 {
                     result.Errors.Add($"Missing node references: {string.Join(", ", result.DagValidation.MissingNodes)}");
                 }
+            }
+
+            // Add warning for disconnected nodes (even if DAG is otherwise valid)
+            if (result.DagValidation.DisconnectedNodes?.Any() == true)
+            {
+                result.Warnings.Add($"Disconnected nodes: {string.Join(", ", result.DagValidation.DisconnectedNodes)}");
             }
 
             // 2. Validate parameters
@@ -193,8 +195,11 @@ public class WorkflowEngine : IWorkflowEngine
         {
             _logger.LogInformation("Starting workflow execution {RunId} for workflow {WorkflowId}", runId, workflow.Id);
 
-            // Persist run
-            await _workflowStore.CreateRunAsync(run, cancellationToken);
+            // Persist run (use CancellationToken.None to ensure run is created even if token is cancelled)
+            await _workflowStore.CreateRunAsync(run, CancellationToken.None);
+
+            // Check for cancellation after creating run record
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Validate workflow
             var validation = await ValidateAsync(workflow, options.ParameterValues, cancellationToken);
@@ -208,6 +213,10 @@ public class WorkflowEngine : IWorkflowEngine
 
             run.Status = WorkflowRunStatus.Running;
             run.StartedAt = DateTimeOffset.UtcNow;
+
+            // Initialize workflow state (for nodes like OutputNode to store data)
+            run.State = new Dictionary<string, object>();
+
             await _workflowStore.UpdateRunAsync(run, cancellationToken);
 
             // Broadcast workflow started
@@ -484,7 +493,9 @@ public class WorkflowEngine : IWorkflowEngine
             _logger.LogWarning("Workflow execution {RunId} was cancelled", runId);
             run.Status = WorkflowRunStatus.Cancelled;
             run.CompletedAt = DateTimeOffset.UtcNow;
-            await _workflowStore.UpdateRunAsync(run, cancellationToken);
+
+            // Use CancellationToken.None to ensure we can update the run status even if cancelled
+            await _workflowStore.UpdateRunAsync(run, CancellationToken.None);
 
             // Broadcast workflow cancelled
             if (_progressBroadcaster != null)

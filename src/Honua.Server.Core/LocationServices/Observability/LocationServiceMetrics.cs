@@ -134,7 +134,7 @@ public class LocationServiceMetrics
             description: "Total number of tiles by format type");
 
         // Provider health gauge
-        _providerHealth = meter.CreateObservableGauge(
+        _providerHealth = meter.CreateObservableGauge<int>(
             "location_service.provider.health",
             () =>
             [

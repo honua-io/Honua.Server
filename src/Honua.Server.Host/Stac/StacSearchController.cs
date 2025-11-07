@@ -38,7 +38,7 @@ namespace Honua.Server.Host.Stac;
 /// </remarks>
 [ApiController]
 [Authorize(Policy = "RequireViewer")]
-[Route("stac/search")]
+[Route("v1/stac/search")]
 public sealed class StacSearchController : ControllerBase
 {
     private readonly IStacCatalogStore _store;

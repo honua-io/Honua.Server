@@ -77,6 +77,7 @@ public static class MauiProgram
 		services.AddSingleton<HonuaField.Data.Repositories.IFeatureRepository, HonuaField.Data.Repositories.FeatureRepository>();
 		services.AddSingleton<HonuaField.Data.Repositories.ICollectionRepository, HonuaField.Data.Repositories.CollectionRepository>();
 		services.AddSingleton<HonuaField.Data.Repositories.IAttachmentRepository, HonuaField.Data.Repositories.AttachmentRepository>();
+		services.AddSingleton<HonuaField.Data.Repositories.IMapRepository, HonuaField.Data.Repositories.MapRepository>();
 
 		// API Services
 		services.AddSingleton<IApiClient, ApiClient>();
@@ -90,6 +91,19 @@ public static class MauiProgram
 		// Location Services
 		services.AddSingleton<ILocationService, LocationService>();
 		services.AddSingleton<IGpsService, GpsService>();
+
+		// Camera and Media Services
+		services.AddSingleton<ICameraService, CameraService>();
+
+		// Offline Map Services
+		services.AddSingleton<IOfflineMapService, OfflineMapService>();
+		services.AddSingleton<OfflineTileProviderFactory>();
+
+		// Symbology Services
+		services.AddSingleton<ISymbologyService, SymbologyService>();
+
+		// Form Builder Service
+		services.AddSingleton<IFormBuilderService, FormBuilderService>();
 	}
 
 	private static void RegisterViewModels(IServiceCollection services)

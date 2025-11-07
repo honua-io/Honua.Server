@@ -36,6 +36,8 @@ public class HonuaFieldDatabase
 			await _database.CreateTableAsync<Attachment>();
 			await _database.CreateTableAsync<Change>();
 			await _database.CreateTableAsync<Map>();
+			await _database.CreateTableAsync<GpsTrack>();
+			await _database.CreateTableAsync<GpsTrackPoint>();
 
 			// Create indexes for performance
 			await CreateIndexesAsync();
@@ -80,6 +82,18 @@ public class HonuaFieldDatabase
 			// Index on synced status in changes for filtering
 			await _database.ExecuteAsync(
 				"CREATE INDEX IF NOT EXISTS idx_changes_synced ON changes(synced)");
+
+			// Index on track_id in GPS track points for fast lookup
+			await _database.ExecuteAsync(
+				"CREATE INDEX IF NOT EXISTS idx_gps_track_points_track_id ON gps_track_points(track_id)");
+
+			// Index on timestamp in GPS track points for temporal queries
+			await _database.ExecuteAsync(
+				"CREATE INDEX IF NOT EXISTS idx_gps_track_points_timestamp ON gps_track_points(timestamp)");
+
+			// Index on status in GPS tracks for filtering
+			await _database.ExecuteAsync(
+				"CREATE INDEX IF NOT EXISTS idx_gps_tracks_status ON gps_tracks(status)");
 
 			// Note: Spatial R-tree indexes for geometry will be created separately
 			// in the repository layer using NetTopologySuite extensions
@@ -193,6 +207,8 @@ public class HonuaFieldDatabase
 		await _database.DeleteAllAsync<Feature>();
 		await _database.DeleteAllAsync<Collection>();
 		await _database.DeleteAllAsync<Map>();
+		await _database.DeleteAllAsync<GpsTrackPoint>();
+		await _database.DeleteAllAsync<GpsTrack>();
 
 		System.Diagnostics.Debug.WriteLine("All database data cleared");
 	}
@@ -208,13 +224,17 @@ public class HonuaFieldDatabase
 		var pendingChanges = await _database.Table<Change>()
 			.Where(c => c.Synced == 0)
 			.CountAsync();
+		var gpsTrackCount = await _database.Table<GpsTrack>().CountAsync();
+		var gpsTrackPointCount = await _database.Table<GpsTrackPoint>().CountAsync();
 
 		return new DatabaseStats
 		{
 			FeatureCount = featureCount,
 			CollectionCount = collectionCount,
 			AttachmentCount = attachmentCount,
-			PendingChanges = pendingChanges
+			PendingChanges = pendingChanges,
+			GpsTrackCount = gpsTrackCount,
+			GpsTrackPointCount = gpsTrackPointCount
 		};
 	}
 }
@@ -228,4 +248,6 @@ public record DatabaseStats
 	public int CollectionCount { get; init; }
 	public int AttachmentCount { get; init; }
 	public int PendingChanges { get; init; }
+	public int GpsTrackCount { get; init; }
+	public int GpsTrackPointCount { get; init; }
 }

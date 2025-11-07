@@ -135,8 +135,8 @@ public sealed class S3RasterTileCacheProviderDisposalTests
     [Fact]
     public void S3RasterTileCacheProvider_Constructor_RequiresBucketName()
     {
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() =>
+        // Act & Assert - empty string is treated as whitespace, throws ArgumentNullException
+        Assert.Throws<ArgumentNullException>(() =>
             new S3RasterTileCacheProvider(_mockS3Client.Object, "", "tiles", false, _logger.Object));
     }
 

@@ -1,10 +1,203 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:HonuaField.ViewModels"
+             xmlns:converters="clr-namespace:HonuaField.Converters"
              x:Class="HonuaField.Views.FeatureDetailPage"
-             Title="FeatureDetail">
-    <VerticalStackLayout Spacing="25" Padding="30" VerticalOptions="Center">
-        <Label Text="FeatureDetail Page" FontSize="32" HorizontalOptions="Center" />
-        <Label Text="Coming soon in Sprint 2+" HorizontalOptions="Center" />
-    </VerticalStackLayout>
+             x:DataType="viewmodels:FeatureDetailViewModel"
+             Title="{Binding Title}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:EmptyStringToVisibilityConverter x:Key="EmptyStringToVisibilityConverter" />
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"
+                                           TrueColor="{StaticResource SuccessGreen}"
+                                           FalseColor="{StaticResource WarningYellow}" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="*,Auto">
+        <!-- Main Content -->
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Style="{StaticResource FormLayout}">
+
+                <!-- Feature Header -->
+                <Frame Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="12">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="Feature ID:"
+                                   Style="{StaticResource BodySmall}"
+                                   TextColor="{StaticResource TextSecondary}" />
+                            <Label Text="{Binding FeatureId}"
+                                   Style="{StaticResource BodySmall}"
+                                   FontAttributes="Bold" />
+                        </HorizontalStackLayout>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Geometry Type" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding GeometryType}" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Sync Status" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                                <HorizontalStackLayout Spacing="4">
+                                    <Label Text="●"
+                                           TextColor="{Binding HasPendingChanges, Converter={StaticResource BoolToColorConverter}}"
+                                           FontSize="12"
+                                           VerticalOptions="Center" />
+                                    <Label Text="{Binding HasPendingChanges, StringFormat='{0:Pending:Synced}'}"
+                                           Style="{StaticResource BodyMedium}"
+                                           FontAttributes="Bold" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" Color="{StaticResource BorderDefault}" />
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Created" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding CreatedDate}" Style="{StaticResource CaptionText}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Modified" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding ModifiedDate}" Style="{StaticResource CaptionText}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Properties Section -->
+                <Label Text="PROPERTIES" Style="{StaticResource SectionHeader}" />
+                <Frame Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="8">
+                        <CollectionView ItemsSource="{Binding Properties}"
+                                      EmptyView="No properties available">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="viewmodels:FeatureProperty">
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Padding="0,4">
+                                        <Label Grid.Column="0"
+                                               Text="{Binding Name}"
+                                               Style="{StaticResource BodySmall}"
+                                               TextColor="{StaticResource TextSecondary}" />
+                                        <Label Grid.Column="1"
+                                               Text="{Binding Value}"
+                                               Style="{StaticResource BodyMedium}"
+                                               FontAttributes="Bold"
+                                               LineBreakMode="WordWrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Attachments Section -->
+                <Label Text="ATTACHMENTS" Style="{StaticResource SectionHeader}" />
+                <Frame Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="12">
+                        <HorizontalStackLayout Spacing="8">
+                            <Label Text="{Binding AttachmentsCount}"
+                                   Style="{StaticResource H4}" />
+                            <Label Text="Attachments"
+                                   Style="{StaticResource BodyMedium}"
+                                   VerticalOptions="Center" />
+                            <Label Text="{Binding AttachmentsTotalSize, StringFormat='({0} bytes)'}"
+                                   Style="{StaticResource BodySmall}"
+                                   TextColor="{StaticResource TextSecondary}"
+                                   VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+
+                        <CollectionView ItemsSource="{Binding Attachments}"
+                                      EmptyView="No attachments"
+                                      SelectionMode="None">
+                            <CollectionView.ItemsLayout>
+                                <GridItemsLayout Orientation="Vertical" Span="3" HorizontalItemSpacing="8" VerticalItemSpacing="8" />
+                            </CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="viewmodels:Attachment">
+                                    <Frame Padding="8" HasShadow="False" BorderColor="{StaticResource BorderDefault}" CornerRadius="8">
+                                        <VerticalStackLayout Spacing="4">
+                                            <Frame WidthRequest="80"
+                                                   HeightRequest="80"
+                                                   Padding="0"
+                                                   CornerRadius="4"
+                                                   BackgroundColor="{StaticResource Gray200}"
+                                                   HasShadow="False">
+                                                <Image Source="{Binding Thumbnail}"
+                                                       Aspect="AspectFill"
+                                                       HeightRequest="80"
+                                                       WidthRequest="80" />
+                                            </Frame>
+                                            <Label Text="{Binding Filename}"
+                                                   Style="{StaticResource CaptionText}"
+                                                   LineBreakMode="TailTruncation"
+                                                   MaxLines="1" />
+                                            <HorizontalStackLayout Spacing="4">
+                                                <Button Text="View"
+                                                        Style="{StaticResource TextButton}"
+                                                        FontSize="10"
+                                                        Padding="4,2"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:FeatureDetailViewModel}}, Path=ViewAttachmentCommand}"
+                                                        CommandParameter="{Binding .}" />
+                                                <Button Text="Delete"
+                                                        Style="{StaticResource TextButton}"
+                                                        FontSize="10"
+                                                        Padding="4,2"
+                                                        TextColor="{StaticResource ErrorRed}"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:FeatureDetailViewModel}}, Path=DeleteAttachmentCommand}"
+                                                        CommandParameter="{Binding .}" />
+                                            </HorizontalStackLayout>
+                                        </VerticalStackLayout>
+                                    </Frame>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Loading Indicator -->
+                <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                 IsVisible="{Binding IsBusy}"
+                                 HorizontalOptions="Center"
+                                 VerticalOptions="Center"
+                                 Margin="0,20" />
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Action Buttons -->
+        <Frame Grid.Row="1"
+               Padding="16"
+               CornerRadius="0"
+               HasShadow="True"
+               BackgroundColor="{StaticResource SurfaceDefault}">
+            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                <Button Grid.Column="0"
+                        Text="Edit"
+                        Style="{StaticResource PrimaryButton}"
+                        Command="{Binding EditFeatureCommand}"
+                        FontSize="14"
+                        Padding="8" />
+                <Button Grid.Column="1"
+                        Text="Delete"
+                        Style="{StaticResource DangerButton}"
+                        Command="{Binding DeleteFeatureCommand}"
+                        FontSize="14"
+                        Padding="8" />
+                <Button Grid.Column="2"
+                        Text="Share"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding ShareFeatureCommand}"
+                        FontSize="14"
+                        Padding="8" />
+                <Button Grid.Column="3"
+                        Text="Map"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding ShowOnMapCommand}"
+                        FontSize="14"
+                        Padding="8" />
+            </Grid>
+        </Frame>
+    </Grid>
 </ContentPage>

@@ -3,13 +3,24 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /source
 
-COPY NuGet.Config ./
-COPY src/Honua.Server.Core/Honua.Server.Core.csproj src/Honua.Server.Core/
-COPY src/Honua.Server.Host/Honua.Server.Host.csproj src/Honua.Server.Host/
+# Copy NuGet config and all project files only (for caching)
+COPY NuGet.Config Directory.Build.props ./
+COPY src/*/*.csproj ./
+RUN for file in $(ls *.csproj 2>/dev/null || true); do \
+      mkdir -p src/$(basename $file .csproj)/ && \
+      mv $file src/$(basename $file .csproj)/; \
+    done
 
-COPY . ./
+# Restore with BuildKit cache mount for NuGet packages
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet restore src/Honua.Server.Host/Honua.Server.Host.csproj
 
-RUN dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
+# Copy source code (this invalidates cache when code changes, but restore is cached)
+COPY src/ ./src/
+
+# Build and publish with cache mount (cache mount persists NuGet packages)
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
     --configuration Release \
     --output /app/publish \
     /p:UseAppHost=false

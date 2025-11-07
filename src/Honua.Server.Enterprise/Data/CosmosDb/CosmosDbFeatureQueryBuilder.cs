@@ -12,8 +12,8 @@ using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
 using Microsoft.Azure.Cosmos;
 using Honua.Server.Core.Extensions;
-
 using Honua.Server.Core.Utilities;
+using QueryDefinition = Microsoft.Azure.Cosmos.QueryDefinition;
 namespace Honua.Server.Enterprise.Data.CosmosDb;
 
 internal sealed class CosmosDbFeatureQueryBuilder

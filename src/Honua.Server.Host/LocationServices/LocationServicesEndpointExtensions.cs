@@ -109,9 +109,9 @@ public static class LocationServicesEndpointExtensions
                 "Retrieves a basemap tile for rendering maps. " +
                 "Tiles are returned in PNG, JPEG, or vector tile format depending on the tileset. " +
                 "Supports standard XYZ tile addressing scheme.")
-            .Produces(StatusCodes.Status200OK, "image/png")
-            .Produces(StatusCodes.Status200OK, "image/jpeg")
-            .Produces(StatusCodes.Status200OK, "application/vnd.mapbox-vector-tile")
+            .Produces(StatusCodes.Status200OK, contentType: "image/png")
+            .Produces(StatusCodes.Status200OK, contentType: "image/jpeg")
+            .Produces(StatusCodes.Status200OK, contentType: "application/vnd.mapbox-vector-tile")
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status500InternalServerError)

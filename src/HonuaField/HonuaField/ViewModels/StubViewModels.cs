@@ -3,14 +3,16 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace HonuaField.ViewModels;
 
 // Stub ViewModels for Sprint 1 - will be fully implemented later
+// Implemented ViewModels have been moved to their own files:
+//   - LoginViewModel (ViewModels/LoginViewModel.cs)
+//   - SettingsViewModel (ViewModels/SettingsViewModel.cs)
+//   - ProfileViewModel (ViewModels/ProfileViewModel.cs)
+//   - OnboardingViewModel (ViewModels/OnboardingViewModel.cs)
+//   - MainViewModel (ViewModels/MainViewModel.cs)
+//   - AppShellViewModel (ViewModels/AppShellViewModel.cs)
+//   - MapViewModel (ViewModels/MapViewModel.cs)
 
-public partial class AppShellViewModel : BaseViewModel { }
-public partial class MainViewModel : BaseViewModel { }
-public partial class LoginViewModel : BaseViewModel { }
-public partial class OnboardingViewModel : BaseViewModel { }
-public partial class MapViewModel : BaseViewModel { }
-public partial class FeatureListViewModel : BaseViewModel { }
-public partial class FeatureDetailViewModel : BaseViewModel { }
-public partial class FeatureEditorViewModel : BaseViewModel { }
-public partial class SettingsViewModel : BaseViewModel { }
-public partial class ProfileViewModel : BaseViewModel { }
+// Feature Management ViewModels are now implemented in their own files:
+//   - FeatureListViewModel (ViewModels/FeatureListViewModel.cs)
+//   - FeatureDetailViewModel (ViewModels/FeatureDetailViewModel.cs)
+//   - FeatureEditorViewModel (ViewModels/FeatureEditorViewModel.cs)

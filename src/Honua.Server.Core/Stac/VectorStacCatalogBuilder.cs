@@ -484,7 +484,19 @@ public sealed class VectorStacCatalogBuilder
         if (layer.Extent?.Temporal is { Count: > 0 })
         {
             var interval = layer.Extent.Temporal[0];
-            var datetime = interval.Start ?? interval.End;
+
+            // Per STAC spec: if both start and end exist, datetime must be null
+            // Otherwise, use start or end as datetime
+            DateTimeOffset? datetime;
+            if (interval.Start is not null && interval.End is not null)
+            {
+                datetime = null;
+            }
+            else
+            {
+                datetime = interval.Start ?? interval.End;
+            }
+
             return (datetime, interval.Start, interval.End);
         }
 

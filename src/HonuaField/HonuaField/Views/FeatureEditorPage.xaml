@@ -1,10 +1,217 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:HonuaField.ViewModels"
+             xmlns:converters="clr-namespace:HonuaField.Converters"
+             xmlns:controls="clr-namespace:HonuaField.Controls.FormFields"
              x:Class="HonuaField.Views.FeatureEditorPage"
-             Title="FeatureEditor">
-    <VerticalStackLayout Spacing="25" Padding="30" VerticalOptions="Center">
-        <Label Text="FeatureEditor Page" FontSize="32" HorizontalOptions="Center" />
-        <Label Text="Coming soon in Sprint 2+" HorizontalOptions="Center" />
-    </VerticalStackLayout>
+             x:DataType="viewmodels:FeatureEditorViewModel"
+             Title="{Binding Title}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+
+            <!-- Form Field Template Selector -->
+            <controls:FormFieldTemplateSelector x:Key="FormFieldTemplateSelector">
+                <controls:FormFieldTemplateSelector.TextFieldTemplate>
+                    <DataTemplate>
+                        <controls:TextFormFieldControl />
+                    </DataTemplate>
+                </controls:FormFieldTemplateSelector.TextFieldTemplate>
+                <controls:FormFieldTemplateSelector.MultilineTextFieldTemplate>
+                    <DataTemplate>
+                        <controls:MultilineTextFormFieldControl />
+                    </DataTemplate>
+                </controls:FormFieldTemplateSelector.MultilineTextFieldTemplate>
+                <controls:FormFieldTemplateSelector.NumberFieldTemplate>
+                    <DataTemplate>
+                        <controls:NumberFormFieldControl />
+                    </DataTemplate>
+                </controls:FormFieldTemplateSelector.NumberFieldTemplate>
+                <controls:FormFieldTemplateSelector.BooleanFieldTemplate>
+                    <DataTemplate>
+                        <controls:BooleanFormFieldControl />
+                    </DataTemplate>
+                </controls:FormFieldTemplateSelector.BooleanFieldTemplate>
+                <controls:FormFieldTemplateSelector.ChoiceFieldTemplate>
+                    <DataTemplate>
+                        <controls:ChoiceFormFieldControl />
+                    </DataTemplate>
+                </controls:FormFieldTemplateSelector.ChoiceFieldTemplate>
+                <controls:FormFieldTemplateSelector.DateFieldTemplate>
+                    <DataTemplate>
+                        <controls:DateFormFieldControl />
+                    </DataTemplate>
+                </controls:FormFieldTemplateSelector.DateFieldTemplate>
+                <controls:FormFieldTemplateSelector.DateTimeFieldTemplate>
+                    <DataTemplate>
+                        <controls:DateTimeFormFieldControl />
+                    </DataTemplate>
+                </controls:FormFieldTemplateSelector.DateTimeFieldTemplate>
+            </controls:FormFieldTemplateSelector>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="*,Auto">
+        <!-- Main Content -->
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Style="{StaticResource FormLayout}">
+
+                <!-- Form Fields Section -->
+                <Label Text="FEATURE PROPERTIES" Style="{StaticResource SectionHeader}" />
+                <Frame Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="12">
+                        <CollectionView ItemsSource="{Binding FormFields}"
+                                      ItemTemplate="{StaticResource FormFieldTemplateSelector}"
+                                      SelectionMode="None">
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Geometry Section -->
+                <Label Text="GEOMETRY" Style="{StaticResource SectionHeader}" />
+                <Frame Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Geometry Type" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding GeometryType}" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="1"
+                                   Text="✓"
+                                   IsVisible="{Binding Geometry, Converter={StaticResource IsNotNullConverter}}"
+                                   TextColor="{StaticResource SuccessGreen}"
+                                   Style="{StaticResource H3}"
+                                   VerticalOptions="Center" />
+                        </Grid>
+
+                        <Button Text="Edit on Map"
+                                Style="{StaticResource SecondaryButton}"
+                                IsEnabled="False">
+                            <Button.Triggers>
+                                <DataTrigger TargetType="Button" Binding="{Binding Geometry}" Value="{x:Null}">
+                                    <Setter Property="Text" Value="Add Geometry on Map" />
+                                </DataTrigger>
+                            </Button.Triggers>
+                        </Button>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Attachments Section -->
+                <Label Text="ATTACHMENTS" Style="{StaticResource SectionHeader}" />
+                <Frame Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="12">
+                        <!-- Add Attachment Buttons -->
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+                            <Button Grid.Row="0" Grid.Column="0"
+                                    Text="📷 Photo"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding AddPhotoCommand}" />
+                            <Button Grid.Row="0" Grid.Column="1"
+                                    Text="🎥 Video"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding AddVideoCommand}" />
+                            <Button Grid.Row="1" Grid.Column="0"
+                                    Text="🎤 Audio"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding AddAudioCommand}" />
+                            <Button Grid.Row="1" Grid.Column="1"
+                                    Text="📁 File"
+                                    Style="{StaticResource SecondaryButton}"
+                                    IsEnabled="False" />
+                        </Grid>
+
+                        <BoxView HeightRequest="1" Color="{StaticResource BorderDefault}"
+                                 IsVisible="{Binding Attachments.Count}" />
+
+                        <!-- Attachments List -->
+                        <CollectionView ItemsSource="{Binding Attachments}"
+                                      EmptyView="No attachments added"
+                                      SelectionMode="None">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="viewmodels:Attachment">
+                                    <Frame Padding="12" Margin="0,4" HasShadow="False" BorderColor="{StaticResource BorderDefault}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                            <!-- Thumbnail -->
+                                            <Frame Grid.Column="0"
+                                                   WidthRequest="60"
+                                                   HeightRequest="60"
+                                                   Padding="0"
+                                                   CornerRadius="8"
+                                                   BackgroundColor="{StaticResource Gray200}"
+                                                   HasShadow="False">
+                                                <Image Source="{Binding Thumbnail}"
+                                                       Aspect="AspectFill" />
+                                            </Frame>
+
+                                            <!-- Info -->
+                                            <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                                                <Label Text="{Binding Filename}"
+                                                       Style="{StaticResource BodyMedium}"
+                                                       FontAttributes="Bold"
+                                                       LineBreakMode="TailTruncation" />
+                                                <Label Text="{Binding Type}"
+                                                       Style="{StaticResource BodySmall}"
+                                                       TextColor="{StaticResource TextSecondary}" />
+                                                <Label Text="{Binding Size, StringFormat='{0} bytes'}"
+                                                       Style="{StaticResource CaptionText}"
+                                                       TextColor="{StaticResource TextSecondary}" />
+                                            </VerticalStackLayout>
+
+                                            <!-- Remove Button -->
+                                            <Button Grid.Column="2"
+                                                    Text="✕"
+                                                    Style="{StaticResource IconButton}"
+                                                    TextColor="{StaticResource ErrorRed}"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:FeatureEditorViewModel}}, Path=RemoveAttachmentCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    VerticalOptions="Center" />
+                                        </Grid>
+                                    </Frame>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Validation Errors -->
+                <Frame Style="{StaticResource CardFrame}"
+                       BackgroundColor="{StaticResource ErrorRed}"
+                       IsVisible="{Binding HasValidationErrors}"
+                       Opacity="0.1">
+                    <Label Text="{Binding ValidationMessage}"
+                           Style="{StaticResource BodyMedium}"
+                           TextColor="{StaticResource White}" />
+                </Frame>
+
+                <!-- Loading Indicator -->
+                <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                 IsVisible="{Binding IsBusy}"
+                                 HorizontalOptions="Center"
+                                 VerticalOptions="Center"
+                                 Margin="0,20" />
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Action Buttons -->
+        <Frame Grid.Row="1"
+               Padding="16"
+               CornerRadius="0"
+               HasShadow="True"
+               BackgroundColor="{StaticResource SurfaceDefault}">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Button Grid.Column="0"
+                        Text="Cancel"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding CancelCommand}" />
+                <Button Grid.Column="1"
+                        Text="Save"
+                        Style="{StaticResource PrimaryButton}"
+                        Command="{Binding SaveCommand}"
+                        IsEnabled="{Binding CanSave}" />
+            </Grid>
+        </Frame>
+    </Grid>
 </ContentPage>

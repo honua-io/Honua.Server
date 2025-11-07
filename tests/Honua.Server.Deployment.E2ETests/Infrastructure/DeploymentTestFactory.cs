@@ -153,17 +153,21 @@ public sealed class DeploymentTestFactory : WebApplicationFactory<Program>, IAsy
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Set environment to Test to skip configuration validation in Program.cs
-        builder.UseEnvironment("Test");
+        // Set environment to Development to allow QuickStart auth mode in tests
+        // Program.cs checks for isTestEnvironment based on "Test" or "Testing" environment name,
+        // but we also need to satisfy QuickStart validation which only allows Development or QuickStart environments
+        builder.UseEnvironment("Development");
+
+        // Use UseSetting for critical configuration values
+        builder.UseSetting("honua:metadata:provider", "json");
+        builder.UseSetting("honua:metadata:path", _metadataPath);
 
         builder.ConfigureAppConfiguration((context, config) =>
         {
-            // Don't clear sources - we want to keep base appsettings
-            // Instead, add our test configuration with high priority (added last = highest priority)
-
+            // Add test configuration with highest priority (added last)
             var configuration = new Dictionary<string, string?>
             {
-                // Core metadata configuration
+                // Core metadata configuration (also set via UseSetting for redundancy)
                 ["honua:metadata:provider"] = "json",
                 ["honua:metadata:path"] = _metadataPath,
 

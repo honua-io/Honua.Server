@@ -39,7 +39,7 @@ internal static class SecureXmlSettings
     /// Creates secure XmlReaderSettings configured to prevent XXE attacks.
     /// </summary>
     /// <returns>Configured XmlReaderSettings with security hardening applied.</returns>
-    public static XmlReaderSettings CreateSecureSettings()
+    public static XmlReaderSettings CreateSecureSettings(bool async = false)
     {
         return new XmlReaderSettings
         {
@@ -61,7 +61,10 @@ internal static class SecureXmlSettings
             IgnoreProcessingInstructions = true,
 
             // Close input stream when reader is disposed
-            CloseInput = false // Let caller manage stream lifecycle
+            CloseInput = false, // Let caller manage stream lifecycle
+
+            // Enable async methods if needed
+            Async = async
         };
     }
 
@@ -120,7 +123,7 @@ internal static class SecureXmlSettings
     {
         Guard.NotNull(stream);
 
-        using var xmlReader = XmlReader.Create(stream, CreateSecureSettings());
+        using var xmlReader = XmlReader.Create(stream, CreateSecureSettings(async: true));
         return await XDocument.LoadAsync(xmlReader, loadOptions, cancellationToken);
     }
 

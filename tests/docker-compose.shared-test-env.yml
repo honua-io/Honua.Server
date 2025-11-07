@@ -26,33 +26,33 @@ services:
     container_name: honua-test-shared
     build:
       context: ..
-      dockerfile: src/Honua.Server.Host/Dockerfile
-      target: final
+      dockerfile: Dockerfile
     environment:
-      # Database Configuration (SQLite for speed)
-      - ConnectionStrings__HonuaDb=Data Source=/app/data/ogc-sample.db
-      - ConnectionStrings__StacCatalogDb=Data Source=/tmp/stac-catalog.db
-
-      # Metadata Configuration
-      - HONUA__METADATA__PATH=/app/data/test-metadata.json
-
-      # Disable STAC catalog synchronization for testing
-      - honua__services__stac__enabled=false
-      - Honua__Services__Stac__Enabled=false
-
-      # Authentication (SQLite)
-      - Authentication__Provider=SQLite
-      - Authentication__SQLite__DatabasePath=/app/data/auth/auth.db
-
-      # Disable features not needed for tests
-      - Redis__Enabled=false
-      - OutputCaching__Enabled=false
-      - Telemetry__Enabled=false
-
-      # Environment
+      # ==================================================================
+      # Use Development environment to allow QuickStart authentication
+      # Load Testing configuration via environment variables
+      # ==================================================================
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_HTTP_PORTS=8080
+
+      # Connection strings
+      - ConnectionStrings__HonuaDb=Data Source=/app/data/ogc-sample.db
+      - ConnectionStrings__StacCatalogDb=Data Source=/tmp/stac-catalog.db
+      - ConnectionStrings__SensorThingsDb=Host=postgres-test-shared;Port=5432;Database=honua_test;Username=postgres;Password=test
+
+      # Test configuration (overrides Development defaults)
+      - HONUA__METADATA__PATH=/app/data/test-metadata.json
+      - HONUA__METADATA__PROVIDER=json
+      - HONUA__AUTHENTICATION__MODE=QuickStart
+      - HONUA__AUTHENTICATION__ENFORCE=false
+      - HONUA__SERVICES__STAC__ENABLED=true
+      - HONUA__SERVICES__STAC__SKIPSYNCHRONIZATION=true
+
+      # Logging (reduce noise in tests)
+      - Logging__LogLevel__Default=Warning
+      - Logging__LogLevel__Microsoft.AspNetCore=Warning
+      - Logging__LogLevel__Microsoft.Hosting.Lifetime=Information
     volumes:
       # Mount test data (writable to allow cache directory creation)
       - ./TestData:/app/data

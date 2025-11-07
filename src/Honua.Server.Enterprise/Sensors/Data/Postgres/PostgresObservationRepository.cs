@@ -20,11 +20,19 @@ namespace Honua.Server.Enterprise.Sensors.Data.Postgres;
 internal sealed class PostgresObservationRepository
 {
     private readonly string _connectionString;
+    private readonly string _basePath;
+    private readonly int _maxObservationsPerRequest;
     private readonly ILogger _logger;
 
-    public PostgresObservationRepository(string connectionString, ILogger logger)
+    public PostgresObservationRepository(
+        string connectionString,
+        string basePath,
+        int maxObservationsPerRequest,
+        ILogger logger)
     {
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        _basePath = basePath ?? throw new ArgumentNullException(nameof(basePath));
+        _maxObservationsPerRequest = maxObservationsPerRequest;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -34,9 +42,11 @@ internal sealed class PostgresObservationRepository
         await conn.OpenAsync(ct);
 
         const string sql = @"
-            SELECT id, result_time, result, result_quality, valid_time, parameters,
-                   datastream_id, feature_of_interest_id, created_at
-            FROM observations
+            SELECT id, phenomenon_time, result_time, result, result_quality,
+                   valid_time_start, valid_time_end, parameters,
+                   datastream_id, feature_of_interest_id, client_timestamp, server_timestamp,
+                   sync_batch_id, created_at
+            FROM sta_observations
             WHERE id = @Id";
 
         var obs = await conn.QuerySingleOrDefaultAsync<ObservationDto>(
@@ -58,25 +68,33 @@ internal sealed class PostgresObservationRepository
             whereClause = "WHERE " + PostgresQueryHelper.TranslateFilter(options.Filter, parameters);
         }
 
-        var orderBy = "ORDER BY result_time DESC";
+        var orderBy = "ORDER BY phenomenon_time DESC";
         if (options.OrderBy?.Any() == true)
         {
             var orderClauses = options.OrderBy.Select(o =>
-                $"{o.Property} {(o.Descending ? "DESC" : "ASC")}");
+                $"{o.Property} {(o.Direction == SortDirection.Descending ? "DESC" : "ASC")}");
             orderBy = "ORDER BY " + string.Join(", ", orderClauses);
         }
 
-        var countSql = $"SELECT COUNT(*) FROM observations {whereClause}";
-        var total = await conn.ExecuteScalarAsync<int>(
-            new CommandDefinition(countSql, parameters, cancellationToken: ct));
+        long? totalCount = null;
+        if (options.Count)
+        {
+            var countSql = $"SELECT COUNT(*) FROM sta_observations {whereClause}";
+            totalCount = await conn.ExecuteScalarAsync<long>(
+                new CommandDefinition(countSql, parameters, cancellationToken: ct));
+        }
 
-        parameters.Add("Skip", options.Skip);
-        parameters.Add("Top", options.Top);
+        var limit = options.Top ?? 100;
+        var offset = options.Skip ?? 0;
+        parameters.Add("Skip", offset);
+        parameters.Add("Top", limit);
 
         var dataSql = $@"
-            SELECT id, result_time, result, result_quality, valid_time, parameters,
-                   datastream_id, feature_of_interest_id, created_at
-            FROM observations
+            SELECT id, phenomenon_time, result_time, result, result_quality,
+                   valid_time_start, valid_time_end, parameters,
+                   datastream_id, feature_of_interest_id, client_timestamp, server_timestamp,
+                   sync_batch_id, created_at
+            FROM sta_observations
             {whereClause}
             {orderBy}
             OFFSET @Skip ROWS
@@ -87,7 +105,11 @@ internal sealed class PostgresObservationRepository
 
         var items = observations.Select(MapToModel).ToList();
 
-        return new PagedResult<Observation>(items, total, options.Skip, options.Top);
+        return new PagedResult<Observation>
+        {
+            Items = items,
+            TotalCount = totalCount ?? -1
+        };
     }
 
     public async Task<Observation> CreateAsync(Observation observation, CancellationToken ct)
@@ -95,37 +117,52 @@ internal sealed class PostgresObservationRepository
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
 
-        observation.Id = Guid.NewGuid().ToString();
-        observation.CreatedAt = DateTimeOffset.UtcNow;
+        var id = Guid.NewGuid().ToString();
+        var createdAt = DateTime.UtcNow;
+        var serverTimestamp = DateTime.UtcNow;
 
         const string sql = @"
-            INSERT INTO observations (
-                id, result_time, result, result_quality, valid_time, parameters,
-                datastream_id, feature_of_interest_id, created_at
+            INSERT INTO sta_observations (
+                id, phenomenon_time, result_time, result, result_quality,
+                valid_time_start, valid_time_end, parameters,
+                datastream_id, feature_of_interest_id,
+                client_timestamp, server_timestamp, sync_batch_id, created_at
             )
             VALUES (
-                @Id, @ResultTime, @Result, @ResultQuality, @ValidTime, @Parameters::jsonb,
-                @DatastreamId, @FeatureOfInterestId, @CreatedAt
+                @Id::uuid, @PhenomenonTime, @ResultTime, @Result::jsonb, @ResultQuality,
+                @ValidTimeStart, @ValidTimeEnd, @Parameters::jsonb,
+                @DatastreamId::uuid, @FeatureOfInterestId::uuid,
+                @ClientTimestamp, @ServerTimestamp, @SyncBatchId::uuid, @CreatedAt
             )";
 
         await conn.ExecuteAsync(new CommandDefinition(sql, new
         {
-            observation.Id,
+            Id = id,
+            observation.PhenomenonTime,
             observation.ResultTime,
             Result = SerializeResult(observation.Result),
             observation.ResultQuality,
-            observation.ValidTime,
+            observation.ValidTimeStart,
+            observation.ValidTimeEnd,
             Parameters = observation.Parameters != null
                 ? JsonSerializer.Serialize(observation.Parameters)
                 : null,
             observation.DatastreamId,
             observation.FeatureOfInterestId,
-            observation.CreatedAt
+            observation.ClientTimestamp,
+            ServerTimestamp = serverTimestamp,
+            observation.SyncBatchId,
+            CreatedAt = createdAt
         }, cancellationToken: ct));
 
-        _logger.LogDebug("Created Observation {ObservationId}", observation.Id);
+        _logger.LogDebug("Created Observation {ObservationId}", id);
 
-        return observation;
+        return observation with
+        {
+            Id = id,
+            CreatedAt = createdAt,
+            ServerTimestamp = serverTimestamp
+        };
     }
 
     public async Task<IReadOnlyList<Observation>> CreateBatchAsync(
@@ -138,102 +175,79 @@ internal sealed class PostgresObservationRepository
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
 
-        // Assign IDs and timestamps
+        // Assign IDs and timestamps, converting to mutable list
+        var updatedObservations = new List<Observation>();
         foreach (var obs in observations)
         {
-            obs.Id = Guid.NewGuid().ToString();
-            obs.CreatedAt = now;
+            var updated = obs with
+            {
+                Id = Guid.NewGuid().ToString(),
+                CreatedAt = now,
+                ServerTimestamp = now
+            };
+            updatedObservations.Add(updated);
         }
 
         // Use PostgreSQL COPY for bulk insert (most efficient)
         await using var writer = conn.BeginBinaryImport(@"
-            COPY observations (
-                id, result_time, result, result_quality, valid_time, parameters,
-                datastream_id, feature_of_interest_id, created_at
+            COPY sta_observations (
+                id, phenomenon_time, result_time, result, result_quality,
+                valid_time_start, valid_time_end, parameters,
+                datastream_id, feature_of_interest_id,
+                client_timestamp, server_timestamp, sync_batch_id, created_at
             ) FROM STDIN (FORMAT BINARY)");
 
-        foreach (var obs in observations)
+        foreach (var obs in updatedObservations)
         {
             await writer.StartRowAsync(ct);
-            await writer.WriteAsync(obs.Id, ct);
-            await writer.WriteAsync(obs.ResultTime, ct);
+            await writer.WriteAsync(Guid.Parse(obs.Id), ct);
+            await writer.WriteAsync(obs.PhenomenonTime, ct);
+            await writer.WriteAsync<object>(obs.ResultTime ?? (object)DBNull.Value, NpgsqlTypes.NpgsqlDbType.TimestampTz, ct);
             await writer.WriteAsync(SerializeResult(obs.Result), ct);
-            await writer.WriteAsync(obs.ResultQuality, ct);
-            await writer.WriteAsync(obs.ValidTime, ct);
-            await writer.WriteAsync(
+            await writer.WriteAsync<object>(obs.ResultQuality ?? (object)DBNull.Value, NpgsqlTypes.NpgsqlDbType.Text, ct);
+            await writer.WriteAsync<object>(obs.ValidTimeStart ?? (object)DBNull.Value, NpgsqlTypes.NpgsqlDbType.TimestampTz, ct);
+            await writer.WriteAsync<object>(obs.ValidTimeEnd ?? (object)DBNull.Value, NpgsqlTypes.NpgsqlDbType.TimestampTz, ct);
+            await writer.WriteAsync<object>(
                 obs.Parameters != null ? JsonSerializer.Serialize(obs.Parameters) : DBNull.Value,
+                NpgsqlTypes.NpgsqlDbType.Jsonb,
                 ct);
-            await writer.WriteAsync(obs.DatastreamId, ct);
-            await writer.WriteAsync(obs.FeatureOfInterestId ?? (object)DBNull.Value, ct);
+            await writer.WriteAsync(Guid.Parse(obs.DatastreamId), ct);
+            await writer.WriteAsync<object>(
+                obs.FeatureOfInterestId != null ? (object)Guid.Parse(obs.FeatureOfInterestId) : DBNull.Value,
+                NpgsqlTypes.NpgsqlDbType.Uuid,
+                ct);
+            await writer.WriteAsync<object>(obs.ClientTimestamp ?? (object)DBNull.Value, NpgsqlTypes.NpgsqlDbType.TimestampTz, ct);
+            await writer.WriteAsync(obs.ServerTimestamp, ct);
+            await writer.WriteAsync<object>(
+                obs.SyncBatchId != null ? (object)Guid.Parse(obs.SyncBatchId) : DBNull.Value,
+                NpgsqlTypes.NpgsqlDbType.Uuid,
+                ct);
             await writer.WriteAsync(obs.CreatedAt, ct);
         }
 
         await writer.CompleteAsync(ct);
 
-        _logger.LogInformation("Created {Count} observations via batch insert", observations.Count);
+        _logger.LogInformation("Created {Count} observations via batch insert", updatedObservations.Count);
 
-        return observations;
+        return updatedObservations;
     }
 
     public async Task<IReadOnlyList<Observation>> CreateDataArrayAsync(
         DataArrayRequest request,
         CancellationToken ct)
     {
-        if (request.Datastreams.Count == 0 || request.Data.Count == 0)
+        // Use the built-in ToObservations method from DataArrayRequest
+        var observations = request.ToObservations();
+
+        if (observations.Count == 0)
         {
             return Array.Empty<Observation>();
         }
 
-        var observations = new List<Observation>();
-
-        // Parse component indices
-        var resultTimeIdx = request.Components.IndexOf("resultTime");
-        var resultIdx = request.Components.IndexOf("result");
-        var datastreamIdx = request.Components.IndexOf("Datastream");
-
-        if (resultTimeIdx < 0 || resultIdx < 0 || datastreamIdx < 0)
-        {
-            throw new InvalidOperationException(
-                "DataArray must include resultTime, result, and Datastream components");
-        }
-
-        // Convert data array to observations
-        foreach (var row in request.Data)
-        {
-            if (row.Count != request.Components.Count)
-            {
-                _logger.LogWarning("DataArray row has {ActualCount} elements but expected {ExpectedCount}",
-                    row.Count, request.Components.Count);
-                continue;
-            }
-
-            var datastreamRef = row[datastreamIdx]?.ToString();
-            if (string.IsNullOrEmpty(datastreamRef))
-            {
-                _logger.LogWarning("DataArray row missing datastream reference");
-                continue;
-            }
-
-            // Extract datastream ID from reference (format: "Datastreams('id')")
-            var datastreamId = ExtractDatastreamId(datastreamRef);
-
-            var observation = new Observation
-            {
-                ResultTime = ParseDateTime(row[resultTimeIdx]),
-                Result = row[resultIdx],
-                DatastreamId = datastreamId,
-                ValidTime = null,
-                ResultQuality = null,
-                Parameters = null
-            };
-
-            observations.Add(observation);
-        }
-
         // Batch insert all observations
-        return await CreateBatchAsync(observations, ct);
+        return await CreateBatchAsync(observations.ToList(), ct);
     }
 
     public async Task DeleteAsync(string id, CancellationToken ct)
@@ -241,7 +255,7 @@ internal sealed class PostgresObservationRepository
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
 
-        const string sql = "DELETE FROM observations WHERE id = @Id";
+        const string sql = "DELETE FROM sta_observations WHERE id = @Id::uuid";
 
         var affected = await conn.ExecuteAsync(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
@@ -265,7 +279,7 @@ internal sealed class PostgresObservationRepository
         var parameters = new DynamicParameters();
         parameters.Add("DatastreamId", datastreamId);
 
-        var whereClause = "WHERE datastream_id = @DatastreamId";
+        var whereClause = "WHERE datastream_id = @DatastreamId::uuid";
 
         if (options.Filter != null)
         {
@@ -273,25 +287,33 @@ internal sealed class PostgresObservationRepository
             whereClause += $" AND ({filterClause})";
         }
 
-        var orderBy = "ORDER BY result_time DESC";
+        var orderBy = "ORDER BY phenomenon_time DESC";
         if (options.OrderBy?.Any() == true)
         {
             var orderClauses = options.OrderBy.Select(o =>
-                $"{o.Property} {(o.Descending ? "DESC" : "ASC")}");
+                $"{o.Property} {(o.Direction == SortDirection.Descending ? "DESC" : "ASC")}");
             orderBy = "ORDER BY " + string.Join(", ", orderClauses);
         }
 
-        var countSql = $"SELECT COUNT(*) FROM observations {whereClause}";
-        var total = await conn.ExecuteScalarAsync<int>(
-            new CommandDefinition(countSql, parameters, cancellationToken: ct));
+        long? totalCount = null;
+        if (options.Count)
+        {
+            var countSql = $"SELECT COUNT(*) FROM sta_observations {whereClause}";
+            totalCount = await conn.ExecuteScalarAsync<long>(
+                new CommandDefinition(countSql, parameters, cancellationToken: ct));
+        }
 
-        parameters.Add("Skip", options.Skip);
-        parameters.Add("Top", options.Top);
+        var limit = options.Top ?? 100;
+        var offset = options.Skip ?? 0;
+        parameters.Add("Skip", offset);
+        parameters.Add("Top", limit);
 
         var dataSql = $@"
-            SELECT id, result_time, result, result_quality, valid_time, parameters,
-                   datastream_id, feature_of_interest_id, created_at
-            FROM observations
+            SELECT id, phenomenon_time, result_time, result, result_quality,
+                   valid_time_start, valid_time_end, parameters,
+                   datastream_id, feature_of_interest_id, client_timestamp, server_timestamp,
+                   sync_batch_id, created_at
+            FROM sta_observations
             {whereClause}
             {orderBy}
             OFFSET @Skip ROWS
@@ -302,7 +324,11 @@ internal sealed class PostgresObservationRepository
 
         var items = observations.Select(MapToModel).ToList();
 
-        return new PagedResult<Observation>(items, total, options.Skip, options.Top);
+        return new PagedResult<Observation>
+        {
+            Items = items,
+            TotalCount = totalCount ?? -1
+        };
     }
 
     private static Observation MapToModel(ObservationDto dto)
@@ -310,13 +336,18 @@ internal sealed class PostgresObservationRepository
         return new Observation
         {
             Id = dto.Id,
+            PhenomenonTime = dto.PhenomenonTime,
             ResultTime = dto.ResultTime,
             Result = DeserializeResult(dto.Result),
             ResultQuality = dto.ResultQuality,
-            ValidTime = dto.ValidTime,
+            ValidTimeStart = dto.ValidTimeStart,
+            ValidTimeEnd = dto.ValidTimeEnd,
             Parameters = PostgresQueryHelper.ParseProperties(dto.Parameters),
             DatastreamId = dto.DatastreamId,
             FeatureOfInterestId = dto.FeatureOfInterestId,
+            ClientTimestamp = dto.ClientTimestamp,
+            ServerTimestamp = dto.ServerTimestamp,
+            SyncBatchId = dto.SyncBatchId,
             CreatedAt = dto.CreatedAt
         };
     }
@@ -344,41 +375,21 @@ internal sealed class PostgresObservationRepository
         }
     }
 
-    private static DateTimeOffset ParseDateTime(object? value)
-    {
-        return value switch
-        {
-            DateTimeOffset dto => dto,
-            DateTime dt => new DateTimeOffset(dt),
-            string str => DateTimeOffset.Parse(str),
-            _ => DateTimeOffset.UtcNow
-        };
-    }
-
-    private static string ExtractDatastreamId(string reference)
-    {
-        // Format: "Datastreams('id')" or just "id"
-        var start = reference.IndexOf('\'');
-        if (start < 0)
-            return reference;
-
-        var end = reference.LastIndexOf('\'');
-        if (end <= start)
-            return reference;
-
-        return reference.Substring(start + 1, end - start - 1);
-    }
-
     private sealed class ObservationDto
     {
         public string Id { get; init; } = string.Empty;
-        public DateTimeOffset ResultTime { get; init; }
+        public DateTime PhenomenonTime { get; init; }
+        public DateTime? ResultTime { get; init; }
         public string? Result { get; init; }
         public string? ResultQuality { get; init; }
-        public DateTimeOffset? ValidTime { get; init; }
+        public DateTime? ValidTimeStart { get; init; }
+        public DateTime? ValidTimeEnd { get; init; }
         public string? Parameters { get; init; }
         public string DatastreamId { get; init; } = string.Empty;
         public string? FeatureOfInterestId { get; init; }
-        public DateTimeOffset CreatedAt { get; init; }
+        public DateTime? ClientTimestamp { get; init; }
+        public DateTime ServerTimestamp { get; init; }
+        public string? SyncBatchId { get; init; }
+        public DateTime CreatedAt { get; init; }
     }
 }

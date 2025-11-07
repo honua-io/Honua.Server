@@ -224,12 +224,13 @@ public sealed class CachedBasemapTileProvider : IBasemapTileProvider, IDisposabl
     /// </summary>
     private string BuildTileCacheKey(TileRequest request)
     {
-        var keyBuilder = CacheKeyBuilder.ForTile(
-            $"{_innerProvider.ProviderKey}:{request.TilesetId}",
+        var keyBuilder = Honua.Server.Core.Caching.CacheKeyBuilder.ForTile(
+            request.TilesetId ?? "default",
             request.Z,
             request.X,
             request.Y,
-            request.ImageFormat ?? "default");
+            request.ImageFormat ?? "default")
+            .WithComponent(_innerProvider.ProviderKey);
 
         // Include scale if configured
         if (_config.BasemapTiles.CachePerScale && request.Scale != 1)

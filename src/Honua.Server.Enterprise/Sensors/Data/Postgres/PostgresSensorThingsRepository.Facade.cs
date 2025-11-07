@@ -61,8 +61,8 @@ public sealed class PostgresSensorThingsRepositoryFacade : ISensorThingsReposito
             : connection.ConnectionString;
 
         // Initialize all specialized repositories
-        _thingRepo = new PostgresThingRepository(_connectionString, _basePath, logger);
-        _locationRepo = new PostgresLocationRepository(_connectionString, _basePath, logger);
+        _thingRepo = new PostgresThingRepository(_connectionString, logger);
+        _locationRepo = new PostgresLocationRepository(_connectionString, logger);
         _observationRepo = new PostgresObservationRepository(_connectionString, _basePath, _config.MaxObservationsPerRequest, logger);
         _sensorRepo = new PostgresSensorRepository(_connectionString, _basePath, logger);
         _observedPropertyRepo = new PostgresObservedPropertyRepository(_connectionString, _basePath, logger);

@@ -83,7 +83,7 @@ public sealed class WmsCapabilitiesBuilder : OgcCapabilitiesBuilder
         var catalog = metadata.Catalog;
 
         var element = new XElement(Wms + "Service",
-            new XElement(Wms + "Name", "HonuaWMS"),
+            new XElement(Wms + "Name", "WMS"),
             new XElement(Wms + "Title", catalog.Title.IsNullOrWhiteSpace() ? catalog.Id : catalog.Title),
             new XElement(Wms + "Abstract", catalog.Description ?? string.Empty),
             new XElement(Wms + "OnlineResource", new XAttribute(XLink + "href", endpoint)));

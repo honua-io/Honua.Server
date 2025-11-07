@@ -60,10 +60,11 @@ internal static class WfsTransactionHandlers
         [FromServices] IFeatureEditOrchestrator orchestrator,
         [FromServices] IResourceAuthorizationService authorizationService,
         [FromServices] ISecurityAuditLogger auditLogger,
-        [FromServices] ILogger logger,
+        [FromServices] ILoggerFactory loggerFactory,
         [FromServices] IOptions<WfsOptions> wfsOptions,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("Honua.Server.Host.Wfs.WfsTransactionHandlers");
         var options = wfsOptions.Value;
 
         // Create timeout cancellation token for transaction operations

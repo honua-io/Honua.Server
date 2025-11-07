@@ -1,5 +1,6 @@
 @using Honua.MapSDK.Services.Drawing
 @using Honua.MapSDK.Models
+@using DrawingDrawingStyle = Honua.MapSDK.Services.Drawing.DrawingStyle
 @inject IDrawingManager DrawingManager
 
 <div class="honua-geometry-editor @CssClass" style="@Style">
@@ -225,7 +226,7 @@
     private DrawnGeometry? SelectedGeometry => DrawingManager.SelectedGeometry;
     private string? EditedName { get; set; }
     private string? EditedDescription { get; set; }
-    private DrawingStyle EditedStyle { get; set; } = DrawingStyle.Defaults.Polygon;
+    private DrawingDrawingStyle EditedStyle { get; set; } = DrawingDrawingStyle.Defaults.Polygon;
     private double BufferDistance { get; set; } = 100;
     private double SimplifyTolerance { get; set; } = 0.001;
 

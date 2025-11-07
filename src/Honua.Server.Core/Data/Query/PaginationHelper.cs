@@ -405,13 +405,13 @@ public static class PaginationHelper
     {
         if (limit.HasValue)
         {
-            sql.Append($" limit {parameterPrefix}limit");
+            sql.Append($" LIMIT {parameterPrefix}limit");
             parameters["limit"] = limit.Value;
         }
 
         if (offset.HasValue && offset.Value > 0)
         {
-            sql.Append($" offset {parameterPrefix}offset");
+            sql.Append($" OFFSET {parameterPrefix}offset");
             parameters["offset"] = offset.Value;
         }
     }

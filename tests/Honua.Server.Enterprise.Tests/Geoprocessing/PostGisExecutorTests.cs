@@ -11,35 +11,22 @@ using Xunit;
 namespace Honua.Server.Enterprise.Tests.Geoprocessing;
 
 [Collection("SharedPostgres")]
-public class PostGisExecutorTests : IAsyncLifetime
+public class PostGisExecutorTests
 {
     private readonly SharedPostgresFixture _fixture;
-    private string _connectionString;
-    private PostGisExecutor _executor;
 
     public PostGisExecutorTests(SharedPostgresFixture fixture)
     {
         _fixture = fixture;
     }
 
-    public Task InitializeAsync()
-    {
-        if (!_fixture.IsAvailable)
-        {
-            throw new Xunit.SkipException("PostgreSQL test container is not available");
-        }
-
-        _connectionString = _fixture.ConnectionString;
-        _executor = new PostGisExecutor(_connectionString, NullLogger<PostGisExecutor>.Instance);
-
-        return Task.CompletedTask;
-    }
-
-    public Task DisposeAsync() => Task.CompletedTask;
-
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteAsync_BufferOperation_ShouldReturnBufferedGeometry()
     {
+        Skip.IfNot(_fixture.IsAvailable, "PostgreSQL test container is not available");
+
+        var connectionString = _fixture.ConnectionString;
+        var executor = new PostGisExecutor(connectionString, NullLogger<PostGisExecutor>.Instance);
         // Arrange
         var run = CreateProcessRun("buffer", new Dictionary<string, object>
         {
@@ -50,7 +37,7 @@ public class PostGisExecutorTests : IAsyncLifetime
         var process = CreateProcessDefinition("buffer");
 
         // Act
-        var result = await _executor.ExecuteAsync(run, process);
+        var result = await executor.ExecuteAsync(run, process);
 
         // Assert
         result.Should().NotBeNull();
@@ -60,9 +47,14 @@ public class PostGisExecutorTests : IAsyncLifetime
         result.Output.Should().ContainKey("area");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteAsync_IntersectionOperation_ShouldReturnIntersection()
     {
+        Skip.IfNot(_fixture.IsAvailable, "PostgreSQL test container is not available");
+
+        var connectionString = _fixture.ConnectionString;
+        var executor = new PostGisExecutor(connectionString, NullLogger<PostGisExecutor>.Instance);
+
         // Arrange
         var run = CreateProcessRun("intersection", new Dictionary<string, object>
         {
@@ -73,7 +65,7 @@ public class PostGisExecutorTests : IAsyncLifetime
         var process = CreateProcessDefinition("intersection");
 
         // Act
-        var result = await _executor.ExecuteAsync(run, process);
+        var result = await executor.ExecuteAsync(run, process);
 
         // Assert
         result.Should().NotBeNull();
@@ -82,9 +74,14 @@ public class PostGisExecutorTests : IAsyncLifetime
         result.Output.Should().ContainKey("isEmpty");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteAsync_UnionOperation_ShouldReturnUnion()
     {
+        Skip.IfNot(_fixture.IsAvailable, "PostgreSQL test container is not available");
+
+        var connectionString = _fixture.ConnectionString;
+        var executor = new PostGisExecutor(connectionString, NullLogger<PostGisExecutor>.Instance);
+
         // Arrange
         var run = CreateProcessRun("union", new Dictionary<string, object>
         {
@@ -95,7 +92,7 @@ public class PostGisExecutorTests : IAsyncLifetime
         var process = CreateProcessDefinition("union");
 
         // Act
-        var result = await _executor.ExecuteAsync(run, process);
+        var result = await executor.ExecuteAsync(run, process);
 
         // Assert
         result.Should().NotBeNull();
@@ -103,9 +100,14 @@ public class PostGisExecutorTests : IAsyncLifetime
         result.Output.Should().ContainKey("geojson");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteAsync_UnsupportedOperation_ShouldReturnFailure()
     {
+        Skip.IfNot(_fixture.IsAvailable, "PostgreSQL test container is not available");
+
+        var connectionString = _fixture.ConnectionString;
+        var executor = new PostGisExecutor(connectionString, NullLogger<PostGisExecutor>.Instance);
+
         // Arrange
         var run = CreateProcessRun("unsupported-operation", new Dictionary<string, object>
         {
@@ -115,7 +117,7 @@ public class PostGisExecutorTests : IAsyncLifetime
         var process = CreateProcessDefinition("unsupported-operation");
 
         // Act
-        var result = await _executor.ExecuteAsync(run, process);
+        var result = await executor.ExecuteAsync(run, process);
 
         // Assert
         result.Should().NotBeNull();
@@ -124,9 +126,14 @@ public class PostGisExecutorTests : IAsyncLifetime
         result.ErrorMessage.Should().Contain("not supported");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteAsync_WithProgressReporting_ShouldReportProgress()
     {
+        Skip.IfNot(_fixture.IsAvailable, "PostgreSQL test container is not available");
+
+        var connectionString = _fixture.ConnectionString;
+        var executor = new PostGisExecutor(connectionString, NullLogger<PostGisExecutor>.Instance);
+
         // Arrange
         var run = CreateProcessRun("spatial-join", new Dictionary<string, object>
         {
@@ -139,14 +146,14 @@ public class PostGisExecutorTests : IAsyncLifetime
         var progress = new Progress<ProcessProgress>(p => progressReports.Add(p));
 
         // Act
-        var result = await _executor.ExecuteAsync(run, process, progress);
+        var result = await executor.ExecuteAsync(run, process, progress);
 
         // Assert - Even if it fails due to no database, should still report progress
         progressReports.Should().NotBeEmpty();
         progressReports.Should().Contain(p => p.Stage == "PostGIS Execution");
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData("buffer")]
     [InlineData("intersection")]
     [InlineData("union")]
@@ -154,6 +161,11 @@ public class PostGisExecutorTests : IAsyncLifetime
     [InlineData("dissolve")]
     public async Task CanExecuteAsync_SupportedOperations_ShouldReturnTrue(string processId)
     {
+        Skip.IfNot(_fixture.IsAvailable, "PostgreSQL test container is not available");
+
+        var connectionString = _fixture.ConnectionString;
+        var executor = new PostGisExecutor(connectionString, NullLogger<PostGisExecutor>.Instance);
+
         // Arrange
         var process = CreateProcessDefinition(processId);
         var request = new ProcessExecutionRequest
@@ -165,15 +177,20 @@ public class PostGisExecutorTests : IAsyncLifetime
         };
 
         // Act
-        var canExecute = await _executor.CanExecuteAsync(process, request);
+        var canExecute = await executor.CanExecuteAsync(process, request);
 
         // Assert
         canExecute.Should().BeTrue();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task CanExecuteAsync_UnsupportedOperation_ShouldReturnFalse()
     {
+        Skip.IfNot(_fixture.IsAvailable, "PostgreSQL test container is not available");
+
+        var connectionString = _fixture.ConnectionString;
+        var executor = new PostGisExecutor(connectionString, NullLogger<PostGisExecutor>.Instance);
+
         // Arrange
         var process = CreateProcessDefinition("unsupported-raster-op");
         var request = new ProcessExecutionRequest
@@ -185,7 +202,7 @@ public class PostGisExecutorTests : IAsyncLifetime
         };
 
         // Act
-        var canExecute = await _executor.CanExecuteAsync(process, request);
+        var canExecute = await executor.CanExecuteAsync(process, request);
 
         // Assert
         canExecute.Should().BeFalse();

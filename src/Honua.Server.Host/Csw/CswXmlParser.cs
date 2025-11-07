@@ -24,8 +24,23 @@ internal static class CswXmlParser
 
         try
         {
+            // Enable buffering to allow reading the body multiple times if needed
+            request.EnableBuffering();
+
+            // Reset stream position if it's seekable
+            if (request.Body.CanSeek)
+            {
+                request.Body.Position = 0;
+            }
+
             // Validate stream size before processing to prevent DoS
             SecureXmlSettings.ValidateStreamSize(request.Body);
+
+            // Reset position again after validation
+            if (request.Body.CanSeek)
+            {
+                request.Body.Position = 0;
+            }
 
             // Use secure XML parsing to prevent XXE attacks
             var doc = await SecureXmlSettings.LoadSecureAsync(request.Body, LoadOptions.None, cancellationToken);
@@ -52,9 +67,11 @@ internal static class CswXmlParser
                 _ => new CswRequest { Service = service, Request = requestType }
             };
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            // Log the exception for debugging - in production this would go to proper logging
+            // For now, rethrow to surface the actual error
+            throw new InvalidOperationException($"Failed to parse CSW XML request: {ex.Message}", ex);
         }
     }
 
