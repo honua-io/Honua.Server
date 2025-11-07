@@ -300,15 +300,24 @@ public class BatchDatabaseOperations
                 }
 
                 // Look for geometry column (usually named 'geom' or 'geometry')
-                var geomColumnIndex = reader.GetOrdinal("geom");
-                if (geomColumnIndex >= 0 && !reader.IsDBNull(geomColumnIndex))
+                // GetOrdinal throws IndexOutOfRangeException if column doesn't exist
+                try
                 {
-                    var geomWkt = reader.GetString(geomColumnIndex);
-                    var geometry = wktReader.Read(geomWkt);
-                    features.Add(new Feature(geometry, attributes));
+                    var geomColumnIndex = reader.GetOrdinal("geom");
+                    if (!reader.IsDBNull(geomColumnIndex))
+                    {
+                        var geomWkt = reader.GetString(geomColumnIndex);
+                        var geometry = wktReader.Read(geomWkt);
+                        features.Add(new Feature(geometry, attributes));
+                    }
+                    else
+                    {
+                        features.Add(new Feature(null, attributes));
+                    }
                 }
-                else
+                catch (IndexOutOfRangeException)
                 {
+                    // Geometry column doesn't exist in this result set
                     features.Add(new Feature(null, attributes));
                 }
             }

@@ -143,7 +143,7 @@ internal sealed class LicenseOptionsValidator : IValidateOptions<LicenseOptions>
         // Validate provider
         var validProviders = new[] { "postgres", "postgresql", "mysql", "sqlite" };
         var provider = options.Provider?.ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(provider) || Array.IndexOf(validProviders, provider) == -1)
+        if (string.IsNullOrWhiteSpace(provider) || !Array.Exists(validProviders, p => p == provider))
         {
             failures.Add($"Provider must be one of: {string.Join(", ", validProviders)}");
         }
