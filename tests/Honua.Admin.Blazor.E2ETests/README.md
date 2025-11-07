@@ -7,8 +7,12 @@ End-to-end (E2E) integration tests for the Honua Admin Blazor application using 
 This test project provides comprehensive E2E testing for the Blazor Admin UI, including:
 
 - **Authentication flows** - Login, logout, session management
+- **Complete workflows** - Full DataSource → Folder → Service → Layer journey
+- **Data Source management** - CRUD operations, connection testing, multiple providers
+- **Folder management** - Folder creation, hierarchy, organization
 - **Service CRUD operations** - Create, read, update, delete services
-- **Complete user workflows** - Real browser testing of complete user journeys
+- **Layer management** - Layer creation, geometry types, CRS configuration
+- **Navigation & UI** - Menu navigation, responsive design, keyboard accessibility
 - **Headless execution** - Runs in CI/CD pipelines without display
 
 ## Technology Stack
@@ -75,6 +79,24 @@ dotnet test --filter "Category=Authentication"
 
 # Run only service management tests
 dotnet test --filter "Category=ServiceManagement"
+
+# Run complete workflow tests
+dotnet test --filter "Category=FullWorkflow"
+
+# Run data source management tests
+dotnet test --filter "Category=DataSourceManagement"
+
+# Run folder management tests
+dotnet test --filter "Category=FolderManagement"
+
+# Run layer management tests
+dotnet test --filter "Category=LayerManagement"
+
+# Run navigation and UI tests
+dotnet test --filter "Category=Navigation"
+
+# Combine categories (OR)
+dotnet test --filter "Category=ServiceManagement|Category=LayerManagement"
 ```
 
 ### Run with Custom Configuration
@@ -132,18 +154,138 @@ $env:E2E_HEADLESS="false"
 dotnet test
 ```
 
+## Test Categories
+
+### Authentication Tests (`AuthenticationTests.cs`)
+**Category**: `Authentication`
+
+Tests covering user authentication and authorization:
+- ✓ Login with valid credentials
+- ✓ Login with invalid credentials (error handling)
+- ✓ Logout functionality
+- ✓ Protected page access without authentication
+- ✓ Form validation on login page
+- ✓ Session persistence after page reload
+
+**Run**: `dotnet test --filter "Category=Authentication"`
+
+### Complete Workflow Tests (`CompleteWorkflowTests.cs`)
+**Category**: `FullWorkflow`, `Workflow`
+
+End-to-end tests covering complete user journeys:
+- ✓ Full workflow: DataSource → Folder → Service → Layer
+- ✓ DataSource creation with connection test → Service creation
+- ✓ Create multiple layers in the same service
+- ✓ Move service between folders
+- ✓ Verify complete hierarchy (service shows layers and datasource)
+
+**Run**: `dotnet test --filter "Category=FullWorkflow"`
+
+### Data Source Management Tests (`DataSourceManagementTests.cs`)
+**Category**: `DataSourceManagement`
+
+Tests for database connection management:
+- ✓ Create PostGIS data source
+- ✓ Create SQL Server data source with connection builder
+- ✓ View data source details
+- ✓ Update data source connection string
+- ✓ Delete data source
+- ✓ Test database connection (success/failure scenarios)
+- ✓ Duplicate ID validation
+- ✓ Search/filter data sources
+- ✓ View services using a data source
+- ✓ Prevent deletion when in use
+
+**Run**: `dotnet test --filter "Category=DataSourceManagement"`
+
+### Service CRUD Tests (`ServiceCrudTests.cs`)
+**Category**: `ServiceManagement`
+
+Tests for OGC service management:
+- ✓ Create service with valid data
+- ✓ View service details
+- ✓ Update existing service
+- ✓ Delete service
+- ✓ Duplicate ID validation
+- ✓ Search/filter services
+
+**Run**: `dotnet test --filter "Category=ServiceManagement"`
+
+### Folder Management Tests (`FolderManagementTests.cs`)
+**Category**: `FolderManagement`
+
+Tests for folder organization:
+- ✓ Create folder with ID and title
+- ✓ Update folder title
+- ✓ Delete empty folder
+- ✓ Create hierarchical folders (parent/child)
+- ✓ Reorder folders
+- ✓ View folder service count
+- ✓ Duplicate ID validation
+- ✓ Expand/collapse folder tree
+- ✓ Search folders
+
+**Run**: `dotnet test --filter "Category=FolderManagement"`
+
+### Layer Management Tests (`LayerManagementTests.cs`)
+**Category**: `LayerManagement`
+
+Tests for layer configuration:
+- ✓ Create layer with Point geometry
+- ✓ Create layer with Polygon geometry
+- ✓ Create layer with LineString geometry
+- ✓ View layer details
+- ✓ Update layer title and description
+- ✓ Configure layer CRS (Coordinate Reference Systems)
+- ✓ Delete layer
+- ✓ Duplicate ID validation
+- ✓ Filter layers by service
+- ✓ Search layers
+- ✓ View layer metadata and properties
+
+**Run**: `dotnet test --filter "Category=LayerManagement"`
+
+### Navigation and UI Tests (`NavigationAndUITests.cs`)
+**Category**: `Navigation`, `UI`
+
+Tests for user interface and navigation:
+- ✓ Navigate to all main pages via menu
+- ✓ Sidebar menu expand/collapse
+- ✓ Breadcrumb navigation
+- ✓ Global search functionality
+- ✓ User menu and logout
+- ✓ Notification/snackbar behavior
+- ✓ Dark mode toggle (if available)
+- ✓ Page title updates
+- ✓ 404 page for non-existent routes
+- ✓ Browser back button navigation
+- ✓ Responsive design (mobile viewport)
+- ✓ Loading indicators
+- ✓ Keyboard navigation (Tab key)
+
+**Run**: `dotnet test --filter "Category=Navigation"`
+
 ## Test Structure
 
 ```
 Honua.Admin.Blazor.E2ETests/
 ├── Infrastructure/
-│   ├── BaseE2ETest.cs           # Base class for all E2E tests
-│   └── TestConfiguration.cs     # Centralized test configuration
+│   ├── BaseE2ETest.cs                # Base class for all E2E tests
+│   └── TestConfiguration.cs          # Centralized test configuration
 ├── Tests/
-│   ├── AuthenticationTests.cs   # Login/logout tests
-│   └── ServiceCrudTests.cs      # Service management tests
-├── playwright.runsettings        # Playwright configuration
-└── README.md                     # This file
+│   ├── AuthenticationTests.cs        # Login/logout tests (6 tests)
+│   ├── CompleteWorkflowTests.cs      # Full workflow tests (4 tests)
+│   ├── ServiceCrudTests.cs           # Service management tests (7 tests)
+│   ├── DataSourceManagementTests.cs  # Data source tests (13 tests)
+│   ├── FolderManagementTests.cs      # Folder organization tests (10 tests)
+│   ├── LayerManagementTests.cs       # Layer configuration tests (11 tests)
+│   └── NavigationAndUITests.cs       # Navigation and UI tests (15 tests)
+├── playwright.runsettings            # Playwright configuration
+├── GlobalUsings.cs                   # Global using statements
+├── .gitignore                        # Excludes test artifacts
+└── README.md                         # This file
+
+Total: 66+ E2E tests covering the complete Admin UI
 ```
 
 ## Writing New Tests
