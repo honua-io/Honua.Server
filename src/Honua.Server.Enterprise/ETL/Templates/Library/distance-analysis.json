@@ -1,0 +1,146 @@
+{
+  "id": "distance-analysis",
+  "name": "Distance Analysis and Classification",
+  "description": "Calculate distances from features to reference points and classify by distance ranges. Proximity analysis workflow.",
+  "category": "Workflow Chains",
+  "icon": "ruler",
+  "difficulty": 1,
+  "estimatedMinutes": 4,
+  "tags": ["distance", "proximity", "analysis", "classification"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "Target features",
+    "Reference points"
+  ],
+  "expectedOutputs": [
+    "Features with distance calculations",
+    "Distance-based classifications"
+  ],
+  "useCases": [
+    "Finding nearest facilities",
+    "Classifying features by distance to services",
+    "Accessibility analysis"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Target Features",
+      "description": "Features to analyze",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "parcels",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 80
+      }
+    },
+    {
+      "id": "source_2",
+      "type": "postgis_source",
+      "name": "Load Reference Points",
+      "description": "Reference locations",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "services",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 180
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "calculate_distance",
+      "name": "Calculate Distances",
+      "description": "Compute nearest distance",
+      "parameters": {
+        "distanceField": "distance_m",
+        "units": "meters"
+      },
+      "position": {
+        "x": 350,
+        "y": 130
+      }
+    },
+    {
+      "id": "geo_2",
+      "type": "classify_by_attribute",
+      "name": "Classify by Distance",
+      "description": "Assign distance categories",
+      "parameters": {
+        "sourceField": "distance_m",
+        "targetField": "distance_class",
+        "breaks": [500, 1000, 2000, 5000]
+      },
+      "position": {
+        "x": 550,
+        "y": 130
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Results",
+      "description": "Store analysis results",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "distance_analysis",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 750,
+        "y": 130
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1",
+      "toPort": "target"
+    },
+    {
+      "from": "source_2",
+      "to": "geo_1",
+      "toPort": "reference"
+    },
+    {
+      "from": "geo_1",
+      "to": "geo_2"
+    },
+    {
+      "from": "geo_2",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "targetTable": {
+      "name": "targetTable",
+      "type": "string",
+      "description": "Features to analyze",
+      "defaultValue": "parcels",
+      "required": true
+    },
+    "referenceTable": {
+      "name": "referenceTable",
+      "type": "string",
+      "description": "Reference points",
+      "defaultValue": "services",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Analysis results table",
+      "defaultValue": "distance_analysis",
+      "required": true
+    }
+  }
+}

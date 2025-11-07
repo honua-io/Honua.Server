@@ -1,8 +1,11 @@
 @page "/geoetl/runs"
+@using Honua.Admin.Blazor.Services
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject FeatureFlagService FeatureFlags
+@inject GeoEtlProgressService ProgressService
+@implements IAsyncDisposable
 
 <PageTitle>Workflow Execution History</PageTitle>
 
@@ -86,24 +89,31 @@ else
                         </MudText>
                     </MudTd>
                     <MudTd DataLabel="Status">
-                        @switch (context.Status)
-                        {
-                            case "Running":
-                                <MudChip Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.PlayArrow">Running</MudChip>
-                                break;
-                            case "Completed":
-                                <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Completed</MudChip>
-                                break;
-                            case "Failed":
-                                <MudChip Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Error">Failed</MudChip>
-                                break;
-                            case "Cancelled":
-                                <MudChip Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Cancel">Cancelled</MudChip>
-                                break;
-                            default:
-                                <MudChip Size="Size.Small">@context.Status</MudChip>
-                                break;
-                        }
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            @switch (context.Status)
+                            {
+                                case "Running":
+                                    <MudChip Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.PlayArrow">Running</MudChip>
+                                    @if (GetRunProgress(context.RunId) is var progress && progress > 0)
+                                    {
+                                        <MudProgressLinear Color="Color.Info" Value="@progress" Size="Size.Small" Style="width: 100px;" />
+                                        <MudText Typo="Typo.caption">@progress%</MudText>
+                                    }
+                                    break;
+                                case "Completed":
+                                    <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Completed</MudChip>
+                                    break;
+                                case "Failed":
+                                    <MudChip Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Error">Failed</MudChip>
+                                    break;
+                                case "Cancelled":
+                                    <MudChip Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Cancel">Cancelled</MudChip>
+                                    break;
+                                default:
+                                    <MudChip Size="Size.Small">@context.Status</MudChip>
+                                    break;
+                            }
+                        </MudStack>
                     </MudTd>
                     <MudTd DataLabel="Started">
                         <MudText Typo="Typo.body2">
@@ -124,7 +134,7 @@ else
                         <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
                             <MudIconButton Icon="@Icons.Material.Filled.Visibility"
                                            Title="View Details"
-                                           OnClick="@(() => ViewRunDetails(context.RunId))" />
+                                           Href="@($"/geoetl/runs/{context.RunId}")" />
                             @if (context.Status == "Running")
                             {
                                 <MudIconButton Icon="@Icons.Material.Filled.Stop"
@@ -146,6 +156,8 @@ else
     private List<WorkflowRunDto>? _runs;
     private string _searchText = "";
     private string _filterStatus = "";
+    private Dictionary<Guid, int> _runProgress = new();
+    private List<IDisposable> _subscriptions = new();
 
     private IEnumerable<WorkflowRunDto> _filteredRuns =>
         _runs?.Where(r =>
@@ -160,7 +172,99 @@ else
         if (_hasAccess)
         {
             await LoadRuns();
+            await InitializeSignalR();
         }
+    }
+
+    private async Task InitializeSignalR()
+    {
+        try
+        {
+            // Initialize SignalR connection
+            var baseUrl = Navigation.BaseUri;
+            await ProgressService.InitializeAsync(baseUrl);
+
+            // Subscribe to workflow events
+            _subscriptions.Add(ProgressService.OnWorkflowStarted(evt =>
+            {
+                InvokeAsync(() =>
+                {
+                    UpdateRunStatus(evt.RunId, "Running");
+                    StateHasChanged();
+                });
+            }));
+
+            _subscriptions.Add(ProgressService.OnNodeProgress(evt =>
+            {
+                InvokeAsync(() =>
+                {
+                    // Calculate overall progress based on node progress
+                    _runProgress[evt.RunId] = evt.Percent;
+                    StateHasChanged();
+                });
+            }));
+
+            _subscriptions.Add(ProgressService.OnWorkflowCompleted(evt =>
+            {
+                InvokeAsync(async () =>
+                {
+                    UpdateRunStatus(evt.RunId, "Completed");
+                    _runProgress.Remove(evt.RunId);
+                    await LoadRuns(); // Refresh to get final data
+                    StateHasChanged();
+                });
+            }));
+
+            _subscriptions.Add(ProgressService.OnWorkflowFailed(evt =>
+            {
+                InvokeAsync(async () =>
+                {
+                    UpdateRunStatus(evt.RunId, "Failed");
+                    _runProgress.Remove(evt.RunId);
+                    await LoadRuns(); // Refresh to get error details
+                    StateHasChanged();
+                });
+            }));
+
+            _subscriptions.Add(ProgressService.OnWorkflowCancelled(evt =>
+            {
+                InvokeAsync(async () =>
+                {
+                    UpdateRunStatus(evt.RunId, "Cancelled");
+                    _runProgress.Remove(evt.RunId);
+                    await LoadRuns(); // Refresh
+                    StateHasChanged();
+                });
+            }));
+
+            // Subscribe to all running workflows
+            if (_runs != null)
+            {
+                foreach (var run in _runs.Where(r => r.Status == "Running"))
+                {
+                    await ProgressService.SubscribeToWorkflowAsync(run.RunId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to initialize SignalR: {ex.Message}");
+            // Continue without real-time updates
+        }
+    }
+
+    private void UpdateRunStatus(Guid runId, string status)
+    {
+        var run = _runs?.FirstOrDefault(r => r.RunId == runId);
+        if (run != null)
+        {
+            run.Status = status;
+        }
+    }
+
+    private int GetRunProgress(Guid runId)
+    {
+        return _runProgress.TryGetValue(runId, out var progress) ? progress : 0;
     }
 
     private async Task LoadRuns()
@@ -224,12 +328,6 @@ else
         return "N/A";
     }
 
-    private void ViewRunDetails(Guid runId)
-    {
-        // TODO: Implement detailed run view
-        Snackbar.Add("Run details view will be implemented in the next iteration", Severity.Info);
-    }
-
     private async Task CancelRun(Guid runId)
     {
         try
@@ -241,6 +339,20 @@ else
         catch (Exception ex)
         {
             Snackbar.Add($"Failed to cancel run: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var subscription in _subscriptions)
+        {
+            subscription?.Dispose();
+        }
+        _subscriptions.Clear();
+
+        if (ProgressService != null)
+        {
+            await ProgressService.DisposeAsync();
         }
     }
 

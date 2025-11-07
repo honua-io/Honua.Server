@@ -1,0 +1,85 @@
+{
+  "id": "attribute-filter-export",
+  "name": "Filter by Attribute and Export",
+  "description": "Filter features by attribute values and export subset. Simple data extraction workflow.",
+  "category": "Data Import/Export",
+  "icon": "filter",
+  "difficulty": 0,
+  "estimatedMinutes": 2,
+  "tags": ["filter", "query", "subset", "extract"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "Features with attributes to filter"
+  ],
+  "expectedOutputs": [
+    "Filtered feature subset"
+  ],
+  "useCases": [
+    "Extracting features by type or category",
+    "Creating thematic subsets",
+    "Data selection workflows"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load All Features",
+      "description": "Read complete dataset",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "all_features",
+        "schemaName": "public",
+        "whereClause": "type = 'residential'"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "geopackage_sink",
+      "name": "Export Filtered",
+      "description": "Save subset",
+      "parameters": {
+        "filePath": "/data/output/filtered.gpkg",
+        "layerName": "filtered",
+        "overwrite": true
+      },
+      "position": {
+        "x": 400,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "Source features table",
+      "defaultValue": "all_features",
+      "required": true
+    },
+    "filterExpression": {
+      "name": "filterExpression",
+      "type": "string",
+      "description": "SQL WHERE clause (e.g., type = 'residential')",
+      "defaultValue": "type = 'residential'",
+      "required": true
+    },
+    "outputPath": {
+      "name": "outputPath",
+      "type": "string",
+      "description": "Output file path",
+      "defaultValue": "/data/output/filtered.gpkg",
+      "required": true
+    }
+  }
+}

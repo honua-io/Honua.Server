@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Enterprise.ETL.Models;
 using Honua.Server.Enterprise.ETL.Nodes;
+using Honua.Server.Enterprise.ETL.Progress;
 using Honua.Server.Enterprise.ETL.Stores;
 using Microsoft.Extensions.Logging;
 
@@ -20,16 +21,19 @@ public class WorkflowEngine : IWorkflowEngine
 {
     private readonly IWorkflowStore _workflowStore;
     private readonly IWorkflowNodeRegistry _nodeRegistry;
+    private readonly IWorkflowProgressBroadcaster? _progressBroadcaster;
     private readonly ILogger<WorkflowEngine> _logger;
 
     public WorkflowEngine(
         IWorkflowStore workflowStore,
         IWorkflowNodeRegistry nodeRegistry,
-        ILogger<WorkflowEngine> logger)
+        ILogger<WorkflowEngine> logger,
+        IWorkflowProgressBroadcaster? progressBroadcaster = null)
     {
         _workflowStore = workflowStore ?? throw new ArgumentNullException(nameof(workflowStore));
         _nodeRegistry = nodeRegistry ?? throw new ArgumentNullException(nameof(nodeRegistry));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _progressBroadcaster = progressBroadcaster;
     }
 
     public async Task<WorkflowValidationResult> ValidateAsync(
@@ -199,6 +203,21 @@ public class WorkflowEngine : IWorkflowEngine
             run.StartedAt = DateTimeOffset.UtcNow;
             await _workflowStore.UpdateRunAsync(run, cancellationToken);
 
+            // Broadcast workflow started
+            if (_progressBroadcaster != null)
+            {
+                await _progressBroadcaster.BroadcastWorkflowStartedAsync(runId, new WorkflowStartedMetadata
+                {
+                    WorkflowId = workflow.Id,
+                    WorkflowName = workflow.Metadata.Name,
+                    TenantId = options.TenantId,
+                    UserId = options.UserId,
+                    TotalNodes = workflow.Nodes.Count,
+                    StartedAt = run.StartedAt.Value,
+                    Parameters = options.ParameterValues
+                });
+            }
+
             // Execute DAG in topological order
             var executionOrder = validation.DagValidation!.ExecutionOrder!;
             var nodeResults = new Dictionary<string, NodeExecutionResult>();
@@ -228,6 +247,16 @@ public class WorkflowEngine : IWorkflowEngine
 
                 _logger.LogInformation("Executing node {NodeId} ({NodeType}) in run {RunId}", nodeId, node.Type, runId);
 
+                // Broadcast node started
+                if (_progressBroadcaster != null)
+                {
+                    await _progressBroadcaster.BroadcastNodeStartedAsync(
+                        runId,
+                        nodeId,
+                        node.Name ?? nodeId,
+                        node.Type);
+                }
+
                 // Report progress
                 ReportProgress(options.ProgressCallback, run.Id, completedNodes, executionOrder.Count, nodeId, 0,
                     $"Executing {nodeImpl.DisplayName}...");
@@ -247,10 +276,22 @@ public class WorkflowEngine : IWorkflowEngine
                     TenantId = options.TenantId,
                     UserId = options.UserId,
                     State = run.State ?? new Dictionary<string, object>(),
-                    ProgressCallback = new Progress<NodeProgress>(p =>
+                    ProgressCallback = new Progress<NodeProgress>(async p =>
                     {
                         ReportProgress(options.ProgressCallback, run.Id, completedNodes, executionOrder.Count,
                             nodeId, p.Percentage, p.Message);
+
+                        // Broadcast node progress via SignalR
+                        if (_progressBroadcaster != null)
+                        {
+                            await _progressBroadcaster.BroadcastNodeProgressAsync(
+                                runId,
+                                nodeId,
+                                p.Percentage,
+                                p.Message,
+                                p.FeaturesProcessed,
+                                p.TotalFeatures);
+                        }
                     })
                 };
 
@@ -269,12 +310,28 @@ public class WorkflowEngine : IWorkflowEngine
                 {
                     _logger.LogError("Node {NodeId} failed: {Error}", nodeId, result.ErrorMessage);
 
+                    // Broadcast node failed
+                    if (_progressBroadcaster != null)
+                    {
+                        await _progressBroadcaster.BroadcastNodeFailedAsync(
+                            runId,
+                            nodeId,
+                            result.ErrorMessage ?? "Unknown error");
+                    }
+
                     if (!options.ContinueOnError)
                     {
                         run.Status = WorkflowRunStatus.Failed;
                         run.ErrorMessage = $"Node {nodeId} failed: {result.ErrorMessage}";
                         run.CompletedAt = DateTimeOffset.UtcNow;
                         await _workflowStore.UpdateRunAsync(run, cancellationToken);
+
+                        // Broadcast workflow failed
+                        if (_progressBroadcaster != null)
+                        {
+                            await _progressBroadcaster.BroadcastWorkflowFailedAsync(runId, run.ErrorMessage);
+                        }
+
                         return run;
                     }
                 }
@@ -282,6 +339,21 @@ public class WorkflowEngine : IWorkflowEngine
                 {
                     nodeResults[nodeId] = result;
                     completedNodes++;
+
+                    // Broadcast node completed
+                    if (_progressBroadcaster != null)
+                    {
+                        await _progressBroadcaster.BroadcastNodeCompletedAsync(
+                            runId,
+                            nodeId,
+                            new NodeCompletedResult
+                            {
+                                DurationMs = nodeStopwatch.ElapsedMilliseconds,
+                                FeaturesProcessed = result.FeaturesProcessed,
+                                BytesRead = null,
+                                BytesWritten = null
+                            });
+                    }
                 }
 
                 await _workflowStore.UpdateRunAsync(run, cancellationToken);
@@ -301,6 +373,21 @@ public class WorkflowEngine : IWorkflowEngine
             ReportProgress(options.ProgressCallback, run.Id, executionOrder.Count, executionOrder.Count, null, 100,
                 "Workflow completed successfully");
 
+            // Broadcast workflow completed
+            if (_progressBroadcaster != null)
+            {
+                await _progressBroadcaster.BroadcastWorkflowCompletedAsync(runId, new WorkflowCompletedSummary
+                {
+                    CompletedAt = run.CompletedAt.Value,
+                    TotalDurationMs = stopwatch.ElapsedMilliseconds,
+                    NodesCompleted = completedNodes,
+                    TotalNodes = executionOrder.Count,
+                    TotalFeaturesProcessed = run.NodeRuns.Sum(n => n.FeaturesProcessed),
+                    TotalBytesRead = null,
+                    TotalBytesWritten = null
+                });
+            }
+
             return run;
         }
         catch (OperationCanceledException)
@@ -309,6 +396,13 @@ public class WorkflowEngine : IWorkflowEngine
             run.Status = WorkflowRunStatus.Cancelled;
             run.CompletedAt = DateTimeOffset.UtcNow;
             await _workflowStore.UpdateRunAsync(run, cancellationToken);
+
+            // Broadcast workflow cancelled
+            if (_progressBroadcaster != null)
+            {
+                await _progressBroadcaster.BroadcastWorkflowCancelledAsync(runId, "Workflow was cancelled by user or system");
+            }
+
             return run;
         }
         catch (Exception ex)
@@ -320,6 +414,13 @@ public class WorkflowEngine : IWorkflowEngine
             run.ErrorStack = ex.StackTrace;
             run.CompletedAt = DateTimeOffset.UtcNow;
             await _workflowStore.UpdateRunAsync(run, cancellationToken);
+
+            // Broadcast workflow failed
+            if (_progressBroadcaster != null)
+            {
+                await _progressBroadcaster.BroadcastWorkflowFailedAsync(runId, ex.Message);
+            }
+
             return run;
         }
     }

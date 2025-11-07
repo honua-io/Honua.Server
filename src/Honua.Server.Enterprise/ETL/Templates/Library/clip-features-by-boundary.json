@@ -1,0 +1,126 @@
+{
+  "id": "clip-features-by-boundary",
+  "name": "Clip Features by Boundary",
+  "description": "Clip input features to a boundary polygon. Extracts only features within the clipping boundary.",
+  "category": "Overlay Operations",
+  "icon": "crop",
+  "difficulty": 0,
+  "estimatedMinutes": 3,
+  "tags": ["clip", "extract", "boundary", "cookie-cutter"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "Features to clip",
+    "Clipping boundary polygon"
+  ],
+  "expectedOutputs": [
+    "Clipped features within boundary"
+  ],
+  "useCases": [
+    "Extracting data for study area",
+    "Creating data subsets by jurisdiction",
+    "Preparing deliverables for specific regions"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Features",
+      "description": "Features to clip",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "features",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 80
+      }
+    },
+    {
+      "id": "source_2",
+      "type": "postgis_source",
+      "name": "Load Boundary",
+      "description": "Clipping boundary",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "boundary",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 180
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "clip",
+      "name": "Clip to Boundary",
+      "description": "Extract features within boundary",
+      "parameters": {
+        "preserveAttributes": true
+      },
+      "position": {
+        "x": 350,
+        "y": 130
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Clipped",
+      "description": "Store clipped features",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "clipped_features",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 550,
+        "y": 130
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1",
+      "toPort": "input"
+    },
+    {
+      "from": "source_2",
+      "to": "geo_1",
+      "toPort": "clip_boundary"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "inputLayer": {
+      "name": "inputLayer",
+      "type": "string",
+      "description": "Features to clip",
+      "defaultValue": "features",
+      "required": true
+    },
+    "boundaryLayer": {
+      "name": "boundaryLayer",
+      "type": "string",
+      "description": "Clipping boundary",
+      "defaultValue": "boundary",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Output clipped table",
+      "defaultValue": "clipped_features",
+      "required": true
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "id": "point-in-polygon-join",
+  "name": "Point-in-Polygon Spatial Join",
+  "description": "Join point features with containing polygon attributes. Classic spatial join for point-to-area enrichment.",
+  "category": "Overlay Operations",
+  "icon": "crosshair-circle",
+  "difficulty": 0,
+  "estimatedMinutes": 3,
+  "tags": ["spatial-join", "point-in-polygon", "containment", "enrichment"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "Point features",
+    "Polygon features"
+  ],
+  "expectedOutputs": [
+    "Points enriched with polygon attributes"
+  ],
+  "useCases": [
+    "Adding administrative area names to points",
+    "Enriching addresses with zone information",
+    "Associating locations with regions"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Points",
+      "description": "Point features to enrich",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "points",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 80
+      }
+    },
+    {
+      "id": "source_2",
+      "type": "postgis_source",
+      "name": "Load Polygons",
+      "description": "Containing polygons",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "zones",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 180
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "spatial_join",
+      "name": "Point in Polygon",
+      "description": "Join by containment",
+      "parameters": {
+        "joinType": "within",
+        "preserveNonMatching": true
+      },
+      "position": {
+        "x": 350,
+        "y": 130
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Enriched Points",
+      "description": "Store joined results",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "enriched_points",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 550,
+        "y": 130
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1",
+      "toPort": "target"
+    },
+    {
+      "from": "source_2",
+      "to": "geo_1",
+      "toPort": "join"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "pointsTable": {
+      "name": "pointsTable",
+      "type": "string",
+      "description": "Points table",
+      "defaultValue": "points",
+      "required": true
+    },
+    "polygonsTable": {
+      "name": "polygonsTable",
+      "type": "string",
+      "description": "Polygons table",
+      "defaultValue": "zones",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Enriched points table",
+      "defaultValue": "enriched_points",
+      "required": true
+    }
+  }
+}

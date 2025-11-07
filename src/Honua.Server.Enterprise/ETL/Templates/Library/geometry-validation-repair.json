@@ -1,0 +1,107 @@
+{
+  "id": "geometry-validation-repair",
+  "name": "Geometry Validation and Repair",
+  "description": "Validate geometries and automatically repair invalid ones. Ensures data quality for spatial operations.",
+  "category": "Geometry Processing",
+  "icon": "wrench",
+  "difficulty": 1,
+  "estimatedMinutes": 4,
+  "tags": ["validate", "repair", "fix", "quality"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "Features with potentially invalid geometries"
+  ],
+  "expectedOutputs": [
+    "Valid, repaired geometries",
+    "Validation report"
+  ],
+  "useCases": [
+    "Fixing topology errors before analysis",
+    "Preparing data for spatial operations",
+    "Quality control for imported data"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Features",
+      "description": "Read features to validate",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "raw_features",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "validate_geometry",
+      "name": "Validate and Repair",
+      "description": "Check and fix geometries",
+      "parameters": {
+        "autoFix": true,
+        "removeInvalid": false,
+        "makeValid": true
+      },
+      "position": {
+        "x": 300,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Valid Features",
+      "description": "Store repaired features",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "valid_features",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 500,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "Input features table",
+      "defaultValue": "raw_features",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Output valid features table",
+      "defaultValue": "valid_features",
+      "required": true
+    },
+    "autoFix": {
+      "name": "autoFix",
+      "type": "boolean",
+      "description": "Automatically repair invalid geometries",
+      "defaultValue": true,
+      "required": false
+    }
+  }
+}

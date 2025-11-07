@@ -1,0 +1,320 @@
+@page "/geoetl/templates"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject FeatureFlagService FeatureFlags
+@inject IDialogService DialogService
+
+<PageTitle>GeoETL Template Gallery</PageTitle>
+
+@if (!_hasAccess)
+{
+    <MudAlert Severity="Severity.Warning" Class="my-4">
+        <MudText Typo="Typo.h6">Enterprise Feature Required</MudText>
+        <MudText>
+            GeoETL templates require an Enterprise license.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/licensing" Class="mt-4">
+            Upgrade to Enterprise
+        </MudButton>
+    </MudAlert>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+        <MudText Typo="Typo.h3" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Layers" Class="mr-2" /> Template Gallery
+        </MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+            Pre-built workflow templates for common geospatial operations. Click to instantiate a template as a new workflow.
+        </MudText>
+
+        <MudPaper Class="pa-4 mb-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Spacing="3">
+                <MudTextField @bind-Value="_searchText"
+                              Label="Search templates"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Style="max-width: 400px;" />
+
+                <MudStack Row="true" Spacing="2">
+                    <MudSelect T="string" @bind-Value="_selectedCategory" Label="Category" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Style="min-width: 200px;">
+                        <MudSelectItem Value="@((string)"All")">All Categories</MudSelectItem>
+                        @foreach (var category in _categories)
+                        {
+                            <MudSelectItem Value="@category">@category</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudSelect T="string" @bind-Value="_selectedDifficulty" Label="Difficulty" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Style="min-width: 150px;">
+                        <MudSelectItem Value="@((string)"All")">All Levels</MudSelectItem>
+                        <MudSelectItem Value="Easy">Easy</MudSelectItem>
+                        <MudSelectItem Value="Medium">Medium</MudSelectItem>
+                        <MudSelectItem Value="Hard">Hard</MudSelectItem>
+                    </MudSelect>
+
+                    <MudCheckBox @bind-Checked="_featuredOnly" Label="Featured Only" Color="Color.Primary" />
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+        }
+        else if (_templates == null || !_templates.Any())
+        {
+            <MudPaper Class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Large" Class="mb-4" Style="font-size: 4rem; opacity: 0.3;" />
+                <MudText Typo="Typo.h5" Class="mb-2">No templates found</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">
+                    Try adjusting your search or filter criteria
+                </MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Showing @_filteredTemplates.Count() of @_templates.Count templates
+            </MudText>
+
+            <MudGrid>
+                @foreach (var template in _filteredTemplates)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard Elevation="2" Class="h-100 d-flex flex-column">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                        <MudText Typo="Typo.h6">@template.Name</MudText>
+                                        @if (template.IsFeatured)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Small" />
+                                        }
+                                    </MudStack>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent Class="flex-grow-1">
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        @template.Description
+                                    </MudText>
+
+                                    <MudDivider />
+
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudChip Size="Size.Small" Color="Color.Info">@template.Category</MudChip>
+                                        <MudChip Size="Size.Small" Color="@GetDifficultyColor(template.Difficulty)">
+                                            @template.Difficulty
+                                        </MudChip>
+                                    </MudStack>
+
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                                        <MudText Typo="Typo.caption">~@template.EstimatedMinutes min</MudText>
+                                        <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Small" Class="ml-2" />
+                                        <MudText Typo="Typo.caption">@template.Nodes.Count nodes</MudText>
+                                    </MudStack>
+
+                                    @if (template.Tags.Any())
+                                    {
+                                        <MudStack Row="true" Spacing="1" Class="flex-wrap">
+                                            @foreach (var tag in template.Tags.Take(3))
+                                            {
+                                                <MudChip Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">@tag</MudChip>
+                                            }
+                                            @if (template.Tags.Count > 3)
+                                            {
+                                                <MudText Typo="Typo.caption">+@(template.Tags.Count - 3) more</MudText>
+                                            }
+                                        </MudStack>
+                                    }
+
+                                    @if (template.UsageCount > 0)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" /> Used @template.UsageCount times
+                                        </MudText>
+                                    }
+                                </MudStack>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => ShowTemplateDetails(template))">
+                                    View Details
+                                </MudButton>
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => InstantiateTemplate(template))">
+                                    Use Template
+                                </MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </MudContainer>
+}
+
+@code {
+    private bool _hasAccess;
+    private bool _loading = true;
+    private List<TemplateDto>? _templates;
+    private List<string> _categories = new();
+    private string _searchText = "";
+    private string _selectedCategory = "All";
+    private string _selectedDifficulty = "All";
+    private bool _featuredOnly = false;
+
+    private IEnumerable<TemplateDto> _filteredTemplates =>
+        _templates?.Where(t =>
+            // Search filter
+            (string.IsNullOrEmpty(_searchText) ||
+             t.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+             t.Description.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+             t.Tags.Any(tag => tag.Contains(_searchText, StringComparison.OrdinalIgnoreCase))) &&
+            // Category filter
+            (_selectedCategory == "All" || t.Category == _selectedCategory) &&
+            // Difficulty filter
+            (_selectedDifficulty == "All" || t.Difficulty == _selectedDifficulty) &&
+            // Featured filter
+            (!_featuredOnly || t.IsFeatured)
+        ) ?? Enumerable.Empty<TemplateDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hasAccess = await FeatureFlags.IsEnabledAsync("geoetl");
+
+        if (_hasAccess)
+        {
+            await LoadTemplates();
+        }
+    }
+
+    private async Task LoadTemplates()
+    {
+        _loading = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<TemplatesResponse>($"/admin/api/geoetl/templates");
+            _templates = response?.Templates ?? new List<TemplateDto>();
+
+            // Load categories
+            var categoriesResponse = await Http.GetFromJsonAsync<CategoriesResponse>($"/admin/api/geoetl/templates/categories");
+            _categories = categoriesResponse?.Categories ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load templates: {ex.Message}", Severity.Error);
+            _templates = new List<TemplateDto>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ShowTemplateDetails(TemplateDto template)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Template", template }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        await DialogService.ShowAsync<TemplateDetailsDialog>("Template Details", parameters, options);
+    }
+
+    private async Task InstantiateTemplate(TemplateDto template)
+    {
+        try
+        {
+            // TODO: Replace with actual tenant ID and user ID from authentication
+            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+            var request = new
+            {
+                tenantId,
+                createdBy = userId,
+                workflowName = $"{template.Name} - {DateTime.Now:yyyy-MM-dd HH:mm}"
+            };
+
+            var response = await Http.PostAsJsonAsync($"/admin/api/geoetl/templates/{template.Id}/instantiate", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<InstantiateResponse>();
+                Snackbar.Add($"Workflow created successfully from template", Severity.Success);
+                Navigation.NavigateTo($"/geoetl/designer?id={result?.WorkflowId}");
+            }
+            else
+            {
+                Snackbar.Add($"Failed to create workflow from template", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetDifficultyColor(string difficulty)
+    {
+        return difficulty switch
+        {
+            "Easy" => Color.Success,
+            "Medium" => Color.Warning,
+            "Hard" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    // DTOs
+    private class TemplatesResponse
+    {
+        public List<TemplateDto> Templates { get; set; } = new();
+        public int Total { get; set; }
+    }
+
+    private class CategoriesResponse
+    {
+        public List<string> Categories { get; set; } = new();
+    }
+
+    private class TemplateDto
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Difficulty { get; set; } = "Easy";
+        public int EstimatedMinutes { get; set; }
+        public List<string> Tags { get; set; } = new();
+        public bool IsFeatured { get; set; }
+        public int UsageCount { get; set; }
+        public List<NodeDto> Nodes { get; set; } = new();
+        public List<string> InputRequirements { get; set; } = new();
+        public List<string> ExpectedOutputs { get; set; } = new();
+        public List<string> UseCases { get; set; } = new();
+    }
+
+    private class NodeDto
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+    }
+
+    private class InstantiateResponse
+    {
+        public Guid WorkflowId { get; set; }
+        public string TemplateId { get; set; } = "";
+        public string Message { get; set; } = "";
+    }
+}

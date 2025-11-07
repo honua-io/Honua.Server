@@ -64,6 +64,13 @@ internal static class HonuaHostConfigurationExtensions
 
             // Register GeoETL services (Enterprise feature)
             builder.Services.AddGeoEtl(connectionString, usePostgresStore: true);
+
+            // Register AI-powered workflow generation (optional, requires OpenAI configuration)
+            builder.Services.AddGeoEtlAi(builder.Configuration);
+
+            // Register GeoETL progress broadcaster for real-time workflow execution tracking
+            builder.Services.AddSingleton<Honua.Server.Enterprise.ETL.Progress.IWorkflowProgressBroadcaster,
+                Honua.Server.Enterprise.ETL.Progress.SignalRWorkflowProgressBroadcaster>();
         }
         else
         {

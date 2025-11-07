@@ -205,12 +205,17 @@ internal static class EndpointExtensions
         // Map GeoETL endpoints (Enterprise feature)
         app.MapGeoEtlWorkflowEndpoints();
         app.MapGeoEtlExecutionEndpoints();
+        app.MapGeoEtlAiEndpoints();
+        app.MapGeoEtlTemplateEndpoints();
 
         // Map Admin UI SignalR hub for real-time updates
         app.MapHub<Honua.Server.Host.Admin.Hubs.MetadataChangeNotificationHub>("/admin/hub/metadata");
 
         // Map GeoEvent SignalR hub for real-time geofence event streaming
         app.MapHub<Honua.Server.Host.GeoEvent.GeoEventHub>("/hubs/geoevent");
+
+        // Map GeoETL Progress SignalR hub for real-time workflow execution tracking
+        app.MapHub<Honua.Server.Host.GeoEvent.GeoEtlProgressHub>("/hubs/geoetl-progress");
 
         return app;
     }

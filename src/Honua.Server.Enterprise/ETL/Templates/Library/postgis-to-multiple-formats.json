@@ -1,0 +1,114 @@
+{
+  "id": "postgis-to-multiple-formats",
+  "name": "PostGIS to Multiple Formats",
+  "description": "Export PostGIS data to multiple output formats simultaneously (Shapefile, GeoJSON, GeoPackage). One source, many outputs.",
+  "category": "Data Import/Export",
+  "icon": "share",
+  "difficulty": 1,
+  "estimatedMinutes": 4,
+  "tags": ["export", "postgis", "multi-format", "distribution"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "PostGIS connection configured",
+    "Source table exists"
+  ],
+  "expectedOutputs": [
+    "Shapefile (.shp)",
+    "GeoJSON file (.geojson)",
+    "GeoPackage file (.gpkg)"
+  ],
+  "useCases": [
+    "Creating distribution packages in multiple formats",
+    "Supporting different client requirements",
+    "Archiving data in various formats"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Read from PostGIS",
+      "description": "Load features from database",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "features",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 200
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "shapefile_sink",
+      "name": "Export to Shapefile",
+      "description": "Write Shapefile output",
+      "parameters": {
+        "filePath": "/data/output/export.shp"
+      },
+      "position": {
+        "x": 400,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_2",
+      "type": "geojson_sink",
+      "name": "Export to GeoJSON",
+      "description": "Write GeoJSON output",
+      "parameters": {
+        "filePath": "/data/output/export.geojson",
+        "prettyPrint": true
+      },
+      "position": {
+        "x": 400,
+        "y": 200
+      }
+    },
+    {
+      "id": "sink_3",
+      "type": "geopackage_sink",
+      "name": "Export to GeoPackage",
+      "description": "Write GeoPackage output",
+      "parameters": {
+        "filePath": "/data/output/export.gpkg",
+        "layerName": "features"
+      },
+      "position": {
+        "x": 400,
+        "y": 300
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "sink_1"
+    },
+    {
+      "from": "source_1",
+      "to": "sink_2"
+    },
+    {
+      "from": "source_1",
+      "to": "sink_3"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "PostGIS source table",
+      "defaultValue": "features",
+      "required": true
+    },
+    "outputDir": {
+      "name": "outputDir",
+      "type": "string",
+      "description": "Output directory for all formats",
+      "defaultValue": "/data/output",
+      "required": true
+    }
+  }
+}

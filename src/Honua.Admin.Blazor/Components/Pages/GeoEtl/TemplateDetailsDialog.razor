@@ -1,0 +1,164 @@
+@inject IDialogService DialogService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h5">@Template.Name</MudText>
+                @if (Template.IsFeatured)
+                {
+                    <MudChip Color="Color.Warning" Icon="@Icons.Material.Filled.Star">Featured</MudChip>
+                }
+            </MudStack>
+
+            <MudText Typo="Typo.body1">@Template.Description</MudText>
+
+            <MudDivider />
+
+            <MudStack Row="true" Spacing="2">
+                <MudChip Size="Size.Medium" Color="Color.Info">@Template.Category</MudChip>
+                <MudChip Size="Size.Medium" Color="@GetDifficultyColor(Template.Difficulty)">
+                    @Template.Difficulty
+                </MudChip>
+                <MudChip Size="Size.Medium" Icon="@Icons.Material.Filled.Schedule">
+                    ~@Template.EstimatedMinutes min
+                </MudChip>
+                <MudChip Size="Size.Medium" Icon="@Icons.Material.Filled.AccountTree">
+                    @Template.Nodes.Count nodes
+                </MudChip>
+            </MudStack>
+
+            @if (Template.Tags.Any())
+            {
+                <MudPaper Class="pa-3" Outlined="true">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Tags</MudText>
+                    <MudStack Row="true" Spacing="1" Class="flex-wrap">
+                        @foreach (var tag in Template.Tags)
+                        {
+                            <MudChip Size="Size.Small" Variant="Variant.Outlined">@tag</MudChip>
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
+
+            @if (Template.InputRequirements.Any())
+            {
+                <MudPaper Class="pa-3" Outlined="true">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Input" Size="Size.Small" /> Input Requirements
+                    </MudText>
+                    <MudList Dense="true">
+                        @foreach (var input in Template.InputRequirements)
+                        {
+                            <MudListItem Icon="@Icons.Material.Filled.Check">
+                                <MudText Typo="Typo.body2">@input</MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudPaper>
+            }
+
+            @if (Template.ExpectedOutputs.Any())
+            {
+                <MudPaper Class="pa-3" Outlined="true">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Output" Size="Size.Small" /> Expected Outputs
+                    </MudText>
+                    <MudList Dense="true">
+                        @foreach (var output in Template.ExpectedOutputs)
+                        {
+                            <MudListItem Icon="@Icons.Material.Filled.Check">
+                                <MudText Typo="Typo.body2">@output</MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudPaper>
+            }
+
+            @if (Template.UseCases.Any())
+            {
+                <MudPaper Class="pa-3" Outlined="true">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Size="Size.Small" /> Use Cases
+                    </MudText>
+                    <MudList Dense="true">
+                        @foreach (var useCase in Template.UseCases)
+                        {
+                            <MudListItem Icon="@Icons.Material.Filled.ArrowRight">
+                                <MudText Typo="Typo.body2">@useCase</MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudPaper>
+            }
+
+            @if (Template.UsageCount > 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" Class="mr-2" />
+                    This template has been used @Template.UsageCount times by other users
+                </MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Close</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="UseTemplate">
+            Use This Template
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public TemplateDto Template { get; set; } = new();
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void UseTemplate()
+    {
+        MudDialog.Close(DialogResult.Ok(Template));
+    }
+
+    private Color GetDifficultyColor(string difficulty)
+    {
+        return difficulty switch
+        {
+            "Easy" => Color.Success,
+            "Medium" => Color.Warning,
+            "Hard" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    // DTO (should match TemplateGallery.razor)
+    public class TemplateDto
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Difficulty { get; set; } = "Easy";
+        public int EstimatedMinutes { get; set; }
+        public List<string> Tags { get; set; } = new();
+        public bool IsFeatured { get; set; }
+        public int UsageCount { get; set; }
+        public List<NodeDto> Nodes { get; set; } = new();
+        public List<string> InputRequirements { get; set; } = new();
+        public List<string> ExpectedOutputs { get; set; } = new();
+        public List<string> UseCases { get; set; } = new();
+    }
+
+    public class NodeDto
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+    }
+}

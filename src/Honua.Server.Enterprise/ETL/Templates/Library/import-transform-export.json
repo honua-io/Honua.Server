@@ -1,0 +1,161 @@
+{
+  "id": "import-transform-export",
+  "name": "Import, Transform, and Export Pipeline",
+  "description": "Complete ETL pipeline: import Shapefile, apply buffer transformation, and export to multiple formats. End-to-end workflow.",
+  "category": "Workflow Chains",
+  "icon": "workflow",
+  "difficulty": 1,
+  "estimatedMinutes": 5,
+  "tags": ["pipeline", "etl", "transformation", "complete-workflow"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "Shapefile input"
+  ],
+  "expectedOutputs": [
+    "PostGIS table with transformed data",
+    "GeoJSON export",
+    "GeoPackage export"
+  ],
+  "useCases": [
+    "Complete data processing pipeline",
+    "Automated data transformation workflows",
+    "Production data processing"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "shapefile_source",
+      "name": "Import Shapefile",
+      "description": "Read source data",
+      "parameters": {
+        "filePath": "/data/input/features.shp",
+        "encoding": "UTF-8"
+      },
+      "position": {
+        "x": 100,
+        "y": 200
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "buffer",
+      "name": "Apply Buffer",
+      "description": "Transform geometries",
+      "parameters": {
+        "distance": 100.0,
+        "units": "meters",
+        "quadrantSegments": 8
+      },
+      "position": {
+        "x": 300,
+        "y": 200
+      }
+    },
+    {
+      "id": "geo_2",
+      "type": "validate_geometry",
+      "name": "Validate Results",
+      "description": "Ensure valid geometries",
+      "parameters": {
+        "autoFix": true
+      },
+      "position": {
+        "x": 500,
+        "y": 200
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save to PostGIS",
+      "description": "Store in database",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "processed_features",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 700,
+        "y": 150
+      }
+    },
+    {
+      "id": "sink_2",
+      "type": "geojson_sink",
+      "name": "Export GeoJSON",
+      "description": "Web-friendly format",
+      "parameters": {
+        "filePath": "/data/output/processed.geojson",
+        "prettyPrint": true
+      },
+      "position": {
+        "x": 700,
+        "y": 250
+      }
+    },
+    {
+      "id": "sink_3",
+      "type": "geopackage_sink",
+      "name": "Export GeoPackage",
+      "description": "Portable format",
+      "parameters": {
+        "filePath": "/data/output/processed.gpkg",
+        "layerName": "processed"
+      },
+      "position": {
+        "x": 700,
+        "y": 350
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "geo_2"
+    },
+    {
+      "from": "geo_2",
+      "to": "sink_1"
+    },
+    {
+      "from": "geo_2",
+      "to": "sink_2"
+    },
+    {
+      "from": "geo_2",
+      "to": "sink_3"
+    }
+  ],
+  "parameters": {
+    "inputPath": {
+      "name": "inputPath",
+      "type": "string",
+      "description": "Input Shapefile path",
+      "defaultValue": "/data/input/features.shp",
+      "required": true
+    },
+    "bufferDistance": {
+      "name": "bufferDistance",
+      "type": "number",
+      "description": "Buffer distance in meters",
+      "defaultValue": 100.0,
+      "required": true,
+      "min": 0
+    },
+    "outputDir": {
+      "name": "outputDir",
+      "type": "string",
+      "description": "Output directory",
+      "defaultValue": "/data/output",
+      "required": true
+    }
+  }
+}

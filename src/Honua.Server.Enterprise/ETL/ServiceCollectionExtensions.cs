@@ -1,9 +1,12 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+using Honua.Server.Enterprise.ETL.AI;
 using Honua.Server.Enterprise.ETL.Engine;
 using Honua.Server.Enterprise.ETL.Nodes;
 using Honua.Server.Enterprise.ETL.Stores;
+using Honua.Server.Enterprise.ETL.Templates;
 using Honua.Server.Enterprise.Geoprocessing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -54,7 +57,7 @@ public static class ServiceCollectionExtensions
                 registry.RegisterNode(node.NodeType, node);
             }
 
-            // Register data source nodes (6 total)
+            // Register data source nodes (10 total: 5 legacy + 4 new GDAL formats)
             registry.RegisterNode("data_source.postgis",
                 new PostGisDataSourceNode(connectionString, loggerFactory.CreateLogger<PostGisDataSourceNode>()));
             registry.RegisterNode("data_source.file",
@@ -65,12 +68,20 @@ public static class ServiceCollectionExtensions
                 new ShapefileDataSourceNode(loggerFactory.CreateLogger<ShapefileDataSourceNode>()));
             registry.RegisterNode("data_source.kml",
                 new KmlDataSourceNode(loggerFactory.CreateLogger<KmlDataSourceNode>()));
+            registry.RegisterNode("data_source.csv_geometry",
+                new CsvGeometryDataSourceNode(loggerFactory.CreateLogger<CsvGeometryDataSourceNode>()));
+            registry.RegisterNode("data_source.gpx",
+                new GpxDataSourceNode(loggerFactory.CreateLogger<GpxDataSourceNode>()));
+            registry.RegisterNode("data_source.gml",
+                new GmlDataSourceNode(loggerFactory.CreateLogger<GmlDataSourceNode>()));
+            registry.RegisterNode("data_source.wfs",
+                new WfsDataSourceNode(loggerFactory.CreateLogger<WfsDataSourceNode>()));
 
             // Get exporters from DI
             var geoPackageExporter = sp.GetRequiredService<Core.Export.IGeoPackageExporter>();
             var shapefileExporter = sp.GetRequiredService<Core.Export.IShapefileExporter>();
 
-            // Register data sink nodes (5 total)
+            // Register data sink nodes (8 total: 5 legacy + 3 new GDAL formats)
             registry.RegisterNode("data_sink.postgis",
                 new PostGisDataSinkNode(connectionString, loggerFactory.CreateLogger<PostGisDataSinkNode>()));
             registry.RegisterNode("data_sink.geojson",
@@ -81,12 +92,21 @@ public static class ServiceCollectionExtensions
                 new GeoPackageSinkNode(geoPackageExporter, loggerFactory.CreateLogger<GeoPackageSinkNode>()));
             registry.RegisterNode("data_sink.shapefile",
                 new ShapefileSinkNode(shapefileExporter, loggerFactory.CreateLogger<ShapefileSinkNode>()));
+            registry.RegisterNode("data_sink.csv_geometry",
+                new CsvGeometrySinkNode(loggerFactory.CreateLogger<CsvGeometrySinkNode>()));
+            registry.RegisterNode("data_sink.gpx",
+                new GpxSinkNode(loggerFactory.CreateLogger<GpxSinkNode>()));
+            registry.RegisterNode("data_sink.gml",
+                new GmlSinkNode(loggerFactory.CreateLogger<GmlSinkNode>()));
 
             return registry;
         });
 
         // Register workflow engine
         services.AddSingleton<IWorkflowEngine, WorkflowEngine>();
+
+        // Register workflow template repository
+        services.AddSingleton<IWorkflowTemplateRepository, JsonWorkflowTemplateRepository>();
 
         return services;
     }
@@ -97,5 +117,73 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddGeoEtlInMemory(this IServiceCollection services, string connectionString)
     {
         return AddGeoEtl(services, connectionString, usePostgresStore: false);
+    }
+
+    /// <summary>
+    /// Registers AI-powered workflow generation services (optional)
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <param name="configuration">Configuration containing OpenAI settings</param>
+    /// <returns>Service collection for chaining</returns>
+    public static IServiceCollection AddGeoEtlAi(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Read OpenAI configuration from appsettings
+        var config = new OpenAiConfiguration();
+        configuration.GetSection("OpenAI").Bind(config);
+
+        // Only register if API key is configured
+        if (!string.IsNullOrWhiteSpace(config.ApiKey))
+        {
+            services.AddSingleton(config);
+            services.AddHttpClient<IGeoEtlAiService, OpenAiGeoEtlService>();
+
+            // Also register as singleton without HttpClient for DI
+            services.AddSingleton<IGeoEtlAiService>(sp =>
+            {
+                var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+                var httpClient = httpClientFactory.CreateClient(nameof(OpenAiGeoEtlService));
+                var logger = sp.GetRequiredService<ILogger<OpenAiGeoEtlService>>();
+                return new OpenAiGeoEtlService(httpClient, config, logger);
+            });
+        }
+        else
+        {
+            // Register null service when not configured (graceful degradation)
+            services.AddSingleton<IGeoEtlAiService?>(sp => null);
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers AI services with custom configuration
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <param name="config">OpenAI configuration</param>
+    /// <returns>Service collection for chaining</returns>
+    public static IServiceCollection AddGeoEtlAi(
+        this IServiceCollection services,
+        OpenAiConfiguration config)
+    {
+        if (config == null || string.IsNullOrWhiteSpace(config.ApiKey))
+        {
+            services.AddSingleton<IGeoEtlAiService?>(sp => null);
+            return services;
+        }
+
+        services.AddSingleton(config);
+        services.AddHttpClient<IGeoEtlAiService, OpenAiGeoEtlService>();
+
+        services.AddSingleton<IGeoEtlAiService>(sp =>
+        {
+            var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient(nameof(OpenAiGeoEtlService));
+            var logger = sp.GetRequiredService<ILogger<OpenAiGeoEtlService>>();
+            return new OpenAiGeoEtlService(httpClient, config, logger);
+        });
+
+        return services;
     }
 }

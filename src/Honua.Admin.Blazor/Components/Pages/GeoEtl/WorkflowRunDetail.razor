@@ -1,0 +1,538 @@
+@page "/geoetl/runs/{RunId:guid}"
+@using Honua.Admin.Blazor.Services
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject GeoEtlProgressService ProgressService
+@implements IAsyncDisposable
+
+<PageTitle>Workflow Run Details</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4" />
+
+    @if (_loading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+    }
+    else if (_run == null)
+    {
+        <MudAlert Severity="Severity.Error">Workflow run not found</MudAlert>
+    }
+    else
+    {
+        <MudGrid>
+            <!-- Header Card -->
+            <MudItem xs="12">
+                <MudPaper Class="pa-4 mb-4">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <MudStack Spacing="2">
+                            <MudText Typo="Typo.h4">@_run.WorkflowName</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Run ID: @_run.Id
+                            </MudText>
+                        </MudStack>
+
+                        <MudStack Row="true" Spacing="2">
+                            @switch (_run.Status)
+                            {
+                                case "Running":
+                                    <MudChip Color="Color.Info" Icon="@Icons.Material.Filled.PlayArrow">Running</MudChip>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Warning"
+                                               StartIcon="@Icons.Material.Filled.Stop"
+                                               OnClick="CancelWorkflow">
+                                        Cancel
+                                    </MudButton>
+                                    break;
+                                case "Completed":
+                                    <MudChip Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Completed</MudChip>
+                                    break;
+                                case "Failed":
+                                    <MudChip Color="Color.Error" Icon="@Icons.Material.Filled.Error">Failed</MudChip>
+                                    break;
+                                case "Cancelled":
+                                    <MudChip Color="Color.Warning" Icon="@Icons.Material.Filled.Cancel">Cancelled</MudChip>
+                                    break;
+                            }
+                        </MudStack>
+                    </MudStack>
+
+                    @if (_run.Status == "Running" && _overallProgress > 0)
+                    {
+                        <MudProgressLinear Color="Color.Info" Value="@_overallProgress" Class="mt-4" />
+                        <MudText Typo="Typo.body2" Align="Align.Center" Class="mt-2">
+                            @_completedNodes / @_totalNodes nodes completed (@_overallProgress%)
+                        </MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <!-- Summary Stats -->
+            <MudItem xs="12" md="3">
+                <MudPaper Class="pa-4">
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.overline">Started</MudText>
+                        <MudText Typo="Typo.body1">@_run.StartedAt?.ToString("g")</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="3">
+                <MudPaper Class="pa-4">
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.overline">Duration</MudText>
+                        <MudText Typo="Typo.body1">@GetDuration()</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="3">
+                <MudPaper Class="pa-4">
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.overline">Features Processed</MudText>
+                        <MudText Typo="Typo.body1">@(_run.FeaturesProcessed?.ToString("N0") ?? "N/A")</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="3">
+                <MudPaper Class="pa-4">
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.overline">Nodes</MudText>
+                        <MudText Typo="Typo.body1">@_completedNodes / @_totalNodes</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Error Message (if failed) -->
+            @if (!string.IsNullOrEmpty(_run.ErrorMessage))
+            {
+                <MudItem xs="12">
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+                        <MudText Typo="Typo.body1" Class="font-weight-bold">Error</MudText>
+                        <MudText Typo="Typo.body2">@_run.ErrorMessage</MudText>
+                    </MudAlert>
+                </MudItem>
+            }
+
+            <!-- Node Execution Timeline -->
+            <MudItem xs="12">
+                <MudPaper Class="pa-4">
+                    <MudText Typo="Typo.h5" Class="mb-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Timeline" Class="mr-2" />
+                        Node Execution Timeline
+                    </MudText>
+
+                    @if (_run.NodeRuns == null || !_run.NodeRuns.Any())
+                    {
+                        <MudText Color="Color.Secondary">No node execution data available</MudText>
+                    }
+                    else
+                    {
+                        <MudTimeline TimelineOrientation="TimelineOrientation.Vertical">
+                            @foreach (var node in _run.NodeRuns.OrderBy(n => n.StartedAt))
+                            {
+                                <MudTimelineItem Color="@GetNodeColor(node.Status)" Size="Size.Small">
+                                    <ItemOpposite>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            @node.StartedAt?.ToString("HH:mm:ss")
+                                        </MudText>
+                                    </ItemOpposite>
+                                    <ItemContent>
+                                        <MudCard Outlined="true">
+                                            <MudCardContent>
+                                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                                    <MudStack Spacing="1">
+                                                        <MudText Typo="Typo.body1" Class="font-weight-bold">
+                                                            @node.NodeId
+                                                        </MudText>
+                                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                            @node.NodeType
+                                                        </MudText>
+                                                    </MudStack>
+
+                                                    <MudStack Spacing="1" AlignItems="AlignItems.End">
+                                                        @switch (node.Status)
+                                                        {
+                                                            case "Running":
+                                                                <MudChip Size="Size.Small" Color="Color.Info">
+                                                                    Running
+                                                                    @if (GetNodeProgress(node.NodeId) > 0)
+                                                                    {
+                                                                        <text> - @GetNodeProgress(node.NodeId)%</text>
+                                                                    }
+                                                                </MudChip>
+                                                                break;
+                                                            case "Completed":
+                                                                <MudChip Size="Size.Small" Color="Color.Success">Completed</MudChip>
+                                                                break;
+                                                            case "Failed":
+                                                                <MudChip Size="Size.Small" Color="Color.Error">Failed</MudChip>
+                                                                break;
+                                                        }
+
+                                                        @if (node.DurationMs.HasValue)
+                                                        {
+                                                            <MudText Typo="Typo.caption">@FormatDuration(node.DurationMs.Value)</MudText>
+                                                        }
+
+                                                        @if (node.FeaturesProcessed.HasValue)
+                                                        {
+                                                            <MudText Typo="Typo.caption">@node.FeaturesProcessed.Value.ToString("N0") features</MudText>
+                                                        }
+                                                    </MudStack>
+                                                </MudStack>
+
+                                                @if (!string.IsNullOrEmpty(node.ErrorMessage))
+                                                {
+                                                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">
+                                                        @node.ErrorMessage
+                                                    </MudAlert>
+                                                }
+
+                                                @if (node.Status == "Running" && GetNodeProgressMessage(node.NodeId) is var msg && !string.IsNullOrEmpty(msg))
+                                                {
+                                                    <MudText Typo="Typo.caption" Color="Color.Info" Class="mt-2">
+                                                        @msg
+                                                    </MudText>
+                                                }
+                                            </MudCardContent>
+                                        </MudCard>
+                                    </ItemContent>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <!-- Live Event Log -->
+            @if (_liveEvents.Any())
+            {
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.h5" Class="mb-4">
+                            <MudIcon Icon="@Icons.Material.Filled.RssFeed" Class="mr-2" />
+                            Live Event Log
+                        </MudText>
+
+                        <MudList Dense="true" Style="max-height: 400px; overflow-y: auto;">
+                            @foreach (var evt in _liveEvents.OrderByDescending(e => e.Timestamp))
+                            {
+                                <MudListItem>
+                                    <MudStack Row="true" Spacing="2">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width: 80px;">
+                                            @evt.Timestamp.ToString("HH:mm:ss")
+                                        </MudText>
+                                        <MudChip Size="Size.Small" Color="@evt.Color">@evt.Type</MudChip>
+                                        <MudText Typo="Typo.body2">@evt.Message</MudText>
+                                    </MudStack>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid RunId { get; set; }
+
+    private bool _loading = true;
+    private WorkflowRunDetailDto? _run;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+    private Dictionary<string, int> _nodeProgress = new();
+    private Dictionary<string, string> _nodeProgressMessages = new();
+    private List<LiveEvent> _liveEvents = new();
+    private List<IDisposable> _subscriptions = new();
+    private int _overallProgress;
+    private int _completedNodes;
+    private int _totalNodes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("GeoETL", href: "/geoetl"),
+            new BreadcrumbItem("Workflow Runs", href: "/geoetl/runs"),
+            new BreadcrumbItem("Run Details", href: null, disabled: true)
+        };
+
+        await LoadRunDetails();
+        await InitializeSignalR();
+    }
+
+    private async Task LoadRunDetails()
+    {
+        _loading = true;
+        try
+        {
+            var response = await Http.GetFromJsonAsync<WorkflowRunDetailDto>($"/admin/api/geoetl/executions/{RunId}");
+            _run = response;
+
+            if (_run != null)
+            {
+                _totalNodes = _run.NodeRuns?.Count ?? 0;
+                _completedNodes = _run.NodeRuns?.Count(n => n.Status == "Completed") ?? 0;
+                _overallProgress = _totalNodes > 0 ? (_completedNodes * 100 / _totalNodes) : 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load workflow run: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task InitializeSignalR()
+    {
+        try
+        {
+            var baseUrl = Navigation.BaseUri;
+            await ProgressService.InitializeAsync(baseUrl);
+
+            // Subscribe to this specific workflow run
+            await ProgressService.SubscribeToWorkflowAsync(RunId);
+
+            // Register event handlers
+            _subscriptions.Add(ProgressService.OnNodeStarted(evt =>
+            {
+                if (evt.RunId == RunId)
+                {
+                    InvokeAsync(() =>
+                    {
+                        AddLiveEvent("Node Started", $"{evt.NodeName} started", Color.Info);
+                        UpdateNodeInRun(evt.NodeId, "Running", null, null);
+                        StateHasChanged();
+                    });
+                }
+            }));
+
+            _subscriptions.Add(ProgressService.OnNodeProgress(evt =>
+            {
+                if (evt.RunId == RunId)
+                {
+                    InvokeAsync(() =>
+                    {
+                        _nodeProgress[evt.NodeId] = evt.Percent;
+                        _nodeProgressMessages[evt.NodeId] = evt.Message ?? "";
+                        AddLiveEvent("Progress", $"{evt.NodeId}: {evt.Percent}% - {evt.Message}", Color.Info);
+                        StateHasChanged();
+                    });
+                }
+            }));
+
+            _subscriptions.Add(ProgressService.OnNodeCompleted(evt =>
+            {
+                if (evt.RunId == RunId)
+                {
+                    InvokeAsync(() =>
+                    {
+                        _completedNodes++;
+                        _overallProgress = _totalNodes > 0 ? (_completedNodes * 100 / _totalNodes) : 0;
+                        _nodeProgress.Remove(evt.NodeId);
+                        _nodeProgressMessages.Remove(evt.NodeId);
+                        AddLiveEvent("Node Completed", $"{evt.NodeId} completed in {FormatDuration(evt.DurationMs)}", Color.Success);
+                        UpdateNodeInRun(evt.NodeId, "Completed", evt.DurationMs, evt.FeaturesProcessed);
+                        StateHasChanged();
+                    });
+                }
+            }));
+
+            _subscriptions.Add(ProgressService.OnNodeFailed(evt =>
+            {
+                if (evt.RunId == RunId)
+                {
+                    InvokeAsync(() =>
+                    {
+                        AddLiveEvent("Node Failed", $"{evt.NodeId} failed: {evt.Error}", Color.Error);
+                        UpdateNodeInRun(evt.NodeId, "Failed", null, null, evt.Error);
+                        StateHasChanged();
+                    });
+                }
+            }));
+
+            _subscriptions.Add(ProgressService.OnWorkflowCompleted(evt =>
+            {
+                if (evt.RunId == RunId)
+                {
+                    InvokeAsync(async () =>
+                    {
+                        AddLiveEvent("Workflow Completed", $"Completed successfully in {FormatDuration(evt.TotalDurationMs)}", Color.Success);
+                        await LoadRunDetails();
+                        StateHasChanged();
+                    });
+                }
+            }));
+
+            _subscriptions.Add(ProgressService.OnWorkflowFailed(evt =>
+            {
+                if (evt.RunId == RunId)
+                {
+                    InvokeAsync(async () =>
+                    {
+                        AddLiveEvent("Workflow Failed", $"Failed: {evt.Error}", Color.Error);
+                        await LoadRunDetails();
+                        StateHasChanged();
+                    });
+                }
+            }));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to initialize SignalR: {ex.Message}");
+        }
+    }
+
+    private void AddLiveEvent(string type, string message, Color color)
+    {
+        _liveEvents.Add(new LiveEvent
+        {
+            Timestamp = DateTimeOffset.Now,
+            Type = type,
+            Message = message,
+            Color = color
+        });
+
+        // Keep only last 100 events
+        if (_liveEvents.Count > 100)
+        {
+            _liveEvents.RemoveAt(0);
+        }
+    }
+
+    private void UpdateNodeInRun(string nodeId, string status, long? durationMs, long? featuresProcessed, string? errorMessage = null)
+    {
+        if (_run?.NodeRuns == null) return;
+
+        var node = _run.NodeRuns.FirstOrDefault(n => n.NodeId == nodeId);
+        if (node != null)
+        {
+            node.Status = status;
+            if (durationMs.HasValue) node.DurationMs = durationMs.Value;
+            if (featuresProcessed.HasValue) node.FeaturesProcessed = featuresProcessed.Value;
+            if (errorMessage != null) node.ErrorMessage = errorMessage;
+        }
+        else
+        {
+            // Add new node run if not exists
+            _run.NodeRuns.Add(new NodeRunDto
+            {
+                NodeId = nodeId,
+                Status = status,
+                StartedAt = DateTime.UtcNow,
+                DurationMs = durationMs,
+                FeaturesProcessed = featuresProcessed,
+                ErrorMessage = errorMessage
+            });
+        }
+    }
+
+    private Color GetNodeColor(string status) => status switch
+    {
+        "Running" => Color.Info,
+        "Completed" => Color.Success,
+        "Failed" => Color.Error,
+        _ => Color.Default
+    };
+
+    private int GetNodeProgress(string nodeId)
+    {
+        return _nodeProgress.TryGetValue(nodeId, out var progress) ? progress : 0;
+    }
+
+    private string? GetNodeProgressMessage(string nodeId)
+    {
+        return _nodeProgressMessages.TryGetValue(nodeId, out var message) ? message : null;
+    }
+
+    private string GetDuration()
+    {
+        if (_run == null || !_run.StartedAt.HasValue) return "N/A";
+
+        var end = _run.CompletedAt ?? DateTimeOffset.UtcNow;
+        var duration = end - _run.StartedAt.Value;
+
+        if (duration.TotalHours >= 1)
+            return $"{duration.TotalHours:F1}h";
+        if (duration.TotalMinutes >= 1)
+            return $"{duration.TotalMinutes:F1}m";
+        return $"{duration.TotalSeconds:F1}s";
+    }
+
+    private string FormatDuration(long durationMs)
+    {
+        var duration = TimeSpan.FromMilliseconds(durationMs);
+        if (duration.TotalHours >= 1)
+            return $"{duration.TotalHours:F1}h";
+        if (duration.TotalMinutes >= 1)
+            return $"{duration.TotalMinutes:F1}m";
+        return $"{duration.TotalSeconds:F1}s";
+    }
+
+    private async Task CancelWorkflow()
+    {
+        try
+        {
+            await Http.PostAsync($"/admin/api/geoetl/executions/{RunId}/cancel", null);
+            Snackbar.Add("Workflow cancellation requested", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to cancel workflow: {ex.Message}", Severity.Error);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var subscription in _subscriptions)
+        {
+            subscription?.Dispose();
+        }
+        _subscriptions.Clear();
+
+        if (ProgressService != null)
+        {
+            await ProgressService.UnsubscribeFromWorkflowAsync(RunId);
+        }
+    }
+
+    private class WorkflowRunDetailDto
+    {
+        public Guid Id { get; set; }
+        public string WorkflowName { get; set; } = "";
+        public string Status { get; set; } = "";
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? CompletedAt { get; set; }
+        public long? FeaturesProcessed { get; set; }
+        public string? ErrorMessage { get; set; }
+        public List<NodeRunDto> NodeRuns { get; set; } = new();
+    }
+
+    private class NodeRunDto
+    {
+        public string NodeId { get; set; } = "";
+        public string NodeType { get; set; } = "";
+        public string Status { get; set; } = "";
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? CompletedAt { get; set; }
+        public long? DurationMs { get; set; }
+        public long? FeaturesProcessed { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+
+    private class LiveEvent
+    {
+        public DateTimeOffset Timestamp { get; set; }
+        public string Type { get; set; } = "";
+        public string Message { get; set; } = "";
+        public Color Color { get; set; }
+    }
+}

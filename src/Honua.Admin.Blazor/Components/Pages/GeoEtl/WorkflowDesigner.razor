@@ -68,6 +68,10 @@ else
                                                 <MudSelectItem Value="@("data_source.postgis")">PostGIS Data Source</MudSelectItem>
                                                 <MudSelectItem Value="@("data_source.geopackage")">GeoPackage Data Source</MudSelectItem>
                                                 <MudSelectItem Value="@("data_source.shapefile")">Shapefile Data Source</MudSelectItem>
+                                                <MudSelectItem Value="@("data_source.csv_geometry")">CSV with Geometry Data Source</MudSelectItem>
+                                                <MudSelectItem Value="@("data_source.gpx")">GPX Data Source</MudSelectItem>
+                                                <MudSelectItem Value="@("data_source.gml")">GML Data Source</MudSelectItem>
+                                                <MudSelectItem Value="@("data_source.wfs")">WFS Data Source</MudSelectItem>
                                                 <MudSelectItem Value="@("geoprocessing.buffer")">Buffer</MudSelectItem>
                                                 <MudSelectItem Value="@("geoprocessing.intersection")">Intersection</MudSelectItem>
                                                 <MudSelectItem Value="@("geoprocessing.union")">Union</MudSelectItem>
@@ -75,6 +79,9 @@ else
                                                 <MudSelectItem Value="@("data_sink.geojson")">GeoJSON Export</MudSelectItem>
                                                 <MudSelectItem Value="@("data_sink.geopackage")">GeoPackage Export</MudSelectItem>
                                                 <MudSelectItem Value="@("data_sink.shapefile")">Shapefile Export</MudSelectItem>
+                                                <MudSelectItem Value="@("data_sink.csv_geometry")">CSV with Geometry Export</MudSelectItem>
+                                                <MudSelectItem Value="@("data_sink.gpx")">GPX Export</MudSelectItem>
+                                                <MudSelectItem Value="@("data_sink.gml")">GML Export</MudSelectItem>
                                                 <MudSelectItem Value="@("data_sink.postgis")">PostGIS Export</MudSelectItem>
                                             </MudSelect>
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">
@@ -154,6 +161,23 @@ else
 
                     <MudStack Spacing="2">
                         <MudButton Variant="Variant.Filled"
+                                   Color="Color.Tertiary"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.AutoAwesome"
+                                   OnClick="OpenAiDialog"
+                                   Disabled="@_aiGenerating">
+                            @if (_aiGenerating)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <span>Generating...</span>
+                            }
+                            else
+                            {
+                                <span>AI Generate Workflow</span>
+                            }
+                        </MudButton>
+
+                        <MudButton Variant="Variant.Filled"
                                    Color="Color.Primary"
                                    FullWidth="true"
                                    StartIcon="@Icons.Material.Filled.Save"
@@ -201,6 +225,69 @@ else
             </MudItem>
         </MudGrid>
     </MudContainer>
+
+    <!-- AI Generation Dialog -->
+    <MudDialog @bind-IsVisible="_showAiDialog" Options="_dialogOptions">
+        <TitleContent>
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Class="mr-2" />
+                AI Workflow Generator
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudText Typo="Typo.body2" Class="mb-4">
+                Describe what you want your workflow to do in plain language, and AI will generate it for you.
+            </MudText>
+
+            <MudTextField @bind-Value="_aiPrompt"
+                          Label="Describe your workflow"
+                          Placeholder="e.g., Buffer buildings by 50 meters and export to geopackage"
+                          Lines="4"
+                          Variant="Variant.Outlined"
+                          HelperText="Be specific about data sources, operations, and outputs"
+                          Class="mb-3" />
+
+            @if (!string.IsNullOrEmpty(_aiExplanation))
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-3">
+                    <MudText Typo="Typo.body2"><strong>Generated Workflow:</strong></MudText>
+                    <MudText Typo="Typo.body2">@_aiExplanation</MudText>
+                </MudAlert>
+            }
+
+            @if (_aiWarnings.Any())
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-3">
+                    @foreach (var warning in _aiWarnings)
+                    {
+                        <MudText Typo="Typo.body2">@warning</MudText>
+                    }
+                </MudAlert>
+            }
+
+            @if (!string.IsNullOrEmpty(_aiError))
+            {
+                <MudAlert Severity="Severity.Error">@_aiError</MudAlert>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseAiDialog">Cancel</MudButton>
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="GenerateWithAi"
+                       Disabled="@(string.IsNullOrWhiteSpace(_aiPrompt) || _aiGenerating)">
+                @if (_aiGenerating)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <span>Generating...</span>
+                }
+                else
+                {
+                    <span>Generate</span>
+                }
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
 }
 
 @code {
@@ -216,6 +303,15 @@ else
 
     private List<NodeModel> _nodes = new();
     private List<EdgeModel> _edges = new();
+
+    // AI Generation
+    private bool _showAiDialog = false;
+    private bool _aiGenerating = false;
+    private string _aiPrompt = "";
+    private string _aiExplanation = "";
+    private string _aiError = "";
+    private List<string> _aiWarnings = new();
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
 
     protected override async Task OnInitializedAsync()
     {
@@ -313,6 +409,153 @@ else
         {
             _saving = false;
         }
+    }
+
+    // AI Generation Methods
+    private void OpenAiDialog()
+    {
+        _aiPrompt = "";
+        _aiExplanation = "";
+        _aiError = "";
+        _aiWarnings.Clear();
+        _showAiDialog = true;
+    }
+
+    private void CloseAiDialog()
+    {
+        _showAiDialog = false;
+    }
+
+    private async Task GenerateWithAi()
+    {
+        if (string.IsNullOrWhiteSpace(_aiPrompt))
+            return;
+
+        _aiGenerating = true;
+        _aiError = "";
+        _aiWarnings.Clear();
+        _aiExplanation = "";
+
+        try
+        {
+            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+            var request = new
+            {
+                prompt = _aiPrompt,
+                tenantId,
+                userId,
+                validateWorkflow = true
+            };
+
+            var response = await Http.PostAsJsonAsync("/admin/api/geoetl/ai/generate", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<AiGenerationResponse>();
+
+                if (result?.Success == true && result.Workflow != null)
+                {
+                    // Update form with generated workflow
+                    _workflowName = result.Workflow.Metadata?.Name ?? "AI Generated Workflow";
+                    _workflowDescription = result.Workflow.Metadata?.Description ?? "";
+                    _workflowCategory = result.Workflow.Metadata?.Category ?? "";
+
+                    // Convert nodes
+                    _nodes.Clear();
+                    foreach (var node in result.Workflow.Nodes ?? new())
+                    {
+                        _nodes.Add(new NodeModel
+                            {
+                                Id = node.Id,
+                                Name = node.Name ?? node.Type,
+                                Type = node.Type
+                            });
+                    }
+
+                    // Convert edges
+                    _edges.Clear();
+                    foreach (var edge in result.Workflow.Edges ?? new())
+                    {
+                        _edges.Add(new EdgeModel
+                            {
+                                From = edge.From,
+                                To = edge.To
+                            });
+                    }
+
+                    _aiExplanation = result.Explanation ?? "";
+                    _aiWarnings = result.Warnings ?? new();
+
+                    Snackbar.Add("Workflow generated successfully! Review and save.", Severity.Success);
+                    _showAiDialog = false;
+                }
+                else
+                {
+                    _aiError = result?.Error ?? "Failed to generate workflow";
+                }
+            }
+            else
+            {
+                var errorText = await response.Content.ReadAsStringAsync();
+                _aiError = $"AI service error: {response.StatusCode}. {errorText}";
+
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest && errorText.Contains("not configured"))
+                {
+                    _aiError = "AI service is not configured. Please configure OpenAI API key in server settings.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _aiError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _aiGenerating = false;
+        }
+    }
+
+    // Response DTOs
+    private class AiGenerationResponse
+    {
+        public bool Success { get; set; }
+        public string? Error { get; set; }
+        public WorkflowDto? Workflow { get; set; }
+        public string? Explanation { get; set; }
+        public double Confidence { get; set; }
+        public List<string>? Warnings { get; set; }
+    }
+
+    private class WorkflowDto
+    {
+        public WorkflowMetadataDto? Metadata { get; set; }
+        public List<WorkflowNodeDto>? Nodes { get; set; }
+        public List<WorkflowEdgeDto>? Edges { get; set; }
+    }
+
+    private class WorkflowMetadataDto
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Category { get; set; }
+        public List<string>? Tags { get; set; }
+    }
+
+    private class WorkflowNodeDto
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public Dictionary<string, object>? Parameters { get; set; }
+    }
+
+    private class WorkflowEdgeDto
+    {
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
     }
 
     private class NodeModel
