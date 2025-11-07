@@ -75,4 +75,16 @@ public abstract partial class BaseViewModel : ObservableObject
 		}
 		return false;
 	}
+
+	/// <summary>
+	/// Show an action sheet dialog
+	/// </summary>
+	protected virtual async Task<string> ShowActionSheetAsync(string title, string cancel, string? destruction, params string[] buttons)
+	{
+		if (Application.Current?.MainPage != null)
+		{
+			return await Application.Current.MainPage.DisplayActionSheet(title, cancel, destruction, buttons);
+		}
+		return cancel;
+	}
 }

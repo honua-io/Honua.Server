@@ -26,6 +26,9 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 	private readonly IFeatureRepository _featureRepository;
 	private readonly ICollectionRepository _collectionRepository;
 	private readonly ILocationService _locationService;
+	private readonly ISymbologyService _symbologyService;
+	private readonly IOfflineMapService _offlineMapService;
+	private readonly IMapRepository _mapRepository;
 
 	private Map? _map;
 	private WritableLayer? _featuresLayer;
@@ -84,6 +87,21 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 	[ObservableProperty]
 	private string _baseMapType = "OpenStreetMap";
 
+	[ObservableProperty]
+	private bool _useOfflineMap;
+
+	[ObservableProperty]
+	private string? _currentOfflineMapId;
+
+	[ObservableProperty]
+	private bool _isDownloadingOfflineMap;
+
+	[ObservableProperty]
+	private double _downloadProgress;
+
+	[ObservableProperty]
+	private string _downloadStatusMessage = string.Empty;
+
 	#endregion
 
 	#region Collections
@@ -103,16 +121,27 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 	/// </summary>
 	public ObservableCollection<Coordinate> DrawingPoints { get; } = new();
 
+	/// <summary>
+	/// Available offline maps
+	/// </summary>
+	public ObservableCollection<OfflineMapInfo> OfflineMaps { get; } = new();
+
 	#endregion
 
 	public MapViewModel(
 		IFeatureRepository featureRepository,
 		ICollectionRepository collectionRepository,
-		ILocationService locationService)
+		ILocationService locationService,
+		ISymbologyService symbologyService,
+		IOfflineMapService offlineMapService,
+		IMapRepository mapRepository)
 	{
 		_featureRepository = featureRepository;
 		_collectionRepository = collectionRepository;
 		_locationService = locationService;
+		_symbologyService = symbologyService;
+		_offlineMapService = offlineMapService;
+		_mapRepository = mapRepository;
 
 		Title = "Map";
 	}
@@ -282,7 +311,8 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 				var collection = await _collectionRepository.GetByIdAsync(feature.CollectionId);
 				if (collection != null)
 				{
-					mapFeature.Styles.Add(CreateStyleFromCollection(collection, geometry.GeometryType));
+					// Pass feature for attribute-based styling
+					mapFeature.Styles.Add(CreateStyleFromCollection(collection, geometry.GeometryType, feature));
 				}
 				else
 				{
@@ -340,46 +370,34 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 	/// </summary>
 	private IStyle CreateStyleFromCollection(Collection collection, string geometryType)
 	{
+		return CreateStyleFromCollection(collection, geometryType, null);
+	}
+
+	/// <summary>
+	/// Creates a Mapsui style from collection symbology for a specific feature
+	/// </summary>
+	private IStyle CreateStyleFromCollection(Collection collection, string geometryType, Feature? feature)
+	{
 		try
 		{
 			if (string.IsNullOrEmpty(collection.Symbology))
 				return CreateDefaultStyle(geometryType);
 
-			var symbology = JsonSerializer.Deserialize<Dictionary<string, object>>(collection.Symbology);
+			// Parse symbology using symbology service
+			var symbology = _symbologyService.ParseSymbology(collection.Symbology);
 			if (symbology == null)
 				return CreateDefaultStyle(geometryType);
 
-			// Extract color (default to blue)
-			var colorStr = symbology.ContainsKey("color") ? symbology["color"]?.ToString() : "#0066CC";
-			var color = ParseColor(colorStr ?? "#0066CC");
+			// If feature provided, use attribute-based styling
+			if (feature != null)
+				return _symbologyService.GetStyleForFeature(feature, symbology, geometryType);
 
-			if (geometryType == "Point" || geometryType == "MultiPoint")
-			{
-				return new SymbolStyle
-				{
-					SymbolScale = 0.8,
-					Fill = new Brush(color),
-					Outline = new Pen(Mapsui.Styles.Color.White, 2)
-				};
-			}
-			else if (geometryType == "LineString" || geometryType == "MultiLineString")
-			{
-				return new VectorStyle
-				{
-					Line = new Pen(color, 3)
-				};
-			}
-			else // Polygon
-			{
-				return new VectorStyle
-				{
-					Fill = new Brush(Mapsui.Styles.Color.FromArgb(80, color.R, color.G, color.B)),
-					Outline = new Pen(color, 2)
-				};
-			}
+			// Otherwise use simple styling
+			return _symbologyService.GetStyleForFeature(new Feature(), symbology, geometryType);
 		}
-		catch
+		catch (Exception ex)
 		{
+			System.Diagnostics.Debug.WriteLine($"Error creating style from symbology: {ex.Message}");
 			return CreateDefaultStyle(geometryType);
 		}
 	}
@@ -416,31 +434,33 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 	}
 
 	/// <summary>
-	/// Parses color string (hex format) to Mapsui Color
+	/// Gets legend items for a collection's symbology
 	/// </summary>
-	private Mapsui.Styles.Color ParseColor(string colorStr)
+	/// <param name="collectionId">Collection ID</param>
+	/// <returns>List of legend items</returns>
+	public async Task<List<LegendItem>> GetLegendItemsAsync(string collectionId)
 	{
 		try
 		{
-			if (colorStr.StartsWith("#"))
-			{
-				colorStr = colorStr[1..];
-			}
+			var collection = await _collectionRepository.GetByIdAsync(collectionId);
+			if (collection == null || string.IsNullOrEmpty(collection.Symbology))
+				return new List<LegendItem>();
 
-			if (colorStr.Length == 6)
-			{
-				var r = Convert.ToByte(colorStr.Substring(0, 2), 16);
-				var g = Convert.ToByte(colorStr.Substring(2, 2), 16);
-				var b = Convert.ToByte(colorStr.Substring(4, 2), 16);
-				return new Mapsui.Styles.Color(r, g, b);
-			}
+			var symbology = _symbologyService.ParseSymbology(collection.Symbology);
+			if (symbology == null)
+				return new List<LegendItem>();
+
+			// Determine geometry type from collection (for now, assume Point)
+			// TODO: Store geometry type in Collection model
+			var geometryType = "Point";
+
+			return _symbologyService.GenerateLegend(symbology, geometryType);
 		}
-		catch
+		catch (Exception ex)
 		{
-			// Fall through to default
+			System.Diagnostics.Debug.WriteLine($"Error generating legend: {ex.Message}");
+			return new List<LegendItem>();
 		}
-
-		return Mapsui.Styles.Color.Blue;
 	}
 
 	#region Commands
@@ -868,6 +888,291 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 		}
 
 		System.Diagnostics.Debug.WriteLine("Drawing cancelled");
+	}
+
+	#endregion
+
+	#region Offline Map Commands
+
+	/// <summary>
+	/// Downloads offline map tiles for the specified area
+	/// </summary>
+	[RelayCommand]
+	private async Task DownloadOfflineMapAsync((string mapId, double minX, double minY, double maxX, double maxY, int minZoom, int maxZoom, string tileSourceId) parameters)
+	{
+		if (IsBusy || IsDownloadingOfflineMap)
+			return;
+
+		try
+		{
+			IsDownloadingOfflineMap = true;
+			IsBusy = true;
+			DownloadProgress = 0;
+			DownloadStatusMessage = "Preparing download...";
+
+			// Get tile source
+			var tileSources = await _offlineMapService.GetTileSourcesAsync();
+			var tileSource = tileSources.FirstOrDefault(s => s.Id == parameters.tileSourceId);
+
+			if (tileSource == null)
+			{
+				await ShowAlertAsync("Error", "Tile source not found");
+				return;
+			}
+
+			// Estimate download size
+			var (estimatedBytes, tileCount) = await _offlineMapService.GetMapSizeAsync(
+				(parameters.minX, parameters.minY, parameters.maxX, parameters.maxY),
+				parameters.minZoom,
+				parameters.maxZoom);
+
+			var estimatedMB = estimatedBytes / 1024.0 / 1024.0;
+
+			// Confirm download
+			var confirmed = await ShowConfirmAsync(
+				"Download Offline Map",
+				$"This will download approximately {tileCount} tiles (~{estimatedMB:F1} MB). Continue?",
+				"Download",
+				"Cancel");
+
+			if (!confirmed)
+			{
+				IsDownloadingOfflineMap = false;
+				IsBusy = false;
+				return;
+			}
+
+			// Download tiles
+			var progress = new Progress<TileDownloadProgress>(p =>
+			{
+				DownloadProgress = p.PercentComplete;
+				DownloadStatusMessage = p.Message;
+			});
+
+			var result = await _offlineMapService.DownloadTilesAsync(
+				parameters.mapId,
+				(parameters.minX, parameters.minY, parameters.maxX, parameters.maxY),
+				parameters.minZoom,
+				parameters.maxZoom,
+				tileSource,
+				progress);
+
+			if (result.Success)
+			{
+				await ShowAlertAsync("Success",
+					$"Downloaded {result.TilesDownloaded} tiles ({result.BytesDownloaded / 1024 / 1024:F1} MB) in {result.Duration.TotalSeconds:F1}s");
+
+				// Refresh offline maps list
+				await LoadOfflineMapsAsync();
+			}
+			else
+			{
+				await ShowAlertAsync("Error",
+					$"Download failed: {result.ErrorMessage}\n{result.TilesDownloaded} tiles downloaded, {result.TilesFailed} failed");
+			}
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to download offline map");
+		}
+		finally
+		{
+			IsDownloadingOfflineMap = false;
+			IsBusy = false;
+			DownloadProgress = 0;
+			DownloadStatusMessage = string.Empty;
+		}
+	}
+
+	/// <summary>
+	/// Deletes offline map tiles
+	/// </summary>
+	[RelayCommand]
+	private async Task DeleteOfflineMapAsync(string? mapId)
+	{
+		if (IsBusy || string.IsNullOrEmpty(mapId))
+			return;
+
+		try
+		{
+			var confirmed = await ShowConfirmAsync(
+				"Delete Offline Map",
+				"This will delete all downloaded tiles for this map. Continue?",
+				"Delete",
+				"Cancel");
+
+			if (!confirmed)
+				return;
+
+			IsBusy = true;
+
+			var success = await _offlineMapService.DeleteMapAsync(mapId);
+
+			if (success)
+			{
+				await ShowAlertAsync("Success", "Offline map deleted");
+
+				// Refresh offline maps list
+				await LoadOfflineMapsAsync();
+
+				// If this was the current offline map, switch back to online
+				if (CurrentOfflineMapId == mapId)
+				{
+					CurrentOfflineMapId = null;
+					UseOfflineMap = false;
+					await SwitchToOnlineMapAsync();
+				}
+			}
+			else
+			{
+				await ShowAlertAsync("Error", "Failed to delete offline map");
+			}
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to delete offline map");
+		}
+		finally
+		{
+			IsBusy = false;
+		}
+	}
+
+	/// <summary>
+	/// Loads the list of available offline maps
+	/// </summary>
+	[RelayCommand]
+	private async Task LoadOfflineMapsAsync()
+	{
+		try
+		{
+			var maps = await _offlineMapService.GetAvailableMapsAsync();
+
+			OfflineMaps.Clear();
+			foreach (var map in maps)
+			{
+				OfflineMaps.Add(map);
+			}
+
+			System.Diagnostics.Debug.WriteLine($"Loaded {OfflineMaps.Count} offline maps");
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"Error loading offline maps: {ex.Message}");
+		}
+	}
+
+	/// <summary>
+	/// Switches to using an offline map
+	/// </summary>
+	[RelayCommand]
+	private async Task SwitchToOfflineMapAsync(string? mapId)
+	{
+		if (IsBusy || string.IsNullOrEmpty(mapId) || _map == null)
+			return;
+
+		try
+		{
+			IsBusy = true;
+
+			// Check if map exists
+			var offlineMap = OfflineMaps.FirstOrDefault(m => m.MapId == mapId);
+			if (offlineMap == null)
+			{
+				await ShowAlertAsync("Error", "Offline map not found");
+				return;
+			}
+
+			// Remove current base map layer
+			var currentBaseLayer = _map.Layers.FindLayer("BaseMap").FirstOrDefault();
+			if (currentBaseLayer != null)
+			{
+				_map.Layers.Remove(currentBaseLayer);
+			}
+
+			// Create offline tile provider
+			var offlineProvider = new OfflineTileProvider(_offlineMapService, mapId, null, offlineOnly: true);
+			var offlineLayer = new TileLayer(offlineProvider)
+			{
+				Name = "BaseMap"
+			};
+
+			_map.Layers.Insert(0, offlineLayer);
+
+			CurrentOfflineMapId = mapId;
+			UseOfflineMap = true;
+
+			System.Diagnostics.Debug.WriteLine($"Switched to offline map: {mapId}");
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to switch to offline map");
+		}
+		finally
+		{
+			IsBusy = false;
+		}
+	}
+
+	/// <summary>
+	/// Switches back to online map
+	/// </summary>
+	[RelayCommand]
+	private async Task SwitchToOnlineMapAsync()
+	{
+		if (IsBusy || _map == null)
+			return;
+
+		try
+		{
+			IsBusy = true;
+
+			// Remove current base map layer
+			var currentBaseLayer = _map.Layers.FindLayer("BaseMap").FirstOrDefault();
+			if (currentBaseLayer != null)
+			{
+				_map.Layers.Remove(currentBaseLayer);
+			}
+
+			// Add online tile layer
+			var onlineLayer = OpenStreetMap.CreateTileLayer();
+			onlineLayer.Name = "BaseMap";
+			_map.Layers.Insert(0, onlineLayer);
+
+			CurrentOfflineMapId = null;
+			UseOfflineMap = false;
+
+			System.Diagnostics.Debug.WriteLine("Switched to online map");
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to switch to online map");
+		}
+		finally
+		{
+			IsBusy = false;
+		}
+	}
+
+	/// <summary>
+	/// Gets storage information for offline maps
+	/// </summary>
+	[RelayCommand]
+	private async Task GetOfflineMapStorageInfoAsync()
+	{
+		try
+		{
+			var totalStorage = await _offlineMapService.GetTotalStorageUsedAsync();
+			var totalMB = totalStorage / 1024.0 / 1024.0;
+
+			await ShowAlertAsync("Storage Info",
+				$"Total offline map storage: {totalMB:F1} MB\n" +
+				$"Number of maps: {OfflineMaps.Count}");
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to get storage info");
+		}
 	}
 
 	#endregion

@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HonuaField.Data.Repositories;
 using HonuaField.Models;
+using HonuaField.Models.FormBuilder;
 using HonuaField.Services;
 using NetTopologySuite.Geometries;
 using System.Collections.ObjectModel;
@@ -11,7 +12,7 @@ namespace HonuaField.ViewModels;
 
 /// <summary>
 /// ViewModel for the feature editor page
-/// Handles creating and editing features with property validation and attachment management
+/// Handles creating and editing features with dynamic form generation, validation and attachment management
 /// </summary>
 public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 {
@@ -19,6 +20,8 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 	private readonly INavigationService _navigationService;
 	private readonly ICollectionRepository _collectionRepository;
 	private readonly IAuthenticationService _authenticationService;
+	private readonly ICameraService _cameraService;
+	private readonly IFormBuilderService _formBuilderService;
 
 	[ObservableProperty]
 	private string _mode = "create"; // "create" or "edit"
@@ -36,7 +39,7 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 	private Feature? _feature;
 
 	[ObservableProperty]
-	private ObservableCollection<EditableProperty> _properties = new();
+	private ObservableCollection<FormField> _formFields = new();
 
 	[ObservableProperty]
 	private ObservableCollection<Attachment> _attachments = new();
@@ -66,12 +69,16 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 		IFeaturesService featuresService,
 		INavigationService navigationService,
 		ICollectionRepository collectionRepository,
-		IAuthenticationService authenticationService)
+		IAuthenticationService authenticationService,
+		ICameraService cameraService,
+		IFormBuilderService formBuilderService)
 	{
 		_featuresService = featuresService;
 		_navigationService = navigationService;
 		_collectionRepository = collectionRepository;
 		_authenticationService = authenticationService;
+		_cameraService = cameraService;
+		_formBuilderService = formBuilderService;
 
 		Title = "Edit Feature";
 	}
@@ -87,7 +94,7 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 		Title = "New Feature";
 
 		await LoadCollectionSchemaAsync();
-		InitializeProperties();
+		InitializeFormFields();
 	}
 
 	/// <summary>
@@ -159,7 +166,7 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 			GeometryType = Geometry?.GeometryType ?? "Point";
 
 			await LoadCollectionSchemaAsync();
-			LoadPropertiesFromFeature();
+			LoadFormFieldsFromFeature();
 			await LoadAttachmentsAsync();
 
 			// Save original state for dirty checking
@@ -176,84 +183,54 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 	}
 
 	/// <summary>
-	/// Initialize properties from collection schema
+	/// Initialize form fields from collection schema
 	/// </summary>
-	private void InitializeProperties()
+	private void InitializeFormFields()
 	{
-		Properties.Clear();
+		FormFields.Clear();
 
 		if (Collection == null)
 			return;
 
 		try
 		{
-			// Parse schema to get property definitions
-			var schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Collection.Schema);
+			// Use FormBuilderService to parse schema and create form fields
+			var fields = _formBuilderService.ParseSchema(Collection.Schema);
 
-			if (schema != null && schema.ContainsKey("properties"))
+			foreach (var field in fields)
 			{
-				var propertiesSchema = schema["properties"];
-
-				foreach (var prop in propertiesSchema.EnumerateObject())
-				{
-					var propertyName = prop.Name;
-					var propertyDef = prop.Value;
-
-					var editableProperty = new EditableProperty
-					{
-						Name = propertyName,
-						DisplayName = GetDisplayName(propertyDef, propertyName),
-						Type = GetPropertyType(propertyDef),
-						IsRequired = GetIsRequired(schema, propertyName),
-						Value = GetDefaultValue(propertyDef)
-					};
-
-					Properties.Add(editableProperty);
-				}
+				FormFields.Add(field);
 			}
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error initializing properties: {ex.Message}");
+			System.Diagnostics.Debug.WriteLine($"Error initializing form fields: {ex.Message}");
 		}
 	}
 
 	/// <summary>
-	/// Load properties from existing feature
+	/// Load form fields from existing feature
 	/// </summary>
-	private void LoadPropertiesFromFeature()
+	private void LoadFormFieldsFromFeature()
 	{
-		InitializeProperties();
+		FormFields.Clear();
 
-		if (Feature == null)
+		if (Feature == null || Collection == null)
 			return;
 
 		try
 		{
-			var propertiesDict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Feature.Properties);
+			// Use FormBuilderService to parse schema with existing values
+			var fields = _formBuilderService.ParseSchemaWithValues(Collection.Schema, Feature.Properties);
 
-			if (propertiesDict != null)
+			foreach (var field in fields)
 			{
-				foreach (var property in Properties)
-				{
-					if (propertiesDict.ContainsKey(property.Name))
-					{
-						var value = propertiesDict[property.Name];
-						property.Value = value.ValueKind switch
-						{
-							JsonValueKind.String => value.GetString(),
-							JsonValueKind.Number => value.GetDouble(),
-							JsonValueKind.True => true,
-							JsonValueKind.False => false,
-							_ => null
-						};
-					}
-				}
+				FormFields.Add(field);
 			}
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error loading properties from feature: {ex.Message}");
+			System.Diagnostics.Debug.WriteLine($"Error loading form fields from feature: {ex.Message}");
 		}
 	}
 
@@ -289,7 +266,7 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 			return;
 
 		// Validate
-		if (!ValidateProperties())
+		if (!ValidateForm())
 		{
 			await ShowAlertAsync("Validation Error", ValidationMessage);
 			return;
@@ -407,16 +384,81 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 	}
 
 	/// <summary>
-	/// Add photo attachment
+	/// Take photo with camera
+	/// </summary>
+	[RelayCommand]
+	private async Task TakePhotoAsync()
+	{
+		try
+		{
+			var result = await _cameraService.TakePhotoAsync();
+
+			if (result != null && result.Success)
+			{
+				var attachment = CreateAttachmentFromCameraResult(result, AttachmentType.Photo);
+				Attachments.Add(attachment);
+				IsDirty = true;
+				await ShowAlertAsync("Success", "Photo captured successfully");
+			}
+			else if (result != null && !result.Success)
+			{
+				await ShowAlertAsync("Error", result.ErrorMessage ?? "Failed to capture photo");
+			}
+			// If result is null, user cancelled - no message needed
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to capture photo");
+		}
+	}
+
+	/// <summary>
+	/// Pick photo from gallery
+	/// </summary>
+	[RelayCommand]
+	private async Task PickPhotoAsync()
+	{
+		try
+		{
+			var result = await _cameraService.PickPhotoAsync();
+
+			if (result != null && result.Success)
+			{
+				var attachment = CreateAttachmentFromCameraResult(result, AttachmentType.Photo);
+				Attachments.Add(attachment);
+				IsDirty = true;
+				await ShowAlertAsync("Success", "Photo selected successfully");
+			}
+			else if (result != null && !result.Success)
+			{
+				await ShowAlertAsync("Error", result.ErrorMessage ?? "Failed to select photo");
+			}
+			// If result is null, user cancelled - no message needed
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to select photo");
+		}
+	}
+
+	/// <summary>
+	/// Add photo attachment (shows options for camera or gallery)
 	/// </summary>
 	[RelayCommand]
 	private async Task AddPhotoAsync()
 	{
 		try
 		{
-			// TODO: Implement photo capture/selection when Media API is available
-			await ShowAlertAsync("Add Photo", "Photo capture will be available soon");
-			IsDirty = true;
+			var choice = await ShowActionSheetAsync("Add Photo", "Cancel", null, "Take Photo", "Choose from Gallery");
+
+			if (choice == "Take Photo")
+			{
+				await TakePhotoAsync();
+			}
+			else if (choice == "Choose from Gallery")
+			{
+				await PickPhotoAsync();
+			}
 		}
 		catch (Exception ex)
 		{
@@ -425,16 +467,81 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 	}
 
 	/// <summary>
-	/// Add video attachment
+	/// Record video with camera
+	/// </summary>
+	[RelayCommand]
+	private async Task RecordVideoAsync()
+	{
+		try
+		{
+			var result = await _cameraService.RecordVideoAsync();
+
+			if (result != null && result.Success)
+			{
+				var attachment = CreateAttachmentFromCameraResult(result, AttachmentType.Video);
+				Attachments.Add(attachment);
+				IsDirty = true;
+				await ShowAlertAsync("Success", "Video recorded successfully");
+			}
+			else if (result != null && !result.Success)
+			{
+				await ShowAlertAsync("Error", result.ErrorMessage ?? "Failed to record video");
+			}
+			// If result is null, user cancelled - no message needed
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to record video");
+		}
+	}
+
+	/// <summary>
+	/// Pick video from gallery
+	/// </summary>
+	[RelayCommand]
+	private async Task PickVideoAsync()
+	{
+		try
+		{
+			var result = await _cameraService.PickVideoAsync();
+
+			if (result != null && result.Success)
+			{
+				var attachment = CreateAttachmentFromCameraResult(result, AttachmentType.Video);
+				Attachments.Add(attachment);
+				IsDirty = true;
+				await ShowAlertAsync("Success", "Video selected successfully");
+			}
+			else if (result != null && !result.Success)
+			{
+				await ShowAlertAsync("Error", result.ErrorMessage ?? "Failed to select video");
+			}
+			// If result is null, user cancelled - no message needed
+		}
+		catch (Exception ex)
+		{
+			await HandleErrorAsync(ex, "Failed to select video");
+		}
+	}
+
+	/// <summary>
+	/// Add video attachment (shows options for camera or gallery)
 	/// </summary>
 	[RelayCommand]
 	private async Task AddVideoAsync()
 	{
 		try
 		{
-			// TODO: Implement video capture/selection
-			await ShowAlertAsync("Add Video", "Video capture will be available soon");
-			IsDirty = true;
+			var choice = await ShowActionSheetAsync("Add Video", "Cancel", null, "Record Video", "Choose from Gallery");
+
+			if (choice == "Record Video")
+			{
+				await RecordVideoAsync();
+			}
+			else if (choice == "Choose from Gallery")
+			{
+				await PickVideoAsync();
+			}
 		}
 		catch (Exception ex)
 		{
@@ -443,21 +550,54 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 	}
 
 	/// <summary>
-	/// Add audio attachment
+	/// Record audio
 	/// </summary>
 	[RelayCommand]
 	private async Task AddAudioAsync()
 	{
 		try
 		{
-			// TODO: Implement audio recording
-			await ShowAlertAsync("Add Audio", "Audio recording will be available soon");
-			IsDirty = true;
+			var result = await _cameraService.RecordAudioAsync();
+
+			if (result != null && result.Success)
+			{
+				var attachment = CreateAttachmentFromCameraResult(result, AttachmentType.Audio);
+				Attachments.Add(attachment);
+				IsDirty = true;
+				await ShowAlertAsync("Success", "Audio recorded successfully");
+			}
+			else if (result != null && !result.Success)
+			{
+				await ShowAlertAsync("Error", result.ErrorMessage ?? "Failed to record audio");
+			}
+			// If result is null, user cancelled - no message needed
 		}
 		catch (Exception ex)
 		{
-			await HandleErrorAsync(ex, "Failed to add audio");
+			await HandleErrorAsync(ex, "Failed to record audio");
 		}
+	}
+
+	/// <summary>
+	/// Create attachment from camera result
+	/// </summary>
+	private Attachment CreateAttachmentFromCameraResult(CameraResult result, AttachmentType type)
+	{
+		var attachment = new Attachment
+		{
+			Id = Guid.NewGuid().ToString(),
+			FeatureId = FeatureId, // Will be set when saving
+			Type = type.ToString(),
+			Filename = result.FileName,
+			Filepath = result.FilePath,
+			ContentType = result.ContentType,
+			Size = result.FileSize,
+			Thumbnail = result.ThumbnailPath,
+			Metadata = result.Metadata != null ? JsonSerializer.Serialize(result.Metadata) : null,
+			UploadStatus = UploadStatus.Pending.ToString()
+		};
+
+		return attachment;
 	}
 
 	/// <summary>
@@ -507,164 +647,66 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 	}
 
 	/// <summary>
-	/// Property value changed - mark as dirty
+	/// Form field value changed - mark as dirty
 	/// </summary>
-	public void OnPropertyValueChanged()
+	public void OnFieldValueChanged()
 	{
 		IsDirty = true;
-		ValidateProperties();
+		ValidateForm();
 	}
 
 	/// <summary>
-	/// Validate all properties
+	/// Validate all form fields
 	/// </summary>
-	private bool ValidateProperties()
+	private bool ValidateForm()
 	{
 		HasValidationErrors = false;
 		ValidationMessage = string.Empty;
 		CanSave = true;
 
-		foreach (var property in Properties)
+		// Use FormBuilderService to validate all fields
+		var isValid = _formBuilderService.ValidateForm(FormFields);
+
+		if (!isValid)
 		{
-			if (property.IsRequired && (property.Value == null || string.IsNullOrWhiteSpace(property.Value.ToString())))
+			HasValidationErrors = true;
+			var errors = _formBuilderService.GetValidationErrors(FormFields);
+
+			// Get first error message
+			if (errors.Count > 0)
 			{
-				HasValidationErrors = true;
-				ValidationMessage = $"{property.DisplayName} is required";
-				CanSave = false;
-				return false;
+				var firstError = errors.First();
+				ValidationMessage = firstError.Value;
 			}
 
-			// Type validation
-			if (property.Value != null)
-			{
-				var isValid = property.Type switch
-				{
-					"number" => double.TryParse(property.Value.ToString(), out _),
-					"integer" => int.TryParse(property.Value.ToString(), out _),
-					"boolean" => bool.TryParse(property.Value.ToString(), out _),
-					_ => true
-				};
-
-				if (!isValid)
-				{
-					HasValidationErrors = true;
-					ValidationMessage = $"{property.DisplayName} must be a valid {property.Type}";
-					CanSave = false;
-					return false;
-				}
-			}
+			CanSave = false;
+			return false;
 		}
 
 		return true;
 	}
 
 	/// <summary>
-	/// Serialize properties to JSON
+	/// Serialize form fields to JSON
 	/// </summary>
 	private string SerializeProperties()
 	{
-		var propertiesDict = GetPropertiesDictionary();
-		return JsonSerializer.Serialize(propertiesDict);
+		return _formBuilderService.SerializeForm(FormFields);
 	}
 
 	/// <summary>
-	/// Get properties as dictionary
+	/// Get form fields as dictionary
 	/// </summary>
 	private Dictionary<string, object?> GetPropertiesDictionary()
 	{
-		var dict = new Dictionary<string, object?>();
-
-		foreach (var property in Properties)
-		{
-			dict[property.Name] = property.Value;
-		}
-
-		return dict;
+		return _formBuilderService.SerializeFormToDictionary(FormFields);
 	}
-
-	#region Schema Helpers
-
-	private string GetDisplayName(JsonElement propertyDef, string fallback)
-	{
-		if (propertyDef.TryGetProperty("title", out var title))
-		{
-			return title.GetString() ?? fallback;
-		}
-		return fallback;
-	}
-
-	private string GetPropertyType(JsonElement propertyDef)
-	{
-		if (propertyDef.TryGetProperty("type", out var type))
-		{
-			return type.GetString() ?? "string";
-		}
-		return "string";
-	}
-
-	private bool GetIsRequired(Dictionary<string, JsonElement> schema, string propertyName)
-	{
-		if (schema.ContainsKey("required"))
-		{
-			var required = schema["required"];
-			if (required.ValueKind == JsonValueKind.Array)
-			{
-				foreach (var item in required.EnumerateArray())
-				{
-					if (item.GetString() == propertyName)
-					{
-						return true;
-					}
-				}
-			}
-		}
-		return false;
-	}
-
-	private object? GetDefaultValue(JsonElement propertyDef)
-	{
-		if (propertyDef.TryGetProperty("default", out var defaultValue))
-		{
-			return defaultValue.ValueKind switch
-			{
-				JsonValueKind.String => defaultValue.GetString(),
-				JsonValueKind.Number => defaultValue.GetDouble(),
-				JsonValueKind.True => true,
-				JsonValueKind.False => false,
-				_ => null
-			};
-		}
-		return null;
-	}
-
-	#endregion
 
 	public void Dispose()
 	{
-		Properties.Clear();
+		FormFields.Clear();
 		Attachments.Clear();
 		_attachmentsToDelete.Clear();
 		_originalProperties.Clear();
 	}
-}
-
-/// <summary>
-/// Helper class for editable property
-/// </summary>
-public partial class EditableProperty : ObservableObject
-{
-	[ObservableProperty]
-	private string _name = string.Empty;
-
-	[ObservableProperty]
-	private string _displayName = string.Empty;
-
-	[ObservableProperty]
-	private string _type = "string";
-
-	[ObservableProperty]
-	private bool _isRequired;
-
-	[ObservableProperty]
-	private object? _value;
 }

@@ -1,6 +1,7 @@
 using SQLite;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
+using System.Text.Json;
 
 namespace HonuaField.Models;
 
@@ -113,6 +114,25 @@ public class Feature
 
 		var envelope = geometry.EnvelopeInternal;
 		return (envelope.MinX, envelope.MaxX, envelope.MinY, envelope.MaxY);
+	}
+
+	/// <summary>
+	/// Get the properties as a dictionary
+	/// </summary>
+	public Dictionary<string, object> GetPropertiesDict()
+	{
+		if (string.IsNullOrWhiteSpace(Properties))
+			return new Dictionary<string, object>();
+
+		try
+		{
+			var props = JsonSerializer.Deserialize<Dictionary<string, object>>(Properties);
+			return props ?? new Dictionary<string, object>();
+		}
+		catch
+		{
+			return new Dictionary<string, object>();
+		}
 	}
 }
 

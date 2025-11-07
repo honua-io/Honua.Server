@@ -5,22 +5,37 @@
 	<!-- Location permissions -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Honua Field needs access to your location to collect geospatial data and track GPS trails while using the app.</string>
-	
+
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Honua Field needs access to your location to collect geospatial data even when the app is in the background.</string>
-	
+
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Honua Field needs access to your location to collect geospatial data and track GPS trails.</string>
-	
+
 	<!-- Required for iOS 14+ precise location -->
 	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
 	<dict>
 		<key>PreciseLocation</key>
 		<string>Honua Field needs precise location for accurate geospatial data collection.</string>
 	</dict>
-	
+
+	<!-- Camera permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>Honua Field needs access to your camera to capture photos and videos for documenting field observations.</string>
+
+	<!-- Microphone permissions -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Honua Field needs access to your microphone to record audio notes and video with sound.</string>
+
+	<!-- Photo Library permissions -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Honua Field needs access to your photo library to select and attach photos to your field observations.</string>
+
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Honua Field needs permission to save photos to your photo library.</string>
+
 	<!-- UIBackgroundModes for background location (optional, if needed) -->
-	<!-- 
+	<!--
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

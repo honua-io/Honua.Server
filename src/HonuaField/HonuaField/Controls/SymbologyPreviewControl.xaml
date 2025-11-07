@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:HonuaField.Controls"
+             x:Class="HonuaField.Controls.SymbologyPreviewControl">
+    <ContentView.Content>
+        <Grid>
+            <!-- Point Symbology Preview -->
+            <Grid x:Name="PointPreview" IsVisible="False">
+                <Ellipse x:Name="PointCircle"
+                         WidthRequest="24"
+                         HeightRequest="24"
+                         Fill="{Binding FillColor}"
+                         Stroke="{Binding StrokeColor}"
+                         StrokeThickness="{Binding StrokeThickness}"/>
+            </Grid>
+
+            <!-- Line Symbology Preview -->
+            <Grid x:Name="LinePreview" IsVisible="False" Padding="4">
+                <BoxView x:Name="LineBox"
+                         HeightRequest="4"
+                         WidthRequest="40"
+                         VerticalOptions="Center"
+                         HorizontalOptions="Center"
+                         Color="{Binding LineColor}"/>
+            </Grid>
+
+            <!-- Polygon Symbology Preview -->
+            <Grid x:Name="PolygonPreview" IsVisible="False">
+                <Border x:Name="PolygonBorder"
+                        WidthRequest="32"
+                        HeightRequest="24"
+                        Stroke="{Binding StrokeColor}"
+                        StrokeThickness="{Binding StrokeThickness}"
+                        BackgroundColor="{Binding FillColor}"/>
+            </Grid>
+        </Grid>
+    </ContentView.Content>
+</ContentView>

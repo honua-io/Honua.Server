@@ -1,10 +1,176 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:HonuaField.ViewModels"
              x:Class="HonuaField.Views.SettingsPage"
-             Title="Settings">
-    <VerticalStackLayout Spacing="25" Padding="30" VerticalOptions="Center">
-        <Label Text="Settings Page" FontSize="32" HorizontalOptions="Center" />
-        <Label Text="Coming soon in Sprint 2+" HorizontalOptions="Center" />
-    </VerticalStackLayout>
+             x:DataType="viewmodels:SettingsViewModel"
+             Title="{Binding Title}">
+
+    <ScrollView>
+        <VerticalStackLayout Style="{StaticResource FormLayout}">
+
+            <!-- Server Settings -->
+            <Label Text="SERVER" Style="{StaticResource SectionHeader}" />
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Server URL" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                    <Entry Text="{Binding ServerUrl}"
+                           Placeholder="https://api.honua.io"
+                           Style="{StaticResource DefaultEntry}" />
+                    <Button Text="Save Server URL"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding SaveServerUrlCommand}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Authentication Settings -->
+            <Label Text="AUTHENTICATION" Style="{StaticResource SectionHeader}" />
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Logged in as" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                            <Label Text="{Binding LoggedInUser}" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1"
+                                Text="Logout"
+                                Style="{StaticResource DangerButton}"
+                                Command="{Binding LogoutCommand}"
+                                VerticalOptions="Center" />
+                    </Grid>
+
+                    <BoxView HeightRequest="1" Color="{StaticResource BorderDefault}" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Biometric Authentication" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                            <Label Text="Use fingerprint or face ID to login" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1"
+                                IsToggled="{Binding BiometricsEnabled}"
+                                OnColor="{StaticResource PrimaryBlue}"
+                                VerticalOptions="Center"
+                                IsEnabled="{Binding BiometricsAvailable}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- App Preferences -->
+            <Label Text="PREFERENCES" Style="{StaticResource SectionHeader}" />
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Units" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                    <Picker ItemsSource="{Binding UnitsOptions}"
+                            SelectedItem="{Binding SelectedUnits}" />
+
+                    <Label Text="Coordinate Format" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                    <Picker ItemsSource="{Binding CoordinateFormatOptions}"
+                            SelectedItem="{Binding CoordinateFormat}" />
+
+                    <Label Text="GPS Accuracy" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                    <Picker ItemsSource="{Binding GpsAccuracyOptions}"
+                            SelectedItem="{Binding GpsAccuracy}" />
+
+                    <Button Text="Save Preferences"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding SavePreferencesCommand}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Map Settings -->
+            <Label Text="MAP" Style="{StaticResource SectionHeader}" />
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Base Map Provider" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                    <Picker ItemsSource="{Binding BaseMapProviders}"
+                            SelectedItem="{Binding BaseMapProvider}" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Offline Tiles" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                            <Label Text="Enable offline map caching" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1"
+                                IsToggled="{Binding OfflineTilesEnabled}"
+                                VerticalOptions="Center" />
+                    </Grid>
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="Storage Used:" Style="{StaticResource BodySmall}" VerticalOptions="Center" />
+                        <Label Text="{Binding OfflineStorageUsed}" Style="{StaticResource BodySmall}" FontAttributes="Bold" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+
+                    <Button Text="Save Map Settings"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding SaveMapSettingsCommand}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Sync Settings -->
+            <Label Text="SYNC" Style="{StaticResource SectionHeader}" />
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Auto Sync" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                            <Label Text="Automatically sync changes" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1"
+                                IsToggled="{Binding AutoSyncEnabled}"
+                                VerticalOptions="Center" />
+                    </Grid>
+
+                    <Label Text="Sync Interval (minutes)" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                    <Picker ItemsSource="{Binding SyncIntervalOptions}"
+                            SelectedItem="{Binding SyncInterval}" />
+
+                    <Grid ColumnDefinitions="*,Auto">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="WiFi Only Sync" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                            <Label Text="Only sync when on WiFi" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                        </VerticalStackLayout>
+                        <Switch Grid.Column="1"
+                                IsToggled="{Binding WifiOnlySync}"
+                                VerticalOptions="Center" />
+                    </Grid>
+
+                    <Button Text="Save Sync Settings"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding SaveSyncSettingsCommand}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Data Management -->
+            <Label Text="DATA MANAGEMENT" Style="{StaticResource SectionHeader}" />
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="12">
+                    <Button Text="Clear Cache"
+                            Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ClearCacheCommand}" />
+                    <Button Text="Delete All Local Data"
+                            Style="{StaticResource DangerButton}"
+                            Command="{Binding DeleteLocalDataCommand}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- About -->
+            <Label Text="ABOUT" Style="{StaticResource SectionHeader}" />
+            <Frame Style="{StaticResource CardFrame}">
+                <VerticalStackLayout Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Version" Style="{StaticResource BodyMedium}" />
+                        <Label Grid.Column="1" Text="{Binding AppVersion}" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Build" Style="{StaticResource BodyMedium}" />
+                        <Label Grid.Column="1" Text="{Binding BuildNumber}" Style="{StaticResource BodyMedium}" FontAttributes="Bold" />
+                    </Grid>
+                    <Button Text="View Licenses"
+                            Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ShowLicensesCommand}" />
+                </VerticalStackLayout>
+            </Frame>
+
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>
