@@ -5,13 +5,13 @@ on:
   #   paths:
   #     - 'deploy/helm/**'
   #     - '.github/workflows/helm-lint.yml'
-  push:
-    branches:
-      - dev
-      - main
-      - master
-    paths:
-      - 'deploy/helm/**'
+  # push:
+  #   branches:
+  #     - dev
+  #     - main
+  #     - master
+  #   paths:
+  #     - 'deploy/helm/**'
   workflow_dispatch:
 
 jobs:
