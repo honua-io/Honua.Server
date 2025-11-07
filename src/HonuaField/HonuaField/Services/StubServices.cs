@@ -21,20 +21,26 @@ public interface IApiClient
 
 // ApiClient implementation is now in ApiClient.cs
 
-public interface IFeaturesService { }
-public class FeaturesService : IFeaturesService { }
+// FeaturesService is now implemented in:
+// - Services/IFeaturesService.cs
+// - Services/FeaturesService.cs
 
-public interface ICollectionsService { }
-public class CollectionsService : ICollectionsService { }
+// ICollectionsService and CollectionsService are now implemented in:
+// - Services/ICollectionsService.cs
+// - Services/CollectionsService.cs
 
-public interface ISyncService { }
-public class SyncService : ISyncService { }
+// ISyncService and SyncService are now implemented in:
+// - Services/ISyncService.cs
+// - Services/SyncService.cs
 
-public interface IConflictResolutionService { }
-public class ConflictResolutionService : IConflictResolutionService { }
+// IConflictResolutionService and ConflictResolutionService are now implemented in:
+// - Services/IConflictResolutionService.cs
+// - Services/ConflictResolutionService.cs
 
-public interface ILocationService { }
-public class LocationService : ILocationService { }
+// ILocationService and LocationService are now implemented in:
+// - Services/ILocationService.cs
+// - Services/LocationService.cs
 
-public interface IGpsService { }
-public class GpsService : IGpsService { }
+// IGpsService and GpsService are now implemented in:
+// - Services/IGpsService.cs
+// - Services/GpsService.cs

@@ -18,7 +18,7 @@
     <Color x:Key="ErrorRed">#DC3545</Color>
     <Color x:Key="InfoBlue">#17A2B8</Color>
 
-    <!-- Neutral Colors (Light Mode) -->
+    <!-- Neutral Colors (Gray Scale) -->
     <Color x:Key="Gray900">#212529</Color>
     <Color x:Key="Gray800">#343A40</Color>
     <Color x:Key="Gray700">#495057</Color>
@@ -28,24 +28,53 @@
     <Color x:Key="Gray300">#DEE2E6</Color>
     <Color x:Key="Gray200">#E9ECEF</Color>
     <Color x:Key="Gray100">#F8F9FA</Color>
+    <Color x:Key="White">#FFFFFF</Color>
+    <Color x:Key="Black">#000000</Color>
 
-    <!-- Text Colors -->
-    <Color x:Key="TextPrimary">#212529</Color>
-    <Color x:Key="TextSecondary">#6C757D</Color>
-    <Color x:Key="TextDisabled">#ADB5BD</Color>
-    <Color x:Key="TextOnPrimary">#FFFFFF</Color>
+    <!-- Light Mode Colors -->
+    <Color x:Key="TextPrimaryLight">#212529</Color>
+    <Color x:Key="TextSecondaryLight">#6C757D</Color>
+    <Color x:Key="TextDisabledLight">#ADB5BD</Color>
+    <Color x:Key="TextOnPrimaryLight">#FFFFFF</Color>
+    <Color x:Key="BackgroundPrimaryLight">#FFFFFF</Color>
+    <Color x:Key="BackgroundSecondaryLight">#F8F9FA</Color>
+    <Color x:Key="BackgroundTertiaryLight">#E9ECEF</Color>
+    <Color x:Key="SurfaceDefaultLight">#FFFFFF</Color>
+    <Color x:Key="SurfaceElevatedLight">#FFFFFF</Color>
+    <Color x:Key="BorderDefaultLight">#DEE2E6</Color>
+    <Color x:Key="BorderFocusLight">#0066CC</Color>
 
-    <!-- Background Colors -->
-    <Color x:Key="BackgroundPrimary">#FFFFFF</Color>
-    <Color x:Key="BackgroundSecondary">#F8F9FA</Color>
-    <Color x:Key="BackgroundTertiary">#E9ECEF</Color>
+    <!-- Dark Mode Colors -->
+    <Color x:Key="TextPrimaryDark">#F8F9FA</Color>
+    <Color x:Key="TextSecondaryDark">#ADB5BD</Color>
+    <Color x:Key="TextDisabledDark">#6C757D</Color>
+    <Color x:Key="TextOnPrimaryDark">#FFFFFF</Color>
+    <Color x:Key="BackgroundPrimaryDark">#121212</Color>
+    <Color x:Key="BackgroundSecondaryDark">#1E1E1E</Color>
+    <Color x:Key="BackgroundTertiaryDark">#2C2C2C</Color>
+    <Color x:Key="SurfaceDefaultDark">#1E1E1E</Color>
+    <Color x:Key="SurfaceElevatedDark">#2C2C2C</Color>
+    <Color x:Key="BorderDefaultDark">#495057</Color>
+    <Color x:Key="BorderFocusDark">#3384D6</Color>
 
-    <!-- Surface Colors -->
-    <Color x:Key="SurfaceDefault">#FFFFFF</Color>
-    <Color x:Key="SurfaceElevated">#FFFFFF</Color>
+    <!-- Adaptive Colors (switch based on theme) -->
+    <Color x:Key="TextPrimary" Light="{StaticResource TextPrimaryLight}" Dark="{StaticResource TextPrimaryDark}">#212529</Color>
+    <Color x:Key="TextSecondary" Light="{StaticResource TextSecondaryLight}" Dark="{StaticResource TextSecondaryDark}">#6C757D</Color>
+    <Color x:Key="TextDisabled" Light="{StaticResource TextDisabledLight}" Dark="{StaticResource TextDisabledDark}">#ADB5BD</Color>
+    <Color x:Key="TextOnPrimary" Light="{StaticResource TextOnPrimaryLight}" Dark="{StaticResource TextOnPrimaryDark}">#FFFFFF</Color>
 
-    <!-- Border Colors -->
-    <Color x:Key="BorderDefault">#DEE2E6</Color>
-    <Color x:Key="BorderFocus">#0066CC</Color>
+    <Color x:Key="BackgroundPrimary" Light="{StaticResource BackgroundPrimaryLight}" Dark="{StaticResource BackgroundPrimaryDark}">#FFFFFF</Color>
+    <Color x:Key="BackgroundSecondary" Light="{StaticResource BackgroundSecondaryLight}" Dark="{StaticResource BackgroundSecondaryDark}">#F8F9FA</Color>
+    <Color x:Key="BackgroundTertiary" Light="{StaticResource BackgroundTertiaryLight}" Dark="{StaticResource BackgroundTertiaryDark}">#E9ECEF</Color>
+
+    <Color x:Key="SurfaceDefault" Light="{StaticResource SurfaceDefaultLight}" Dark="{StaticResource SurfaceDefaultDark}">#FFFFFF</Color>
+    <Color x:Key="SurfaceElevated" Light="{StaticResource SurfaceElevatedLight}" Dark="{StaticResource SurfaceElevatedDark}">#FFFFFF</Color>
+
+    <Color x:Key="BorderDefault" Light="{StaticResource BorderDefaultLight}" Dark="{StaticResource BorderDefaultDark}">#DEE2E6</Color>
+    <Color x:Key="BorderFocus" Light="{StaticResource BorderFocusLight}" Dark="{StaticResource BorderFocusDark}">#0066CC</Color>
+
+    <!-- Special Purpose Colors -->
+    <Color x:Key="Transparent">Transparent</Color>
+    <Color x:Key="ShadowColor" Light="#40000000" Dark="#40FFFFFF">#40000000</Color>
 
 </ResourceDictionary>

@@ -1,10 +1,189 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:HonuaField.ViewModels"
+             xmlns:converters="clr-namespace:HonuaField.Converters"
              x:Class="HonuaField.Views.MainPage"
-             Title="Main">
-    <VerticalStackLayout Spacing="25" Padding="30" VerticalOptions="Center">
-        <Label Text="Main Page" FontSize="32" HorizontalOptions="Center" />
-        <Label Text="Coming soon in Sprint 2+" HorizontalOptions="Center" />
-    </VerticalStackLayout>
+             x:DataType="viewmodels:MainViewModel"
+             Title="{Binding Title}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter"
+                                           TrueColor="{StaticResource SuccessGreen}"
+                                           FalseColor="{StaticResource ErrorRed}" />
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <Grid Style="{StaticResource PageGrid}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Welcome Header -->
+            <Frame Grid.Row="0" Style="{StaticResource CardFrame}" Padding="20">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="{Binding WelcomeMessage}" Style="{StaticResource H2}" />
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="Status:" Style="{StaticResource BodyMedium}" />
+                        <Label Text="{Binding ConnectionStatus}"
+                               TextColor="{Binding IsOnline, Converter={StaticResource BoolToColorConverter}}"
+                               Style="{StaticResource BodyMedium}"
+                               FontAttributes="Bold" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Quick Stats -->
+            <Label Grid.Row="1" Text="QUICK STATS" Style="{StaticResource SectionHeader}" />
+
+            <Grid Grid.Row="2" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                <!-- Total Features -->
+                <Frame Grid.Row="0" Grid.Column="0" Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Features" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                        <Label Text="{Binding TotalFeatures}" Style="{StaticResource H1}" />
+                        <Button Text="View All"
+                                Style="{StaticResource TextButton}"
+                                Command="{Binding ViewFeaturesCommand}"
+                                HorizontalOptions="Start"
+                                Padding="0" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Total Collections -->
+                <Frame Grid.Row="0" Grid.Column="1" Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Collections" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                        <Label Text="{Binding TotalCollections}" Style="{StaticResource H1}" />
+                        <Button Text="Browse"
+                                Style="{StaticResource TextButton}"
+                                Command="{Binding ViewCollectionsCommand}"
+                                HorizontalOptions="Start"
+                                Padding="0" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Pending Changes -->
+                <Frame Grid.Row="1" Grid.Column="0" Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Pending" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                        <Label Text="{Binding PendingChanges}" Style="{StaticResource H1}" TextColor="{StaticResource WarningYellow}" />
+                        <Button Text="Sync Now"
+                                Style="{StaticResource TextButton}"
+                                Command="{Binding SyncNowCommand}"
+                                IsEnabled="{Binding IsSyncing, Converter={StaticResource InverseBoolConverter}}"
+                                HorizontalOptions="Start"
+                                Padding="0" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Offline Maps -->
+                <Frame Grid.Row="1" Grid.Column="1" Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Offline Maps" Style="{StaticResource BodySmall}" TextColor="{StaticResource TextSecondary}" />
+                        <Label Text="{Binding OfflineMapsCount}" Style="{StaticResource H1}" />
+                        <Button Text="Manage"
+                                Style="{StaticResource TextButton}"
+                                Command="{Binding ManageOfflineMapsCommand}"
+                                HorizontalOptions="Start"
+                                Padding="0" />
+                    </VerticalStackLayout>
+                </Frame>
+            </Grid>
+
+            <!-- Quick Actions -->
+            <Label Grid.Row="3" Text="QUICK ACTIONS" Style="{StaticResource SectionHeader}" />
+
+            <Grid Grid.Row="4" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                <!-- View Map -->
+                <Frame Grid.Row="0" Grid.Column="0" Style="{StaticResource CardFrame}" Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="📍" FontSize="32" HorizontalOptions="Center" />
+                        <Button Text="View Map"
+                                Style="{StaticResource PrimaryButton}"
+                                Command="{Binding ViewMapCommand}" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Create Feature -->
+                <Frame Grid.Row="0" Grid.Column="1" Style="{StaticResource CardFrame}" Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="➕" FontSize="32" HorizontalOptions="Center" />
+                        <Button Text="New Feature"
+                                Style="{StaticResource PrimaryButton}"
+                                Command="{Binding CreateFeatureCommand}" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Settings -->
+                <Frame Grid.Row="1" Grid.Column="0" Style="{StaticResource CardFrame}" Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="⚙️" FontSize="32" HorizontalOptions="Center" />
+                        <Button Text="Settings"
+                                Style="{StaticResource SecondaryButton}"
+                                Command="{Binding OpenSettingsCommand}" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Profile -->
+                <Frame Grid.Row="1" Grid.Column="1" Style="{StaticResource CardFrame}" Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="👤" FontSize="32" HorizontalOptions="Center" />
+                        <Button Text="Profile"
+                                Style="{StaticResource SecondaryButton}"
+                                Command="{Binding OpenProfileCommand}" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Recent Activity -->
+                <Frame Grid.Row="2" Grid.ColumnSpan="2" Style="{StaticResource CardFrame}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Recent Activity" Style="{StaticResource H4}" />
+
+                        <CollectionView ItemsSource="{Binding RecentActivities}"
+                                      EmptyView="No recent activity">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="viewmodels:RecentActivityItem">
+                                    <Grid ColumnDefinitions="Auto,*,Auto"
+                                          ColumnSpacing="12"
+                                          Padding="0,8">
+                                        <Label Grid.Column="0"
+                                               Text="📌"
+                                               FontSize="20"
+                                               VerticalOptions="Center" />
+                                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                            <Label Text="{Binding Title}"
+                                                   Style="{StaticResource BodyMedium}"
+                                                   FontAttributes="Bold" />
+                                            <Label Text="{Binding Description}"
+                                                   Style="{StaticResource BodySmall}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="2"
+                                               Text="{Binding TimestampDisplay}"
+                                               Style="{StaticResource CaptionText}"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Frame>
+            </Grid>
+
+            <!-- Loading Indicator -->
+            <ActivityIndicator Grid.Row="0"
+                             Grid.RowSpan="5"
+                             IsRunning="{Binding IsBusy}"
+                             IsVisible="{Binding IsBusy}"
+                             HorizontalOptions="Center"
+                             VerticalOptions="Center" />
+        </Grid>
+    </ScrollView>
 </ContentPage>

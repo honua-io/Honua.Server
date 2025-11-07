@@ -1,9 +1,21 @@
+using HonuaField.ViewModels;
+
 namespace HonuaField.Views;
 
 public partial class MainPage : ContentPage
 {
-	public MainPage()
+	private readonly MainViewModel _viewModel;
+
+	public MainPage(MainViewModel viewModel)
 	{
 		InitializeComponent();
+		_viewModel = viewModel;
+		BindingContext = _viewModel;
+	}
+
+	protected override async void OnAppearing()
+	{
+		base.OnAppearing();
+		await _viewModel.OnAppearingAsync();
 	}
 }

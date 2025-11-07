@@ -1,10 +1,170 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:HonuaField.ViewModels"
+             xmlns:models="clr-namespace:HonuaField.Models"
              x:Class="HonuaField.Views.FeatureListPage"
-             Title="FeatureList">
-    <VerticalStackLayout Spacing="25" Padding="30" VerticalOptions="Center">
-        <Label Text="FeatureList Page" FontSize="32" HorizontalOptions="Center" />
-        <Label Text="Coming soon in Sprint 2+" HorizontalOptions="Center" />
-    </VerticalStackLayout>
+             x:DataType="viewmodels:FeatureListViewModel"
+             Title="{Binding Title}">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="New"
+                     Command="{Binding CreateNewFeatureCommand}"
+                     IconImageSource="add.png" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="0">
+        <!-- Search Bar -->
+        <SearchBar Grid.Row="0"
+                   Placeholder="Search features..."
+                   Text="{Binding SearchText}"
+                   SearchCommand="{Binding SearchCommand}"
+                   Style="{StaticResource SearchBar}"
+                   Margin="16,8" />
+
+        <!-- Feature List with RefreshView -->
+        <RefreshView Grid.Row="1"
+                     IsRefreshing="{Binding IsRefreshing}"
+                     Command="{Binding RefreshCommand}">
+            <CollectionView ItemsSource="{Binding Features}"
+                          SelectionMode="None"
+                          RemainingItemsThreshold="5"
+                          RemainingItemsThresholdReachedCommand="{Binding LoadMoreFeaturesCommand}">
+
+                <!-- Empty View -->
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout Padding="30"
+                                       HorizontalOptions="Center"
+                                       VerticalOptions="Center"
+                                       Spacing="16">
+                        <Label Text="📍"
+                               FontSize="64"
+                               HorizontalOptions="Center" />
+                        <Label Text="No features found"
+                               Style="{StaticResource H3}"
+                               HorizontalOptions="Center" />
+                        <Label Text="Create your first feature or adjust your search"
+                               Style="{StaticResource BodyMedium}"
+                               TextColor="{StaticResource TextSecondary}"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center" />
+                        <Button Text="Create Feature"
+                                Style="{StaticResource PrimaryButton}"
+                                Command="{Binding CreateNewFeatureCommand}"
+                                HorizontalOptions="Center"
+                                Margin="0,16,0,0" />
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+
+                <!-- Item Template -->
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Feature">
+                        <Frame Style="{StaticResource ListItemFrame}"
+                               Margin="16,8">
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:FeatureListViewModel}}, Path=ViewFeatureDetailCommand}"
+                                    CommandParameter="{Binding .}" />
+                            </Frame.GestureRecognizers>
+
+                            <Grid ColumnDefinitions="Auto,*,Auto"
+                                  ColumnSpacing="12">
+                                <!-- Geometry Type Icon -->
+                                <Label Grid.Column="0"
+                                       Text="📍"
+                                       FontSize="24"
+                                       VerticalOptions="Center" />
+
+                                <!-- Feature Info -->
+                                <VerticalStackLayout Grid.Column="1" Spacing="4">
+                                    <Label Text="{Binding Id}"
+                                           Style="{StaticResource BodyMedium}"
+                                           FontAttributes="Bold" />
+                                    <Label Text="{Binding CollectionId}"
+                                           Style="{StaticResource BodySmall}"
+                                           TextColor="{StaticResource TextSecondary}" />
+                                    <Label Text="{Binding SyncStatus}"
+                                           Style="{StaticResource CaptionText}"
+                                           IsVisible="{Binding SyncStatus, Converter={StaticResource EmptyStringToVisibilityConverter}}" />
+                                </VerticalStackLayout>
+
+                                <!-- Action Buttons -->
+                                <VerticalStackLayout Grid.Column="2" Spacing="8">
+                                    <Button Text="🗺️"
+                                            FontSize="18"
+                                            Style="{StaticResource IconButton}"
+                                            WidthRequest="36"
+                                            HeightRequest="36"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:FeatureListViewModel}}, Path=ShowOnMapCommand}"
+                                            CommandParameter="{Binding .}"
+                                            SemanticProperties.Description="Show on map" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Frame>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+                <!-- Footer (for loading more) -->
+                <CollectionView.Footer>
+                    <Grid Padding="16" IsVisible="{Binding HasMoreItems}">
+                        <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                         HorizontalOptions="Center" />
+                    </Grid>
+                </CollectionView.Footer>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- Loading Overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="2"
+              IsVisible="{Binding IsBusy}"
+              BackgroundColor="#80000000">
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                             Color="{StaticResource White}"
+                             HorizontalOptions="Center"
+                             VerticalOptions="Center" />
+        </Grid>
+
+        <!-- Filter Badge -->
+        <Frame Grid.Row="1"
+               IsVisible="{Binding FilterText, Converter={StaticResource EmptyStringToVisibilityConverter}, ConverterParameter=Invert}"
+               BackgroundColor="{StaticResource InfoBlue}"
+               Padding="12,6"
+               CornerRadius="16"
+               VerticalOptions="Start"
+               HorizontalOptions="Start"
+               Margin="16"
+               HasShadow="True">
+            <HorizontalStackLayout Spacing="8">
+                <Label Text="{Binding FilterText}"
+                       Style="{StaticResource BodySmall}"
+                       TextColor="{StaticResource White}"
+                       FontAttributes="Bold"
+                       VerticalOptions="Center" />
+                <Button Text="✕"
+                        FontSize="12"
+                        Style="{StaticResource IconButton}"
+                        WidthRequest="24"
+                        HeightRequest="24"
+                        Padding="0"
+                        TextColor="{StaticResource White}"
+                        Command="{Binding ClearSearchCommand}" />
+            </HorizontalStackLayout>
+        </Frame>
+
+        <!-- Total Count Badge -->
+        <Frame Grid.Row="1"
+               IsVisible="{Binding TotalCount, Converter={StaticResource IntToBoolConverter}}"
+               BackgroundColor="{StaticResource PrimaryBlue}"
+               Padding="12,6"
+               CornerRadius="16"
+               VerticalOptions="Start"
+               HorizontalOptions="End"
+               Margin="16"
+               HasShadow="True">
+            <Label Text="{Binding TotalCount, StringFormat='{0} total'}"
+                   Style="{StaticResource BodySmall}"
+                   TextColor="{StaticResource White}"
+                   FontAttributes="Bold" />
+        </Frame>
+    </Grid>
 </ContentPage>

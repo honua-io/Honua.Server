@@ -1,10 +1,176 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:HonuaField.ViewModels"
+             xmlns:mapsui="clr-namespace:Mapsui.UI.Maui;assembly=Mapsui.UI.Maui"
              x:Class="HonuaField.Views.MapPage"
-             Title="Map">
-    <VerticalStackLayout Spacing="25" Padding="30" VerticalOptions="Center">
-        <Label Text="Map Page" FontSize="32" HorizontalOptions="Center" />
-        <Label Text="Coming soon in Sprint 2+" HorizontalOptions="Center" />
-    </VerticalStackLayout>
+             x:DataType="viewmodels:MapViewModel"
+             Title="{Binding Title}">
+
+    <Grid>
+        <!-- Mapsui Map Control -->
+        <mapsui:MapControl x:Name="mapControl" />
+
+        <!-- Overlay Controls -->
+        <Grid VerticalOptions="End"
+              HorizontalOptions="End"
+              Padding="16"
+              RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Layers Button -->
+            <Button Grid.Row="0"
+                    Text="🗂️"
+                    FontSize="24"
+                    Style="{StaticResource IconButton}"
+                    BackgroundColor="{StaticResource SurfaceElevated}"
+                    WidthRequest="50"
+                    HeightRequest="50"
+                    Clicked="OnLayersButtonClicked"
+                    SemanticProperties.Description="Toggle layers panel" />
+
+            <!-- Drawing Tools Button -->
+            <Button Grid.Row="1"
+                    Text="✏️"
+                    FontSize="24"
+                    Style="{StaticResource IconButton}"
+                    BackgroundColor="{StaticResource SurfaceElevated}"
+                    WidthRequest="50"
+                    HeightRequest="50"
+                    Clicked="OnDrawButtonClicked"
+                    SemanticProperties.Description="Drawing tools" />
+
+            <!-- Zoom To All -->
+            <Button Grid.Row="2"
+                    Text="🌍"
+                    FontSize="24"
+                    Style="{StaticResource IconButton}"
+                    BackgroundColor="{StaticResource SurfaceElevated}"
+                    WidthRequest="50"
+                    HeightRequest="50"
+                    Command="{Binding ZoomToAllFeaturesCommand}"
+                    SemanticProperties.Description="Zoom to all features" />
+
+            <!-- Location Button -->
+            <Button Grid.Row="3"
+                    Text="📍"
+                    FontSize="24"
+                    Style="{StaticResource IconButton}"
+                    BackgroundColor="{StaticResource SurfaceElevated}"
+                    WidthRequest="50"
+                    HeightRequest="50"
+                    Command="{Binding ZoomToLocationCommand}"
+                    SemanticProperties.Description="Zoom to my location" />
+
+            <!-- GPS Tracking Toggle -->
+            <Button Grid.Row="4"
+                    Text="{Binding IsTrackingLocation, Converter={StaticResource BoolToStringConverter}, ConverterParameter='🔴|⚪'}"
+                    FontSize="24"
+                    Style="{StaticResource IconButton}"
+                    BackgroundColor="{StaticResource SurfaceElevated}"
+                    WidthRequest="50"
+                    HeightRequest="50"
+                    Command="{Binding ToggleLocationTrackingCommand}"
+                    SemanticProperties.Description="Toggle GPS tracking" />
+        </Grid>
+
+        <!-- Layer Selection Panel (hidden by default) -->
+        <Frame x:Name="layersPanel"
+               IsVisible="False"
+               BackgroundColor="{StaticResource SurfaceElevated}"
+               Padding="16"
+               VerticalOptions="Start"
+               HorizontalOptions="End"
+               Margin="16,60,16,0"
+               MaximumWidthRequest="300">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="Layers" Style="{StaticResource H4}" />
+
+                <CollectionView ItemsSource="{Binding Layers}">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewmodels:CollectionLayerInfo">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Padding="0,4">
+                                <CheckBox Grid.Column="0"
+                                         IsChecked="{Binding IsVisible}"
+                                         CheckedChanged="OnLayerVisibilityChanged" />
+                                <Label Grid.Column="1"
+                                       Text="{Binding Name}"
+                                       Style="{StaticResource BodyMedium}"
+                                       VerticalOptions="Center" />
+                                <Label Grid.Column="2"
+                                       Text="{Binding FeatureCount}"
+                                       Style="{StaticResource BodySmall}"
+                                       VerticalOptions="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <Button Text="Close"
+                        Style="{StaticResource SecondaryButton}"
+                        Clicked="OnLayersButtonClicked" />
+            </VerticalStackLayout>
+        </Frame>
+
+        <!-- Drawing Tools Panel (hidden by default) -->
+        <Frame x:Name="drawingPanel"
+               IsVisible="False"
+               BackgroundColor="{StaticResource SurfaceElevated}"
+               Padding="16"
+               VerticalOptions="Start"
+               HorizontalOptions="End"
+               Margin="16,60,16,0"
+               MaximumWidthRequest="300">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="Drawing Tools" Style="{StaticResource H4}" />
+
+                <Button Text="📍 Draw Point"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding DrawFeatureCommand}"
+                        CommandParameter="Point" />
+
+                <Button Text="📏 Draw Line"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding DrawFeatureCommand}"
+                        CommandParameter="Line" />
+
+                <Button Text="⬜ Draw Polygon"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding DrawFeatureCommand}"
+                        CommandParameter="Polygon" />
+
+                <Button Text="Cancel"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding CancelDrawingCommand}"
+                        Clicked="OnDrawButtonClicked" />
+            </VerticalStackLayout>
+        </Frame>
+
+        <!-- Loading Indicator -->
+        <ActivityIndicator IsRunning="{Binding IsBusy}"
+                         IsVisible="{Binding IsBusy}"
+                         HorizontalOptions="Center"
+                         VerticalOptions="Center" />
+
+        <!-- Feature Count Badge -->
+        <Frame IsVisible="{Binding FeaturesInView, Converter={StaticResource IntToBoolConverter}}"
+               BackgroundColor="{StaticResource PrimaryBlue}"
+               Padding="12,6"
+               CornerRadius="16"
+               VerticalOptions="Start"
+               HorizontalOptions="Start"
+               Margin="16"
+               HasShadow="True">
+            <Label Text="{Binding FeaturesInView, StringFormat='{0} features'}"
+                   Style="{StaticResource BodySmall}"
+                   TextColor="{StaticResource White}"
+                   FontAttributes="Bold" />
+        </Frame>
+    </Grid>
 </ContentPage>
