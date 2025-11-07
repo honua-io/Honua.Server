@@ -22,7 +22,7 @@ A cloud-native geospatial server built on .NET 9, implementing OGC standards and
 Honua provides a complete OGC-compliant geospatial server with:
 
 - **Standards Implementation**: OGC API Features/Tiles/Records, WFS 2.0/3.0, WMS 1.3, WCS 2.0, STAC 1.0, Geoservices REST (Esri), Carto SQL API
-- **Data Providers**: PostgreSQL/PostGIS, MySQL, SQLite, SQL Server, Oracle, Snowflake, BigQuery, Redshift, MongoDB, Cosmos DB
+- **Data Providers**: PostgreSQL/PostGIS, MySQL, SQLite, DuckDB, SQL Server, Oracle, Snowflake, BigQuery, Redshift, MongoDB, Cosmos DB
 - **Cloud-Native Architecture**: Docker, Kubernetes, multi-cloud deployment, OpenTelemetry observability
 - **High Performance**: Built on .NET 9 with NetTopologySuite for geometry operations
 - **Transactional Editing**: Full WFS-T support with versioning and conflict resolution
@@ -77,7 +77,7 @@ docker compose up
 
 **Full Image** (~150-180MB)
 - Vector and raster processing (GDAL 3.11)
-- All database providers (PostgreSQL, MySQL, SQL Server, Oracle, Snowflake, BigQuery, MongoDB, Cosmos DB)
+- All database providers (PostgreSQL, MySQL, SQLite, DuckDB, SQL Server, Oracle, Snowflake, BigQuery, MongoDB, Cosmos DB)
 - Cloud storage integration (AWS S3, Azure Blob, Google Cloud Storage)
 - Map rendering and tile generation
 - Complete OGC WCS 2.0 coverage support
@@ -85,7 +85,7 @@ docker compose up
 
 **Lite Image** (~60-80MB)
 - Vector-only processing (no GDAL)
-- PostgreSQL, MySQL, SQLite support
+- PostgreSQL, MySQL, SQLite, DuckDB support
 - 50% faster cold starts
 - Perfect for serverless platforms
 
