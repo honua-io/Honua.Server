@@ -7,7 +7,7 @@
     "pbiviz": "pbiviz",
     "start": "pbiviz start",
     "package": "pbiviz package",
-    "lint": "tslint -c tslint.json -p tsconfig.json",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "prestart": "pbiviz update 5.3.0",
     "prepackage": "pbiviz update 5.3.0"
   },
@@ -22,13 +22,15 @@
   "license": "MIT",
   "devDependencies": {
     "@types/d3": "^7.4.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
     "powerbi-visuals-api": "^5.3.0",
     "powerbi-visuals-tools": "^5.3.0",
     "powerbi-visuals-utils-dataviewutils": "^3.0.0",
     "powerbi-visuals-utils-formattingutils": "^5.1.0",
-    "powerbi-visuals-utils-interactivityutils": "^5.8.0",
-    "powerbi-visuals-utils-tooltiputils": "^3.1.0",
-    "tslint": "^6.1.3",
+    "powerbi-visuals-utils-interactivityutils": "^5.7.1",
+    "powerbi-visuals-utils-tooltiputils": "^3.0.0",
     "typescript": "^4.9.0"
   },
   "dependencies": {

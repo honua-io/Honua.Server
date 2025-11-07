@@ -1,0 +1,356 @@
+@page "/dashboards/emergency-response"
+<PageTitle>Emergency Response Dashboard - Honua MapSDK</PageTitle>
+
+<div class="dashboard-container">
+    <div class="dashboard-header" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; border: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div>
+                <h1 class="dashboard-title" style="color: white;">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Class="mr-2" />
+                    Emergency Response Dashboard
+                </h1>
+                <p class="dashboard-subtitle" style="color: rgba(255,255,255,0.9);">
+                    Real-time incident tracking and coordination for emergency services.
+                </p>
+            </div>
+            <MudStack Row="true" Spacing="2">
+                <MudChip Color="Color.Error" Icon="@Icons.Material.Filled.Warning" Style="color: white;">
+                    3 Active Incidents
+                </MudChip>
+                <MudChip Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle" Style="color: white;">
+                    24 Units Available
+                </MudChip>
+            </MudStack>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <MudPaper Elevation="2" Class="pa-3 mb-4">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="2">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Active Incidents</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Error">3</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Units Dispatched</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Warning">12</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Available Units</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Success">24</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Avg Response Time</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Primary">4.2 min</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Today's Calls</MudText>
+                    <MudText Typo="Typo.h5">47</MudText>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Last Updated</MudText>
+                <MudText Typo="Typo.body2">@DateTime.Now.ToString("HH:mm:ss")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Success">Live</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudGrid>
+        <!-- Left Panel: Incident List -->
+        <MudItem xs="12" md="3">
+            <MudStack Spacing="3">
+                <!-- Active Incidents -->
+                <MudPaper Elevation="2" Style="max-height: 500px; overflow-y: auto;">
+                    <div class="pa-3" style="background: #D32F2F; color: white; font-weight: bold;">
+                        <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" /> ACTIVE INCIDENTS (3)
+                    </div>
+                    <MudList Dense="true">
+                        <MudListItem>
+                            <MudPaper Class="pa-2 mb-2" Elevation="1" Style="border-left: 4px solid #D32F2F;">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Error">Structure Fire</MudText>
+                                <MudText Typo="Typo.caption">123 Market St</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Dispatched: 14:32</MudText>
+                                <MudChip Size="Size.Small" Color="Color.Error">High Priority</MudChip>
+                            </MudPaper>
+                        </MudListItem>
+                        <MudListItem>
+                            <MudPaper Class="pa-2 mb-2" Elevation="1" Style="border-left: 4px solid #FF9800;">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Warning">Vehicle Accident</MudText>
+                                <MudText Typo="Typo.caption">Mission St & 5th Ave</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Dispatched: 14:45</MudText>
+                                <MudChip Size="Size.Small" Color="Color.Warning">Medium Priority</MudChip>
+                            </MudPaper>
+                        </MudListItem>
+                        <MudListItem>
+                            <MudPaper Class="pa-2 mb-2" Elevation="1" Style="border-left: 4px solid #2196F3;">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Info">Medical Emergency</MudText>
+                                <MudText Typo="Typo.caption">456 Folsom St</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Dispatched: 14:50</MudText>
+                                <MudChip Size="Size.Small" Color="Color.Info">Normal Priority</MudChip>
+                            </MudPaper>
+                        </MudListItem>
+                    </MudList>
+                </MudPaper>
+
+                <!-- Emergency Resources -->
+                <MudPaper Class="pa-3" Elevation="2">
+                    <div class="panel-header">
+                        <h3 class="panel-title">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalPolice" Size="Size.Small" Class="mr-1" />
+                            Resource Layers
+                        </h3>
+                    </div>
+                    <HonuaLayerList Id="emergency-layers"
+                                    SyncWith="emergency-map"
+                                    ShowOpacitySlider="true"
+                                    ShowVisibilityToggle="true"
+                                    ShowLegend="true"
+                                    GroupLayers="true"
+                                    Style="width: 100%;" />
+                </MudPaper>
+
+                <!-- Coordinate Display -->
+                <MudPaper Class="pa-3" Elevation="2">
+                    <HonuaCoordinateDisplay Id="emergency-coords"
+                                            SyncWith="emergency-map"
+                                            Format="DecimalDegrees"
+                                            Precision="6"
+                                            ShowCopyButton="true"
+                                            ShowPinButton="true"
+                                            ShowDistanceFromOrigin="true"
+                                            ShowBearing="true"
+                                            Style="width: 100%;" />
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+
+        <!-- Center: Map -->
+        <MudItem xs="12" md="6">
+            <MudStack Spacing="3">
+                <MudPaper Elevation="2" Style="height: 600px; position: relative;">
+                    <HonuaMap Id="emergency-map"
+                              MapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+                              Center="new[] { -122.4194, 37.7749 }"
+                              Zoom="13"
+                              Style="width: 100%; height: 100%; border-radius: 8px;" />
+
+                    <!-- Emergency Alert Overlay -->
+                    <div style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(211, 47, 47, 0.95); color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-weight: bold; z-index: 1000;">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" /> NEW INCIDENT: Structure Fire - 123 Market St
+                    </div>
+
+                    <!-- Map Tools -->
+                    <div style="position: absolute; top: 80px; left: 16px; background: rgba(30,30,30,0.9); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px;">
+                        <MudTooltip Text="Measure Distance">
+                            <MudIconButton Icon="@Icons.Material.Filled.Straighten" Color="Color.Primary" Size="Size.Small" Style="color: white;" />
+                        </MudTooltip>
+                        <MudTooltip Text="Draw Response Zone">
+                            <MudIconButton Icon="@Icons.Material.Filled.Draw" Color="Color.Warning" Size="Size.Small" Style="color: white;" />
+                        </MudTooltip>
+                        <MudTooltip Text="Route to Incident">
+                            <MudIconButton Icon="@Icons.Material.Filled.Directions" Color="Color.Info" Size="Size.Small" Style="color: white;" />
+                        </MudTooltip>
+                        <MudTooltip Text="Search Location">
+                            <MudIconButton Icon="@Icons.Material.Filled.Search" Size="Size.Small" Style="color: white;" />
+                        </MudTooltip>
+                    </div>
+
+                    <HonuaDraw Id="emergency-draw"
+                               SyncWith="emergency-map"
+                               AllowPoints="true"
+                               AllowLines="true"
+                               AllowPolygons="true"
+                               AllowCircles="true"
+                               ShowMeasurements="true"
+                               Style="width: 100%; height: 100%;" />
+
+                    <HonuaPopup Id="emergency-popup"
+                                SyncWith="emergency-map"
+                                TriggerMode="PopupTrigger.Click"
+                                ShowCloseButton="true"
+                                MaxWidth="450px">
+                        <ContentTemplate Context="feature">
+                            <MudCard>
+                                <MudCardHeader Style="background: #D32F2F; color: white;">
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6" Style="color: white;">
+                                            <MudIcon Icon="@Icons.Material.Filled.Emergency" Style="color: white;" />
+                                            @feature.Properties["incidentType"]
+                                        </MudText>
+                                        <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.9);">
+                                            Incident #@feature.Properties["incidentId"]
+                                        </MudText>
+                                    </CardHeaderContent>
+                                    <CardHeaderActions>
+                                        <MudChip Size="Size.Small" Color="Color.Error" Style="color: white;">
+                                            @feature.Properties["priority"]
+                                        </MudChip>
+                                    </CardHeaderActions>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudGrid>
+                                        <MudItem xs="12">
+                                            <MudText Typo="Typo.subtitle2">Location</MudText>
+                                            <MudText Typo="Typo.body2">@feature.Properties["address"]</MudText>
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudText Typo="Typo.caption">Time Called</MudText>
+                                            <MudText Typo="Typo.body2"><strong>@feature.Properties["timeReported"]</strong></MudText>
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudText Typo="Typo.caption">Time Dispatched</MudText>
+                                            <MudText Typo="Typo.body2"><strong>@feature.Properties["timeDispatched"]</strong></MudText>
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudText Typo="Typo.caption">Units Assigned</MudText>
+                                            <MudText Typo="Typo.body2"><strong>@feature.Properties["unitsAssigned"]</strong></MudText>
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudText Typo="Typo.caption">ETA</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Warning"><strong>@feature.Properties["eta"] min</strong></MudText>
+                                        </MudItem>
+                                    </MudGrid>
+                                    <MudDivider Class="my-2" />
+                                    <MudText Typo="Typo.caption">Description</MudText>
+                                    <MudText Typo="Typo.body2">@feature.Properties["description"]</MudText>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Navigation" Size="Size.Small">
+                                        Navigate
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Phone" Size="Size.Small">
+                                        Contact
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Update" Size="Size.Small">
+                                        Update Status
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </ContentTemplate>
+                    </HonuaPopup>
+
+                    <!-- Basemap Gallery -->
+                    <div style="position: absolute; bottom: 16px; right: 16px;">
+                        <HonuaBasemapGallery Id="emergency-basemaps"
+                                             SyncWith="emergency-map"
+                                             ShowThumbnails="true"
+                                             Style="width: 200px;" />
+                    </div>
+                </MudPaper>
+
+                <!-- Timeline -->
+                <MudPaper Elevation="2" Style="height: 200px;">
+                    <HonuaTimeline Id="emergency-timeline"
+                                   SyncWith="emergency-map"
+                                   TimeField="incidentTime"
+                                   Title="Incident Timeline (Last 24 Hours)"
+                                   ShowPlaybackControls="true"
+                                   ShowDateRange="true"
+                                   AnimationSpeed="1000"
+                                   Style="width: 100%; height: 100%;" />
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+
+        <!-- Right Panel: Analytics & Units -->
+        <MudItem xs="12" md="3">
+            <MudStack Spacing="3">
+                <!-- Incident Type Distribution -->
+                <MudPaper Elevation="2" Class="pa-3" Style="height: 250px;">
+                    <HonuaChart Id="emergency-incident-chart"
+                                SyncWith="emergency-map"
+                                Type="ChartType.Doughnut"
+                                Field="incidentType"
+                                Title="Incident Types (Today)"
+                                ShowLegend="true"
+                                LegendPosition="bottom"
+                                EnableFilter="true"
+                                Style="width: 100%; height: 100%;" />
+                </MudPaper>
+
+                <!-- Response Times -->
+                <MudPaper Elevation="2" Class="pa-3" Style="height: 250px;">
+                    <HonuaChart Id="emergency-response-chart"
+                                SyncWith="emergency-map"
+                                Type="ChartType.Line"
+                                Field="responseTime"
+                                TimeField="incidentTime"
+                                Title="Response Times (Avg)"
+                                ShowLegend="false"
+                                Style="width: 100%; height: 100%;" />
+                </MudPaper>
+
+                <!-- Available Units -->
+                <MudPaper Class="pa-3" Elevation="2">
+                    <div class="panel-header">
+                        <h3 class="panel-title">Available Units</h3>
+                    </div>
+                    <MudList Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.LocalFireDepartment" IconColor="Color.Error">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                <MudText>Fire Engines</MudText>
+                                <MudChip Size="Size.Small" Color="Color.Success">8 / 12</MudChip>
+                            </MudStack>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.LocalPolice" IconColor="Color.Primary">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                <MudText>Police Units</MudText>
+                                <MudChip Size="Size.Small" Color="Color.Success">15 / 20</MudChip>
+                            </MudStack>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.LocalHospital" IconColor="Color.Error">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                <MudText>Ambulances</MudText>
+                                <MudChip Size="Size.Small" Color="Color.Warning">4 / 10</MudChip>
+                            </MudStack>
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Build" IconColor="Color.Secondary">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                <MudText>Rescue Teams</MudText>
+                                <MudChip Size="Size.Small" Color="Color.Success">6 / 6</MudChip>
+                            </MudStack>
+                        </MudListItem>
+                    </MudList>
+                </MudPaper>
+
+                <!-- Legend -->
+                <MudPaper Class="pa-3" Elevation="2">
+                    <div class="panel-header">
+                        <h3 class="panel-title">Map Legend</h3>
+                    </div>
+                    <HonuaLegend Id="emergency-legend"
+                                 SyncWith="emergency-map"
+                                 ShowLayerNames="true"
+                                 Collapsible="true"
+                                 Style="width: 100%;" />
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Incident Log Table -->
+    <MudPaper Elevation="2" Class="mt-4" Style="height: 400px;">
+        <HonuaAttributeTable Id="emergency-table"
+                             SyncWith="emergency-map"
+                             DataSource="data/incidents.geojson"
+                             Title="Incident Log (Last 24 Hours)"
+                             ShowToolbar="true"
+                             AllowColumnSort="true"
+                             AllowColumnFilter="true"
+                             ShowQuickFilter="true"
+                             ShowExport="true"
+                             Dense="true"
+                             PageSize="15"
+                             Style="width: 100%; height: 100%;" />
+    </MudPaper>
+</div>

@@ -30,6 +30,9 @@
   <ItemGroup>
     <!-- Reference to Honua.Server.Core for metadata models -->
     <ProjectReference Include="../Honua.Server.Core/Honua.Server.Core.csproj" />
+
+    <!-- Reference to Honua.MapSDK for visual map builder -->
+    <ProjectReference Include="../Honua.MapSDK/Honua.MapSDK.csproj" />
   </ItemGroup>
 
 </Project>

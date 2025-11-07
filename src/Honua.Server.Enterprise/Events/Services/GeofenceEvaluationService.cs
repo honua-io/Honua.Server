@@ -132,6 +132,13 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
             }
 
             // Generate EXIT events
+            // Batch query all exit geofences to avoid N+1 problem
+            var exitGeofences = exitGeofenceIds.Any()
+                ? await _geofenceRepository.GetByIdsAsync(exitGeofenceIds, tenantId, cancellationToken)
+                : new List<Geofence>();
+
+            var exitGeofenceMap = exitGeofences.ToDictionary(g => g.Id);
+
             foreach (var exitGeofenceId in exitGeofenceIds)
             {
                 var previousState = currentStates.FirstOrDefault(s => s.GeofenceId == exitGeofenceId);
@@ -140,13 +147,9 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
                     continue;
                 }
 
-                // Get geofence details (we need name for the event)
-                var geofence = await _geofenceRepository.GetByIdAsync(
-                    exitGeofenceId,
-                    tenantId,
-                    cancellationToken);
-
-                if (geofence == null || !geofence.EnabledEventTypes.HasFlag(GeofenceEventTypes.Exit))
+                // Get geofence details from batch query result
+                if (!exitGeofenceMap.TryGetValue(exitGeofenceId, out var geofence) ||
+                    !geofence.EnabledEventTypes.HasFlag(GeofenceEventTypes.Exit))
                 {
                     continue;
                 }

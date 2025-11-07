@@ -301,7 +301,7 @@ public sealed class RegexCacheTests : IDisposable
     }
 
     [Fact]
-    public void GetOrAdd_MultipleAccesses_UpdatesAccessTimes()
+    public async Task GetOrAdd_MultipleAccesses_UpdatesAccessTimes()
     {
         // Arrange
         var pattern1 = @"^pattern1$";
@@ -309,9 +309,9 @@ public sealed class RegexCacheTests : IDisposable
 
         // Act
         RegexCache.GetOrAdd(pattern1);
-        Thread.Sleep(10); // Small delay to ensure different access times
+        await Task.Delay(10); // Small delay to ensure different access times
         RegexCache.GetOrAdd(pattern2);
-        Thread.Sleep(10);
+        await Task.Delay(10);
         RegexCache.GetOrAdd(pattern1); // Access pattern1 again
 
         var stats = RegexCache.GetStatistics();

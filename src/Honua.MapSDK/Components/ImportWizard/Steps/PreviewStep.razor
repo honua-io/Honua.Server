@@ -1,0 +1,197 @@
+@using Honua.MapSDK.Models.Import
+
+<div class="import-step preview-step">
+    <MudText Typo="Typo.h6" Class="mb-4">Preview Data</MudText>
+
+    @if (Data != null)
+    {
+        <div class="preview-summary mb-4">
+            <MudPaper Elevation="0" Class="pa-3">
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <div class="stat-item">
+                            <MudIcon Icon="@Icons.Material.Filled.TableRows" Color="Color.Primary" Size="Size.Small" />
+                            <div class="stat-content">
+                                <MudText Typo="Typo.h6">@Data.Features.Count</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Features</MudText>
+                            </div>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <div class="stat-item">
+                            <MudIcon Icon="@Icons.Material.Filled.ViewColumn" Color="Color.Info" Size="Size.Small" />
+                            <div class="stat-content">
+                                <MudText Typo="Typo.h6">@Data.Fields.Count</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Fields</MudText>
+                            </div>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <div class="stat-item">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                            <div class="stat-content">
+                                <MudText Typo="Typo.h6">@Data.ValidRows</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Valid</MudText>
+                            </div>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <div class="stat-item">
+                            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                            <div class="stat-content">
+                                <MudText Typo="Typo.h6">@Data.Errors.Count</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Errors</MudText>
+                            </div>
+                        </div>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </div>
+
+        <div class="preview-metadata mb-4">
+            <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.InsertDriveFile">
+                Format: @Data.Format
+            </MudChip>
+            @if (!string.IsNullOrEmpty(Data.CRS))
+            {
+                <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.Public">
+                    CRS: @Data.CRS
+                </MudChip>
+            }
+            <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.TextFields">
+                Encoding: @Data.Encoding
+            </MudChip>
+            @if (HasGeometry())
+            {
+                <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.Place" Color="Color.Success">
+                    Has Geometry
+                </MudChip>
+            }
+        </div>
+
+        @if (Data.Errors.Any())
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                <MudText Typo="Typo.body2">
+                    Found @Data.Errors.Count issue(s) in the data.
+                    <MudLink OnClick="@(() => _showErrors = !_showErrors)">
+                        @(_showErrors ? "Hide" : "Show") details
+                    </MudLink>
+                </MudText>
+                @if (_showErrors)
+                {
+                    <MudList Dense="true" Class="mt-2">
+                        @foreach (var error in Data.Errors.Take(10))
+                        {
+                            <MudListItem Icon="@GetSeverityIcon(error.Severity)">
+                                <MudText Typo="Typo.body2">
+                                    Row @error.RowNumber: @error.Message
+                                    @if (!string.IsNullOrEmpty(error.Field))
+                                    {
+                                        <text> (Field: @error.Field)</text>
+                                    }
+                                </MudText>
+                            </MudListItem>
+                        }
+                        @if (Data.Errors.Count > 10)
+                        {
+                            <MudListItem>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    ... and @(Data.Errors.Count - 10) more
+                                </MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudAlert>
+        }
+
+        <MudPaper Elevation="0" Class="preview-table">
+            <MudTable Items="@Data.Features.Take(MaxPreviewRows)"
+                      Dense="true"
+                      Hover="true"
+                      Striped="true"
+                      FixedHeader="true"
+                      Height="400px">
+                <HeaderContent>
+                    @foreach (var field in Data.Fields.Take(MaxColumns))
+                    {
+                        <MudTh>
+                            <div class="field-header">
+                                <MudText Typo="Typo.caption">@field.Name</MudText>
+                                <MudChip Size="Size.Small" Variant="Variant.Text">
+                                    @field.Type.ToString()
+                                </MudChip>
+                            </div>
+                        </MudTh>
+                    }
+                    @if (Data.Fields.Count > MaxColumns)
+                    {
+                        <MudTh>
+                            <MudText Typo="Typo.caption">+@(Data.Fields.Count - MaxColumns) more</MudText>
+                        </MudTh>
+                    }
+                </HeaderContent>
+                <RowTemplate>
+                    @foreach (var field in Data.Fields.Take(MaxColumns))
+                    {
+                        <MudTd DataLabel="@field.Name">
+                            @if (context.Properties.TryGetValue(field.Name, out var value))
+                            {
+                                <span class="cell-value">@FormatValue(value, field.Type)</span>
+                            }
+                        </MudTd>
+                    }
+                    @if (Data.Fields.Count > MaxColumns)
+                    {
+                        <MudTd>...</MudTd>
+                    }
+                </RowTemplate>
+                <PagerContent>
+                    <MudText Typo="Typo.caption" Class="pa-2">
+                        Showing first @Math.Min(MaxPreviewRows, Data.Features.Count) of @Data.Features.Count rows
+                    </MudText>
+                </PagerContent>
+            </MudTable>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    [Parameter] public ParsedData? Data { get; set; }
+    [Parameter] public int MaxPreviewRows { get; set; } = 100;
+    [Parameter] public int MaxColumns { get; set; } = 10;
+
+    private bool _showErrors = false;
+
+    private bool HasGeometry()
+    {
+        return Data?.Features.Any(f => f.Geometry != null) ?? false;
+    }
+
+    private string GetSeverityIcon(ValidationSeverity severity)
+    {
+        return severity switch
+        {
+            ValidationSeverity.Error => Icons.Material.Filled.Error,
+            ValidationSeverity.Warning => Icons.Material.Filled.Warning,
+            ValidationSeverity.Info => Icons.Material.Filled.Info,
+            _ => Icons.Material.Filled.Info
+        };
+    }
+
+    private string FormatValue(object? value, FieldType type)
+    {
+        if (value == null) return string.Empty;
+
+        return type switch
+        {
+            FieldType.Number => Convert.ToDouble(value).ToString("N2"),
+            FieldType.Integer => Convert.ToInt32(value).ToString("N0"),
+            FieldType.Boolean => Convert.ToBoolean(value) ? "Yes" : "No",
+            FieldType.DateTime => Convert.ToDateTime(value).ToString("yyyy-MM-dd HH:mm"),
+            FieldType.Date => Convert.ToDateTime(value).ToString("yyyy-MM-dd"),
+            _ => value.ToString() ?? string.Empty
+        };
+    }
+}

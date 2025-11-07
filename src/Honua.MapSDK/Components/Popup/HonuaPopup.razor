@@ -1,0 +1,908 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-popup-container @CssClass">
+    @if (_isOpen && _currentContent != null)
+    {
+        <div class="popup-overlay @(_closeOnMapClick ? "clickable" : "")" @onclick="OnOverlayClick"></div>
+
+        <div class="honua-popup @GetSizeClass()" style="@GetPopupStyle()">
+            @if (ShowCloseButton)
+            {
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.Close"
+                    Size="Size.Small"
+                    OnClick="@ClosePopup"
+                    Class="popup-close-button"
+                    aria-label="Close popup" />
+            }
+
+            <div class="popup-content">
+                @if (Template != null)
+                {
+                    @Template(_currentContent)
+                }
+                else if (_currentContent.Template?.ContentTemplate != null)
+                {
+                    @((MarkupString)RenderTemplate(_currentContent))
+                }
+                else
+                {
+                    @RenderDefaultPopup(_currentContent)
+                }
+            </div>
+
+            @if (ShowActions && (_currentContent.Template?.Actions.Count > 0 || CustomActions?.Count > 0))
+            {
+                <div class="popup-actions">
+                    @foreach (var action in GetVisibleActions())
+                    {
+                        <MudTooltip Text="@action.Tooltip">
+                            <MudButton
+                                StartIcon="@action.Icon"
+                                Color="@GetActionColor(action.Color)"
+                                Size="Size.Small"
+                                Variant="Variant.Text"
+                                OnClick="@(() => OnActionClicked(action))"
+                                Class="popup-action-button">
+                                @action.Label
+                            </MudButton>
+                        </MudTooltip>
+                    }
+                </div>
+            }
+
+            @if (AllowMultipleFeatures && _allFeatures.Count > 1)
+            {
+                <div class="popup-pagination">
+                    <MudIconButton
+                        Icon="@Icons.Material.Filled.ChevronLeft"
+                        Size="Size.Small"
+                        OnClick="@PreviousFeature"
+                        Disabled="@(_currentFeatureIndex == 0)"
+                        aria-label="Previous feature" />
+                    <MudText Typo="Typo.caption" Class="pagination-text">
+                        @(_currentFeatureIndex + 1) / @_allFeatures.Count
+                    </MudText>
+                    <MudIconButton
+                        Icon="@Icons.Material.Filled.ChevronRight"
+                        Size="Size.Small"
+                        OnClick="@NextFeature"
+                        Disabled="@(_currentFeatureIndex == _allFeatures.Count - 1)"
+                        aria-label="Next feature" />
+                </div>
+            }
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div class="popup-loading">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+        </div>
+    }
+
+    @if (_errorMessage != null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="popup-error" CloseIconClicked="@(() => _errorMessage = null)">
+            @_errorMessage
+        </MudAlert>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the popup component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"popup-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Trigger mode for popup display
+    /// </summary>
+    [Parameter]
+    public PopupTrigger TriggerMode { get; set; } = PopupTrigger.Click;
+
+    /// <summary>
+    /// Custom Razor template for popup content
+    /// </summary>
+    [Parameter]
+    public RenderFragment<PopupContent>? Template { get; set; }
+
+    /// <summary>
+    /// Maximum width in pixels
+    /// </summary>
+    [Parameter]
+    public int MaxWidth { get; set; } = 400;
+
+    /// <summary>
+    /// Maximum height in pixels
+    /// </summary>
+    [Parameter]
+    public int MaxHeight { get; set; } = 600;
+
+    /// <summary>
+    /// Show close button
+    /// </summary>
+    [Parameter]
+    public bool ShowCloseButton { get; set; } = true;
+
+    /// <summary>
+    /// Close popup when clicking on map
+    /// </summary>
+    [Parameter]
+    public bool CloseOnMapClick { get; set; } = true;
+
+    /// <summary>
+    /// Allow multiple features selection with pagination
+    /// </summary>
+    [Parameter]
+    public bool AllowMultipleFeatures { get; set; } = true;
+
+    /// <summary>
+    /// Show action buttons
+    /// </summary>
+    [Parameter]
+    public bool ShowActions { get; set; } = true;
+
+    /// <summary>
+    /// Custom action buttons
+    /// </summary>
+    [Parameter]
+    public List<PopupAction>? CustomActions { get; set; }
+
+    /// <summary>
+    /// Layer IDs to query for popup (null means all layers)
+    /// </summary>
+    [Parameter]
+    public string[]? QueryLayers { get; set; }
+
+    /// <summary>
+    /// Enable auto-pan to keep popup visible
+    /// </summary>
+    [Parameter]
+    public bool AutoPan { get; set; } = true;
+
+    /// <summary>
+    /// Template configuration for layers
+    /// </summary>
+    [Parameter]
+    public Dictionary<string, PopupTemplate>? LayerTemplates { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Event callback when feature is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<PopupContent> OnFeatureClick { get; set; }
+
+    /// <summary>
+    /// Event callback when action is triggered
+    /// </summary>
+    [Parameter]
+    public EventCallback<(PopupAction Action, PopupContent Content)> OnActionTriggered { get; set; }
+
+    /// <summary>
+    /// Event callback when popup opens
+    /// </summary>
+    [Parameter]
+    public EventCallback<PopupContent> OnPopupOpened { get; set; }
+
+    /// <summary>
+    /// Event callback when popup closes
+    /// </summary>
+    [Parameter]
+    public EventCallback OnPopupClosed { get; set; }
+
+    private bool _isOpen = false;
+    private bool _loading = false;
+    private PopupContent? _currentContent;
+    private List<PopupContent> _allFeatures = new();
+    private int _currentFeatureIndex = 0;
+    private bool _mapReady = false;
+    private bool _closeOnMapClick = true;
+    private string? _errorMessage;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaPopup>? _dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _closeOnMapClick = CloseOnMapClick;
+        SetupSubscriptions();
+        _dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-popup.js"
+                );
+
+                if (_mapReady && SyncWith != null)
+                {
+                    await InitializePopup();
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Error loading popup module: {ex.Message}";
+                Console.Error.WriteLine($"Error loading popup JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                _ = InitializePopup();
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for feature clicked message
+        Bus.Subscribe<FeatureClickedMessage>(args =>
+        {
+            if (TriggerMode == PopupTrigger.Click && (SyncWith == null || args.Message.MapId == SyncWith))
+            {
+                _ = HandleFeatureClick(args.Message);
+            }
+        });
+
+        // Listen for feature hovered message
+        Bus.Subscribe<FeatureHoveredMessage>(args =>
+        {
+            if (TriggerMode == PopupTrigger.Hover && (SyncWith == null || args.Message.MapId == SyncWith))
+            {
+                if (args.Message.FeatureId != null)
+                {
+                    _ = HandleFeatureHover(args.Message);
+                }
+                else
+                {
+                    _ = ClosePopup();
+                }
+            }
+        });
+
+        // Listen for open popup requests
+        Bus.Subscribe<OpenPopupRequestMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _ = OpenPopupAtLocation(args.Message);
+            }
+        });
+
+        // Listen for close popup requests
+        Bus.Subscribe<ClosePopupRequestMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _ = ClosePopup();
+            }
+        });
+
+        // Listen for feature selected message
+        Bus.Subscribe<FeatureSelectedMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                var content = new PopupContent
+                {
+                    FeatureId = args.Message.FeatureId,
+                    LayerId = args.Message.LayerId,
+                    Properties = args.Message.Properties,
+                    Geometry = args.Message.Geometry,
+                    Coordinates = args.Message.Coordinates
+                };
+                _ = ShowPopup(content);
+            }
+        });
+    }
+
+    private async Task InitializePopup()
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        try
+        {
+            var config = new
+            {
+                mapId = SyncWith,
+                componentId = Id,
+                triggerMode = TriggerMode.ToString().ToLower(),
+                queryLayers = QueryLayers,
+                autoPan = AutoPan,
+                maxWidth = MaxWidth,
+                maxHeight = MaxHeight
+            };
+
+            await _jsModule.InvokeVoidAsync("initializePopup", SyncWith, Id, config, _dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error initializing popup: {ex.Message}";
+            Console.Error.WriteLine($"Error initializing popup: {ex.Message}");
+        }
+    }
+
+    private async Task HandleFeatureClick(FeatureClickedMessage message)
+    {
+        try
+        {
+            _loading = true;
+            StateHasChanged();
+
+            var content = new PopupContent
+            {
+                FeatureId = message.FeatureId,
+                LayerId = message.LayerId,
+                Properties = message.Properties,
+                Geometry = message.Geometry
+            };
+
+            // Get coordinates from geometry or query the map
+            if (_jsModule != null && SyncWith != null)
+            {
+                var coords = await _jsModule.InvokeAsync<double[]>("getFeatureCoordinates", SyncWith, message.FeatureId, message.LayerId);
+                content.Coordinates = coords;
+            }
+
+            // Apply layer template if available
+            if (LayerTemplates?.ContainsKey(message.LayerId) == true)
+            {
+                content.Template = LayerTemplates[message.LayerId];
+            }
+
+            await ShowPopup(content);
+            await OnFeatureClick.InvokeAsync(content);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error handling feature click: {ex.Message}";
+            Console.Error.WriteLine($"Error in HandleFeatureClick: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleFeatureHover(FeatureHoveredMessage message)
+    {
+        if (message.FeatureId == null || message.LayerId == null) return;
+
+        try
+        {
+            var content = new PopupContent
+            {
+                FeatureId = message.FeatureId,
+                LayerId = message.LayerId,
+                Properties = message.Properties ?? new()
+            };
+
+            // Get coordinates
+            if (_jsModule != null && SyncWith != null)
+            {
+                var coords = await _jsModule.InvokeAsync<double[]>("getFeatureCoordinates", SyncWith, message.FeatureId, message.LayerId);
+                content.Coordinates = coords;
+            }
+
+            // Apply layer template
+            if (LayerTemplates?.ContainsKey(message.LayerId) == true)
+            {
+                content.Template = LayerTemplates[message.LayerId];
+            }
+
+            await ShowPopup(content);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error in HandleFeatureHover: {ex.Message}");
+        }
+    }
+
+    private async Task OpenPopupAtLocation(OpenPopupRequestMessage message)
+    {
+        var content = new PopupContent
+        {
+            FeatureId = message.FeatureId ?? Guid.NewGuid().ToString(),
+            LayerId = message.LayerId ?? "custom",
+            Properties = message.Properties ?? new(),
+            Coordinates = message.Coordinates
+        };
+
+        await ShowPopup(content);
+    }
+
+    /// <summary>
+    /// Show popup with content
+    /// </summary>
+    public async Task ShowPopup(PopupContent content)
+    {
+        _currentContent = content;
+        _allFeatures = new List<PopupContent> { content };
+        _currentFeatureIndex = 0;
+        _isOpen = true;
+
+        // Display popup on map
+        if (_jsModule != null && SyncWith != null && content.Coordinates != null)
+        {
+            await _jsModule.InvokeVoidAsync("openPopup", SyncWith, content.Coordinates);
+
+            if (AutoPan)
+            {
+                await _jsModule.InvokeVoidAsync("panToPopup", SyncWith, content.Coordinates);
+            }
+        }
+
+        // Publish message
+        await Bus.PublishAsync(new PopupOpenedMessage
+        {
+            PopupId = Id,
+            FeatureId = content.FeatureId,
+            LayerId = content.LayerId,
+            Coordinates = content.Coordinates ?? new double[] { 0, 0 },
+            ComponentId = Id
+        }, Id);
+
+        await OnPopupOpened.InvokeAsync(content);
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Close the popup
+    /// </summary>
+    public async Task ClosePopup()
+    {
+        if (!_isOpen) return;
+
+        _isOpen = false;
+        _currentContent = null;
+        _allFeatures.Clear();
+        _currentFeatureIndex = 0;
+
+        // Close popup on map
+        if (_jsModule != null && SyncWith != null)
+        {
+            await _jsModule.InvokeVoidAsync("closePopup", SyncWith);
+        }
+
+        // Publish message
+        await Bus.PublishAsync(new PopupClosedMessage
+        {
+            PopupId = Id,
+            ComponentId = Id
+        }, Id);
+
+        await OnPopupClosed.InvokeAsync();
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Called from JavaScript when map is clicked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnMapClickedFromJS()
+    {
+        if (_closeOnMapClick)
+        {
+            await ClosePopup();
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when features are queried at a point
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeaturesQueriedFromJS(string featuresJson)
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var features = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(featuresJson, options);
+
+            if (features == null || features.Count == 0)
+            {
+                await ClosePopup();
+                return;
+            }
+
+            _allFeatures.Clear();
+            foreach (var feature in features)
+            {
+                var content = new PopupContent
+                {
+                    FeatureId = feature.ContainsKey("id") ? feature["id"].ToString() ?? "" : Guid.NewGuid().ToString(),
+                    LayerId = feature.ContainsKey("layer") ? feature["layer"].ToString() ?? "" : "unknown"
+                };
+
+                if (feature.ContainsKey("properties") && feature["properties"] is JsonElement propsElement)
+                {
+                    content.Properties = JsonSerializer.Deserialize<Dictionary<string, object>>(propsElement.GetRawText()) ?? new();
+                }
+
+                if (feature.ContainsKey("geometry"))
+                {
+                    content.Geometry = feature["geometry"];
+                }
+
+                // Apply layer template
+                if (LayerTemplates?.ContainsKey(content.LayerId) == true)
+                {
+                    content.Template = LayerTemplates[content.LayerId];
+                }
+
+                _allFeatures.Add(content);
+            }
+
+            if (_allFeatures.Count > 0)
+            {
+                _currentContent = _allFeatures[0];
+                _currentFeatureIndex = 0;
+                _isOpen = true;
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error in OnFeaturesQueriedFromJS: {ex.Message}");
+        }
+    }
+
+    private void OnOverlayClick()
+    {
+        if (_closeOnMapClick)
+        {
+            _ = ClosePopup();
+        }
+    }
+
+    private void PreviousFeature()
+    {
+        if (_currentFeatureIndex > 0)
+        {
+            _currentFeatureIndex--;
+            _currentContent = _allFeatures[_currentFeatureIndex];
+            StateHasChanged();
+        }
+    }
+
+    private void NextFeature()
+    {
+        if (_currentFeatureIndex < _allFeatures.Count - 1)
+        {
+            _currentFeatureIndex++;
+            _currentContent = _allFeatures[_currentFeatureIndex];
+            StateHasChanged();
+        }
+    }
+
+    private List<PopupAction> GetVisibleActions()
+    {
+        var actions = new List<PopupAction>();
+
+        // Add template actions
+        if (_currentContent?.Template?.Actions != null)
+        {
+            actions.AddRange(_currentContent.Template.Actions.Where(a => a.Visible));
+        }
+
+        // Add custom actions
+        if (CustomActions != null)
+        {
+            actions.AddRange(CustomActions.Where(a => a.Visible));
+        }
+
+        return actions.OrderBy(a => a.Order).ToList();
+    }
+
+    private async Task OnActionClicked(PopupAction action)
+    {
+        try
+        {
+            if (_currentContent == null) return;
+
+            // Handle built-in actions
+            switch (action.Type)
+            {
+                case PopupActionType.ZoomTo:
+                    await ZoomToFeature();
+                    break;
+
+                case PopupActionType.CopyCoordinates:
+                    await CopyCoordinates();
+                    break;
+
+                case PopupActionType.Delete:
+                    // Publish delete message
+                    await Bus.PublishAsync(new FeatureDeletedMessage
+                    {
+                        FeatureId = _currentContent.FeatureId,
+                        ComponentId = Id
+                    }, Id);
+                    await ClosePopup();
+                    break;
+
+                case PopupActionType.Custom:
+                    // Invoke custom callback
+                    await OnActionTriggered.InvokeAsync((action, _currentContent));
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error executing action: {ex.Message}";
+            Console.Error.WriteLine($"Error in OnActionClicked: {ex.Message}");
+        }
+    }
+
+    private async Task ZoomToFeature()
+    {
+        if (_currentContent?.Coordinates == null || SyncWith == null) return;
+
+        await Bus.PublishAsync(new FlyToRequestMessage
+        {
+            MapId = SyncWith,
+            Center = _currentContent.Coordinates,
+            Zoom = 16,
+            Duration = 1000
+        }, Id);
+    }
+
+    private async Task CopyCoordinates()
+    {
+        if (_currentContent?.Coordinates == null || _jsModule == null) return;
+
+        try
+        {
+            var coordsText = $"{_currentContent.Coordinates[1]:F6}, {_currentContent.Coordinates[0]:F6}";
+            await _jsModule.InvokeVoidAsync("copyToClipboard", coordsText);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error copying coordinates: {ex.Message}");
+        }
+    }
+
+    private RenderFragment RenderDefaultPopup(PopupContent content) => builder =>
+    {
+        var seq = 0;
+
+        // Title
+        var title = GetPopupTitle(content);
+        if (!string.IsNullOrEmpty(title))
+        {
+            builder.OpenComponent<MudText>(seq++);
+            builder.AddAttribute(seq++, "Typo", Typo.h6);
+            builder.AddAttribute(seq++, "Class", "popup-title");
+            builder.AddAttribute(seq++, "ChildContent", (RenderFragment)(b =>
+            {
+                b.AddContent(0, title);
+            }));
+            builder.CloseComponent();
+        }
+
+        // Properties table
+        if (content.Properties.Count > 0)
+        {
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "popup-properties");
+
+            builder.OpenElement(seq++, "table");
+            builder.AddAttribute(seq++, "class", "properties-table");
+
+            foreach (var prop in content.Properties.OrderBy(p => p.Key))
+            {
+                if (ShouldDisplayField(prop.Key, prop.Value))
+                {
+                    builder.OpenElement(seq++, "tr");
+
+                    builder.OpenElement(seq++, "td");
+                    builder.AddAttribute(seq++, "class", "property-label");
+                    builder.AddContent(seq++, FormatFieldLabel(prop.Key));
+                    builder.CloseElement();
+
+                    builder.OpenElement(seq++, "td");
+                    builder.AddAttribute(seq++, "class", "property-value");
+                    builder.AddContent(seq++, FormatFieldValue(prop.Value));
+                    builder.CloseElement();
+
+                    builder.CloseElement();
+                }
+            }
+
+            builder.CloseElement(); // table
+            builder.CloseElement(); // div
+        }
+
+        // Coordinates
+        if (content.Coordinates != null)
+        {
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "popup-coordinates");
+            builder.OpenComponent<MudText>(seq++);
+            builder.AddAttribute(seq++, "Typo", Typo.caption);
+            builder.AddAttribute(seq++, "Color", Color.Secondary);
+            builder.AddAttribute(seq++, "ChildContent", (RenderFragment)(b =>
+            {
+                b.AddContent(0, $"Coordinates: {content.Coordinates[1]:F6}, {content.Coordinates[0]:F6}");
+            }));
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+    };
+
+    private string RenderTemplate(PopupContent content)
+    {
+        if (content.Template?.ContentTemplate == null) return string.Empty;
+
+        var template = content.Template.ContentTemplate;
+
+        // Replace placeholders with values
+        foreach (var prop in content.Properties)
+        {
+            var placeholder = $"{{{prop.Key}}}";
+            var value = FormatFieldValue(prop.Value);
+            template = template.Replace(placeholder, value);
+        }
+
+        return template;
+    }
+
+    private string GetPopupTitle(PopupContent content)
+    {
+        // Use template title if available
+        if (!string.IsNullOrEmpty(content.Template?.Title))
+        {
+            var title = content.Template.Title;
+            foreach (var prop in content.Properties)
+            {
+                title = title.Replace($"{{{prop.Key}}}", prop.Value?.ToString() ?? "");
+            }
+            return title;
+        }
+
+        // Try common title fields
+        var titleFields = new[] { "name", "title", "label", "id", "feature_id" };
+        foreach (var field in titleFields)
+        {
+            if (content.Properties.ContainsKey(field))
+            {
+                return content.Properties[field]?.ToString() ?? "";
+            }
+        }
+
+        return content.LayerId;
+    }
+
+    private bool ShouldDisplayField(string fieldName, object? value)
+    {
+        // Skip internal/technical fields
+        var skipFields = new[] { "id", "layer", "source", "sourceLayer", "geometry" };
+        if (skipFields.Contains(fieldName, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // Skip null/empty values
+        if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private string FormatFieldLabel(string fieldName)
+    {
+        // Convert snake_case or camelCase to Title Case
+        var label = fieldName.Replace("_", " ");
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(label);
+    }
+
+    private string FormatFieldValue(object? value)
+    {
+        if (value == null) return "";
+
+        if (value is DateTime dateTime)
+        {
+            return dateTime.ToString("g");
+        }
+
+        if (value is double || value is float || value is decimal)
+        {
+            if (double.TryParse(value.ToString(), out var numValue))
+            {
+                return numValue.ToString("N2");
+            }
+        }
+
+        if (value is JsonElement jsonElement)
+        {
+            return jsonElement.ValueKind switch
+            {
+                JsonValueKind.String => jsonElement.GetString() ?? "",
+                JsonValueKind.Number => jsonElement.GetDouble().ToString("N2"),
+                JsonValueKind.True => "Yes",
+                JsonValueKind.False => "No",
+                JsonValueKind.Null => "",
+                _ => jsonElement.ToString()
+            };
+        }
+
+        return value.ToString() ?? "";
+    }
+
+    private Color GetActionColor(string? colorName)
+    {
+        if (string.IsNullOrEmpty(colorName)) return Color.Default;
+
+        return colorName.ToLowerInvariant() switch
+        {
+            "primary" => Color.Primary,
+            "secondary" => Color.Secondary,
+            "success" => Color.Success,
+            "error" => Color.Error,
+            "warning" => Color.Warning,
+            "info" => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private string GetSizeClass()
+    {
+        return $"popup-max-w-{MaxWidth} popup-max-h-{MaxHeight}";
+    }
+
+    private string GetPopupStyle()
+    {
+        return $"max-width: {MaxWidth}px; max-height: {MaxHeight}px;";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("cleanup", SyncWith);
+                await _jsModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

@@ -1,0 +1,351 @@
+@page "/emergency-response"
+<PageTitle>Emergency Response - Honua MapSDK</PageTitle>
+
+<div class="dashboard-container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h1 class="dashboard-title">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Class="mr-2" />
+                    Emergency Response Dashboard
+                </h1>
+                <p class="dashboard-subtitle">
+                    Real-time incident management with multi-layer infrastructure visualization.
+                    Monitor emergency services, hospitals, and response units.
+                </p>
+            </div>
+            <MudChip Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+                All Systems Operational
+            </MudChip>
+        </div>
+    </div>
+
+    <!-- Dashboard with Sidebar -->
+    <div class="dashboard-with-sidebar">
+        <!-- Sidebar with Legend -->
+        <div class="dashboard-sidebar">
+            <!-- Layer Legend -->
+            <div class="component-panel mb-3">
+                <div class="panel-header">
+                    <h3 class="panel-title">Map Layers</h3>
+                </div>
+                <MudList Dense="true">
+                    <MudListItem OnClick="@(() => ToggleLayer("hospitals"))">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_layerStates["hospitals"]" Color="Color.Error" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.LocalHospital" Color="Color.Error" Size="Size.Small" />
+                            <MudText>Hospitals</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem OnClick="@(() => ToggleLayer("fireStations"))">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_layerStates["fireStations"]" Color="Color.Warning" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Color="Color.Warning" Size="Size.Small" />
+                            <MudText>Fire Stations</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem OnClick="@(() => ToggleLayer("police"))">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_layerStates["police"]" Color="Color.Primary" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.LocalPolice" Color="Color.Primary" Size="Size.Small" />
+                            <MudText>Police Stations</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem OnClick="@(() => ToggleLayer("schools"))">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_layerStates["schools"]" Color="Color.Info" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.School" Color="Color.Info" Size="Size.Small" />
+                            <MudText>Schools</MudText>
+                        </div>
+                    </MudListItem>
+                    <MudListItem OnClick="@(() => ToggleLayer("parks"))">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <MudCheckBox @bind-Checked="_layerStates["parks"]" Color="Color.Success" Dense="true" />
+                            <MudIcon Icon="@Icons.Material.Filled.Park" Color="Color.Success" Size="Size.Small" />
+                            <MudText>Parks</MudText>
+                        </div>
+                    </MudListItem>
+                </MudList>
+            </div>
+
+            <!-- Infrastructure Stats -->
+            <div class="component-panel mb-3">
+                <div class="panel-header">
+                    <h3 class="panel-title">Infrastructure</h3>
+                </div>
+                <MudStack Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Hospitals</MudText>
+                        <MudText Typo="Typo.h6">3</MudText>
+                        <MudText Typo="Typo.caption">1,804 total beds</MudText>
+                    </div>
+                    <MudDivider />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Fire Stations</MudText>
+                        <MudText Typo="Typo.h6">4</MudText>
+                        <MudText Typo="Typo.caption">14 response units</MudText>
+                    </div>
+                    <MudDivider />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Police Stations</MudText>
+                        <MudText Typo="Typo.h6">4</MudText>
+                        <MudText Typo="Typo.caption">400 officers</MudText>
+                    </div>
+                    <MudDivider />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Schools</MudText>
+                        <MudText Typo="Typo.h6">4</MudText>
+                        <MudText Typo="Typo.caption">6,250 students</MudText>
+                    </div>
+                </MudStack>
+            </div>
+
+            <!-- Filter Panel -->
+            <div class="component-panel">
+                <div class="panel-header">
+                    <h3 class="panel-title">Filters</h3>
+                </div>
+                <MudStack Spacing="2">
+                    <MudSelect T="string" Label="Facility Type" @bind-Value="_selectedType" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem Value="@("All")">All Types</MudSelectItem>
+                        <MudSelectItem Value="@("Hospital")">Hospitals</MudSelectItem>
+                        <MudSelectItem Value="@("Fire Station")">Fire Stations</MudSelectItem>
+                        <MudSelectItem Value="@("Police Station")">Police Stations</MudSelectItem>
+                        <MudSelectItem Value="@("School")">Schools</MudSelectItem>
+                        <MudSelectItem Value="@("Park")">Parks</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSwitch @bind-Checked="_showEmergencyOnly" Color="Color.Error" Label="Emergency Services Only" />
+
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true" StartIcon="@Icons.Material.Filled.Clear"
+                               OnClick="@ClearFilters">
+                        Clear Filters
+                    </MudButton>
+                </MudStack>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="dashboard-content">
+            <!-- Map -->
+            <div class="dashboard-map-section" style="height: 500px;">
+                <HonuaMap Id="emergency-map"
+                          MapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+                          Center="new[] { -122.4194, 37.7749 }"
+                          Zoom="12"
+                          OnFeatureClicked="@OnFacilityClicked"
+                          Style="width: 100%; height: 100%;" />
+            </div>
+
+            <!-- Data Grid and Charts -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+                <!-- Data Grid -->
+                <div class="dashboard-grid-container">
+                    <HonuaDataGrid TItem="FacilityFeature"
+                                   Id="facility-grid"
+                                   SyncWith="emergency-map"
+                                   DataSource="data/pois.geojson"
+                                   Title="Emergency Infrastructure"
+                                   ShowToolbar="true"
+                                   ShowSearch="true"
+                                   ShowExport="true"
+                                   Dense="true"
+                                   PageSize="10"
+                                   Filterable="true"
+                                   Sortable="true"
+                                   OnDataLoaded="@OnDataLoaded">
+                        <Columns>
+                            <PropertyColumn Property="x => x.Properties.Id" Title="ID" Sortable="true" />
+                            <PropertyColumn Property="x => x.Properties.Name" Title="Name" Sortable="true" Filterable="true" />
+                            <PropertyColumn Property="x => x.Properties.Type" Title="Type" Sortable="true" Filterable="true">
+                                <CellTemplate>
+                                    <MudChip Size="Size.Small" Color="@GetTypeColor(context.Properties.Type)" Icon="@GetTypeIcon(context.Properties.Type)">
+                                        @context.Properties.Type
+                                    </MudChip>
+                                </CellTemplate>
+                            </PropertyColumn>
+                            <PropertyColumn Property="x => x.Properties.Capacity" Title="Capacity" Sortable="true">
+                                <CellTemplate>
+                                    @context.Properties.Capacity.ToString("N0")
+                                </CellTemplate>
+                            </PropertyColumn>
+                            <PropertyColumn Property="x => x.Properties.Address" Title="Address" Filterable="true" />
+                        </Columns>
+                    </HonuaDataGrid>
+                </div>
+
+                <!-- Charts -->
+                <div class="dashboard-charts-container">
+                    <div class="dashboard-chart-card" style="height: 300px;">
+                        <HonuaChart Id="facility-chart"
+                                    SyncWith="emergency-map"
+                                    Type="ChartType.Bar"
+                                    Field="type"
+                                    Title="Facilities by Type"
+                                    Aggregation="AggregationType.Count"
+                                    EnableFilter="true"
+                                    AutoSync="true"
+                                    Style="width: 100%; height: 100%;" />
+                    </div>
+
+                    <div class="dashboard-chart-card" style="height: 300px;">
+                        <HonuaChart Id="capacity-chart"
+                                    SyncWith="emergency-map"
+                                    Type="ChartType.Bar"
+                                    Field="capacity"
+                                    Title="Total Capacity by Type"
+                                    Aggregation="AggregationType.Sum"
+                                    EnableFilter="false"
+                                    AutoSync="true"
+                                    Style="width: 100%; height: 100%;" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Facility Detail Dialog -->
+    @if (_selectedFacility != null)
+    {
+        <MudDialog @bind-IsVisible="_showFacilityDialog" Options="_dialogOptions">
+            <TitleContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@GetTypeIcon(_selectedFacility.Properties.Type)" Class="mr-2" />
+                    Facility Details
+                </MudText>
+            </TitleContent>
+            <DialogContent>
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.h5">@_selectedFacility.Properties.Name</MudText>
+                        <MudChip Size="Size.Small" Color="@GetTypeColor(_selectedFacility.Properties.Type)">
+                            @_selectedFacility.Properties.Type
+                        </MudChip>
+                        <MudDivider Class="my-3" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Address</MudText>
+                        <MudText Typo="Typo.body1">@_selectedFacility.Properties.Address</MudText>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Facility ID</MudText>
+                        <MudText Typo="Typo.body1">@_selectedFacility.Properties.Id</MudText>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Capacity</MudText>
+                        <MudText Typo="Typo.h6">@_selectedFacility.Properties.Capacity.ToString("N0")</MudText>
+                    </MudItem>
+                </MudGrid>
+            </DialogContent>
+            <DialogActions>
+                <MudButton Color="Color.Primary" OnClick="@(() => _showFacilityDialog = false)">Close</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Directions">
+                    Get Directions
+                </MudButton>
+            </DialogActions>
+        </MudDialog>
+    }
+</div>
+
+@code {
+    private Dictionary<string, bool> _layerStates = new()
+    {
+        { "hospitals", true },
+        { "fireStations", true },
+        { "police", true },
+        { "schools", true },
+        { "parks", true }
+    };
+
+    private string _selectedType = "All";
+    private bool _showEmergencyOnly = false;
+
+    private FacilityFeature? _selectedFacility;
+    private bool _showFacilityDialog = false;
+
+    private DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true,
+        CloseButton = true
+    };
+
+    private void OnDataLoaded(int count)
+    {
+        StateHasChanged();
+    }
+
+    private void ToggleLayer(string layer)
+    {
+        _layerStates[layer] = !_layerStates[layer];
+    }
+
+    private void ClearFilters()
+    {
+        _selectedType = "All";
+        _showEmergencyOnly = false;
+    }
+
+    private void OnFacilityClicked(FeatureClickedMessage message)
+    {
+        if (message.Properties.ContainsKey("id"))
+        {
+            _selectedFacility = new FacilityFeature
+            {
+                Type = "Feature",
+                Properties = new FacilityProperties
+                {
+                    Id = message.Properties["id"]?.ToString() ?? "",
+                    Name = message.Properties["name"]?.ToString() ?? "",
+                    Type = message.Properties["type"]?.ToString() ?? "",
+                    Address = message.Properties["address"]?.ToString() ?? "",
+                    Capacity = Convert.ToInt32(message.Properties["capacity"])
+                },
+                Geometry = message.Geometry
+            };
+
+            _showFacilityDialog = true;
+            StateHasChanged();
+        }
+    }
+
+    private Color GetTypeColor(string type) => type switch
+    {
+        "Hospital" => Color.Error,
+        "Fire Station" => Color.Warning,
+        "Police Station" => Color.Primary,
+        "School" => Color.Info,
+        "Park" => Color.Success,
+        _ => Color.Default
+    };
+
+    private string GetTypeIcon(string type) => type switch
+    {
+        "Hospital" => Icons.Material.Filled.LocalHospital,
+        "Fire Station" => Icons.Material.Filled.LocalFireDepartment,
+        "Police Station" => Icons.Material.Filled.LocalPolice,
+        "School" => Icons.Material.Filled.School,
+        "Park" => Icons.Material.Filled.Park,
+        _ => Icons.Material.Filled.Place
+    };
+
+    public class FacilityFeature
+    {
+        public string Type { get; set; } = "Feature";
+        public FacilityProperties Properties { get; set; } = new();
+        public object? Geometry { get; set; }
+    }
+
+    public class FacilityProperties
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string Address { get; set; } = "";
+        public int Capacity { get; set; }
+    }
+}

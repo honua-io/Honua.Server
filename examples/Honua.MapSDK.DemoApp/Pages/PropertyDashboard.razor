@@ -1,0 +1,272 @@
+@page "/property-dashboard"
+<PageTitle>Property Analysis Dashboard - Honua MapSDK</PageTitle>
+
+<div class="dashboard-container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h1 class="dashboard-title">
+                    <MudIcon Icon="@Icons.Material.Filled.HomeWork" Class="mr-2" />
+                    Property Analysis Dashboard
+                </h1>
+                <p class="dashboard-subtitle">
+                    Analyze real estate properties with interactive maps, charts, and filtering.
+                    Click on properties to see details, use filters to narrow down results.
+                </p>
+            </div>
+            <div>
+                <MudChip Color="Color.Success" Icon="@Icons.Material.Filled.Sync">
+                    @_propertyCount Properties Loaded
+                </MudChip>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Grid Layout -->
+    <div class="dashboard-grid">
+        <!-- Map Section -->
+        <div class="dashboard-map-section">
+            <HonuaMap Id="property-map"
+                      MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                      Center="new[] { -122.4094, 37.7849 }"
+                      Zoom="13"
+                      OnFeatureClicked="@OnPropertyClicked"
+                      Style="width: 100%; height: 100%;" />
+        </div>
+
+        <!-- Data Section (Grid + Charts) -->
+        <div class="dashboard-data-section">
+            <!-- Data Grid -->
+            <div class="dashboard-grid-container">
+                <HonuaDataGrid TItem="PropertyFeature"
+                               Id="property-grid"
+                               SyncWith="property-map"
+                               DataSource="data/parcels.geojson"
+                               Title="Property Parcels"
+                               ShowToolbar="true"
+                               ShowSearch="true"
+                               ShowExport="true"
+                               ShowRefresh="true"
+                               Dense="true"
+                               PageSize="10"
+                               Filterable="true"
+                               Sortable="true"
+                               OnDataLoaded="@OnDataLoaded">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Properties.Id" Title="ID" Sortable="true" Filterable="true" />
+                        <PropertyColumn Property="x => x.Properties.Address" Title="Address" Sortable="true" Filterable="true" />
+                        <PropertyColumn Property="x => x.Properties.AssessedValue" Title="Value" Sortable="true" Filterable="true">
+                            <CellTemplate>
+                                <MudText Typo="Typo.body2" Style="font-weight: 500;">
+                                    @context.Properties.AssessedValue.ToString("C0")
+                                </MudText>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        <PropertyColumn Property="x => x.Properties.LandUse" Title="Land Use" Sortable="true" Filterable="true">
+                            <CellTemplate>
+                                <MudChip Size="Size.Small" Color="@GetLandUseColor(context.Properties.LandUse)">
+                                    @context.Properties.LandUse
+                                </MudChip>
+                            </CellTemplate>
+                        </PropertyColumn>
+                        <PropertyColumn Property="x => x.Properties.Sqft" Title="Sq Ft" Sortable="true" Filterable="true">
+                            <CellTemplate>
+                                @context.Properties.Sqft.ToString("N0")
+                            </CellTemplate>
+                        </PropertyColumn>
+                        <PropertyColumn Property="x => x.Properties.YearBuilt" Title="Year" Sortable="true" Filterable="true" />
+                    </Columns>
+                </HonuaDataGrid>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="dashboard-charts-container">
+                <!-- Property Values Histogram -->
+                <div class="dashboard-chart-card">
+                    <HonuaChart Id="value-histogram"
+                                SyncWith="property-map"
+                                Type="ChartType.Histogram"
+                                Field="assessedValue"
+                                Title="Property Value Distribution"
+                                Bins="8"
+                                ValueFormat="ValueFormat.Currency"
+                                EnableFilter="true"
+                                AutoSync="true"
+                                Style="width: 100%; height: 200px;" />
+                </div>
+
+                <!-- Land Use Pie Chart -->
+                <div class="dashboard-chart-card">
+                    <HonuaChart Id="landuse-pie"
+                                SyncWith="property-map"
+                                Type="ChartType.Pie"
+                                Field="landUse"
+                                Title="Land Use Distribution"
+                                EnableFilter="true"
+                                AutoSync="true"
+                                ShowLegend="true"
+                                LegendPosition="bottom"
+                                Style="width: 100%; height: 200px;" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Property Detail Dialog -->
+    @if (_selectedProperty != null)
+    {
+        <MudDialog @bind-IsVisible="_showPropertyDialog" Options="_dialogOptions">
+            <TitleContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" />
+                    Property Details
+                </MudText>
+            </TitleContent>
+            <DialogContent>
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.h5">@_selectedProperty.Properties.Address</MudText>
+                        <MudDivider Class="my-3" />
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Property ID</MudText>
+                        <MudText Typo="Typo.body1">@_selectedProperty.Properties.Id</MudText>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Assessed Value</MudText>
+                        <MudText Typo="Typo.h6" Color="Color.Success">
+                            @_selectedProperty.Properties.AssessedValue.ToString("C0")
+                        </MudText>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Land Use</MudText>
+                        <MudChip Color="@GetLandUseColor(_selectedProperty.Properties.LandUse)">
+                            @_selectedProperty.Properties.LandUse
+                        </MudChip>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Square Feet</MudText>
+                        <MudText Typo="Typo.body1">@_selectedProperty.Properties.Sqft.ToString("N0") sq ft</MudText>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Bedrooms</MudText>
+                        <MudText Typo="Typo.body1">
+                            @(_selectedProperty.Properties.Bedrooms > 0 ? $"{_selectedProperty.Properties.Bedrooms} beds" : "N/A")
+                        </MudText>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Bathrooms</MudText>
+                        <MudText Typo="Typo.body1">
+                            @(_selectedProperty.Properties.Bathrooms > 0 ? $"{_selectedProperty.Properties.Bathrooms} baths" : "N/A")
+                        </MudText>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Year Built</MudText>
+                        <MudText Typo="Typo.body1">@_selectedProperty.Properties.YearBuilt</MudText>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Age</MudText>
+                        <MudText Typo="Typo.body1">@(DateTime.Now.Year - _selectedProperty.Properties.YearBuilt) years</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Price per Square Foot</MudText>
+                        <MudText Typo="Typo.h6">
+                            @((_selectedProperty.Properties.AssessedValue / _selectedProperty.Properties.Sqft).ToString("C2"))/sq ft
+                        </MudText>
+                    </MudItem>
+                </MudGrid>
+            </DialogContent>
+            <DialogActions>
+                <MudButton Color="Color.Primary" OnClick="@(() => _showPropertyDialog = false)">Close</MudButton>
+            </DialogActions>
+        </MudDialog>
+    }
+</div>
+
+@code {
+    private int _propertyCount = 0;
+    private PropertyFeature? _selectedProperty;
+    private bool _showPropertyDialog = false;
+
+    private DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true,
+        CloseButton = true
+    };
+
+    private void OnDataLoaded(int count)
+    {
+        _propertyCount = count;
+        StateHasChanged();
+    }
+
+    private void OnPropertyClicked(FeatureClickedMessage message)
+    {
+        if (message.Properties.ContainsKey("id"))
+        {
+            // Create a PropertyFeature from the clicked feature
+            _selectedProperty = new PropertyFeature
+            {
+                Type = "Feature",
+                Properties = new PropertyProperties
+                {
+                    Id = message.Properties["id"]?.ToString() ?? "",
+                    Address = message.Properties["address"]?.ToString() ?? "",
+                    AssessedValue = Convert.ToInt32(message.Properties["assessedValue"]),
+                    LandUse = message.Properties["landUse"]?.ToString() ?? "",
+                    Sqft = Convert.ToInt32(message.Properties["sqft"]),
+                    Bedrooms = Convert.ToInt32(message.Properties.GetValueOrDefault("bedrooms", 0)),
+                    Bathrooms = Convert.ToDouble(message.Properties.GetValueOrDefault("bathrooms", 0)),
+                    YearBuilt = Convert.ToInt32(message.Properties["yearBuilt"])
+                },
+                Geometry = message.Geometry
+            };
+
+            _showPropertyDialog = true;
+            StateHasChanged();
+        }
+    }
+
+    private Color GetLandUseColor(string landUse) => landUse switch
+    {
+        "Residential" => Color.Success,
+        "Commercial" => Color.Primary,
+        "Mixed-Use" => Color.Info,
+        "Industrial" => Color.Warning,
+        _ => Color.Default
+    };
+
+    /// <summary>
+    /// Property feature model matching the GeoJSON structure
+    /// </summary>
+    public class PropertyFeature
+    {
+        public string Type { get; set; } = "Feature";
+        public PropertyProperties Properties { get; set; } = new();
+        public object? Geometry { get; set; }
+    }
+
+    public class PropertyProperties
+    {
+        public string Id { get; set; } = "";
+        public string Address { get; set; } = "";
+        public int AssessedValue { get; set; }
+        public string LandUse { get; set; } = "";
+        public int Sqft { get; set; }
+        public int Bedrooms { get; set; }
+        public double Bathrooms { get; set; }
+        public int YearBuilt { get; set; }
+    }
+}

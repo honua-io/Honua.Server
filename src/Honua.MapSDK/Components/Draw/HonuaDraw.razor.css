@@ -1,0 +1,389 @@
+.honua-draw {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Positioning */
+.draw-embedded {
+    position: relative;
+}
+
+.draw-floating {
+    position: absolute;
+    z-index: 10;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+}
+
+.draw-top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.draw-top-left {
+    top: 10px;
+    left: 10px;
+}
+
+.draw-bottom-right {
+    bottom: 10px;
+    right: 10px;
+}
+
+.draw-bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+/* Toolbar */
+.draw-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.toolbar-divider {
+    height: 24px;
+    margin: 0 4px;
+}
+
+.tool-button {
+    transition: all 0.2s ease;
+}
+
+.tool-button:hover {
+    transform: scale(1.05);
+}
+
+/* Instructions */
+.draw-instructions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #E3F2FD;
+    border-radius: 6px;
+    border-left: 3px solid #2196F3;
+}
+
+.draw-instructions .mud-text {
+    color: #1565C0;
+    margin: 0;
+}
+
+/* Measurement Panel */
+.measurement-panel {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #F5F5F5;
+    border-bottom: 1px solid #E0E0E0;
+}
+
+.panel-title {
+    flex: 1;
+    font-weight: 500;
+    margin: 0;
+}
+
+.measurement-values {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.measurement-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    background: #F9FAFB;
+    border-radius: 4px;
+}
+
+.measurement-item.coordinates {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.measurement-label {
+    color: #6B7280;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.measurement-value {
+    color: #1F2937;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+/* Feature List */
+.feature-list {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.feature-items {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #F0F0F0;
+    transition: background-color 0.2s ease;
+}
+
+.feature-item:hover {
+    background: #F9FAFB;
+}
+
+.feature-item.selected {
+    background: #E3F2FD;
+    border-left: 3px solid #2196F3;
+}
+
+.feature-item:last-child {
+    border-bottom: none;
+}
+
+.feature-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.feature-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #1F2937;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.feature-measurement {
+    font-size: 0.75rem;
+    color: #6B7280;
+    margin-top: 2px;
+}
+
+.feature-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.feature-item:hover .feature-actions,
+.feature-item.selected .feature-actions {
+    opacity: 1;
+}
+
+/* Error Alert */
+.draw-error {
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .draw-floating {
+        max-width: 90vw;
+        max-height: 80vh;
+    }
+
+    .toolbar-section {
+        justify-content: center;
+    }
+
+    .measurement-panel,
+    .feature-list {
+        font-size: 0.875rem;
+    }
+
+    .feature-item {
+        padding: 8px 10px;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .draw-floating,
+    .draw-toolbar,
+    .measurement-panel,
+    .feature-list {
+        background: #1E1E1E;
+        color: #E0E0E0;
+    }
+
+    .panel-header {
+        background: #2D2D2D;
+        border-bottom-color: #404040;
+    }
+
+    .measurement-item {
+        background: #2D2D2D;
+    }
+
+    .measurement-label {
+        color: #9CA3AF;
+    }
+
+    .measurement-value {
+        color: #E5E7EB;
+    }
+
+    .feature-item {
+        border-bottom-color: #404040;
+    }
+
+    .feature-item:hover {
+        background: #2D2D2D;
+    }
+
+    .feature-item.selected {
+        background: #1E3A5F;
+        border-left-color: #64B5F6;
+    }
+
+    .feature-name {
+        color: #E5E7EB;
+    }
+
+    .feature-measurement {
+        color: #9CA3AF;
+    }
+
+    .draw-instructions {
+        background: #1E3A5F;
+        border-left-color: #64B5F6;
+    }
+
+    .draw-instructions .mud-text {
+        color: #90CAF9;
+    }
+}
+
+/* Accessibility */
+.tool-button:focus,
+.feature-item:focus {
+    outline: 2px solid #2196F3;
+    outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+    .draw-toolbar,
+    .draw-instructions,
+    .feature-actions {
+        display: none;
+    }
+
+    .draw-floating {
+        position: static;
+        box-shadow: none;
+        border: 1px solid #E0E0E0;
+    }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .draw-toolbar,
+    .measurement-panel,
+    .feature-list {
+        border: 2px solid currentColor;
+    }
+
+    .feature-item.selected {
+        border: 2px solid #2196F3;
+    }
+
+    .measurement-value,
+    .feature-name {
+        font-weight: 700;
+    }
+}
+
+/* Animation */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.draw-instructions,
+.measurement-panel {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Scrollbar Styling */
+.feature-items::-webkit-scrollbar {
+    width: 6px;
+}
+
+.feature-items::-webkit-scrollbar-track {
+    background: #F5F5F5;
+}
+
+.feature-items::-webkit-scrollbar-thumb {
+    background: #BDBDBD;
+    border-radius: 3px;
+}
+
+.feature-items::-webkit-scrollbar-thumb:hover {
+    background: #9E9E9E;
+}
+
+/* Compact Mode */
+.honua-draw[data-compact="true"] .draw-toolbar {
+    padding: 4px;
+}
+
+.honua-draw[data-compact="true"] .measurement-item,
+.honua-draw[data-compact="true"] .feature-item {
+    padding: 6px 8px;
+}
+
+.honua-draw[data-compact="true"] .panel-header {
+    padding: 8px 10px;
+}

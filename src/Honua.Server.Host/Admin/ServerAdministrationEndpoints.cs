@@ -25,10 +25,8 @@ public static class ServerAdministrationEndpoints
     {
         var group = endpoints.MapGroup("/admin/server")
             .WithTags("Admin - Server Configuration")
-            .WithOpenApi();
-
-        // TODO: Add authorization after auth integration
-        // .RequireAuthorization("RequireAdministrator")
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // CORS Configuration
         group.MapGet("/cors", GetCorsConfiguration)

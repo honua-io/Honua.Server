@@ -1,0 +1,662 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-chart @CssClass" @ref="_chartContainer" id="@Id" style="@Style">
+    @if (_isLoading)
+    {
+        <div class="honua-chart-loading">
+            <div class="spinner"></div>
+            <div>Loading chart data...</div>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this chart component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"chart-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to sync with (required for auto-sync features)
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Chart type: Histogram, Bar, Pie, Doughnut, or Line
+    /// </summary>
+    [Parameter]
+    public ChartType Type { get; set; } = ChartType.Bar;
+
+    /// <summary>
+    /// Field name to visualize
+    /// </summary>
+    [Parameter]
+    public required string Field { get; set; }
+
+    /// <summary>
+    /// Time field name (for line charts with temporal data)
+    /// </summary>
+    [Parameter]
+    public string? TimeField { get; set; }
+
+    /// <summary>
+    /// Chart title
+    /// </summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>
+    /// Number of bins for histogram
+    /// </summary>
+    [Parameter]
+    public int Bins { get; set; } = 10;
+
+    /// <summary>
+    /// Aggregation method: Count, Sum, Avg, Min, Max
+    /// </summary>
+    [Parameter]
+    public AggregationType Aggregation { get; set; } = AggregationType.Count;
+
+    /// <summary>
+    /// Value format: None, Currency, Percent, Decimal, Integer
+    /// </summary>
+    [Parameter]
+    public ValueFormat ValueFormat { get; set; } = ValueFormat.None;
+
+    /// <summary>
+    /// Color scheme: Default, Cool, Warm, Earth
+    /// </summary>
+    [Parameter]
+    public string ColorScheme { get; set; } = "default";
+
+    /// <summary>
+    /// Theme: Light or Dark
+    /// </summary>
+    [Parameter]
+    public string Theme { get; set; } = "light";
+
+    /// <summary>
+    /// Show legend
+    /// </summary>
+    [Parameter]
+    public bool ShowLegend { get; set; } = true;
+
+    /// <summary>
+    /// Legend position: top, bottom, left, right
+    /// </summary>
+    [Parameter]
+    public string LegendPosition { get; set; } = "top";
+
+    /// <summary>
+    /// Enable click-to-filter functionality
+    /// </summary>
+    [Parameter]
+    public bool EnableFilter { get; set; } = true;
+
+    /// <summary>
+    /// Auto-sync with map extent changes
+    /// </summary>
+    [Parameter]
+    public bool AutoSync { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of categories to show (rest grouped as "Other")
+    /// </summary>
+    [Parameter]
+    public int MaxCategories { get; set; } = 20;
+
+    /// <summary>
+    /// Additional CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Inline style
+    /// </summary>
+    [Parameter]
+    public string Style { get; set; } = "width: 100%; height: 400px;";
+
+    /// <summary>
+    /// Child content (for advanced customization)
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Callback when chart segment is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<ChartSegmentClickedEventArgs> OnSegmentClicked { get; set; }
+
+    private ElementReference _chartContainer;
+    private IJSObjectReference? _chartModule;
+    private IJSObjectReference? _chartInstance;
+    private DotNetObjectReference<HonuaChart>? _dotNetRef;
+    private bool _isInitialized = false;
+    private bool _isLoading = true;
+
+    // Data storage
+    private List<Dictionary<string, object>> _allData = new();
+    private List<Dictionary<string, object>> _visibleData = new();
+    private double[]? _currentBounds;
+    private Dictionary<string, object> _activeFilters = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeChart();
+            SetupSubscriptions();
+        }
+    }
+
+    private async Task InitializeChart()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load Chart.js module
+            _chartModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-chart.js"
+            );
+
+            // Create chart instance
+            _chartInstance = await _chartModule.InvokeAsync<IJSObjectReference>(
+                "createChart",
+                _chartContainer,
+                new
+                {
+                    id = Id,
+                    type = Type.ToString(),
+                    title = Title,
+                    bins = Bins,
+                    valueFormat = ValueFormat.ToString().ToLower(),
+                    colorScheme = ColorScheme,
+                    theme = Theme,
+                    showLegend = ShowLegend,
+                    legendPosition = LegendPosition
+                },
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+            _isLoading = false;
+
+            // Request initial data if we're synced with a map
+            if (!string.IsNullOrEmpty(SyncWith))
+            {
+                await Bus.PublishAsync(new DataRequestMessage
+                {
+                    ComponentId = Id,
+                    MapId = SyncWith
+                }, Id);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing chart: {ex.Message}");
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map extent changes
+        if (AutoSync && !string.IsNullOrEmpty(SyncWith))
+        {
+            Bus.Subscribe<MapExtentChangedMessage>(async args =>
+            {
+                if (args.Message.MapId == SyncWith)
+                {
+                    _currentBounds = args.Message.Bounds;
+                    await UpdateChartForVisibleFeatures();
+                }
+            });
+        }
+
+        // Listen for filter changes from other components
+        Bus.Subscribe<FilterAppliedMessage>(async args =>
+        {
+            // Store the filter
+            _activeFilters[args.Message.FilterId] = args.Message.Expression;
+            await UpdateChartForVisibleFeatures();
+        });
+
+        Bus.Subscribe<FilterClearedMessage>(async args =>
+        {
+            _activeFilters.Remove(args.Message.FilterId);
+            await UpdateChartForVisibleFeatures();
+        });
+
+        Bus.Subscribe<AllFiltersClearedMessage>(async args =>
+        {
+            _activeFilters.Clear();
+            await UpdateChartForVisibleFeatures();
+        });
+
+        // Listen for data loaded messages
+        Bus.Subscribe<DataLoadedMessage>(async args =>
+        {
+            if (!string.IsNullOrEmpty(SyncWith))
+            {
+                // Request the actual data
+                await Bus.PublishAsync(new DataRequestMessage
+                {
+                    ComponentId = Id,
+                    MapId = SyncWith
+                }, Id);
+            }
+        });
+
+        // Listen for data response
+        Bus.Subscribe<DataResponseMessage>(async args =>
+        {
+            if (args.Message.RequesterId == Id)
+            {
+                await UpdateData(args.Message.Features);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Updates the chart with new data
+    /// </summary>
+    public async Task UpdateData(List<Dictionary<string, object>> features)
+    {
+        _allData = features ?? new List<Dictionary<string, object>>();
+        await UpdateChartForVisibleFeatures();
+    }
+
+    private async Task UpdateChartForVisibleFeatures()
+    {
+        if (!_isInitialized || _chartInstance == null)
+            return;
+
+        try
+        {
+            await _chartInstance.InvokeVoidAsync("showLoading");
+
+            // Filter data based on current bounds and active filters
+            _visibleData = FilterData(_allData);
+
+            // Calculate chart data based on type
+            var (labels, values) = CalculateChartData(_visibleData);
+
+            // Update the chart
+            await _chartInstance.InvokeVoidAsync("updateData", labels, values, new
+            {
+                label = Title ?? Field
+            });
+
+            await _chartInstance.InvokeVoidAsync("hideLoading");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating chart: {ex.Message}");
+        }
+    }
+
+    private List<Dictionary<string, object>> FilterData(List<Dictionary<string, object>> data)
+    {
+        var filtered = data.AsEnumerable();
+
+        // Apply spatial filter if bounds are set
+        if (_currentBounds != null && AutoSync)
+        {
+            // Note: Spatial filtering would require geometry information
+            // For now, we'll pass through all data
+            // TODO: Implement spatial filtering when geometry is available
+        }
+
+        // Apply attribute filters
+        foreach (var filter in _activeFilters.Values)
+        {
+            // Apply filter expression (simplified - in production, parse MapLibre filter expressions)
+            // For now, we'll keep all data
+        }
+
+        return filtered.ToList();
+    }
+
+    private (string[] labels, double[] values) CalculateChartData(List<Dictionary<string, object>> data)
+    {
+        if (data.Count == 0)
+        {
+            return (Array.Empty<string>(), Array.Empty<double>());
+        }
+
+        if (Type == ChartType.Histogram)
+        {
+            return CalculateHistogram(data);
+        }
+        else if (Type == ChartType.Line && !string.IsNullOrEmpty(TimeField))
+        {
+            return CalculateTimeSeries(data);
+        }
+        else
+        {
+            return CalculateCategorical(data);
+        }
+    }
+
+    private (string[] labels, double[] values) CalculateHistogram(List<Dictionary<string, object>> data)
+    {
+        var values = data
+            .Where(d => d.ContainsKey(Field) && d[Field] != null)
+            .Select(d => Convert.ToDouble(d[Field]))
+            .Where(v => !double.IsNaN(v) && !double.IsInfinity(v))
+            .ToList();
+
+        if (values.Count == 0)
+        {
+            return (Array.Empty<string>(), Array.Empty<double>());
+        }
+
+        var min = values.Min();
+        var max = values.Max();
+        var binWidth = (max - min) / Bins;
+
+        var bins = new int[Bins];
+        var labels = new string[Bins];
+
+        // Initialize bin labels
+        for (int i = 0; i < Bins; i++)
+        {
+            var binStart = min + (i * binWidth);
+            var binEnd = binStart + binWidth;
+            labels[i] = $"{binStart:F1}-{binEnd:F1}";
+        }
+
+        // Count values in each bin
+        foreach (var value in values)
+        {
+            var binIndex = (int)Math.Min((value - min) / binWidth, Bins - 1);
+            if (binIndex >= 0 && binIndex < Bins)
+            {
+                bins[binIndex]++;
+            }
+        }
+
+        return (labels, bins.Select(b => (double)b).ToArray());
+    }
+
+    private (string[] labels, double[] values) CalculateCategorical(List<Dictionary<string, object>> data)
+    {
+        var groups = data
+            .Where(d => d.ContainsKey(Field) && d[Field] != null)
+            .GroupBy(d => d[Field]?.ToString() ?? "Unknown")
+            .Select(g => new
+            {
+                Label = g.Key,
+                Value = ApplyAggregation(g.ToList())
+            })
+            .OrderByDescending(x => x.Value)
+            .ToList();
+
+        // Limit categories
+        if (groups.Count > MaxCategories)
+        {
+            var topGroups = groups.Take(MaxCategories - 1).ToList();
+            var otherValue = groups.Skip(MaxCategories - 1).Sum(g => g.Value);
+
+            if (otherValue > 0)
+            {
+                topGroups.Add(new { Label = "Other", Value = otherValue });
+            }
+
+            groups = topGroups;
+        }
+
+        return (
+            groups.Select(g => g.Label).ToArray(),
+            groups.Select(g => g.Value).ToArray()
+        );
+    }
+
+    private (string[] labels, double[] values) CalculateTimeSeries(List<Dictionary<string, object>> data)
+    {
+        if (string.IsNullOrEmpty(TimeField))
+        {
+            return (Array.Empty<string>(), Array.Empty<double>());
+        }
+
+        var groups = data
+            .Where(d => d.ContainsKey(TimeField) && d.ContainsKey(Field))
+            .GroupBy(d => d[TimeField]?.ToString() ?? "Unknown")
+            .Select(g => new
+            {
+                Label = g.Key,
+                Value = ApplyAggregation(g.ToList()),
+                Timestamp = ParseTimestamp(g.Key)
+            })
+            .OrderBy(x => x.Timestamp)
+            .ToList();
+
+        return (
+            groups.Select(g => g.Label).ToArray(),
+            groups.Select(g => g.Value).ToArray()
+        );
+    }
+
+    private double ApplyAggregation(List<Dictionary<string, object>> group)
+    {
+        if (Aggregation == AggregationType.Count)
+        {
+            return group.Count;
+        }
+
+        var values = group
+            .Where(d => d.ContainsKey(Field) && d[Field] != null)
+            .Select(d => TryGetNumericValue(d[Field]))
+            .Where(v => v.HasValue)
+            .Select(v => v!.Value)
+            .ToList();
+
+        if (values.Count == 0)
+        {
+            return 0;
+        }
+
+        return Aggregation switch
+        {
+            AggregationType.Sum => values.Sum(),
+            AggregationType.Avg => values.Average(),
+            AggregationType.Min => values.Min(),
+            AggregationType.Max => values.Max(),
+            _ => values.Count
+        };
+    }
+
+    private double? TryGetNumericValue(object value)
+    {
+        try
+        {
+            return Convert.ToDouble(value);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private DateTime ParseTimestamp(string timestamp)
+    {
+        if (DateTime.TryParse(timestamp, out var dt))
+        {
+            return dt;
+        }
+        return DateTime.MinValue;
+    }
+
+    /// <summary>
+    /// Called from JavaScript when chart segment is clicked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnChartSegmentClicked(string label, double value, int index)
+    {
+        var args = new ChartSegmentClickedEventArgs
+        {
+            Label = label,
+            Value = value,
+            Index = index,
+            Field = Field
+        };
+
+        await OnSegmentClicked.InvokeAsync(args);
+
+        // If filtering is enabled, publish a filter message
+        if (EnableFilter && !string.IsNullOrEmpty(SyncWith))
+        {
+            var filterId = $"{Id}-filter";
+
+            // Create filter expression based on chart type
+            object filterExpression = Type == ChartType.Histogram
+                ? CreateHistogramFilter(label)
+                : CreateCategoricalFilter(label);
+
+            await Bus.PublishAsync(new FilterAppliedMessage
+            {
+                FilterId = filterId,
+                Type = FilterType.Attribute,
+                Expression = filterExpression
+            }, Id);
+        }
+    }
+
+    private object CreateHistogramFilter(string binLabel)
+    {
+        // Parse bin range (e.g., "100.0-200.0")
+        var parts = binLabel.Split('-');
+        if (parts.Length == 2 &&
+            double.TryParse(parts[0], out var min) &&
+            double.TryParse(parts[1], out var max))
+        {
+            return new object[] { "all",
+                new object[] { ">=", new object[] { "get", Field }, min },
+                new object[] { "<", new object[] { "get", Field }, max }
+            };
+        }
+
+        return new object[] { "==", new object[] { "get", Field }, binLabel };
+    }
+
+    private object CreateCategoricalFilter(string category)
+    {
+        return new object[] { "==", new object[] { "get", Field }, category };
+    }
+
+    /// <summary>
+    /// Public API: Export chart as PNG image
+    /// </summary>
+    public async Task<string?> ExportAsPngAsync()
+    {
+        if (_chartInstance == null) return null;
+        return await _chartInstance.InvokeAsync<string>("exportAsImage", "png");
+    }
+
+    /// <summary>
+    /// Public API: Export chart as JPEG image
+    /// </summary>
+    public async Task<string?> ExportAsJpegAsync()
+    {
+        if (_chartInstance == null) return null;
+        return await _chartInstance.InvokeAsync<string>("exportAsImage", "jpeg");
+    }
+
+    /// <summary>
+    /// Public API: Update chart theme
+    /// </summary>
+    public async Task SetThemeAsync(string theme)
+    {
+        Theme = theme;
+        if (_chartInstance != null)
+        {
+            await _chartInstance.InvokeVoidAsync("setTheme", theme);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Refresh chart data
+    /// </summary>
+    public async Task RefreshAsync()
+    {
+        await UpdateChartForVisibleFeatures();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_chartInstance != null)
+        {
+            await _chartInstance.InvokeVoidAsync("dispose");
+            await _chartInstance.DisposeAsync();
+        }
+
+        if (_chartModule != null)
+        {
+            await _chartModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}
+
+/// <summary>
+/// Chart type enumeration
+/// </summary>
+public enum ChartType
+{
+    Histogram,
+    Bar,
+    Pie,
+    Doughnut,
+    Line
+}
+
+/// <summary>
+/// Aggregation type enumeration
+/// </summary>
+public enum AggregationType
+{
+    Count,
+    Sum,
+    Avg,
+    Min,
+    Max
+}
+
+/// <summary>
+/// Value format enumeration
+/// </summary>
+public enum ValueFormat
+{
+    None,
+    Currency,
+    Percent,
+    Decimal,
+    Integer
+}
+
+/// <summary>
+/// Event args for chart segment clicked event
+/// </summary>
+public class ChartSegmentClickedEventArgs
+{
+    public required string Label { get; init; }
+    public required double Value { get; init; }
+    public required int Index { get; init; }
+    public required string Field { get; init; }
+}

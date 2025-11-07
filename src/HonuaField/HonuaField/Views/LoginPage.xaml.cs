@@ -12,15 +12,41 @@ public partial class LoginPage : ContentPage
 		BindingContext = _viewModel = viewModel;
 	}
 
-	protected override async void OnAppearing()
+	protected override void OnAppearing()
 	{
 		base.OnAppearing();
-		await _viewModel.OnAppearingAsync();
+		// Fire and forget with proper exception handling
+		_ = HandleOnAppearingAsync();
 	}
 
-	protected override async void OnDisappearing()
+	protected override void OnDisappearing()
 	{
 		base.OnDisappearing();
-		await _viewModel.OnDisappearingAsync();
+		// Fire and forget with proper exception handling
+		_ = HandleOnDisappearingAsync();
+	}
+
+	private async Task HandleOnAppearingAsync()
+	{
+		try
+		{
+			await _viewModel.OnAppearingAsync();
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"Error in OnAppearing: {ex}");
+		}
+	}
+
+	private async Task HandleOnDisappearingAsync()
+	{
+		try
+		{
+			await _viewModel.OnDisappearingAsync();
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"Error in OnDisappearing: {ex}");
+		}
 	}
 }

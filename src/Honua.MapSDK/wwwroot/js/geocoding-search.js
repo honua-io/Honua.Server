@@ -57,16 +57,31 @@ export function addMarker(mapId, longitude, latitude, label, clearPrevious = tru
         clearMarkers(mapId);
     }
 
-    // Create marker element
+    // Create marker element safely without innerHTML to prevent XSS
     const markerElement = document.createElement('div');
     markerElement.className = 'geocoding-search-marker';
-    markerElement.innerHTML = `
-        <svg width="32" height="40" viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 0C7.2 0 0 7.2 0 16c0 8.8 16 24 16 24s16-15.2 16-24c0-8.8-7.2-16-16-16z"
-                  fill="#1976d2" stroke="white" stroke-width="2"/>
-            <circle cx="16" cy="16" r="6" fill="white"/>
-        </svg>
-    `;
+
+    // Create SVG element using DOM methods
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '32');
+    svg.setAttribute('height', '40');
+    svg.setAttribute('viewBox', '0 0 32 40');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M16 0C7.2 0 0 7.2 0 16c0 8.8 16 24 16 24s16-15.2 16-24c0-8.8-7.2-16-16-16z');
+    path.setAttribute('fill', '#1976d2');
+    path.setAttribute('stroke', 'white');
+    path.setAttribute('stroke-width', '2');
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', '16');
+    circle.setAttribute('cy', '16');
+    circle.setAttribute('r', '6');
+    circle.setAttribute('fill', 'white');
+
+    svg.appendChild(path);
+    svg.appendChild(circle);
+    markerElement.appendChild(svg);
     markerElement.style.cursor = 'pointer';
 
     // Create popup

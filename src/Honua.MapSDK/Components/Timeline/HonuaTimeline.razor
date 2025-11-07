@@ -1,0 +1,902 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-timeline @GetCssClass()"
+     id="@Id"
+     style="@GetStyle()"
+     data-theme="@Theme"
+     tabindex="@(EnableKeyboardShortcuts ? "0" : "-1")"
+     @onkeydown="OnKeyDown">
+
+    @if (!Compact)
+    {
+        <div class="timeline-header">
+            @if (ShowCurrentTime)
+            {
+                <div class="current-time">
+                    @FormatTime(CurrentTime)
+                </div>
+            }
+        </div>
+    }
+
+    <div class="timeline-controls">
+        @if (ShowJumpButtons)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.SkipPrevious"
+                           Size="Size.Small"
+                           OnClick="JumpToStart"
+                           Disabled="@(!_isInitialized || CurrentStep == 0)"
+                           Title="Jump to start (Home)" />
+        }
+
+        @if (ShowStepButtons)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft"
+                           Size="Size.Small"
+                           OnClick="StepBackward"
+                           Disabled="@(!_isInitialized || CurrentStep == 0)"
+                           Title="Step backward (Left arrow)" />
+        }
+
+        <MudIconButton Icon="@(_isPlaying ? Icons.Material.Filled.Pause : Icons.Material.Filled.PlayArrow)"
+                       Size="@(Compact ? Size.Small : Size.Medium)"
+                       OnClick="TogglePlayPause"
+                       Disabled="@(!_isInitialized)"
+                       Title="@(_isPlaying ? "Pause (Space)" : "Play (Space)")"
+                       Color="Color.Primary" />
+
+        @if (ShowStepButtons)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight"
+                           Size="Size.Small"
+                           OnClick="StepForward"
+                           Disabled="@(!_isInitialized || CurrentStep >= TotalSteps - 1)"
+                           Title="Step forward (Right arrow)" />
+        }
+
+        @if (ShowJumpButtons)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.SkipNext"
+                           Size="Size.Small"
+                           OnClick="JumpToEnd"
+                           Disabled="@(!_isInitialized || CurrentStep >= TotalSteps - 1)"
+                           Title="Jump to end (End)" />
+        }
+
+        @if (EnableReverse && !Compact)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Repeat"
+                           Size="Size.Small"
+                           OnClick="ToggleReverse"
+                           Color="@(_playbackDirection == -1 ? Color.Primary : Color.Default)"
+                           Disabled="@(!_isInitialized)"
+                           Title="Reverse playback" />
+        }
+
+        @if (ShowSpeedControls)
+        {
+            <MudSelect T="double"
+                       @bind-Value="SpeedMultiplier"
+                       Dense="true"
+                       Variant="Variant.Outlined"
+                       Class="speed-select"
+                       Disabled="@(!_isInitialized)"
+                       Title="Playback speed">
+                <MudSelectItem Value="0.25">0.25x</MudSelectItem>
+                <MudSelectItem Value="0.5">0.5x</MudSelectItem>
+                <MudSelectItem Value="1.0">1x</MudSelectItem>
+                <MudSelectItem Value="2.0">2x</MudSelectItem>
+                <MudSelectItem Value="4.0">4x</MudSelectItem>
+                <MudSelectItem Value="8.0">8x</MudSelectItem>
+            </MudSelect>
+        }
+
+        <MudIconButton Icon="@(Loop ? Icons.Material.Filled.Repeat : Icons.Material.Outlined.Repeat)"
+                       Size="Size.Small"
+                       OnClick="ToggleLoop"
+                       Color="@(Loop ? Color.Primary : Color.Default)"
+                       Disabled="@(!_isInitialized)"
+                       Title="@(Loop ? "Loop enabled" : "Loop disabled")" />
+    </div>
+
+    <div class="timeline-slider-container" @ref="_sliderContainer">
+        @if (ShowBookmarks && Bookmarks?.Any() == true)
+        {
+            <div class="timeline-bookmarks">
+                @foreach (var bookmark in Bookmarks)
+                {
+                    var position = GetBookmarkPosition(bookmark.Time);
+                    <div class="timeline-bookmark"
+                         style="left: @(position)%; background-color: @bookmark.Color;"
+                         title="@bookmark.Label"
+                         @onclick="() => JumpToTime(bookmark.Time)">
+                    </div>
+                }
+            </div>
+        }
+
+        <MudSlider T="int"
+                   @bind-Value="CurrentStep"
+                   Min="0"
+                   Max="@(TotalSteps - 1)"
+                   Step="1"
+                   Disabled="@(!_isInitialized)"
+                   ValueChanged="OnSliderChanged"
+                   Class="timeline-slider"
+                   Color="Color.Primary" />
+
+        @if (ShowDateRange)
+        {
+            <div class="timeline-labels">
+                <span class="timeline-label timeline-label-start" title="@FormatTime(StartTime)">
+                    @FormatTimeCompact(StartTime)
+                </span>
+                @if (!Compact)
+                {
+                    <span class="timeline-label timeline-label-current"
+                          style="left: @(GetProgress())%"
+                          title="@FormatTime(CurrentTime)">
+                        @FormatTimeCompact(CurrentTime)
+                    </span>
+                }
+                <span class="timeline-label timeline-label-end" title="@FormatTime(EndTime)">
+                    @FormatTimeCompact(EndTime)
+                </span>
+            </div>
+        }
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="timeline-loading">
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this timeline component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"timeline-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to sync with (required for ComponentBus integration)
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Field name containing timestamp data
+    /// </summary>
+    [Parameter]
+    public string? TimeField { get; set; }
+
+    /// <summary>
+    /// Start time of timeline
+    /// </summary>
+    [Parameter]
+    public DateTime? StartTime { get; set; }
+
+    /// <summary>
+    /// End time of timeline
+    /// </summary>
+    [Parameter]
+    public DateTime? EndTime { get; set; }
+
+    /// <summary>
+    /// Custom time steps (overrides auto-generated steps)
+    /// </summary>
+    [Parameter]
+    public List<DateTime>? TimeSteps { get; set; }
+
+    /// <summary>
+    /// Time format string
+    /// </summary>
+    [Parameter]
+    public string TimeFormat { get; set; } = "yyyy-MM-dd HH:mm";
+
+    /// <summary>
+    /// Playback speed in milliseconds per step
+    /// </summary>
+    [Parameter]
+    public int PlaybackSpeed { get; set; } = 1000;
+
+    /// <summary>
+    /// Playback speed multiplier
+    /// </summary>
+    [Parameter]
+    public double SpeedMultiplier { get; set; } = 1.0;
+
+    /// <summary>
+    /// Enable loop playback
+    /// </summary>
+    [Parameter]
+    public bool Loop { get; set; } = true;
+
+    /// <summary>
+    /// Show speed controls
+    /// </summary>
+    [Parameter]
+    public bool ShowSpeedControls { get; set; } = true;
+
+    /// <summary>
+    /// Show step forward/backward buttons
+    /// </summary>
+    [Parameter]
+    public bool ShowStepButtons { get; set; } = true;
+
+    /// <summary>
+    /// Show jump to start/end buttons
+    /// </summary>
+    [Parameter]
+    public bool ShowJumpButtons { get; set; } = true;
+
+    /// <summary>
+    /// Show date range display
+    /// </summary>
+    [Parameter]
+    public bool ShowDateRange { get; set; } = true;
+
+    /// <summary>
+    /// Show current time display
+    /// </summary>
+    [Parameter]
+    public bool ShowCurrentTime { get; set; } = true;
+
+    /// <summary>
+    /// Enable compact mode
+    /// </summary>
+    [Parameter]
+    public bool Compact { get; set; } = false;
+
+    /// <summary>
+    /// Component width
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "100%";
+
+    /// <summary>
+    /// Component position
+    /// </summary>
+    [Parameter]
+    public TimelinePosition Position { get; set; } = TimelinePosition.None;
+
+    /// <summary>
+    /// Auto-start playback on load
+    /// </summary>
+    [Parameter]
+    public bool AutoPlay { get; set; } = false;
+
+    /// <summary>
+    /// Enable reverse playback
+    /// </summary>
+    [Parameter]
+    public bool EnableReverse { get; set; } = false;
+
+    /// <summary>
+    /// Step unit (Minutes, Hours, Days, etc.)
+    /// </summary>
+    [Parameter]
+    public TimeStepUnit StepUnit { get; set; } = TimeStepUnit.Auto;
+
+    /// <summary>
+    /// Number of steps to generate
+    /// </summary>
+    [Parameter]
+    public int? TotalStepsOverride { get; set; }
+
+    /// <summary>
+    /// Time zone display
+    /// </summary>
+    [Parameter]
+    public TimeZoneDisplay TimeZone { get; set; } = TimeZoneDisplay.Local;
+
+    /// <summary>
+    /// Theme (light or dark)
+    /// </summary>
+    [Parameter]
+    public string Theme { get; set; } = "light";
+
+    /// <summary>
+    /// Enable keyboard shortcuts
+    /// </summary>
+    [Parameter]
+    public bool EnableKeyboardShortcuts { get; set; } = true;
+
+    /// <summary>
+    /// Show bookmarks
+    /// </summary>
+    [Parameter]
+    public bool ShowBookmarks { get; set; } = false;
+
+    /// <summary>
+    /// Bookmarks
+    /// </summary>
+    [Parameter]
+    public List<TimeBookmark>? Bookmarks { get; set; }
+
+    /// <summary>
+    /// Additional CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline style
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Callback when time changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<TimeChangedMessage> OnTimeChanged { get; set; }
+
+    /// <summary>
+    /// Callback when playback state changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<PlaybackState> OnStateChanged { get; set; }
+
+    // Private fields
+    private ElementReference _sliderContainer;
+    private IJSObjectReference? _timelineModule;
+    private IJSObjectReference? _timelineInstance;
+    private DotNetObjectReference<HonuaTimeline>? _dotNetRef;
+    private bool _isInitialized = false;
+    private bool _isLoading = true;
+    private bool _isPlaying = false;
+    private int _playbackDirection = 1; // 1 = forward, -1 = reverse
+    private CancellationTokenSource? _playbackCts;
+    private System.Threading.Timer? _playbackTimer;
+
+    // Time state
+    private DateTime _startTime = DateTime.UtcNow.AddHours(-24);
+    private DateTime _endTime = DateTime.UtcNow;
+    private DateTime _currentTime = DateTime.UtcNow;
+    private List<DateTime> _timeSteps = new();
+    private int _currentStep = 0;
+    private int _totalSteps = 100;
+
+    // Properties
+    private DateTime CurrentTime => _currentTime;
+    private int CurrentStep
+    {
+        get => _currentStep;
+        set
+        {
+            if (_currentStep != value && value >= 0 && value < _totalSteps)
+            {
+                _currentStep = value;
+                UpdateCurrentTime();
+            }
+        }
+    }
+    private int TotalSteps => _totalSteps;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        InitializeTimeRange();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeTimeline();
+            SetupSubscriptions();
+
+            if (AutoPlay)
+            {
+                await Play();
+            }
+        }
+    }
+
+    private void InitializeTimeRange()
+    {
+        // Set start/end times
+        _startTime = StartTime ?? DateTime.UtcNow.AddHours(-24);
+        _endTime = EndTime ?? DateTime.UtcNow;
+
+        // Generate time steps
+        if (TimeSteps?.Any() == true)
+        {
+            _timeSteps = TimeSteps.OrderBy(t => t).ToList();
+            _totalSteps = _timeSteps.Count;
+        }
+        else
+        {
+            _totalSteps = TotalStepsOverride ?? CalculateOptimalSteps();
+            _timeSteps = GenerateTimeSteps(_startTime, _endTime, _totalSteps);
+        }
+
+        // Set initial current time
+        _currentTime = _timeSteps.FirstOrDefault();
+        _currentStep = 0;
+    }
+
+    private async Task InitializeTimeline()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load timeline JS module
+            _timelineModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-timeline.js"
+            );
+
+            // Initialize timeline instance
+            _timelineInstance = await _timelineModule.InvokeAsync<IJSObjectReference>(
+                "createTimeline",
+                _sliderContainer,
+                new
+                {
+                    id = Id,
+                    startTime = _startTime,
+                    endTime = _endTime,
+                    currentStep = _currentStep,
+                    totalSteps = _totalSteps
+                },
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+            _isLoading = false;
+
+            // Publish initial time
+            await PublishTimeChanged();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing timeline: {ex.Message}");
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready messages
+        if (!string.IsNullOrEmpty(SyncWith))
+        {
+            Bus.Subscribe<MapReadyMessage>(async args =>
+            {
+                if (args.Message.MapId == SyncWith)
+                {
+                    // Timeline is ready, could request data extent here
+                }
+            });
+
+            // Listen for data loaded messages to extract time extent
+            Bus.Subscribe<DataLoadedMessage>(async args =>
+            {
+                if (args.Message.ComponentId == SyncWith || args.Message.Source == SyncWith)
+                {
+                    // Could auto-adjust time range based on loaded data
+                }
+            });
+        }
+    }
+
+    private int CalculateOptimalSteps()
+    {
+        var duration = _endTime - _startTime;
+
+        if (duration.TotalMinutes < 60) return 60; // 1 minute steps
+        if (duration.TotalHours < 24) return 100; // ~15 minute steps
+        if (duration.TotalDays < 7) return 168; // 1 hour steps
+        if (duration.TotalDays < 30) return 120; // ~6 hour steps
+        if (duration.TotalDays < 365) return 365; // 1 day steps
+
+        return 100; // Default
+    }
+
+    private List<DateTime> GenerateTimeSteps(DateTime start, DateTime end, int steps)
+    {
+        var timeSteps = new List<DateTime>();
+        var duration = end - start;
+        var stepSize = duration.TotalMilliseconds / (steps - 1);
+
+        for (int i = 0; i < steps; i++)
+        {
+            var time = start.AddMilliseconds(stepSize * i);
+            timeSteps.Add(time);
+        }
+
+        return timeSteps;
+    }
+
+    private void UpdateCurrentTime()
+    {
+        if (_currentStep >= 0 && _currentStep < _timeSteps.Count)
+        {
+            _currentTime = _timeSteps[_currentStep];
+            _ = PublishTimeChanged();
+        }
+    }
+
+    private async Task OnSliderChanged(int value)
+    {
+        CurrentStep = value;
+        await PublishTimeChanged();
+        StateHasChanged();
+    }
+
+    private async Task PublishTimeChanged()
+    {
+        if (!_isInitialized) return;
+
+        var message = new TimeChangedMessage
+        {
+            CurrentTime = _currentTime,
+            StartTime = _startTime,
+            EndTime = _endTime,
+            ComponentId = Id,
+            TimeField = TimeField,
+            CurrentStep = _currentStep,
+            TotalSteps = _totalSteps,
+            Progress = GetProgress(),
+            IsPlaying = _isPlaying,
+            Direction = _playbackDirection
+        };
+
+        await Bus.PublishAsync(message, Id);
+        await OnTimeChanged.InvokeAsync(message);
+
+        // Publish filter for temporal filtering
+        if (!string.IsNullOrEmpty(TimeField) && !string.IsNullOrEmpty(SyncWith))
+        {
+            await Bus.PublishAsync(new FilterAppliedMessage
+            {
+                FilterId = $"{Id}-temporal-filter",
+                Type = FilterType.Temporal,
+                Expression = new object[] { "==", new object[] { "get", TimeField }, _currentTime.ToString("o") }
+            }, Id);
+        }
+    }
+
+    private async Task TogglePlayPause()
+    {
+        if (_isPlaying)
+        {
+            await Pause();
+        }
+        else
+        {
+            await Play();
+        }
+    }
+
+    /// <summary>
+    /// Start playback
+    /// </summary>
+    public async Task Play()
+    {
+        if (_isPlaying || !_isInitialized) return;
+
+        _isPlaying = true;
+        _playbackCts = new CancellationTokenSource();
+
+        await PublishStateChanged();
+        await StartPlaybackTimer();
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Pause playback
+    /// </summary>
+    public async Task Pause()
+    {
+        if (!_isPlaying) return;
+
+        _isPlaying = false;
+        _playbackCts?.Cancel();
+        _playbackTimer?.Dispose();
+
+        await PublishStateChanged();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Stop playback and reset to start
+    /// </summary>
+    public async Task Stop()
+    {
+        await Pause();
+        await JumpToStart();
+    }
+
+    private async Task StartPlaybackTimer()
+    {
+        var token = _playbackCts?.Token ?? CancellationToken.None;
+
+        await Task.Run(async () =>
+        {
+            while (_isPlaying && !token.IsCancellationRequested)
+            {
+                await Task.Delay((int)(PlaybackSpeed / SpeedMultiplier), token);
+
+                if (token.IsCancellationRequested) break;
+
+                await InvokeAsync(async () =>
+                {
+                    var nextStep = _currentStep + _playbackDirection;
+
+                    if (nextStep >= _totalSteps)
+                    {
+                        if (Loop)
+                        {
+                            nextStep = 0;
+                        }
+                        else
+                        {
+                            await Pause();
+                            return;
+                        }
+                    }
+                    else if (nextStep < 0)
+                    {
+                        if (Loop)
+                        {
+                            nextStep = _totalSteps - 1;
+                        }
+                        else
+                        {
+                            await Pause();
+                            return;
+                        }
+                    }
+
+                    CurrentStep = nextStep;
+                    StateHasChanged();
+                });
+            }
+        }, token);
+    }
+
+    /// <summary>
+    /// Step forward one frame
+    /// </summary>
+    public async Task StepForward()
+    {
+        if (_currentStep < _totalSteps - 1)
+        {
+            CurrentStep = _currentStep + 1;
+            await PublishTimeChanged();
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Step backward one frame
+    /// </summary>
+    public async Task StepBackward()
+    {
+        if (_currentStep > 0)
+        {
+            CurrentStep = _currentStep - 1;
+            await PublishTimeChanged();
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Jump to start of timeline
+    /// </summary>
+    public async Task JumpToStart()
+    {
+        CurrentStep = 0;
+        await PublishTimeChanged();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Jump to end of timeline
+    /// </summary>
+    public async Task JumpToEnd()
+    {
+        CurrentStep = _totalSteps - 1;
+        await PublishTimeChanged();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Jump to specific time
+    /// </summary>
+    public async Task JumpToTime(DateTime time)
+    {
+        // Find closest time step
+        var index = 0;
+        var minDiff = TimeSpan.MaxValue;
+
+        for (int i = 0; i < _timeSteps.Count; i++)
+        {
+            var diff = (_timeSteps[i] - time).Duration();
+            if (diff < minDiff)
+            {
+                minDiff = diff;
+                index = i;
+            }
+        }
+
+        CurrentStep = index;
+        await PublishTimeChanged();
+        StateHasChanged();
+    }
+
+    private async Task ToggleLoop()
+    {
+        Loop = !Loop;
+        await PublishStateChanged();
+        StateHasChanged();
+    }
+
+    private async Task ToggleReverse()
+    {
+        _playbackDirection *= -1;
+        await PublishStateChanged();
+        StateHasChanged();
+    }
+
+    private async Task PublishStateChanged()
+    {
+        var message = new TimelineStateChangedMessage
+        {
+            ComponentId = Id,
+            State = _isPlaying ? "playing" : "paused",
+            Speed = SpeedMultiplier,
+            Loop = Loop
+        };
+
+        await Bus.PublishAsync(message, Id);
+        await OnStateChanged.InvokeAsync(_isPlaying ? PlaybackState.Playing : PlaybackState.Paused);
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (!EnableKeyboardShortcuts || !_isInitialized) return;
+
+        switch (e.Key)
+        {
+            case " ": // Space
+                await TogglePlayPause();
+                break;
+            case "ArrowRight":
+                await StepForward();
+                break;
+            case "ArrowLeft":
+                await StepBackward();
+                break;
+            case "Home":
+                await JumpToStart();
+                break;
+            case "End":
+                await JumpToEnd();
+                break;
+        }
+    }
+
+    private string FormatTime(DateTime time)
+    {
+        try
+        {
+            var displayTime = TimeZone == TimeZoneDisplay.UTC ? time.ToUniversalTime() : time.ToLocalTime();
+            return displayTime.ToString(TimeFormat);
+        }
+        catch
+        {
+            return time.ToString("yyyy-MM-dd HH:mm");
+        }
+    }
+
+    private string FormatTimeCompact(DateTime time)
+    {
+        try
+        {
+            var displayTime = TimeZone == TimeZoneDisplay.UTC ? time.ToUniversalTime() : time.ToLocalTime();
+            var duration = _endTime - _startTime;
+
+            if (duration.TotalHours < 24)
+                return displayTime.ToString("HH:mm");
+            else if (duration.TotalDays < 365)
+                return displayTime.ToString("MMM dd");
+            else
+                return displayTime.ToString("yyyy-MM");
+        }
+        catch
+        {
+            return time.ToString("MMM dd");
+        }
+    }
+
+    private double GetProgress()
+    {
+        if (_totalSteps <= 1) return 0;
+        return (_currentStep / (double)(_totalSteps - 1)) * 100.0;
+    }
+
+    private double GetBookmarkPosition(DateTime bookmarkTime)
+    {
+        var totalDuration = (_endTime - _startTime).TotalMilliseconds;
+        if (totalDuration == 0) return 0;
+
+        var bookmarkDuration = (bookmarkTime - _startTime).TotalMilliseconds;
+        return (bookmarkDuration / totalDuration) * 100.0;
+    }
+
+    private string GetCssClass()
+    {
+        var classes = new List<string>();
+
+        if (Compact) classes.Add("compact");
+        if (Position != TimelinePosition.None) classes.Add($"position-{Position.ToString().ToLower()}");
+        if (!string.IsNullOrEmpty(CssClass)) classes.Add(CssClass);
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetStyle()
+    {
+        var styles = new List<string>();
+
+        if (!string.IsNullOrEmpty(Width)) styles.Add($"width: {Width}");
+        if (!string.IsNullOrEmpty(Style)) styles.Add(Style);
+
+        return string.Join("; ", styles);
+    }
+
+    /// <summary>
+    /// Called from JavaScript for smooth slider updates
+    /// </summary>
+    [JSInvokable]
+    public async Task OnSliderChangedFromJS(int step)
+    {
+        CurrentStep = step;
+        await PublishTimeChanged();
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Pause();
+        _playbackCts?.Dispose();
+        _playbackTimer?.Dispose();
+
+        if (_timelineInstance != null)
+        {
+            try
+            {
+                await _timelineInstance.InvokeVoidAsync("dispose");
+                await _timelineInstance.DisposeAsync();
+            }
+            catch { }
+        }
+
+        if (_timelineModule != null)
+        {
+            try
+            {
+                await _timelineModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

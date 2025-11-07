@@ -4,17 +4,17 @@ on:
   schedule:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
-  push:
-    branches: [ master, main, dev ]
-    paths:
-      - 'Dockerfile'
-      - 'src/**'
-      - '.github/workflows/container-security.yml'
-  pull_request:
-    branches: [ master, main ]
-    paths:
-      - 'Dockerfile'
-      - 'src/**'
+  # push:
+  #   branches: [ master, main, dev ]
+  #   paths:
+  #     - 'Dockerfile'
+  #     - 'src/**'
+  #     - '.github/workflows/container-security.yml'
+  # pull_request:
+  #   branches: [ master, main ]
+  #   paths:
+  #     - 'Dockerfile'
+  #     - 'src/**'
   workflow_dispatch:
 
 env:

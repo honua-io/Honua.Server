@@ -33,8 +33,7 @@ internal static class WebApplicationExtensions
     public static WebApplication UseHonuaSecurity(this WebApplication app)
     {
         // Security headers - apply early in pipeline
-        // TODO: Implement UseSecurityHeaders middleware extension method
-        // app.UseSecurityHeaders();
+        app.UseSecurityHeaders();
 
         // HSTS and HTTPS redirection - enforce HTTPS in production
         if (!app.Environment.IsDevelopment())
@@ -99,14 +98,13 @@ internal static class WebApplicationExtensions
     /// <returns>The web application for method chaining.</returns>
     public static WebApplication UseHonuaRequestLogging(this WebApplication app)
     {
-        // TODO: Implement UseRequestResponseLogging middleware extension method
-        // app.UseRequestResponseLogging(options =>
-        // {
-        //     options.LogRequests = app.Configuration.GetValue("Observability:RequestLogging:Enabled", true);
-        //     options.LogResponses = app.Configuration.GetValue("Observability:RequestLogging:Enabled", true);
-        //     options.LogHeaders = app.Configuration.GetValue("Observability:RequestLogging:LogHeaders", false);
-        //     options.SlowRequestThresholdMs = app.Configuration.GetValue("Observability:RequestLogging:SlowThresholdMs", 5000L);
-        // });
+        app.UseRequestResponseLogging(options =>
+        {
+            options.LogRequests = app.Configuration.GetValue("Observability:RequestLogging:Enabled", true);
+            options.LogResponses = app.Configuration.GetValue("Observability:RequestLogging:Enabled", true);
+            options.LogHeaders = app.Configuration.GetValue("Observability:RequestLogging:LogHeaders", false);
+            options.SlowRequestThresholdMs = app.Configuration.GetValue("Observability:RequestLogging:SlowThresholdMs", 5000L);
+        });
 
         return app;
     }
@@ -191,8 +189,7 @@ internal static class WebApplicationExtensions
     /// <returns>The web application for method chaining.</returns>
     public static WebApplication UseHonuaCsrfProtection(this WebApplication app)
     {
-        // TODO: Implement UseCsrfValidation middleware extension method
-        // app.UseCsrfValidation();
+        app.UseCsrfValidation();
         return app;
     }
 
@@ -408,16 +405,13 @@ internal static class WebApplicationExtensions
         app.UseHonuaLocalization();
 
         // 11. API versioning (AFTER routing to access route values)
-        // TODO: Implement UseApiVersioning middleware extension method
-        // app.UseApiVersioning();
+        app.UseApiVersioning();
 
         // 12. Deprecation warnings (AFTER API versioning)
-        // TODO: Implement UseDeprecationWarnings middleware extension method
-        // app.UseDeprecationWarnings();
+        app.UseDeprecationWarnings();
 
         // 13. Output caching (MUST be after UseRouting() per Microsoft docs)
-        // TODO: Implement UseHonuaCaching middleware extension method
-        // app.UseHonuaCaching();
+        app.UseHonuaCaching();
 
         // 14. CORS (after routing, before authentication)
         app.UseHonuaCorsMiddleware();
@@ -437,8 +431,7 @@ internal static class WebApplicationExtensions
         app.UseHonuaCsrfProtection();
 
         // 20. Security policy enforcement (after authorization, before endpoint execution)
-        // TODO: Implement UseSecurityPolicy middleware extension method
-        // app.UseSecurityPolicy();
+        app.UseSecurityPolicy();
 
         // 21. Initialize geometry complexity validator for WFS/GML parsing (DOS protection)
         InitializeGeometryComplexityValidator(app);

@@ -1,0 +1,387 @@
+.honua-popup-container {
+    position: relative;
+    z-index: 1000;
+}
+
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 999;
+}
+
+.popup-overlay.clickable {
+    cursor: pointer;
+}
+
+.honua-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15),
+                0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    z-index: 1001;
+    animation: popupSlideIn 0.2s ease-out;
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes popupSlideIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -48%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.popup-close-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.popup-close-button:hover {
+    background: #f5f5f5;
+}
+
+.popup-content {
+    padding: 20px;
+    padding-top: 40px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 100px;
+}
+
+.popup-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #1976d2;
+    padding-right: 32px;
+}
+
+.popup-properties {
+    margin-top: 12px;
+}
+
+.properties-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.properties-table tr {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.properties-table tr:last-child {
+    border-bottom: none;
+}
+
+.property-label {
+    padding: 8px 12px 8px 0;
+    font-weight: 500;
+    color: #666;
+    vertical-align: top;
+    width: 40%;
+}
+
+.property-value {
+    padding: 8px 0;
+    color: #333;
+    word-break: break-word;
+}
+
+.popup-coordinates {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.popup-actions {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #e0e0e0;
+    background: #fafafa;
+    flex-wrap: wrap;
+}
+
+.popup-action-button {
+    text-transform: none;
+}
+
+.popup-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid #e0e0e0;
+    background: #f5f5f5;
+}
+
+.pagination-text {
+    min-width: 60px;
+    text-align: center;
+    font-weight: 500;
+    color: #666;
+}
+
+.popup-loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    z-index: 1002;
+}
+
+.popup-error {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 500px;
+    z-index: 1003;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Size variants */
+.popup-max-w-300 {
+    max-width: 300px;
+}
+
+.popup-max-w-400 {
+    max-width: 400px;
+}
+
+.popup-max-w-500 {
+    max-width: 500px;
+}
+
+.popup-max-w-600 {
+    max-width: 600px;
+}
+
+.popup-max-h-400 {
+    max-height: 400px;
+}
+
+.popup-max-h-600 {
+    max-height: 600px;
+}
+
+.popup-max-h-800 {
+    max-height: 800px;
+}
+
+/* Media gallery styles */
+.popup-media-gallery {
+    margin: 16px 0;
+}
+
+.popup-media-gallery img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+/* Collapsible sections */
+.popup-section {
+    margin-top: 16px;
+}
+
+.popup-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.popup-section-header:hover {
+    background: #f5f5f5;
+}
+
+.popup-section-title {
+    font-weight: 600;
+    color: #333;
+}
+
+.popup-section-content {
+    padding: 8px 0;
+}
+
+/* Charts in popup */
+.popup-chart {
+    margin: 16px 0;
+    height: 200px;
+}
+
+/* Link styles */
+.popup-content a {
+    color: #1976d2;
+    text-decoration: none;
+}
+
+.popup-content a:hover {
+    text-decoration: underline;
+}
+
+/* Image field styles */
+.popup-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 8px 0;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .honua-popup {
+        background: #1e1e1e;
+        color: #e0e0e0;
+    }
+
+    .popup-title {
+        color: #64b5f6;
+    }
+
+    .properties-table tr {
+        border-bottom-color: #333;
+    }
+
+    .property-label {
+        color: #aaa;
+    }
+
+    .property-value {
+        color: #e0e0e0;
+    }
+
+    .popup-coordinates {
+        border-top-color: #333;
+    }
+
+    .popup-actions {
+        background: #2a2a2a;
+        border-top-color: #333;
+    }
+
+    .popup-pagination {
+        background: #252525;
+        border-top-color: #333;
+    }
+
+    .pagination-text {
+        color: #aaa;
+    }
+
+    .popup-close-button {
+        background: #2a2a2a;
+    }
+
+    .popup-close-button:hover {
+        background: #333;
+    }
+
+    .popup-section-header:hover {
+        background: #2a2a2a;
+    }
+
+    .popup-section-title {
+        color: #e0e0e0;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .honua-popup {
+        max-width: calc(100vw - 40px) !important;
+        max-height: calc(100vh - 100px) !important;
+    }
+
+    .popup-content {
+        padding: 16px;
+        padding-top: 36px;
+    }
+
+    .property-label {
+        width: 50%;
+    }
+}
+
+@media (max-width: 480px) {
+    .honua-popup {
+        max-width: calc(100vw - 20px) !important;
+    }
+
+    .popup-actions {
+        flex-direction: column;
+    }
+
+    .popup-action-button {
+        width: 100%;
+    }
+
+    .properties-table {
+        font-size: 0.8rem;
+    }
+
+    .property-label,
+    .property-value {
+        display: block;
+        width: 100%;
+        padding: 4px 0;
+    }
+
+    .property-label {
+        font-weight: 600;
+        margin-top: 8px;
+    }
+}
+
+/* Pointer arrow (optional enhancement) */
+.honua-popup::before {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid white;
+    display: none; /* Hidden by default, can be enabled via class */
+}
+
+.honua-popup.show-arrow::before {
+    display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+    .honua-popup::before {
+        border-top-color: #1e1e1e;
+    }
+}

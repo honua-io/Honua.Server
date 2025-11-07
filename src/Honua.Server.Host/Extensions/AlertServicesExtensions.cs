@@ -26,6 +26,12 @@ public static class AlertServicesExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Register HTTP clients for notification channel testing
+        services.AddHttpClient("Slack");
+        services.AddHttpClient("Teams");
+        services.AddHttpClient("PagerDuty");
+        services.AddHttpClient("Opsgenie");
+
         // Get PostgreSQL connection string for alerts
         var connectionString = configuration.GetConnectionString("Alerts")
             ?? configuration.GetConnectionString("Postgres")
@@ -40,6 +46,7 @@ public static class AlertServicesExtensions
             // Register alert configuration services
             services.AddScoped<IAlertConfigurationService, AlertConfigurationService>();
             services.AddScoped<INotificationChannelService, NotificationChannelService>();
+            services.AddScoped<IAlertPublishingService, AlertPublishingService>();
 
             var logger = services.BuildServiceProvider().GetService<ILogger<PostgresAlertConfigurationDbConnectionFactory>>();
             logger?.LogInformation("Alert management services registered with PostgreSQL connection");

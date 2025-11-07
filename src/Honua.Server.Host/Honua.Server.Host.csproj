@@ -6,6 +6,7 @@
     <ProjectReference Include="..\Honua.Server.Enterprise\Honua.Server.Enterprise.csproj" />
     <ProjectReference Include="..\Honua.Server.Observability\Honua.Server.Observability.csproj" />
     <ProjectReference Include="..\Honua.Server.AlertReceiver\Honua.Server.AlertReceiver.csproj" />
+    <ProjectReference Include="..\Honua.MapSDK\Honua.MapSDK.csproj" />
   </ItemGroup>
 
   <!-- Optional OData support - only included when EnableOData=true -->

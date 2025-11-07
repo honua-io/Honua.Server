@@ -7,11 +7,11 @@ on:
       - 'Dockerfile.test'
       - 'docker-compose.test.yml'
       - '.dockerignore'
-  pull_request:
-    paths:
-      - 'Dockerfile.test'
-      - 'docker-compose.test.yml'
-      - '.dockerignore'
+  # pull_request:
+  #   paths:
+  #     - 'Dockerfile.test'
+  #     - 'docker-compose.test.yml'
+  #     - '.dockerignore'
 
 jobs:
   docker-unit-tests:

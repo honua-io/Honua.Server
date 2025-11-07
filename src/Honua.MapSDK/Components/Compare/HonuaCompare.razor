@@ -1,0 +1,659 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-compare @GetCssClass()"
+     id="@Id"
+     style="@GetStyle()"
+     data-compare-id="@Id"
+     data-mode="@Mode"
+     @ref="_containerRef">
+
+    <div class="compare-container" @ref="_compareContainer">
+        @if (_isLoading)
+        {
+            <div class="compare-loading">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Loading maps...</div>
+            </div>
+        }
+
+        @if (ShowLabels && _isInitialized)
+        {
+            <div class="compare-labels">
+                <div class="compare-label compare-label-left">@LeftLabel</div>
+                <div class="compare-label compare-label-right">@RightLabel</div>
+            </div>
+        }
+
+        @if (ShowTimestamps && LeftTimestamp != null && RightTimestamp != null)
+        {
+            <div class="compare-timestamps">
+                <div class="compare-timestamp compare-timestamp-left">
+                    <div class="timestamp-label">@LeftTimestamp.Label</div>
+                    @if (!string.IsNullOrEmpty(LeftTimestamp.Description))
+                    {
+                        <div class="timestamp-description">@LeftTimestamp.Description</div>
+                    }
+                </div>
+                <div class="compare-timestamp compare-timestamp-right">
+                    <div class="timestamp-label">@RightTimestamp.Label</div>
+                    @if (!string.IsNullOrEmpty(RightTimestamp.Description))
+                    {
+                        <div class="timestamp-description">@RightTimestamp.Description</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (_isInitialized && AllowModeSwitch)
+    {
+        <div class="compare-controls">
+            <div class="mode-switcher">
+                <button class="mode-button @(Mode == CompareMode.SideBySide ? "active" : "")"
+                        @onclick="() => SetMode(CompareMode.SideBySide)"
+                        title="Side by Side">
+                    <span class="mode-icon">⚏</span>
+                </button>
+                <button class="mode-button @(Mode == CompareMode.Swipe ? "active" : "")"
+                        @onclick="() => SetMode(CompareMode.Swipe)"
+                        title="Swipe">
+                    <span class="mode-icon">⇄</span>
+                </button>
+                <button class="mode-button @(Mode == CompareMode.Overlay ? "active" : "")"
+                        @onclick="() => SetMode(CompareMode.Overlay)"
+                        title="Overlay">
+                    <span class="mode-icon">⧉</span>
+                </button>
+                <button class="mode-button @(Mode == CompareMode.Flicker ? "active" : "")"
+                        @onclick="() => SetMode(CompareMode.Flicker)"
+                        title="Flicker">
+                    <span class="mode-icon">⚡</span>
+                </button>
+                <button class="mode-button @(Mode == CompareMode.SpyGlass ? "active" : "")"
+                        @onclick="() => SetMode(CompareMode.SpyGlass)"
+                        title="Spy Glass">
+                    <span class="mode-icon">🔍</span>
+                </button>
+            </div>
+
+            @if (Mode == CompareMode.Overlay)
+            {
+                <div class="opacity-control">
+                    <label>Opacity</label>
+                    <input type="range"
+                           min="0"
+                           max="100"
+                           step="1"
+                           value="@((int)(_overlayOpacity * 100))"
+                           @oninput="OnOpacityChanged" />
+                    <span>@((int)(_overlayOpacity * 100))%</span>
+                </div>
+            }
+
+            @if (AllowOrientationSwitch && (Mode == CompareMode.SideBySide || Mode == CompareMode.Swipe))
+            {
+                <div class="orientation-switcher">
+                    <button class="orientation-button @(Orientation == CompareOrientation.Vertical ? "active" : "")"
+                            @onclick="() => SetOrientation(CompareOrientation.Vertical)"
+                            title="Vertical Split">
+                        <span>⬌</span>
+                    </button>
+                    <button class="orientation-button @(Orientation == CompareOrientation.Horizontal ? "active" : "")"
+                            @onclick="() => SetOrientation(CompareOrientation.Horizontal)"
+                            title="Horizontal Split">
+                        <span>⬍</span>
+                    </button>
+                </div>
+            }
+
+            <div class="sync-control">
+                <button class="sync-button @(_syncNavigation ? "active" : "")"
+                        @onclick="ToggleSync"
+                        title="@(_syncNavigation ? "Navigation Synced" : "Navigation Independent")">
+                    <span>@(_syncNavigation ? "🔗" : "🔓")</span>
+                </button>
+            </div>
+
+            @if (AllowScreenshot)
+            {
+                <button class="screenshot-button" @onclick="CaptureScreenshot" title="Capture Screenshot">
+                    <span>📷</span>
+                </button>
+            }
+
+            @if (AllowFullscreen)
+            {
+                <button class="fullscreen-button" @onclick="ToggleFullscreen" title="Toggle Fullscreen">
+                    <span>@(_isFullscreen ? "⛶" : "⛶")</span>
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this compare component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"compare-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Left/before map style URL
+    /// </summary>
+    [Parameter]
+    public required string LeftMapStyle { get; set; }
+
+    /// <summary>
+    /// Right/after map style URL
+    /// </summary>
+    [Parameter]
+    public required string RightMapStyle { get; set; }
+
+    /// <summary>
+    /// Comparison mode
+    /// </summary>
+    [Parameter]
+    public CompareMode Mode { get; set; } = CompareMode.Swipe;
+
+    /// <summary>
+    /// Sync navigation between maps
+    /// </summary>
+    [Parameter]
+    public bool SyncNavigation { get; set; } = true;
+
+    /// <summary>
+    /// Initial divider position (0-1)
+    /// </summary>
+    [Parameter]
+    public double InitialPosition { get; set; } = 0.5;
+
+    /// <summary>
+    /// Show labels
+    /// </summary>
+    [Parameter]
+    public bool ShowLabels { get; set; } = true;
+
+    /// <summary>
+    /// Allow mode switching
+    /// </summary>
+    [Parameter]
+    public bool AllowModeSwitch { get; set; } = true;
+
+    /// <summary>
+    /// Allow orientation switching
+    /// </summary>
+    [Parameter]
+    public bool AllowOrientationSwitch { get; set; } = true;
+
+    /// <summary>
+    /// Left map label
+    /// </summary>
+    [Parameter]
+    public string LeftLabel { get; set; } = "Before";
+
+    /// <summary>
+    /// Right map label
+    /// </summary>
+    [Parameter]
+    public string RightLabel { get; set; } = "After";
+
+    /// <summary>
+    /// Initial center coordinates
+    /// </summary>
+    [Parameter]
+    public double[]? Center { get; set; }
+
+    /// <summary>
+    /// Initial zoom level
+    /// </summary>
+    [Parameter]
+    public double? Zoom { get; set; }
+
+    /// <summary>
+    /// Initial bearing
+    /// </summary>
+    [Parameter]
+    public double Bearing { get; set; } = 0;
+
+    /// <summary>
+    /// Initial pitch
+    /// </summary>
+    [Parameter]
+    public double Pitch { get; set; } = 0;
+
+    /// <summary>
+    /// Orientation for split/swipe modes
+    /// </summary>
+    [Parameter]
+    public CompareOrientation Orientation { get; set; } = CompareOrientation.Vertical;
+
+    /// <summary>
+    /// Overlay opacity (0-1)
+    /// </summary>
+    [Parameter]
+    public double OverlayOpacity { get; set; } = 0.5;
+
+    /// <summary>
+    /// Spy glass radius in pixels
+    /// </summary>
+    [Parameter]
+    public int SpyGlassRadius { get; set; } = 150;
+
+    /// <summary>
+    /// Flicker interval in milliseconds
+    /// </summary>
+    [Parameter]
+    public int FlickerInterval { get; set; } = 1000;
+
+    /// <summary>
+    /// Allow screenshot capture
+    /// </summary>
+    [Parameter]
+    public bool AllowScreenshot { get; set; } = true;
+
+    /// <summary>
+    /// Allow fullscreen toggle
+    /// </summary>
+    [Parameter]
+    public bool AllowFullscreen { get; set; } = true;
+
+    /// <summary>
+    /// Show timestamps
+    /// </summary>
+    [Parameter]
+    public bool ShowTimestamps { get; set; } = false;
+
+    /// <summary>
+    /// Left/before timestamp info
+    /// </summary>
+    [Parameter]
+    public CompareTimestamp? LeftTimestamp { get; set; }
+
+    /// <summary>
+    /// Right/after timestamp info
+    /// </summary>
+    [Parameter]
+    public CompareTimestamp? RightTimestamp { get; set; }
+
+    /// <summary>
+    /// Component width
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "100%";
+
+    /// <summary>
+    /// Component height
+    /// </summary>
+    [Parameter]
+    public string Height { get; set; } = "600px";
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline style
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Callback when mode changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<CompareMode> OnModeChanged { get; set; }
+
+    /// <summary>
+    /// Callback when divider position changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<double> OnPositionChanged { get; set; }
+
+    /// <summary>
+    /// Callback when sync state changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnSyncChanged { get; set; }
+
+    /// <summary>
+    /// Callback when orientation changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<CompareOrientation> OnOrientationChanged { get; set; }
+
+    // Private fields
+    private ElementReference _containerRef;
+    private ElementReference _compareContainer;
+    private IJSObjectReference? _compareModule;
+    private IJSObjectReference? _compareInstance;
+    private DotNetObjectReference<HonuaCompare>? _dotNetRef;
+    private bool _isInitialized = false;
+    private bool _isLoading = true;
+    private bool _syncNavigation = true;
+    private double _dividerPosition = 0.5;
+    private double _overlayOpacity = 0.5;
+    private bool _isFullscreen = false;
+
+    protected override void OnInitialized()
+    {
+        _syncNavigation = SyncNavigation;
+        _dividerPosition = InitialPosition;
+        _overlayOpacity = OverlayOpacity;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeCompare();
+        }
+    }
+
+    private async Task InitializeCompare()
+    {
+        try
+        {
+            _isLoading = true;
+            StateHasChanged();
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load compare module
+            _compareModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-compare.js"
+            );
+
+            // Initialize compare instance
+            _compareInstance = await _compareModule.InvokeAsync<IJSObjectReference>(
+                "createCompare",
+                _compareContainer,
+                new
+                {
+                    id = Id,
+                    leftStyle = LeftMapStyle,
+                    rightStyle = RightMapStyle,
+                    mode = Mode.ToString().ToLowerInvariant(),
+                    orientation = Orientation.ToString().ToLowerInvariant(),
+                    center = Center ?? new[] { 0.0, 0.0 },
+                    zoom = Zoom ?? 2.0,
+                    bearing = Bearing,
+                    pitch = Pitch,
+                    syncNavigation = _syncNavigation,
+                    dividerPosition = _dividerPosition,
+                    overlayOpacity = _overlayOpacity,
+                    spyGlassRadius = SpyGlassRadius,
+                    flickerInterval = FlickerInterval
+                },
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+            _isLoading = false;
+            StateHasChanged();
+
+            // Publish ready message
+            await Bus.PublishAsync(new CompareReadyMessage
+            {
+                CompareId = Id,
+                Mode = Mode,
+                LeftStyle = LeftMapStyle,
+                RightStyle = RightMapStyle
+            }, Id);
+
+            Console.WriteLine($"Honua Compare {Id} initialized in {Mode} mode");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing compare: {ex.Message}");
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Set comparison mode
+    /// </summary>
+    public async Task SetMode(CompareMode mode)
+    {
+        if (_compareInstance == null || Mode == mode) return;
+
+        Mode = mode;
+        await _compareInstance.InvokeVoidAsync("setMode", mode.ToString().ToLowerInvariant());
+
+        await Bus.PublishAsync(new CompareModeChangedMessage
+        {
+            CompareId = Id,
+            Mode = mode
+        }, Id);
+
+        await OnModeChanged.InvokeAsync(mode);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Set divider position (0-1)
+    /// </summary>
+    public async Task SetDividerPosition(double position)
+    {
+        if (_compareInstance == null) return;
+
+        _dividerPosition = Math.Clamp(position, 0.0, 1.0);
+        await _compareInstance.InvokeVoidAsync("setDividerPosition", _dividerPosition);
+
+        await OnPositionChanged.InvokeAsync(_dividerPosition);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Set orientation
+    /// </summary>
+    public async Task SetOrientation(CompareOrientation orientation)
+    {
+        if (_compareInstance == null || Orientation == orientation) return;
+
+        Orientation = orientation;
+        await _compareInstance.InvokeVoidAsync("setOrientation", orientation.ToString().ToLowerInvariant());
+
+        await OnOrientationChanged.InvokeAsync(orientation);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Toggle sync state
+    /// </summary>
+    public async Task ToggleSync()
+    {
+        _syncNavigation = !_syncNavigation;
+
+        if (_compareInstance != null)
+        {
+            await _compareInstance.InvokeVoidAsync("setSyncNavigation", _syncNavigation);
+        }
+
+        await OnSyncChanged.InvokeAsync(_syncNavigation);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Set overlay opacity (0-1)
+    /// </summary>
+    public async Task SetOpacity(double opacity)
+    {
+        if (_compareInstance == null) return;
+
+        _overlayOpacity = Math.Clamp(opacity, 0.0, 1.0);
+        await _compareInstance.InvokeVoidAsync("setOpacity", _overlayOpacity);
+        StateHasChanged();
+    }
+
+    private async Task OnOpacityChanged(ChangeEventArgs e)
+    {
+        if (e.Value != null && int.TryParse(e.Value.ToString(), out int value))
+        {
+            await SetOpacity(value / 100.0);
+        }
+    }
+
+    /// <summary>
+    /// Capture screenshot of both views
+    /// </summary>
+    public async Task<string?> CaptureScreenshot()
+    {
+        if (_compareInstance == null) return null;
+
+        try
+        {
+            return await _compareInstance.InvokeAsync<string>("captureScreenshot");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error capturing screenshot: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Toggle fullscreen mode
+    /// </summary>
+    public async Task ToggleFullscreen()
+    {
+        if (_compareInstance == null) return;
+
+        try
+        {
+            _isFullscreen = !_isFullscreen;
+            await _compareInstance.InvokeVoidAsync("toggleFullscreen");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error toggling fullscreen: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Fly to location on both maps
+    /// </summary>
+    public async Task FlyTo(double[] center, double zoom, double? bearing = null, double? pitch = null)
+    {
+        if (_compareInstance == null) return;
+
+        await _compareInstance.InvokeVoidAsync("flyTo", center, zoom, bearing, pitch);
+    }
+
+    /// <summary>
+    /// Update left map style
+    /// </summary>
+    public async Task UpdateLeftStyle(string styleUrl)
+    {
+        if (_compareInstance == null) return;
+
+        LeftMapStyle = styleUrl;
+        await _compareInstance.InvokeVoidAsync("updateLeftStyle", styleUrl);
+    }
+
+    /// <summary>
+    /// Update right map style
+    /// </summary>
+    public async Task UpdateRightStyle(string styleUrl)
+    {
+        if (_compareInstance == null) return;
+
+        RightMapStyle = styleUrl;
+        await _compareInstance.InvokeVoidAsync("updateRightStyle", styleUrl);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when divider position changes
+    /// </summary>
+    [JSInvokable]
+    public async Task OnDividerPositionChangedInternal(double position)
+    {
+        _dividerPosition = position;
+        await OnPositionChanged.InvokeAsync(position);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Called from JavaScript when view changes
+    /// </summary>
+    [JSInvokable]
+    public async Task OnViewChangedInternal(double[] center, double zoom, double bearing, double pitch)
+    {
+        await Bus.PublishAsync(new CompareViewChangedMessage
+        {
+            CompareId = Id,
+            Center = center,
+            Zoom = zoom,
+            Bearing = bearing,
+            Pitch = pitch
+        }, Id);
+    }
+
+    private string GetCssClass()
+    {
+        var classes = new List<string>();
+
+        if (!string.IsNullOrEmpty(CssClass))
+        {
+            classes.Add(CssClass);
+        }
+
+        if (_isFullscreen)
+        {
+            classes.Add("fullscreen");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetStyle()
+    {
+        var styles = new List<string>
+        {
+            $"width: {Width}",
+            $"height: {Height}"
+        };
+
+        if (!string.IsNullOrEmpty(Style))
+        {
+            styles.Add(Style);
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_compareInstance != null)
+        {
+            try
+            {
+                await _compareInstance.InvokeVoidAsync("dispose");
+                await _compareInstance.DisposeAsync();
+            }
+            catch { }
+        }
+
+        if (_compareModule != null)
+        {
+            try
+            {
+                await _compareModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

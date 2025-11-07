@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using Honua.Server.Core.Observability;
 using Xunit;
 
@@ -152,7 +153,7 @@ public class TracingIntegrationTests
     }
 
     [Fact]
-    public void Activity_CanRecordDuration()
+    public async Task Activity_CanRecordDuration()
     {
         // Arrange
         using var listener = new ActivityListener
@@ -167,7 +168,7 @@ public class TracingIntegrationTests
         using (var activity = HonuaTelemetry.RasterTiles.StartActivity("Raster Render"))
         {
             activity?.SetTag("raster.dataset", "elevation");
-            Thread.Sleep(10); // Simulate work
+            await Task.Delay(10); // Simulate work
             stopwatch.Stop();
             activity?.SetTag("raster.duration_ms", stopwatch.ElapsedMilliseconds);
         }

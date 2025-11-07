@@ -1,0 +1,445 @@
+@page "/components/attribute-table"
+<PageTitle>AttributeTable Demo - Honua MapSDK</PageTitle>
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <div>
+            <h1 class="dashboard-title">
+                <MudIcon Icon="@Icons.Material.Filled.TableView" Class="mr-2" />
+                HonuaAttributeTable Component
+            </h1>
+            <p class="dashboard-subtitle">
+                High-performance attribute table for large datasets with sorting, filtering, map sync, inline editing, and export.
+            </p>
+        </div>
+    </div>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Color="Color.Primary">
+        <!-- Basic Table -->
+        <MudTabPanel Icon="@Icons.Material.Filled.TableRows" Text="Basic">
+            <MudGrid>
+                <MudItem xs="12">
+                    <div style="height: 400px;">
+                        <HonuaMap Id="attr-basic-map"
+                                  MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                                  Center="new[] { -122.4194, 37.7749 }"
+                                  Zoom="12"
+                                  Style="width: 100%; height: 100%; border-radius: 8px;" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12">
+                    <div class="component-panel" style="height: 400px;">
+                        <HonuaAttributeTable Id="basic-table"
+                                             SyncWith="attr-basic-map"
+                                             DataSource="data/parcels.geojson"
+                                             Title="Property Parcels"
+                                             ShowToolbar="true"
+                                             Dense="true"
+                                             Striped="true"
+                                             PageSize="10"
+                                             Style="width: 100%; height: 100%;" />
+                    </div>
+                </MudItem>
+            </MudGrid>
+
+            <div class="code-example mt-4">
+                <pre><code>&lt;HonuaAttributeTable Id="table"
+                     SyncWith="my-map"
+                     DataSource="data/features.geojson"
+                     Title="Features"
+                     ShowToolbar="true"
+                     Dense="true"
+                     PageSize="10" /&gt;</code></pre>
+            </div>
+        </MudTabPanel>
+
+        <!-- Large Dataset -->
+        <MudTabPanel Icon="@Icons.Material.Filled.Dataset" Text="Large Dataset">
+            <MudText Typo="Typo.h6" Class="mb-3">Performance with 10,000+ Records</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Virtualization and lazy loading enable smooth handling of large datasets.
+            </MudText>
+
+            <div class="component-panel" style="height: 600px;">
+                <HonuaAttributeTable Id="large-table"
+                                     SyncWith="attr-basic-map"
+                                     DataSource="data/large-dataset.geojson"
+                                     Title="Large Dataset (10,452 records)"
+                                     ShowToolbar="true"
+                                     ShowStats="true"
+                                     Dense="true"
+                                     Virtualization="true"
+                                     PageSize="50"
+                                     Style="width: 100%; height: 100%;" />
+            </div>
+
+            <MudGrid Class="mt-4">
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3" Elevation="2">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total Records</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">10,452</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3" Elevation="2">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Visible Records</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">50</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3" Elevation="2">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Selected</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Success">3</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3" Elevation="2">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Load Time</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Info">124ms</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <MudAlert Severity="Severity.Success" Class="mt-4">
+                <strong>Performance Features:</strong> Virtual scrolling, lazy loading, client-side caching, and efficient rendering handle large datasets smoothly.
+            </MudAlert>
+        </MudTabPanel>
+
+        <!-- Sort & Filter -->
+        <MudTabPanel Icon="@Icons.Material.Filled.FilterList" Text="Sort & Filter">
+            <MudGrid>
+                <MudItem xs="12" md="3">
+                    <div class="component-panel" style="height: 600px; overflow-y: auto;">
+                        <div class="panel-header">
+                            <h3 class="panel-title">Filters</h3>
+                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Title="Clear All" />
+                        </div>
+
+                        <MudStack Spacing="3">
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Search</MudText>
+                                <MudTextField Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Placeholder="Search all fields..."
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Search"
+                                              FullWidth="true" />
+                            </div>
+
+                            <MudDivider />
+
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Land Use</MudText>
+                                <MudCheckBox Label="Residential" Dense="true" />
+                                <MudCheckBox Label="Commercial" Dense="true" />
+                                <MudCheckBox Label="Industrial" Dense="true" />
+                                <MudCheckBox Label="Mixed Use" Dense="true" />
+                            </div>
+
+                            <MudDivider />
+
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Assessed Value</MudText>
+                                <MudRangeSlider T="int" Min="0" Max="5000000" Step="10000" />
+                                <MudText Typo="Typo.caption">$0 - $5,000,000</MudText>
+                            </div>
+
+                            <MudDivider />
+
+                            <div>
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Square Feet</MudText>
+                                <MudNumericField T="int" Label="Min" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                <MudNumericField T="int" Label="Max" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </div>
+
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true">
+                                Apply Filters
+                            </MudButton>
+                        </MudStack>
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="9">
+                    <div class="component-panel" style="height: 600px;">
+                        <HonuaAttributeTable Id="filter-table"
+                                             SyncWith="attr-basic-map"
+                                             DataSource="data/parcels.geojson"
+                                             Title="Filtered Results"
+                                             ShowToolbar="true"
+                                             AllowColumnSort="true"
+                                             AllowColumnFilter="true"
+                                             ShowQuickFilter="true"
+                                             Dense="true"
+                                             PageSize="15"
+                                             Style="width: 100%; height: 100%;" />
+                    </div>
+                </MudItem>
+            </MudGrid>
+
+            <div class="code-example mt-4">
+                <pre><code>&lt;HonuaAttributeTable SyncWith="my-map"
+                     DataSource="data/features.geojson"
+                     AllowColumnSort="true"
+                     AllowColumnFilter="true"
+                     ShowQuickFilter="true"
+                     OnFilterChanged="HandleFilterChanged" /&gt;</code></pre>
+            </div>
+        </MudTabPanel>
+
+        <!-- Inline Editing -->
+        <MudTabPanel Icon="@Icons.Material.Filled.Edit" Text="Inline Edit">
+            <MudText Typo="Typo.h6" Class="mb-3">Inline Editing</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Edit attribute values directly in the table with validation and save/cancel workflow.
+            </MudText>
+
+            <div class="component-panel" style="height: 550px;">
+                <HonuaAttributeTable Id="edit-table"
+                                     SyncWith="attr-basic-map"
+                                     DataSource="data/parcels.geojson"
+                                     Title="Editable Table"
+                                     ShowToolbar="true"
+                                     AllowInlineEdit="true"
+                                     EditMode="EditMode.Row"
+                                     ValidateOnEdit="true"
+                                     Dense="true"
+                                     PageSize="12"
+                                     Style="width: 100%; height: 100%;" />
+            </div>
+
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                <strong>Edit Modes:</strong> Cell (click to edit single cell), Row (edit entire row), or Batch (edit multiple rows then save all).
+            </MudAlert>
+
+            <MudGrid Class="mt-4">
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.TouchApp" Size="Size.Small" /> Cell Edit
+                        </MudText>
+                        <MudText Typo="Typo.body2">Click any cell to edit its value</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.TableRows" Size="Size.Small" /> Row Edit
+                        </MudText>
+                        <MudText Typo="Typo.body2">Click edit button to edit entire row</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small" /> Batch Edit
+                        </MudText>
+                        <MudText Typo="Typo.body2">Edit multiple rows then save all at once</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <div class="code-example mt-4">
+                <pre><code>&lt;HonuaAttributeTable AllowInlineEdit="true"
+                     EditMode="EditMode.Row"
+                     ValidateOnEdit="true"
+                     OnRowEdited="HandleRowEdited"
+                     OnEditCancelled="HandleEditCancelled" /&gt;
+
+@@code {
+    private async Task HandleRowEdited(RowEditEvent e)
+    {
+        // Validate and save changes
+        await SaveChangesAsync(e.Row);
+    }
+}</code></pre>
+            </div>
+        </MudTabPanel>
+
+        <!-- Export -->
+        <MudTabPanel Icon="@Icons.Material.Filled.FileDownload" Text="Export">
+            <MudText Typo="Typo.h6" Class="mb-3">Export Options</MudText>
+            <MudText Typo="Typo.body1" Class="mb-4">
+                Export table data in multiple formats: CSV, Excel, JSON, or GeoJSON.
+            </MudText>
+
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <div class="component-panel" style="height: 500px;">
+                        <HonuaAttributeTable Id="export-table"
+                                             SyncWith="attr-basic-map"
+                                             DataSource="data/parcels.geojson"
+                                             Title="Exportable Data"
+                                             ShowToolbar="true"
+                                             ShowExport="true"
+                                             AllowColumnSelection="true"
+                                             Dense="true"
+                                             PageSize="10"
+                                             Style="width: 100%; height: 100%;" />
+                    </div>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <div class="component-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title">Export Settings</h3>
+                        </div>
+
+                        <MudStack Spacing="2">
+                            <MudText Typo="Typo.subtitle2">Format</MudText>
+                            <MudRadioGroup T="string" SelectedOption="@_selectedFormat">
+                                <MudRadio Value="@("csv")" Color="Color.Primary">CSV</MudRadio>
+                                <MudRadio Value="@("excel")" Color="Color.Primary">Excel (XLSX)</MudRadio>
+                                <MudRadio Value="@("json")" Color="Color.Primary">JSON</MudRadio>
+                                <MudRadio Value="@("geojson")" Color="Color.Primary">GeoJSON</MudRadio>
+                            </MudRadioGroup>
+
+                            <MudDivider Class="my-2" />
+
+                            <MudText Typo="Typo.subtitle2">Options</MudText>
+                            <MudCheckBox Label="Include headers" Checked="true" Dense="true" />
+                            <MudCheckBox Label="Export all columns" Checked="true" Dense="true" />
+                            <MudCheckBox Label="Export visible rows only" Dense="true" />
+                            <MudCheckBox Label="Include geometry" Checked="true" Dense="true" />
+
+                            <MudDivider Class="my-2" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Download"
+                                       FullWidth="true">
+                                Export (1,234 rows)
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Secondary"
+                                       StartIcon="@Icons.Material.Filled.Print"
+                                       FullWidth="true">
+                                Print
+                            </MudButton>
+                        </MudStack>
+                    </div>
+
+                    <MudPaper Class="pa-3 mt-3" Elevation="1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Recent Exports</MudText>
+                        <MudList Dense="true">
+                            <MudListItem Icon="@Icons.Material.Filled.InsertDriveFile">
+                                <MudText Typo="Typo.body2">parcels.csv</MudText>
+                                <MudText Typo="Typo.caption">2 minutes ago</MudText>
+                            </MudListItem>
+                            <MudListItem Icon="@Icons.Material.Filled.InsertDriveFile">
+                                <MudText Typo="Typo.body2">data.xlsx</MudText>
+                                <MudText Typo="Typo.caption">1 hour ago</MudText>
+                            </MudListItem>
+                        </MudList>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <!-- API Reference -->
+        <MudTabPanel Icon="@Icons.Material.Filled.Code" Text="API">
+            <MudText Typo="Typo.h6" Class="mb-3">Component Properties</MudText>
+            <MudSimpleTable Elevation="0" Dense="true">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Type</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>SyncWith</code></td>
+                        <td>string</td>
+                        <td>-</td>
+                        <td>Map ID to synchronize with</td>
+                    </tr>
+                    <tr>
+                        <td><code>DataSource</code></td>
+                        <td>string</td>
+                        <td>-</td>
+                        <td>URL to GeoJSON data source</td>
+                    </tr>
+                    <tr>
+                        <td><code>AllowColumnSort</code></td>
+                        <td>bool</td>
+                        <td>true</td>
+                        <td>Enable column sorting</td>
+                    </tr>
+                    <tr>
+                        <td><code>AllowColumnFilter</code></td>
+                        <td>bool</td>
+                        <td>true</td>
+                        <td>Enable column filtering</td>
+                    </tr>
+                    <tr>
+                        <td><code>AllowInlineEdit</code></td>
+                        <td>bool</td>
+                        <td>false</td>
+                        <td>Enable inline editing</td>
+                    </tr>
+                    <tr>
+                        <td><code>EditMode</code></td>
+                        <td>EditMode</td>
+                        <td>Cell</td>
+                        <td>Cell, Row, or Batch</td>
+                    </tr>
+                    <tr>
+                        <td><code>ShowExport</code></td>
+                        <td>bool</td>
+                        <td>false</td>
+                        <td>Show export button</td>
+                    </tr>
+                    <tr>
+                        <td><code>Virtualization</code></td>
+                        <td>bool</td>
+                        <td>true</td>
+                        <td>Enable virtual scrolling</td>
+                    </tr>
+                    <tr>
+                        <td><code>PageSize</code></td>
+                        <td>int</td>
+                        <td>10</td>
+                        <td>Rows per page</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+
+            <MudText Typo="Typo.h6" Class="mt-4 mb-3">Events</MudText>
+            <MudSimpleTable Elevation="0" Dense="true">
+                <thead>
+                    <tr>
+                        <th>Event</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>OnRowSelected</code></td>
+                        <td>EventCallback&lt;Row&gt;</td>
+                        <td>Fired when row is selected</td>
+                    </tr>
+                    <tr>
+                        <td><code>OnRowEdited</code></td>
+                        <td>EventCallback&lt;RowEditEvent&gt;</td>
+                        <td>Fired when row is edited</td>
+                    </tr>
+                    <tr>
+                        <td><code>OnFilterChanged</code></td>
+                        <td>EventCallback&lt;FilterState&gt;</td>
+                        <td>Fired when filters change</td>
+                    </tr>
+                    <tr>
+                        <td><code>OnExport</code></td>
+                        <td>EventCallback&lt;ExportOptions&gt;</td>
+                        <td>Fired when export initiated</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+        </MudTabPanel>
+    </MudTabs>
+</div>
+
+@code {
+    private string _selectedFormat = "csv";
+}

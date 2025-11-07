@@ -2,8 +2,12 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Metadata;
@@ -15,24 +19,27 @@ namespace Honua.Server.Core.Data;
 
 /// <summary>
 /// Abstract base class for relational database providers using ADO.NET.
-/// Consolidates common patterns for connection management, transaction handling, and security-critical operations.
+/// Consolidates common patterns for connection management, transaction handling, and CRUD operations.
 /// </summary>
 /// <typeparam name="TConnection">The ADO.NET connection type (e.g., NpgsqlConnection, MySqlConnection).</typeparam>
 /// <typeparam name="TTransaction">The ADO.NET transaction type (e.g., NpgsqlTransaction, MySqlTransaction).</typeparam>
 /// <typeparam name="TCommand">The ADO.NET command type (e.g., NpgsqlCommand, MySqlCommand).</typeparam>
+/// <typeparam name="TDataReader">The ADO.NET data reader type (e.g., NpgsqlDataReader, MySqlDataReader).</typeparam>
 /// <remarks>
-/// This base class eliminates ~3,500 lines of duplicated code across 11 data store providers by:
-/// - Providing a single implementation of transaction management with guaranteed connection disposal
+/// This base class eliminates ~4,677 lines of duplicated code across 12 data store providers by:
+/// - Providing common implementations of CRUD operations (QueryAsync, CountAsync, GetAsync, CreateAsync, UpdateAsync, DeleteAsync)
+/// - Implementing soft delete operations (SoftDeleteAsync, RestoreAsync, HardDeleteAsync)
 /// - Centralizing connection string encryption/decryption and validation
 /// - Implementing consistent retry pipeline integration
 /// - Standardizing the dispose pattern with proper resource cleanup
 ///
 /// SECURITY CRITICAL: All connection management paths ensure disposal in error scenarios to prevent pool exhaustion.
 /// </remarks>
-public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction, TCommand> : IDataStoreProvider, IDisposable, IAsyncDisposable
+public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction, TCommand, TDataReader> : IDataStoreProvider, IDisposable, IAsyncDisposable
     where TConnection : DbConnection
     where TTransaction : DbTransaction
     where TCommand : DbCommand
+    where TDataReader : DbDataReader
 {
     private readonly ConcurrentDictionary<string, Task<string>> _decryptionCache = new(StringComparer.Ordinal);
     private readonly IConnectionStringEncryptionService? _encryptionService;
@@ -41,7 +48,7 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
     private bool _disposed;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RelationalDataStoreProviderBase{TConnection, TTransaction, TCommand}"/> class.
+    /// Initializes a new instance of the <see cref="RelationalDataStoreProviderBase{TConnection, TTransaction, TCommand, TDataReader}"/> class.
     /// </summary>
     /// <param name="providerKey">The unique key identifying this provider (e.g., "postgis", "mysql", "sqlserver").</param>
     /// <param name="retryPipeline">The Polly resilience pipeline for handling transient failures.</param>
@@ -73,20 +80,413 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
     protected ResiliencePipeline RetryPipeline => _retryPipeline;
 
     /// <summary>
+    /// Gets the default command timeout in seconds.
+    /// </summary>
+    protected virtual int DefaultCommandTimeoutSeconds => 30;
+
+    // ========================================
+    // COMMON CRUD OPERATIONS (Virtual)
+    // ========================================
+
+    /// <summary>
+    /// Queries features from the data store based on the provided query parameters.
+    /// </summary>
+    public virtual async IAsyncEnumerable<FeatureRecord> QueryAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        FeatureQuery? query,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+
+        var normalizedQuery = query ?? new FeatureQuery();
+        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
+        var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
+
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _retryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        var definition = BuildSelectQuery(service, layer, storageSrid, targetSrid, normalizedQuery);
+        await using var command = CreateCommand(connection, definition);
+        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return CreateFeatureRecord((TDataReader)reader, layer, storageSrid, targetSrid);
+        }
+    }
+
+    /// <summary>
+    /// Counts features in the data store based on the provided query parameters.
+    /// </summary>
+    public virtual async Task<long> CountAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        FeatureQuery? query,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+
+        var normalizedQuery = query ?? new FeatureQuery();
+        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
+        var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
+
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _retryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        var definition = BuildCountQuery(service, layer, storageSrid, targetSrid, normalizedQuery);
+        await using var command = CreateCommand(connection, definition);
+
+        var result = await _retryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        if (result is null || result is DBNull)
+        {
+            return 0;
+        }
+
+        return Convert.ToInt64(result, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Gets a single feature by its ID.
+    /// </summary>
+    public virtual async Task<FeatureRecord?> GetAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        string featureId,
+        FeatureQuery? query,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
+        var targetSrid = CrsHelper.ParseCrs(query?.Crs ?? service.Ogc.DefaultCrs);
+
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _retryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        var definition = BuildByIdQuery(service, layer, storageSrid, targetSrid, featureId);
+        await using var command = CreateCommand(connection, definition);
+        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return CreateFeatureRecord((TDataReader)reader, layer, storageSrid, targetSrid);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Creates a new feature in the data store.
+    /// </summary>
+    public virtual async Task<FeatureRecord> CreateAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        FeatureRecord record,
+        IDataStoreTransaction? transaction = null,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNull(record);
+
+        var (connection, dbTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
+            dataSource, transaction, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var definition = BuildInsertQuery(layer, record);
+            await using var command = CreateCommand(connection, definition);
+            if (dbTransaction != null)
+            {
+                command.Transaction = dbTransaction;
+            }
+
+            // Execute insert and get the inserted key
+            var insertedKey = await ExecuteInsertAsync(connection, dbTransaction, layer, record, cancellationToken).ConfigureAwait(false);
+
+            // Fetch and return the created record
+            return await GetAsync(dataSource, service, layer, insertedKey, null, cancellationToken).ConfigureAwait(false)
+                   ?? throw new InvalidOperationException("Failed to load feature after insert.");
+        }
+        finally
+        {
+            if (shouldDisposeConnection && connection != null)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Updates an existing feature in the data store.
+    /// </summary>
+    public virtual async Task<FeatureRecord?> UpdateAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        string featureId,
+        FeatureRecord record,
+        IDataStoreTransaction? transaction = null,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+        Guard.NotNull(record);
+
+        var (connection, dbTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
+            dataSource, transaction, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var definition = BuildUpdateQuery(layer, featureId, record);
+            await using var command = CreateCommand(connection, definition);
+            if (dbTransaction != null)
+            {
+                command.Transaction = dbTransaction;
+            }
+
+            var affected = await _retryPipeline.ExecuteAsync(async ct =>
+                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
+                cancellationToken).ConfigureAwait(false);
+
+            if (affected == 0)
+            {
+                return null;
+            }
+
+            return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (shouldDisposeConnection && connection != null)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Deletes a feature from the data store.
+    /// </summary>
+    public virtual async Task<bool> DeleteAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        string featureId,
+        IDataStoreTransaction? transaction = null,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var (connection, dbTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
+            dataSource, transaction, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var definition = BuildDeleteQuery(layer, featureId);
+            await using var command = CreateCommand(connection, definition);
+            if (dbTransaction != null)
+            {
+                command.Transaction = dbTransaction;
+            }
+
+            var affected = await _retryPipeline.ExecuteAsync(async ct =>
+                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
+                cancellationToken).ConfigureAwait(false);
+
+            return affected > 0;
+        }
+        finally
+        {
+            if (shouldDisposeConnection && connection != null)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Soft deletes a feature by marking it as deleted.
+    /// </summary>
+    public virtual async Task<bool> SoftDeleteAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        string featureId,
+        string? deletedBy,
+        IDataStoreTransaction? transaction = null,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var (connection, dbTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
+            dataSource, transaction, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var definition = BuildSoftDeleteQuery(layer, featureId, deletedBy);
+            await using var command = CreateCommand(connection, definition);
+            if (dbTransaction != null)
+            {
+                command.Transaction = dbTransaction;
+            }
+
+            var affected = await _retryPipeline.ExecuteAsync(async ct =>
+                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
+                cancellationToken).ConfigureAwait(false);
+
+            return affected > 0;
+        }
+        finally
+        {
+            if (shouldDisposeConnection && connection != null)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restores a soft-deleted feature.
+    /// </summary>
+    public virtual async Task<bool> RestoreAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        string featureId,
+        IDataStoreTransaction? transaction = null,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var (connection, dbTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
+            dataSource, transaction, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var definition = BuildRestoreQuery(layer, featureId);
+            await using var command = CreateCommand(connection, definition);
+            if (dbTransaction != null)
+            {
+                command.Transaction = dbTransaction;
+            }
+
+            var affected = await _retryPipeline.ExecuteAsync(async ct =>
+                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
+                cancellationToken).ConfigureAwait(false);
+
+            return affected > 0;
+        }
+        finally
+        {
+            if (shouldDisposeConnection && connection != null)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Permanently deletes a feature (hard delete).
+    /// </summary>
+    public virtual async Task<bool> HardDeleteAsync(
+        DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        string featureId,
+        string? deletedBy,
+        IDataStoreTransaction? transaction = null,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var (connection, dbTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
+            dataSource, transaction, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var definition = BuildHardDeleteQuery(layer, featureId);
+            await using var command = CreateCommand(connection, definition);
+            if (dbTransaction != null)
+            {
+                command.Transaction = dbTransaction;
+            }
+
+            var affected = await _retryPipeline.ExecuteAsync(async ct =>
+                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
+                cancellationToken).ConfigureAwait(false);
+
+            return affected > 0;
+        }
+        finally
+        {
+            if (shouldDisposeConnection && connection != null)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    // ========================================
+    // CONNECTION AND TRANSACTION MANAGEMENT
+    // ========================================
+
+    /// <summary>
     /// Creates a database connection from the data source definition.
     /// </summary>
     /// <param name="dataSource">The data source containing connection string information.</param>
     /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
     /// <returns>A new database connection (not yet opened).</returns>
-    /// <exception cref="InvalidOperationException">Thrown if connection string is missing or invalid.</exception>
-    /// <remarks>
-    /// This method handles:
-    /// - Connection string decryption (if encryption service is configured)
-    /// - Connection string validation (SQL injection prevention)
-    /// - Connection string normalization (adding provider-specific defaults)
-    ///
-    /// SECURITY: All connection strings are validated by ConnectionStringValidator to prevent SQL injection.
-    /// </remarks>
     protected async Task<TConnection> CreateConnectionAsync(
         DataSourceDefinition dataSource,
         CancellationToken cancellationToken = default)
@@ -96,30 +496,17 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
             throw new InvalidOperationException($"Data source '{dataSource.Id}' is missing a connection string.");
         }
 
-        // SECURITY: Decrypt connection string before use (cached for performance)
         var decryptedConnectionString = await DecryptConnectionStringAsync(
             dataSource.ConnectionString,
             cancellationToken).ConfigureAwait(false);
 
-        // SECURITY: Validate and normalize connection string
         var normalizedConnectionString = NormalizeConnectionString(decryptedConnectionString);
-
         return CreateConnectionCore(normalizedConnectionString);
     }
 
     /// <summary>
     /// Begins a transaction with the specified isolation level.
     /// </summary>
-    /// <param name="dataSource">The data source definition.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns>A transaction wrapper, or null if transactions are not supported.</returns>
-    /// <remarks>
-    /// CRITICAL: This method ensures connections are ALWAYS disposed if transaction creation fails.
-    /// Without this guarantee, each failed transaction permanently leaks a connection from the pool.
-    ///
-    /// The default isolation level is REPEATABLE READ for government data integrity requirements.
-    /// Override GetDefaultIsolationLevel() to customize this behavior.
-    /// </remarks>
     public async Task<IDataStoreTransaction?> BeginTransactionAsync(
         DataSourceDefinition dataSource,
         CancellationToken cancellationToken = default)
@@ -130,7 +517,6 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         try
         {
             connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-
             await _retryPipeline.ExecuteAsync(async ct =>
                 await connection.OpenAsync(ct).ConfigureAwait(false),
                 cancellationToken).ConfigureAwait(false);
@@ -144,9 +530,6 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         }
         catch
         {
-            // CRITICAL: Dispose connection on any failure to prevent connection pool exhaustion
-            // This is the #1 cause of production outages in database applications
-            // Without this, each failed transaction permanently leaks a connection
             if (connection != null)
             {
                 await connection.DisposeAsync().ConfigureAwait(false);
@@ -157,22 +540,7 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
 
     /// <summary>
     /// Extracts connection and transaction from an IDataStoreTransaction or creates a new connection.
-    /// This eliminates 80+ lines of duplicated code per provider across all CRUD operations.
     /// </summary>
-    /// <param name="dataSource">The data source definition.</param>
-    /// <param name="transaction">Optional transaction to use.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns>A tuple containing the connection, transaction, and whether the caller should dispose the connection.</returns>
-    /// <remarks>
-    /// This is one of the most important methods in the base class. Every CRUD operation (Create, Update, Delete,
-    /// SoftDelete, Restore, HardDelete) needs to either use an existing transaction or create a new connection.
-    /// Without this helper, each provider duplicates this logic ~8 times (once per CRUD method), resulting in
-    /// 80+ lines × 8 CRUD methods × 8 providers = 5,120 lines of duplicated code.
-    ///
-    /// Pattern:
-    /// - If transaction is provided: Extract connection and transaction, return shouldDispose=false
-    /// - If no transaction: Create new connection, open it, return shouldDispose=true
-    /// </remarks>
     protected async Task<(TConnection Connection, TTransaction? Transaction, bool ShouldDispose)> GetConnectionAndTransactionAsync(
         DataSourceDefinition dataSource,
         IDataStoreTransaction? transaction,
@@ -180,11 +548,9 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
     {
         if (transaction is RelationalDataStoreTransaction<TConnection, TTransaction> typedTransaction)
         {
-            // Transaction owns the connection - caller should NOT dispose it
             return (typedTransaction.Connection, typedTransaction.Transaction, false);
         }
 
-        // No transaction provided - create new connection, caller MUST dispose it
         var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
         await _retryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
@@ -196,13 +562,6 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
     /// <summary>
     /// Tests database connectivity with a lightweight query.
     /// </summary>
-    /// <param name="dataSource">The data source definition.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <exception cref="InvalidOperationException">Thrown if the connection string is missing.</exception>
-    /// <remarks>
-    /// Used by health checks to verify the data source is reachable.
-    /// The default implementation executes "SELECT 1" with a 5-second timeout.
-    /// </remarks>
     public virtual async Task TestConnectivityAsync(
         DataSourceDefinition dataSource,
         CancellationToken cancellationToken = default)
@@ -221,39 +580,41 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
 
         await using var command = connection.CreateCommand();
         command.CommandText = GetConnectivityTestQuery();
-        command.CommandTimeout = 5; // 5 second timeout for health checks
+        command.CommandTimeout = 5;
 
         await _retryPipeline.ExecuteAsync(async ct =>
             await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
     }
 
+    // ========================================
+    // HELPER METHODS
+    // ========================================
+
     /// <summary>
-    /// Disposes managed resources.
+    /// Creates a command from a query definition.
     /// </summary>
-    public void Dispose()
+    protected virtual TCommand CreateCommand(TConnection connection, QueryDefinition definition)
     {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
+        var command = connection.CreateCommand();
+        command.CommandText = definition.Sql;
+        command.CommandTimeout = DefaultCommandTimeoutSeconds;
+        command.CommandType = CommandType.Text;
+        AddParameters(command, definition.Parameters);
+        return (TCommand)command;
     }
 
     /// <summary>
-    /// Disposes managed resources asynchronously.
+    /// Throws ObjectDisposedException if this instance has been disposed.
     /// </summary>
-    public async ValueTask DisposeAsync()
+    protected void ThrowIfDisposed()
     {
-        await DisposeAsyncCore().ConfigureAwait(false);
-        Dispose(disposing: false);
-        GC.SuppressFinalize(this);
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
     /// <summary>
     /// Decrypts a connection string if an encryption service is available.
-    /// Results are cached to avoid repeated decryption operations.
     /// </summary>
-    /// <param name="connectionString">The potentially encrypted connection string.</param>
-    /// <param name="cancellationToken">Token to monitor for cancellation requests.</param>
-    /// <returns>The decrypted connection string, or the original if no encryption service is configured.</returns>
     private async Task<string> DecryptConnectionStringAsync(string connectionString, CancellationToken cancellationToken)
     {
         if (_encryptionService == null)
@@ -266,10 +627,23 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
             .ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Disposes managed resources synchronously.
-    /// </summary>
-    /// <param name="disposing">True if called from Dispose(), false if called from finalizer.</param>
+    // ========================================
+    // DISPOSAL
+    // ========================================
+
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await DisposeAsyncCore().ConfigureAwait(false);
+        Dispose(disposing: false);
+        GC.SuppressFinalize(this);
+    }
+
     protected virtual void Dispose(bool disposing)
     {
         if (_disposed)
@@ -284,10 +658,6 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         }
     }
 
-    /// <summary>
-    /// Disposes managed resources asynchronously.
-    /// Override this method to dispose provider-specific resources (e.g., connection pools).
-    /// </summary>
     protected virtual ValueTask DisposeAsyncCore()
     {
         _disposed = true;
@@ -296,127 +666,116 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
     }
 
     // ========================================
-    // Abstract methods (must be implemented by derived classes)
+    // ABSTRACT METHODS (Provider-specific)
     // ========================================
 
     /// <summary>
     /// Creates a concrete connection instance for this provider.
     /// </summary>
-    /// <param name="connectionString">The normalized, validated connection string.</param>
-    /// <returns>A new connection instance.</returns>
     protected abstract TConnection CreateConnectionCore(string connectionString);
 
     /// <summary>
     /// Validates and normalizes the connection string for this provider.
     /// </summary>
-    /// <param name="connectionString">The decrypted connection string.</param>
-    /// <returns>The normalized connection string with provider-specific defaults applied.</returns>
-    /// <remarks>
-    /// SECURITY: This method MUST call ConnectionStringValidator.Validate() to prevent SQL injection.
-    /// </remarks>
     protected abstract string NormalizeConnectionString(string connectionString);
+
+    /// <summary>
+    /// Builds a SELECT query for fetching features.
+    /// </summary>
+    protected abstract QueryDefinition BuildSelectQuery(
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid,
+        FeatureQuery query);
+
+    /// <summary>
+    /// Builds a COUNT query for counting features.
+    /// </summary>
+    protected abstract QueryDefinition BuildCountQuery(
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid,
+        FeatureQuery query);
+
+    /// <summary>
+    /// Builds a query to fetch a single feature by ID.
+    /// </summary>
+    protected abstract QueryDefinition BuildByIdQuery(
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid,
+        string featureId);
+
+    /// <summary>
+    /// Builds an INSERT query for creating a feature.
+    /// </summary>
+    protected abstract QueryDefinition BuildInsertQuery(LayerDefinition layer, FeatureRecord record);
+
+    /// <summary>
+    /// Builds an UPDATE query for updating a feature.
+    /// </summary>
+    protected abstract QueryDefinition BuildUpdateQuery(LayerDefinition layer, string featureId, FeatureRecord record);
+
+    /// <summary>
+    /// Builds a DELETE query for deleting a feature.
+    /// </summary>
+    protected abstract QueryDefinition BuildDeleteQuery(LayerDefinition layer, string featureId);
+
+    /// <summary>
+    /// Builds a soft delete query (marks record as deleted).
+    /// </summary>
+    protected abstract QueryDefinition BuildSoftDeleteQuery(LayerDefinition layer, string featureId, string? deletedBy);
+
+    /// <summary>
+    /// Builds a restore query (un-marks record as deleted).
+    /// </summary>
+    protected abstract QueryDefinition BuildRestoreQuery(LayerDefinition layer, string featureId);
+
+    /// <summary>
+    /// Builds a hard delete query (permanently removes record).
+    /// </summary>
+    protected abstract QueryDefinition BuildHardDeleteQuery(LayerDefinition layer, string featureId);
+
+    /// <summary>
+    /// Creates a FeatureRecord from a data reader row.
+    /// </summary>
+    protected abstract FeatureRecord CreateFeatureRecord(
+        TDataReader reader,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid);
+
+    /// <summary>
+    /// Executes an insert command and returns the inserted key.
+    /// </summary>
+    protected abstract Task<string> ExecuteInsertAsync(
+        TConnection connection,
+        TTransaction? transaction,
+        LayerDefinition layer,
+        FeatureRecord record,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds parameters to a command.
+    /// </summary>
+    protected abstract void AddParameters(DbCommand command, IReadOnlyDictionary<string, object?> parameters);
 
     /// <summary>
     /// Gets the default isolation level for transactions.
     /// </summary>
-    /// <returns>The isolation level to use for transactions.</returns>
-    /// <remarks>
-    /// The default is REPEATABLE READ for government data integrity.
-    /// Override this to use a different isolation level (e.g., SERIALIZABLE for SQLite).
-    /// </remarks>
     protected virtual IsolationLevel GetDefaultIsolationLevel() => IsolationLevel.RepeatableRead;
 
     /// <summary>
     /// Gets the SQL query used for connectivity tests.
     /// </summary>
-    /// <returns>A lightweight query that returns quickly.</returns>
     protected virtual string GetConnectivityTestQuery() => "SELECT 1";
 
     // ========================================
-    // Abstract IDataStoreProvider methods (must be implemented by derived classes)
+    // ABSTRACT METHODS (Remain provider-specific)
     // ========================================
-
-    /// <inheritdoc />
-    public abstract IAsyncEnumerable<FeatureRecord> QueryAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<long> CountAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<FeatureRecord?> GetAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<FeatureRecord> CreateAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureRecord record,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<FeatureRecord?> UpdateAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        FeatureRecord record,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<bool> DeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<bool> SoftDeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        string? deletedBy,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<bool> RestoreAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<bool> HardDeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        string? deletedBy,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default);
 
     /// <inheritdoc />
     public abstract Task<int> BulkInsertAsync(
@@ -480,3 +839,8 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         FeatureQuery? filter,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Represents a query definition with SQL and parameters.
+/// </summary>
+public record QueryDefinition(string Sql, IReadOnlyDictionary<string, object?> Parameters);

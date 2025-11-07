@@ -1,0 +1,18 @@
+# Test results
+TestResults/
+test-results/
+
+# Screenshots
+screenshots/
+
+# Playwright browsers (downloaded locally)
+bin/Debug/net9.0/.playwright/
+bin/Release/net9.0/.playwright/
+
+# Videos and traces
+*.webm
+*.zip
+
+# Build artifacts
+bin/
+obj/
