@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Location permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Honua Field needs access to your location to collect geospatial data and track GPS trails while using the app.</string>
+	
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Honua Field needs access to your location to collect geospatial data even when the app is in the background.</string>
+	
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Honua Field needs access to your location to collect geospatial data and track GPS trails.</string>
+	
+	<!-- Required for iOS 14+ precise location -->
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>PreciseLocation</key>
+		<string>Honua Field needs precise location for accurate geospatial data collection.</string>
+	</dict>
+	
+	<!-- UIBackgroundModes for background location (optional, if needed) -->
+	<!-- 
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+	-->
+</dict>
+</plist>
