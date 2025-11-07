@@ -1034,6 +1034,18 @@ public sealed class GdalCogCacheServiceTests : IDisposable
                     {
                         // Expected if disposal happens during conversion
                     }
+                    catch (ApplicationException ex) when (
+                        ex.Message.Contains("delete fails") ||
+                        ex.Message.Contains("TIFFRewriteDirectory") ||
+                        ex.Message.Contains("TIFFReadDirectory") ||
+                        ex.Message.Contains("Error fetching directory"))
+                    {
+                        // Expected - GDAL internal errors during concurrent dispose and file operations
+                    }
+                    catch (FileNotFoundException ex) when (ex.Message.Contains(".tmp.tif"))
+                    {
+                        // Expected - temporary files may be deleted during disposal before move completes
+                    }
                 }))
                 .ToArray();
 

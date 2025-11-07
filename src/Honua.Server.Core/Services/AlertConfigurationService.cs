@@ -237,7 +237,12 @@ WHERE id = @Id;";
             },
             cancellationToken: cancellationToken);
 
-        await connection.ExecuteAsync(command).ConfigureAwait(false);
+        var rowsAffected = await connection.ExecuteAsync(command).ConfigureAwait(false);
+        if (rowsAffected == 0)
+        {
+            throw new KeyNotFoundException($"Alert rule with ID {id} not found.");
+        }
+
         _logger.LogInformation("Updated alert rule {RuleId}: {RuleName}", id, rule.Name);
     }
 
@@ -247,7 +252,12 @@ WHERE id = @Id;";
 
         const string sql = "DELETE FROM alert_rules WHERE id = @Id;";
         var command = new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken);
-        await connection.ExecuteAsync(command).ConfigureAwait(false);
+        var rowsAffected = await connection.ExecuteAsync(command).ConfigureAwait(false);
+        if (rowsAffected == 0)
+        {
+            throw new KeyNotFoundException($"Alert rule with ID {id} not found.");
+        }
+
         _logger.LogInformation("Deleted alert rule {RuleId}", id);
     }
 
