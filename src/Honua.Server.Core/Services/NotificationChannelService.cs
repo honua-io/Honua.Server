@@ -187,7 +187,12 @@ WHERE id = @Id;";
             },
             cancellationToken: cancellationToken);
 
-        await connection.ExecuteAsync(command).ConfigureAwait(false);
+        var rowsAffected = await connection.ExecuteAsync(command).ConfigureAwait(false);
+        if (rowsAffected == 0)
+        {
+            throw new KeyNotFoundException($"Notification channel with ID {id} not found.");
+        }
+
         _logger.LogInformation("Updated notification channel {ChannelId}: {ChannelName}", id, channel.Name);
     }
 

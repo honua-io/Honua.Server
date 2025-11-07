@@ -3,6 +3,8 @@
 @using Honua.MapSDK.Models.Routing
 @using Honua.MapSDK.Services.Routing
 @using Microsoft.JSInterop
+@using RoutingWaypoint = Honua.MapSDK.Models.Routing.Waypoint
+@using RoutingWaypointType = Honua.MapSDK.Models.Routing.WaypointType
 @implements IAsyncDisposable
 @inject ComponentBus Bus
 @inject IJSRuntime JS
@@ -47,7 +49,7 @@
                             Adornment="Adornment.End"
                             AdornmentIcon="@Icons.Material.Filled.Search"
                             OnAdornmentClick="@(() => OnSearchWaypoint(index))" />
-                        @if (_waypoints.Count > 2 && waypoint.Type == WaypointType.Via)
+                        @if (_waypoints.Count > 2 && waypoint.Type == RoutingWaypointType.Via)
                         {
                             <MudIconButton
                                 Icon="@Icons.Material.Filled.Close"
@@ -75,7 +77,7 @@
             <div class="routing-options">
                 <MudSelect
                     T="TravelMode"
-                    @bind-Value="_travelMode"
+                    Value="@_travelMode"
                     Label="Travel Mode"
                     Variant="Variant.Outlined"
                     Dense="true"
@@ -94,7 +96,7 @@
 
                 <MudSelect
                     T="RoutePreference"
-                    @bind-Value="_preference"
+                    Value="@_preference"
                     Label="Preference"
                     Variant="Variant.Outlined"
                     Dense="true"
@@ -400,7 +402,7 @@
     /// Event callback when waypoint is added
     /// </summary>
     [Parameter]
-    public EventCallback<Waypoint> OnWaypointAdded { get; set; }
+    public EventCallback<RoutingWaypoint> OnWaypointAdded { get; set; }
 
     /// <summary>
     /// Event callback when close is clicked
@@ -415,7 +417,7 @@
     private bool _isCalculating = false;
     private string? _errorMessage;
 
-    private List<Waypoint> _waypoints = new();
+    private List<RoutingWaypoint> _waypoints = new();
     private Route? _currentRoute;
     private List<Route> _alternatives = new();
     private Route? _selectedAlternative;
@@ -486,15 +488,15 @@
     private void InitializeWaypoints()
     {
         // Initialize with start and end waypoints
-        _waypoints.Add(new Waypoint
+        _waypoints.Add(new RoutingWaypoint
         {
-            Type = WaypointType.Start,
+            Type = RoutingWaypointType.Start,
             Label = "A"
         });
 
-        _waypoints.Add(new Waypoint
+        _waypoints.Add(new RoutingWaypoint
         {
-            Type = WaypointType.End,
+            Type = RoutingWaypointType.End,
             Label = "B"
         });
     }
@@ -523,9 +525,9 @@
         if (_waypoints.Count >= MaxWaypoints) return;
 
         // Insert before the last waypoint (end)
-        var viaWaypoint = new Waypoint
+        var viaWaypoint = new RoutingWaypoint
         {
-            Type = WaypointType.Via,
+            Type = RoutingWaypointType.Via,
             Label = GetWaypointLabel(_waypoints.Count - 1)
         };
 
@@ -539,7 +541,7 @@
     private void RemoveWaypoint(int index)
     {
         if (_waypoints.Count <= 2) return;
-        if (_waypoints[index].Type != WaypointType.Via) return;
+        if (_waypoints[index].Type != RoutingWaypointType.Via) return;
 
         _waypoints.RemoveAt(index);
         UpdateWaypointLabels();
@@ -909,32 +911,32 @@
     }
 
     // UI Helper methods
-    private string GetWaypointIcon(WaypointType type)
+    private string GetWaypointIcon(RoutingWaypointType type)
     {
         return type switch
         {
-            WaypointType.Start => Icons.Material.Filled.FlagCircle,
-            WaypointType.End => Icons.Material.Filled.LocationOn,
+            RoutingWaypointType.Start => Icons.Material.Filled.FlagCircle,
+            RoutingWaypointType.End => Icons.Material.Filled.LocationOn,
             _ => Icons.Material.Filled.Circle
         };
     }
 
-    private Color GetWaypointColor(WaypointType type)
+    private Color GetWaypointColor(RoutingWaypointType type)
     {
         return type switch
         {
-            WaypointType.Start => Color.Success,
-            WaypointType.End => Color.Error,
+            RoutingWaypointType.Start => Color.Success,
+            RoutingWaypointType.End => Color.Error,
             _ => Color.Primary
         };
     }
 
-    private string GetWaypointPlaceholder(WaypointType type)
+    private string GetWaypointPlaceholder(RoutingWaypointType type)
     {
         return type switch
         {
-            WaypointType.Start => "Start location",
-            WaypointType.End => "End location",
+            RoutingWaypointType.Start => "Start location",
+            RoutingWaypointType.End => "End location",
             _ => "Waypoint"
         };
     }

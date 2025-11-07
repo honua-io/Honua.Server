@@ -40,7 +40,7 @@ internal static class WfsHandlers
         [FromServices] IFeatureEditOrchestrator editOrchestrator,
         [FromServices] IResourceAuthorizationService authorizationService,
         [FromServices] ISecurityAuditLogger auditLogger,
-        [FromServices] ILogger logger,
+        [FromServices] ILoggerFactory loggerFactory,
         [FromServices] ICsvExporter csvExporter,
         [FromServices] IShapefileExporter shapefileExporter,
         [FromServices] IWfsSchemaCache schemaCache,
@@ -48,6 +48,7 @@ internal static class WfsHandlers
         CancellationToken cancellationToken)
     {
         Guard.NotNull(context);
+        var logger = loggerFactory.CreateLogger("Honua.Server.Host.Wfs.WfsHandlers");
         Guard.NotNull(metadataRegistry);
         Guard.NotNull(catalog);
         Guard.NotNull(contextResolver);
@@ -104,7 +105,7 @@ internal static class WfsHandlers
                     return await WfsLockHandlers.HandleLockFeatureAsync(context, request, query, catalog, contextResolver, repository, lockManager, metadataRegistry, cancellationToken);
 
                 case "TRANSACTION":
-                    return await WfsTransactionHandlers.HandleTransactionAsync(context, request, query, catalog, contextResolver, repository, lockManager, editOrchestrator, authorizationService, auditLogger, logger, wfsOptions, cancellationToken);
+                    return await WfsTransactionHandlers.HandleTransactionAsync(context, request, query, catalog, contextResolver, repository, lockManager, editOrchestrator, authorizationService, auditLogger, loggerFactory, wfsOptions, cancellationToken);
 
                 default:
                     return WfsHelpers.CreateException("OperationNotSupported", "request", $"Request '{requestValue}' is not supported.");

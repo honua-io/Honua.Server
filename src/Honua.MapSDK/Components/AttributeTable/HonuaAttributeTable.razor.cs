@@ -7,6 +7,7 @@ using MudBlazor;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using MudSelectionMode = MudBlazor.SelectionMode;
 
 namespace Honua.MapSDK.Components.AttributeTable;
 
@@ -115,7 +116,7 @@ public partial class HonuaAttributeTable : ComponentBase, IAsyncDisposable
     /// Selection mode
     /// </summary>
     [Parameter]
-    public SelectionMode SelectionMode { get; set; } = SelectionMode.Multiple;
+    public Models.SelectionMode SelectionMode { get; set; } = Models.SelectionMode.Multiple;
 
     /// <summary>
     /// Highlight selected features on map

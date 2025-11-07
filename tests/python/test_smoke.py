@@ -7,20 +7,23 @@ Run with: pytest tests/python/test_smoke.py -v
 Total: ~15 tests, should complete in < 30 seconds
 """
 
+import os
 import pytest
 import requests
 
 # Base URL for the Honua server
-BASE_URL = "http://localhost:8080"
+BASE_URL = os.getenv("HONUA_API_BASE_URL", "http://localhost:5100")
 
 
 @pytest.fixture(scope="module")
 def server_url():
     """Get server URL, skip all tests if server not available."""
     try:
+        # Check if server is responding at all
+        # Don't check status code - just that we get a response (even 503 Unhealthy is fine)
         response = requests.get(f"{BASE_URL}/health", timeout=5)
-        if response.status_code == 200:
-            return BASE_URL
+        # Any response means server is up, even if unhealthy
+        return BASE_URL
     except requests.exceptions.RequestException:
         pass
 
@@ -39,7 +42,7 @@ class TestOGCAPI:
 
     def test_conformance(self, server_url):
         """Verify conformance declaration."""
-        response = requests.get(f"{server_url}/conformance")
+        response = requests.get(f"{server_url}/v1/conformance")
         assert response.status_code == 200
         data = response.json()
         assert "conformsTo" in data
@@ -55,7 +58,7 @@ class TestWFS:
             "version": "2.0.0",
             "request": "GetCapabilities"
         }
-        response = requests.get(f"{server_url}/wfs", params=params)
+        response = requests.get(f"{server_url}/v1/wfs", params=params)
         assert response.status_code == 200
         assert b"WFS_Capabilities" in response.content
 
@@ -70,7 +73,7 @@ class TestWMS:
             "version": "1.3.0",
             "request": "GetCapabilities"
         }
-        response = requests.get(f"{server_url}/wms", params=params)
+        response = requests.get(f"{server_url}/v1/wms", params=params)
         assert response.status_code == 200
         assert b"WMS_Capabilities" in response.content
 
@@ -95,7 +98,7 @@ class TestSTAC:
 
     def test_catalog_root(self, server_url):
         """Verify STAC catalog is accessible."""
-        response = requests.get(f"{server_url}/stac")
+        response = requests.get(f"{server_url}/v1/stac")
         assert response.status_code == 200
         data = response.json()
         assert data.get("type") in ["Catalog", "Collection"]

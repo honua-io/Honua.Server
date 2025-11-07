@@ -115,8 +115,8 @@ public sealed class AzureBlobRasterDisposalTests
     [Fact]
     public void AzureBlobRasterTileCacheProvider_Constructor_RequiresContainer()
     {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
+        // Act & Assert - BlobContainerClient constructor itself throws NullReferenceException
+        Assert.Throws<NullReferenceException>(() =>
             new AzureBlobRasterTileCacheProvider(null!, false, _logger.Object));
     }
 

@@ -38,7 +38,7 @@ internal static class OgcStylesHandlers
     /// </summary>
     private static async Task<(StyleDefinition? Style, ValidationResult? Validation, IResult? Error)> TryReadStyleAsync(
         HttpRequest request,
-        [FromServices] ILogger logger,
+        ILogger logger,
         CancellationToken cancellationToken)
     {
         using var document = await OgcSharedHandlers.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
@@ -87,9 +87,10 @@ internal static class OgcStylesHandlers
         [FromServices] IStyleRepository styleRepository,
         [FromServices] IMetadataRegistry metadataRegistry,
         [FromServices] IApiMetrics apiMetrics,
-        [FromServices] ILogger<Program> logger,
+        [FromServices] ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("Honua.Server.Host.Ogc.OgcStylesHandlers");
         Guard.NotNull(request);
         Guard.NotNull(styleRepository);
         Guard.NotNull(metadataRegistry);
@@ -149,9 +150,10 @@ internal static class OgcStylesHandlers
         [FromServices] IStyleRepository styleRepository,
         [FromServices] IMetadataRegistry metadataRegistry,
         [FromServices] IApiMetrics apiMetrics,
-        [FromServices] ILogger<Program> logger,
+        [FromServices] ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("Honua.Server.Host.Ogc.OgcStylesHandlers");
         ArgumentException.ThrowIfNullOrWhiteSpace(styleId);
         Guard.NotNull(request);
         Guard.NotNull(styleRepository);
@@ -216,9 +218,10 @@ internal static class OgcStylesHandlers
         [FromServices] IStyleRepository styleRepository,
         [FromServices] IMetadataRegistry metadataRegistry,
         [FromServices] IApiMetrics apiMetrics,
-        [FromServices] ILogger<Program> logger,
+        [FromServices] ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("Honua.Server.Host.Ogc.OgcStylesHandlers");
         ArgumentException.ThrowIfNullOrWhiteSpace(styleId);
         Guard.NotNull(styleRepository);
         Guard.NotNull(metadataRegistry);
@@ -361,9 +364,10 @@ internal static class OgcStylesHandlers
     public static async Task<IResult> ValidateStyle(
         HttpRequest request,
         [FromServices] IApiMetrics apiMetrics,
-        [FromServices] ILogger<Program> logger,
+        [FromServices] ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("Honua.Server.Host.Ogc.OgcStylesHandlers");
         Guard.NotNull(request);
 
         var contentType = request.ContentType?.Split(';')[0].Trim().ToLowerInvariant();

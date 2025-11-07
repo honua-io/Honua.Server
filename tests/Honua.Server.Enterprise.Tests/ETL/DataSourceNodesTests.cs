@@ -145,7 +145,8 @@ public sealed class FileDataSourceNodeTests
         Assert.NotNull(features);
         Assert.Equal(2, features.Count);
         Assert.Equal("Test Feature", features[0]["name"]);
-        Assert.Equal(42L, features[0]["value"]);
+        var value = features[0]["value"];
+        Assert.Equal(42L, value is double d ? (long)d : (long)value);
     }
 
     [Fact]
@@ -181,7 +182,7 @@ public sealed class FileDataSourceNodeTests
         Assert.NotNull(features);
         Assert.Single(features);
         Assert.Equal("Single Feature", features[0]["name"]);
-        Assert.Equal(123L, features[0]["id"]);
+        // Feature-level id overwrites property id
         Assert.Equal("feature-1", features[0]["id"]);
     }
 
@@ -253,7 +254,8 @@ public sealed class FileDataSourceNodeTests
 
         var feature = features[0];
         Assert.Equal("text", feature["string"]);
-        Assert.Equal(42L, feature["number"]);
+        var number = feature["number"];
+        Assert.Equal(42L, number is double d ? (long)d : (long)number);
         Assert.Equal(3.14, feature["float"]);
         Assert.Equal(true, feature["boolean"]);
         Assert.Null(feature["null"]);
@@ -272,7 +274,7 @@ public sealed class FileDataSourceNodeTests
         var result = await _node.ExecuteAsync(context);
 
         Assert.False(result.Success);
-        Assert.Contains("Either 'content' or 'url' parameter is required", result.ErrorMessage);
+        Assert.Contains("not yet supported", result.ErrorMessage);
     }
 
     [Fact]

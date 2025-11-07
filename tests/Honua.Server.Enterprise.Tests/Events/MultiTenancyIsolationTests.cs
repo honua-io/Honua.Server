@@ -212,7 +212,7 @@ public class MultiTenancyIsolationTests
             {
                 capturedEvent = events[0];
             })
-            .ReturnsAsync(1);
+            .ReturnsAsync((List<GeofenceEvent> events, CancellationToken _) => events);
 
         // Act
         await _service.EvaluateLocationAsync(

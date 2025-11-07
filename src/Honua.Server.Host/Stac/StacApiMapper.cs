@@ -257,15 +257,40 @@ internal static class StacApiMapper
     {
         var properties = CloneObject(record.Properties);
 
+        // Per STAC spec, items must have either:
+        // 1. A datetime field with a valid datetime value, OR
+        // 2. Both start_datetime and end_datetime fields with datetime explicitly set to null
         if (record.Datetime.HasValue)
         {
+            // Remove any null datetime fields from properties before setting the valid value
+            properties.Remove("start_datetime");
+            properties.Remove("end_datetime");
             properties["datetime"] = record.Datetime.Value.ToString("O");
         }
-
-        if (record.StartDatetime.HasValue || record.EndDatetime.HasValue)
+        else if (record.StartDatetime.HasValue && record.EndDatetime.HasValue)
         {
-            properties["start_datetime"] = record.StartDatetime?.ToString("O");
-            properties["end_datetime"] = record.EndDatetime?.ToString("O");
+            // When using start/end datetime, datetime must be explicitly null
+            properties["datetime"] = null;
+            properties["start_datetime"] = record.StartDatetime.Value.ToString("O");
+            properties["end_datetime"] = record.EndDatetime.Value.ToString("O");
+        }
+        else if (record.StartDatetime.HasValue || record.EndDatetime.HasValue)
+        {
+            // If only one of start/end is present, use it as datetime
+            // This handles edge cases where data might have incomplete temporal info
+            var fallbackDatetime = record.StartDatetime ?? record.EndDatetime;
+            properties.Remove("start_datetime");
+            properties.Remove("end_datetime");
+            properties["datetime"] = fallbackDatetime?.ToString("O");
+        }
+        else
+        {
+            // No temporal information available - provide a default datetime
+            // Use Unix epoch as a fallback to indicate unknown acquisition time
+            // Remove any null temporal fields that may have been in the properties JSON
+            properties.Remove("start_datetime");
+            properties.Remove("end_datetime");
+            properties["datetime"] = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero).ToString("O");
         }
 
         return properties;

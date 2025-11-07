@@ -74,12 +74,12 @@ def test_tile_matrix_set(wmts_client, test_layer_name):
         pytest.skip("Layer has no tile matrix sets")
 
     # Prefer WebMercatorQuad if available
-    for tms_link in layer.tilematrixsetlinks:
+    for tms_link in layer.tilematrixsetlinks.values():
         if 'WebMercatorQuad' in tms_link.tilematrixset:
             return tms_link.tilematrixset
 
     # Otherwise use first available
-    return layer.tilematrixsetlinks[0].tilematrixset
+    return next(iter(layer.tilematrixsetlinks.values())).tilematrixset
 
 
 # ============================================================================
@@ -171,7 +171,7 @@ def test_wmts_layer_has_tile_matrix_sets(wmts_client, test_layer_name):
     assert len(layer.tilematrixsetlinks) > 0, "Layer must support at least one tile matrix set"
 
     # Validate tile matrix set links
-    for tms_link in layer.tilematrixsetlinks:
+    for tms_link in layer.tilematrixsetlinks.values():
         assert hasattr(tms_link, 'tilematrixset'), "TileMatrixSetLink must have identifier"
         tms_id = tms_link.tilematrixset
         assert tms_id in wmts_client.tilematrixsets, \

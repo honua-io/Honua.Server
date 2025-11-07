@@ -82,7 +82,8 @@ public sealed class StacParentLinksTests
             Id = "test-item",
             CollectionId = "my-collection",
             Title = "Test Item",
-            Geometry = "{\"type\":\"Point\",\"coordinates\":[0,0]}"
+            Geometry = "{\"type\":\"Point\",\"coordinates\":[0,0]}",
+            Datetime = DateTimeOffset.UtcNow
         };
 
         // Act
@@ -107,7 +108,8 @@ public sealed class StacParentLinksTests
         {
             Id = "test-item",
             CollectionId = "test-col",
-            Geometry = null
+            Geometry = null,
+            Datetime = DateTimeOffset.UtcNow
         };
 
         // Act
@@ -134,7 +136,8 @@ public sealed class StacParentLinksTests
         {
             Id = "item-1",
             CollectionId = "collection with spaces & special!chars",
-            Geometry = null
+            Geometry = null,
+            Datetime = DateTimeOffset.UtcNow
         };
 
         // Act
@@ -160,13 +163,15 @@ public sealed class StacParentLinksTests
             {
                 Id = "item-1",
                 CollectionId = "col-1",
-                Geometry = null
+                Geometry = null,
+                Datetime = DateTimeOffset.UtcNow
             },
             new StacItemRecord
             {
                 Id = "item-2",
                 CollectionId = "col-2",
-                Geometry = null
+                Geometry = null,
+                Datetime = DateTimeOffset.UtcNow
             }
         };
 
@@ -201,7 +206,8 @@ public sealed class StacParentLinksTests
             {
                 Id = "item-1",
                 CollectionId = "test-collection",
-                Geometry = null
+                Geometry = null,
+                Datetime = DateTimeOffset.UtcNow
             }
         };
 
@@ -248,7 +254,8 @@ public sealed class StacParentLinksTests
         {
             Id = "item",
             CollectionId = "col",
-            Geometry = null
+            Geometry = null,
+            Datetime = DateTimeOffset.UtcNow
         };
 
         // Act

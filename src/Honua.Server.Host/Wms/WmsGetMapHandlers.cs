@@ -242,7 +242,6 @@ internal static class WmsGetMapHandlers
                         try
                         {
                             var result = await rasterRenderer.RenderAsync(renderRequest, linkedCts.Token).ConfigureAwait(false);
-                            await using var renderStream = result.Content;
 
                             // Estimate size based on dimensions and format
                             var estimatedSize = EstimateImageSize(width, height, normalizedFormat);
@@ -252,6 +251,7 @@ internal static class WmsGetMapHandlers
                             if (shouldBuffer && options.EnableStreaming)
                             {
                                 // Buffer small images for caching/CDN headers
+                                await using var renderStream = result.Content;
                                 using var buffer = new MemoryStream((int)estimatedSize);
                                 await renderStream.CopyToAsync(buffer, linkedCts.Token).ConfigureAwait(false);
                                 bufferedBytes = buffer.ToArray();
@@ -262,6 +262,7 @@ internal static class WmsGetMapHandlers
                             else
                             {
                                 // For large images or when streaming is disabled, note streaming mode
+                                // DO NOT dispose the stream here - it will be disposed by the StreamingFileResult
                                 renderActivity.AddTag("raster.streaming", options.EnableStreaming);
                                 renderActivity.AddTag("raster.estimated_bytes", estimatedSize);
                             }

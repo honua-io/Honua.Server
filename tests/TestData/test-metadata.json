@@ -32,7 +32,7 @@
     {
       "id": "sqlite-primary",
       "provider": "sqlite",
-      "connectionString": "Data Source=/data/ogc-sample.db"
+      "connectionString": "Data Source=/app/data/ogc-sample.db"
     }
   ],
   "services": [

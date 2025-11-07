@@ -42,5 +42,5 @@ public interface ITerraformGenerator
     /// <param name="tier">Service tier (Development, Production, Enterprise)</param>
     /// <param name="envelope">Resource envelope with compute/storage requirements</param>
     /// <returns>Estimated monthly cost in USD</returns>
-    decimal EstimateMonthly Cost(string tier, ResourceEnvelope envelope);
+    decimal EstimateMonthlyCost(string tier, ResourceEnvelope envelope);
 }

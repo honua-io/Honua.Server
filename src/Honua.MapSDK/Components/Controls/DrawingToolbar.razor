@@ -1,5 +1,6 @@
 @using Honua.MapSDK.Services.Drawing
 @using Honua.MapSDK.Models
+@using DrawingDrawingStyle = Honua.MapSDK.Services.Drawing.DrawingStyle
 @inject IDrawingManager DrawingManager
 
 <div class="honua-drawing-toolbar @CssClass" style="@Style">
@@ -194,7 +195,7 @@
     [Parameter]
     public EventCallback<string> OnExport { get; set; }
 
-    private DrawingStyle CurrentStyle { get; set; } = DrawingStyle.Defaults.Polygon;
+    private DrawingDrawingStyle CurrentStyle { get; set; } = DrawingDrawingStyle.Defaults.Polygon;
     private bool IsEditMode { get; set; }
     private bool IsDeleteMode { get; set; }
     private bool HasSelection => DrawingManager.SelectedGeometry != null;

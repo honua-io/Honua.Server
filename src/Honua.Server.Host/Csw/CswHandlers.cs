@@ -86,23 +86,16 @@ internal static class CswHandlers
 
         var metadataSnapshot = await metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
-        try
+        return requestValue.ToUpperInvariant() switch
         {
-            return requestValue.ToUpperInvariant() switch
-            {
-                "GETCAPABILITIES" => await HandleGetCapabilitiesAsync(request, metadataSnapshot, cancellationToken),
-                "DESCRIBERECORD" => HandleDescribeRecord(request),
-                "GETRECORDS" => await HandleGetRecordsAsync(request, query, catalog, metadataSnapshot, parameters, cancellationToken),
-                "GETRECORDBYID" => await HandleGetRecordByIdAsync(request, query, catalog, parameters, cancellationToken),
-                "GETDOMAIN" => HandleGetDomain(request),
-                "TRANSACTION" => HandleTransaction(request, parameters),
-                _ => CreateExceptionReport("InvalidParameterValue", "request", $"Request '{requestValue}' is not supported.")
-            };
-        }
-        catch (Exception ex)
-        {
-            return CreateExceptionReport("NoApplicableCode", null, $"Error processing request: {ex.Message}");
-        }
+            "GETCAPABILITIES" => await HandleGetCapabilitiesAsync(request, metadataSnapshot, cancellationToken),
+            "DESCRIBERECORD" => HandleDescribeRecord(request),
+            "GETRECORDS" => await HandleGetRecordsAsync(request, query, catalog, metadataSnapshot, parameters, cancellationToken),
+            "GETRECORDBYID" => await HandleGetRecordByIdAsync(request, query, catalog, metadataRegistry, parameters, cancellationToken),
+            "GETDOMAIN" => HandleGetDomain(request),
+            "TRANSACTION" => HandleTransaction(request, parameters),
+            _ => CreateExceptionReport("InvalidParameterValue", "request", $"Request '{requestValue}' is not supported.")
+        };
     }
 
     private static async Task<IResult> HandleGetCapabilitiesAsync(HttpRequest request, MetadataSnapshot metadata, CancellationToken cancellationToken)
@@ -244,6 +237,7 @@ internal static class CswHandlers
         HttpRequest request,
         IQueryCollection query,
         ICatalogProjectionService catalog,
+        IMetadataRegistry metadataRegistry,
         Dictionary<string, string> xmlParameters,
         CancellationToken cancellationToken)
     {
@@ -254,7 +248,7 @@ internal static class CswHandlers
             async activity =>
             {
                 var id = xmlParameters.GetValueOrDefault("id") ?? QueryParsingHelpers.GetQueryValue(query, "id");
-                activity.AddTag("csw.record_id", id);
+                activity?.AddTag("csw.record_id", id);
                 if (id.IsNullOrWhiteSpace())
                 {
                     return CreateExceptionReport("MissingParameterValue", "id", "Parameter 'id' is required.");
@@ -269,8 +263,7 @@ internal static class CswHandlers
                     return CreateExceptionReport("InvalidParameterValue", "id", $"Record with id '{id}' not found.");
                 }
 
-                // Need to get metadata from registry to access layer ISO 19115 metadata
-                var metadataRegistry = request.HttpContext.RequestServices.GetRequiredService<IMetadataRegistry>();
+                // Get metadata from the registry passed as parameter
                 var metadata = await metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
                 var useIso19139 = outputSchema.Equals("http://www.isotc211.org/2005/gmd", StringComparison.OrdinalIgnoreCase);

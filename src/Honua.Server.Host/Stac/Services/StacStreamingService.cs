@@ -139,20 +139,31 @@ public sealed class StacStreamingService
         writer.WritePropertyName("properties");
         writer.WriteStartObject();
 
-        // Add datetime properties
+        // Add datetime properties from record fields
+        // Per STAC spec, items must have either:
+        // 1. A datetime field with a valid datetime value, OR
+        // 2. Both start_datetime and end_datetime fields with datetime explicitly set to null
         if (item.Datetime.HasValue)
         {
             writer.WriteString("datetime", item.Datetime.Value.ToString("O"));
         }
-
-        if (item.StartDatetime.HasValue)
+        else if (item.StartDatetime.HasValue && item.EndDatetime.HasValue)
         {
+            writer.WriteNull("datetime");
             writer.WriteString("start_datetime", item.StartDatetime.Value.ToString("O"));
-        }
-
-        if (item.EndDatetime.HasValue)
-        {
             writer.WriteString("end_datetime", item.EndDatetime.Value.ToString("O"));
+        }
+        else if (item.StartDatetime.HasValue || item.EndDatetime.HasValue)
+        {
+            // If only one of start/end is present, use it as datetime
+            var fallbackDatetime = item.StartDatetime ?? item.EndDatetime;
+            writer.WriteString("datetime", fallbackDatetime!.Value.ToString("O"));
+        }
+        else
+        {
+            // No temporal information available - provide a default datetime
+            // Use Unix epoch as a fallback to indicate unknown acquisition time
+            writer.WriteString("datetime", new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero).ToString("O"));
         }
 
         // Write additional properties from the JSON object
@@ -160,10 +171,10 @@ public sealed class StacStreamingService
         {
             foreach (var prop in item.Properties)
             {
-                // Skip datetime properties if they're already in the item
-                if (prop.Key == "datetime" && item.Datetime.HasValue) continue;
-                if (prop.Key == "start_datetime" && item.StartDatetime.HasValue) continue;
-                if (prop.Key == "end_datetime" && item.EndDatetime.HasValue) continue;
+                // Always skip datetime temporal fields - they're handled above from record fields
+                if (prop.Key == "datetime") continue;
+                if (prop.Key == "start_datetime") continue;
+                if (prop.Key == "end_datetime") continue;
 
                 writer.WritePropertyName(prop.Key);
                 prop.Value.WriteTo(writer);

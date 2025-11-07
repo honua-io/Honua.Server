@@ -412,7 +412,7 @@ public sealed class DeployExecuteCommandTests : IDisposable
                         Type = "Custom",
                         Operation = "Create VPC",
                         ExpectedOutcome = "Network ready",
-                        EstimatedDuration = "00:05:00",
+                        EstimatedDuration = TimeSpan.FromMinutes(5),
                         RequiresDowntime = false,
                         ModifiesData = false,
                         IsReversible = true,
@@ -426,7 +426,7 @@ public sealed class DeployExecuteCommandTests : IDisposable
                         Type = "Custom",
                         Operation = "Deploy container",
                         ExpectedOutcome = "Server running",
-                        EstimatedDuration = "00:10:00",
+                        EstimatedDuration = TimeSpan.FromMinutes(10),
                         RequiresDowntime = false,
                         ModifiesData = false,
                         IsReversible = true,
@@ -446,7 +446,7 @@ public sealed class DeployExecuteCommandTests : IDisposable
                             DeniedOperations = Array.Empty<string>(),
                             AllowedResources = Array.Empty<string>()
                         },
-                        Duration = "02:00:00",
+                        Duration = TimeSpan.FromHours(2),
                         Purpose = "Infrastructure deployment",
                         Operations = new[] { "Create VPC", "Deploy instances" }
                     }
@@ -507,9 +507,14 @@ public sealed class DeployExecuteCommandTests : IDisposable
             GeneratedAt = DateTime.UtcNow
         };
 
-        // Use options with string enum converter to match what DeployExecuteCommand expects
-        var options = new JsonSerializerOptions(JsonSerializerOptionsRegistry.WebIndented);
-        options.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        // Use fresh options with string enum converter for serializing test data
+        // Don't use JsonSerializerOptionsRegistry because its TypeInfoResolver doesn't know about anonymous types
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = null, // Use exact property names from anonymous objects
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        };
 
         var json = JsonSerializer.Serialize(plan, options);
         await File.WriteAllTextAsync(planPath, json);

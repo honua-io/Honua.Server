@@ -338,7 +338,7 @@ public class PaginationHelperTests
             sql, 10, 20, parameters, PaginationHelper.DatabaseVendor.Snowflake, ":");
 
         // Assert
-        sql.ToString().Should().Contain("limit :limit offset :offset");
+        sql.ToString().Should().Contain("LIMIT :limit OFFSET :offset");
         parameters["limit"].Should().Be(20);
         parameters["offset"].Should().Be(10);
     }
@@ -355,7 +355,7 @@ public class PaginationHelperTests
             sql, 10, 20, parameters, PaginationHelper.DatabaseVendor.BigQuery);
 
         // Assert
-        sql.ToString().Should().Contain("limit @limit offset @offset");
+        sql.ToString().Should().Contain("LIMIT @limit OFFSET @offset");
     }
 
     [Fact]
@@ -370,7 +370,7 @@ public class PaginationHelperTests
             sql, 10, 20, parameters, PaginationHelper.DatabaseVendor.Redshift);
 
         // Assert
-        sql.ToString().Should().Contain("limit @limit offset @offset");
+        sql.ToString().Should().Contain("LIMIT @limit OFFSET @offset");
     }
 
     [Fact]

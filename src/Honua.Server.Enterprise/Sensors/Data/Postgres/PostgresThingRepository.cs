@@ -33,7 +33,7 @@ internal sealed class PostgresThingRepository
         await conn.OpenAsync(ct);
 
         const string sql = @"
-            SELECT id, name, description, properties, user_id, created_at, updated_at
+            SELECT id, name, description, properties, created_at, updated_at
             FROM things
             WHERE id = @Id";
 
@@ -64,7 +64,7 @@ internal sealed class PostgresThingRepository
         if (options.OrderBy?.Any() == true)
         {
             var orderClauses = options.OrderBy.Select(o =>
-                $"{o.Property} {(o.Descending ? "DESC" : "ASC")}");
+                $"{o.Property} {(o.Direction == SortDirection.Descending ? "DESC" : "ASC")}");
             orderBy = "ORDER BY " + string.Join(", ", orderClauses);
         }
 
@@ -78,7 +78,7 @@ internal sealed class PostgresThingRepository
         parameters.Add("Top", options.Top);
 
         var dataSql = $@"
-            SELECT id, name, description, properties, user_id, created_at, updated_at
+            SELECT id, name, description, properties, created_at, updated_at
             FROM things
             {whereClause}
             {orderBy}
@@ -90,7 +90,11 @@ internal sealed class PostgresThingRepository
 
         var items = things.Select(MapToModel).ToList();
 
-        return new PagedResult<Thing>(items, total, options.Skip, options.Top);
+        return new PagedResult<Thing>
+        {
+            Items = items,
+            TotalCount = total
+        };
     }
 
     public async Task<IReadOnlyList<Thing>> GetByUserAsync(string userId, CancellationToken ct)
@@ -98,8 +102,10 @@ internal sealed class PostgresThingRepository
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
 
+        // Note: The database has a user_id column, but the Thing model doesn't expose it
+        // This method filters by user_id at the database level for security purposes
         const string sql = @"
-            SELECT id, name, description, properties, user_id, created_at, updated_at
+            SELECT id, name, description, properties, created_at, updated_at
             FROM things
             WHERE user_id = @UserId
             ORDER BY created_at DESC";
@@ -115,30 +121,33 @@ internal sealed class PostgresThingRepository
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
 
-        thing.Id = Guid.NewGuid().ToString();
-        thing.CreatedAt = DateTimeOffset.UtcNow;
-        thing.UpdatedAt = thing.CreatedAt;
+        var id = Guid.NewGuid().ToString();
+        var now = DateTime.UtcNow;
 
         const string sql = @"
-            INSERT INTO things (id, name, description, properties, user_id, created_at, updated_at)
-            VALUES (@Id, @Name, @Description, @Properties::jsonb, @UserId, @CreatedAt, @UpdatedAt)";
+            INSERT INTO things (id, name, description, properties, created_at, updated_at)
+            VALUES (@Id, @Name, @Description, @Properties::jsonb, @CreatedAt, @UpdatedAt)";
 
         await conn.ExecuteAsync(new CommandDefinition(sql, new
         {
-            thing.Id,
+            Id = id,
             thing.Name,
             thing.Description,
             Properties = thing.Properties != null
                 ? JsonSerializer.Serialize(thing.Properties)
                 : null,
-            thing.UserId,
-            thing.CreatedAt,
-            thing.UpdatedAt
+            CreatedAt = now,
+            UpdatedAt = now
         }, cancellationToken: ct));
 
-        _logger.LogInformation("Created Thing {ThingId} for user {UserId}", thing.Id, thing.UserId);
+        _logger.LogInformation("Created Thing {ThingId}", id);
 
-        return thing;
+        return thing with
+        {
+            Id = id,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
     }
 
     public async Task<Thing> UpdateAsync(string id, Thing thing, CancellationToken ct)
@@ -146,8 +155,7 @@ internal sealed class PostgresThingRepository
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
 
-        thing.Id = id;
-        thing.UpdatedAt = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
 
         const string sql = @"
             UPDATE things
@@ -156,7 +164,7 @@ internal sealed class PostgresThingRepository
                 properties = COALESCE(@Properties::jsonb, properties),
                 updated_at = @UpdatedAt
             WHERE id = @Id
-            RETURNING id, name, description, properties, user_id, created_at, updated_at";
+            RETURNING id, name, description, properties, created_at, updated_at";
 
         var updated = await conn.QuerySingleAsync<ThingDto>(new CommandDefinition(sql, new
         {
@@ -166,7 +174,7 @@ internal sealed class PostgresThingRepository
             Properties = thing.Properties != null
                 ? JsonSerializer.Serialize(thing.Properties)
                 : null,
-            thing.UpdatedAt
+            UpdatedAt = now
         }, cancellationToken: ct));
 
         _logger.LogInformation("Updated Thing {ThingId}", id);
@@ -200,7 +208,6 @@ internal sealed class PostgresThingRepository
             Name = dto.Name,
             Description = dto.Description,
             Properties = PostgresQueryHelper.ParseProperties(dto.Properties),
-            UserId = dto.UserId,
             CreatedAt = dto.CreatedAt,
             UpdatedAt = dto.UpdatedAt
         };
@@ -212,8 +219,7 @@ internal sealed class PostgresThingRepository
         public string Name { get; init; } = string.Empty;
         public string? Description { get; init; }
         public string? Properties { get; init; }
-        public string? UserId { get; init; }
-        public DateTimeOffset CreatedAt { get; init; }
-        public DateTimeOffset UpdatedAt { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public DateTime UpdatedAt { get; init; }
     }
 }

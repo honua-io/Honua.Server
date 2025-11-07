@@ -258,6 +258,11 @@ public class FileDataSourceNode : WorkflowNodeBase
 
             // For now, only support inline GeoJSON content
             // TODO: Add support for URL download and other formats (Shapefile, GeoPackage)
+            if (!string.IsNullOrEmpty(url) && string.IsNullOrEmpty(content))
+            {
+                return NodeExecutionResult.Fail("URL download not yet supported. Please provide 'content' parameter with inline GeoJSON.");
+            }
+
             if (format.ToLowerInvariant() != "geojson")
             {
                 return NodeExecutionResult.Fail($"Format '{format}' not yet supported. Currently only 'geojson' is supported.");
@@ -265,8 +270,7 @@ public class FileDataSourceNode : WorkflowNodeBase
 
             ReportProgress(context, 20, "Parsing GeoJSON");
 
-            var geojson = content ?? throw new InvalidOperationException("Content is required");
-            var doc = JsonDocument.Parse(geojson);
+            var doc = JsonDocument.Parse(content);
             var root = doc.RootElement;
 
             var features = new List<Dictionary<string, object>>();

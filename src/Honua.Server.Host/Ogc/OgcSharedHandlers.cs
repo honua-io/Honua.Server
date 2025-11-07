@@ -568,7 +568,8 @@ internal static class OgcSharedHandlers
                     }
                 }
 
-                return (default, string.Empty, Results.StatusCode(StatusCodes.Status406NotAcceptable));
+                // If no Accept header media types matched, fall back to default format (GeoJSON)
+                // This is more lenient than returning 406 and aligns with OGC best practices
             }
         }
 

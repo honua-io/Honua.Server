@@ -189,22 +189,22 @@ public static class MapConfigurationEndpoints
             if (config == null)
                 return Results.NotFound(new { error = "Map configuration not found" });
 
-            var html = $"""
+            var html = $$"""
 <!DOCTYPE html>
 <html>
 <head>
-  <title>{config.Name}</title>
-  <script src="{sdkUrl}/honua-mapsdk.js"></script>
-  <link rel="stylesheet" href="{sdkUrl}/honua-mapsdk.css">
+  <title>{{config.Name}}</title>
+  <script src="{{sdkUrl}}/honua-mapsdk.js"></script>
+  <link rel="stylesheet" href="{{sdkUrl}}/honua-mapsdk.css">
   <style>
-    body {{ margin: 0; padding: 0; }}
-    #map {{ width: 100vw; height: 100vh; }}
+    body { margin: 0; padding: 0; }
+    #map { width: 100vw; height: 100vh; }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
-    const config = {config.Configuration};
+    const config = {{config.Configuration}};
     HonuaMap.create('#map', config);
   </script>
 </body>

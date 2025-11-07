@@ -1,36 +1,62 @@
-# Python Integration Test Dependencies
-# Core testing framework
-pytest>=7.0.0
-pytest-xdist>=3.0.0  # For parallel test execution
+# ==============================================================================
+# Honua Server Python Test Dependencies
+# ==============================================================================
+# This file pins exact versions for reproducible test environments.
+# Update with: pip install --upgrade <package> && pip freeze > requirements.txt
 
-# HTTP and API clients
-requests>=2.28.0
+# Core Testing Framework
+pytest==8.3.4
+pytest-xdist==3.6.1  # Parallel test execution
+pytest-timeout==2.3.1  # Test timeout support
+pytest-cov==6.0.0  # Code coverage
+pytest-mock==3.14.0  # Mocking support
 
-# STAC (SpatioTemporal Asset Catalog) testing
-pystac-client>=0.7.0
-pystac>=1.8.0
+# HTTP Client Libraries
+requests==2.32.3
+urllib3==2.2.3
 
-# Raster data testing (WCS, COG)
-rasterio>=1.3.0
-numpy>=1.21.0
+# OGC Standards Libraries
+OWSLib==0.31.0  # WMS, WFS, WCS, CSW client
+pyproj==3.7.0  # Coordinate transformations
+shapely==2.0.6  # Geometry operations
+fiona==1.10.1  # OGR/GDAL vector data access
 
-# OGC Web Services testing (WMS, WFS, WMTS, CSW, WCS)
-owslib>=0.29.0
+# Geospatial Data Formats
+geojson==3.1.0  # GeoJSON support
+pyarrow==18.1.0  # Apache Arrow / GeoArrow
+flatbuffers==24.3.25  # FlatGeobuf dependency
+geopandas==1.0.1  # Geospatial DataFrames
+pandas==2.2.3  # Data analysis
 
-# Image processing and validation
-Pillow>=9.0.0
+# Raster Processing
+rasterio==1.4.3  # GDAL/raster I/O
+numpy==2.2.1  # Numerical computing
+Pillow==11.0.0  # Image processing
 
-# Geospatial utilities
-shapely>=2.0.0
+# STAC
+pystac==1.11.0  # STAC data model
+pystac-client==0.8.5  # STAC API client
 
-# JSON schema validation (for STAC)
-jsonschema>=4.0.0
+# Vector Tiles
+mapbox-vector-tile==2.1.0  # MVT encoding/decoding
 
-# Optional: ArcGIS REST API testing
-# Uncomment if testing with ArcGIS Python API
-# arcgis>=2.0.0
+# XML/GML Processing
+lxml==5.3.0  # XML parsing
+xmltodict==0.14.2  # XML to dict conversion
 
-# Optional: GeoPandas for spatial dataframe testing
-# Uncomment if testing spatial dataframes
-# geopandas>=0.12.0
-# pandas>=1.5.0
+# OpenRosa/ODK
+pyxform==2.1.1  # XForms support (if needed)
+
+# Database Clients (for integration tests)
+psycopg2-binary==2.9.10  # PostgreSQL adapter
+redis==5.2.1  # Redis client
+
+# Utilities
+python-dotenv==1.0.1  # Environment variable loading
+pyyaml==6.0.2  # YAML configuration
+click==8.1.8  # CLI utilities
+
+# Development Tools
+ruff==0.8.4  # Fast Python linter
+black==24.10.0  # Code formatter
+mypy==1.13.0  # Type checking
