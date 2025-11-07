@@ -2,6 +2,7 @@
 @using Honua.MapSDK.Core.Messages
 @using Honua.MapSDK.Services.Geocoding
 @using Microsoft.JSInterop
+@using GeocodingSearchResult = Honua.MapSDK.Services.Geocoding.SearchResult
 @implements IAsyncDisposable
 @inject ComponentBus Bus
 @inject IJSRuntime JS
@@ -22,8 +23,8 @@
             </MudTooltip>
         }
 
-        <MudAutocomplete T="SearchResult"
-                         @bind-Value="_selectedResult"
+        <MudAutocomplete T="GeocodingSearchResult"
+                         Value="@_selectedResult"
                          SearchFunc="@SearchAsync"
                          ToStringFunc="@(r => r?.DisplayName ?? "")"
                          Placeholder="@Placeholder"
@@ -40,7 +41,7 @@
                          ProgressIndicatorColor="Color.Primary"
                          AdornmentIcon="@Icons.Material.Filled.Search"
                          AdornmentColor="Color.Primary"
-                         ValueChanged="@OnResultSelected"
+                         ValueChanged="@HandleResultSelected"
                          Class="search-autocomplete"
                          aria-label="@Placeholder">
             <ItemTemplate Context="result">
@@ -223,7 +224,7 @@
     /// Event callback when search result is selected
     /// </summary>
     [Parameter]
-    public EventCallback<SearchResult> OnResultSelected { get; set; }
+    public EventCallback<GeocodingSearchResult> OnResultSelected { get; set; }
 
     /// <summary>
     /// Event callback when geolocation is successful
@@ -233,7 +234,7 @@
 
     private IGeocoder? _geocoder;
     private HttpClient? _httpClient;
-    private SearchResult? _selectedResult;
+    private GeocodingSearchResult? _selectedResult;
     private List<RecentSearch> _recentSearches = new();
     private bool _mapReady = false;
     private bool _isLocating = false;
@@ -303,11 +304,11 @@
         });
     }
 
-    private async Task<IEnumerable<SearchResult>> SearchAsync(string searchText)
+    private async Task<IEnumerable<GeocodingSearchResult>> SearchAsync(string searchText)
     {
         if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < MinSearchLength)
         {
-            return Enumerable.Empty<SearchResult>();
+            return Enumerable.Empty<GeocodingSearchResult>();
         }
 
         _hideRecent = true;
@@ -317,26 +318,26 @@
         {
             if (_geocoder == null)
             {
-                return Enumerable.Empty<SearchResult>();
+                return Enumerable.Empty<GeocodingSearchResult>();
             }
 
             var results = await _geocoder.SearchAsync(searchText, MaxResults);
-            return results ?? Enumerable.Empty<SearchResult>();
+            return results ?? Enumerable.Empty<GeocodingSearchResult>();
         }
         catch (GeocodingException ex)
         {
             _errorMessage = ex.Message;
-            return Enumerable.Empty<SearchResult>();
+            return Enumerable.Empty<GeocodingSearchResult>();
         }
         catch (Exception ex)
         {
             _errorMessage = "An error occurred while searching. Please try again.";
             Console.Error.WriteLine($"Search error: {ex.Message}");
-            return Enumerable.Empty<SearchResult>();
+            return Enumerable.Empty<GeocodingSearchResult>();
         }
     }
 
-    private async Task OnResultSelected(SearchResult? result)
+    private async Task HandleResultSelected(GeocodingSearchResult? result)
     {
         if (result == null) return;
 
@@ -466,7 +467,7 @@
 
     private async Task OnRecentSearchClicked(RecentSearch recent)
     {
-        var result = new SearchResult
+        var result = new GeocodingSearchResult
         {
             Id = recent.Id,
             DisplayName = recent.DisplayName,
@@ -477,10 +478,10 @@
         };
 
         _selectedResult = result;
-        await OnResultSelected(result);
+        await HandleResultSelected(result);
     }
 
-    private async Task AddToRecentSearches(SearchResult result)
+    private async Task AddToRecentSearches(GeocodingSearchResult result)
     {
         var recent = new RecentSearch
         {
@@ -583,7 +584,7 @@
         };
     }
 
-    private string GetLocationText(SearchResult result)
+    private string GetLocationText(GeocodingSearchResult result)
     {
         var parts = new List<string>();
         if (!string.IsNullOrEmpty(result.City)) parts.Add(result.City);

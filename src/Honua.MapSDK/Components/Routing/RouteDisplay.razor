@@ -5,6 +5,7 @@
 @using Honua.Server.Core.LocationServices.Models
 @using Honua.MapSDK.Models.Routing
 @using Honua.MapSDK.Services.Routing
+@using RoutingElevationPoint = Honua.MapSDK.Models.Routing.ElevationPoint
 @inject RouteVisualizationService VisualizationService
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
@@ -244,7 +245,7 @@
     public EventCallback<Route> OnAlternativeRouteSelected { get; set; }
 
     private ElementReference elevationChartRef;
-    private List<ElevationPoint> ElevationData { get; set; } = new();
+    private List<RoutingElevationPoint> ElevationData { get; set; } = new();
     private int ChartWidth { get; set; } = 400;
     private bool IsAnimating { get; set; }
     private double AnimationProgress { get; set; }

@@ -1,4 +1,6 @@
 @using Honua.MapSDK.Services.Drawing
+@using DrawingElevationProfile = Honua.MapSDK.Services.Drawing.ElevationProfile
+@using DrawingMeasurementUnit = Honua.MapSDK.Services.Drawing.MeasurementUnit
 @inject MeasurementManager MeasurementManager
 
 <div class="honua-measurement-display @CssClass" style="@Style">
@@ -57,20 +59,20 @@
                         <select @bind="SelectedUnit" @bind:after="OnUnitChanged">
                             @if (CurrentMeasurement.Type == MeasurementType.Distance)
                             {
-                                <option value="@MeasurementUnit.Meters">Meters</option>
-                                <option value="@MeasurementUnit.Kilometers">Kilometers</option>
-                                <option value="@MeasurementUnit.Feet">Feet</option>
-                                <option value="@MeasurementUnit.Miles">Miles</option>
-                                <option value="@MeasurementUnit.NauticalMiles">Nautical Miles</option>
+                                <option value="@DrawingMeasurementUnit.Meters">Meters</option>
+                                <option value="@DrawingMeasurementUnit.Kilometers">Kilometers</option>
+                                <option value="@DrawingMeasurementUnit.Feet">Feet</option>
+                                <option value="@DrawingMeasurementUnit.Miles">Miles</option>
+                                <option value="@DrawingMeasurementUnit.NauticalMiles">Nautical Miles</option>
                             }
                             else if (CurrentMeasurement.Type == MeasurementType.Area)
                             {
-                                <option value="@MeasurementUnit.SquareMeters">Square Meters</option>
-                                <option value="@MeasurementUnit.SquareKilometers">Square Kilometers</option>
-                                <option value="@MeasurementUnit.SquareFeet">Square Feet</option>
-                                <option value="@MeasurementUnit.SquareMiles">Square Miles</option>
-                                <option value="@MeasurementUnit.Acres">Acres</option>
-                                <option value="@MeasurementUnit.Hectares">Hectares</option>
+                                <option value="@DrawingMeasurementUnit.SquareMeters">Square Meters</option>
+                                <option value="@DrawingMeasurementUnit.SquareKilometers">Square Kilometers</option>
+                                <option value="@DrawingMeasurementUnit.SquareFeet">Square Feet</option>
+                                <option value="@DrawingMeasurementUnit.SquareMiles">Square Miles</option>
+                                <option value="@DrawingMeasurementUnit.Acres">Acres</option>
+                                <option value="@DrawingMeasurementUnit.Hectares">Hectares</option>
                             }
                         </select>
                     </div>
@@ -172,8 +174,8 @@
     private MeasurementResult? CurrentMeasurement { get; set; }
     private MeasurementResult? Perimeter { get; set; }
     private BearingResult? Bearing { get; set; }
-    private ElevationProfile? ElevationProfile { get; set; }
-    private MeasurementUnit SelectedUnit { get; set; } = MeasurementUnit.Meters;
+    private DrawingElevationProfile? ElevationProfile { get; set; }
+    private DrawingMeasurementUnit SelectedUnit { get; set; } = DrawingMeasurementUnit.Meters;
     private bool ShowMeasurement => CurrentMeasurement != null;
 
     protected override void OnParametersSet()

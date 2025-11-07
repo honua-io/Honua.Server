@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using Npgsql;
+using Location = Honua.Server.Enterprise.Sensors.Models.Location;
 
 namespace Honua.Server.Enterprise.Sensors.Data.Postgres;
 
@@ -66,7 +67,7 @@ internal sealed class PostgresLocationRepository
         if (options.OrderBy?.Any() == true)
         {
             var orderClauses = options.OrderBy.Select(o =>
-                $"{o.Property} {(o.Descending ? "DESC" : "ASC")}");
+                $"{o.Property} {(o.Direction == SortDirection.Descending ? "DESC" : "ASC")}");
             orderBy = "ORDER BY " + string.Join(", ", orderClauses);
         }
 
@@ -92,7 +93,11 @@ internal sealed class PostgresLocationRepository
 
         var items = locations.Select(MapToModel).ToList();
 
-        return new PagedResult<Location>(items, total, options.Skip, options.Top);
+        return new PagedResult<Location>
+        {
+            Items = items,
+            TotalCount = total
+        };
     }
 
     public async Task<PagedResult<Location>> GetByThingAsync(
@@ -121,7 +126,7 @@ internal sealed class PostgresLocationRepository
         if (options.OrderBy?.Any() == true)
         {
             var orderClauses = options.OrderBy.Select(o =>
-                $"l.{o.Property} {(o.Descending ? "DESC" : "ASC")}");
+                $"l.{o.Property} {(o.Direction == SortDirection.Descending ? "DESC" : "ASC")}");
             orderBy = "ORDER BY " + string.Join(", ", orderClauses);
         }
 
@@ -147,7 +152,11 @@ internal sealed class PostgresLocationRepository
 
         var items = locations.Select(MapToModel).ToList();
 
-        return new PagedResult<Location>(items, total, options.Skip, options.Top);
+        return new PagedResult<Location>
+        {
+            Items = items,
+            TotalCount = total
+        };
     }
 
     public async Task<Location> CreateAsync(Location location, CancellationToken ct)
@@ -155,9 +164,8 @@ internal sealed class PostgresLocationRepository
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
 
-        location.Id = Guid.NewGuid().ToString();
-        location.CreatedAt = DateTimeOffset.UtcNow;
-        location.UpdatedAt = location.CreatedAt;
+        var id = Guid.NewGuid().ToString();
+        var now = DateTime.UtcNow;
 
         const string sql = @"
             INSERT INTO locations (
@@ -172,21 +180,26 @@ internal sealed class PostgresLocationRepository
 
         await conn.ExecuteAsync(new CommandDefinition(sql, new
         {
-            location.Id,
+            Id = id,
             location.Name,
             location.Description,
             location.EncodingType,
-            Location = SerializeGeometry(location.Location),
+            Location = SerializeGeometry(location.Geometry),
             Properties = location.Properties != null
                 ? JsonSerializer.Serialize(location.Properties)
                 : null,
-            location.CreatedAt,
-            location.UpdatedAt
+            CreatedAt = now,
+            UpdatedAt = now
         }, cancellationToken: ct));
 
-        _logger.LogInformation("Created Location {LocationId}", location.Id);
+        _logger.LogInformation("Created Location {LocationId}", id);
 
-        return location;
+        return location with
+        {
+            Id = id,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
     }
 
     public async Task<Location> UpdateAsync(string id, Location location, CancellationToken ct)
@@ -194,8 +207,7 @@ internal sealed class PostgresLocationRepository
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync(ct);
 
-        location.Id = id;
-        location.UpdatedAt = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
 
         const string sql = @"
             UPDATE locations
@@ -216,11 +228,11 @@ internal sealed class PostgresLocationRepository
             location.Name,
             location.Description,
             location.EncodingType,
-            Location = location.Location != null ? SerializeGeometry(location.Location) : null,
+            Location = location.Geometry != null ? SerializeGeometry(location.Geometry) : null,
             Properties = location.Properties != null
                 ? JsonSerializer.Serialize(location.Properties)
                 : null,
-            location.UpdatedAt
+            UpdatedAt = now
         }, cancellationToken: ct));
 
         _logger.LogInformation("Updated Location {LocationId}", id);
@@ -254,7 +266,7 @@ internal sealed class PostgresLocationRepository
             Name = dto.Name,
             Description = dto.Description,
             EncodingType = dto.EncodingType,
-            Location = DeserializeGeometry(dto.Location),
+            Geometry = DeserializeGeometry(dto.Location),
             Properties = PostgresQueryHelper.ParseProperties(dto.Properties),
             CreatedAt = dto.CreatedAt,
             UpdatedAt = dto.UpdatedAt
@@ -294,7 +306,7 @@ internal sealed class PostgresLocationRepository
         public string EncodingType { get; init; } = string.Empty;
         public string? Location { get; init; }
         public string? Properties { get; init; }
-        public DateTimeOffset CreatedAt { get; init; }
-        public DateTimeOffset UpdatedAt { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public DateTime UpdatedAt { get; init; }
     }
 }

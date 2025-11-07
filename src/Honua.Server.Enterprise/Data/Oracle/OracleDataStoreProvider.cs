@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Data.Common;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
@@ -22,7 +23,7 @@ namespace Honua.Server.Enterprise.Data.Oracle;
 /// Oracle Spatial data provider using Oracle.ManagedDataAccess.Core with SDO_GEOMETRY.
 /// Inherits from RelationalDataStoreProviderBase for standardized connection and transaction management.
 /// </summary>
-public sealed class OracleDataStoreProvider : RelationalDataStoreProviderBase<OracleConnection, OracleTransaction, OracleCommand>
+public sealed class OracleDataStoreProvider : RelationalDataStoreProviderBase<OracleConnection, OracleTransaction, OracleCommand, OracleDataReader>
 {
     public const string ProviderKey = "oracle";
 
@@ -39,6 +40,10 @@ public sealed class OracleDataStoreProvider : RelationalDataStoreProviderBase<Or
     public override string Provider => ProviderKey;
 
     public override IDataStoreCapabilities Capabilities => OracleDataStoreCapabilities.Instance;
+
+    // ========================================
+    // ABSTRACT METHOD IMPLEMENTATIONS
+    // ========================================
 
     protected override OracleConnection CreateConnectionCore(string connectionString)
     {
@@ -77,248 +82,175 @@ public sealed class OracleDataStoreProvider : RelationalDataStoreProviderBase<Or
 
     protected override string GetConnectivityTestQuery() => "SELECT 1 FROM DUAL";
 
-    public override async IAsyncEnumerable<FeatureRecord> QueryAsync(
-        DataSourceDefinition dataSource,
+    protected override QueryDefinition BuildSelectQuery(
         ServiceDefinition service,
         LayerDefinition layer,
-        FeatureQuery? query,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        int storageSrid,
+        int targetSrid,
+        FeatureQuery query)
     {
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-
-        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await RetryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
         var builder = new OracleFeatureQueryBuilder(layer);
-        var (sql, parameters) = builder.BuildSelect(query ?? new FeatureQuery());
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        SqlParameterHelper.AddParameters(command, parameters);
-
-        await using var reader = await RetryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteReaderAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return CreateFeatureRecord(reader, layer);
-        }
+        var (sql, parameters) = builder.BuildSelect(query);
+        return new QueryDefinition(sql, parameters);
     }
 
-    public override async Task<long> CountAsync(
-        DataSourceDefinition dataSource,
+    protected override QueryDefinition BuildCountQuery(
         ServiceDefinition service,
         LayerDefinition layer,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default)
+        int storageSrid,
+        int targetSrid,
+        FeatureQuery query)
     {
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-
-        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await RetryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
         var builder = new OracleFeatureQueryBuilder(layer);
-        var (sql, parameters) = builder.BuildCount(query ?? new FeatureQuery());
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        SqlParameterHelper.AddParameters(command, parameters);
-
-        var result = await RetryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        return result is null or DBNull ? 0L : Convert.ToInt64(result, CultureInfo.InvariantCulture);
+        var (sql, parameters) = builder.BuildCount(query);
+        return new QueryDefinition(sql, parameters);
     }
 
-    public override async Task<FeatureRecord?> GetAsync(
-        DataSourceDefinition dataSource,
+    protected override QueryDefinition BuildByIdQuery(
         ServiceDefinition service,
         LayerDefinition layer,
-        string featureId,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default)
+        int storageSrid,
+        int targetSrid,
+        string featureId)
     {
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
-        await RetryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
         var builder = new OracleFeatureQueryBuilder(layer);
         var (sql, parameters) = builder.BuildById(featureId);
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildInsertQuery(LayerDefinition layer, FeatureRecord record)
+    {
+        var builder = new OracleFeatureQueryBuilder(layer);
+        var (sql, parameters) = builder.BuildInsert(record);
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildUpdateQuery(LayerDefinition layer, string featureId, FeatureRecord record)
+    {
+        var builder = new OracleFeatureQueryBuilder(layer);
+        var (sql, parameters) = builder.BuildUpdate(featureId, record);
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildDeleteQuery(LayerDefinition layer, string featureId)
+    {
+        var builder = new OracleFeatureQueryBuilder(layer);
+        var (sql, parameters) = builder.BuildDelete(featureId);
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildSoftDeleteQuery(LayerDefinition layer, string featureId, string? deletedBy)
+    {
+        var table = layer.Storage?.Table ?? layer.Id;
+        var keyColumn = layer.IdField;
+        var sql = $@"
+            UPDATE {QuoteIdentifier(table)}
+            SET is_deleted = 1,
+                deleted_at = SYSTIMESTAMP,
+                deleted_by = :deletedBy
+            WHERE {QuoteIdentifier(keyColumn)} = :key
+              AND (is_deleted IS NULL OR is_deleted = 0)";
+
+        var parameters = new Dictionary<string, object?>
+        {
+            [":key"] = featureId,
+            [":deletedBy"] = (object?)deletedBy ?? DBNull.Value
+        };
+
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildRestoreQuery(LayerDefinition layer, string featureId)
+    {
+        var table = layer.Storage?.Table ?? layer.Id;
+        var keyColumn = layer.IdField;
+        var sql = $@"
+            UPDATE {QuoteIdentifier(table)}
+            SET is_deleted = 0,
+                deleted_at = NULL,
+                deleted_by = NULL
+            WHERE {QuoteIdentifier(keyColumn)} = :key
+              AND is_deleted = 1";
+
+        var parameters = new Dictionary<string, object?> { [":key"] = featureId };
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildHardDeleteQuery(LayerDefinition layer, string featureId)
+    {
+        var table = layer.Storage?.Table ?? layer.Id;
+        var keyColumn = layer.IdField;
+        var sql = $"DELETE FROM {QuoteIdentifier(table)} WHERE {QuoteIdentifier(keyColumn)} = :key";
+        var parameters = new Dictionary<string, object?> { [":key"] = featureId };
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override FeatureRecord CreateFeatureRecord(
+        OracleDataReader reader,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid)
+    {
+        // Use FeatureRecordReader with custom geometry extraction for Oracle SDO_UTIL.TO_GEOJSON
+        var skipColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "GEOJSON" };
+
+        return FeatureRecordReader.ReadFeatureRecordWithCustomGeometry(
+            reader,
+            layer,
+            layer.GeometryField,
+            skipColumns,
+            () =>
+            {
+                // Extract geometry from GEOJSON column if present
+                var geoJsonOrdinal = FeatureRecordReader.TryGetGeometryOrdinal(reader, "GEOJSON");
+                if (geoJsonOrdinal >= 0 && !reader.IsDBNull(geoJsonOrdinal))
+                {
+                    var geoJson = reader.GetString(geoJsonOrdinal);
+                    return FeatureRecordNormalizer.ParseGeometry(geoJson);
+                }
+                return null;
+            });
+    }
+
+    protected override async Task<string> ExecuteInsertAsync(
+        OracleConnection connection,
+        OracleTransaction? transaction,
+        LayerDefinition layer,
+        FeatureRecord record,
+        CancellationToken cancellationToken)
+    {
+        var builder = new OracleFeatureQueryBuilder(layer);
+        var (sql, parameters) = builder.BuildInsert(record);
 
         await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = sql;
         SqlParameterHelper.AddParameters(command, parameters);
 
-        await using var reader = await RetryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteReaderAsync(ct).ConfigureAwait(false),
+        await RetryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
-        if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        // Get the inserted key from the record attributes
+        var idValue = record.Attributes.TryGetValue(layer.IdField, out var id) ? id : null;
+        if (idValue != null)
         {
-            return CreateFeatureRecord(reader, layer);
+            return idValue.ToString() ?? throw new InvalidOperationException("Failed to obtain key for inserted feature.");
         }
 
-        return null;
+        throw new InvalidOperationException("Failed to obtain key for inserted feature.");
     }
 
-    public override async Task<FeatureRecord> CreateAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureRecord record,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
+    protected override void AddParameters(DbCommand command, IReadOnlyDictionary<string, object?> parameters)
     {
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNull(record);
-
-        var (connection, oracleTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            var builder = new OracleFeatureQueryBuilder(layer);
-            var (sql, parameters) = builder.BuildInsert(record);
-
-            await using var command = connection.CreateCommand();
-            command.Transaction = oracleTransaction;
-            command.CommandText = sql;
-            SqlParameterHelper.AddParameters(command, parameters);
-
-            await RetryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-
-            // Fetch the inserted record
-            var idValue = record.Attributes.TryGetValue(layer.IdField, out var id) ? id : null;
-            if (idValue != null)
-            {
-                var inserted = await GetAsync(dataSource, service, layer, idValue.ToString()!, null, cancellationToken).ConfigureAwait(false);
-                return inserted ?? record;
-            }
-
-            return record;
-        }
-        finally
-        {
-            if (shouldDisposeConnection)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
+        SqlParameterHelper.AddParameters(command, parameters);
     }
 
-    public override async Task<FeatureRecord?> UpdateAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        FeatureRecord record,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
+    protected override IsolationLevel GetDefaultIsolationLevel() => IsolationLevel.RepeatableRead;
 
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-        Guard.NotNull(record);
-
-        var (connection, oracleTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            var builder = new OracleFeatureQueryBuilder(layer);
-            var (sql, parameters) = builder.BuildUpdate(featureId, record);
-
-            await using var command = connection.CreateCommand();
-            command.Transaction = oracleTransaction;
-            command.CommandText = sql;
-            SqlParameterHelper.AddParameters(command, parameters);
-
-            var rowsAffected = await RetryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-
-            if (rowsAffected == 0)
-            {
-                return null;
-            }
-
-            return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
-        }
-        finally
-        {
-            if (shouldDisposeConnection)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public override async Task<bool> DeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        var (connection, oracleTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            var builder = new OracleFeatureQueryBuilder(layer);
-            var (sql, parameters) = builder.BuildDelete(featureId);
-
-            await using var command = connection.CreateCommand();
-            command.Transaction = oracleTransaction;
-            command.CommandText = sql;
-            SqlParameterHelper.AddParameters(command, parameters);
-
-            var rowsAffected = await RetryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-
-            return rowsAffected > 0;
-        }
-        finally
-        {
-            if (shouldDisposeConnection)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
+    // ========================================
+    // BULK OPERATIONS (Provider-specific)
+    // ========================================
 
     /// <summary>
     /// Inserts multiple features using Oracle array binding for optimal performance.
@@ -654,30 +586,6 @@ public sealed class OracleDataStoreProvider : RelationalDataStoreProviderBase<Or
             await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
     }
-
-    private FeatureRecord CreateFeatureRecord(IDataReader reader, LayerDefinition layer)
-    {
-        // Use FeatureRecordReader with custom geometry extraction for Oracle SDO_UTIL.TO_GEOJSON
-        var skipColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "GEOJSON" };
-
-        return FeatureRecordReader.ReadFeatureRecordWithCustomGeometry(
-            reader,
-            layer,
-            layer.GeometryField,
-            skipColumns,
-            () =>
-            {
-                // Extract geometry from GEOJSON column if present
-                var geoJsonOrdinal = FeatureRecordReader.TryGetGeometryOrdinal(reader, "GEOJSON");
-                if (geoJsonOrdinal >= 0 && !reader.IsDBNull(geoJsonOrdinal))
-                {
-                    var geoJson = reader.GetString(geoJsonOrdinal);
-                    return FeatureRecordNormalizer.ParseGeometry(geoJson);
-                }
-                return null;
-            });
-    }
-
 
     /// <summary>
     /// Quotes an Oracle identifier using double quotes, with SQL injection protection.
@@ -1017,46 +925,5 @@ public sealed class OracleDataStoreProvider : RelationalDataStoreProviderBase<Or
         };
     }
 
-
-    public override Task<bool> SoftDeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        string? deletedBy,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException(
-            $"Soft delete is not supported by the {nameof(OracleDataStoreProvider)}. " +
-            "Check IDataStoreCapabilities.SupportsSoftDelete before calling this method.");
-    }
-
-    public override Task<bool> RestoreAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException(
-            $"Restore is not supported by the {nameof(OracleDataStoreProvider)}. " +
-            "Check IDataStoreCapabilities.SupportsSoftDelete before calling this method.");
-    }
-
-    public override Task<bool> HardDeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        string? deletedBy,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        throw new NotSupportedException(
-            $"Hard delete is not supported by the {nameof(OracleDataStoreProvider)}. " +
-            "Use the standard DeleteAsync method for permanent deletion.");
-    }
 
 }

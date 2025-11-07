@@ -2,6 +2,7 @@
 @using Honua.MapSDK.Core.Messages
 @using Honua.MapSDK.Models
 @using Microsoft.JSInterop
+@using MudTimelinePosition = MudBlazor.TimelinePosition
 @implements IAsyncDisposable
 @inject ComponentBus Bus
 @inject IJSRuntime JS
@@ -267,7 +268,7 @@
     /// Component position
     /// </summary>
     [Parameter]
-    public TimelinePosition Position { get; set; } = TimelinePosition.None;
+    public Models.TimelinePosition Position { get; set; } = Models.TimelinePosition.None;
 
     /// <summary>
     /// Auto-start playback on load
@@ -845,7 +846,7 @@
         var classes = new List<string>();
 
         if (Compact) classes.Add("compact");
-        if (Position != TimelinePosition.None) classes.Add($"position-{Position.ToString().ToLower()}");
+        if (Position != Models.TimelinePosition.None) classes.Add($"position-{Position.ToString().ToLower()}");
         if (!string.IsNullOrEmpty(CssClass)) classes.Add(CssClass);
 
         return string.Join(" ", classes);
