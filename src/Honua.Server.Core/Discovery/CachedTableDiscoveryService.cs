@@ -192,8 +192,10 @@ public sealed class CachedTableDiscoveryService : ITableDiscoveryService, IDispo
     private static long EstimateCacheSize(IEnumerable<DiscoveredTable> tables)
     {
         // Rough estimate: 1 unit per table plus 1 unit per 10 columns
-        var tableCount = tables.Count();
-        var columnCount = tables.Sum(t => t.Columns.Count);
+        // Materialize once to avoid multiple enumerations
+        var materializedTables = tables.ToList();
+        var tableCount = materializedTables.Count;
+        var columnCount = materializedTables.Sum(t => t.Columns.Count);
         return tableCount + (columnCount / 10);
     }
 
