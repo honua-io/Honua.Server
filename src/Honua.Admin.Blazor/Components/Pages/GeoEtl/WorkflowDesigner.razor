@@ -1,0 +1,337 @@
+@page "/geoetl/designer"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject FeatureFlagService FeatureFlags
+
+<PageTitle>Workflow Designer</PageTitle>
+
+@if (!_hasAccess)
+{
+    <MudAlert Severity="Severity.Warning" Class="my-4">
+        <MudText Typo="Typo.h6">Enterprise Feature Required</MudText>
+        <MudText>GeoETL workflows require an Enterprise license.</MudText>
+    </MudAlert>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <MudText Typo="Typo.h3" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="mr-2" />
+            @(_isEditing ? "Edit Workflow" : "Create Workflow")
+        </MudText>
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Class="pa-4">
+                    <MudForm @ref="_form" @bind-IsValid="@_formValid">
+                        <MudTextField @bind-Value="_workflowName"
+                                      Label="Workflow Name"
+                                      Required="true"
+                                      RequiredError="Name is required"
+                                      Variant="Variant.Outlined"
+                                      Class="mb-4" />
+
+                        <MudTextField @bind-Value="_workflowDescription"
+                                      Label="Description"
+                                      Lines="3"
+                                      Variant="Variant.Outlined"
+                                      Class="mb-4" />
+
+                        <MudTextField @bind-Value="_workflowCategory"
+                                      Label="Category"
+                                      Variant="Variant.Outlined"
+                                      Class="mb-4" />
+
+                        <MudDivider Class="my-4" />
+
+                        <MudText Typo="Typo.h6" Class="mb-2">Workflow Nodes</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                            Define the steps in your workflow. Each node performs a specific operation.
+                        </MudText>
+
+                        @foreach (var node in _nodes)
+                        {
+                            <MudCard Class="mb-3">
+                                <MudCardContent>
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                        <div style="flex: 1;">
+                                            <MudTextField @bind-Value="node.Name"
+                                                          Label="Node Name"
+                                                          Variant="Variant.Text"
+                                                          Class="mb-2" />
+                                            <MudSelect @bind-Value="node.Type"
+                                                       Label="Node Type"
+                                                       Variant="Variant.Text"
+                                                       Class="mb-2">
+                                                <MudSelectItem Value="@("data_source.file")">File Data Source</MudSelectItem>
+                                                <MudSelectItem Value="@("data_source.postgis")">PostGIS Data Source</MudSelectItem>
+                                                <MudSelectItem Value="@("data_source.geopackage")">GeoPackage Data Source</MudSelectItem>
+                                                <MudSelectItem Value="@("data_source.shapefile")">Shapefile Data Source</MudSelectItem>
+                                                <MudSelectItem Value="@("geoprocessing.buffer")">Buffer</MudSelectItem>
+                                                <MudSelectItem Value="@("geoprocessing.intersection")">Intersection</MudSelectItem>
+                                                <MudSelectItem Value="@("geoprocessing.union")">Union</MudSelectItem>
+                                                <MudSelectItem Value="@("geoprocessing.difference")">Difference</MudSelectItem>
+                                                <MudSelectItem Value="@("data_sink.geojson")">GeoJSON Export</MudSelectItem>
+                                                <MudSelectItem Value="@("data_sink.geopackage")">GeoPackage Export</MudSelectItem>
+                                                <MudSelectItem Value="@("data_sink.shapefile")">Shapefile Export</MudSelectItem>
+                                                <MudSelectItem Value="@("data_sink.postgis")">PostGIS Export</MudSelectItem>
+                                            </MudSelect>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                Node ID: @node.Id
+                                            </MudText>
+                                        </div>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Color="Color.Error"
+                                                       OnClick="@(() => RemoveNode(node))" />
+                                    </MudStack>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+
+                        <MudButton Variant="Variant.Outlined"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddNode"
+                                   Class="mb-4">
+                            Add Node
+                        </MudButton>
+
+                        <MudDivider Class="my-4" />
+
+                        <MudText Typo="Typo.h6" Class="mb-2">Node Connections</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                            Connect nodes to define the data flow through your workflow.
+                        </MudText>
+
+                        @foreach (var edge in _edges)
+                        {
+                            <MudCard Class="mb-2">
+                                <MudCardContent>
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudSelect @bind-Value="edge.From"
+                                                       Label="From Node"
+                                                       Variant="Variant.Text"
+                                                       Style="min-width: 200px;">
+                                                @foreach (var node in _nodes)
+                                                {
+                                                    <MudSelectItem Value="@node.Id">@node.Name</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" />
+                                            <MudSelect @bind-Value="edge.To"
+                                                       Label="To Node"
+                                                       Variant="Variant.Text"
+                                                       Style="min-width: 200px;">
+                                                @foreach (var node in _nodes)
+                                                {
+                                                    <MudSelectItem Value="@node.Id">@node.Name</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                        </MudStack>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Color="Color.Error"
+                                                       OnClick="@(() => RemoveEdge(edge))" />
+                                    </MudStack>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+
+                        <MudButton Variant="Variant.Outlined"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddEdge"
+                                   Disabled="@(_nodes.Count < 2)"
+                                   Class="mb-4">
+                            Add Connection
+                        </MudButton>
+                    </MudForm>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4 sticky-top">
+                    <MudText Typo="Typo.h6" Class="mb-3">Quick Actions</MudText>
+
+                    <MudStack Spacing="2">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   OnClick="SaveWorkflow"
+                                   Disabled="@(!_formValid || _saving)">
+                            @if (_saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <span>Save Workflow</span>
+                            }
+                        </MudButton>
+
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Secondary"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Close"
+                                   OnClick="@(() => Navigation.NavigateTo("/geoetl/workflows"))">
+                            Cancel
+                        </MudButton>
+                    </MudStack>
+
+                    <MudDivider Class="my-3" />
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Workflow Summary</MudText>
+                    <MudList Dense="true">
+                        <MudListItem Icon="@Icons.Material.Filled.ViewList">
+                            @_nodes.Count node(s)
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Link">
+                            @_edges.Count connection(s)
+                        </MudListItem>
+                    </MudList>
+
+                    <MudDivider Class="my-3" />
+
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
+                        This is a simplified workflow designer. Advanced visual designer coming in Phase 3.
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+}
+
+@code {
+    private bool _hasAccess;
+    private bool _isEditing;
+    private bool _formValid;
+    private bool _saving;
+    private MudForm? _form;
+
+    private string _workflowName = "";
+    private string _workflowDescription = "";
+    private string _workflowCategory = "";
+
+    private List<NodeModel> _nodes = new();
+    private List<EdgeModel> _edges = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hasAccess = await FeatureFlags.IsEnabledAsync("geoetl");
+
+        // Check if editing existing workflow
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var workflowId = query["id"];
+
+        if (!string.IsNullOrEmpty(workflowId) && Guid.TryParse(workflowId, out var id))
+        {
+            _isEditing = true;
+            await LoadWorkflow(id);
+        }
+        else
+        {
+            // Initialize with a basic template
+            AddNode();
+        }
+    }
+
+    private async Task LoadWorkflow(Guid workflowId)
+    {
+        // TODO: Load workflow from API
+        Snackbar.Add("Workflow loading not yet implemented", Severity.Info);
+    }
+
+    private void AddNode()
+    {
+        var nodeId = $"node_{_nodes.Count + 1}";
+        _nodes.Add(new NodeModel
+            {
+                Id = nodeId,
+                Name = $"Node {_nodes.Count + 1}",
+                Type = "data_source.file"
+            });
+    }
+
+    private void RemoveNode(NodeModel node)
+    {
+        _nodes.Remove(node);
+        // Remove edges connected to this node
+        _edges.RemoveAll(e => e.From == node.Id || e.To == node.Id);
+    }
+
+    private void AddEdge()
+    {
+        if (_nodes.Count >= 2)
+        {
+            _edges.Add(new EdgeModel
+                {
+                    From = _nodes[0].Id,
+                    To = _nodes[^1].Id
+                });
+        }
+    }
+
+    private void RemoveEdge(EdgeModel edge)
+    {
+        _edges.Remove(edge);
+    }
+
+    private async Task SaveWorkflow()
+    {
+        if (!_formValid)
+            return;
+
+        _saving = true;
+        try
+        {
+            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+            var request = new
+            {
+                tenantId,
+                createdBy = userId,
+                name = _workflowName,
+                description = _workflowDescription,
+                category = _workflowCategory,
+                nodes = _nodes.Select(n => new { id = n.Id, type = n.Type, name = n.Name, parameters = new Dictionary<string, object>() }),
+                edges = _edges.Select(e => new { from = e.From, to = e.To })
+            };
+
+            await Http.PostAsJsonAsync("/admin/api/geoetl/workflows", request);
+            Snackbar.Add("Workflow saved successfully", Severity.Success);
+            Navigation.NavigateTo("/geoetl/workflows");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to save workflow: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private class NodeModel
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+    }
+
+    private class EdgeModel
+    {
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
+    }
+}
+
+<style>
+    .sticky-top {
+        position: sticky;
+        top: 20px;
+    }
+</style>

@@ -1,0 +1,225 @@
+@page "/geoetl/workflows"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject FeatureFlagService FeatureFlags
+
+<PageTitle>GeoETL Workflows</PageTitle>
+
+@if (!_hasAccess)
+{
+    <MudAlert Severity="Severity.Warning" Class="my-4">
+        <MudText Typo="Typo.h6">Enterprise Feature Required</MudText>
+        <MudText>
+            GeoETL workflows require an Enterprise license.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/licensing" Class="mt-4">
+            Upgrade to Enterprise
+        </MudButton>
+    </MudAlert>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+        <MudText Typo="Typo.h3" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.Transform" Class="mr-2" /> GeoETL Workflows
+        </MudText>
+
+        <MudPaper Class="pa-4 mb-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudTextField @bind-Value="_searchText"
+                              Label="Search workflows"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Style="max-width: 400px;" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@(() => Navigation.NavigateTo("/geoetl/designer"))">
+                    Create Workflow
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+        }
+        else if (_workflows == null || !_workflows.Any())
+        {
+            <MudPaper Class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Transform" Size="Size.Large" Class="mb-4" Style="font-size: 4rem; opacity: 0.3;" />
+                <MudText Typo="Typo.h5" Class="mb-2">No workflows yet</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                    Create your first ETL workflow to start processing geospatial data
+                </MudText>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@(() => Navigation.NavigateTo("/geoetl/designer"))">
+                    Create Workflow
+                </MudButton>
+            </MudPaper>
+        }
+        else
+        {
+            <MudTable Items="@_filteredWorkflows" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh>Category</MudTh>
+                    <MudTh>Nodes</MudTh>
+                    <MudTh>Last Updated</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">
+                        <MudText Typo="Typo.body1" Class="font-weight-medium">
+                            @context.Metadata.Name
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Description">
+                        <MudText Typo="Typo.body2">
+                            @(context.Metadata.Description ?? "No description")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Category">
+                        @if (!string.IsNullOrEmpty(context.Metadata.Category))
+                        {
+                            <MudChip Size="Size.Small" Color="Color.Info">@context.Metadata.Category</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Nodes">
+                        <MudText Typo="Typo.body2">
+                            @context.Nodes.Count nodes
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Last Updated">
+                        <MudText Typo="Typo.body2">
+                            @context.UpdatedAt.ToString("g")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                           Title="Edit"
+                                           OnClick="@(() => EditWorkflow(context.WorkflowId))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.PlayArrow"
+                                           Title="Execute"
+                                           Color="Color.Success"
+                                           OnClick="@(() => ExecuteWorkflow(context.WorkflowId))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.History"
+                                           Title="View Runs"
+                                           OnClick="@(() => ViewRuns(context.WorkflowId))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Title="Delete"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteWorkflow(context.WorkflowId))" />
+                        </MudButtonGroup>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudContainer>
+}
+
+@code {
+    private bool _hasAccess;
+    private bool _loading = true;
+    private List<WorkflowDto>? _workflows;
+    private string _searchText = "";
+
+    private IEnumerable<WorkflowDto> _filteredWorkflows =>
+        _workflows?.Where(w =>
+            string.IsNullOrEmpty(_searchText) ||
+            w.Metadata.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+            (w.Metadata.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+        ) ?? Enumerable.Empty<WorkflowDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hasAccess = await FeatureFlags.IsEnabledAsync("geoetl");
+
+        if (_hasAccess)
+        {
+            await LoadWorkflows();
+        }
+    }
+
+    private async Task LoadWorkflows()
+    {
+        _loading = true;
+        try
+        {
+            // TODO: Replace with actual tenant ID from authentication
+            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var response = await Http.GetFromJsonAsync<List<WorkflowDto>>($"/admin/api/geoetl/workflows?tenantId={tenantId}");
+            _workflows = response ?? new List<WorkflowDto>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load workflows: {ex.Message}", Severity.Error);
+            _workflows = new List<WorkflowDto>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void EditWorkflow(Guid workflowId)
+    {
+        Navigation.NavigateTo($"/geoetl/designer?id={workflowId}");
+    }
+
+    private async Task ExecuteWorkflow(Guid workflowId)
+    {
+        // TODO: Implement execution with parameter dialog
+        Snackbar.Add("Workflow execution will be implemented in the next iteration", Severity.Info);
+    }
+
+    private void ViewRuns(Guid workflowId)
+    {
+        Navigation.NavigateTo($"/geoetl/runs?workflowId={workflowId}");
+    }
+
+    private async Task DeleteWorkflow(Guid workflowId)
+    {
+        // TODO: Add confirmation dialog
+        try
+        {
+            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            await Http.DeleteAsync($"/admin/api/geoetl/workflows/{workflowId}?tenantId={tenantId}&deletedBy={userId}");
+            Snackbar.Add("Workflow deleted successfully", Severity.Success);
+            await LoadWorkflows();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to delete workflow: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // DTOs
+    private class WorkflowDto
+    {
+        public Guid WorkflowId { get; set; }
+        public WorkflowMetadataDto Metadata { get; set; } = new();
+        public List<NodeDto> Nodes { get; set; } = new();
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    private class WorkflowMetadataDto
+    {
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public string? Category { get; set; }
+    }
+
+    private class NodeDto
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "";
+    }
+}

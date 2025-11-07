@@ -54,19 +54,33 @@ public static class ServiceCollectionExtensions
                 registry.RegisterNode(node.NodeType, node);
             }
 
-            // Register data source nodes
+            // Register data source nodes (6 total)
             registry.RegisterNode("data_source.postgis",
                 new PostGisDataSourceNode(connectionString, loggerFactory.CreateLogger<PostGisDataSourceNode>()));
             registry.RegisterNode("data_source.file",
                 new FileDataSourceNode(loggerFactory.CreateLogger<FileDataSourceNode>()));
+            registry.RegisterNode("data_source.geopackage",
+                new GeoPackageDataSourceNode(connectionString, loggerFactory.CreateLogger<GeoPackageDataSourceNode>()));
+            registry.RegisterNode("data_source.shapefile",
+                new ShapefileDataSourceNode(loggerFactory.CreateLogger<ShapefileDataSourceNode>()));
+            registry.RegisterNode("data_source.kml",
+                new KmlDataSourceNode(loggerFactory.CreateLogger<KmlDataSourceNode>()));
 
-            // Register data sink nodes
+            // Get exporters from DI
+            var geoPackageExporter = sp.GetRequiredService<Core.Export.IGeoPackageExporter>();
+            var shapefileExporter = sp.GetRequiredService<Core.Export.IShapefileExporter>();
+
+            // Register data sink nodes (5 total)
             registry.RegisterNode("data_sink.postgis",
                 new PostGisDataSinkNode(connectionString, loggerFactory.CreateLogger<PostGisDataSinkNode>()));
             registry.RegisterNode("data_sink.geojson",
                 new GeoJsonExportNode(loggerFactory.CreateLogger<GeoJsonExportNode>()));
             registry.RegisterNode("data_sink.output",
                 new OutputNode(loggerFactory.CreateLogger<OutputNode>()));
+            registry.RegisterNode("data_sink.geopackage",
+                new GeoPackageSinkNode(geoPackageExporter, loggerFactory.CreateLogger<GeoPackageSinkNode>()));
+            registry.RegisterNode("data_sink.shapefile",
+                new ShapefileSinkNode(shapefileExporter, loggerFactory.CreateLogger<ShapefileSinkNode>()));
 
             return registry;
         });

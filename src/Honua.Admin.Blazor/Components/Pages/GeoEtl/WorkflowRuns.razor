@@ -1,0 +1,256 @@
+@page "/geoetl/runs"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject FeatureFlagService FeatureFlags
+
+<PageTitle>Workflow Execution History</PageTitle>
+
+@if (!_hasAccess)
+{
+    <MudAlert Severity="Severity.Warning" Class="my-4">
+        <MudText Typo="Typo.h6">Enterprise Feature Required</MudText>
+        <MudText>GeoETL workflows require an Enterprise license.</MudText>
+    </MudAlert>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+        <MudText Typo="Typo.h3" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+            Workflow Execution History
+        </MudText>
+
+        <MudPaper Class="pa-4 mb-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudTextField @bind-Value="_searchText"
+                              Label="Search runs"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Style="max-width: 400px;" />
+
+                <MudStack Row="true" Spacing="2">
+                    <MudSelect @bind-Value="_filterStatus"
+                               Label="Status"
+                               Variant="Variant.Outlined"
+                               Style="min-width: 150px;">
+                        <MudSelectItem Value="@("")">All</MudSelectItem>
+                        <MudSelectItem Value="@("Running")">Running</MudSelectItem>
+                        <MudSelectItem Value="@("Completed")">Completed</MudSelectItem>
+                        <MudSelectItem Value="@("Failed")">Failed</MudSelectItem>
+                        <MudSelectItem Value="@("Cancelled")">Cancelled</MudSelectItem>
+                    </MudSelect>
+
+                    <MudButton Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="LoadRuns">
+                        Refresh
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+        }
+        else if (_runs == null || !_runs.Any())
+        {
+            <MudPaper Class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Class="mb-4" Style="font-size: 4rem; opacity: 0.3;" />
+                <MudText Typo="Typo.h5" Class="mb-2">No execution history</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">
+                    Workflow runs will appear here once you execute workflows
+                </MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudTable Items="@_filteredRuns" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading">
+                <HeaderContent>
+                    <MudTh>Workflow</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Started</MudTh>
+                    <MudTh>Duration</MudTh>
+                    <MudTh>Features</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Workflow">
+                        <MudText Typo="Typo.body1" Class="font-weight-medium">
+                            @context.WorkflowName
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Run ID: @context.RunId.ToString()[..8]
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        @switch (context.Status)
+                        {
+                            case "Running":
+                                <MudChip Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.PlayArrow">Running</MudChip>
+                                break;
+                            case "Completed":
+                                <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Completed</MudChip>
+                                break;
+                            case "Failed":
+                                <MudChip Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Error">Failed</MudChip>
+                                break;
+                            case "Cancelled":
+                                <MudChip Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Cancel">Cancelled</MudChip>
+                                break;
+                            default:
+                                <MudChip Size="Size.Small">@context.Status</MudChip>
+                                break;
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Started">
+                        <MudText Typo="Typo.body2">
+                            @context.StartedAt.ToString("g")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Duration">
+                        <MudText Typo="Typo.body2">
+                            @GetDuration(context)
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Features">
+                        <MudText Typo="Typo.body2">
+                            @context.FeaturesProcessed.ToString("N0")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                            <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                           Title="View Details"
+                                           OnClick="@(() => ViewRunDetails(context.RunId))" />
+                            @if (context.Status == "Running")
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Stop"
+                                               Title="Cancel"
+                                               Color="Color.Warning"
+                                               OnClick="@(() => CancelRun(context.RunId))" />
+                            }
+                        </MudButtonGroup>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudContainer>
+}
+
+@code {
+    private bool _hasAccess;
+    private bool _loading = true;
+    private List<WorkflowRunDto>? _runs;
+    private string _searchText = "";
+    private string _filterStatus = "";
+
+    private IEnumerable<WorkflowRunDto> _filteredRuns =>
+        _runs?.Where(r =>
+            (string.IsNullOrEmpty(_filterStatus) || r.Status == _filterStatus) &&
+            (string.IsNullOrEmpty(_searchText) || r.WorkflowName.Contains(_searchText, StringComparison.OrdinalIgnoreCase))
+        ) ?? Enumerable.Empty<WorkflowRunDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hasAccess = await FeatureFlags.IsEnabledAsync("geoetl");
+
+        if (_hasAccess)
+        {
+            await LoadRuns();
+        }
+    }
+
+    private async Task LoadRuns()
+    {
+        _loading = true;
+        try
+        {
+            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+            // Check if filtering by specific workflow
+            var uri = new Uri(Navigation.Uri);
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            var workflowId = query["workflowId"];
+
+            string endpoint;
+            if (!string.IsNullOrEmpty(workflowId))
+            {
+                endpoint = $"/admin/api/geoetl/executions/workflow/{workflowId}";
+            }
+            else
+            {
+                endpoint = $"/admin/api/geoetl/executions/tenant/{tenantId}";
+            }
+
+            var response = await Http.GetFromJsonAsync<List<WorkflowRunDto>>(endpoint);
+            _runs = response ?? new List<WorkflowRunDto>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load workflow runs: {ex.Message}", Severity.Error);
+            _runs = new List<WorkflowRunDto>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string GetDuration(WorkflowRunDto run)
+    {
+        if (run.CompletedAt.HasValue)
+        {
+            var duration = run.CompletedAt.Value - run.StartedAt;
+            if (duration.TotalHours >= 1)
+                return $"{duration.TotalHours:F1}h";
+            if (duration.TotalMinutes >= 1)
+                return $"{duration.TotalMinutes:F1}m";
+            return $"{duration.TotalSeconds:F1}s";
+        }
+
+        if (run.Status == "Running")
+        {
+            var elapsed = DateTime.UtcNow - run.StartedAt;
+            if (elapsed.TotalHours >= 1)
+                return $"{elapsed.TotalHours:F1}h";
+            if (elapsed.TotalMinutes >= 1)
+                return $"{elapsed.TotalMinutes:F1}m";
+            return $"{elapsed.TotalSeconds:F1}s";
+        }
+
+        return "N/A";
+    }
+
+    private void ViewRunDetails(Guid runId)
+    {
+        // TODO: Implement detailed run view
+        Snackbar.Add("Run details view will be implemented in the next iteration", Severity.Info);
+    }
+
+    private async Task CancelRun(Guid runId)
+    {
+        try
+        {
+            await Http.PostAsync($"/admin/api/geoetl/executions/{runId}/cancel", null);
+            Snackbar.Add("Workflow run cancelled", Severity.Success);
+            await LoadRuns();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to cancel run: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private class WorkflowRunDto
+    {
+        public Guid RunId { get; set; }
+        public string WorkflowName { get; set; } = "";
+        public string Status { get; set; } = "";
+        public DateTime StartedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public long FeaturesProcessed { get; set; }
+    }
+}

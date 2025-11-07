@@ -1,8 +1,8 @@
-# Honua GeoETL - Phase 1 Implementation
+# Honua GeoETL - Phase 1 + 1.5 + Web UI Implementation
 
-**Version:** 1.0
-**Status:** Phase 1 Complete - Foundation Ready
-**Last Updated:** 2025-11-05
+**Version:** 2.0
+**Status:** Phase 1.5 Complete - Web UI Ready
+**Last Updated:** 2025-11-07
 
 ## Overview
 
@@ -47,13 +47,18 @@ ETL/
   - 3 operations: Buffer, Intersection, Union
   - Ready for Phase 1.5 expansion
 
-- **Data Source Nodes**
+- **Data Source Nodes (5 total)**
   - PostGIS: Read from tables or custom queries
   - File: Parse GeoJSON features (inline or URL)
+  - GeoPackage: Read from GPKG files via GDAL
+  - Shapefile: Read from SHP files via GDAL
+  - KML: Read from KML/KMZ files
 
-- **Data Sink Nodes**
+- **Data Sink Nodes (5 total)**
   - PostGIS: Write features to database tables
   - GeoJSON: Export to GeoJSON format
+  - GeoPackage: Export to GPKG files via GDAL
+  - Shapefile: Export to SHP files (ZIP) via GDAL
   - Output: Store in workflow state for retrieval
 
 - **PostgreSQL Storage**
@@ -293,26 +298,33 @@ public async Task EndToEnd_FileSourceToGeoJsonExport_Succeeds()
 | Workflow Engine | ✅ Complete | DAG validation, execution |
 | **Phase 1: Geoprocessing (Tier 1)** | ✅ Complete | 3 operations (Buffer, Intersection, Union) |
 | **Phase 1.5: Geoprocessing (Tier 2)** | ✅ Complete | 4 operations (Difference, Simplify, ConvexHull, Dissolve) |
-| Data Source Nodes | ✅ Complete | PostGIS, File |
-| Data Sink Nodes | ✅ Complete | PostGIS, GeoJSON, Output |
+| **GDAL Data Source Nodes** | ✅ Complete | GeoPackage, Shapefile, KML |
+| **GDAL Data Sink Nodes** | ✅ Complete | GeoPackage, Shapefile exports |
+| Data Source Nodes | ✅ Complete | PostGIS, File, GeoPackage, Shapefile, KML (5 total) |
+| Data Sink Nodes | ✅ Complete | PostGIS, GeoJSON, GeoPackage, Shapefile, Output (5 total) |
 | PostgreSQL Store | ✅ Complete | Full CRUD with metrics |
 | Database Migration | ✅ Complete | 017_ETL.sql |
-| Service Registration | ✅ Complete | DI extensions, 12 node types |
+| **REST API Endpoints** | ✅ Complete | CRUD workflows, execution, monitoring |
+| **Blazor Web UI** | ✅ Complete | Workflow list, designer, execution history |
+| Service Registration | ✅ Complete | DI extensions, 17 node types |
 | Unit Tests | ✅ Complete | 85%+ coverage, 6 test files, 95+ tests |
-| **Blazor Web UI** | ⏳ Pending | Next phase |
 
-**Total Node Types Available: 12**
+**Total Node Types Available: 17**
 - 7 Geoprocessing operations (Phase 1 + 1.5)
-- 2 Data source nodes
-- 3 Data sink nodes
+- 5 Data source nodes (PostGIS, File, GeoPackage, Shapefile, KML)
+- 5 Data sink nodes (PostGIS, GeoJSON, GeoPackage, Shapefile, Output)
 
 ## Next Steps
 
-### Phase 1.5 Remaining Items
-- ⏳ Build custom parameter UIs for complex operations (Blazor components)
-- ⏳ Implement long-running job progress tracking
+### Phase 2 - Enhancement Items
+- ⏳ Advanced visual workflow designer (drag-and-drop canvas)
+- ⏳ Custom parameter UIs for complex operations (Blazor components)
+- ⏳ Real-time progress tracking with SignalR
+- ⏳ Workflow templates library (25+ pre-built workflows)
+- ⏳ AI-powered workflow generation (natural language → workflow)
 - ⏳ Add retry logic and advanced error handling
 - ⏳ Tier 3 (Complex) operations with multi-step wizards
+- ⏳ Additional GDAL formats (CSV with geometry, GPX, GML)
 
 ### Phase 2 (Months 4-6, Parallel)
 - AI-powered workflow generation (research phase)

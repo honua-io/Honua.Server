@@ -202,6 +202,10 @@ internal static class EndpointExtensions
         // Map MapSDK configuration endpoints (visual map builder)
         app.MapMapConfigurationEndpoints();
 
+        // Map GeoETL endpoints (Enterprise feature)
+        app.MapGeoEtlWorkflowEndpoints();
+        app.MapGeoEtlExecutionEndpoints();
+
         // Map Admin UI SignalR hub for real-time updates
         app.MapHub<Honua.Server.Host.Admin.Hubs.MetadataChangeNotificationHub>("/admin/hub/metadata");
 
