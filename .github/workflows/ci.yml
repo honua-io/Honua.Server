@@ -12,10 +12,11 @@ name: Continuous Integration
 # - Slow: Performance/benchmark tests (30s+)
 
 on:
-  push:
-    branches: [ master, main, develop ]
+  # push:
+  #   branches: [ master, main, develop ]
   # pull_request:
   #   branches: [ master, main ]
+  workflow_dispatch:
 
 env:
   DOTNET_VERSION: '9.0.x'

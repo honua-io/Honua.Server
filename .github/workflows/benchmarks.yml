@@ -6,10 +6,10 @@ on:
   #     - 'src/**'
   #     - 'tests/Honua.Server.Benchmarks/**'
   #     - '.github/workflows/benchmarks.yml'
-  push:
-    branches:
-      - master
-      - dev
+  # push:
+  #   branches:
+  #     - master
+  #     - dev
   schedule:
     # Run benchmarks nightly to track performance trends
     - cron: '0 2 * * *'

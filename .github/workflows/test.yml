@@ -1,12 +1,12 @@
 name: MapSDK Tests
 
 on:
-  push:
-    branches: [ main, develop ]
-    paths:
-      - 'src/Honua.MapSDK/**'
-      - 'tests/Honua.MapSDK.Tests/**'
-      - '.github/workflows/test.yml'
+  # push:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'src/Honua.MapSDK/**'
+  #     - 'tests/Honua.MapSDK.Tests/**'
+  #     - '.github/workflows/test.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
