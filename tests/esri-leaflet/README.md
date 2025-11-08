@@ -6,7 +6,7 @@ Comprehensive end-to-end tests for Honua.Server's Esri REST API implementation u
 
 This test suite validates that Honua.Server correctly implements the Esri GeoServices REST API specification, ensuring compatibility with Esri Leaflet and other Esri-compatible clients.
 
-## 📦 What's Tested
+## 📦 What's Tested (140+ Tests)
 
 ### FeatureServer Tests
 - Service and layer metadata retrieval
@@ -47,6 +47,36 @@ This test suite validates that Honua.Server correctly implements the Esri GeoSer
 - Coordinate reference system transformations
 - Geometry customization
 - Large dataset handling
+
+### Tile and Basemap Tests (NEW)
+- Tiled map layer rendering
+- Vector tile layer support
+- Image service layers
+- Tile metadata validation
+
+### Feature Editing Tests (NEW)
+- Add features (single and batch)
+- Update feature attributes and geometry
+- Delete features by ID and WHERE clause
+- Combined applyEdits operations
+- Transaction rollback handling
+
+### Advanced Features Tests (NEW)
+- Clustered feature layers
+- Time-aware layer queries
+- Attachment support
+- Related records
+- Definition expressions
+- Popup binding
+- Simple and unique value renderers
+
+### Authentication and Security Tests (NEW)
+- Token generation
+- Token-based access
+- Expired token handling
+- CORS headers validation
+- Rate limiting
+- Preflight OPTIONS requests
 
 ## 🚀 Quick Start
 
