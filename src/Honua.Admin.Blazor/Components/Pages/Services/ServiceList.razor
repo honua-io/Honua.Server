@@ -2,11 +2,13 @@
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
 @using Honua.Admin.Blazor.Components.Shared
+@using Honua.Admin.Blazor.Shared.Helpers
 @inject ServiceApiClient ServiceApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationState NavState
 @inject ILogger<ServiceList> Logger
+@implements IDisposable
 
 <PageTitle>Services - Honua Admin</PageTitle>
 
@@ -17,12 +19,13 @@
         <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
             <MudText Typo="Typo.h4">Services</MudText>
             <MudSpacer />
-            <MudTextField @bind-Value="_searchText"
+            <MudTextField Value="@_searchText"
+                          ValueChanged="@((string value) => OnSearchTextChanged(value))"
                           Placeholder="Search services..."
                           Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          Immediate="true"
-                          Style="max-width: 400px" />
+                          AdornmentIcon="@(_searching ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Search)"
+                          Style="max-width: 400px"
+                          Clearable="true" />
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Add"
@@ -181,9 +184,11 @@
 
     private bool _loading = true;
     private bool _actionInProgress = false;
+    private bool _searching = false;
     private string? _errorMessage;
     private string _searchText = string.Empty;
     private List<ServiceListItem> _services = new();
+    private SearchDebouncer _searchDebouncer = new(300);
 
     private IEnumerable<ServiceListItem> _filteredServices =>
         string.IsNullOrWhiteSpace(_searchText)
@@ -195,6 +200,18 @@
     {
         NavState.SetBreadcrumbs(_breadcrumbs.ToArray());
         await LoadServicesAsync();
+    }
+
+    private void OnSearchTextChanged(string value)
+    {
+        _searchText = value;
+        _searching = true;
+
+        _searchDebouncer.Debounce(() =>
+        {
+            _searching = false;
+            StateHasChanged();
+        });
     }
 
     private async Task LoadServicesAsync()
@@ -220,15 +237,22 @@
 
     private async Task StartService(ServiceListItem service)
     {
+        // Optimistic update
+        var originalState = service.Enabled;
+        service.Enabled = true;
+        StateHasChanged();
+
         _actionInProgress = true;
         try
         {
             await ServiceApi.EnableServiceAsync(service.Id);
             Snackbar.Add($"Service '{service.Title}' started successfully", Severity.Success);
-            await LoadServicesAsync();
         }
         catch (Exception ex)
         {
+            // Rollback on error
+            service.Enabled = originalState;
+            StateHasChanged();
             Snackbar.Add($"Failed to start service: {ex.Message}", Severity.Error);
             Logger.LogError(ex, "Error starting service {ServiceId}", service.Id);
         }
@@ -248,15 +272,22 @@
 
         if (confirm == true)
         {
+            // Optimistic update
+            var originalState = service.Enabled;
+            service.Enabled = false;
+            StateHasChanged();
+
             _actionInProgress = true;
             try
             {
                 await ServiceApi.DisableServiceAsync(service.Id);
                 Snackbar.Add($"Service '{service.Title}' stopped successfully", Severity.Success);
-                await LoadServicesAsync();
             }
             catch (Exception ex)
             {
+                // Rollback on error
+                service.Enabled = originalState;
+                StateHasChanged();
                 Snackbar.Add($"Failed to stop service: {ex.Message}", Severity.Error);
                 Logger.LogError(ex, "Error stopping service {ServiceId}", service.Id);
             }
@@ -277,15 +308,29 @@
 
         if (confirm == true)
         {
+            // Optimistic update - remove from list
+            var serviceIndex = _services.IndexOf(service);
+            _services.Remove(service);
+            StateHasChanged();
+
             _actionInProgress = true;
             try
             {
                 await ServiceApi.DeleteServiceAsync(service.Id);
                 Snackbar.Add($"Service '{service.Title}' deleted successfully", Severity.Success);
-                await LoadServicesAsync();
             }
             catch (Exception ex)
             {
+                // Rollback on error - add back to list at original position
+                if (serviceIndex >= 0 && serviceIndex <= _services.Count)
+                {
+                    _services.Insert(serviceIndex, service);
+                }
+                else
+                {
+                    _services.Add(service);
+                }
+                StateHasChanged();
                 Snackbar.Add($"Failed to delete service: {ex.Message}", Severity.Error);
                 Logger.LogError(ex, "Error deleting service {ServiceId}", service.Id);
             }
@@ -294,5 +339,10 @@
                 _actionInProgress = false;
             }
         }
+    }
+
+    public void Dispose()
+    {
+        _searchDebouncer?.Dispose();
     }
 }

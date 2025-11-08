@@ -1,8 +1,10 @@
 @page "/geoetl/workflows"
+@using Honua.Admin.Blazor.Shared.Helpers
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject FeatureFlagService FeatureFlags
+@implements IDisposable
 
 <PageTitle>GeoETL Workflows</PageTitle>
 
@@ -27,12 +29,14 @@ else
 
         <MudPaper Class="pa-4 mb-4">
             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                <MudTextField @bind-Value="_searchText"
+                <MudTextField Value="@_searchText"
+                              ValueChanged="@((string value) => OnSearchTextChanged(value))"
                               Label="Search workflows"
                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              Style="max-width: 400px;" />
+                              AdornmentIcon="@(_searching ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Search)"
+                              Style="max-width: 400px;"
+                              Clearable="true" />
                 <MudButton Variant="Variant.Filled"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.Add"
@@ -127,8 +131,10 @@ else
 @code {
     private bool _hasAccess;
     private bool _loading = true;
+    private bool _searching = false;
     private List<WorkflowDto>? _workflows;
     private string _searchText = "";
+    private SearchDebouncer _searchDebouncer = new(300);
 
     private IEnumerable<WorkflowDto> _filteredWorkflows =>
         _workflows?.Where(w =>
@@ -145,6 +151,18 @@ else
         {
             await LoadWorkflows();
         }
+    }
+
+    private void OnSearchTextChanged(string value)
+    {
+        _searchText = value;
+        _searching = true;
+
+        _searchDebouncer.Debounce(() =>
+        {
+            _searching = false;
+            StateHasChanged();
+        });
     }
 
     private async Task LoadWorkflows()
@@ -221,5 +239,10 @@ else
     {
         public string Id { get; set; } = "";
         public string Type { get; set; } = "";
+    }
+
+    public void Dispose()
+    {
+        _searchDebouncer?.Dispose();
     }
 }

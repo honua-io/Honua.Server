@@ -2,6 +2,7 @@
 @page "/services/{ServiceId}/layers"
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Components.Shared
 @attribute [Authorize(Roles = "administrator,datapublisher")]
 @inject LayerApiClient LayerApi
 @inject ServiceApiClient ServiceApi
@@ -66,15 +67,45 @@
 
         @if (_loading)
         {
-            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.Table" Rows="5" />
         }
-
-        @if (!string.IsNullOrEmpty(_errorMessage))
+        else
         {
-            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
-        }
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+            }
 
-        <MudTable Items="@_filteredLayers"
+            @if (!_filteredLayers.Any())
+            {
+                <MudPaper Class="pa-8" Elevation="0">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Large" Color="Color.Default" Style="font-size: 4rem; opacity: 0.3;" />
+                        <MudText Typo="Typo.h6" Align="Align.Center">
+                            @if (!string.IsNullOrEmpty(ServiceId))
+                            {
+                                <text>No layers found for this service</text>
+                            }
+                            else
+                            {
+                                <text>No layers found</text>
+                            }
+                        </MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                            Create your first layer to publish geospatial data through services!
+                        </MudText>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Href="@GetNewLayerUrl()">
+                            Create Layer
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+            }
+            else
+            {
+                <MudTable Items="@_filteredLayers"
                   Hover="true"
                   Breakpoint="Breakpoint.Sm"
                   Loading="@_loading"
@@ -133,23 +164,24 @@
                     </MudStack>
                 </MudTd>
             </RowTemplate>
-            <NoRecordsContent>
-                <MudText Align="Align.Center" Class="py-4">
-                    @if (_searchString.Length > 0)
-                    {
-                        <span>No layers match your search.</span>
-                    }
-                    else if (!string.IsNullOrEmpty(ServiceId))
-                    {
-                        <span>No layers found for this service. Create your first layer to get started!</span>
-                    }
-                    else
-                    {
-                        <span>No layers found. Create your first layer to get started!</span>
-                    }
-                </MudText>
-            </NoRecordsContent>
-        </MudTable>
+                <NoRecordsContent>
+                    <MudPaper Class="pa-8" Elevation="0">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" Style="font-size: 4rem;" />
+                            <MudText Typo="Typo.h6" Color="Color.Default">
+                                No layers found matching "@_searchString"
+                            </MudText>
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => _searchString = string.Empty)">
+                                Clear Search
+                            </MudButton>
+                        </MudStack>
+                    </MudPaper>
+                </NoRecordsContent>
+            </MudTable>
+            }
+        }
     </MudPaper>
 </MudContainer>
 

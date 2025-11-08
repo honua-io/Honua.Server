@@ -30,15 +30,36 @@
             <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
         }
 
-        <MudForm @ref="_form" @bind-IsValid="@_formValid">
+        @if (_validationErrors.Any())
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                <MudText Typo="Typo.body1"><b>Please fix @_validationErrors.Count error(s) before saving:</b></MudText>
+                <MudList Dense="true" Class="mt-2">
+                    @foreach (var error in _validationErrors)
+                    {
+                        <MudListItem Icon="@Icons.Material.Filled.Error" IconColor="Color.Warning">
+                            <MudText Typo="Typo.body2">@error</MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudAlert>
+        }
+
+        <MudForm @ref="_form" @bind-IsValid="@_formValid" ValidationDelay="0">
             <MudGrid>
                 <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.Id"
+                    <MudTextField @ref="_layerIdField"
+                                  @bind-Value="_model.Id"
                                   Label="Layer ID"
                                   Required="true"
                                   Disabled="@_isEditMode"
+                                  Immediate="true"
                                   HelperText="Unique identifier (alphanumeric, hyphens, underscores)"
-                                  Validation="@(new Func<string, string>(ValidateLayerId))" />
+                                  Validation="@(new Func<string, IEnumerable<string>>(ValidateLayerId))"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@GetValidationIcon(nameof(_model.Id))"
+                                  AdornmentColor="@GetValidationColor(nameof(_model.Id))"
+                                  OnBlur="@(() => OnFieldBlur(nameof(_model.Id)))" />
                 </MudItem>
 
                 <MudItem xs="12" md="6">
@@ -55,11 +76,17 @@
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_model.Title"
+                    <MudTextField @ref="_titleField"
+                                  @bind-Value="_model.Title"
                                   Label="Title"
                                   Required="true"
+                                  Immediate="true"
                                   HelperText="Display name for the layer"
-                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                                  Validation="@(new Func<string, IEnumerable<string>>(ValidateTitleField))"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@GetValidationIcon(nameof(_model.Title))"
+                                  AdornmentColor="@GetValidationColor(nameof(_model.Title))"
+                                  OnBlur="@(() => OnFieldBlur(nameof(_model.Title)))" />
                 </MudItem>
 
                 <MudItem xs="12">
@@ -82,19 +109,31 @@
                 </MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.IdField"
+                    <MudTextField @ref="_idField"
+                                  @bind-Value="_model.IdField"
                                   Label="ID Field"
                                   Required="true"
+                                  Immediate="true"
                                   HelperText="Feature ID column name"
-                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                                  Validation="@(new Func<string, IEnumerable<string>>(ValidateIdField))"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@GetValidationIcon(nameof(_model.IdField))"
+                                  AdornmentColor="@GetValidationColor(nameof(_model.IdField))"
+                                  OnBlur="@(() => OnFieldBlur(nameof(_model.IdField)))" />
                 </MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.GeometryField"
+                    <MudTextField @ref="_geometryField"
+                                  @bind-Value="_model.GeometryField"
                                   Label="Geometry Field"
                                   Required="true"
+                                  Immediate="true"
                                   HelperText="Geometry column name"
-                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                                  Validation="@(new Func<string, IEnumerable<string>>(ValidateGeometryField))"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@GetValidationIcon(nameof(_model.GeometryField))"
+                                  AdornmentColor="@GetValidationColor(nameof(_model.GeometryField))"
+                                  OnBlur="@(() => OnFieldBlur(nameof(_model.GeometryField)))" />
                 </MudItem>
 
                 <MudItem xs="12" md="6">
@@ -191,6 +230,10 @@
     public string? ServiceId { get; set; }
 
     private MudForm _form = default!;
+    private MudTextField<string> _layerIdField = default!;
+    private MudTextField<string> _titleField = default!;
+    private MudTextField<string> _idField = default!;
+    private MudTextField<string> _geometryField = default!;
     private bool _formValid;
     private bool _loading;
     private bool _saving;
@@ -199,6 +242,11 @@
     private LayerEditorModel _model = new();
     private List<ServiceListItem> _services = new();
     private List<BreadcrumbItem> _breadcrumbs = new();
+
+    // Validation tracking
+    private Dictionary<string, bool> _fieldValidity = new();
+    private Dictionary<string, bool> _fieldTouched = new();
+    private List<string> _validationErrors = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -300,8 +348,10 @@
     private async Task HandleSaveAsync()
     {
         await _form.Validate();
+
         if (!_formValid || _model.Crs.Count == 0)
         {
+            await FocusFirstInvalidField();
             Snackbar.Add("Please fix validation errors before saving.", Severity.Error);
             return;
         }

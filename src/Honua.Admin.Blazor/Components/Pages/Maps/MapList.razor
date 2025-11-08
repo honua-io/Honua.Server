@@ -1,5 +1,6 @@
 @page "/maps"
 @using Honua.Server.Core.Models
+@using Honua.Admin.Blazor.Components.Shared
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
@@ -21,12 +22,35 @@
     </MudPaper>
 
     <MudPaper Class="pa-4">
-        <MudTable Items="@_configurations"
-                 Loading="@_loading"
-                 Hover="true"
-                 Breakpoint="Breakpoint.Sm"
-                 LoadingProgressColor="Color.Primary">
-            <HeaderContent>
+        @if (_loading)
+        {
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.Table" Rows="5" />
+        }
+        else if (!_configurations.Any())
+        {
+            <MudPaper Class="pa-8" Elevation="0">
+                <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                    <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Large" Color="Color.Default" Style="font-size: 4rem; opacity: 0.3;" />
+                    <MudText Typo="Typo.h6" Align="Align.Center">No map configurations found</MudText>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                        Create your first map configuration to start building interactive geospatial applications!
+                    </MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="CreateNew">
+                        Create New Map
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <MudTable Items="@_configurations"
+                     Hover="true"
+                     Breakpoint="Breakpoint.Sm"
+                     LoadingProgressColor="Color.Primary">
+                <HeaderContent>
                 <MudTh>Name</MudTh>
                 <MudTh>Description</MudTh>
                 <MudTh>Created By</MudTh>
@@ -109,12 +133,13 @@
                     </MudMenu>
                 </MudTd>
             </RowTemplate>
-            <NoRecordsContent>
-                <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
-                    No map configurations found. Create your first map!
-                </MudText>
-            </NoRecordsContent>
-        </MudTable>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+                        No map configurations found.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+        }
     </MudPaper>
 </MudContainer>
 

@@ -30,15 +30,36 @@
             <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
         }
 
-        <MudForm @ref="_form" @bind-IsValid="@_formValid">
+        @if (_validationErrors.Any())
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                <MudText Typo="Typo.body1"><b>Please fix @_validationErrors.Count error(s) before saving:</b></MudText>
+                <MudList Dense="true" Class="mt-2">
+                    @foreach (var error in _validationErrors)
+                    {
+                        <MudListItem Icon="@Icons.Material.Filled.Error" IconColor="Color.Warning">
+                            <MudText Typo="Typo.body2">@error</MudText>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudAlert>
+        }
+
+        <MudForm @ref="_form" @bind-IsValid="@_formValid" ValidationDelay="0">
             <MudGrid>
                 <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_model.Id"
+                    <MudTextField @ref="_serviceIdField"
+                                  @bind-Value="_model.Id"
                                   Label="Service ID"
                                   Required="true"
                                   Disabled="@_isEditMode"
+                                  Immediate="true"
                                   HelperText="Unique identifier (alphanumeric, hyphens, underscores)"
-                                  Validation="@(new Func<string, string>(ValidateServiceId))" />
+                                  Validation="@(new Func<string, IEnumerable<string>>(ValidateServiceId))"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@GetValidationIcon(nameof(_model.Id))"
+                                  AdornmentColor="@GetValidationColor(nameof(_model.Id))"
+                                  OnBlur="@(() => OnFieldBlur(nameof(_model.Id)))" />
                 </MudItem>
 
                 <MudItem xs="12" md="6">
@@ -102,11 +123,17 @@
                 </MudItem>
 
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_model.Title"
+                    <MudTextField @ref="_titleField"
+                                  @bind-Value="_model.Title"
                                   Label="Title"
                                   Required="true"
+                                  Immediate="true"
                                   HelperText="Display name for the service"
-                                  Validation="@(new Func<string, string>(ValidateRequired))" />
+                                  Validation="@(new Func<string, IEnumerable<string>>(ValidateRequired))"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@GetValidationIcon(nameof(_model.Title))"
+                                  AdornmentColor="@GetValidationColor(nameof(_model.Title))"
+                                  OnBlur="@(() => OnFieldBlur(nameof(_model.Title)))" />
                 </MudItem>
 
                 <MudItem xs="12">
@@ -187,6 +214,8 @@
     public string? Id { get; set; }
 
     private MudForm _form = default!;
+    private MudTextField<string> _serviceIdField = default!;
+    private MudTextField<string> _titleField = default!;
     private bool _formValid;
     private bool _loading;
     private bool _saving;
@@ -196,6 +225,11 @@
     private List<DataSourceListItem> _dataSources = new();
     private List<FolderListItem> _folders = new();
     private List<BreadcrumbItem> _breadcrumbs = new();
+
+    // Validation tracking
+    private Dictionary<string, bool> _fieldValidity = new();
+    private Dictionary<string, bool> _fieldTouched = new();
+    private List<string> _validationErrors = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -290,8 +324,10 @@
     private async Task HandleSaveAsync()
     {
         await _form.Validate();
+
         if (!_formValid)
         {
+            await FocusFirstInvalidField();
             Snackbar.Add("Please fix validation errors before saving.", Severity.Error);
             return;
         }
@@ -404,20 +440,103 @@
         }
     }
 
-    private string ValidateServiceId(string id)
+    private IEnumerable<string> ValidateServiceId(string id)
     {
+        var errors = new List<string>();
+
         if (string.IsNullOrWhiteSpace(id))
-            return "Service ID is required";
+        {
+            errors.Add("Service ID is required");
+            UpdateFieldValidity(nameof(_model.Id), false);
+        }
+        else if (!System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9_-]+$"))
+        {
+            errors.Add("Service ID must contain only alphanumeric characters, hyphens, and underscores");
+            UpdateFieldValidity(nameof(_model.Id), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_model.Id), true);
+        }
 
-        if (!System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9_-]+$"))
-            return "Service ID must contain only alphanumeric characters, hyphens, and underscores";
-
-        return string.Empty;
+        UpdateValidationSummary();
+        return errors;
     }
 
-    private string ValidateRequired(string value)
+    private IEnumerable<string> ValidateRequired(string value)
     {
-        return string.IsNullOrWhiteSpace(value) ? "This field is required" : string.Empty;
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            errors.Add("This field is required");
+            UpdateFieldValidity(nameof(_model.Title), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_model.Title), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private void UpdateFieldValidity(string fieldName, bool isValid)
+    {
+        _fieldValidity[fieldName] = isValid;
+    }
+
+    private void OnFieldBlur(string fieldName)
+    {
+        _fieldTouched[fieldName] = true;
+        StateHasChanged();
+    }
+
+    private string GetValidationIcon(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return string.Empty;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Icons.Material.Filled.CheckCircle
+            : Icons.Material.Filled.Error;
+    }
+
+    private Color GetValidationColor(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return Color.Default;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Color.Success
+            : Color.Error;
+    }
+
+    private void UpdateValidationSummary()
+    {
+        _validationErrors.Clear();
+
+        if (_fieldTouched.GetValueOrDefault(nameof(_model.Id)) && !_fieldValidity.GetValueOrDefault(nameof(_model.Id)))
+        {
+            _validationErrors.Add("Service ID: Invalid format or missing");
+        }
+
+        if (_fieldTouched.GetValueOrDefault(nameof(_model.Title)) && !_fieldValidity.GetValueOrDefault(nameof(_model.Title)))
+        {
+            _validationErrors.Add("Title: Required field is missing");
+        }
+    }
+
+    private async Task FocusFirstInvalidField()
+    {
+        if (!_fieldValidity.GetValueOrDefault(nameof(_model.Id)) && _serviceIdField != null)
+        {
+            await _serviceIdField.FocusAsync();
+        }
+        else if (!_fieldValidity.GetValueOrDefault(nameof(_model.Title)) && _titleField != null)
+        {
+            await _titleField.FocusAsync();
+        }
     }
 
     private void OnModelChanged()

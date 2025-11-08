@@ -246,6 +246,24 @@ html, body {
    Tables & Lists
    ======================================== */
 
+/* Sticky table headers */
+.sticky-header thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: white;
+}
+
+.sticky-header thead th {
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark theme support for sticky headers */
+.mud-theme-dark .sticky-header thead th {
+    background: #1e1e1e;
+}
+
 /* Smooth row hover */
 .mud-table-row {
     transition: background-color 0.2s ease;
