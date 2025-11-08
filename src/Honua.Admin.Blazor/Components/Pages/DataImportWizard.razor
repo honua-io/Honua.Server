@@ -96,6 +96,21 @@
                     <MudStack Spacing="4" Class="mt-4">
                         <MudText Typo="Typo.h6">Configure import settings</MudText>
 
+                        @if (_validationErrors.Any())
+                        {
+                            <MudAlert Severity="Severity.Warning">
+                                <MudText Typo="Typo.body1"><b>Please fix @_validationErrors.Count error(s):</b></MudText>
+                                <MudList Dense="true" Class="mt-2">
+                                    @foreach (var error in _validationErrors)
+                                    {
+                                        <MudListItem Icon="@Icons.Material.Filled.Error" IconColor="Color.Warning">
+                                            <MudText Typo="Typo.body2">@error</MudText>
+                                        </MudListItem>
+                                    }
+                                </MudList>
+                            </MudAlert>
+                        }
+
                         <MudSelect T="string"
                                    Label="Target Service"
                                    @bind-Value="_wizardState.TargetServiceId"
@@ -118,11 +133,18 @@
 
                         @if (_wizardState.CreateNewLayer)
                         {
-                            <MudTextField Label="Layer ID"
+                            <MudTextField @ref="_layerIdField"
+                                          Label="Layer ID"
                                           @bind-Value="_wizardState.TargetLayerId"
                                           Required="true"
+                                          Immediate="true"
                                           Variant="Variant.Filled"
-                                          HelperText="Unique identifier (e.g., 'parcels', 'roads')" />
+                                          HelperText="Unique identifier (e.g., 'parcels', 'roads')"
+                                          Validation="@(new Func<string, IEnumerable<string>>(ValidateLayerId))"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@GetValidationIcon(nameof(_wizardState.TargetLayerId))"
+                                          AdornmentColor="@GetValidationColor(nameof(_wizardState.TargetLayerId))"
+                                          OnBlur="@(() => OnFieldBlur(nameof(_wizardState.TargetLayerId)))" />
 
                             <MudTextField Label="Layer Name"
                                           @bind-Value="_wizardState.TargetLayerName"
@@ -285,6 +307,14 @@
     private double _uploadProgress = 0;
     private DateTime? _uploadStartTime;
 
+    // Field references
+    private MudTextField<string> _layerIdField = default!;
+
+    // Validation tracking
+    private Dictionary<string, bool> _fieldValidity = new();
+    private Dictionary<string, bool> _fieldTouched = new();
+    private List<string> _validationErrors = new();
+
     protected override async Task OnInitializedAsync()
     {
         await LoadServicesAsync();
@@ -445,6 +475,82 @@
         _wizardState = new ImportWizardState();
         _selectedFile = null;
         _activeStep = 0;
+        _fieldValidity.Clear();
+        _fieldTouched.Clear();
+        _validationErrors.Clear();
+    }
+
+    private IEnumerable<string> ValidateLayerId(string id)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            errors.Add("Layer ID is required");
+            UpdateFieldValidity(nameof(_wizardState.TargetLayerId), false);
+        }
+        else if (!System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9_-]+$"))
+        {
+            errors.Add("Layer ID must contain only alphanumeric characters, hyphens, and underscores");
+            UpdateFieldValidity(nameof(_wizardState.TargetLayerId), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_wizardState.TargetLayerId), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private void UpdateFieldValidity(string fieldName, bool isValid)
+    {
+        _fieldValidity[fieldName] = isValid;
+    }
+
+    private void OnFieldBlur(string fieldName)
+    {
+        _fieldTouched[fieldName] = true;
+        StateHasChanged();
+    }
+
+    private string GetValidationIcon(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return string.Empty;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Icons.Material.Filled.CheckCircle
+            : Icons.Material.Filled.Error;
+    }
+
+    private Color GetValidationColor(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return Color.Default;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Color.Success
+            : Color.Error;
+    }
+
+    private void UpdateValidationSummary()
+    {
+        _validationErrors.Clear();
+
+        if (string.IsNullOrWhiteSpace(_wizardState.TargetServiceId))
+        {
+            _validationErrors.Add("Target Service: Please select a service");
+        }
+
+        if (_wizardState.CreateNewLayer)
+        {
+            if (_fieldTouched.GetValueOrDefault(nameof(_wizardState.TargetLayerId)) &&
+                !_fieldValidity.GetValueOrDefault(nameof(_wizardState.TargetLayerId)))
+            {
+                _validationErrors.Add("Layer ID: Invalid format or missing");
+            }
+        }
     }
 
     public async ValueTask DisposeAsync()

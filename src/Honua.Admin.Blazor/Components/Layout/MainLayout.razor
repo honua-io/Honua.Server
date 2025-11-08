@@ -1,5 +1,12 @@
+@using Honua.Admin.Blazor.Shared.Services
 @inherits LayoutComponentBase
 @inject FeatureFlagService FeatureFlags
+@inject KeyboardShortcutService KeyboardShortcuts
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+@inject NotificationService Notifications
+@implements IAsyncDisposable
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -71,6 +78,7 @@
     private bool _isMobile = false;
     private List<BreadcrumbItem> _breadcrumbs = new();
     private FeatureFlagState? _featureFlags;
+    private string? _currentPage;
 
     [Inject] private NavigationState NavState { get; set; } = default!;
 
@@ -85,6 +93,13 @@
 
         // Check if mobile on initial load
         CheckIfMobile();
+
+        // Initialize keyboard shortcuts
+        await InitializeKeyboardShortcutsAsync();
+
+        // Track current page for context-dependent shortcuts
+        Navigation.LocationChanged += OnLocationChanged;
+        UpdateCurrentPage();
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -93,6 +108,46 @@
         {
             CheckIfMobile();
         }
+    }
+
+    private async Task InitializeKeyboardShortcutsAsync()
+    {
+        await KeyboardShortcuts.InitializeAsync();
+
+        // Navigation shortcuts
+        KeyboardShortcuts.Register(AdminShortcuts.GoToServices, () => NavigateToPage("/services"),
+            "Go to Services", "Navigation");
+        KeyboardShortcuts.Register(AdminShortcuts.GoToLayers, () => NavigateToPage("/layers"),
+            "Go to Layers", "Navigation");
+        KeyboardShortcuts.Register(AdminShortcuts.GoToMaps, () => NavigateToPage("/maps"),
+            "Go to Maps", "Navigation");
+
+        // Search shortcuts
+        KeyboardShortcuts.Register(AdminShortcuts.FocusSearch, FocusGlobalSearch,
+            "Focus global search", "Search");
+
+        // Action shortcuts
+        KeyboardShortcuts.Register(AdminShortcuts.NewItem, HandleNewItem,
+            "Create new item (context-dependent)", "Actions");
+        KeyboardShortcuts.Register(AdminShortcuts.Refresh, HandleRefresh,
+            "Refresh current page", "Actions");
+
+        // General shortcuts
+        KeyboardShortcuts.Register(AdminShortcuts.ShowHelp, ShowKeyboardHelp,
+            "Show keyboard shortcuts help", "General");
+        KeyboardShortcuts.Register("Shift+?", ShowKeyboardHelp,
+            "Show keyboard shortcuts help", "General");
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        UpdateCurrentPage();
+    }
+
+    private void UpdateCurrentPage()
+    {
+        var uri = new Uri(Navigation.Uri);
+        _currentPage = uri.AbsolutePath.ToLower();
     }
 
     private void CheckIfMobile()
@@ -120,8 +175,84 @@
         _ => Color.Default
     };
 
-    public void Dispose()
+    // Keyboard shortcut handlers
+
+    private async Task FocusGlobalSearch()
+    {
+        try
+        {
+            // Focus the global search autocomplete input
+            await JSRuntime.InvokeVoidAsync("HonuaAdmin.KeyboardShortcuts.focusElementBySelector",
+                ".mud-autocomplete input");
+            Notifications.Info("Search focused - press Esc to cancel");
+        }
+        catch
+        {
+            // Silently fail if search not available
+        }
+    }
+
+    private void NavigateToPage(string url)
+    {
+        Navigation.NavigateTo(url);
+        Notifications.Info($"Navigated to {url}");
+    }
+
+    private void HandleNewItem()
+    {
+        // Context-dependent "New" action
+        var message = _currentPage switch
+        {
+            var p when p.Contains("/services") => "Create new service",
+            var p when p.Contains("/layers") => "Create new layer",
+            var p when p.Contains("/maps") => "Create new map",
+            var p when p.Contains("/folders") => "Create new folder",
+            var p when p.Contains("/datasources") => "Create new data source",
+            var p when p.Contains("/users") => "Create new user",
+            var p when p.Contains("/roles") => "Create new role",
+            _ => "Create new item (navigate to a specific page first)"
+        };
+
+        // In a real implementation, this would trigger the actual creation dialog
+        // For now, just show feedback
+        Notifications.Info(message);
+    }
+
+    private async Task HandleRefresh()
+    {
+        // Refresh current page
+        Notifications.Info("Refreshing page...");
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        await Task.CompletedTask;
+    }
+
+    private async Task ShowKeyboardHelp()
+    {
+        var shortcuts = KeyboardShortcuts.GetAllShortcuts();
+        var parameters = new DialogParameters
+        {
+            { "Shortcuts", shortcuts }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true
+        };
+
+        await DialogService.ShowAsync<KeyboardShortcutsHelp>("Keyboard Shortcuts", parameters, options);
+    }
+
+    public async ValueTask DisposeAsync()
     {
         NavState.OnChange -= UpdateBreadcrumbs;
+        Navigation.LocationChanged -= OnLocationChanged;
+
+        if (KeyboardShortcuts != null)
+        {
+            await KeyboardShortcuts.DisposeAsync();
+        }
     }
 }

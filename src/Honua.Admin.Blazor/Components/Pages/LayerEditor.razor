@@ -485,20 +485,162 @@
         };
     }
 
-    private string ValidateLayerId(string id)
+    private IEnumerable<string> ValidateLayerId(string id)
     {
+        var errors = new List<string>();
+
         if (string.IsNullOrWhiteSpace(id))
-            return "Layer ID is required";
+        {
+            errors.Add("Layer ID is required");
+            UpdateFieldValidity(nameof(_model.Id), false);
+        }
+        else if (!System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9_-]+$"))
+        {
+            errors.Add("Layer ID must contain only alphanumeric characters, hyphens, and underscores");
+            UpdateFieldValidity(nameof(_model.Id), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_model.Id), true);
+        }
 
-        if (!System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9_-]+$"))
-            return "Layer ID must contain only alphanumeric characters, hyphens, and underscores";
-
-        return string.Empty;
+        UpdateValidationSummary();
+        return errors;
     }
 
-    private string ValidateRequired(string value)
+    private IEnumerable<string> ValidateTitleField(string value)
     {
-        return string.IsNullOrWhiteSpace(value) ? "This field is required" : string.Empty;
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            errors.Add("Title is required");
+            UpdateFieldValidity(nameof(_model.Title), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_model.Title), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private IEnumerable<string> ValidateIdField(string value)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            errors.Add("ID Field is required");
+            UpdateFieldValidity(nameof(_model.IdField), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_model.IdField), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private IEnumerable<string> ValidateGeometryField(string value)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            errors.Add("Geometry Field is required");
+            UpdateFieldValidity(nameof(_model.GeometryField), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_model.GeometryField), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private void UpdateFieldValidity(string fieldName, bool isValid)
+    {
+        _fieldValidity[fieldName] = isValid;
+    }
+
+    private void OnFieldBlur(string fieldName)
+    {
+        _fieldTouched[fieldName] = true;
+        StateHasChanged();
+    }
+
+    private string GetValidationIcon(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return string.Empty;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Icons.Material.Filled.CheckCircle
+            : Icons.Material.Filled.Error;
+    }
+
+    private Color GetValidationColor(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return Color.Default;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Color.Success
+            : Color.Error;
+    }
+
+    private void UpdateValidationSummary()
+    {
+        _validationErrors.Clear();
+
+        if (_fieldTouched.GetValueOrDefault(nameof(_model.Id)) && !_fieldValidity.GetValueOrDefault(nameof(_model.Id)))
+        {
+            _validationErrors.Add("Layer ID: Invalid format or missing");
+        }
+
+        if (_fieldTouched.GetValueOrDefault(nameof(_model.Title)) && !_fieldValidity.GetValueOrDefault(nameof(_model.Title)))
+        {
+            _validationErrors.Add("Title: Required field is missing");
+        }
+
+        if (_fieldTouched.GetValueOrDefault(nameof(_model.IdField)) && !_fieldValidity.GetValueOrDefault(nameof(_model.IdField)))
+        {
+            _validationErrors.Add("ID Field: Required field is missing");
+        }
+
+        if (_fieldTouched.GetValueOrDefault(nameof(_model.GeometryField)) && !_fieldValidity.GetValueOrDefault(nameof(_model.GeometryField)))
+        {
+            _validationErrors.Add("Geometry Field: Required field is missing");
+        }
+
+        if (_model.Crs.Count == 0)
+        {
+            _validationErrors.Add("CRS: At least one coordinate reference system is required");
+        }
+    }
+
+    private async Task FocusFirstInvalidField()
+    {
+        if (!_fieldValidity.GetValueOrDefault(nameof(_model.Id)) && _layerIdField != null)
+        {
+            await _layerIdField.FocusAsync();
+        }
+        else if (!_fieldValidity.GetValueOrDefault(nameof(_model.Title)) && _titleField != null)
+        {
+            await _titleField.FocusAsync();
+        }
+        else if (!_fieldValidity.GetValueOrDefault(nameof(_model.IdField)) && _idField != null)
+        {
+            await _idField.FocusAsync();
+        }
+        else if (!_fieldValidity.GetValueOrDefault(nameof(_model.GeometryField)) && _geometryField != null)
+        {
+            await _geometryField.FocusAsync();
+        }
     }
 
     // Local model for form binding
