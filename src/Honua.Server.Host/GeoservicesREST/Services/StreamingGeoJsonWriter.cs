@@ -239,9 +239,10 @@ public sealed class StreamingGeoJsonWriter
                 {
                     geometryToWrite = DouglasPeuckerSimplifier.Simplify(ntsGeom, context.MaxAllowableOffset.Value);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     // If simplification fails, use original geometry
+                    _logger.LogDebug(ex, "Geometry simplification failed with max allowable offset {MaxOffset}, using original geometry", context.MaxAllowableOffset.Value);
                     geometryToWrite = ntsGeom;
                 }
             }
