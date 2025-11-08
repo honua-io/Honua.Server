@@ -7,6 +7,8 @@ using System.Runtime.InteropServices;
 using Honua.Server.Core.Extensions;
 
 using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
+
 namespace Honua.Server.Core.Security;
 
 /// <summary>
@@ -167,16 +169,23 @@ public static class SecurePathValidator
     /// </summary>
     /// <param name="requestedPath">The path to validate and check</param>
     /// <param name="baseDirectory">The base directory that access must be restricted to</param>
+    /// <param name="logger">Optional logger for recording validation failures</param>
     /// <returns>True if the path is valid and exists, false otherwise</returns>
-    public static bool IsValidAndExists(string requestedPath, string baseDirectory)
+    public static bool IsValidAndExists(string requestedPath, string baseDirectory, ILogger? logger = null)
     {
         try
         {
             var validPath = ValidatePath(requestedPath, baseDirectory);
             return File.Exists(validPath) || Directory.Exists(validPath);
         }
-        catch
+        catch (UnauthorizedAccessException ex)
         {
+            logger?.LogWarning(ex, "Path validation failed for requested path. This may indicate a path traversal attempt");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogDebug(ex, "Path validation or existence check failed for requested path: {RequestedPath}", requestedPath);
             return false;
         }
     }
