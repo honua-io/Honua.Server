@@ -62,11 +62,13 @@ public sealed class CachedTableDiscoveryService : ITableDiscoveryService, IDispo
         var cacheKey = GetCacheKey(dataSourceId);
 
         // Try to get from cache
-        if (_cache.TryGetValue<IEnumerable<DiscoveredTable>>(cacheKey, out var cached))
+        if (_cache.TryGetValue<IEnumerable<DiscoveredTable>>(cacheKey, out var cached) && cached != null)
         {
+            // Use the Count property for materialized collections (O(1)) instead of Count() method
+            var materializedCached = cached as ICollection<DiscoveredTable> ?? cached.ToList();
             _logger.LogDebug("Returning {Count} cached tables for {DataSourceId}",
-                cached?.Count() ?? 0, dataSourceId);
-            return cached ?? Array.Empty<DiscoveredTable>();
+                materializedCached.Count, dataSourceId);
+            return materializedCached;
         }
 
         _logger.LogInformation("Cache miss for {DataSourceId} - discovering tables", dataSourceId);
@@ -74,20 +76,23 @@ public sealed class CachedTableDiscoveryService : ITableDiscoveryService, IDispo
         // Not in cache - discover and cache
         var tables = await _inner.DiscoverTablesAsync(dataSourceId, cancellationToken);
 
+        // Materialize once to avoid multiple enumerations
+        var materializedTables = tables as ICollection<DiscoveredTable> ?? tables.ToList();
+
         // Cache the results
         var cacheOptions = new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = _options.CacheDuration,
-            Size = EstimateCacheSize(tables)
+            Size = EstimateCacheSize(materializedTables)
         };
 
-        _cache.Set(cacheKey, tables, cacheOptions);
+        _cache.Set(cacheKey, materializedTables, cacheOptions);
 
         _logger.LogInformation(
             "Discovered and cached {Count} tables for {DataSourceId}",
-            tables.Count(), dataSourceId);
+            materializedTables.Count, dataSourceId);
 
-        return tables;
+        return materializedTables;
     }
 
     public async Task<DiscoveredTable?> DiscoverTableAsync(

@@ -25,7 +25,8 @@ public static class CqlFilterParserUtils
 
         if (string.Equals(name, layer.IdField, StringComparison.OrdinalIgnoreCase))
         {
-            var idField = layer.Fields.FirstOrDefault(f => string.Equals(f.Name, layer.IdField, StringComparison.OrdinalIgnoreCase));
+            // Use SingleOrDefault since field names are unique within a layer
+            var idField = layer.Fields.SingleOrDefault(f => string.Equals(f.Name, layer.IdField, StringComparison.OrdinalIgnoreCase));
             return (layer.IdField, idField?.DataType ?? idField?.StorageType);
         }
 
@@ -35,7 +36,8 @@ public static class CqlFilterParserUtils
             return (layer.GeometryField, "geometry");
         }
 
-        var field = layer.Fields.FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase))
+        // Use SingleOrDefault since field names are unique within a layer
+        var field = layer.Fields.SingleOrDefault(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"Field '{name}' is not defined for layer '{layer.Id}'.");
 
         return (field.Name, field.DataType);
