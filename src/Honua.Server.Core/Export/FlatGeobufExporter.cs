@@ -115,7 +115,8 @@ public sealed class FlatGeobufExporter : IFlatGeobufExporter
             var indexResult = HilbertRTreeBuilder.Build(indexNodes, featureCount > 0 ? HilbertRTreeBuilder.DefaultNodeSize : (ushort)0);
             var headerMemory = BuildHeaderBuffer(headerTemplate, featureCount, indexResult);
 
-            await fileStream.WriteAsync(FlatGeobuf.Constants.MagicBytes, cancellationToken).ConfigureAwait(false);
+            // Write FlatGeobuf magic bytes (fgb + version + reserved)
+            await fileStream.WriteAsync(FlatGeobuf.Constants.MagicBytes.AsMemory(), cancellationToken).ConfigureAwait(false);
             await fileStream.WriteAsync(headerMemory, cancellationToken).ConfigureAwait(false);
 
             if (indexResult.IndexBytes.Length > 0)

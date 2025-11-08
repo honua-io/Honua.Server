@@ -235,7 +235,7 @@ public class FileDataSourceNode : WorkflowNodeBase
         return Task.FromResult(result);
     }
 
-    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
+    protected override Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -253,19 +253,19 @@ public class FileDataSourceNode : WorkflowNodeBase
 
             if (string.IsNullOrEmpty(content) && string.IsNullOrEmpty(url))
             {
-                return NodeExecutionResult.Fail("Either 'content' or 'url' parameter is required");
+                return Task.FromResult(NodeExecutionResult.Fail("Either 'content' or 'url' parameter is required"));
             }
 
             // For now, only support inline GeoJSON content
             // TODO: Add support for URL download and other formats (Shapefile, GeoPackage)
             if (!string.IsNullOrEmpty(url) && string.IsNullOrEmpty(content))
             {
-                return NodeExecutionResult.Fail("URL download not yet supported. Please provide 'content' parameter with inline GeoJSON.");
+                return Task.FromResult(NodeExecutionResult.Fail("URL download not yet supported. Please provide 'content' parameter with inline GeoJSON."));
             }
 
             if (format.ToLowerInvariant() != "geojson")
             {
-                return NodeExecutionResult.Fail($"Format '{format}' not yet supported. Currently only 'geojson' is supported.");
+                return Task.FromResult(NodeExecutionResult.Fail($"Format '{format}' not yet supported. Currently only 'geojson' is supported."));
             }
 
             ReportProgress(context, 20, "Parsing GeoJSON");
@@ -305,7 +305,7 @@ public class FileDataSourceNode : WorkflowNodeBase
 
             ReportProgress(context, 100, $"Parsed {features.Count} features");
 
-            return new NodeExecutionResult
+            return Task.FromResult(new NodeExecutionResult
             {
                 Success = true,
                 Data = new Dictionary<string, object>
@@ -316,13 +316,13 @@ public class FileDataSourceNode : WorkflowNodeBase
                 },
                 FeaturesProcessed = features.Count,
                 DurationMs = stopwatch.ElapsedMilliseconds
-            };
+            });
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             Logger.LogError(ex, "File data source node {NodeId} failed", context.NodeDefinition.Id);
-            return NodeExecutionResult.Fail($"File parsing failed: {ex.Message}", ex.StackTrace);
+            return Task.FromResult(NodeExecutionResult.Fail($"File parsing failed: {ex.Message}", ex.StackTrace));
         }
     }
 

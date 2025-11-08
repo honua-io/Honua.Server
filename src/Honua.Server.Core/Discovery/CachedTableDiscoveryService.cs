@@ -163,7 +163,7 @@ public sealed class CachedTableDiscoveryService : ITableDiscoveryService, IDispo
     {
         // This runs on a background thread, so we can't use the cancellation token
         // We'll just fire and forget the refresh
-        _ = Task.Run(async () =>
+        _ = Task.Run(() =>
         {
             try
             {

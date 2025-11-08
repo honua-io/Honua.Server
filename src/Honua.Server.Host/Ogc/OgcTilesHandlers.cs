@@ -60,6 +60,7 @@ internal static class OgcTilesHandlers
     /// <param name="resolver">Service for resolving collection context.</param>
     /// <param name="rasterRegistry">Registry for raster dataset definitions.</param>
     /// <param name="cacheHeaderService">Service for generating cache headers and ETags.</param>
+    /// <param name="tilesHandler">Handler for OGC tiles operations.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
     /// JSON response containing tileset metadata including tile matrix sets, zoom levels,
@@ -469,6 +470,7 @@ internal static class OgcTilesHandlers
     /// <param name="tileCacheProvider">Provider for tile caching.</param>
     /// <param name="tileCacheMetrics">Metrics collector for tile cache operations.</param>
     /// <param name="cacheHeaderService">Service for generating cache headers and ETags.</param>
+    /// <param name="tilesHandler">Handler for OGC tiles operations.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
     /// A file result containing the tile image (PNG, JPEG, WebP) or vector data (MVT, GeoJSON, PMTiles).

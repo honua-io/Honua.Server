@@ -22,7 +22,7 @@ public class SpatialAnalysisService
     /// <summary>
     /// Perform a buffer analysis on a feature
     /// </summary>
-    public async Task<AnalysisResult> BufferAsync(
+    public Task<AnalysisResult> BufferAsync(
         Feature feature,
         double distance,
         DistanceUnit unit = DistanceUnit.Meters,
@@ -54,26 +54,26 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing buffer analysis");
-            return new AnalysisResult
+            return Task.FromResult(new AnalysisResult
             {
                 OperationType = AnalysisOperationType.Buffer.ToString(),
                 Result = new { },
                 Success = false,
                 ErrorMessage = ex.Message,
                 ExecutionTime = (DateTime.UtcNow - startTime).TotalMilliseconds
-            };
+            });
         }
     }
 
     /// <summary>
     /// Perform multi-ring buffer analysis
     /// </summary>
-    public async Task<AnalysisResult> MultiRingBufferAsync(
+    public Task<AnalysisResult> MultiRingBufferAsync(
         Feature feature,
         List<double> distances,
         DistanceUnit unit = DistanceUnit.Meters)
@@ -103,19 +103,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing multi-ring buffer analysis");
-            return CreateErrorResult(AnalysisOperationType.MultiRingBuffer, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.MultiRingBuffer, ex, startTime));
         }
     }
 
     /// <summary>
     /// Perform intersection analysis between two features
     /// </summary>
-    public async Task<AnalysisResult> IntersectAsync(Feature feature1, Feature feature2)
+    public Task<AnalysisResult> IntersectAsync(Feature feature1, Feature feature2)
     {
         var startTime = DateTime.UtcNow;
 
@@ -132,19 +132,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing intersect analysis");
-            return CreateErrorResult(AnalysisOperationType.Intersect, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.Intersect, ex, startTime));
         }
     }
 
     /// <summary>
     /// Perform union analysis on multiple features
     /// </summary>
-    public async Task<AnalysisResult> UnionAsync(List<Feature> features)
+    public Task<AnalysisResult> UnionAsync(List<Feature> features)
     {
         var startTime = DateTime.UtcNow;
 
@@ -166,19 +166,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing union analysis");
-            return CreateErrorResult(AnalysisOperationType.Union, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.Union, ex, startTime));
         }
     }
 
     /// <summary>
     /// Perform difference analysis (subtract feature2 from feature1)
     /// </summary>
-    public async Task<AnalysisResult> DifferenceAsync(Feature feature1, Feature feature2)
+    public Task<AnalysisResult> DifferenceAsync(Feature feature1, Feature feature2)
     {
         var startTime = DateTime.UtcNow;
 
@@ -195,19 +195,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing difference analysis");
-            return CreateErrorResult(AnalysisOperationType.Difference, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.Difference, ex, startTime));
         }
     }
 
     /// <summary>
     /// Dissolve features based on an attribute field
     /// </summary>
-    public async Task<AnalysisResult> DissolveAsync(List<Feature> features, string field)
+    public Task<AnalysisResult> DissolveAsync(List<Feature> features, string field)
     {
         var startTime = DateTime.UtcNow;
 
@@ -229,19 +229,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing dissolve analysis");
-            return CreateErrorResult(AnalysisOperationType.Dissolve, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.Dissolve, ex, startTime));
         }
     }
 
     /// <summary>
     /// Find points within a polygon
     /// </summary>
-    public async Task<AnalysisResult> PointsWithinPolygonAsync(List<Feature> points, Feature polygon)
+    public Task<AnalysisResult> PointsWithinPolygonAsync(List<Feature> points, Feature polygon)
     {
         var startTime = DateTime.UtcNow;
 
@@ -262,19 +262,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing points within polygon analysis");
-            return CreateErrorResult(AnalysisOperationType.PointInPolygon, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.PointInPolygon, ex, startTime));
         }
     }
 
     /// <summary>
     /// Find nearest neighbor(s) to a target feature
     /// </summary>
-    public async Task<AnalysisResult> NearestNeighborAsync(
+    public Task<AnalysisResult> NearestNeighborAsync(
         Feature target,
         List<Feature> candidates,
         int count = 1)
@@ -300,19 +300,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing nearest neighbor analysis");
-            return CreateErrorResult(AnalysisOperationType.NearestNeighbor, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.NearestNeighbor, ex, startTime));
         }
     }
 
     /// <summary>
     /// Find features within a specified distance
     /// </summary>
-    public async Task<AnalysisResult> WithinDistanceAsync(
+    public Task<AnalysisResult> WithinDistanceAsync(
         Feature target,
         List<Feature> candidates,
         double distance,
@@ -339,19 +339,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing within distance analysis");
-            return CreateErrorResult(AnalysisOperationType.Within, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.Within, ex, startTime));
         }
     }
 
     /// <summary>
     /// Calculate area of a polygon feature
     /// </summary>
-    public async Task<AnalysisResult> CalculateAreaAsync(Feature feature, DistanceUnit unit = DistanceUnit.Meters)
+    public Task<AnalysisResult> CalculateAreaAsync(Feature feature, DistanceUnit unit = DistanceUnit.Meters)
     {
         var startTime = DateTime.UtcNow;
 
@@ -376,19 +376,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error calculating area");
-            return CreateErrorResult(AnalysisOperationType.Area, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.Area, ex, startTime));
         }
     }
 
     /// <summary>
     /// Calculate length/perimeter of a line or polygon feature
     /// </summary>
-    public async Task<AnalysisResult> CalculateLengthAsync(Feature feature, DistanceUnit unit = DistanceUnit.Meters)
+    public Task<AnalysisResult> CalculateLengthAsync(Feature feature, DistanceUnit unit = DistanceUnit.Meters)
     {
         var startTime = DateTime.UtcNow;
 
@@ -413,19 +413,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error calculating length");
-            return CreateErrorResult(AnalysisOperationType.Length, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.Length, ex, startTime));
         }
     }
 
     /// <summary>
     /// Calculate centroid of a feature
     /// </summary>
-    public async Task<AnalysisResult> CalculateCentroidAsync(Feature feature)
+    public Task<AnalysisResult> CalculateCentroidAsync(Feature feature)
     {
         var startTime = DateTime.UtcNow;
 
@@ -443,19 +443,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error calculating centroid");
-            return CreateErrorResult(AnalysisOperationType.Centroid, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.Centroid, ex, startTime));
         }
     }
 
     /// <summary>
     /// Calculate bounding box of a feature
     /// </summary>
-    public async Task<AnalysisResult> CalculateBoundingBoxAsync(Feature feature)
+    public Task<AnalysisResult> CalculateBoundingBoxAsync(Feature feature)
     {
         var startTime = DateTime.UtcNow;
 
@@ -472,19 +472,19 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error calculating bounding box");
-            return CreateErrorResult(AnalysisOperationType.BoundingBox, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.BoundingBox, ex, startTime));
         }
     }
 
     /// <summary>
     /// Perform spatial join between two layers
     /// </summary>
-    public async Task<AnalysisResult> SpatialJoinAsync(
+    public Task<AnalysisResult> SpatialJoinAsync(
         List<Feature> sourceFeatures,
         List<Feature> targetFeatures,
         SpatialRelationship relationship = SpatialRelationship.Intersects)
@@ -511,12 +511,12 @@ public class SpatialAnalysisService
             };
 
             CacheResult(result);
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error performing spatial join");
-            return CreateErrorResult(AnalysisOperationType.SpatialJoin, ex, startTime);
+            return Task.FromResult(CreateErrorResult(AnalysisOperationType.SpatialJoin, ex, startTime));
         }
     }
 

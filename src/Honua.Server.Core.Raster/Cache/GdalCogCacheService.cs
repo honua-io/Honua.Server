@@ -457,9 +457,9 @@ public sealed class GdalCogCacheService : DisposableBase, IRasterCacheService
 
             return Path.GetFileNameWithoutExtension(cachedUri);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "Failed to extract cache key from URI {Uri}", cachedUri);
+            // Silently return null for invalid URIs
             return null;
         }
     }

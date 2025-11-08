@@ -22,7 +22,7 @@ internal static class LocationServicesEndpoints
 {
     /// <summary>
     /// Geocodes an address to geographic coordinates.
-    /// GET /api/location/geocode?query={address}&provider={provider?}
+    /// GET /api/location/geocode?query={address}&amp;provider={provider?}
     /// </summary>
     public static async Task<IResult> HandleGeocodeAsync(
         [FromQuery] string query,
@@ -89,7 +89,7 @@ internal static class LocationServicesEndpoints
 
     /// <summary>
     /// Reverse geocodes coordinates to an address.
-    /// GET /api/location/reverse?lat={lat}&lon={lon}&provider={provider?}
+    /// GET /api/location/reverse?lat={lat}&amp;lon={lon}&amp;provider={provider?}
     /// </summary>
     public static async Task<IResult> HandleReverseGeocodeAsync(
         [FromQuery] double lat,

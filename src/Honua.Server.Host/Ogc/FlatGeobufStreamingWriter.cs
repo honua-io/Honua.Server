@@ -79,8 +79,8 @@ public sealed class FlatGeobufStreamingWriter : StreamingFeatureCollectionWriter
         StreamingWriterContext context,
         CancellationToken cancellationToken)
     {
-        // Write FlatGeobuf magic bytes
-        await outputStream.WriteAsync(FlatGeobuf.Constants.MagicBytes, cancellationToken).ConfigureAwait(false);
+        // Write FlatGeobuf magic bytes (fgb + version + reserved)
+        await outputStream.WriteAsync(FlatGeobuf.Constants.MagicBytes.AsMemory(), cancellationToken).ConfigureAwait(false);
 
         // Build header with schema information
         var srid = context.TargetWkid;

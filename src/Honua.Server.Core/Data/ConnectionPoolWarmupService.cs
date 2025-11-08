@@ -49,23 +49,24 @@ public sealed class ConnectionPoolWarmupService : IHostedService
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         // Skip warmup if disabled or in development (unless forced)
         if (!_options.Enabled)
         {
             _logger.LogInformation("Connection pool warmup is disabled via configuration");
-            return;
+            return Task.CompletedTask;
         }
 
         if (_environment.IsDevelopment() && !_options.EnableInDevelopment)
         {
             _logger.LogDebug("Skipping connection pool warmup in development environment");
-            return;
+            return Task.CompletedTask;
         }
 
         // Don't block startup - run warmup in background
         _ = Task.Run(async () => await WarmupConnectionPoolsAsync(cancellationToken), cancellationToken);
+        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
