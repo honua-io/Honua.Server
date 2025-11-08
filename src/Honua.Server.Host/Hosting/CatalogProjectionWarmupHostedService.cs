@@ -11,6 +11,10 @@ using Honua.Server.Host.Utilities;
 
 namespace Honua.Server.Host.Hosting;
 
+/// <summary>
+/// Background service that warms up the catalog projection snapshot during application startup.
+/// Ensures the catalog is pre-loaded and ready before the application begins serving requests.
+/// </summary>
 public sealed class CatalogProjectionWarmupHostedService : IHostedService
 {
     private readonly ICatalogProjectionService _catalog;
@@ -24,6 +28,11 @@ public sealed class CatalogProjectionWarmupHostedService : IHostedService
         _logger = Guard.NotNull(logger);
     }
 
+    /// <summary>
+    /// Triggered when the application host is starting. Performs catalog warmup asynchronously.
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the warmup operation</param>
+    /// <returns>A task representing the asynchronous startup operation</returns>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         try
@@ -42,5 +51,10 @@ public sealed class CatalogProjectionWarmupHostedService : IHostedService
         }
     }
 
+    /// <summary>
+    /// Triggered when the application host is stopping. No cleanup needed for this service.
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the stop operation</param>
+    /// <returns>A completed task</returns>
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

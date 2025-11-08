@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -36,10 +37,44 @@ public sealed class NotificationChannel
 /// </summary>
 public interface INotificationChannelService
 {
+    /// <summary>
+    /// Creates a new notification channel.
+    /// </summary>
+    /// <param name="channel">The notification channel configuration to create</param>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>The ID of the newly created notification channel</returns>
     Task<long> CreateNotificationChannelAsync(NotificationChannel channel, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a specific notification channel by its ID.
+    /// </summary>
+    /// <param name="id">The ID of the notification channel to retrieve</param>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>The notification channel if found, otherwise null</returns>
     Task<NotificationChannel?> GetNotificationChannelAsync(long id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves all notification channels.
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>A read-only list of all notification channels</returns>
     Task<IReadOnlyList<NotificationChannel>> GetNotificationChannelsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing notification channel.
+    /// </summary>
+    /// <param name="id">The ID of the notification channel to update</param>
+    /// <param name="channel">The updated notification channel configuration</param>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>A task representing the asynchronous update operation</returns>
     Task UpdateNotificationChannelAsync(long id, NotificationChannel channel, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes a notification channel.
+    /// </summary>
+    /// <param name="id">The ID of the notification channel to delete</param>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>A task representing the asynchronous delete operation</returns>
     Task DeleteNotificationChannelAsync(long id, CancellationToken cancellationToken = default);
 }
 
@@ -285,8 +320,10 @@ WHERE id = @Id;";
         {
             return JsonSerializer.Deserialize<T>(json);
         }
-        catch
+        catch (JsonException ex)
         {
+            // Log deserialization failures to detect data corruption
+            Debug.WriteLine($"Failed to deserialize {typeof(T).Name}: {ex.Message}");
             return default;
         }
     }

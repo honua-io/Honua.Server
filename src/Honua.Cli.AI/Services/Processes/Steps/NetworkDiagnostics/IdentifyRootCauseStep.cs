@@ -115,7 +115,7 @@ public class IdentifyRootCauseStep : KernelProcessStep<NetworkDiagnosticsState>
             rootCause = "No issues detected. All diagnostic tests passed successfully.";
             rootCauseCategory = "None";
 
-            var passedTests = _state.TestsRun.Where(t => t.Success).Count();
+            var passedTests = _state.TestsRun.Count(t => t.Success);
             if (passedTests > 0)
             {
                 rootCause += $" ({passedTests} test(s) completed successfully)";

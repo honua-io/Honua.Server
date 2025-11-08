@@ -153,7 +153,8 @@ public static class KeysetPaginationQueryBuilder
 
         // Check for duplicate field names
         var fieldNames = sortFields.Select(f => f.FieldName).ToList();
-        if (fieldNames.Count != fieldNames.Distinct().Count())
+        var distinctCount = new HashSet<string>(fieldNames).Count;
+        if (fieldNames.Count != distinctCount)
         {
             return (false, "Sort fields contain duplicate field names");
         }

@@ -193,8 +193,8 @@ public sealed class ConsultantPatternsStatsCommand : AsyncCommand<ConsultantPatt
         _console.WriteLine();
 
         // Show insights
-        var highAcceptance = sortedStats.Where(x => x.Stats.AcceptanceRate >= 0.7).Count();
-        var lowAcceptance = sortedStats.Where(x => x.Stats.AcceptanceRate < 0.4 && x.Stats.TimesRecommended > 5).Count();
+        var highAcceptance = sortedStats.Count(x => x.Stats.AcceptanceRate >= 0.7);
+        var lowAcceptance = sortedStats.Count(x => x.Stats.AcceptanceRate < 0.4 && x.Stats.TimesRecommended > 5);
 
         _console.MarkupLine($"[bold]Insights:[/]");
         _console.MarkupLine($"• {highAcceptance} patterns have high acceptance (≥70%)");

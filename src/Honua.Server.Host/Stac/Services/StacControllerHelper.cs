@@ -39,6 +39,8 @@ public sealed class StacControllerHelper
     /// </summary>
     public string? GetIfMatchETag(HttpRequest request)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         if (request.Headers.TryGetValue(HeaderNames.IfMatch, out var ifMatchValues))
         {
             var ifMatch = ifMatchValues.FirstOrDefault();
@@ -55,6 +57,8 @@ public sealed class StacControllerHelper
     /// </summary>
     public void SetETagHeader(HttpResponse response, string? etag)
     {
+        ArgumentNullException.ThrowIfNull(response);
+
         if (!string.IsNullOrWhiteSpace(etag))
         {
             response.Headers[HeaderNames.ETag] = $"\"{etag}\"";
@@ -168,6 +172,8 @@ public sealed class StacControllerHelper
     /// </summary>
     public (string username, string? ipAddress) BuildAuditContext(HttpContext httpContext)
     {
+        ArgumentNullException.ThrowIfNull(httpContext);
+
         var username = GetUsername(httpContext.User);
         var ipAddress = GetIpAddress(httpContext.Connection);
         return (username, ipAddress);

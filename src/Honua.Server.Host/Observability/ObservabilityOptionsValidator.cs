@@ -13,6 +13,11 @@ public sealed class ObservabilityOptionsValidator : IValidateOptions<Observabili
 {
     public ValidateOptionsResult Validate(string? name, ObservabilityOptions options)
     {
+        if (options == null)
+        {
+            return ValidateOptionsResult.Fail("ObservabilityOptions cannot be null");
+        }
+
         var failures = new List<string>();
 
         // Validate metrics configuration

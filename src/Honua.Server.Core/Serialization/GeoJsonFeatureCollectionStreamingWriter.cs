@@ -247,8 +247,9 @@ public sealed class GeoJsonFeatureCollectionStreamingWriter : StreamingFeatureCo
             var geoJsonReader = new GeoJsonReader();
             return geoJsonReader.Read<Geometry>(text);
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(ex, "Failed to parse geometry from text");
             return null;
         }
     }

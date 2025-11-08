@@ -554,7 +554,7 @@ public sealed class MetadataSnapshot
     {
         // Group layers by service for validation
         var layersByService = layers.GroupBy(l => l.ServiceId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(g => g.Key, g => g, StringComparer.OrdinalIgnoreCase);
 
         foreach (var service in services)
         {

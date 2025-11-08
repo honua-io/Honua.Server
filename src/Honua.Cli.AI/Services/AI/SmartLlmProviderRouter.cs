@@ -229,9 +229,9 @@ public sealed class SmartLlmProviderRouter : ILlmProviderRouter
 
                 if (stats.Any())
                 {
-                    // Calculate weighted score for each provider
+                    // Calculate weighted score for each provider and find the best one
                     // Score = (success_rate * 0.5) + (speed_score * 0.3) + (cost_score * 0.2)
-                    var scoredProviders = stats
+                    var bestProvider = stats
                         .Select(kvp =>
                         {
                             var provider = kvp.Key;
@@ -245,12 +245,10 @@ public sealed class SmartLlmProviderRouter : ILlmProviderRouter
 
                             return new { Provider = provider, Score = weightedScore, Stats = providerStats };
                         })
-                        .OrderByDescending(p => p.Score)
-                        .ToList();
+                        .MaxBy(p => p.Score);
 
-                    if (scoredProviders.Any())
+                    if (bestProvider != null)
                     {
-                        var bestProvider = scoredProviders.First();
                         _logger.LogInformation(
                             "Reinforcement learning selected {Provider} for {TaskType} (score: {Score:F2}, success rate: {SuccessRate:P0}, avg latency: {Latency}ms)",
                             bestProvider.Provider,
@@ -468,8 +466,7 @@ public sealed class SmartLlmProviderRouter : ILlmProviderRouter
             // Majority vote
             var grouped = decisions
                 .GroupBy(d => d)
-                .OrderByDescending(g => g.Count())
-                .First();
+                .MaxBy(g => g.Count())!;
 
             var majorityDecision = grouped.Key;
             var majorityIndex = Array.IndexOf(decisions, majorityDecision);
@@ -482,7 +479,7 @@ public sealed class SmartLlmProviderRouter : ILlmProviderRouter
         }
 
         // Fall back to longest/most detailed response
-        var longestResponse = responses.OrderByDescending(r => r.Content.Length).First();
+        var longestResponse = responses.MaxBy(r => r.Content.Length)!;
         _logger.LogInformation("Using longest response for consensus ({Length} chars)", longestResponse.Content.Length);
 
         return Task.FromResult((longestResponse, 0.5, "longest-response"));

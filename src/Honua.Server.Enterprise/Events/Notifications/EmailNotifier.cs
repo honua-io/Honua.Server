@@ -55,6 +55,12 @@ public class EmailNotifier : IGeofenceEventNotifier
         }
     }
 
+    /// <summary>
+    /// Sends a batch email notification summarizing multiple geofence events.
+    /// </summary>
+    /// <param name="events">List of geofence events and their associated geofences to notify about</param>
+    /// <param name="cancellationToken">Token to cancel the notification operation</param>
+    /// <returns>A task representing the asynchronous notification operation</returns>
     public async Task NotifyBatchAsync(
         List<(GeofenceEvent Event, Geofence Geofence)> events,
         CancellationToken cancellationToken = default)

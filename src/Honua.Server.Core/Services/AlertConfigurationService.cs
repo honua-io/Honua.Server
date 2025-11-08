@@ -410,8 +410,10 @@ WHERE alert_routing_configuration.id = (SELECT id FROM alert_routing_configurati
         {
             return JsonSerializer.Deserialize<T>(json);
         }
-        catch
+        catch (JsonException ex)
         {
+            // Log deserialization failures to detect data corruption or schema changes
+            System.Diagnostics.Debug.WriteLine($"Failed to deserialize {typeof(T).Name}: {ex.Message}");
             return default;
         }
     }

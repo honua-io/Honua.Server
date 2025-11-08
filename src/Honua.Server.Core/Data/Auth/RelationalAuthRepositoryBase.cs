@@ -752,14 +752,23 @@ WHERE NOT EXISTS (
 
         var now = DateTimeOffset.UtcNow.UtcDateTime;
 
-        foreach (var role in roles.Where(r => r.HasValue()).Select(r => r.Trim().ToLowerInvariant()).Distinct())
+        // Use HashSet to deduplicate roles efficiently (O(n) instead of chained LINQ O(n²))
+        var uniqueRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var role in roles)
         {
-            await ExecuteNonQueryAsync(connection, insertRoleSql, new
+            if (!string.IsNullOrWhiteSpace(role))
             {
-                UserId = userId,
-                RoleId = role,
-                GrantedAt = now
-            }, transaction, cancellationToken).ConfigureAwait(false);
+                var normalized = role.Trim().ToLowerInvariant();
+                if (uniqueRoles.Add(normalized))
+                {
+                    await ExecuteNonQueryAsync(connection, insertRoleSql, new
+                    {
+                        UserId = userId,
+                        RoleId = normalized,
+                        GrantedAt = now
+                    }, transaction, cancellationToken).ConfigureAwait(false);
+                }
+            }
         }
     }
 

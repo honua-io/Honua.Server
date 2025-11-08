@@ -30,6 +30,8 @@ public class GeofenceManagementService : IGeofenceManagementService
         string? tenantId = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         // Convert GeoJSON to NetTopologySuite Polygon
         var polygon = ConvertToPolygon(request.Geometry);
 
@@ -104,6 +106,8 @@ public class GeofenceManagementService : IGeofenceManagementService
         string? tenantId = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var existing = await _repository.GetByIdAsync(id, tenantId, cancellationToken);
         if (existing == null)
         {

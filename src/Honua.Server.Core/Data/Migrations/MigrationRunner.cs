@@ -196,17 +196,19 @@ public sealed class MigrationRunner
         }
 
         // Apply pending migrations
-        var pendingMigrations = availableMigrations
-            .Where(m => !appliedVersions.Contains(m.Version))
-            .ToList();
+        var pendingMigrationsQuery = availableMigrations
+            .Where(m => !appliedVersions.Contains(m.Version));
 
-        if (pendingMigrations.Count == 0)
+        // Check if there are any pending migrations before materializing
+        if (!pendingMigrationsQuery.Any())
         {
             _logger.LogInformation("No pending migrations to apply");
             result.Success = true;
             return result;
         }
 
+        // Materialize only when needed for iteration
+        var pendingMigrations = pendingMigrationsQuery.ToList();
         _logger.LogInformation("Applying {Count} pending migrations", pendingMigrations.Count);
 
         await using var connection = new NpgsqlConnection(_connectionString);
@@ -359,7 +361,7 @@ public sealed class MigrationRunner
     public async Task<string?> GetCurrentVersionAsync(CancellationToken cancellationToken = default)
     {
         var applied = await GetAppliedMigrationsAsync(cancellationToken);
-        return applied.OrderByDescending(m => m.Version).FirstOrDefault()?.Version;
+        return applied.MaxBy(m => m.Version)?.Version;
     }
 
     private async Task<bool> CheckMigrationsTableExistsAsync(

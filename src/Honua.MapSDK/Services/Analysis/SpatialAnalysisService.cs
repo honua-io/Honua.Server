@@ -28,6 +28,8 @@ public class SpatialAnalysisService
         DistanceUnit unit = DistanceUnit.Meters,
         int steps = 8)
     {
+        ArgumentNullException.ThrowIfNull(feature);
+
         var startTime = DateTime.UtcNow;
 
         try
@@ -76,6 +78,9 @@ public class SpatialAnalysisService
         List<double> distances,
         DistanceUnit unit = DistanceUnit.Meters)
     {
+        ArgumentNullException.ThrowIfNull(feature);
+        ArgumentNullException.ThrowIfNull(distances);
+
         var startTime = DateTime.UtcNow;
 
         try
@@ -540,7 +545,7 @@ public class SpatialAnalysisService
         if (_resultCache.Count >= _maxCacheSize)
         {
             // Remove oldest result
-            var oldest = _resultCache.OrderBy(kvp => ((AnalysisResult)kvp.Value).Timestamp).First();
+            var oldest = _resultCache.MinBy(kvp => ((AnalysisResult)kvp.Value).Timestamp);
             _resultCache.Remove(oldest.Key);
         }
 

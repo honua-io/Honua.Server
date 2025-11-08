@@ -50,6 +50,8 @@ public sealed class ZarrChunkCache : IDisposable
         Func<Task<byte[]>> fetchFunc,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(fetchFunc);
+
         var cacheKey = BuildCacheKey(zarrUri, variableName, chunkCoords);
 
         // Try to get from cache

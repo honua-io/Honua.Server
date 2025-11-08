@@ -89,8 +89,10 @@ internal sealed class PostgresFeatureOperations
         {
             definition = builder.BuildSelect(normalizedQuery);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger?.LogError(ex, "Failed to build select query for layer {LayerId} in service {ServiceId}. Storage SRID: {StorageSrid}, Target SRID: {TargetSrid}",
+                layer.Id, service.Id, storageSrid, targetSrid);
             _queryBuilderPool.Return(builder, service, layer, storageSrid, targetSrid);
             throw;
         }
