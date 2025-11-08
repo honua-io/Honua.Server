@@ -7,44 +7,60 @@
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
-        <MudText Typo="Typo.h5" Class="ml-3">Honua Admin</MudText>
-        <MudSpacer />
-        <GlobalSearch Class="mx-4" Style="max-width: 500px; width: 100%;" />
+    <MudAppBar Elevation="1" Dense="@_isMobile">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                      Color="Color.Inherit"
+                      Edge="Edge.Start"
+                      OnClick="@ToggleDrawer"
+                      Title="Toggle menu" />
+        <MudText Typo="@(_isMobile ? Typo.h6 : Typo.h5)" Class="ml-3">
+            @(_isMobile ? "Honua" : "Honua Admin")
+        </MudText>
         <MudSpacer />
 
-        @* License Tier Badge *@
-        @if (_featureFlags != null)
+        @if (!_isMobile)
         {
-            <MudChip Color="@GetTierColor()" Size="Size.Small" Icon="@Icons.Material.Filled.Badge" Class="mr-2">
-                @_featureFlags.Tier
-            </MudChip>
+            <GlobalSearch Class="mx-4" Style="max-width: 500px; width: 100%;" />
+            <MudSpacer />
 
-            @if (_featureFlags.DaysUntilExpiration <= 30 && _featureFlags.DaysUntilExpiration > 0)
+            @* License Tier Badge *@
+            @if (_featureFlags != null)
             {
-                <MudChip Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Warning" Class="mr-2">
-                    Expires in @_featureFlags.DaysUntilExpiration days
+                <MudChip Color="@GetTierColor()" Size="Size.Small" Icon="@Icons.Material.Filled.Badge" Class="mr-2">
+                    @_featureFlags.Tier
                 </MudChip>
-            }
-            else if (_featureFlags.DaysUntilExpiration <= 0)
-            {
-                <MudChip Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Error" Class="mr-2">
-                    License Expired
-                </MudChip>
+
+                @if (_featureFlags.DaysUntilExpiration <= 30 && _featureFlags.DaysUntilExpiration > 0)
+                {
+                    <MudChip Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Warning" Class="mr-2">
+                        Expires in @_featureFlags.DaysUntilExpiration days
+                    </MudChip>
+                }
+                else if (_featureFlags.DaysUntilExpiration <= 0)
+                {
+                    <MudChip Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Error" Class="mr-2">
+                        License Expired
+                    </MudChip>
+                }
             }
         }
 
         <LoginDisplay />
     </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+    <MudDrawer @bind-Open="_drawerOpen"
+               ClipMode="DrawerClipMode.Always"
+               Elevation="2"
+               Variant="@(_isMobile ? DrawerVariant.Temporary : DrawerVariant.Persistent)">
         <NavMenu />
     </MudDrawer>
 
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-            <MudBreadcrumbs Items="_breadcrumbs"></MudBreadcrumbs>
+    <MudMainContent Class="main-content">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="@(_isMobile ? "mt-2 pa-2" : "mt-4 pa-4")">
+            @if (!_isMobile)
+            {
+                <MudBreadcrumbs Items="_breadcrumbs"></MudBreadcrumbs>
+            }
             @Body
         </MudContainer>
     </MudMainContent>
@@ -52,6 +68,7 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _isMobile = false;
     private List<BreadcrumbItem> _breadcrumbs = new();
     private FeatureFlagState? _featureFlags;
 
@@ -65,6 +82,24 @@
 
         // Load feature flags for license tier display
         _featureFlags = await FeatureFlags.GetFeatureFlagsAsync();
+
+        // Check if mobile on initial load
+        CheckIfMobile();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            CheckIfMobile();
+        }
+    }
+
+    private void CheckIfMobile()
+    {
+        // Simple heuristic: close drawer on mobile
+        // In a real app, you'd use JS interop to check window.innerWidth
+        _isMobile = false; // Default to desktop, can be enhanced with JS interop
     }
 
     private void UpdateBreadcrumbs()
