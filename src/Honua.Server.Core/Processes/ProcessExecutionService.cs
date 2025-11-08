@@ -55,8 +55,15 @@ public sealed class ProcessExecutionService : BackgroundService
             await _queue.Writer.WriteAsync(job, cancellationToken).ConfigureAwait(false);
             return true;
         }
-        catch
+        catch (OperationCanceledException)
         {
+            _logger.LogInformation("Job {JobId} enqueue was cancelled", job.JobId);
+            await _jobStore.UnregisterByIdAsync(job.JobId, cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enqueue job {JobId} to execution queue", job.JobId);
             await _jobStore.UnregisterByIdAsync(job.JobId, cancellationToken).ConfigureAwait(false);
             throw;
         }

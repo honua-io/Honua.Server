@@ -57,20 +57,20 @@ public class WorkflowEngine : IWorkflowEngine
             if (!result.DagValidation.IsValid)
             {
                 result.IsValid = false;
-                if (result.DagValidation.Cycles?.Any() == true)
+                if (result.DagValidation.Cycles is { Count: > 0 } cycles)
                 {
-                    result.Errors.Add($"Workflow contains cycles: {string.Join(", ", result.DagValidation.Cycles.Select(c => string.Join(" → ", c)))}");
+                    result.Errors.Add($"Workflow contains cycles: {string.Join(", ", cycles.Select(c => string.Join(" → ", c)))}");
                 }
-                if (result.DagValidation.MissingNodes?.Any() == true)
+                if (result.DagValidation.MissingNodes is { Count: > 0 } missingNodes)
                 {
-                    result.Errors.Add($"Missing node references: {string.Join(", ", result.DagValidation.MissingNodes)}");
+                    result.Errors.Add($"Missing node references: {string.Join(", ", missingNodes)}");
                 }
             }
 
             // Add warning for disconnected nodes (even if DAG is otherwise valid)
-            if (result.DagValidation.DisconnectedNodes?.Any() == true)
+            if (result.DagValidation.DisconnectedNodes is { Count: > 0 } disconnectedNodes)
             {
-                result.Warnings.Add($"Disconnected nodes: {string.Join(", ", result.DagValidation.DisconnectedNodes)}");
+                result.Warnings.Add($"Disconnected nodes: {string.Join(", ", disconnectedNodes)}");
             }
 
             // 2. Validate parameters
