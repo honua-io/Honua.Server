@@ -189,10 +189,55 @@
     <script src="tests/geometry.test.js"></script>
     <script src="tests/query.test.js"></script>
     <script src="tests/export.test.js"></script>
+    <script src="tests/tiles.test.js"></script>
+    <script src="tests/editing.test.js"></script>
+    <script src="tests/advanced.test.js"></script>
+    <script src="tests/authentication.test.js"></script>
 
     <script>
-        // Run tests
-        mocha.run();
+        // Run tests and expose results for headless runner
+        window.mochaTests = [];
+        window.mochaStats = { start: Date.now() };
+
+        window.mochaRunner = mocha.run(function() {
+            window.mochaStats.end = Date.now();
+            window.mochaStats.duration = window.mochaStats.end - window.mochaStats.start;
+        });
+
+        // Track test results
+        window.mochaRunner.on('pass', function(test) {
+            window.mochaTests.push({
+                title: test.title,
+                fullTitle: test.fullTitle(),
+                duration: test.duration,
+                state: 'passed'
+            });
+        });
+
+        window.mochaRunner.on('fail', function(test, err) {
+            window.mochaTests.push({
+                title: test.title,
+                fullTitle: test.fullTitle(),
+                duration: test.duration,
+                state: 'failed',
+                error: err.message
+            });
+        });
+
+        window.mochaRunner.on('pending', function(test) {
+            window.mochaTests.push({
+                title: test.title,
+                fullTitle: test.fullTitle(),
+                state: 'pending'
+            });
+        });
+
+        window.mochaRunner.on('end', function() {
+            window.mochaStats.passes = this.stats.passes;
+            window.mochaStats.failures = this.stats.failures;
+            window.mochaStats.pending = this.stats.pending;
+            window.mochaStats.tests = this.stats.tests;
+        });
     </script>
 </body>
 </html>

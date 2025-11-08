@@ -80,29 +80,22 @@ This test suite validates that Honua.Server correctly implements the Esri GeoSer
 
 ## 🚀 Quick Start
 
-### Option 1: Browser-Based Testing (Recommended)
-
 1. **Install dependencies:**
    ```bash
    cd tests/esri-leaflet
    npm install
    ```
 
-2. **Start a local server:**
+2. **Run API tests:**
    ```bash
-   npm run serve
+   npm test
    ```
 
-3. **Open in browser:**
-   - Navigate to `http://localhost:8888/test-runner.html`
-   - The tests will run automatically with interactive map visualization
-
-### Option 2: Command-Line Testing
-
-```bash
-cd tests/esri-leaflet
-npm test
-```
+3. **Optional: Browser testing for interactive visualization**
+   ```bash
+   npm run test:browser
+   # Opens http://localhost:8888/test-runner.html in browser
+   ```
 
 ## ⚙️ Configuration
 

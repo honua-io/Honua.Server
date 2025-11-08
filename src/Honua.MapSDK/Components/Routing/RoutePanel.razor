@@ -236,6 +236,16 @@
                                 With traffic: @FormatDuration(route.DurationWithTrafficSeconds.Value)
                             </div>
                         }
+                        @if (false)
+                        {
+                            <div class="route-warnings">
+                                @* CoreRoute doesn't have Traffic delays - remove this section *@
+                                @*@foreach (var delay in route.Traffic.Delays)
+                                {
+                                    <small>⚠️ @delay.Reason</small>*@
+                                }
+                            </div>
+                        }
                     </div>
                 }
             </div>
