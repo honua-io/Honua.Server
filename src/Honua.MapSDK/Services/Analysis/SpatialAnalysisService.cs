@@ -540,7 +540,7 @@ public class SpatialAnalysisService
         if (_resultCache.Count >= _maxCacheSize)
         {
             // Remove oldest result
-            var oldest = _resultCache.OrderBy(kvp => ((AnalysisResult)kvp.Value).Timestamp).First();
+            var oldest = _resultCache.MinBy(kvp => ((AnalysisResult)kvp.Value).Timestamp);
             _resultCache.Remove(oldest.Key);
         }
 

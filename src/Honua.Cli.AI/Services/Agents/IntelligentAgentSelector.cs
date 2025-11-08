@@ -80,7 +80,7 @@ public class IntelligentAgentSelector
         var highConfidence = agentScores.Where(x => string.Equals(x.Confidence.Level, "High", StringComparison.OrdinalIgnoreCase)).ToList();
         if (highConfidence.Any())
         {
-            var best = highConfidence.OrderByDescending(x => x.Confidence.Overall).First();
+            var best = highConfidence.MaxBy(x => x.Confidence.Overall)!;
             _logger.LogInformation(
                 "Selected {AgentName} with High confidence ({Confidence:P0})",
                 best.AgentName,
@@ -89,7 +89,7 @@ public class IntelligentAgentSelector
         }
 
         // Fallback to highest overall score
-        var fallback = agentScores.OrderByDescending(x => x.Confidence.Overall).First();
+        var fallback = agentScores.MaxBy(x => x.Confidence.Overall)!;
         _logger.LogInformation(
             "Selected {AgentName} with {Level} confidence ({Confidence:P0})",
             fallback.AgentName,

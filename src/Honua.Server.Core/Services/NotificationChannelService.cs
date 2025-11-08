@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -285,8 +286,10 @@ WHERE id = @Id;";
         {
             return JsonSerializer.Deserialize<T>(json);
         }
-        catch
+        catch (JsonException ex)
         {
+            // Log deserialization failures to detect data corruption
+            Debug.WriteLine($"Failed to deserialize {typeof(T).Name}: {ex.Message}");
             return default;
         }
     }

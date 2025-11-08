@@ -55,6 +55,8 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogAccountLockout(string username, string? ipAddress, DateTimeOffset lockedUntil)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
         _logger.LogWarning(
             "SECURITY_AUDIT: Account locked - Username={Username}, IP={IPAddress}, LockedUntil={LockedUntil:u}",
             username, ipAddress ?? "unknown", lockedUntil);
@@ -72,6 +74,10 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogDataAccess(string username, string operation, string resourceType, string? resourceId, string? ipAddress)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentException.ThrowIfNullOrWhiteSpace(operation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceType);
+
         _logger.LogInformation(
             "SECURITY_AUDIT: Data access - Username={Username}, Operation={Operation}, ResourceType={ResourceType}, ResourceId={ResourceId}, IP={IPAddress}",
             username, operation, resourceType, resourceId ?? "N/A", ipAddress ?? "unknown");
@@ -120,6 +126,8 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogPasswordExpired(string username, DateTimeOffset expiresAt, string? ipAddress)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
         _logger.LogWarning(
             "SECURITY_AUDIT: Password expired - Username={Username}, ExpiredOn={ExpiredOn:u}, IP={IPAddress}",
             username, expiresAt, ipAddress ?? "unknown");
@@ -127,6 +135,8 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogPasswordExpiresSoon(string username, DateTimeOffset expiresAt, int daysUntilExpiration, string? ipAddress)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
         _logger.LogInformation(
             "SECURITY_AUDIT: Password expires soon - Username={Username}, ExpiresOn={ExpiresOn:u}, DaysRemaining={DaysRemaining}, IP={IPAddress}",
             username, expiresAt, daysUntilExpiration, ipAddress ?? "unknown");
@@ -134,6 +144,8 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogPasswordChanged(string username, string? ipAddress, string? actorUsername)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
         _logger.LogInformation(
             "SECURITY_AUDIT: Password changed - Username={Username}, Actor={Actor}, IP={IPAddress}",
             username, actorUsername ?? "self", ipAddress ?? "unknown");
