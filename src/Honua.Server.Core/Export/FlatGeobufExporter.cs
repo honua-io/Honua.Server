@@ -248,8 +248,10 @@ public sealed class FlatGeobufExporter : IFlatGeobufExporter
             geometry = geometryFactory.CreateGeometry(geometry);
             return geometry;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            // Log GeoJSON parsing failures in debug builds
+            Debug.WriteLine($"Failed to parse geometry as GeoJSON: {ex.Message}");
             return null;
         }
     }

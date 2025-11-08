@@ -204,7 +204,7 @@ public class MapConfigurationService : IMapConfigurationService
         // Check for duplicate layer IDs
         var duplicateLayerIds = config.Layers
             .GroupBy(l => l.Id)
-            .Where(g => g.Count() > 1)
+            .Where(g => g.Skip(1).Any())
             .Select(g => g.Key);
 
         foreach (var id in duplicateLayerIds)

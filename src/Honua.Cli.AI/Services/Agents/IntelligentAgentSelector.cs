@@ -55,6 +55,11 @@ public class IntelligentAgentSelector
         string[] availableAgents,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userRequest);
+        ArgumentNullException.ThrowIfNull(availableAgents);
+        if (availableAgents.Length == 0)
+            throw new ArgumentException("At least one agent must be available", nameof(availableAgents));
+
         _logger.LogDebug("Selecting best agent for request: {Request}", userRequest);
 
         var taskType = _capabilities.ClassifyTaskType(userRequest);

@@ -43,6 +43,10 @@ public sealed class FeatureAttachmentOrchestrator : IFeatureAttachmentOrchestrat
 
     public async Task<IReadOnlyList<AttachmentDescriptor>> ListAsync(string serviceId, string layerId, string featureId, CancellationToken cancellationToken = default)
     {
+        Guard.NotNullOrWhiteSpace(serviceId);
+        Guard.NotNullOrWhiteSpace(layerId);
+        Guard.NotNullOrWhiteSpace(featureId);
+
         var layer = await ResolveLayerAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
         if (layer is null || !layer.Attachments.Enabled)
         {
