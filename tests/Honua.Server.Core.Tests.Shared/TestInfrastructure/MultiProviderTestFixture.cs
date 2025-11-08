@@ -1,8 +1,11 @@
 using System.Data;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using DuckDB.NET.Data;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Tests.Shared.TestConfiguration;
+using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using MySqlConnector;
 using Npgsql;
@@ -12,32 +15,73 @@ using Xunit.Sdk;
 namespace Honua.Server.Core.Tests.Shared;
 
 /// <summary>
-/// Test fixture that provides multiple database providers (SQLite, PostgreSQL, MySQL, SQL Server)
+/// Test fixture that provides multiple database providers (SQLite, PostgreSQL, MySQL, SQL Server, DuckDB)
 /// with identical test data for comprehensive provider × API × format matrix testing.
+/// Respects DatabaseTestConfiguration for conditional provider initialization.
 /// </summary>
 public sealed class MultiProviderTestFixture : IAsyncLifetime
 {
     private IContainer? _postgresContainer;
     private IContainer? _mysqlContainer;
+    private IContainer? _sqlServerContainer;
 
     private string? _sqlitePath;
+    private string? _duckDbPath;
 
     public Dictionary<string, TestDatabaseInfo> Providers { get; } = new();
 
     public const string SqliteProvider = "sqlite";
     public const string PostgresProvider = "postgres";
     public const string MySqlProvider = "mysql";
+    public const string SqlServerProvider = "sqlserver";
+    public const string DuckDbProvider = "duckdb";
 
     public async Task InitializeAsync()
     {
+        Console.WriteLine($"[MultiProviderTestFixture] {DatabaseTestConfiguration.GetConfigurationSummary()}");
+
         // Initialize SQLite (fastest, always available)
         await InitializeSqliteAsync();
 
-        // Initialize PostgreSQL (via Testcontainers)
-        await InitializePostgresAsync();
+        // Initialize PostgreSQL (via Testcontainers) - controlled by configuration
+        if (DatabaseTestConfiguration.IsPostgresEnabled)
+        {
+            await InitializePostgresAsync();
+        }
+        else
+        {
+            Console.WriteLine("[MultiProviderTestFixture] PostgreSQL tests disabled by configuration");
+        }
 
-        // Initialize MySQL (via Testcontainers)
-        await InitializeMySqlAsync();
+        // Initialize MySQL (via Testcontainers) - controlled by configuration
+        if (DatabaseTestConfiguration.IsMySqlEnabled)
+        {
+            await InitializeMySqlAsync();
+        }
+        else
+        {
+            Console.WriteLine("[MultiProviderTestFixture] MySQL tests disabled by configuration");
+        }
+
+        // Initialize SQL Server (via Testcontainers) - controlled by configuration
+        if (DatabaseTestConfiguration.IsSqlServerEnabled)
+        {
+            await InitializeSqlServerAsync();
+        }
+        else
+        {
+            Console.WriteLine("[MultiProviderTestFixture] SQL Server tests disabled by configuration");
+        }
+
+        // Initialize DuckDB (file-based) - controlled by configuration
+        if (DatabaseTestConfiguration.IsDuckDbEnabled)
+        {
+            await InitializeDuckDbAsync();
+        }
+        else
+        {
+            Console.WriteLine("[MultiProviderTestFixture] DuckDB tests disabled by configuration");
+        }
 
         // Seed all providers with identical test data
         await SeedAllProvidersAsync();
@@ -160,6 +204,95 @@ public sealed class MultiProviderTestFixture : IAsyncLifetime
         }
     }
 
+    private async Task InitializeSqlServerAsync()
+    {
+        try
+        {
+            _sqlServerContainer = new ContainerBuilder()
+                .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+                .WithPortBinding(1433, true)
+                .WithEnvironment("ACCEPT_EULA", "Y")
+                .WithEnvironment("MSSQL_SA_PASSWORD", "Honua_Test_Pass123!")
+                .WithEnvironment("MSSQL_PID", "Developer")
+                .WithWaitStrategy(Wait.ForUnixContainer()
+                    .UntilCommandIsCompleted("/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "Honua_Test_Pass123!", "-Q", "SELECT 1", "-C"))
+                .WithStartupCallback(async (container, ct) =>
+                {
+                    // Add extra delay to ensure SQL Server is fully ready
+                    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+                })
+                .Build();
+
+            await _sqlServerContainer.StartAsync();
+
+            var port = _sqlServerContainer.GetMappedPublicPort(1433);
+            var masterConnectionString = $"Server=localhost,{port};Database=master;User Id=sa;Password=Honua_Test_Pass123!;TrustServerCertificate=True;Encrypt=False;";
+
+            // Create test database
+            await using (var connection = new SqlConnection(masterConnectionString))
+            {
+                await connection.OpenAsync();
+                await using var createDbCmd = new SqlCommand("IF DB_ID('honua_test') IS NULL CREATE DATABASE honua_test;", connection);
+                createDbCmd.CommandTimeout = 60;
+                await createDbCmd.ExecuteNonQueryAsync();
+            }
+
+            var connectionString = $"Server=localhost,{port};Database=honua_test;User Id=sa;Password=Honua_Test_Pass123!;TrustServerCertificate=True;Encrypt=False;";
+
+            Providers[SqlServerProvider] = new TestDatabaseInfo
+            {
+                ProviderName = SqlServerProvider,
+                ConnectionString = connectionString,
+                ProviderType = "sqlserver",
+                SupportsSpatialExtension = true // SQL Server spatial types
+            };
+
+            Console.WriteLine($"[MultiProviderTestFixture] SQL Server container started successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[MultiProviderTestFixture] Unable to start SQL Server test container: {ex.Message}");
+            _sqlServerContainer = null;
+        }
+    }
+
+    private async Task InitializeDuckDbAsync()
+    {
+        try
+        {
+            _duckDbPath = Path.Combine(Path.GetTempPath(), $"honua-test-{Guid.NewGuid():N}.duckdb");
+            var connectionString = $"DataSource={_duckDbPath}";
+
+            // Test DuckDB availability and spatial extension
+            using var connection = new DuckDBConnection(connectionString);
+            await connection.OpenAsync();
+
+            // Load spatial extension
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "INSTALL spatial; LOAD spatial; SELECT ST_Point(0, 0);";
+            await cmd.ExecuteScalarAsync();
+
+            Providers[DuckDbProvider] = new TestDatabaseInfo
+            {
+                ProviderName = DuckDbProvider,
+                ConnectionString = connectionString,
+                ProviderType = "duckdb",
+                SupportsSpatialExtension = true // DuckDB spatial extension
+            };
+
+            Console.WriteLine($"[MultiProviderTestFixture] DuckDB initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[MultiProviderTestFixture] Unable to initialize DuckDB: {ex.Message}");
+            if (_duckDbPath != null && File.Exists(_duckDbPath))
+            {
+                try { File.Delete(_duckDbPath); } catch { /* Ignore cleanup errors */ }
+            }
+            _duckDbPath = null;
+        }
+    }
+
     private static async Task WaitForMySqlReadyAsync(string connectionString, int maxRetries = 10)
     {
         var delay = TimeSpan.FromMilliseconds(500);
@@ -212,6 +345,12 @@ public sealed class MultiProviderTestFixture : IAsyncLifetime
                 break;
             case "mysql":
                 await SeedMySqlAsync(provider);
+                break;
+            case "sqlserver":
+                await SeedSqlServerAsync(provider);
+                break;
+            case "duckdb":
+                await SeedDuckDbAsync(provider);
                 break;
             default:
                 throw new NotSupportedException($"Provider {provider.ProviderType} not supported");
@@ -377,6 +516,121 @@ public sealed class MultiProviderTestFixture : IAsyncLifetime
         }, "MySQL seeding");
     }
 
+    private async Task SeedSqlServerAsync(TestDatabaseInfo provider)
+    {
+        await using var connection = new SqlConnection(provider.ConnectionString);
+        await connection.OpenAsync();
+
+        var featureId = 1;
+        foreach (var (type, scenario) in GeometryTestData.GetAllTestCombinations())
+        {
+            var tableName = GetTableName(type, scenario);
+            var geometry = GeometryTestData.GetTestGeometry(type, scenario);
+            var wkt = GeometryTestData.ToWkt(geometry);
+
+            // Create table with SQL Server geometry
+            await using (var createCmd = new SqlCommand($@"
+                IF OBJECT_ID('{tableName}', 'U') IS NOT NULL DROP TABLE {tableName};
+                CREATE TABLE {tableName} (
+                    feature_id INTEGER PRIMARY KEY,
+                    name NVARCHAR(MAX),
+                    geometry_type NVARCHAR(MAX),
+                    category NVARCHAR(MAX),
+                    priority INTEGER,
+                    active BIT,
+                    created_at DATETIME2,
+                    measurement FLOAT,
+                    description NVARCHAR(MAX),
+                    geom GEOMETRY
+                );", connection))
+            {
+                createCmd.CommandTimeout = 60;
+                await createCmd.ExecuteNonQueryAsync();
+            }
+
+            // Insert test feature using geometry::STGeomFromText
+            await using var insertCmd = new SqlCommand($@"
+                INSERT INTO {tableName} (feature_id, name, geometry_type, category, priority, active, created_at, measurement, description, geom)
+                VALUES (@id, @name, @geom_type, @category, @priority, @active, @created_at, @measurement, @description, geometry::STGeomFromText(@wkt, 4326));", connection);
+
+            var attrs = GeometryTestData.GetTestAttributes(type, featureId++);
+            insertCmd.Parameters.AddWithValue("@id", attrs["feature_id"]!);
+            insertCmd.Parameters.AddWithValue("@name", attrs["name"]!);
+            insertCmd.Parameters.AddWithValue("@geom_type", attrs["geometry_type"]!);
+            insertCmd.Parameters.AddWithValue("@category", attrs["category"]!);
+            insertCmd.Parameters.AddWithValue("@priority", attrs["priority"]!);
+            insertCmd.Parameters.AddWithValue("@active", (bool)attrs["active"]!);
+            insertCmd.Parameters.AddWithValue("@created_at", (DateTime)attrs["created_at"]!);
+            insertCmd.Parameters.AddWithValue("@measurement", attrs["measurement"]!);
+            insertCmd.Parameters.AddWithValue("@description", attrs["description"]!);
+            insertCmd.Parameters.AddWithValue("@wkt", wkt);
+            insertCmd.CommandTimeout = 60;
+
+            await insertCmd.ExecuteNonQueryAsync();
+        }
+    }
+
+    private async Task SeedDuckDbAsync(TestDatabaseInfo provider)
+    {
+        using var connection = new DuckDBConnection(provider.ConnectionString);
+        await connection.OpenAsync();
+
+        // Load spatial extension
+        using (var loadCmd = connection.CreateCommand())
+        {
+            loadCmd.CommandText = "INSTALL spatial; LOAD spatial;";
+            await loadCmd.ExecuteNonQueryAsync();
+        }
+
+        var featureId = 1;
+        foreach (var (type, scenario) in GeometryTestData.GetAllTestCombinations())
+        {
+            var tableName = GetTableName(type, scenario);
+            var geometry = GeometryTestData.GetTestGeometry(type, scenario);
+            var wkt = GeometryTestData.ToWkt(geometry);
+
+            // Create table with DuckDB geometry
+            using (var createCmd = connection.CreateCommand())
+            {
+                createCmd.CommandText = $@"
+                    CREATE TABLE IF NOT EXISTS {tableName} (
+                        feature_id INTEGER PRIMARY KEY,
+                        name VARCHAR,
+                        geometry_type VARCHAR,
+                        category VARCHAR,
+                        priority INTEGER,
+                        active BOOLEAN,
+                        created_at TIMESTAMP,
+                        measurement DOUBLE,
+                        description VARCHAR,
+                        geom GEOMETRY
+                    );";
+                await createCmd.ExecuteNonQueryAsync();
+            }
+
+            // Insert test feature using ST_GeomFromText
+            using var insertCmd = connection.CreateCommand();
+            insertCmd.CommandText = $@"
+                INSERT INTO {tableName} (feature_id, name, geometry_type, category, priority, active, created_at, measurement, description, geom)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ST_GeomFromText($10, 4326))
+                ON CONFLICT DO NOTHING;";
+
+            var attrs = GeometryTestData.GetTestAttributes(type, featureId++);
+            insertCmd.Parameters.Add(new DuckDBParameter(attrs["feature_id"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter(attrs["name"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter(attrs["geometry_type"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter(attrs["category"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter(attrs["priority"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter((bool)attrs["active"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter((DateTime)attrs["created_at"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter(attrs["measurement"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter(attrs["description"]!));
+            insertCmd.Parameters.Add(new DuckDBParameter(wkt));
+
+            await insertCmd.ExecuteNonQueryAsync();
+        }
+    }
+
     private static async Task ExecuteWithRetryAsync(Func<Task> action, string operationName, int maxRetries = 5)
     {
         var delay = TimeSpan.FromMilliseconds(500);
@@ -430,10 +684,41 @@ public sealed class MultiProviderTestFixture : IAsyncLifetime
             await _mysqlContainer.DisposeAsync();
         }
 
+        if (_sqlServerContainer != null)
+        {
+            await _sqlServerContainer.DisposeAsync();
+        }
+
         // Cleanup SQLite file
         if (_sqlitePath != null && File.Exists(_sqlitePath))
         {
-            File.Delete(_sqlitePath);
+            try
+            {
+                File.Delete(_sqlitePath);
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+        }
+
+        // Cleanup DuckDB file
+        if (_duckDbPath != null && File.Exists(_duckDbPath))
+        {
+            try
+            {
+                File.Delete(_duckDbPath);
+                // Also cleanup WAL file if exists
+                var walPath = _duckDbPath + ".wal";
+                if (File.Exists(walPath))
+                {
+                    File.Delete(walPath);
+                }
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
         }
     }
 
