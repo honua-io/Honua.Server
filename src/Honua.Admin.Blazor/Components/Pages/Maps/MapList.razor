@@ -1,10 +1,12 @@
 @page "/maps"
 @using Honua.Server.Core.Models
 @using Honua.Admin.Blazor.Components.Shared
+@using Honua.Admin.Blazor.Shared.Helpers
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@implements IDisposable
 
 <PageTitle>Map Configurations</PageTitle>
 
@@ -12,6 +14,14 @@
     <MudPaper Class="pa-4 mb-4">
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h4">Map Configurations</MudText>
+            <MudSpacer />
+            <MudTextField Value="@_searchText"
+                          ValueChanged="@((string value) => OnSearchTextChanged(value))"
+                          Placeholder="Search maps..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@(_searching ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Search)"
+                          Style="max-width: 400px"
+                          Clearable="true" />
             <MudButton Variant="Variant.Filled"
                       Color="Color.Primary"
                       StartIcon="@Icons.Material.Filled.Add"
@@ -46,7 +56,7 @@
         }
         else
         {
-            <MudTable Items="@_configurations"
+            <MudTable Items="@_filteredConfigurations"
                      Hover="true"
                      Breakpoint="Breakpoint.Sm"
                      LoadingProgressColor="Color.Primary">
@@ -146,10 +156,34 @@
 @code {
     private List<MapConfigurationListItem> _configurations = new();
     private bool _loading = true;
+    private bool _searching = false;
+    private string _searchText = string.Empty;
+    private SearchDebouncer _searchDebouncer = new(300);
+
+    private IEnumerable<MapConfigurationListItem> _filteredConfigurations =>
+        string.IsNullOrWhiteSpace(_searchText)
+            ? _configurations
+            : _configurations.Where(m =>
+                m.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                (m.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (m.Tags?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                m.CreatedBy.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
         await LoadConfigurations();
+    }
+
+    private void OnSearchTextChanged(string value)
+    {
+        _searchText = value;
+        _searching = true;
+
+        _searchDebouncer.Debounce(() =>
+        {
+            _searching = false;
+            StateHasChanged();
+        });
     }
 
     private async Task LoadConfigurations()
@@ -250,5 +284,10 @@
         public string? Tags { get; set; }
         public string? ThumbnailUrl { get; set; }
         public int ViewCount { get; set; }
+    }
+
+    public void Dispose()
+    {
+        _searchDebouncer?.Dispose();
     }
 }

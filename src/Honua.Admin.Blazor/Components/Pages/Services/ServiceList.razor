@@ -3,16 +3,19 @@
 @using Honua.Admin.Blazor.Shared.Models
 @using Honua.Admin.Blazor.Components.Shared
 @using Honua.Admin.Blazor.Shared.Helpers
+@using Microsoft.JSInterop
 @inject ServiceApiClient ServiceApi
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationState NavState
 @inject ILogger<ServiceList> Logger
-@implements IDisposable
+@inject TouchGestureService TouchGestures
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <PageTitle>Services - Honua Admin</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4" id="services-container">
     <MudBreadcrumbs Items="_breadcrumbs" />
 
     <MudPaper Elevation="2" Class="pa-4 mt-4">
@@ -26,6 +29,12 @@
                           AdornmentIcon="@(_searching ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Search)"
                           Style="max-width: 400px"
                           Clearable="true" />
+            <MudTooltip Text="@(_isDense ? "Normal Density" : "Dense View")">
+                <MudIconButton Icon="@(_isDense ? Icons.Material.Filled.ViewCompact : Icons.Material.Filled.ViewComfy)"
+                               Color="Color.Default"
+                               OnClick="@(() => _isDense = !_isDense)"
+                               Title="Toggle Density" />
+            </MudTooltip>
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Add"
@@ -74,15 +83,17 @@
                 <MudTable Items="@_filteredServices"
                           Hover="true"
                           Breakpoint="Breakpoint.Sm"
-                          Dense="false"
+                          Dense="@_isDense"
                           Loading="@_actionInProgress"
-                          LoadingProgressColor="Color.Primary">
+                          LoadingProgressColor="Color.Primary"
+                          SortLabel="Sort By"
+                          Class="sticky-header">
                     <HeaderContent>
-                        <MudTh>Name</MudTh>
-                        <MudTh>Type</MudTh>
-                        <MudTh>Folder</MudTh>
-                        <MudTh>Layers</MudTh>
-                        <MudTh>Status</MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ServiceListItem, object>(x => x.Title)">Name</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ServiceListItem, object>(x => x.ServiceType)">Type</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ServiceListItem, object>(x => x.FolderId ?? string.Empty)">Folder</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ServiceListItem, object>(x => x.LayerCount)" InitialDirection="SortDirection.Descending">Layers</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<ServiceListItem, object>(x => x.Enabled)">Status</MudTableSortLabel></MudTh>
                         <MudTh>Actions</MudTh>
                     </HeaderContent>
                     <RowTemplate>
@@ -165,6 +176,9 @@
                             </MudStack>
                         </MudPaper>
                     </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                    </PagerContent>
                 </MudTable>
 
                 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-4">
@@ -185,10 +199,14 @@
     private bool _loading = true;
     private bool _actionInProgress = false;
     private bool _searching = false;
+    private bool _isDense = false;
     private string? _errorMessage;
     private string _searchText = string.Empty;
     private List<ServiceListItem> _services = new();
     private SearchDebouncer _searchDebouncer = new(300);
+    private DotNetObjectReference<ServiceList>? _dotNetRef;
+    private string? _pullToRefreshGestureId;
+    private string? _swipeNavGestureId;
 
     private IEnumerable<ServiceListItem> _filteredServices =>
         string.IsNullOrWhiteSpace(_searchText)
@@ -200,6 +218,58 @@
     {
         NavState.SetBreadcrumbs(_breadcrumbs.ToArray());
         await LoadServicesAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Initialize touch gestures for mobile
+                _dotNetRef = DotNetObjectReference.Create(this);
+
+                // Pull-to-refresh
+                _pullToRefreshGestureId = await TouchGestures.InitializePullToRefreshAsync(
+                    "services-container",
+                    _dotNetRef
+                );
+
+                // Swipe navigation (back to home)
+                _swipeNavGestureId = await TouchGestures.InitializeSwipeNavigationAsync(
+                    "services-container",
+                    _dotNetRef
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error initializing touch gestures");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPullToRefresh()
+    {
+        await LoadServicesAsync();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnSwipeBack()
+    {
+        Navigation.NavigateTo("/");
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task OnSwipeDelete(string serviceId)
+    {
+        var service = _services.FirstOrDefault(s => s.Id == serviceId);
+        if (service != null)
+        {
+            await DeleteService(service);
+        }
     }
 
     private void OnSearchTextChanged(string value)
@@ -341,8 +411,19 @@
         }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
+        if (_pullToRefreshGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_pullToRefreshGestureId);
+        }
+
+        if (_swipeNavGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_swipeNavGestureId);
+        }
+
+        _dotNetRef?.Dispose();
         _searchDebouncer?.Dispose();
     }
 }

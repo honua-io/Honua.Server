@@ -1,5 +1,6 @@
 @page "/geoetl/workflows"
 @using Honua.Admin.Blazor.Shared.Helpers
+@using Honua.Admin.Blazor.Components.Shared
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -48,7 +49,7 @@ else
 
         @if (_loading)
         {
-            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.Table" Rows="5" />
         }
         else if (_workflows == null || !_workflows.Any())
         {
