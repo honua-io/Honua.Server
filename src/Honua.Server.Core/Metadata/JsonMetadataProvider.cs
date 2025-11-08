@@ -144,6 +144,8 @@ internal sealed class ServerDocument
 {
     public List<string>? AllowedHosts { get; set; }
     public CorsDocument? Cors { get; set; }
+    public ServerSecurityDocument? Security { get; set; }
+    public RbacDocument? Rbac { get; set; }
 }
 
 internal sealed class CorsDocument
@@ -155,6 +157,24 @@ internal sealed class CorsDocument
     public List<string>? ExposedHeaders { get; set; }
     public bool? AllowCredentials { get; set; }
     public int? MaxAgeSeconds { get; set; }
+}
+
+internal sealed class ServerSecurityDocument
+{
+    public List<string>? AllowedRasterDirectories { get; set; }
+}
+
+internal sealed class RbacDocument
+{
+    public bool? Enabled { get; set; }
+    public List<RbacRoleDocument>? Roles { get; set; }
+}
+
+internal sealed class RbacRoleDocument
+{
+    public string? Id { get; set; }
+    public string? Name { get; set; }
+    public List<string>? Permissions { get; set; }
 }
 
 internal sealed class CatalogDocument

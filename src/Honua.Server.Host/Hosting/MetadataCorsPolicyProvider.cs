@@ -58,12 +58,11 @@ internal sealed class MetadataCorsPolicyProvider : ICorsPolicyProvider
             if (cors.AllowCredentials)
             {
                 _logger.LogError(
-                    "CORS configuration error for collection '{CollectionName}': " +
+                    "CORS configuration error: " +
                     "Cannot use AllowAnyOrigin with AllowCredentials. This violates the CORS specification. " +
-                    "Either set AllowAnyOrigin=false and specify allowed origins, or set AllowCredentials=false.",
-                    collectionName);
+                    "Either set AllowAnyOrigin=false and specify allowed origins, or set AllowCredentials=false.");
                 throw new InvalidOperationException(
-                    $"Invalid CORS configuration for collection '{collectionName}': " +
+                    "Invalid CORS configuration: " +
                     "Cannot use AllowAnyOrigin with AllowCredentials. This combination violates the CORS specification.");
             }
             builder.AllowAnyOrigin();

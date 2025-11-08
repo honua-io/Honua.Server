@@ -626,7 +626,7 @@ public partial class HonuaDataGrid<TItem> : ComponentBase, IAsyncDisposable
 
     #region Row Selection
 
-    private async Task OnRowSelected(TItem? item)
+    private async Task HandleRowSelected(TItem? item)
     {
         if (item == null) return;
 
@@ -646,7 +646,7 @@ public partial class HonuaDataGrid<TItem> : ComponentBase, IAsyncDisposable
         }, Id);
     }
 
-    private async Task OnMultipleRowsSelected(HashSet<TItem> items)
+    private async Task HandleMultipleRowsSelected(HashSet<TItem> items)
     {
         _selectedItems = items;
         await OnMultipleRowsSelected.InvokeAsync(items);

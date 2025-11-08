@@ -1,6 +1,9 @@
 ﻿{
   "server": {
-    "allowedHosts": ["*"]
+    "allowedHosts": ["*"],
+    "security": {
+      "allowedRasterDirectories": ["/app/data"]
+    }
   },
   "catalog": {
     "id": "honua-ogc-sample",
@@ -134,6 +137,28 @@
     }
   ],
   "rasterDatasets": [
+    {
+      "id": "elevation",
+      "title": "Elevation",
+      "serviceId": "roads",
+      "layerId": "roads-primary",
+      "crs": ["EPSG:4326"],
+      "source": {
+        "type": "geotiff",
+        "uri": "file:///app/data/elevation.tif",
+        "mediaType": "image/tiff; application=geotiff"
+      },
+      "datetime": "2021-06-15T12:00:00Z",
+      "extent": {
+        "bbox": [
+          [-122.6, 45.5, -122.3, 45.7]
+        ]
+      },
+      "styles": {
+        "defaultStyleId": "natural-color",
+        "styleIds": ["natural-color"]
+      }
+    },
     {
       "id": "roads-imagery",
       "title": "Roads Imagery",

@@ -9,6 +9,7 @@ using Honua.Server.Core.Export;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Query;
+using Honua.Server.Core.Raster.Export;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
@@ -47,6 +48,7 @@ internal interface IOgcFeaturesQueryHandler
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        IOgcFeaturesAttachmentHandler attachmentHandler,
         CancellationToken cancellationToken);
 
     /// <summary>

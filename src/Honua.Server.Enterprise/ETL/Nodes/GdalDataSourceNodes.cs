@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
+using NetTopologySuite.IO.GML2;
 
 namespace Honua.Server.Enterprise.ETL.Nodes;
 
@@ -33,7 +34,7 @@ public sealed class GeoPackageDataSourceNode : WorkflowNodeBase
     public override string NodeType => "data_source.geopackage";
     public override string DisplayName => "GeoPackage Data Source";
     public override string Description => "Reads features from a GeoPackage (.gpkg) file";
-    public override string Category => "Data Sources";
+    public string Category => "Data Sources";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -150,7 +151,7 @@ public sealed class GeoPackageDataSourceNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -164,7 +165,7 @@ public sealed class ShapefileDataSourceNode : WorkflowNodeBase
     public override string NodeType => "data_source.shapefile";
     public override string DisplayName => "Shapefile Data Source";
     public override string Description => "Reads features from a Shapefile (.shp) with associated files";
-    public override string Category => "Data Sources";
+    public string Category => "Data Sources";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -259,7 +260,7 @@ public sealed class ShapefileDataSourceNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -273,7 +274,7 @@ public sealed class KmlDataSourceNode : WorkflowNodeBase
     public override string NodeType => "data_source.kml";
     public override string DisplayName => "KML Data Source";
     public override string Description => "Reads features from KML/KMZ files";
-    public override string Category => "Data Sources";
+    public string Category => "Data Sources";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -338,7 +339,7 @@ public sealed class KmlDataSourceNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -352,7 +353,7 @@ public sealed class CsvGeometryDataSourceNode : WorkflowNodeBase
     public override string NodeType => "data_source.csv_geometry";
     public override string DisplayName => "CSV with Geometry Data Source";
     public override string Description => "Reads features from CSV files with WKT, WKB, or lat/lon columns";
-    public override string Category => "Data Sources";
+    public string Category => "Data Sources";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -562,7 +563,7 @@ public sealed class CsvGeometryDataSourceNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -576,7 +577,7 @@ public sealed class GpxDataSourceNode : WorkflowNodeBase
     public override string NodeType => "data_source.gpx";
     public override string DisplayName => "GPX Data Source";
     public override string Description => "Reads waypoints, tracks, and routes from GPX files";
-    public override string Category => "Data Sources";
+    public string Category => "Data Sources";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -741,7 +742,7 @@ public sealed class GpxDataSourceNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -755,7 +756,7 @@ public sealed class GmlDataSourceNode : WorkflowNodeBase
     public override string NodeType => "data_source.gml";
     public override string DisplayName => "GML Data Source";
     public override string Description => "Reads features from GML 2.0/3.0/3.2 files";
-    public override string Category => "Data Sources";
+    public string Category => "Data Sources";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -882,7 +883,7 @@ public sealed class GmlDataSourceNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -902,7 +903,7 @@ public sealed class WfsDataSourceNode : WorkflowNodeBase
     public override string NodeType => "data_source.wfs";
     public override string DisplayName => "WFS Data Source";
     public override string Description => "Reads features from WFS (Web Feature Service) endpoints";
-    public override string Category => "Data Sources";
+    public string Category => "Data Sources";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -1113,6 +1114,6 @@ public sealed class WfsDataSourceNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }

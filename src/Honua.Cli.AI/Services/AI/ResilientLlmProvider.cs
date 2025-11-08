@@ -141,6 +141,7 @@ public sealed class ResilientLlmProvider : ILlmProvider
 
             return new LlmResponse
             {
+                Content = string.Empty,
                 Success = false,
                 ErrorMessage = $"LLM provider {_innerProvider.ProviderName} is temporarily unavailable due to repeated failures. " +
                                $"Circuit breaker will reset in {_options.CircuitBreakerDuration.TotalSeconds}s.",
@@ -155,6 +156,7 @@ public sealed class ResilientLlmProvider : ILlmProvider
 
             return new LlmResponse
             {
+                Content = string.Empty,
                 Success = false,
                 ErrorMessage = $"LLM request failed after {_options.MaxRetries} retries: {ex.Message}",
                 Model = _innerProvider.DefaultModel
@@ -174,6 +176,7 @@ public sealed class ResilientLlmProvider : ILlmProvider
         // For streaming, we only apply circuit breaker (not retry)
         // Retrying a partial stream is complex and usually not desired
         IAsyncEnumerable<LlmStreamChunk>? stream = null;
+        LlmStreamChunk? errorChunk = null;
 
         try
         {
@@ -187,11 +190,16 @@ public sealed class ResilientLlmProvider : ILlmProvider
                 "Circuit breaker is OPEN for {Provider}. Cannot start stream.",
                 _innerProvider.ProviderName);
 
-            yield return new LlmStreamChunk
+            errorChunk = new LlmStreamChunk
             {
                 Content = $"[Error: LLM provider temporarily unavailable]",
                 IsFinal = true
             };
+        }
+
+        if (errorChunk != null)
+        {
+            yield return errorChunk;
             yield break;
         }
 

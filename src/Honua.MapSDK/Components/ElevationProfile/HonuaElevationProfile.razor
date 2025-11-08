@@ -1,6 +1,7 @@
 @using Honua.MapSDK.Core
 @using Honua.MapSDK.Core.Messages
-@using Honua.MapSDK.Models
+@using ElevationProfile = Honua.MapSDK.Models.ElevationProfile
+@using Honua.MapSDK.Services.Drawing
 @using Microsoft.JSInterop
 @using System.Text.Json
 @implements IAsyncDisposable
@@ -121,9 +122,9 @@
 
                 <MudNumericField T="int" Label="Sample Points" @bind-Value="_samplePoints" Min="10" Max="500" Variant="Variant.Outlined" Dense="true" />
 
-                <MudSelect T="MeasurementUnit" Label="Unit" @bind-Value="_unit" Dense="true" Variant="Variant.Outlined">
-                    <MudSelectItem Value="MeasurementUnit.Metric">Metric</MudSelectItem>
-                    <MudSelectItem Value="MeasurementUnit.Imperial">Imperial</MudSelectItem>
+                <MudSelect T="MeasurementUnitSystem" Label="Unit" @bind-Value="_unit" Dense="true" Variant="Variant.Outlined">
+                    <MudSelectItem Value="MeasurementUnitSystem.Metric">Metric</MudSelectItem>
+                    <MudSelectItem Value="MeasurementUnitSystem.Imperial">Imperial</MudSelectItem>
                 </MudSelect>
 
                 <MudSelect T="ActivityType" Label="Activity Type" @bind-Value="_activityType" Dense="true" Variant="Variant.Outlined">
@@ -246,7 +247,7 @@
                     <div class="sections-list">
                         @foreach (var section in _currentProfile.SteepSections.OrderByDescending(s => s.AverageGrade))
                         {
-                            <div class="section-item severity-@section.Severity.ToString().ToLower()">
+                            <div class="@($"section-item severity-{section.Severity.ToString().ToLower()}")">
                                 <div class="section-info">
                                     <div class="section-distance">
                                         @FormatDistance(section.StartDistance) - @FormatDistance(section.EndDistance)
@@ -362,7 +363,7 @@
     /// Measurement unit
     /// </summary>
     [Parameter]
-    public MeasurementUnit Unit { get; set; } = MeasurementUnit.Metric;
+    public MeasurementUnitSystem Unit { get; set; } = MeasurementUnitSystem.Metric;
 
     /// <summary>
     /// Show statistics panel
@@ -454,7 +455,7 @@
     private ElevationSource _elevationSource;
     private string? _apiKey;
     private int _samplePoints;
-    private MeasurementUnit _unit;
+    private MeasurementUnitSystem _unit;
     private bool _showGradeColors;
     private bool _showStatistics;
     private bool _calculateTimeEstimates = true;
@@ -788,7 +789,7 @@
         }
     }
 
-    private async Task ZoomToWaypoint(Waypoint waypoint)
+    private async Task ZoomToWaypoint(ElevationWaypoint waypoint)
     {
         try
         {
@@ -854,7 +855,7 @@
     {
         return _unit switch
         {
-            MeasurementUnit.Imperial => meters >= 1609.34
+            MeasurementUnitSystem.Imperial => meters >= 1609.34
                 ? $"{(meters / 1609.34):F2} mi"
                 : $"{(meters * 3.28084):F0} ft",
             _ => meters >= 1000
@@ -867,7 +868,7 @@
     {
         return _unit switch
         {
-            MeasurementUnit.Imperial => $"{(meters * 3.28084):F0} ft",
+            MeasurementUnitSystem.Imperial => $"{(meters * 3.28084):F0} ft",
             _ => $"{meters:F0} m"
         };
     }
@@ -879,31 +880,31 @@
         return hours > 0 ? $"{hours}h {mins}m" : $"{mins}m";
     }
 
-    private string GetWaypointIcon(WaypointType type)
+    private string GetWaypointIcon(ElevationWaypointType type)
     {
         return type switch
         {
-            WaypointType.Start => Icons.Material.Filled.PlayArrow,
-            WaypointType.End => Icons.Material.Filled.Flag,
-            WaypointType.Summit => Icons.Material.Filled.Terrain,
-            WaypointType.Valley => Icons.Material.Filled.Landscape,
-            WaypointType.Junction => Icons.Material.Filled.CallSplit,
-            WaypointType.Viewpoint => Icons.Material.Filled.Visibility,
-            WaypointType.Water => Icons.Material.Filled.Water,
-            WaypointType.Campsite => Icons.Material.Filled.Cabin,
-            WaypointType.Hazard => Icons.Material.Filled.Warning,
+            ElevationWaypointType.Start => Icons.Material.Filled.PlayArrow,
+            ElevationWaypointType.End => Icons.Material.Filled.Flag,
+            ElevationWaypointType.Summit => Icons.Material.Filled.Terrain,
+            ElevationWaypointType.Valley => Icons.Material.Filled.Landscape,
+            ElevationWaypointType.Junction => Icons.Material.Filled.CallSplit,
+            ElevationWaypointType.Viewpoint => Icons.Material.Filled.Visibility,
+            ElevationWaypointType.Water => Icons.Material.Filled.Water,
+            ElevationWaypointType.Campsite => Icons.Material.Filled.Cabin,
+            ElevationWaypointType.Hazard => Icons.Material.Filled.Warning,
             _ => Icons.Material.Filled.Room
         };
     }
 
-    private Color GetWaypointColor(WaypointType type)
+    private Color GetWaypointColor(ElevationWaypointType type)
     {
         return type switch
         {
-            WaypointType.Start => Color.Success,
-            WaypointType.End => Color.Error,
-            WaypointType.Summit => Color.Primary,
-            WaypointType.Hazard => Color.Warning,
+            ElevationWaypointType.Start => Color.Success,
+            ElevationWaypointType.End => Color.Error,
+            ElevationWaypointType.Summit => Color.Primary,
+            ElevationWaypointType.Hazard => Color.Warning,
             _ => Color.Info
         };
     }

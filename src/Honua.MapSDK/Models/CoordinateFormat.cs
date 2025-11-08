@@ -39,7 +39,7 @@ public enum CoordinateFormat
 /// <summary>
 /// Measurement unit system
 /// </summary>
-public enum MeasurementUnit
+public enum MeasurementUnitSystem
 {
     /// <summary>
     /// Metric system (meters, kilometers)
@@ -95,7 +95,7 @@ public class CoordinateDisplayOptions
     /// <summary>
     /// Measurement unit system
     /// </summary>
-    public MeasurementUnit Unit { get; set; } = MeasurementUnit.Metric;
+    public MeasurementUnitSystem Unit { get; set; } = MeasurementUnitSystem.Metric;
 
     /// <summary>
     /// Allow user to switch coordinate formats

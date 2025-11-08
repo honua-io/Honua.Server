@@ -144,12 +144,12 @@ public static class CoordinateConverter
     /// <summary>
     /// Format elevation with appropriate unit
     /// </summary>
-    public static string FormatElevation(double elevation, MeasurementUnit unit)
+    public static string FormatElevation(double elevation, MeasurementUnitSystem unit)
     {
         return unit switch
         {
-            MeasurementUnit.Imperial => $"{MetersToFeet(elevation):F0} ft",
-            MeasurementUnit.Nautical => $"{elevation:F0} m", // Nautical uses metric for elevation
+            MeasurementUnitSystem.Imperial => $"{MetersToFeet(elevation):F0} ft",
+            MeasurementUnitSystem.Nautical => $"{elevation:F0} m", // Nautical uses metric for elevation
             _ => $"{elevation:F0} m"
         };
     }

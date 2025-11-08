@@ -44,6 +44,7 @@ public class OgcHandlersKmlTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -154,6 +155,8 @@ public class OgcHandlersKmlTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.AttachmentOrchestrator,
             _fixture.Registry,
             _fixture.CacheHeaderService,
+            OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
+            OgcTestUtilities.CreateOgcFeaturesEditingHandlerStub(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

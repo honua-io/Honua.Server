@@ -136,6 +136,7 @@ internal static class OgcApiEndpointExtensions
         [FromServices] IMetadataRegistry metadataRegistry,
         [FromServices] IApiMetrics apiMetrics,
         [FromServices] OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(catalog);
@@ -167,6 +168,7 @@ internal static class OgcApiEndpointExtensions
             metadataRegistry,
             apiMetrics,
             cacheHeaderService,
+            attachmentHandler,
             cancellationToken);
     }
 

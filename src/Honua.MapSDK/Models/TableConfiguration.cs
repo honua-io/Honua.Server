@@ -150,7 +150,7 @@ public class FilterConfig
     /// <summary>
     /// Filter type
     /// </summary>
-    public FilterType Type { get; set; } = FilterType.Simple;
+    public TableFilterType Type { get; set; } = TableFilterType.Simple;
 
     /// <summary>
     /// Simple filter: field name
@@ -191,7 +191,7 @@ public class FilterConfig
 /// <summary>
 /// Filter type enum
 /// </summary>
-public enum FilterType
+public enum TableFilterType
 {
     Simple,      // Field operator value
     Advanced,    // SQL-like expression

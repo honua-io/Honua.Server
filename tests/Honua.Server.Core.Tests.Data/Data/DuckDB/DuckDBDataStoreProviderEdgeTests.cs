@@ -216,7 +216,7 @@ public sealed class DuckDBDataStoreProviderEdgeTests : IDisposable
 
         // Verify count
         var totalCount = await provider.CountAsync(dataSource, service, layer, new FeatureQuery());
-        totalCount.Should().BeGreaterOrEqualTo(100, "database should contain inserted records");
+        totalCount.Should().BeGreaterThanOrEqualTo(100, "database should contain inserted records");
     }
 
     [Fact]
@@ -322,5 +322,20 @@ public sealed class DuckDBDataStoreProviderEdgeTests : IDisposable
             BindingFlags.NonPublic | BindingFlags.Static) ?? throw new InvalidOperationException("NormalizeRecord not found");
 
         return method.Invoke(null, new object?[] { layer, attributes, includeKey })!;
+    }
+}
+
+internal static class TestExtensions
+{
+    public static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(
+        this IEnumerable<T> source,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] System.Threading.CancellationToken cancellationToken = default)
+    {
+        foreach (var item in source)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return item;
+        }
+        await Task.CompletedTask;
     }
 }

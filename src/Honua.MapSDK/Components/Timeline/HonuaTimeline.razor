@@ -3,6 +3,7 @@
 @using Honua.MapSDK.Models
 @using Microsoft.JSInterop
 @using MudTimelinePosition = MudBlazor.TimelinePosition
+@using FilterType = Honua.MapSDK.Core.Messages.FilterType
 @implements IAsyncDisposable
 @inject ComponentBus Bus
 @inject IJSRuntime JS
@@ -123,31 +124,31 @@
         }
 
         <MudSlider T="int"
-                   @bind-Value="CurrentStep"
+                   Value="CurrentStep"
+                   ValueChanged="OnSliderChanged"
                    Min="0"
                    Max="@(TotalSteps - 1)"
                    Step="1"
                    Disabled="@(!_isInitialized)"
-                   ValueChanged="OnSliderChanged"
                    Class="timeline-slider"
                    Color="Color.Primary" />
 
         @if (ShowDateRange)
         {
             <div class="timeline-labels">
-                <span class="timeline-label timeline-label-start" title="@FormatTime(StartTime)">
-                    @FormatTimeCompact(StartTime)
+                <span class="timeline-label timeline-label-start" title="@FormatTime(StartTime.GetValueOrDefault())">
+                    @FormatTimeCompact(StartTime.GetValueOrDefault())
                 </span>
                 @if (!Compact)
                 {
                     <span class="timeline-label timeline-label-current"
                           style="left: @(GetProgress())%"
-                          title="@FormatTime(CurrentTime)">
-                        @FormatTimeCompact(CurrentTime)
+                          title="@FormatTime(_currentTime)">
+                        @FormatTimeCompact(_currentTime)
                     </span>
                 }
-                <span class="timeline-label timeline-label-end" title="@FormatTime(EndTime)">
-                    @FormatTimeCompact(EndTime)
+                <span class="timeline-label timeline-label-end" title="@FormatTime(EndTime.GetValueOrDefault())">
+                    @FormatTimeCompact(EndTime.GetValueOrDefault())
                 </span>
             </div>
         }

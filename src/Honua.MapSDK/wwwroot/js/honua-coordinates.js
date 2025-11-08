@@ -131,7 +131,7 @@ function handleClick(e, map, dotNetRef) {
         }
 
         // Send to .NET
-        dotNetRef.invokeMethodAsync('OnCoordinateClick', {
+        dotNetRef.invokeMethodAsync('HandleCoordinateClick', {
             longitude: lngLat.lng,
             latitude: lngLat.lat,
             elevation: elevation

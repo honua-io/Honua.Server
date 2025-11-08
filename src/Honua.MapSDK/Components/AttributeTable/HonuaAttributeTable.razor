@@ -14,7 +14,7 @@
                  Hover="true"
                  Bordered="true"
                  Striped="true"
-                 MultiSelection="@(SelectionMode == SelectionMode.Multiple)"
+                 MultiSelection="@(SelectionMode == MapSDK.Models.SelectionMode.Multiple)"
                  SelectOnRowClick="true"
                  SelectedItem="_selectedFeature"
                  SelectedItemChanged="OnFeatureSelected"
@@ -165,7 +165,7 @@
                 <!-- Map Sync Indicator -->
                 @if (SyncWith != null && _isSynced)
                 {
-                    <MudChip Size="Size.Small"
+                    <MudChip T="string" Size="Size.Small"
                              Color="Color.Success"
                              Icon="@Icons.Material.Filled.Sync"
                              OnClose="@DisableSync">
@@ -204,14 +204,14 @@
                                     Resizable="true">
                         <CellTemplate>
                             @{
-                                var value = GetPropertyValue(context, col.FieldName);
+                                var value = GetPropertyValue(context.Item, col.FieldName);
                                 var formattedValue = FormatValue(value, col);
                                 var conditionalStyle = GetConditionalStyle(value, col);
                             }
                             <div style="@conditionalStyle">
                                 @if (col.DataType == ColumnDataType.Geometry)
                                 {
-                                    <MudChip Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
                                         @formattedValue
                                     </MudChip>
                                 }
@@ -237,21 +237,21 @@
                                 @if (col.DataType == ColumnDataType.Boolean)
                                 {
                                     <MudCheckBox T="bool?"
-                                                 Value="@(GetPropertyValue(context, col.FieldName) as bool?)"
-                                                 ValueChanged="@((bool? val) => UpdatePropertyValue(context, col.FieldName, val))" />
+                                                 Value="@(GetPropertyValue(context.Item, col.FieldName) as bool?)"
+                                                 ValueChanged="@((bool? val) => UpdatePropertyValue(context.Item, col.FieldName, val))" />
                                 }
                                 else if (col.DataType == ColumnDataType.Number || col.DataType == ColumnDataType.Integer)
                                 {
                                     <MudNumericField T="double?"
-                                                     Value="@(Convert.ToDouble(GetPropertyValue(context, col.FieldName)))"
-                                                     ValueChanged="@((double? val) => UpdatePropertyValue(context, col.FieldName, val))"
+                                                     Value="@(Convert.ToDouble(GetPropertyValue(context.Item, col.FieldName)))"
+                                                     ValueChanged="@((double? val) => UpdatePropertyValue(context.Item, col.FieldName, val))"
                                                      Variant="Variant.Text" />
                                 }
                                 else
                                 {
                                     <MudTextField T="string"
-                                                  Value="@(GetPropertyValue(context, col.FieldName)?.ToString())"
-                                                  ValueChanged="@((string val) => UpdatePropertyValue(context, col.FieldName, val))"
+                                                  Value="@(GetPropertyValue(context.Item, col.FieldName)?.ToString())"
+                                                  ValueChanged="@((string val) => UpdatePropertyValue(context.Item, col.FieldName, val))"
                                                   Variant="Variant.Text" />
                                 }
                             }
@@ -294,7 +294,7 @@
         </NoRecordsContent>
     </MudDataGrid>
 
-    @if (_configuration?.ShowSummary && _displayedFeatures.Count > 0)
+    @if ((_configuration?.ShowSummary ?? false) && _displayedFeatures.Count > 0)
     {
         <div class="attribute-table-summary">
             <MudPaper Elevation="1" Class="pa-2">
@@ -302,7 +302,7 @@
                     <strong>Summary:</strong>
                     @if (_selectedFeatures.Count > 0)
                     {
-                        <MudChip Size="Size.Small" Color="Color.Primary">@_selectedFeatures.Count selected</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@_selectedFeatures.Count selected</MudChip>
                     }
                     @foreach (var summary in _configuration.Summaries)
                     {

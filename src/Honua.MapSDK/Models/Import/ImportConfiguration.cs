@@ -1,3 +1,5 @@
+using Honua.MapSDK.Models;
+
 namespace Honua.MapSDK.Models.Import;
 
 /// <summary>
@@ -115,20 +117,6 @@ public class FieldMapping
     /// Whether this field is required
     /// </summary>
     public bool Required { get; set; } = false;
-}
-
-/// <summary>
-/// Supported geometry types
-/// </summary>
-public enum GeometryType
-{
-    Point,
-    LineString,
-    Polygon,
-    MultiPoint,
-    MultiLineString,
-    MultiPolygon,
-    GeometryCollection
 }
 
 /// <summary>

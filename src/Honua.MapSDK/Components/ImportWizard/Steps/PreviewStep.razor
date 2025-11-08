@@ -51,21 +51,21 @@
         </div>
 
         <div class="preview-metadata mb-4">
-            <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.InsertDriveFile">
+            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.InsertDriveFile">
                 Format: @Data.Format
             </MudChip>
             @if (!string.IsNullOrEmpty(Data.CRS))
             {
-                <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.Public">
+                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.Public">
                     CRS: @Data.CRS
                 </MudChip>
             }
-            <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.TextFields">
+            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.TextFields">
                 Encoding: @Data.Encoding
             </MudChip>
             @if (HasGeometry())
             {
-                <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.Place" Color="Color.Success">
+                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.Place" Color="Color.Success">
                     Has Geometry
                 </MudChip>
             }
@@ -82,10 +82,10 @@
                 </MudText>
                 @if (_showErrors)
                 {
-                    <MudList Dense="true" Class="mt-2">
+                    <MudList T="string" Dense="true" Class="mt-2">
                         @foreach (var error in Data.Errors.Take(10))
                         {
-                            <MudListItem Icon="@GetSeverityIcon(error.Severity)">
+                            <MudListItem T="string" Icon="@GetSeverityIcon(error.Severity)">
                                 <MudText Typo="Typo.body2">
                                     Row @error.RowNumber: @error.Message
                                     @if (!string.IsNullOrEmpty(error.Field))
@@ -121,7 +121,7 @@
                         <MudTh>
                             <div class="field-header">
                                 <MudText Typo="Typo.caption">@field.Name</MudText>
-                                <MudChip Size="Size.Small" Variant="Variant.Text">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
                                     @field.Type.ToString()
                                 </MudChip>
                             </div>

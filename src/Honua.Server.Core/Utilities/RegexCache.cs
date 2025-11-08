@@ -90,7 +90,15 @@ public static class RegexCache
         var regex = new Regex(pattern, options, timeout);
 
         var newEntry = new CacheEntry(regex, DateTime.UtcNow);
-        Cache.TryAdd(cacheKey, newEntry);
+
+        // If another thread added it concurrently, use their entry
+        if (!Cache.TryAdd(cacheKey, newEntry))
+        {
+            // Another thread added it, retrieve and return their entry
+            return Cache.TryGetValue(cacheKey, out var existingEntry)
+                ? existingEntry.Regex
+                : regex;
+        }
 
         return regex;
     }

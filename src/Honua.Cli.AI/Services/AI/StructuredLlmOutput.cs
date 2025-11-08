@@ -147,7 +147,7 @@ public class StructuredLlmOutput
 
                 _logger.LogDebug("Successfully parsed structured output on attempt {Attempt}", attempt + 1);
 
-                return StructuredLlmResult<T>.Success(parsed, rawResponse, attemptCount: attempt + 1);
+                return StructuredLlmResult<T>.CreateSuccess(parsed, rawResponse, attemptCount: attempt + 1);
             }
             catch (JsonException ex)
             {
@@ -308,8 +308,7 @@ Generate ONLY the JSON response, no additional text or explanation.";
             SystemPrompt = original.SystemPrompt,
             UserPrompt = original.UserPrompt + "\n\n" + correctionPrompt,
             Temperature = original.Temperature,
-            MaxTokens = original.MaxTokens,
-            Model = original.Model
+            MaxTokens = original.MaxTokens
         };
     }
 }
@@ -327,7 +326,7 @@ public sealed class StructuredLlmResult<T> where T : class
     public List<string>? ValidationErrors { get; init; }
     public int AttemptCount { get; init; } = 1;
 
-    public static StructuredLlmResult<T> Success(T data, LlmResponse? rawResponse = null, int attemptCount = 1)
+    public static StructuredLlmResult<T> CreateSuccess(T data, LlmResponse? rawResponse = null, int attemptCount = 1)
     {
         return new StructuredLlmResult<T>
         {

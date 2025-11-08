@@ -233,7 +233,7 @@ def wmts_base_url(honua_api_base_url: str) -> str:
 @pytest.fixture(scope="module")
 def wcs_base_url(honua_api_base_url: str) -> str:
     """Base URL for WCS tests."""
-    return f"{honua_api_base_url}/wcs"
+    return f"{honua_api_base_url}/v1/wcs"
 
 
 @pytest.fixture(scope="module")

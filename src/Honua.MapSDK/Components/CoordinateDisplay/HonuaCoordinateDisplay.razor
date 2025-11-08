@@ -19,7 +19,7 @@
 
                     @if (_isPinned && _pinnedCoordinates != null)
                     {
-                        <MudChip Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
                                  OnClose="@UnpinCoordinates" Class="pinned-chip">
                             Pinned
                         </MudChip>
@@ -135,7 +135,7 @@
                     @if (ShowDistance && _distanceFromPinned.HasValue && _isPinned)
                     {
                         <div class="info-item">
-                            <MudIcon Icon="@Icons.Material.Filled.StraightLine" Size="Size.Small" Class="info-icon" />
+                            <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Small" Class="info-icon" />
                             <span>Distance: @FormatDistance(_distanceFromPinned.Value)</span>
                         </div>
                     }
@@ -226,7 +226,7 @@
     /// Measurement unit system
     /// </summary>
     [Parameter]
-    public MeasurementUnit Unit { get; set; } = MeasurementUnit.Metric;
+    public MeasurementUnitSystem Unit { get; set; } = MeasurementUnitSystem.Metric;
 
     /// <summary>
     /// Allow user to switch coordinate formats
@@ -422,7 +422,7 @@
     /// JavaScript callback when coordinates are clicked
     /// </summary>
     [JSInvokable]
-    public async Task OnCoordinateClick(CoordinateClickData data)
+    public async Task HandleCoordinateClick(CoordinateClickData data)
     {
         try
         {
@@ -598,19 +598,19 @@
             // Use JavaScript formatting for consistency
             var unitStr = Unit switch
             {
-                MeasurementUnit.Imperial => "imperial",
-                MeasurementUnit.Nautical => "nautical",
+                MeasurementUnitSystem.Imperial => "imperial",
+                MeasurementUnitSystem.Nautical => "nautical",
                 _ => "metric"
             };
 
             // Note: This is a simplified version. Ideally, we'd call the JS function,
             // but for simplicity, we'll do it here
-            if (Unit == MeasurementUnit.Imperial)
+            if (Unit == MeasurementUnitSystem.Imperial)
             {
                 var feet = meters * 3.28084;
                 return feet < 5280 ? $"{feet:F0} ft" : $"{(feet / 5280):F2} mi";
             }
-            else if (Unit == MeasurementUnit.Nautical)
+            else if (Unit == MeasurementUnitSystem.Nautical)
             {
                 var nauticalMiles = meters / 1852;
                 return nauticalMiles < 0.1 ? $"{meters:F0} m" : $"{nauticalMiles:F2} nm";

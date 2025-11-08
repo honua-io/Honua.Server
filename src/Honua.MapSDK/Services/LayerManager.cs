@@ -455,9 +455,9 @@ public class LayerManager : ILayerManager
         group.Visible = visible;
 
         // Update all layers in group
-        foreach (var layerId in group.LayerIds)
+        foreach (var layer in _layers.Where(l => l.GroupId == groupId))
         {
-            SetLayerVisibility(layerId, visible);
+            SetLayerVisibility(layer.Id, visible);
         }
 
         _logger?.LogDebug("Set group {GroupId} visibility to {Visible}", groupId, visible);
@@ -484,9 +484,9 @@ public class LayerManager : ILayerManager
         group.Opacity = opacity;
 
         // Update all layers in group
-        foreach (var layerId in group.LayerIds)
+        foreach (var layer in _layers.Where(l => l.GroupId == groupId))
         {
-            SetLayerOpacity(layerId, opacity);
+            SetLayerOpacity(layer.Id, opacity);
         }
 
         _logger?.LogDebug("Set group {GroupId} opacity to {Opacity}", groupId, opacity);
@@ -501,8 +501,8 @@ public class LayerManager : ILayerManager
             return;
         }
 
-        group.Expanded = !group.Expanded;
-        _logger?.LogDebug("Toggled group {GroupId} expanded to {Expanded}", groupId, group.Expanded);
+        group.IsExpanded = !group.IsExpanded;
+        _logger?.LogDebug("Toggled group {GroupId} expanded to {Expanded}", groupId, group.IsExpanded);
     }
 
     public void AddLayerToGroup(string layerId, string groupId)
@@ -512,9 +512,8 @@ public class LayerManager : ILayerManager
 
         if (layer == null || group == null) return;
 
-        if (!group.LayerIds.Contains(layerId))
+        if (layer.GroupId != groupId)
         {
-            group.LayerIds.Add(layerId);
             layer.GroupId = groupId;
             _logger?.LogDebug("Added layer {LayerId} to group {GroupId}", layerId, groupId);
         }
@@ -527,9 +526,11 @@ public class LayerManager : ILayerManager
 
         if (layer == null || group == null) return;
 
-        group.LayerIds.Remove(layerId);
-        layer.GroupId = null;
-        _logger?.LogDebug("Removed layer {LayerId} from group {GroupId}", layerId, groupId);
+        if (layer.GroupId == groupId)
+        {
+            layer.GroupId = null;
+            _logger?.LogDebug("Removed layer {LayerId} from group {GroupId}", layerId, groupId);
+        }
     }
 
     // ===== Bulk Operations =====

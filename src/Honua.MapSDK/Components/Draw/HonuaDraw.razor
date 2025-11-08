@@ -1,6 +1,7 @@
 @using Honua.MapSDK.Core
 @using Honua.MapSDK.Core.Messages
-@using Honua.MapSDK.Models
+@using DrawingStyle = Honua.MapSDK.Models.DrawingStyle
+@using Honua.MapSDK.Services.Drawing
 @using Microsoft.JSInterop
 @using System.Text.Json
 @implements IAsyncDisposable
@@ -80,14 +81,14 @@
                 <MudTooltip Text="Measurement unit">
                     <MudMenu Icon="@Icons.Material.Filled.Straighten" Color="Color.Default" Size="Size.Small"
                              Dense="true" aria-label="Measurement unit" Disabled="@(!_mapReady)">
-                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnit.Metric))">
-                            @(_measurementUnit == MeasurementUnit.Metric ? "✓ " : "")Metric
+                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnitSystem.Metric))">
+                            @(_measurementUnit == MeasurementUnitSystem.Metric ? "✓ " : "")Metric
                         </MudMenuItem>
-                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnit.Imperial))">
-                            @(_measurementUnit == MeasurementUnit.Imperial ? "✓ " : "")Imperial
+                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnitSystem.Imperial))">
+                            @(_measurementUnit == MeasurementUnitSystem.Imperial ? "✓ " : "")Imperial
                         </MudMenuItem>
-                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnit.Nautical))">
-                            @(_measurementUnit == MeasurementUnit.Nautical ? "✓ " : "")Nautical
+                        <MudMenuItem OnClick="@(() => SetMeasurementUnit(MeasurementUnitSystem.Nautical))">
+                            @(_measurementUnit == MeasurementUnitSystem.Nautical ? "✓ " : "")Nautical
                         </MudMenuItem>
                     </MudMenu>
                 </MudTooltip>
@@ -252,7 +253,7 @@
                                 <MudIconButton
                                     Icon="@(feature.IsVisible ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
                                     Size="Size.Small"
-                                    OnClick="@((e) => { e.StopPropagation(); ToggleFeatureVisibility(feature.Id); })"
+                                    OnClick="@(() => ToggleFeatureVisibility(feature.Id))"
                                     aria-label="Toggle visibility" />
                                 @if (AllowEdit && !feature.IsLocked)
                                 {
@@ -260,14 +261,14 @@
                                         Icon="@Icons.Material.Filled.Edit"
                                         Size="Size.Small"
                                         Color="Color.Primary"
-                                        OnClick="@((e) => { e.StopPropagation(); EditFeature(feature.Id); })"
+                                        OnClick="@(() => EditFeature(feature.Id))"
                                         aria-label="Edit feature" />
                                 }
                                 <MudIconButton
                                     Icon="@Icons.Material.Filled.Delete"
                                     Size="Size.Small"
                                     Color="Color.Error"
-                                    OnClick="@((e) => { e.StopPropagation(); DeleteFeature(feature.Id); })"
+                                    OnClick="@(() => DeleteFeature(feature.Id))"
                                     aria-label="Delete feature" />
                             </div>
                         </div>
@@ -368,7 +369,7 @@
     /// Measurement unit system
     /// </summary>
     [Parameter]
-    public MeasurementUnit MeasurementUnit { get; set; } = MeasurementUnit.Metric;
+    public MeasurementUnitSystem MeasurementUnit { get; set; } = MeasurementUnitSystem.Metric;
 
     /// <summary>
     /// Position on the map
@@ -419,7 +420,7 @@
     public EventCallback<string> OnFeatureDeleted { get; set; }
 
     private DrawMode _currentMode = DrawMode.None;
-    private MeasurementUnit _measurementUnit = MeasurementUnit.Metric;
+    private MeasurementUnitSystem _measurementUnit = MeasurementUnitSystem.Metric;
     private List<DrawingFeature> _features = new();
     private DrawingFeature? _selectedFeature;
     private FeatureMeasurements? _activeMeasurement;
@@ -973,7 +974,7 @@
         };
     }
 
-    private async Task SetMeasurementUnit(MeasurementUnit unit)
+    private async Task SetMeasurementUnit(MeasurementUnitSystem unit)
     {
         _measurementUnit = unit;
 
@@ -1070,10 +1071,10 @@
     {
         return _measurementUnit switch
         {
-            MeasurementUnit.Imperial => meters >= 1609.34
+            MeasurementUnitSystem.Imperial => meters >= 1609.34
                 ? $"{(meters / 1609.34):F2} mi"
                 : $"{(meters * 3.28084):F1} ft",
-            MeasurementUnit.Nautical => $"{(meters / 1852):F2} nm",
+            MeasurementUnitSystem.Nautical => $"{(meters / 1852):F2} nm",
             _ => meters >= 1000
                 ? $"{(meters / 1000):F2} km"
                 : $"{meters:F1} m"
@@ -1084,7 +1085,7 @@
     {
         return _measurementUnit switch
         {
-            MeasurementUnit.Imperial => sqMeters >= 4046.86
+            MeasurementUnitSystem.Imperial => sqMeters >= 4046.86
                 ? $"{(sqMeters / 4046.86):F2} acres"
                 : $"{(sqMeters * 10.7639):F1} ft²",
             _ => sqMeters >= 10000

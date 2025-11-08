@@ -4,6 +4,8 @@
 @using Honua.MapSDK.Services.Import
 @using Honua.MapSDK.Components.ImportWizard.Steps
 @using System.Text.Json
+@using ValidationSeverity = Honua.MapSDK.Models.Import.ValidationSeverity
+@using ValidationError = Honua.MapSDK.Models.Import.ValidationError
 @implements IAsyncDisposable
 @inject ComponentBus Bus
 
@@ -300,7 +302,7 @@
         MaxWidth = MaxWidth.Large,
         FullWidth = true,
         CloseButton = true,
-        DisableBackdropClick = false
+        BackdropClick = true
     };
 
     protected override void OnInitialized()
@@ -331,7 +333,7 @@
         // Auto-advance to preview step
         if (_parsedData != null && !_parsedData.Errors.Any(e => e.Severity == ValidationSeverity.Error))
         {
-            await NextStep();
+            NextStep();
         }
     }
 
@@ -374,19 +376,20 @@
         _activeStep = newStep;
     }
 
-    private async Task NextStep()
+    private void NextStep()
     {
-        if (_stepper != null)
-        {
-            await _stepper.NextStep();
-        }
+        // MudStepper v8 doesn't have ActiveStepIndex setter
+        // Track step changes via ActiveStepChanged event
+        _activeStep++;
+        StateHasChanged();
     }
 
-    private async Task PreviousStep()
+    private void PreviousStep()
     {
-        if (_stepper != null)
+        if (_activeStep > 0)
         {
-            await _stepper.PreviousStep();
+            _activeStep--;
+            StateHasChanged();
         }
     }
 
@@ -427,7 +430,7 @@
 
         try
         {
-            await NextStep(); // Move to import step
+            NextStep(); // Move to import step
 
             var startTime = DateTime.UtcNow;
             _importStepRef?.Reset();
@@ -607,10 +610,7 @@
     {
         Reset();
         _activeStep = 0;
-        if (_stepper != null)
-        {
-            _stepper.Reset();
-        }
+        StateHasChanged();
     }
 
     private void Close()

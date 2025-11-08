@@ -270,7 +270,7 @@ public class SignalRWorkflowProgressBroadcaster : IWorkflowProgressBroadcaster
 /// <summary>
 /// Placeholder for GeoEtlProgressHub reference (actual hub is in Honua.Server.Host)
 /// </summary>
-internal static class GeoEtlProgressHub
+public class GeoEtlProgressHub : Hub
 {
     internal static string GetWorkflowGroupName(Guid runId) => $"workflow:{runId}";
 }

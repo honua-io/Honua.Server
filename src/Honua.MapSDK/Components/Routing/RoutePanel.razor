@@ -31,22 +31,22 @@
             <label>Travel Mode</label>
             <div class="travel-mode-buttons">
                 <button class="travel-mode-btn @(TravelMode == "car" ? "active" : "")"
-                        @onclick="() => SetTravelMode(\"car\")"
+                        @onclick='() => SetTravelMode("car")'
                         title="Car">
                     🚗
                 </button>
                 <button class="travel-mode-btn @(TravelMode == "truck" ? "active" : "")"
-                        @onclick="() => SetTravelMode(\"truck\")"
+                        @onclick='() => SetTravelMode("truck")'
                         title="Truck">
                     🚚
                 </button>
                 <button class="travel-mode-btn @(TravelMode == "bicycle" ? "active" : "")"
-                        @onclick="() => SetTravelMode(\"bicycle\")"
+                        @onclick='() => SetTravelMode("bicycle")'
                         title="Bicycle">
                     🚴
                 </button>
                 <button class="travel-mode-btn @(TravelMode == "pedestrian" ? "active" : "")"
-                        @onclick="() => SetTravelMode(\"pedestrian\")"
+                        @onclick='() => SetTravelMode("pedestrian")'
                         title="Walk">
                     🚶
                 </button>
@@ -230,18 +230,19 @@
                             <span>@FormatDistance(route.DistanceMeters)</span>
                             <span>@FormatDuration(route.DurationSeconds)</span>
                         </div>
-                        @if (route.DurationWithTrafficSeconds.HasValue)
+                        @if (route.DurationWithTrafficSeconds.HasValue && route.DurationWithTrafficSeconds.Value > 0)
                         {
                             <div class="route-traffic-info">
                                 With traffic: @FormatDuration(route.DurationWithTrafficSeconds.Value)
                             </div>
                         }
-                        @if (route.Warnings?.Count > 0)
+                        @if (false)
                         {
                             <div class="route-warnings">
-                                @foreach (var warning in route.Warnings)
+                                @* CoreRoute doesn't have Traffic delays - remove this section *@
+                                @*@foreach (var delay in route.Traffic.Delays)
                                 {
-                                    <small>⚠️ @warning</small>
+                                    <small>⚠️ @delay.Reason</small>*@
                                 }
                             </div>
                         }
