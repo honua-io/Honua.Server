@@ -434,9 +434,9 @@ internal sealed class OgcFeaturesRenderingHandler : IOgcFeaturesRenderingHandler
 
     private static string DetermineStorageCrs(LayerDefinition layer)
     {
-        if (layer.Crs.HasValue())
+        if (layer.Crs.Count > 0)
         {
-            return layer.Crs;
+            return layer.Crs[0];
         }
 
         if (layer.Extent?.Crs.HasValue() == true)
@@ -449,7 +449,7 @@ internal sealed class OgcFeaturesRenderingHandler : IOgcFeaturesRenderingHandler
 
     private static IReadOnlyList<string> BuildOrderedStyleIds(LayerDefinition layer)
     {
-        if (layer.Styles.IsNullOrEmpty())
+        if (layer.StyleIds == null || layer.StyleIds.Count == 0)
         {
             return Array.Empty<string>();
         }
@@ -462,11 +462,11 @@ internal sealed class OgcFeaturesRenderingHandler : IOgcFeaturesRenderingHandler
             styleIds.Add(defaultStyleId);
         }
 
-        foreach (var style in layer.Styles.OrderBy(s => s.Id, StringComparer.OrdinalIgnoreCase))
+        foreach (var styleId in layer.StyleIds.OrderBy(s => s, StringComparer.OrdinalIgnoreCase))
         {
-            if (!string.Equals(style.Id, defaultStyleId, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(styleId, defaultStyleId, StringComparison.OrdinalIgnoreCase))
             {
-                styleIds.Add(style.Id);
+                styleIds.Add(styleId);
             }
         }
 

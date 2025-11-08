@@ -318,30 +318,6 @@ public class ExtrusionLayer : LayerDefinition
 }
 
 /// <summary>
-/// Layer group for organizing layers
-/// </summary>
-public class LayerGroup
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-
-    public required string Name { get; set; }
-
-    public string? Description { get; set; }
-
-    public bool Visible { get; set; } = true;
-
-    public bool Expanded { get; set; } = true;
-
-    public double Opacity { get; set; } = 1.0;
-
-    public string? ParentGroupId { get; set; }
-
-    public List<string> LayerIds { get; set; } = new();
-
-    public Dictionary<string, object> Metadata { get; set; } = new();
-}
-
-/// <summary>
 /// Style configuration for vector features
 /// </summary>
 public class FeatureStyle

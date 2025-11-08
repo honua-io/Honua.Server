@@ -44,6 +44,7 @@ public class OgcHandlersGeoArrowTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

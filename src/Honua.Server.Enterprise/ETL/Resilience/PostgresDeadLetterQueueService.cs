@@ -299,7 +299,7 @@ public class PostgresDeadLetterQueueService : IDeadLetterQueueService
         var categories = await conn.QueryAsync(categorySql, new { From = from, To = to });
         foreach (var row in categories)
         {
-            if (Enum.TryParse<ErrorCategory>(row.error_category, out var category))
+            if (Enum.TryParse<ErrorCategory>(row.error_category, out ErrorCategory category))
             {
                 stats.FailuresByCategory[category] = row.count;
             }

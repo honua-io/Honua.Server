@@ -129,9 +129,9 @@ public sealed class LlmProviderFactory : ProviderFactoryBase<ILlmProvider>, ILlm
 }
 
 /// <summary>
-/// Resilient LLM provider with automatic fallback.
+/// LLM provider with automatic fallback.
 /// </summary>
-public sealed class ResilientLlmProvider : ILlmProvider
+public sealed class FallbackLlmProvider : ILlmProvider
 {
     private readonly ILlmProvider _primary;
     private readonly ILlmProvider? _fallback;
@@ -139,7 +139,7 @@ public sealed class ResilientLlmProvider : ILlmProvider
     public string ProviderName => $"{_primary.ProviderName} (with fallback: {_fallback?.ProviderName ?? "none"})";
     public string DefaultModel => _primary.DefaultModel;
 
-    public ResilientLlmProvider(ILlmProvider primary, ILlmProvider? fallback = null)
+    public FallbackLlmProvider(ILlmProvider primary, ILlmProvider? fallback = null)
     {
         _primary = primary ?? throw new ArgumentNullException(nameof(primary));
         _fallback = fallback;

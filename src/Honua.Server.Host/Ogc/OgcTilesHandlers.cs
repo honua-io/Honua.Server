@@ -446,6 +446,7 @@ internal static class OgcTilesHandlers
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -927,7 +928,7 @@ internal static class OgcTilesHandlers
     {
         Guard.NotNull(request);
 
-        var normalized = tilesHandler.NormalizeTileMatrixSet(tileMatrixSetId);
+        var normalized = OgcSharedHandlers.NormalizeTileMatrixSet(tileMatrixSetId);
         if (normalized is null)
         {
             return Results.NotFound();

@@ -50,6 +50,7 @@ public class OgcHandlersKmzTests
             registry,
             OgcTestUtilities.CreateApiMetrics(),
             OgcTestUtilities.CreateCacheHeaderService(),
+            OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -95,6 +96,8 @@ public class OgcHandlersKmzTests
             attachmentOrchestrator,
             registry,
             OgcTestUtilities.CreateCacheHeaderService(),
+            OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
+            OgcTestUtilities.CreateOgcFeaturesEditingHandlerStub(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

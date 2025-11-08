@@ -72,7 +72,7 @@ def test_wcs_open_coverage_via_gdal(honua_api_base_url):
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
 
     # GDAL WCS URL format: WCS:http://server/wcs?coverageId=xxx
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -128,7 +128,7 @@ def test_wcs_read_coverage_metadata(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -158,7 +158,7 @@ def test_wcs_read_coverage_crs(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -187,7 +187,7 @@ def test_wcs_read_coverage_transform(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -219,7 +219,7 @@ def test_wcs_read_coverage_bounds(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -248,7 +248,7 @@ def test_wcs_read_coverage_resolution(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -287,7 +287,7 @@ def test_wcs_read_coverage_data_full(honua_api_base_url):
         pytest.skip("rasterio or numpy not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -320,7 +320,7 @@ def test_wcs_read_coverage_data_windowed(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -357,7 +357,7 @@ def test_wcs_read_coverage_data_downsampled(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -398,7 +398,7 @@ def test_wcs_read_coverage_data_with_resampling(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -439,7 +439,7 @@ def test_wcs_read_band_metadata(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -477,7 +477,7 @@ def test_wcs_read_multiband_coverage(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -520,7 +520,7 @@ def test_wcs_coverage_data_type_preserved(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:
@@ -619,7 +619,7 @@ def test_wcs_invalid_coverage_raises_error(honua_api_base_url):
     except ImportError:
         pytest.skip("rasterio not installed")
 
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId=nonexistent_coverage"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId=nonexistent_coverage"
 
     with pytest.raises(RasterioIOError):
         with rasterio.open(wcs_url) as dataset:
@@ -636,7 +636,7 @@ def test_wcs_malformed_url_raises_error(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     # Missing coverageId parameter
-    wcs_url = f"WCS:{honua_api_base_url}/wcs"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs"
 
     with pytest.raises(RasterioIOError):
         with rasterio.open(wcs_url) as dataset:
@@ -728,7 +728,7 @@ def test_wcs_large_coverage_streaming(honua_api_base_url):
         pytest.skip("rasterio not installed")
 
     coverage_id = get_wcs_coverage_id(honua_api_base_url)
-    wcs_url = f"WCS:{honua_api_base_url}/wcs?coverageId={coverage_id}"
+    wcs_url = f"WCS:{honua_api_base_url}/v1/wcs?coverageId={coverage_id}"
 
     try:
         with rasterio.open(wcs_url) as dataset:

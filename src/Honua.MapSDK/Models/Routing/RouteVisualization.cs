@@ -222,9 +222,74 @@ public sealed class Waypoint
     public int Order { get; set; }
 
     /// <summary>
+    /// Waypoint type (Start, Via, End).
+    /// </summary>
+    public WaypointType Type { get; set; } = WaypointType.Via;
+
+    /// <summary>
     /// Whether this is a via point (won't be in turn-by-turn instructions).
     /// </summary>
     public bool IsViaPoint { get; set; }
+
+    /// <summary>
+    /// Label for the waypoint (e.g., "A", "B", "C").
+    /// </summary>
+    public string? Label { get; set; }
+
+    /// <summary>
+    /// Longitude coordinate (convenience property).
+    /// </summary>
+    public double Longitude
+    {
+        get => Coordinates.Length > 0 ? Coordinates[0] : 0;
+        set
+        {
+            if (Coordinates.Length == 0)
+                Coordinates = new double[2];
+            Coordinates[0] = value;
+        }
+    }
+
+    /// <summary>
+    /// Latitude coordinate (convenience property).
+    /// </summary>
+    public double Latitude
+    {
+        get => Coordinates.Length > 1 ? Coordinates[1] : 0;
+        set
+        {
+            if (Coordinates.Length < 2)
+            {
+                var lon = Coordinates.Length > 0 ? Coordinates[0] : 0;
+                Coordinates = new double[2] { lon, value };
+            }
+            else
+            {
+                Coordinates[1] = value;
+            }
+        }
+    }
+}
+
+/// <summary>
+/// Type of waypoint in a route.
+/// </summary>
+public enum WaypointType
+{
+    /// <summary>
+    /// Starting point.
+    /// </summary>
+    Start,
+
+    /// <summary>
+    /// Intermediate waypoint.
+    /// </summary>
+    Via,
+
+    /// <summary>
+    /// Ending point.
+    /// </summary>
+    End
 }
 
 /// <summary>

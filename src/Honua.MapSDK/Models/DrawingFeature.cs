@@ -113,21 +113,6 @@ public class FeatureMeasurements
 }
 
 /// <summary>
-/// Geometry types supported by the drawing component
-/// </summary>
-public enum GeometryType
-{
-    Point,
-    LineString,
-    Polygon,
-    Circle,
-    Rectangle,
-    MultiPoint,
-    MultiLineString,
-    MultiPolygon
-}
-
-/// <summary>
 /// Drawing modes available in the component
 /// </summary>
 public enum DrawMode
@@ -142,14 +127,4 @@ public enum DrawMode
     Text,
     Select,
     Edit
-}
-
-/// <summary>
-/// Measurement units
-/// </summary>
-public enum MeasurementUnit
-{
-    Metric,
-    Imperial,
-    Nautical
 }

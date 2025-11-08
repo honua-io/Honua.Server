@@ -24,10 +24,11 @@ public abstract class DisposableComponentBase : ComponentBase, IDisposable
     /// </summary>
     /// <typeparam name="TMessage">The message type to subscribe to.</typeparam>
     /// <param name="handler">The message handler.</param>
-    protected void SubscribeToMessage<TMessage>(Action<TMessage> handler)
+    protected void SubscribeToMessage<TMessage>(Action<MessageArgs<TMessage>> handler) where TMessage : class
     {
-        var subscription = ComponentBus.Subscribe(handler);
-        _subscriptions.Add(subscription);
+        ComponentBus.Subscribe(handler);
+        // Note: ComponentBus.Subscribe doesn't return IDisposable
+        // Subscriptions are managed by the ComponentBus internally
     }
 
     /// <summary>

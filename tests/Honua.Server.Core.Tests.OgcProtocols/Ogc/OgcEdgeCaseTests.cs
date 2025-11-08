@@ -50,6 +50,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -64,6 +65,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -122,6 +124,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -136,6 +139,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -193,6 +197,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson&bbox=170,-10,-170,10");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -207,6 +212,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -245,6 +251,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson&bbox=-180,85,180,90");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -259,6 +266,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -290,6 +298,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         offsetValue.ToString().Should().Be("999999");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -304,6 +313,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -332,6 +342,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson&limit=0");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -346,6 +357,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -376,6 +388,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson&limit=-1");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -390,6 +403,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -409,6 +423,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson&offset=-100");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -423,6 +438,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -459,6 +475,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -473,6 +490,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -514,6 +532,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -528,6 +547,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -573,6 +593,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -587,6 +608,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -637,6 +659,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -651,6 +674,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -690,6 +714,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -704,6 +729,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -744,6 +770,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -758,6 +785,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -806,6 +834,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -820,6 +849,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -863,6 +893,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -877,6 +908,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -923,6 +955,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
         var context = _fixture.CreateHttpContext("/ogc/collections/roads::roads-primary/items", "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -937,6 +970,7 @@ public class OgcEdgeCaseTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

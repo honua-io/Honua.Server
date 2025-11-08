@@ -48,8 +48,8 @@
                     @if (_layers.Any(l => l.Group == "basemap"))
                     {
                         <div class="layer-group">
-                            <div class="group-header" @onclick="() => ToggleGroup(\"basemap\")">
-                                <MudIcon Icon="@(_expandedGroups.Contains(\"basemap\") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                            <div class="group-header" @onclick='() => ToggleGroup("basemap")'>
+                                <MudIcon Icon="@(_expandedGroups.Contains("basemap") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
                                 <span>Basemaps</span>
                                 <span class="layer-count">(@_layers.Count(l => l.Group == "basemap"))</span>
                             </div>
@@ -69,8 +69,8 @@
                     @if (_layers.Any(l => l.Group == "overlay"))
                     {
                         <div class="layer-group">
-                            <div class="group-header" @onclick="() => ToggleGroup(\"overlay\")">
-                                <MudIcon Icon="@(_expandedGroups.Contains(\"overlay\") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                            <div class="group-header" @onclick='() => ToggleGroup("overlay")'>
+                                <MudIcon Icon="@(_expandedGroups.Contains("overlay") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
                                 <span>Overlays</span>
                                 <span class="layer-count">(@_layers.Count(l => l.Group == "overlay"))</span>
                             </div>
@@ -90,8 +90,8 @@
                     @if (_layers.Any(l => l.Group == "default"))
                     {
                         <div class="layer-group">
-                            <div class="group-header" @onclick="() => ToggleGroup(\"default\")">
-                                <MudIcon Icon="@(_expandedGroups.Contains(\"default\") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                            <div class="group-header" @onclick='() => ToggleGroup("default")'>
+                                <MudIcon Icon="@(_expandedGroups.Contains("default") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
                                 <span>Layers</span>
                                 <span class="layer-count">(@_layers.Count(l => l.Group == "default"))</span>
                             </div>
@@ -434,9 +434,9 @@
     {
         return type switch
         {
-            LayerType.Vector => Icons.Material.Filled.VectorSquare,
+            LayerType.Vector => Icons.Material.Filled.Layers,
             LayerType.Raster => Icons.Material.Filled.Image,
-            LayerType.ThreeD => Icons.Material.Filled.ThreeDRotation,
+            LayerType.ThreeD => Icons.Material.Filled.ViewInAr,
             LayerType.Heatmap => Icons.Material.Filled.Gradient,
             LayerType.Cluster => Icons.Material.Filled.BubbleChart,
             LayerType.Line => Icons.Material.Filled.Timeline,

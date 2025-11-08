@@ -43,7 +43,7 @@ public sealed class DuckDBDataStoreProvider : DisposableBase, IDataStoreProvider
 
     public DuckDBDataStoreProvider(IConnectionStringEncryptionService? encryptionService = null)
     {
-        _retryPipeline = DatabaseRetryPolicy.CreateDefaultRetryPipeline();
+        _retryPipeline = DatabaseRetryPolicy.CreatePostgresRetryPipeline();
         _encryptionService = encryptionService;
     }
 
@@ -800,7 +800,7 @@ public sealed class DuckDBDataStoreProvider : DisposableBase, IDataStoreProvider
 
             var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
-            return new RelationalDataStoreTransaction<DuckDBConnection, DuckDBTransaction>(connection, transaction);
+            return new RelationalDataStoreTransaction<DuckDBConnection, DuckDBTransaction>(connection, (DuckDBTransaction)transaction);
         }
         catch
         {

@@ -53,7 +53,9 @@ internal sealed class MetadataSchemaParser
         return new ServerDefinition
         {
             AllowedHosts = ToTrimmedReadOnlyList(document.AllowedHosts),
-            Cors = BuildCors(document.Cors)
+            Cors = BuildCors(document.Cors),
+            Security = BuildServerSecurity(document.Security),
+            Rbac = BuildRbac(document.Rbac)
         };
     }
 
@@ -407,6 +409,31 @@ internal sealed class MetadataSchemaParser
             AllowCredentials = document.AllowCredentials ?? false,
             MaxAge = maxAge
         };
+    }
+
+    private ServerSecurityDefinition BuildServerSecurity(ServerSecurityDocument? document)
+    {
+        if (document is null)
+        {
+            return ServerSecurityDefinition.Default;
+        }
+
+        return new ServerSecurityDefinition
+        {
+            AllowedRasterDirectories = ToTrimmedReadOnlyList(document.AllowedRasterDirectories)
+        };
+    }
+
+    private RbacDefinition BuildRbac(RbacDocument? document)
+    {
+        if (document is null)
+        {
+            return RbacDefinition.Default;
+        }
+
+        // For now, return default RBAC definition
+        // TODO: Implement full RBAC parsing when RbacDocument structure is defined
+        return RbacDefinition.Default;
     }
 
     private (IReadOnlyList<string> Values, bool AllowAny) NormalizeCorsList(List<string>? values, bool supportWildcard)

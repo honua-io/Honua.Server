@@ -76,7 +76,8 @@ public class GeocodingSearchService
 
         // Check cache first
         var cacheKey = GenerateCacheKey(query, providerKey, mapBounds);
-        if (await TryGetFromCacheAsync(cacheKey, out var cachedResults))
+        var (found, cachedResults) = await TryGetFromCacheAsync(cacheKey);
+        if (found)
         {
             _logger.LogDebug("Returning cached results for query: {Query}", query);
             return cachedResults;
@@ -292,13 +293,16 @@ public class GeocodingSearchService
         }
     }
 
-    private async Task<bool> TryGetFromCacheAsync(string key, out List<SearchResult> results)
+    private async Task<(bool found, List<SearchResult> results)> TryGetFromCacheAsync(string key)
     {
-        results = new List<SearchResult>();
         await _cacheLock.WaitAsync();
         try
         {
-            return _cache.TryGetValue(key, out results!);
+            if (_cache.TryGetValue(key, out var results))
+            {
+                return (true, results);
+            }
+            return (false, new List<SearchResult>());
         }
         finally
         {

@@ -369,10 +369,10 @@ internal sealed class DuckDBFeatureQueryBuilder
     internal static string QuoteIdentifier(string identifier)
     {
         // DuckDB uses double quotes for identifiers like PostgreSQL
-        return SqlIdentifierValidator.ValidateAndQuotePostgreSQL(identifier);
+        return SqlIdentifierValidator.ValidateAndQuotePostgres(identifier);
     }
 
-    private static string QuoteAlias(string alias) => SqlIdentifierValidator.ValidateAndQuotePostgreSQL(alias);
+    private static string QuoteAlias(string alias) => SqlIdentifierValidator.ValidateAndQuotePostgres(alias);
 }
 
 internal sealed record DuckDBQueryDefinition(string Sql, IReadOnlyDictionary<string, object?> Parameters);

@@ -13,11 +13,14 @@ using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Query;
+using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Query.Expressions;
 using Honua.Server.Core.Query.Filter;
+using Honua.Server.Core.Raster.Export;
 using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Host.Extensions;
+using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
@@ -292,6 +295,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        IOgcFeaturesAttachmentHandler attachmentHandler,
         CancellationToken cancellationToken)
     {
         static QueryCollection RemoveCollectionsParameter(IQueryCollection source)
@@ -333,7 +337,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
             return formatError;
         }
 
-        var supportsAggregation = format is OgcResponseFormat.GeoJson or OgcResponseFormat.Html;
+        var supportsAggregation = format is OgcSharedHandlers.OgcResponseFormat.GeoJson or OgcSharedHandlers.OgcResponseFormat.Html;
         if (!supportsAggregation)
         {
             if (collections.Count != 1)
@@ -356,11 +360,12 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
                 metadataRegistry,
                 apiMetrics,
                 cacheHeaderService,
+                attachmentHandler,
                 sanitized,
                 cancellationToken).ConfigureAwait(false);
         }
 
-        var isHtml = format == OgcResponseFormat.Html;
+        var isHtml = format == OgcSharedHandlers.OgcResponseFormat.Html;
         var preparedQueries = new List<(SearchCollectionContext Context, FeatureQuery Query, string ContentCrs)>(resolutions.Count);
         FeatureQuery? baseQuery = null;
         FeatureResultType resultType = FeatureResultType.Results;

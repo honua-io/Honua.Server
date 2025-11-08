@@ -116,10 +116,10 @@
             @if (ShowAvoidOptions && _travelMode == TravelMode.Driving)
             {
                 <div class="avoid-options">
-                    <MudChipSet MultiSelection="true" @bind-SelectedValues="_selectedAvoidOptions">
-                        <MudChip Value="AvoidOption.Tolls" Color="Color.Default" Size="Size.Small">Avoid Tolls</MudChip>
-                        <MudChip Value="AvoidOption.Highways" Color="Color.Default" Size="Size.Small">Avoid Highways</MudChip>
-                        <MudChip Value="AvoidOption.Ferries" Color="Color.Default" Size="Size.Small">Avoid Ferries</MudChip>
+                    <MudChipSet T="AvoidOption" MultiSelection="true" @bind-SelectedValues="_selectedAvoidOptions">
+                        <MudChip T="AvoidOption" Value="AvoidOption.Tolls" Color="Color.Default" Size="Size.Small">Avoid Tolls</MudChip>
+                        <MudChip T="AvoidOption" Value="AvoidOption.Highways" Color="Color.Default" Size="Size.Small">Avoid Highways</MudChip>
+                        <MudChip T="AvoidOption" Value="AvoidOption.Ferries" Color="Color.Default" Size="Size.Small">Avoid Ferries</MudChip>
                     </MudChipSet>
                 </div>
             }
@@ -211,11 +211,11 @@
                     <MudExpansionPanel Text="Service Area Analysis">
                         <div class="isochrone-options">
                             <MudText Typo="Typo.body2" Class="mb-2">Show areas reachable within:</MudText>
-                            <MudChipSet MultiSelection="true" @bind-SelectedValues="_selectedIntervals">
-                                <MudChip Value="5" Color="Color.Default" Size="Size.Small">5 min</MudChip>
-                                <MudChip Value="10" Color="Color.Default" Size="Size.Small">10 min</MudChip>
-                                <MudChip Value="15" Color="Color.Default" Size="Size.Small">15 min</MudChip>
-                                <MudChip Value="30" Color="Color.Default" Size="Size.Small">30 min</MudChip>
+                            <MudChipSet T="int" MultiSelection="true" @bind-SelectedValues="_selectedIntervals">
+                                <MudChip T="int" Value="5" Color="Color.Default" Size="Size.Small">5 min</MudChip>
+                                <MudChip T="int" Value="10" Color="Color.Default" Size="Size.Small">10 min</MudChip>
+                                <MudChip T="int" Value="15" Color="Color.Default" Size="Size.Small">15 min</MudChip>
+                                <MudChip T="int" Value="30" Color="Color.Default" Size="Size.Small">30 min</MudChip>
                             </MudChipSet>
                             <MudButton
                                 Variant="Variant.Outlined"
@@ -425,8 +425,8 @@
 
     private TravelMode _travelMode;
     private RoutePreference _preference = RoutePreference.Fastest;
-    private ICollection<object>? _selectedAvoidOptions;
-    private ICollection<object>? _selectedIntervals;
+    private IReadOnlyCollection<AvoidOption>? _selectedAvoidOptions;
+    private IReadOnlyCollection<int>? _selectedIntervals;
 
     private List<TravelMode> _supportedModes = new();
 
@@ -490,12 +490,14 @@
         // Initialize with start and end waypoints
         _waypoints.Add(new RoutingWaypoint
         {
+            Coordinates = new double[2],
             Type = RoutingWaypointType.Start,
             Label = "A"
         });
 
         _waypoints.Add(new RoutingWaypoint
         {
+            Coordinates = new double[2],
             Type = RoutingWaypointType.End,
             Label = "B"
         });
@@ -527,6 +529,7 @@
         // Insert before the last waypoint (end)
         var viaWaypoint = new RoutingWaypoint
         {
+            Coordinates = new double[2],
             Type = RoutingWaypointType.Via,
             Label = GetWaypointLabel(_waypoints.Count - 1)
         };
@@ -966,8 +969,8 @@
             ManeuverType.UTurn => Icons.Material.Filled.UTurnLeft,
             ManeuverType.Straight or ManeuverType.Continue => Icons.Material.Filled.Straight,
             ManeuverType.Merge => Icons.Material.Filled.Merge,
-            ManeuverType.Fork => Icons.Material.Filled.Fork,
-            ManeuverType.Roundabout => Icons.Material.Filled.Roundabout,
+            ManeuverType.Fork => Icons.Material.Filled.CallSplit,
+            ManeuverType.Roundabout => Icons.Material.Filled.RotateRight,
             ManeuverType.Arrive => Icons.Material.Filled.Place,
             ManeuverType.Depart => Icons.Material.Filled.NearMe,
             _ => Icons.Material.Filled.ArrowForward

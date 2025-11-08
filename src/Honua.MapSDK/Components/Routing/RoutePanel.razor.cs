@@ -10,6 +10,7 @@ using Honua.MapSDK.Models.Routing;
 using Honua.MapSDK.Services.Routing;
 using Honua.Server.Core.LocationServices;
 using Honua.Server.Core.LocationServices.Models;
+using CoreRoute = Honua.Server.Core.LocationServices.Models.Route;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -54,7 +55,7 @@ public partial class RoutePanel : ComponentBase, IAsyncDisposable
     /// Event fired when a route is selected.
     /// </summary>
     [Parameter]
-    public EventCallback<Route> OnRouteSelected { get; set; }
+    public EventCallback<CoreRoute> OnRouteSelected { get; set; }
 
     /// <summary>
     /// Event fired when the panel is closed.
@@ -76,7 +77,7 @@ public partial class RoutePanel : ComponentBase, IAsyncDisposable
     protected bool IsHazmat { get; set; }
     protected bool IsCalculating { get; set; }
     protected string? ErrorMessage { get; set; }
-    protected List<Route> CalculatedRoutes { get; set; } = new();
+    protected List<CoreRoute> CalculatedRoutes { get; set; } = new();
     protected int SelectedRouteIndex { get; set; }
     protected int? DraggedWaypointIndex { get; set; }
 
@@ -286,9 +287,10 @@ public partial class RoutePanel : ComponentBase, IAsyncDisposable
     {
         if (CalculatedRoutes.Count > 0)
         {
-            var route = CalculatedRoutes[SelectedRouteIndex];
-            var coordinates = VisualizationService.ParseRouteGeometry(route);
-            var gpx = ExportService.ExportToGpx(route, coordinates, "My Route");
+            var coreRoute = CalculatedRoutes[SelectedRouteIndex];
+            var mapRoute = ConvertToMapSDKRoute(coreRoute);
+            var coordinates = VisualizationService.ParseRouteGeometry(mapRoute);
+            var gpx = ExportService.ExportToGpx(coreRoute, coordinates, "My Route");
             await DownloadFile("route.gpx", gpx, "application/gpx+xml");
         }
     }
@@ -297,9 +299,10 @@ public partial class RoutePanel : ComponentBase, IAsyncDisposable
     {
         if (CalculatedRoutes.Count > 0)
         {
-            var route = CalculatedRoutes[SelectedRouteIndex];
-            var coordinates = VisualizationService.ParseRouteGeometry(route);
-            var kml = ExportService.ExportToKml(route, coordinates, "My Route");
+            var coreRoute = CalculatedRoutes[SelectedRouteIndex];
+            var mapRoute = ConvertToMapSDKRoute(coreRoute);
+            var coordinates = VisualizationService.ParseRouteGeometry(mapRoute);
+            var kml = ExportService.ExportToKml(coreRoute, coordinates, "My Route");
             await DownloadFile("route.kml", kml, "application/vnd.google-earth.kml+xml");
         }
     }
@@ -321,8 +324,8 @@ public partial class RoutePanel : ComponentBase, IAsyncDisposable
     {
         if (CalculatedRoutes.Count > 0)
         {
-            var route = CalculatedRoutes[SelectedRouteIndex];
-            var html = ExportService.GeneratePrintableHtml(route, "Route Directions");
+            var coreRoute = CalculatedRoutes[SelectedRouteIndex];
+            var html = ExportService.GeneratePrintableHtml(coreRoute, "Route Directions");
 
             // Open in new window for printing
             await JSRuntime.InvokeVoidAsync("eval",
@@ -360,10 +363,13 @@ public partial class RoutePanel : ComponentBase, IAsyncDisposable
         ErrorMessage = null;
     }
 
-    private async Task DisplayRouteOnMap(Route route)
+    private async Task DisplayRouteOnMap(CoreRoute coreRoute)
     {
         try
         {
+            // Convert to MapSDK Route for visualization
+            var route = ConvertToMapSDKRoute(coreRoute);
+
             // Clear previous routes
             await VisualizationService.ClearAllRoutesAsync(MapId);
 
@@ -382,7 +388,7 @@ public partial class RoutePanel : ComponentBase, IAsyncDisposable
                 Waypoints);
 
             // Add turn markers if instructions available
-            if (route.Instructions != null)
+            if (route.Instructions != null && route.Instructions.Count > 0)
             {
                 await VisualizationService.AddTurnMarkersAsync(
                     MapId,
@@ -413,6 +419,24 @@ public partial class RoutePanel : ComponentBase, IAsyncDisposable
     {
         // In a real implementation, you would get this from NavigationManager or configuration
         return "https://example.com";
+    }
+
+    /// <summary>
+    /// Converts a Core Route to a MapSDK Route for visualization.
+    /// </summary>
+    private Models.Routing.Route ConvertToMapSDKRoute(CoreRoute coreRoute)
+    {
+        return new Models.Routing.Route
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Distance = coreRoute.DistanceMeters,
+            Duration = (int)coreRoute.DurationSeconds,
+            Geometry = coreRoute.Geometry,
+            Waypoints = Waypoints.ToList(),
+            TravelMode = Enum.TryParse<TravelMode>(TravelMode, true, out var mode) ? mode : Models.Routing.TravelMode.Driving,
+            CalculatedAt = DateTime.UtcNow,
+            RoutingEngine = SelectedProvider
+        };
     }
 
     public async ValueTask DisposeAsync()

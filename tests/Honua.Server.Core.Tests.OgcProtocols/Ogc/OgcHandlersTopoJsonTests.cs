@@ -55,6 +55,7 @@ public class OgcHandlersTopoJsonTests
             registry,
             OgcTestUtilities.CreateApiMetrics(),
             OgcTestUtilities.CreateCacheHeaderService(),
+            OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -117,6 +118,8 @@ public class OgcHandlersTopoJsonTests
             OgcTestUtilities.CreateAttachmentOrchestratorStub(),
             registry,
             OgcTestUtilities.CreateCacheHeaderService(),
+            OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
+            OgcTestUtilities.CreateOgcFeaturesEditingHandlerStub(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -174,6 +177,7 @@ public class OgcHandlersTopoJsonTests
             registry,
             OgcTestUtilities.CreateApiMetrics(),
             OgcTestUtilities.CreateCacheHeaderService(),
+            OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

@@ -54,10 +54,12 @@ public sealed class GeometryEdgeCaseTests
 
         // Assert
         degeneratePolygon.Area.Should().Be(0.0, "degenerate polygon should have zero area");
-        degeneratePolygon.IsValid.Should().BeTrue("degenerate but topologically valid");
+        // NTS marks collinear rings as invalid, which is correct behavior
+        degeneratePolygon.IsValid.Should().BeFalse("degenerate polygon with all collinear points is invalid");
 
         _output.WriteLine($"Degenerate polygon area: {degeneratePolygon.Area}");
         _output.WriteLine($"Degenerate polygon WKT: {degeneratePolygon.AsText()}");
+        _output.WriteLine($"Degenerate polygon IsValid: {degeneratePolygon.IsValid}");
     }
 
     [Fact]
@@ -69,9 +71,11 @@ public sealed class GeometryEdgeCaseTests
         // Assert
         degenerateLine.Length.Should().Be(0.0, "degenerate line should have zero length");
         degenerateLine.NumPoints.Should().Be(2);
-        degenerateLine.IsValid.Should().BeTrue();
+        // NTS marks degenerate lines (same point repeated) as invalid
+        degenerateLine.IsValid.Should().BeFalse("degenerate line with repeated points is invalid");
 
         _output.WriteLine($"Degenerate line length: {degenerateLine.Length}");
+        _output.WriteLine($"Degenerate line IsValid: {degenerateLine.IsValid}");
     }
 
     #endregion

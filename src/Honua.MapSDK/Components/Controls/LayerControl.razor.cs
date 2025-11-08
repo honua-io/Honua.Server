@@ -235,7 +235,7 @@ public partial class LayerControl : ComponentBase, IDisposable
             var groupInstance = LayerManager.GetGroup(group.Id);
             if (groupInstance != null)
             {
-                groupInstance.Expanded = true;
+                groupInstance.IsExpanded = true;
             }
         }
         StateHasChanged();
@@ -248,7 +248,7 @@ public partial class LayerControl : ComponentBase, IDisposable
             var groupInstance = LayerManager.GetGroup(group.Id);
             if (groupInstance != null)
             {
-                groupInstance.Expanded = false;
+                groupInstance.IsExpanded = false;
             }
         }
         StateHasChanged();
@@ -277,7 +277,7 @@ public partial class LayerControl : ComponentBase, IDisposable
     private void OnDragOver(DragEventArgs e)
     {
         if (!EnableDragDrop) return;
-        e.PreventDefault();
+        // Note: PreventDefault is handled via @ondragover:preventDefault="true" in razor
     }
 
     // ===== Public API =====
@@ -317,7 +317,7 @@ public partial class LayerControl : ComponentBase, IDisposable
         var group = LayerManager.GetGroup(groupId);
         if (group != null)
         {
-            group.Expanded = true;
+            group.IsExpanded = true;
             StateHasChanged();
         }
     }
@@ -330,7 +330,7 @@ public partial class LayerControl : ComponentBase, IDisposable
         var group = LayerManager.GetGroup(groupId);
         if (group != null)
         {
-            group.Expanded = false;
+            group.IsExpanded = false;
             StateHasChanged();
         }
     }

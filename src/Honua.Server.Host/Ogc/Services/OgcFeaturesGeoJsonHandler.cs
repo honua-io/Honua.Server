@@ -13,6 +13,7 @@ using Honua.Server.Core.Data;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
+using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Host.Extensions;
 using Honua.Server.Host.Utilities;

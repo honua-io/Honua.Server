@@ -2,6 +2,8 @@
 @using Honua.MapSDK.Core.Messages
 @using Honua.MapSDK.Models
 @using MudBlazor
+@using MapFieldType = Honua.MapSDK.Models.FieldType
+@using MapFilterType = Honua.MapSDK.Models.FilterType
 @inject ComponentBus Bus
 
 <div class="honua-filter-panel @CssClass">
@@ -181,7 +183,7 @@
                             }
                             else
                             {
-                                @if (_selectedField?.Type == FieldType.Date)
+                                @if (_selectedField?.Type == MapFieldType.Date)
                                 {
                                     <MudDatePicker @bind-Date="_attributeDateValue"
                                                   Label="Value"
@@ -189,7 +191,7 @@
                                                   Margin="Margin.Dense"
                                                   Class="mt-2" />
                                 }
-                                else if (_selectedField?.Type == FieldType.Number)
+                                else if (_selectedField?.Type == MapFieldType.Number)
                                 {
                                     <MudNumericField @bind-Value="_attributeNumberValue"
                                                     Label="Value"
@@ -198,7 +200,7 @@
                                                     T="double"
                                                     Class="mt-2" />
                                 }
-                                else if (_selectedField?.Type == FieldType.Boolean)
+                                else if (_selectedField?.Type == MapFieldType.Boolean)
                                 {
                                     <MudSwitch @bind-Value="_attributeBoolValue"
                                               Label="Value"
@@ -562,7 +564,7 @@
                 Field = fieldName,
                 Label = _selectedField?.Label ?? fieldName,
                 Operator = _attributeOperator,
-                FieldType = _selectedField?.Type ?? FieldType.String,
+                FieldType = _selectedField?.Type ?? MapFieldType.String,
                 IsActive = true
             };
 
@@ -578,9 +580,9 @@
                 {
                     filter.Value = _selectedField?.Type switch
                     {
-                        FieldType.Number => _attributeNumberValue,
-                        FieldType.Date => _attributeDateValue?.ToString("o"),
-                        FieldType.Boolean => _attributeBoolValue,
+                        MapFieldType.Number => _attributeNumberValue,
+                        MapFieldType.Date => _attributeDateValue?.ToString("o"),
+                        MapFieldType.Boolean => _attributeBoolValue,
                         _ => _attributeValue
                     };
                 }
@@ -650,7 +652,7 @@
     {
         // Remove any existing filters of the same type (for spatial and temporal)
         // Allow multiple attribute filters
-        if (filter.Type != FilterType.Attribute)
+        if (filter.Type != MapFilterType.Attribute)
         {
             _activeFilters.RemoveAll(f => f.Type == filter.Type);
         }
@@ -661,7 +663,7 @@
         await Bus.PublishAsync(new FilterAppliedMessage
         {
             FilterId = filter.Id,
-            Type = filter.Type,
+            Type = (Honua.MapSDK.Core.Messages.FilterType)(int)filter.Type,
             Expression = filter.ToExpression()
         }, Id);
 
@@ -678,7 +680,7 @@
             FilterId = filter.Id
         }, Id);
 
-        await StateHasChanged();
+        StateHasChanged();
     }
 
     private async Task ClearAllFilters()

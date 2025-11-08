@@ -387,7 +387,7 @@ internal static class OgcSharedHandlers
         return (new QueryFilter(expression), null);
     }
 
-    private static (IReadOnlyList<FeatureSortOrder>? SortOrders, IResult? Error) ParseSortOrders(string? raw, LayerDefinition layer)
+    internal static (IReadOnlyList<FeatureSortOrder>? SortOrders, IResult? Error) ParseSortOrders(string? raw, LayerDefinition layer)
     {
         if (raw.IsNullOrWhiteSpace())
         {
@@ -806,7 +806,7 @@ internal static class OgcSharedHandlers
         return new[] { CrsHelper.DefaultCrsIdentifier };
     }
 
-    private static bool LooksLikeJson(string? value)
+    internal static bool LooksLikeJson(string? value)
     {
         if (value.IsNullOrWhiteSpace())
         {
@@ -909,6 +909,7 @@ internal static class OgcSharedHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         CancellationToken cancellationToken)
     {
         static QueryCollection RemoveCollectionsParameter(IQueryCollection source)
@@ -973,6 +974,7 @@ internal static class OgcSharedHandlers
                 metadataRegistry,
                 apiMetrics,
                 cacheHeaderService,
+                attachmentHandler,
                 sanitized,
                 cancellationToken).ConfigureAwait(false);
         }

@@ -12,6 +12,7 @@ using Honua.Server.Enterprise.ETL.Models;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Features;
 using NetTopologySuite.IO;
+using NetTopologySuite.IO.GML2;
 
 namespace Honua.Server.Enterprise.ETL.Nodes;
 
@@ -33,7 +34,7 @@ public sealed class GeoPackageSinkNode : WorkflowNodeBase
     public override string NodeType => "data_sink.geopackage";
     public override string DisplayName => "GeoPackage Export";
     public override string Description => "Exports features to GeoPackage (.gpkg) format";
-    public override string Category => "Data Sinks";
+    public string Category => "Data Sinks";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -111,7 +112,7 @@ public sealed class GeoPackageSinkNode : WorkflowNodeBase
                     fields.Add(new FieldDefinition
                     {
                         Name = name,
-                        Type = fieldType,
+                        DataType = fieldType,
                         Nullable = true
                     });
                 }
@@ -121,14 +122,15 @@ public sealed class GeoPackageSinkNode : WorkflowNodeBase
         return new LayerDefinition
         {
             Id = tableName,
+            ServiceId = "etl-temp",
             Title = tableName,
             GeometryField = "geom",
             GeometryType = features.FirstOrDefault()?.Geometry?.GeometryType ?? "Geometry",
+            IdField = "id",
             Fields = fields,
-            Storage = new StorageDefinition
+            Storage = new LayerStorageDefinition
             {
-                Table = tableName,
-                Schema = "public"
+                Table = tableName
             }
         };
     }
@@ -189,7 +191,7 @@ public sealed class GeoPackageSinkNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -211,7 +213,7 @@ public sealed class ShapefileSinkNode : WorkflowNodeBase
     public override string NodeType => "data_sink.shapefile";
     public override string DisplayName => "Shapefile Export";
     public override string Description => "Exports features to Shapefile (.shp) format as a ZIP archive";
-    public override string Category => "Data Sinks";
+    public string Category => "Data Sinks";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -295,7 +297,7 @@ public sealed class ShapefileSinkNode : WorkflowNodeBase
                     fields.Add(new FieldDefinition
                     {
                         Name = name,
-                        Type = fieldType,
+                        DataType = fieldType,
                         Nullable = true
                     });
                 }
@@ -305,14 +307,15 @@ public sealed class ShapefileSinkNode : WorkflowNodeBase
         return new LayerDefinition
         {
             Id = layerId,
+            ServiceId = "etl-temp",
             Title = layerId,
             GeometryField = "geom",
             GeometryType = features.FirstOrDefault()?.Geometry?.GeometryType ?? "Geometry",
+            IdField = "id",
             Fields = fields,
-            Storage = new StorageDefinition
+            Storage = new LayerStorageDefinition
             {
-                Table = layerId,
-                Schema = "public"
+                Table = layerId
             }
         };
     }
@@ -373,7 +376,7 @@ public sealed class ShapefileSinkNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -387,7 +390,7 @@ public sealed class CsvGeometrySinkNode : WorkflowNodeBase
     public override string NodeType => "data_sink.csv_geometry";
     public override string DisplayName => "CSV with Geometry Export";
     public override string Description => "Exports features to CSV files with WKT, WKB, or lat/lon columns";
-    public override string Category => "Data Sinks";
+    public string Category => "Data Sinks";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -577,7 +580,7 @@ public sealed class CsvGeometrySinkNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -591,7 +594,7 @@ public sealed class GpxSinkNode : WorkflowNodeBase
     public override string NodeType => "data_sink.gpx";
     public override string DisplayName => "GPX Export";
     public override string Description => "Exports features as GPX waypoints, tracks, or routes";
-    public override string Category => "Data Sinks";
+    public string Category => "Data Sinks";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -762,7 +765,7 @@ public sealed class GpxSinkNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }
 
@@ -776,7 +779,7 @@ public sealed class GmlSinkNode : WorkflowNodeBase
     public override string NodeType => "data_sink.gml";
     public override string DisplayName => "GML Export";
     public override string Description => "Exports features to GML 3.2 format";
-    public override string Category => "Data Sinks";
+    public string Category => "Data Sinks";
 
     protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
@@ -853,7 +856,7 @@ public sealed class GmlSinkNode : WorkflowNodeBase
                 try
                 {
                     var gmlGeometry = gmlWriter.Write(feature.Geometry);
-                    var gmlDoc = System.Xml.Linq.XDocument.Parse(gmlGeometry);
+                    var gmlDoc = System.Xml.Linq.XDocument.Load(gmlGeometry);
                     if (gmlDoc.Root != null)
                     {
                         var geometryElement = new System.Xml.Linq.XElement("geometry", gmlDoc.Root);
@@ -900,6 +903,6 @@ public sealed class GmlSinkNode : WorkflowNodeBase
 
         return Task.FromResult(errors.Count == 0
             ? NodeValidationResult.Success()
-            : NodeValidationResult.Failure(errors));
+            : NodeValidationResult.Failure(errors.ToArray()));
     }
 }

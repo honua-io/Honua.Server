@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
+using Honua.Server.Core.Serialization;
 using Microsoft.AspNetCore.Http;
 
 namespace Honua.Server.Host.Ogc.Services;

@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Xml;
 using Honua.MapSDK.Models.Routing;
-using Honua.Server.Core.LocationServices.Models;
+using ServerRoute = Honua.Server.Core.LocationServices.Models.Route;
 
 namespace Honua.MapSDK.Services.Routing;
 
@@ -25,7 +25,7 @@ public sealed class RouteExportService
     /// <param name="description">Route description.</param>
     /// <returns>GPX XML string.</returns>
     public string ExportToGpx(
-        Route route,
+        ServerRoute route,
         List<double[]> coordinates,
         string routeName = "Route",
         string? description = null)
@@ -100,7 +100,7 @@ public sealed class RouteExportService
     /// <param name="style">Route style for visualization.</param>
     /// <returns>KML XML string.</returns>
     public string ExportToKml(
-        Route route,
+        ServerRoute route,
         List<double[]> coordinates,
         string routeName = "Route",
         string? description = null,
@@ -189,7 +189,7 @@ public sealed class RouteExportService
     /// <param name="includeInstructions">Whether to include turn-by-turn instructions.</param>
     /// <returns>GeoJSON string.</returns>
     public string ExportToGeoJson(
-        Route route,
+        ServerRoute route,
         List<double[]> coordinates,
         string routeName = "Route",
         bool includeInstructions = true)
@@ -276,7 +276,7 @@ public sealed class RouteExportService
     /// <param name="route">Route to format.</param>
     /// <param name="routeName">Name for the route.</param>
     /// <returns>HTML string.</returns>
-    public string GeneratePrintableHtml(Route route, string routeName = "Route Directions")
+    public string GeneratePrintableHtml(ServerRoute route, string routeName = "Route Directions")
     {
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");

@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Honua.MapSDK.Models.Routing;
-using Honua.Server.Core.LocationServices.Models;
+using CoreRoute = Honua.Server.Core.LocationServices.Models.Route;
 
 namespace Honua.MapSDK.Services.Routing;
 
@@ -20,7 +20,7 @@ public sealed class RouteComparisonService
     /// <param name="routes">Routes to compare with provider information.</param>
     /// <returns>List of comparison metrics for each route.</returns>
     public List<RouteComparisonMetrics> CompareRoutes(
-        IReadOnlyList<(string Provider, Route Route)> routes)
+        IReadOnlyList<(string Provider, CoreRoute Route)> routes)
     {
         return routes.Select((r, index) => new RouteComparisonMetrics
         {

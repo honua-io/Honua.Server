@@ -151,7 +151,7 @@ public partial class GeocodingSearch : ComponentBase
         }
     }
 
-    private async Task OnMapExtentChanged(ComponentBusEventArgs<MapExtentChangedMessage> args)
+    private async Task OnMapExtentChanged(MessageArgs<MapExtentChangedMessage> args)
     {
         var message = args.Message;
         if (MapId != null && message.MapId != MapId)

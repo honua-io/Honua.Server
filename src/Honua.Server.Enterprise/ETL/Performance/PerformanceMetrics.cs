@@ -120,16 +120,16 @@ public class PerformanceMetrics : IPerformanceMetrics
 
     public void RecordWorkflowStarted(Guid workflowRunId)
     {
-        _workflowsStarted.Add(1, new("workflow_run_id", workflowRunId.ToString()));
+        _workflowsStarted.Add(1, new KeyValuePair<string, object?>("workflow_run_id", workflowRunId.ToString()));
         _logger.LogDebug("Workflow {WorkflowRunId} started", workflowRunId);
     }
 
     public void RecordWorkflowCompleted(Guid workflowRunId, TimeSpan duration, int nodesCompleted)
     {
-        _workflowsCompleted.Add(1, new("workflow_run_id", workflowRunId.ToString()));
+        _workflowsCompleted.Add(1, new KeyValuePair<string, object?>("workflow_run_id", workflowRunId.ToString()));
         _workflowDuration.Record(duration.TotalMilliseconds,
-            new("workflow_run_id", workflowRunId.ToString()),
-            new("status", "completed"));
+            new KeyValuePair<string, object?>("workflow_run_id", workflowRunId.ToString()),
+            new KeyValuePair<string, object?>("status", "completed"));
 
         _logger.LogInformation(
             "Workflow {WorkflowRunId} completed in {DurationMs}ms with {NodesCompleted} nodes",
@@ -143,10 +143,10 @@ public class PerformanceMetrics : IPerformanceMetrics
 
     public void RecordWorkflowFailed(Guid workflowRunId, TimeSpan duration)
     {
-        _workflowsFailed.Add(1, new("workflow_run_id", workflowRunId.ToString()));
+        _workflowsFailed.Add(1, new KeyValuePair<string, object?>("workflow_run_id", workflowRunId.ToString()));
         _workflowDuration.Record(duration.TotalMilliseconds,
-            new("workflow_run_id", workflowRunId.ToString()),
-            new("status", "failed"));
+            new KeyValuePair<string, object?>("workflow_run_id", workflowRunId.ToString()),
+            new KeyValuePair<string, object?>("status", "failed"));
 
         _logger.LogWarning("Workflow {WorkflowRunId} failed after {DurationMs}ms", workflowRunId, duration.TotalMilliseconds);
 
@@ -156,10 +156,10 @@ public class PerformanceMetrics : IPerformanceMetrics
 
     public void RecordWorkflowCancelled(Guid workflowRunId, TimeSpan duration)
     {
-        _workflowsCancelled.Add(1, new("workflow_run_id", workflowRunId.ToString()));
+        _workflowsCancelled.Add(1, new KeyValuePair<string, object?>("workflow_run_id", workflowRunId.ToString()));
         _workflowDuration.Record(duration.TotalMilliseconds,
-            new("workflow_run_id", workflowRunId.ToString()),
-            new("status", "cancelled"));
+            new KeyValuePair<string, object?>("workflow_run_id", workflowRunId.ToString()),
+            new KeyValuePair<string, object?>("status", "cancelled"));
 
         _logger.LogWarning("Workflow {WorkflowRunId} cancelled after {DurationMs}ms", workflowRunId, duration.TotalMilliseconds);
 
@@ -186,7 +186,7 @@ public class PerformanceMetrics : IPerformanceMetrics
         if (featuresProcessed > 0)
         {
             _featuresProcessed.Add(featuresProcessed,
-                new("node_type", nodeType));
+                new KeyValuePair<string, object?>("node_type", nodeType));
         }
 
         _logger.LogInformation(
@@ -236,13 +236,13 @@ public class PerformanceMetrics : IPerformanceMetrics
 
     public void RecordCacheHit(string cacheType, string key)
     {
-        _cacheHits.Add(1, new("cache_type", cacheType));
+        _cacheHits.Add(1, new KeyValuePair<string, object?>("cache_type", cacheType));
         _logger.LogTrace("Cache hit: {CacheType}:{Key}", cacheType, key);
     }
 
     public void RecordCacheMiss(string cacheType, string key)
     {
-        _cacheMisses.Add(1, new("cache_type", cacheType));
+        _cacheMisses.Add(1, new KeyValuePair<string, object?>("cache_type", cacheType));
         _logger.LogTrace("Cache miss: {CacheType}:{Key}", cacheType, key);
     }
 
@@ -272,7 +272,7 @@ public class PerformanceMetrics : IPerformanceMetrics
     {
         foreach (var kvp in _queueDepths)
         {
-            yield return new Measurement<int>(kvp.Value, new("queue_name", kvp.Key));
+            yield return new Measurement<int>(kvp.Value, new KeyValuePair<string, object?>[] { new("queue_name", kvp.Key) });
         }
     }
 
@@ -280,7 +280,7 @@ public class PerformanceMetrics : IPerformanceMetrics
     {
         foreach (var kvp in _memoryUsage)
         {
-            yield return new Measurement<long>(kvp.Value, new("workflow_run_id", kvp.Key.ToString()));
+            yield return new Measurement<long>(kvp.Value, new KeyValuePair<string, object?>[] { new("workflow_run_id", kvp.Key.ToString()) });
         }
     }
 }

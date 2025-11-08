@@ -48,7 +48,8 @@ public static class GeoEtlAiEndpoints
         group.MapPost("/generate", async (
             [FromServices] IGeoEtlAiService? aiService,
             [FromServices] IWorkflowEngine? engine,
-            [FromBody] GenerateWorkflowRequest request) =>
+            [FromBody] GenerateWorkflowRequest request,
+            CancellationToken cancellationToken = default) =>
         {
             if (aiService == null)
             {
@@ -127,7 +128,8 @@ public static class GeoEtlAiEndpoints
         group.MapPost("/explain", async (
             [FromServices] IGeoEtlAiService? aiService,
             [FromServices] IWorkflowStore? store,
-            [FromBody] ExplainWorkflowRequest request) =>
+            [FromBody] ExplainWorkflowRequest request,
+            CancellationToken cancellationToken) =>
         {
             if (aiService == null)
             {
@@ -161,7 +163,7 @@ public static class GeoEtlAiEndpoints
                     });
                 }
 
-                workflow = await store.GetWorkflowAsync(request.WorkflowId.Value, request.TenantId.Value);
+                workflow = await store.GetWorkflowAsync(request.WorkflowId.Value, cancellationToken);
                 if (workflow == null)
                 {
                     return Results.NotFound(new

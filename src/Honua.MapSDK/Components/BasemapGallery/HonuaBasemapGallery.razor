@@ -2,6 +2,7 @@
 @using Honua.MapSDK.Core.Messages
 @using Honua.MapSDK.Models
 @using Honua.MapSDK.Services
+@using Microsoft.AspNetCore.Components.Rendering
 @using Microsoft.JSInterop
 @implements IDisposable
 @inject ComponentBus Bus
@@ -476,7 +477,7 @@
 
                 if (basemap.IsPremium)
                 {
-                    contentBuilder.OpenComponent<MudChip>(11);
+                    contentBuilder.OpenComponent<MudChip<string>>(11);
                     contentBuilder.AddAttribute(12, "Size", Size.Small);
                     contentBuilder.AddAttribute(13, "Color", Color.Warning);
                     contentBuilder.AddAttribute(14, "Icon", Icons.Material.Filled.Star);
@@ -486,7 +487,7 @@
 
                 if (basemap.RequiresApiKey)
                 {
-                    contentBuilder.OpenComponent<MudChip>(16);
+                    contentBuilder.OpenComponent<MudChip<string>>(16);
                     contentBuilder.AddAttribute(17, "Size", Size.Small);
                     contentBuilder.AddAttribute(18, "Color", Color.Info);
                     contentBuilder.AddAttribute(19, "Icon", Icons.Material.Filled.Key);
@@ -523,7 +524,7 @@
                 cardBuilder.AddAttribute(19, "Color", isFavorite ? Color.Error : Color.Default);
                 cardBuilder.AddAttribute(20, "OnClick", EventCallback.Factory.Create(this, (MouseEventArgs e) =>
                 {
-                    e.StopPropagation();
+                    // Handled by @onclick:stopPropagation="true"
                     ToggleFavorite(basemap.Id);
                 }));
                 cardBuilder.CloseComponent();
@@ -538,7 +539,7 @@
     {
         var isActive = _activeBasemapId == basemap.Id;
 
-        builder.OpenComponent<MudListItem>(sequence++);
+        builder.OpenComponent<MudListItem<string>>(sequence++);
         builder.AddAttribute(sequence++, "Class", $"basemap-list-item {(isActive ? "active" : "")}");
         builder.AddAttribute(sequence++, "OnClick", EventCallback.Factory.Create(this, () => OnBasemapClickedAsync(basemap)));
 
@@ -744,7 +745,7 @@
 
         if (Categories != null && Categories.Length > 0)
         {
-            basemapCategories = basemapCategories.Where(c => Categories.Contains(c, StringComparer.OrdinalIgnoreCase));
+            basemapCategories = basemapCategories.Where(c => Categories.Contains(c, StringComparer.OrdinalIgnoreCase)).OrderBy(c => c);
         }
 
         categories.AddRange(basemapCategories);

@@ -1,6 +1,5 @@
 @using Honua.MapSDK.Services
 @using Honua.MapSDK.Models
-@inject ILayerManager LayerManager
 
 <div class="honua-layer-control @CssClass" style="@Style">
     <div class="layer-control-header">
@@ -49,7 +48,7 @@
             {
                 <div class="layer-group" data-group-id="@group.Id">
                     <div class="layer-group-header" @onclick="() => ToggleGroup(group.Id)">
-                        <i class="bi @(group.Expanded ? "bi-chevron-down" : "bi-chevron-right")"></i>
+                        <i class="bi @(group.IsExpanded ? "bi-chevron-down" : "bi-chevron-right")"></i>
                         <input type="checkbox"
                                checked="@group.Visible"
                                @onclick:stopPropagation="true"
@@ -68,7 +67,7 @@
                         }
                     </div>
 
-                    @if (group.Expanded)
+                    @if (group.IsExpanded)
                     {
                         <div class="layer-group-content">
                             @foreach (var layer in GetGroupLayers(group.Id))
@@ -374,7 +373,7 @@
     }
 
     /* Mobile responsive */
-    @media (max-width: 768px) {
+    @@media (max-width: 768px) {
         .honua-layer-control {
             width: 100%;
             max-width: 300px;
@@ -390,7 +389,7 @@
     }
 
     /* Dark theme support */
-    @media (prefers-color-scheme: dark) {
+    @@media (prefers-color-scheme: dark) {
         .honua-layer-control {
             background: #2d2d2d;
             color: #e0e0e0;

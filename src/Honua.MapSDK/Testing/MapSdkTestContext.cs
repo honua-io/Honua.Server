@@ -117,18 +117,20 @@ public class MockComponentBus : ComponentBus
     /// <summary>
     /// Publishes a message and records it.
     /// </summary>
-    public override void Publish<TMessage>(TMessage message)
+    public new void Publish<TMessage>(TMessage message, string? source = null)
+        where TMessage : class
     {
         _publishedMessages.Add((typeof(TMessage).Name, message!));
-        base.Publish(message);
+        base.Publish(message, source);
     }
 
     /// <summary>
     /// Clears all recorded messages.
     /// </summary>
-    public void Clear()
+    public new void Clear()
     {
         _publishedMessages.Clear();
+        base.Clear();
     }
 
     /// <summary>

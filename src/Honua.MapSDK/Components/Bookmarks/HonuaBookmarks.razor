@@ -149,7 +149,7 @@ else
                                         {
                                             <MudIconButton Icon="@Icons.Material.Filled.MoreVert"
                                                            Size="Size.Small"
-                                                           OnClick="@((e) => { e.StopPropagation(); ShowFolderMenu(folder); })" />
+                                                           OnClick="@(() => ShowFolderMenu(folder))" />
                                         }
                                     </div>
                                     @if (_expandedFolders.Contains(folder.Id))
@@ -170,8 +170,8 @@ else
                         if (unfoldered.Any())
                         {
                             <div class="bookmark-folder">
-                                <div class="folder-header" @onclick="() => ToggleFolder(\"_uncategorized\")">
-                                    <MudIcon Icon="@(_expandedFolders.Contains(\"_uncategorized\") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                                <div class="folder-header" @onclick='() => ToggleFolder("_uncategorized")'>
+                                    <MudIcon Icon="@(_expandedFolders.Contains("_uncategorized") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
                                     <MudIcon Icon="@Icons.Material.Filled.BookmarkBorder" Size="Size.Small" Color="Color.Default" />
                                     <span class="folder-name">Uncategorized</span>
                                     <span class="folder-count">(@unfoldered.Count)</span>

@@ -185,10 +185,10 @@ public class LayerStyle
     /// <summary>
     /// Heatmap settings
     /// </summary>
-    public HeatmapStyle? Heatmap { get; set; }
+    public HeatmapStyleSimple? Heatmap { get; set; }
 }
 
-public class HeatmapStyle
+public class HeatmapStyleSimple
 {
     public double Radius { get; set; } = 20;
     public double Intensity { get; set; } = 1.0;
@@ -230,10 +230,10 @@ public class FilterConfiguration
 
     public bool AllowTemporal { get; set; } = true;
 
-    public List<FilterDefinition> AvailableFilters { get; set; } = new();
+    public List<FilterFieldDefinition> AvailableFilters { get; set; } = new();
 }
 
-public class FilterDefinition
+public class FilterFieldDefinition
 {
     public required string Field { get; set; }
 

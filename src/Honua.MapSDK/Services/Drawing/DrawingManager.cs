@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Honua.MapSDK.Models;
+using ModelDrawingStyle = Honua.MapSDK.Models.DrawingStyle;
 
 namespace Honua.MapSDK.Services.Drawing;
 

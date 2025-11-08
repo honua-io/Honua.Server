@@ -170,6 +170,11 @@ public class LayerGroup
     /// Whether group is locked
     /// </summary>
     public bool IsLocked { get; set; }
+
+    /// <summary>
+    /// Layer IDs in this group
+    /// </summary>
+    public List<string> LayerIds { get; set; } = new();
 }
 
 /// <summary>
