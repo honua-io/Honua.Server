@@ -13,6 +13,7 @@ using Honua.Server.Host.Admin.Models;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 
@@ -115,7 +116,7 @@ public static class AlertAdministrationEndpoints
     #region Alert Rules
 
     private static async Task<IResult> GetAlertRules(
-        IAlertConfigurationService configService,
+        [FromServices] IAlertConfigurationService configService,
         CancellationToken ct)
     {
         try
@@ -145,7 +146,7 @@ public static class AlertAdministrationEndpoints
 
     private static async Task<IResult> GetAlertRuleById(
         long id,
-        IAlertConfigurationService configService,
+        [FromServices] IAlertConfigurationService configService,
         CancellationToken ct)
     {
         try
@@ -190,8 +191,8 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> CreateAlertRule(
         CreateAlertRuleRequest request,
         HttpContext context,
-        IAlertConfigurationService configService,
-        ILogger<AlertRule> logger,
+        [FromServices] IAlertConfigurationService configService,
+        [FromServices] ILogger<AlertRule> logger,
         CancellationToken ct)
     {
         try
@@ -251,8 +252,8 @@ public static class AlertAdministrationEndpoints
         long id,
         UpdateAlertRuleRequest request,
         HttpContext context,
-        IAlertConfigurationService configService,
-        ILogger<AlertRule> logger,
+        [FromServices] IAlertConfigurationService configService,
+        [FromServices] ILogger<AlertRule> logger,
         CancellationToken ct)
     {
         try
@@ -307,8 +308,8 @@ public static class AlertAdministrationEndpoints
 
     private static async Task<IResult> DeleteAlertRule(
         long id,
-        IAlertConfigurationService configService,
-        ILogger<AlertRule> logger,
+        [FromServices] IAlertConfigurationService configService,
+        [FromServices] ILogger<AlertRule> logger,
         CancellationToken ct)
     {
         try
@@ -342,10 +343,10 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> TestAlertRule(
         long id,
         TestAlertRuleRequest? request,
-        IAlertConfigurationService configService,
-        INotificationChannelService channelService,
-        IAlertPublishingService publishingService,
-        ILogger<AlertRule> logger,
+        [FromServices] IAlertConfigurationService configService,
+        [FromServices] INotificationChannelService channelService,
+        [FromServices] IAlertPublishingService publishingService,
+        [FromServices] ILogger<AlertRule> logger,
         CancellationToken ct)
     {
         try
@@ -410,7 +411,7 @@ public static class AlertAdministrationEndpoints
     #region Notification Channels
 
     private static async Task<IResult> GetNotificationChannels(
-        INotificationChannelService channelService,
+        [FromServices] INotificationChannelService channelService,
         CancellationToken ct)
     {
         try
@@ -439,7 +440,7 @@ public static class AlertAdministrationEndpoints
 
     private static async Task<IResult> GetNotificationChannelById(
         long id,
-        INotificationChannelService channelService,
+        [FromServices] INotificationChannelService channelService,
         CancellationToken ct)
     {
         try
@@ -483,8 +484,8 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> CreateNotificationChannel(
         CreateNotificationChannelRequest request,
         HttpContext context,
-        INotificationChannelService channelService,
-        ILogger<NotificationChannel> logger,
+        [FromServices] INotificationChannelService channelService,
+        [FromServices] ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
         try
@@ -543,8 +544,8 @@ public static class AlertAdministrationEndpoints
         long id,
         UpdateNotificationChannelRequest request,
         HttpContext context,
-        INotificationChannelService channelService,
-        ILogger<NotificationChannel> logger,
+        [FromServices] INotificationChannelService channelService,
+        [FromServices] ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
         try
@@ -589,8 +590,8 @@ public static class AlertAdministrationEndpoints
 
     private static async Task<IResult> DeleteNotificationChannel(
         long id,
-        INotificationChannelService channelService,
-        ILogger<NotificationChannel> logger,
+        [FromServices] INotificationChannelService channelService,
+        [FromServices] ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
         try
@@ -624,9 +625,9 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> TestNotificationChannel(
         long id,
         TestNotificationChannelRequest? request,
-        INotificationChannelService channelService,
-        IAlertPublishingService publishingService,
-        ILogger<NotificationChannel> logger,
+        [FromServices] INotificationChannelService channelService,
+        [FromServices] IAlertPublishingService publishingService,
+        [FromServices] ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
         try
@@ -683,7 +684,7 @@ public static class AlertAdministrationEndpoints
     #region Alert History
 
     private static async Task<IResult> GetAlertHistory(
-        IAlertHistoryStore historyStore,
+        [FromServices] IAlertHistoryStore historyStore,
         string? severity,
         string? status,
         string? service,
@@ -726,7 +727,7 @@ public static class AlertAdministrationEndpoints
 
     private static async Task<IResult> GetAlertHistoryById(
         long id,
-        IAlertHistoryStore historyStore,
+        [FromServices] IAlertHistoryStore historyStore,
         CancellationToken ct)
     {
         try
@@ -750,8 +751,8 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> AcknowledgeAlert(
         long id,
         AcknowledgeAlertRequest request,
-        IAlertHistoryStore historyStore,
-        ILogger<AlertHistoryEntry> logger,
+        [FromServices] IAlertHistoryStore historyStore,
+        [FromServices] ILogger<AlertHistoryEntry> logger,
         CancellationToken ct)
     {
         try
@@ -786,8 +787,8 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> SilenceAlert(
         long id,
         SilenceAlertRequest request,
-        IAlertHistoryStore historyStore,
-        ILogger<AlertHistoryEntry> logger,
+        [FromServices] IAlertHistoryStore historyStore,
+        [FromServices] ILogger<AlertHistoryEntry> logger,
         CancellationToken ct)
     {
         try
@@ -827,7 +828,7 @@ public static class AlertAdministrationEndpoints
     #region Alert Routing
 
     private static async Task<IResult> GetAlertRouting(
-        IAlertConfigurationService configService,
+        [FromServices] IAlertConfigurationService configService,
         CancellationToken ct)
     {
         try
@@ -866,8 +867,8 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> UpdateAlertRouting(
         UpdateAlertRoutingConfigurationRequest request,
         HttpContext context,
-        IAlertConfigurationService configService,
-        ILogger<AlertRoutingConfiguration> logger,
+        [FromServices] IAlertConfigurationService configService,
+        [FromServices] ILogger<AlertRoutingConfiguration> logger,
         CancellationToken ct)
     {
         try

@@ -88,12 +88,23 @@ public class SqlInjectionPropertyTests
                 Assert.StartsWith("\"", quoted);
                 Assert.EndsWith("\"", quoted);
 
-                // Should not contain unescaped quotes
-                var inner = quoted.Substring(1, quoted.Length - 2);
-                if (inner.Contains("\""))
+                // For dot-separated identifiers, each part is quoted separately
+                // e.g., "schema"."table" is valid PostgreSQL syntax
+                // Split by the pattern "." to get individual quoted parts
+                var quotedParts = quoted.Split(new[] { "\".\"" }, StringSplitOptions.None);
+
+                foreach (var quotedPart in quotedParts)
                 {
-                    // Any quotes should be escaped (doubled)
-                    Assert.DoesNotContain("\"\"\"", inner); // Triple quotes indicate improper escaping
+                    // Remove outer quotes from each part (first and last may have them)
+                    var part = quotedPart.Trim('"');
+
+                    // Within each part, any quotes should be escaped (doubled)
+                    if (part.Contains('"'))
+                    {
+                        // Replace all doubled quotes and check no single quotes remain
+                        var withoutDoubled = part.Replace("\"\"", "");
+                        Assert.DoesNotContain('"', withoutDoubled);
+                    }
                 }
 
                 return true;
