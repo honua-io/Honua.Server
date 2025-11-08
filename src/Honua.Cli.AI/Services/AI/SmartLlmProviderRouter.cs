@@ -466,8 +466,7 @@ public sealed class SmartLlmProviderRouter : ILlmProviderRouter
             // Majority vote
             var grouped = decisions
                 .GroupBy(d => d)
-                .OrderByDescending(g => g.Count())
-                .First();
+                .MaxBy(g => g.Count())!;
 
             var majorityDecision = grouped.Key;
             var majorityIndex = Array.IndexOf(decisions, majorityDecision);
@@ -480,7 +479,7 @@ public sealed class SmartLlmProviderRouter : ILlmProviderRouter
         }
 
         // Fall back to longest/most detailed response
-        var longestResponse = responses.OrderByDescending(r => r.Content.Length).First();
+        var longestResponse = responses.MaxBy(r => r.Content.Length)!;
         _logger.LogInformation("Using longest response for consensus ({Length} chars)", longestResponse.Content.Length);
 
         return Task.FromResult((longestResponse, 0.5, "longest-response"));
