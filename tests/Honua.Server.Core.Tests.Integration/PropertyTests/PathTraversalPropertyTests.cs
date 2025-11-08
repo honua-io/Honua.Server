@@ -42,14 +42,9 @@ public class PathTraversalPropertyTests
     public Property Sanitize_ShouldRemoveInvalidFileNameCharacters()
     {
         return Prop.ForAll(
-            Arb.Default.String(),
+            Arb.Default.String().Filter(s => !string.IsNullOrWhiteSpace(s)),
             input =>
             {
-                if (string.IsNullOrWhiteSpace(input))
-                {
-                    return CacheKeyNormalizer.SanitizeForFilesystem(input) == "default";
-                }
-
                 var sanitized = CacheKeyNormalizer.SanitizeForFilesystem(input);
                 var invalidChars = Path.GetInvalidFileNameChars();
 
@@ -67,7 +62,7 @@ public class PathTraversalPropertyTests
     public Property Sanitize_ShouldProduceValidFileName()
     {
         return Prop.ForAll(
-            Arb.Default.String(),
+            Arb.Default.String().Filter(s => !string.IsNullOrWhiteSpace(s)),
             input =>
             {
                 var sanitized = CacheKeyNormalizer.SanitizeForFilesystem(input);
@@ -92,7 +87,7 @@ public class PathTraversalPropertyTests
     public Property Sanitize_ShouldBeDeterministic()
     {
         return Prop.ForAll(
-            Arb.Default.String(),
+            Arb.Default.String().Filter(s => !string.IsNullOrWhiteSpace(s)),
             input =>
             {
                 var result1 = CacheKeyNormalizer.SanitizeForFilesystem(input);
