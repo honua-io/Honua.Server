@@ -8,10 +8,31 @@ using Honua.Server.Core.Utilities;
 
 namespace Honua.Server.Core.Configuration;
 
+/// <summary>
+/// Service for accessing and updating Honua configuration with change notifications.
+/// Provides thread-safe access to configuration and notifies consumers of configuration updates.
+/// </summary>
 public interface IHonuaConfigurationService
 {
+    /// <summary>
+    /// Gets the current configuration instance.
+    /// This property is thread-safe and always returns the latest configuration.
+    /// </summary>
     HonuaConfiguration Current { get; }
+
+    /// <summary>
+    /// Gets a change token that is triggered when configuration is updated via <see cref="Update"/>.
+    /// Consumers can register callbacks to be notified when configuration changes.
+    /// </summary>
+    /// <returns>A change token that fires on configuration updates.</returns>
     IChangeToken GetChangeToken();
+
+    /// <summary>
+    /// Updates the configuration and triggers change notifications to all registered consumers.
+    /// This operation is thread-safe and atomic.
+    /// </summary>
+    /// <param name="configuration">The new configuration instance to apply.</param>
+    /// <exception cref="ArgumentNullException">Thrown when configuration is null.</exception>
     void Update(HonuaConfiguration configuration);
 }
 

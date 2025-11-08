@@ -134,6 +134,8 @@ public sealed record CdnCachePolicy
     /// </summary>
     public static CdnCachePolicy FromConfiguration(CdnCachePolicyConfiguration config)
     {
+        ArgumentNullException.ThrowIfNull(config);
+
         if (!config.Enabled)
         {
             return NoCache;
@@ -157,6 +159,8 @@ public sealed record CdnCachePolicy
     /// </summary>
     public static CdnCachePolicy FromRasterDefinition(Metadata.RasterCdnDefinition cdn)
     {
+        ArgumentNullException.ThrowIfNull(cdn);
+
         if (!cdn.Enabled)
         {
             return NoCache;

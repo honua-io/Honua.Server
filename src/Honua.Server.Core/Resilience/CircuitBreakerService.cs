@@ -404,10 +404,7 @@ public class CircuitBreakerService : ICircuitBreakerService
     /// </summary>
     private static bool IsTransientStorageException(Exception ex)
     {
-        if (ex == null)
-        {
-            return false;
-        }
+        ArgumentNullException.ThrowIfNull(ex);
 
         var typeName = ex.GetType().FullName ?? string.Empty;
         var message = ex.Message?.ToLowerInvariant() ?? string.Empty;
