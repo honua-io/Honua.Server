@@ -2,6 +2,7 @@
 @using Honua.MapSDK.Core.Messages
 @using Honua.MapSDK.Models
 @using Honua.MapSDK.Services.Editing
+@using Honua.MapSDK.Components.Editor
 @using Microsoft.JSInterop
 @using System.Text.Json
 @implements IAsyncDisposable
@@ -327,7 +328,7 @@
                                 Value="@GetAttributeValue(rule.FieldName)?.ToString()"
                                 ValueChanged="@((string val) => SetAttributeValue(rule.FieldName, val))"
                                 Required="@rule.IsRequired"
-                                MaxLength="@rule.MaxLength"
+                                MaxLength="@(rule.MaxLength ?? 0)"
                                 Variant="Variant.Outlined" />
                         }
                     </div>
@@ -853,7 +854,6 @@
             await Bus.PublishAsync(new FeatureDeletedMessage
             {
                 FeatureId = _selectedFeature.Id,
-                LayerId = _selectedFeature.LayerId ?? "",
                 ComponentId = Id
             }, Id);
 
@@ -1106,13 +1106,4 @@
 
         _dotNetRef?.Dispose();
     }
-}
-
-public enum EditMode
-{
-    None,
-    Select,
-    Draw,
-    EditVertices,
-    Move
 }

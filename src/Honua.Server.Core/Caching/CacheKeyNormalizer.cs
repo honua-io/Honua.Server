@@ -308,12 +308,18 @@ public static class CacheKeyNormalizer
             }
         }
 
-        var result = builder.ToString().Trim('-');
+        var result = builder.ToString().Trim('-', '.');
+
+        // Prevent directory traversal by rejecting results that are just dots
+        if (result == "." || result == "..")
+        {
+            result = "default";
+        }
 
         // Limit length to prevent filesystem issues
         if (result.Length > 64)
         {
-            result = result.Substring(0, 64).TrimEnd('-');
+            result = result.Substring(0, 64).TrimEnd('-', '.');
         }
 
         return result.IsNullOrEmpty() ? "default" : result;

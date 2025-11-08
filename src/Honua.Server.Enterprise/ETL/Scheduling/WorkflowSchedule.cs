@@ -137,7 +137,7 @@ public class WorkflowSchedule
     {
         try
         {
-            var cronExpr = CronExpression.Parse(CronExpression);
+            var cronExpr = Cronos.CronExpression.Parse(CronExpression);
             var baseTime = from ?? DateTimeOffset.UtcNow;
 
             // Convert to specified timezone
@@ -169,7 +169,7 @@ public class WorkflowSchedule
 
         try
         {
-            var cronExpr = CronExpression.Parse(CronExpression);
+            var cronExpr = Cronos.CronExpression.Parse(CronExpression);
             var timezone = TimeZoneInfo.FindSystemTimeZoneById(Timezone);
             var localTime = TimeZoneInfo.ConvertTime(currentTime, timezone);
 
@@ -199,7 +199,7 @@ public class WorkflowSchedule
     {
         try
         {
-            CronExpression.Parse(CronExpression);
+            Cronos.CronExpression.Parse(CronExpression);
             return true;
         }
         catch

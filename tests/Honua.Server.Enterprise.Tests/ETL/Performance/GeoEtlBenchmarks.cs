@@ -20,7 +20,7 @@ namespace Honua.Server.Enterprise.Tests.ETL.Performance;
 /// Performance benchmarks for GeoETL workflows
 /// </summary>
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net80)]
+[SimpleJob]
 public class GeoEtlBenchmarks
 {
     private WorkflowDefinition _simpleWorkflow = null!;
@@ -40,7 +40,7 @@ public class GeoEtlBenchmarks
         _nodeRegistry = new MockNodeRegistry();
 
         // Create workflow store
-        var workflowStore = new InMemoryWorkflowStore(NullLogger<InMemoryWorkflowStore>.Instance);
+        var workflowStore = new InMemoryWorkflowStore();
 
         // Create engines
         _sequentialEngine = new WorkflowEngine(
@@ -190,7 +190,9 @@ public class GeoEtlBenchmarks
 
         public IWorkflowNode? GetNode(string nodeType) => _nodes.TryGetValue(nodeType, out var node) ? node : null;
         public IEnumerable<IWorkflowNode> GetAllNodes() => _nodes.Values;
-        public void RegisterNode(IWorkflowNode node) => _nodes[node.NodeType] = node;
+        public void RegisterNode(string nodeType, IWorkflowNode node) => _nodes[nodeType] = node;
+        public IEnumerable<string> GetAllNodeTypes() => _nodes.Keys;
+        public bool IsRegistered(string nodeType) => _nodes.ContainsKey(nodeType);
     }
 
     private class MockNode : IWorkflowNode
@@ -238,7 +240,7 @@ public class GeoEtlBenchmarks
 /// Benchmarks for database operations
 /// </summary>
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net80)]
+[SimpleJob]
 public class DatabaseBenchmarks
 {
     private List<IFeature> _features = null!;

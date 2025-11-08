@@ -9,6 +9,7 @@ using Honua.Server.Core.Attachments;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Serialization;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 

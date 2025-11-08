@@ -103,7 +103,7 @@ public class ElevationProfile
     /// <summary>
     /// Waypoints along the route
     /// </summary>
-    public List<Waypoint> Waypoints { get; set; } = new();
+    public List<ElevationWaypoint> Waypoints { get; set; } = new();
 
     /// <summary>
     /// Time estimate for completion (optional)
@@ -216,7 +216,7 @@ public class SteepSection
 /// <summary>
 /// Named waypoint along the route
 /// </summary>
-public class Waypoint
+public class ElevationWaypoint
 {
     /// <summary>
     /// Waypoint identifier
@@ -246,7 +246,7 @@ public class Waypoint
     /// <summary>
     /// Waypoint type: Start, End, Summit, Valley, Junction, POI
     /// </summary>
-    public WaypointType Type { get; set; }
+    public ElevationWaypointType Type { get; set; }
 
     /// <summary>
     /// Optional description
@@ -328,7 +328,7 @@ public class ElevationProfileOptions
     /// <summary>
     /// Measurement unit system
     /// </summary>
-    public MeasurementUnit Unit { get; set; } = MeasurementUnit.Metric;
+    public MeasurementUnitSystem Unit { get; set; } = MeasurementUnitSystem.Metric;
 
     /// <summary>
     /// Smoothing factor (0-1, 0=no smoothing, 1=maximum smoothing)
@@ -481,7 +481,7 @@ public enum ElevationSource
 /// <summary>
 /// Type of waypoint
 /// </summary>
-public enum WaypointType
+public enum ElevationWaypointType
 {
     Start,
     End,

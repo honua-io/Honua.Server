@@ -1,7 +1,9 @@
 @using Honua.MapSDK.Core
 @using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Components.Chart
 @using Microsoft.JSInterop
 @using System.Text.Json
+@using FilterType = Honua.MapSDK.Core.Messages.FilterType
 @implements IAsyncDisposable
 @inject ComponentBus Bus
 @inject IJSRuntime JS
@@ -474,7 +476,7 @@
         return Aggregation switch
         {
             AggregationType.Sum => values.Sum(),
-            AggregationType.Avg => values.Average(),
+            AggregationType.Average => values.Average(),
             AggregationType.Min => values.Min(),
             AggregationType.Max => values.Max(),
             _ => values.Count
@@ -612,51 +614,4 @@
 
         _dotNetRef?.Dispose();
     }
-}
-
-/// <summary>
-/// Chart type enumeration
-/// </summary>
-public enum ChartType
-{
-    Histogram,
-    Bar,
-    Pie,
-    Doughnut,
-    Line
-}
-
-/// <summary>
-/// Aggregation type enumeration
-/// </summary>
-public enum AggregationType
-{
-    Count,
-    Sum,
-    Avg,
-    Min,
-    Max
-}
-
-/// <summary>
-/// Value format enumeration
-/// </summary>
-public enum ValueFormat
-{
-    None,
-    Currency,
-    Percent,
-    Decimal,
-    Integer
-}
-
-/// <summary>
-/// Event args for chart segment clicked event
-/// </summary>
-public class ChartSegmentClickedEventArgs
-{
-    public required string Label { get; init; }
-    public required double Value { get; init; }
-    public required int Index { get; init; }
-    public required string Field { get; init; }
 }

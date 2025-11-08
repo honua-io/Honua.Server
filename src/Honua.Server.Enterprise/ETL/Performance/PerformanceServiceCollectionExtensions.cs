@@ -111,68 +111,78 @@ public static class PerformanceServiceCollectionExtensions
 
     /// <summary>
     /// Adds OpenTelemetry instrumentation for GeoETL
+    /// NOTE: Requires OpenTelemetry packages to be installed:
+    /// - OpenTelemetry.Extensions.Hosting
+    /// - OpenTelemetry.Instrumentation.Runtime
+    /// - OpenTelemetry.Instrumentation.Process
+    /// - OpenTelemetry.Exporter.Prometheus.AspNetCore (if using Prometheus)
+    /// - OpenTelemetry.Exporter.OpenTelemetryProtocol (if using OTLP)
     /// </summary>
     public static IServiceCollection AddGeoEtlOpenTelemetry(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var enableMetrics = configuration.GetValue<bool>("GeoETL:Performance:Monitoring:EnableMetrics", true);
+        // Commented out until OpenTelemetry packages are added
+        // var enableMetrics = configuration.GetValue<bool>("GeoETL:Performance:Monitoring:EnableMetrics", true);
 
-        if (enableMetrics)
-        {
-            services.AddOpenTelemetry()
-                .WithMetrics(builder =>
-                {
-                    builder
-                        .AddMeter("Honua.GeoETL")
-                        .AddRuntimeInstrumentation()
-                        .AddProcessInstrumentation();
+        // if (enableMetrics)
+        // {
+        //     services.AddOpenTelemetry()
+        //         .WithMetrics(builder =>
+        //         {
+        //             builder
+        //                 .AddMeter("Honua.GeoETL")
+        //                 .AddRuntimeInstrumentation()
+        //                 .AddProcessInstrumentation();
 
-                    // Add Prometheus exporter if enabled
-                    var prometheusEnabled = configuration.GetValue<bool>("GeoETL:Performance:Monitoring:Prometheus:Enabled", false);
-                    if (prometheusEnabled)
-                    {
-                        builder.AddPrometheusExporter();
-                    }
+        //             // Add Prometheus exporter if enabled
+        //             var prometheusEnabled = configuration.GetValue<bool>("GeoETL:Performance:Monitoring:Prometheus:Enabled", false);
+        //             if (prometheusEnabled)
+        //             {
+        //                 builder.AddPrometheusExporter();
+        //             }
 
-                    // Add OTLP exporter if configured
-                    var otlpEndpoint = configuration.GetValue<string>("GeoETL:Performance:Monitoring:OtlpEndpoint");
-                    if (!string.IsNullOrEmpty(otlpEndpoint))
-                    {
-                        builder.AddOtlpExporter(options =>
-                        {
-                            options.Endpoint = new Uri(otlpEndpoint);
-                        });
-                    }
-                });
-        }
+        //             // Add OTLP exporter if configured
+        //             var otlpEndpoint = configuration.GetValue<string>("GeoETL:Performance:Monitoring:OtlpEndpoint");
+        //             if (!string.IsNullOrEmpty(otlpEndpoint))
+        //             {
+        //                 builder.AddOtlpExporter(options =>
+        //                 {
+        //                     options.Endpoint = new Uri(otlpEndpoint);
+        //                 });
+        //             }
+        //         });
+        // }
 
         return services;
     }
 
     /// <summary>
     /// Adds Application Insights for GeoETL
+    /// NOTE: Requires Application Insights package to be installed:
+    /// - Microsoft.ApplicationInsights.AspNetCore
     /// </summary>
     public static IServiceCollection AddGeoEtlApplicationInsights(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var appInsightsEnabled = configuration.GetValue<bool>("GeoETL:Performance:Monitoring:ApplicationInsights:Enabled", false);
+        // Commented out until Application Insights package is added
+        // var appInsightsEnabled = configuration.GetValue<bool>("GeoETL:Performance:Monitoring:ApplicationInsights:Enabled", false);
 
-        if (appInsightsEnabled)
-        {
-            var connectionString = configuration.GetValue<string>("GeoETL:Performance:Monitoring:ApplicationInsights:ConnectionString");
+        // if (appInsightsEnabled)
+        // {
+        //     var connectionString = configuration.GetValue<string>("GeoETL:Performance:Monitoring:ApplicationInsights:ConnectionString");
 
-            if (!string.IsNullOrEmpty(connectionString))
-            {
-                services.AddApplicationInsightsTelemetry(options =>
-                {
-                    options.ConnectionString = connectionString;
-                    options.EnableAdaptiveSampling = true;
-                    options.EnableQuickPulseMetricStream = true;
-                });
-            }
-        }
+        //     if (!string.IsNullOrEmpty(connectionString))
+        //     {
+        //         services.AddApplicationInsightsTelemetry(options =>
+        //         {
+        //             options.ConnectionString = connectionString;
+        //             options.EnableAdaptiveSampling = true;
+        //             options.EnableQuickPulseMetricStream = true;
+        //         });
+        //     }
+        // }
 
         return services;
     }

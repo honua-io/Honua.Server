@@ -110,7 +110,7 @@ public sealed class TokenBudgetManager
             "Request approved. User: {UserId}, Request tokens: {Tokens}, User total: {UserTotal}, Daily total: {DailyTotal}",
             userId, totalRequestTokens, userTotal, dailyTotal);
 
-        return BudgetCheckResult.Approved(
+        return BudgetCheckResult.CreateApproved(
             estimatedTokens: totalRequestTokens,
             userId: userId,
             currentUserUsage: userUsage.TotalTokens,
@@ -323,7 +323,7 @@ public sealed class BudgetCheckResult
     public long CurrentUserUsage { get; init; }
     public long CurrentDailyUsage { get; init; }
 
-    public static BudgetCheckResult Approved(
+    public static BudgetCheckResult CreateApproved(
         int estimatedTokens,
         string? userId = null,
         long currentUserUsage = 0,

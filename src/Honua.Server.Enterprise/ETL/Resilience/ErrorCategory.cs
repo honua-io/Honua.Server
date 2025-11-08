@@ -70,7 +70,6 @@ public static class ErrorCategorizer
 
             // Resource errors
             OutOfMemoryException => ErrorCategory.Resource,
-            InsufficientMemoryException => ErrorCategory.Resource,
             HttpRequestException httpEx when httpEx.StatusCode == HttpStatusCode.TooManyRequests => ErrorCategory.Resource,
 
             // Configuration errors

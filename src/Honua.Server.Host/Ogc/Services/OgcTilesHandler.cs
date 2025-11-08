@@ -12,6 +12,7 @@ using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
 using Honua.Server.Core.Raster;
+using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Styling;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Host.Raster;
@@ -195,7 +196,7 @@ internal sealed class OgcTilesHandler : IOgcTilesHandler
 
         var service = snapshot.Services.FirstOrDefault(s =>
             string.Equals(s.Id, dataset.ServiceId, StringComparison.OrdinalIgnoreCase));
-        if (service is null || service.Layers.IsNullOrEmpty())
+        if (service is null || service.Layers == null || service.Layers.Count == 0)
         {
             return Array.Empty<Geometry>();
         }

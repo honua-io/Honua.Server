@@ -210,6 +210,7 @@ internal static class OgcLandingHandlers
         HttpRequest request,
         IFeatureContextResolver resolver,
         OgcCacheHeaderService cacheHeaderService,
+        Services.IOgcFeaturesRenderingHandler renderingHandler,
         CancellationToken cancellationToken)
     {
         var result = await OgcSharedHandlers.ResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);

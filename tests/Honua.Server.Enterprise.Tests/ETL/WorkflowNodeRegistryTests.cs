@@ -144,7 +144,7 @@ public sealed class WorkflowNodeRegistryTests
         public override string DisplayName => "Test Node";
         public override string Description => "A test node";
 
-        public override Task<NodeExecutionResult> ExecuteAsync(
+        protected override Task<NodeExecutionResult> ExecuteInternalAsync(
             NodeExecutionContext context,
             CancellationToken cancellationToken = default)
         {

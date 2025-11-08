@@ -79,7 +79,7 @@
                                            Class="mb-3">
                                     @foreach (PaperSize size in Enum.GetValues<PaperSize>())
                                     {
-                                        <MudSelectItem Value="size">@GetPaperSizeLabel(size)</MudSelectItem>
+                                        <MudSelectItem T="PaperSize" Value="size">@GetPaperSizeLabel(size)</MudSelectItem>
                                     }
                                 </MudSelect>
 
@@ -88,8 +88,8 @@
                                            Label="Orientation"
                                            Variant="Variant.Outlined"
                                            Class="mb-3">
-                                    <MudSelectItem Value="PageOrientation.Portrait">Portrait</MudSelectItem>
-                                    <MudSelectItem Value="PageOrientation.Landscape">Landscape</MudSelectItem>
+                                    <MudSelectItem T="PageOrientation" Value="PageOrientation.Portrait">Portrait</MudSelectItem>
+                                    <MudSelectItem T="PageOrientation" Value="PageOrientation.Landscape">Landscape</MudSelectItem>
                                 </MudSelect>
 
                                 <!-- Format -->
@@ -97,9 +97,9 @@
                                            Label="Output Format"
                                            Variant="Variant.Outlined"
                                            Class="mb-3">
-                                    <MudSelectItem Value="PrintFormat.Pdf">PDF</MudSelectItem>
-                                    <MudSelectItem Value="PrintFormat.Png">PNG</MudSelectItem>
-                                    <MudSelectItem Value="PrintFormat.Jpeg">JPEG</MudSelectItem>
+                                    <MudSelectItem T="PrintFormat" Value="PrintFormat.Pdf">PDF</MudSelectItem>
+                                    <MudSelectItem T="PrintFormat" Value="PrintFormat.Png">PNG</MudSelectItem>
+                                    <MudSelectItem T="PrintFormat" Value="PrintFormat.Jpeg">JPEG</MudSelectItem>
                                 </MudSelect>
 
                                 <!-- DPI -->
@@ -107,10 +107,10 @@
                                            Label="DPI / Quality"
                                            Variant="Variant.Outlined"
                                            Class="mb-3">
-                                    <MudSelectItem Value="72">72 DPI (Screen)</MudSelectItem>
-                                    <MudSelectItem Value="150">150 DPI (Draft)</MudSelectItem>
-                                    <MudSelectItem Value="300">300 DPI (Standard)</MudSelectItem>
-                                    <MudSelectItem Value="600">600 DPI (High)</MudSelectItem>
+                                    <MudSelectItem T="int" Value="72">72 DPI (Screen)</MudSelectItem>
+                                    <MudSelectItem T="int" Value="150">150 DPI (Draft)</MudSelectItem>
+                                    <MudSelectItem T="int" Value="300">300 DPI (Standard)</MudSelectItem>
+                                    <MudSelectItem T="int" Value="600">600 DPI (High)</MudSelectItem>
                                 </MudSelect>
 
                                 <!-- Layout Template -->
@@ -120,9 +120,9 @@
                                                Label="Layout Template"
                                                Variant="Variant.Outlined"
                                                Class="mb-3">
-                                        @foreach (var layout in _capabilities.Layouts)
+                                        @foreach (var layoutItem in _capabilities.Layouts)
                                         {
-                                            <MudSelectItem Value="@layout.Name">@layout.Label</MudSelectItem>
+                                            <MudSelectItem T="string" Value="@layoutItem.Name">@layoutItem.Label</MudSelectItem>
                                         }
                                     </MudSelect>
                                 }
@@ -137,9 +137,9 @@
                                            Label="Map Extent"
                                            Variant="Variant.Outlined"
                                            Class="mb-3">
-                                    <MudSelectItem Value="PrintExtentMode.CurrentView">Current View</MudSelectItem>
-                                    <MudSelectItem Value="PrintExtentMode.Custom">Custom Extent</MudSelectItem>
-                                    <MudSelectItem Value="PrintExtentMode.FitFeatures">Fit All Features</MudSelectItem>
+                                    <MudSelectItem T="PrintExtentMode" Value="PrintExtentMode.CurrentView">Current View</MudSelectItem>
+                                    <MudSelectItem T="PrintExtentMode" Value="PrintExtentMode.Custom">Custom Extent</MudSelectItem>
+                                    <MudSelectItem T="PrintExtentMode" Value="PrintExtentMode.FitFeatures">Fit All Features</MudSelectItem>
                                 </MudSelect>
 
                                 <!-- Scale -->
@@ -148,15 +148,15 @@
                                            Variant="Variant.Outlined"
                                            HelperText="1:X scale"
                                            Class="mb-3">
-                                    <MudSelectItem Value="1000">1:1,000</MudSelectItem>
-                                    <MudSelectItem Value="2500">1:2,500</MudSelectItem>
-                                    <MudSelectItem Value="5000">1:5,000</MudSelectItem>
-                                    <MudSelectItem Value="10000">1:10,000</MudSelectItem>
-                                    <MudSelectItem Value="25000">1:25,000</MudSelectItem>
-                                    <MudSelectItem Value="50000">1:50,000</MudSelectItem>
-                                    <MudSelectItem Value="100000">1:100,000</MudSelectItem>
-                                    <MudSelectItem Value="250000">1:250,000</MudSelectItem>
-                                    <MudSelectItem Value="500000">1:500,000</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("1000")">1:1,000</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("2500")">1:2,500</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("5000")">1:5,000</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("10000")">1:10,000</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("25000")">1:25,000</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("50000")">1:50,000</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("100000")">1:100,000</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("250000")">1:250,000</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("500000")">1:500,000</MudSelectItem>
                                 </MudSelect>
 
                                 <!-- Bearing/Rotation -->
@@ -173,22 +173,22 @@
                         <!-- Options Tab -->
                         <MudTabPanel Text="Options" Icon="@Icons.Material.Filled.Tune">
                             <div class="tab-content">
-                                <MudSwitch @bind-Checked="_config.IncludeLegend"
+                                <MudSwitch T="bool" @bind-Checked="_config.IncludeLegend"
                                            Color="Color.Primary"
                                            Label="Include Legend"
                                            Class="mb-2" />
 
-                                <MudSwitch @bind-Checked="_config.IncludeScaleBar"
+                                <MudSwitch T="bool" @bind-Checked="_config.IncludeScaleBar"
                                            Color="Color.Primary"
                                            Label="Include Scale Bar"
                                            Class="mb-2" />
 
-                                <MudSwitch @bind-Checked="_config.IncludeNorthArrow"
+                                <MudSwitch T="bool" @bind-Checked="_config.IncludeNorthArrow"
                                            Color="Color.Primary"
                                            Label="Include North Arrow"
                                            Class="mb-2" />
 
-                                <MudSwitch @bind-Checked="_config.IncludeAttribution"
+                                <MudSwitch T="bool" @bind-Checked="_config.IncludeAttribution"
                                            Color="Color.Primary"
                                            Label="Include Attribution"
                                            Class="mb-2" />
@@ -358,7 +358,7 @@
         MaxWidth = MaxWidth.Large,
         FullWidth = true,
         CloseButton = true,
-        DisableBackdropClick = false
+        BackdropClick = true
     };
 
     private readonly DialogOptions _progressDialogOptions = new()
@@ -366,7 +366,7 @@
         MaxWidth = MaxWidth.Small,
         FullWidth = true,
         CloseButton = false,
-        DisableBackdropClick = true
+        BackdropClick = false
     };
 
     protected override async Task OnInitializedAsync()
@@ -377,7 +377,7 @@
         // Subscribe to map messages if synced
         if (!string.IsNullOrEmpty(SyncWith))
         {
-            Bus.Subscribe<MapExtentChangedMessage>(HandleMapExtentChanged);
+            Bus.Subscribe<MapExtentChangedMessage>(args => HandleMapExtentChanged(args.Message));
         }
 
         await base.OnInitializedAsync();

@@ -18,10 +18,10 @@
             </MudText>
 
             <MudPaper Elevation="0" Class="pa-4">
-                <MudList Dense="true">
+                <MudList T="string" Dense="true">
                     @foreach (var step in _completedSteps)
                     {
-                        <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
                             <MudText Typo="Typo.body2">@step</MudText>
                         </MudListItem>
                     }
@@ -114,7 +114,7 @@
                     <MudAlert Severity="Severity.Error" Class="mb-4">
                         @if (Result.Errors.Any())
                         {
-                            <MudList Dense="true">
+                            <MudList T="string" Dense="true">
                                 @foreach (var error in Result.Errors.Take(5))
                                 {
                                     <MudListItem>

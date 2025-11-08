@@ -43,6 +43,7 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         [FromServices] Services.IOgcFeaturesQueryHandler queryHandler,
         [FromServices] ILogger logger,
         CancellationToken cancellationToken)
@@ -76,6 +77,7 @@ internal static partial class OgcFeaturesHandlers
                 metadataRegistry,
                 apiMetrics,
                 cacheHeaderService,
+                attachmentHandler,
                 cancellationToken).ConfigureAwait(false);
 
             stopwatch.Stop();
@@ -117,6 +119,7 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         [FromServices] Services.IOgcFeaturesGeoJsonHandler geoJsonHandler,
         [FromServices] Services.IOgcFeaturesQueryHandler queryHandler,
         [FromServices] ILogger logger,
@@ -262,6 +265,7 @@ internal static partial class OgcFeaturesHandlers
                 metadataRegistry,
                 apiMetrics,
                 cacheHeaderService,
+                attachmentHandler,
                 cancellationToken).ConfigureAwait(false);
 
             stopwatch.Stop();

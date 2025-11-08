@@ -147,16 +147,16 @@ public static class GeoEtlTemplateEndpoints
             }
 
             // Create workflow
-            var created = await workflowStore.CreateWorkflowAsync(workflow, request.CreatedBy);
+            var created = await workflowStore.CreateWorkflowAsync(workflow, cancellationToken);
 
             // Increment usage count
             await templateRepository.IncrementUsageCountAsync(templateId, cancellationToken);
 
             return Results.Created(
-                $"/admin/api/geoetl/workflows/{created.WorkflowId}",
+                $"/admin/api/geoetl/workflows/{created.Id}",
                 new
                 {
-                    workflowId = created.WorkflowId,
+                    workflowId = created.Id,
                     templateId,
                     message = "Workflow created successfully from template"
                 });

@@ -54,7 +54,7 @@
                         <div class="result-details">
                             @if (!string.IsNullOrEmpty(result.Type))
                             {
-                                <MudChip Size="Size.Small" Variant="Variant.Text" Class="result-type-chip">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="result-type-chip">
                                     @result.Type
                                 </MudChip>
                             }
@@ -304,7 +304,7 @@
         });
     }
 
-    private async Task<IEnumerable<GeocodingSearchResult>> SearchAsync(string searchText)
+    private async Task<IEnumerable<GeocodingSearchResult>> SearchAsync(string searchText, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < MinSearchLength)
         {

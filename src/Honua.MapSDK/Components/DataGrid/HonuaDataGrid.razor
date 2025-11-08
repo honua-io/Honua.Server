@@ -17,7 +17,7 @@
                  SelectedItem="_selectedItem"
                  SelectedItemChanged="OnRowSelected"
                  SelectedItems="_selectedItems"
-                 SelectedItemsChanged="OnMultipleRowsSelected"
+                 SelectedItemsChanged="HandleMultipleRowsSelected"
                  Filterable="@Filterable"
                  FilterMode="@DataGridFilterMode.Simple"
                  FilterCaseSensitivity="@DataGridFilterCaseSensitivity.CaseInsensitive"
@@ -72,7 +72,7 @@
 
                 @if (SyncWith != null && _isSynced)
                 {
-                    <MudChip Size="Size.Small"
+                    <MudChip T="string" Size="Size.Small"
                              Color="Color.Success"
                              Icon="@Icons.Material.Filled.Sync"
                              OnClose="@(() => DisableSync())">
@@ -93,7 +93,7 @@
             {
                 @foreach (var column in _columnDefinitions)
                 {
-                    <PropertyColumn Property="@column.PropertyFunc"
+                    <TemplateColumn T="TItem"
                                     Title="@column.Title"
                                     Sortable="@column.Sortable"
                                     Filterable="@column.Filterable"
@@ -101,10 +101,10 @@
                                     Hidden="@column.Hidden">
                         <CellTemplate>
                             @{
-                                var value = column.PropertyFunc(context);
+                                var value = column.PropertyFunc(context.Item);
                                 if (column.IsGeometry)
                                 {
-                                    <MudChip Size="Size.Small" Color="Color.Info">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">
                                         @GetGeometryType(value)
                                     </MudChip>
                                 }
@@ -114,7 +114,7 @@
                                 }
                             }
                         </CellTemplate>
-                    </PropertyColumn>
+                    </TemplateColumn>
                 }
             }
         </Columns>

@@ -16,7 +16,7 @@ namespace Honua.Server.Enterprise.Tests.ETL;
 /// </summary>
 public class SignalRWorkflowProgressBroadcasterTests
 {
-    private readonly Mock<IHubContext<TestGeoEtlProgressHub>> _mockHubContext;
+    private readonly Mock<IHubContext<GeoEtlProgressHub>> _mockHubContext;
     private readonly Mock<IHubClients> _mockClients;
     private readonly Mock<IClientProxy> _mockClientProxy;
     private readonly Mock<ILogger<SignalRWorkflowProgressBroadcaster>> _mockLogger;
@@ -24,7 +24,7 @@ public class SignalRWorkflowProgressBroadcasterTests
 
     public SignalRWorkflowProgressBroadcasterTests()
     {
-        _mockHubContext = new Mock<IHubContext<TestGeoEtlProgressHub>>();
+        _mockHubContext = new Mock<IHubContext<GeoEtlProgressHub>>();
         _mockClients = new Mock<IHubClients>();
         _mockClientProxy = new Mock<IClientProxy>();
         _mockLogger = new Mock<ILogger<SignalRWorkflowProgressBroadcaster>>();
@@ -294,11 +294,4 @@ public class SignalRWorkflowProgressBroadcasterTests
                 It.Is<Func<It.IsAnyType, Exception?, string>>((v, t) => true)),
             Times.Once);
     }
-}
-
-/// <summary>
-/// Test hub class for mocking
-/// </summary>
-public class TestGeoEtlProgressHub : Hub
-{
 }

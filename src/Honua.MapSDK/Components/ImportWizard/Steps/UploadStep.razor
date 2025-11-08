@@ -1,17 +1,16 @@
 @using Honua.MapSDK.Models.Import
+@using Microsoft.AspNetCore.Components.Forms
 
 <div class="import-step upload-step">
     <MudText Typo="Typo.h6" Class="mb-4">Upload Data File</MudText>
 
     @if (string.IsNullOrEmpty(_errorMessage))
     {
-        <MudPaper Class="drop-zone @(_isDragging ? "dragging" : "")"
+        <MudPaper Class="@($"drop-zone {(_isDragging ? "dragging" : "")}")"
                   Elevation="0"
-                  ondragover="event.preventDefault();"
                   @ondragenter="OnDragEnter"
                   @ondragleave="OnDragLeave"
-                  @ondrop="OnDrop"
-                  @ondrop:preventDefault="true">
+                  @ondrop="OnDrop">
             <div class="drop-zone-content">
                 <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
                 <MudText Typo="Typo.h6" Class="mb-2">Drag & Drop File Here</MudText>
@@ -21,15 +20,13 @@
                                Accept=".geojson,.json,.csv,.tsv,.kml,.kmz,.gpx"
                                OnFilesChanged="OnFileSelected"
                                MaximumFileCount="1">
-                    <ButtonTemplate>
-                        <MudButton HtmlTag="label"
-                                   Variant="Variant.Filled"
+                    <ActivatorContent>
+                        <MudButton Variant="Variant.Filled"
                                    Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.FolderOpen"
-                                   for="@context">
+                                   StartIcon="@Icons.Material.Filled.FolderOpen">
                             Browse Files
                         </MudButton>
-                    </ButtonTemplate>
+                    </ActivatorContent>
                 </MudFileUpload>
             </div>
 
@@ -38,10 +35,10 @@
             <div class="supported-formats">
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Supported formats:</MudText>
                 <div class="format-chips">
-                    <MudChip Size="Size.Small" Variant="Variant.Text">GeoJSON</MudChip>
-                    <MudChip Size="Size.Small" Variant="Variant.Text">CSV</MudChip>
-                    <MudChip Size="Size.Small" Variant="Variant.Text">KML/KMZ</MudChip>
-                    <MudChip Size="Size.Small" Variant="Variant.Text">GPX</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">GeoJSON</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">CSV</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">KML/KMZ</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">GPX</MudChip>
                 </div>
             </div>
         </MudPaper>

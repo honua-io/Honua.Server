@@ -255,7 +255,6 @@ public class ParallelWorkflowEngine : IWorkflowEngine
             // Execute levels in parallel
             var nodeResults = new ConcurrentDictionary<string, NodeExecutionResult>();
             var nodeRuns = new ConcurrentDictionary<string, NodeRun>();
-            int completedNodes = 0;
             int totalNodes = workflow.Nodes.Count;
 
             foreach (var level in parallelLevels)
@@ -270,7 +269,6 @@ public class ParallelWorkflowEngine : IWorkflowEngine
                     nodeResults,
                     nodeRuns,
                     options,
-                    ref completedNodes,
                     totalNodes,
                     cts.Token
                 )).ToList();
@@ -307,6 +305,8 @@ public class ParallelWorkflowEngine : IWorkflowEngine
                 "Parallel workflow execution {RunId} completed in {DurationMs}ms",
                 runId,
                 stopwatch.ElapsedMilliseconds);
+
+            var completedNodes = nodeRuns.Values.Count(n => n.Status == NodeRunStatus.Completed);
 
             if (_progressBroadcaster != null)
             {
@@ -397,7 +397,6 @@ public class ParallelWorkflowEngine : IWorkflowEngine
         ConcurrentDictionary<string, NodeExecutionResult> nodeResults,
         ConcurrentDictionary<string, NodeRun> nodeRuns,
         WorkflowExecutionOptions options,
-        ref int completedNodes,
         int totalNodes,
         CancellationToken cancellationToken)
     {
@@ -477,7 +476,6 @@ public class ParallelWorkflowEngine : IWorkflowEngine
             if (result.Success)
             {
                 nodeResults[nodeId] = result;
-                Interlocked.Increment(ref completedNodes);
 
                 if (_progressBroadcaster != null)
                 {

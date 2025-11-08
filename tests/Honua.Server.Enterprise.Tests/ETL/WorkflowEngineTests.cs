@@ -648,7 +648,7 @@ internal class TestSourceNode : WorkflowNodeBase
         return Task.FromResult(NodeValidationResult.Success());
     }
 
-    public override Task<NodeExecutionResult> ExecuteAsync(
+    protected override Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -673,7 +673,7 @@ internal class TestTransformNode : WorkflowNodeBase
     public override string DisplayName => "Test Transform";
     public override string Description => "Test transformation node";
 
-    public override Task<NodeExecutionResult> ExecuteAsync(
+    protected override Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -702,7 +702,7 @@ internal class TestSinkNode : WorkflowNodeBase
     public override string DisplayName => "Test Sink";
     public override string Description => "Test data sink node";
 
-    public override Task<NodeExecutionResult> ExecuteAsync(
+    protected override Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -729,7 +729,7 @@ internal class TestFailNode : WorkflowNodeBase
     public override string DisplayName => "Test Fail";
     public override string Description => "Test node that always fails";
 
-    public override Task<NodeExecutionResult> ExecuteAsync(
+    protected override Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {

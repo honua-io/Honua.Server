@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Data;
+using Honua.Server.Core.Editing;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
-using Honua.Server.Host.Data;
 using Microsoft.AspNetCore.Http;
 
 namespace Honua.Server.Host.Ogc.Services;

@@ -8,7 +8,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Honua.MapSDK.Models.Routing;
-using Honua.Server.Core.LocationServices.Models;
+using ServerRoute = Honua.Server.Core.LocationServices.Models.Route;
+using ServerRouteInstruction = Honua.Server.Core.LocationServices.Models.RouteInstruction;
 using Microsoft.JSInterop;
 
 namespace Honua.MapSDK.Services.Routing;
@@ -79,18 +80,58 @@ public sealed class RouteVisualizationService : IAsyncDisposable
     }
 
     /// <summary>
+    /// Calculates the bounding box for a set of coordinates.
+    /// </summary>
+    /// <param name="coordinates">List of [longitude, latitude] coordinates.</param>
+    /// <returns>Bounding box as [minLng, minLat, maxLng, maxLat].</returns>
+    private double[] CalculateBoundingBox(List<double[]> coordinates)
+    {
+        if (!coordinates.Any())
+        {
+            return new[] { 0.0, 0.0, 0.0, 0.0 };
+        }
+
+        var minLng = coordinates.Min(c => c[0]);
+        var minLat = coordinates.Min(c => c[1]);
+        var maxLng = coordinates.Max(c => c[0]);
+        var maxLat = coordinates.Max(c => c[1]);
+
+        return new[] { minLng, minLat, maxLng, maxLat };
+    }
+
+    /// <summary>
     /// Parses route geometry based on format.
     /// </summary>
     /// <param name="route">Route with geometry data.</param>
     /// <returns>List of [longitude, latitude] coordinates.</returns>
     public List<double[]> ParseRouteGeometry(Route route)
     {
-        if (route.GeometryFormat.Equals("geojson", StringComparison.OrdinalIgnoreCase))
+        // Try to parse as GeoJSON first
+        if (route.Geometry is JsonElement geoJson)
         {
             try
             {
-                var geoJson = JsonSerializer.Deserialize<JsonElement>(route.Geometry);
                 if (geoJson.TryGetProperty("coordinates", out var coords))
+                {
+                    return coords.EnumerateArray()
+                        .Select(c => new[] { c[0].GetDouble(), c[1].GetDouble() })
+                        .ToList();
+                }
+            }
+            catch
+            {
+                // Fall through to string format
+            }
+        }
+
+        // Try to parse Geometry as string (polyline or JSON string)
+        if (route.Geometry is string geometryStr)
+        {
+            // Try parsing as JSON first
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<JsonElement>(geometryStr);
+                if (parsed.TryGetProperty("coordinates", out var coords))
                 {
                     return coords.EnumerateArray()
                         .Select(c => new[] { c[0].GetDouble(), c[1].GetDouble() })
@@ -101,10 +142,13 @@ public sealed class RouteVisualizationService : IAsyncDisposable
             {
                 // Fall through to polyline decoding
             }
+
+            // Default to polyline format
+            return DecodePolyline(geometryStr);
         }
 
-        // Default to polyline format
-        return DecodePolyline(route.Geometry);
+        // Return empty list if geometry can't be parsed
+        return new List<double[]>();
     }
 
     /// <summary>
@@ -157,9 +201,15 @@ public sealed class RouteVisualizationService : IAsyncDisposable
             }
         });
 
-        if (animation.FitBoundsAfter && route.BoundingBox != null)
+        if (animation.FitBoundsAfter)
         {
-            await FitMapToBoundsAsync(mapId, route.BoundingBox, animation.BoundsPadding);
+            // Calculate bounding box from geometry
+            var routeCoordinates = ParseRouteGeometry(route);
+            if (routeCoordinates.Any())
+            {
+                var bbox = CalculateBoundingBox(routeCoordinates);
+                await FitMapToBoundsAsync(mapId, bbox, animation.BoundsPadding);
+            }
         }
     }
 
@@ -181,15 +231,15 @@ public sealed class RouteVisualizationService : IAsyncDisposable
         markerStyle ??= new TurnMarkerStyle();
 
         var markers = instructions
-            .Where(i => i.Location != null)
+            .Where(i => i.Coordinate != null && i.Coordinate.Length >= 2)
             .Select((instruction, index) => new
             {
                 id = $"{routeId}-marker-{index}",
-                location = instruction.Location,
-                icon = ManeuverIcons.GetIcon(instruction.ManeuverType),
+                location = instruction.Coordinate,
+                icon = ManeuverIcons.GetIcon(instruction.Maneuver.ToString()),
                 size = markerStyle.Size,
                 text = instruction.Text,
-                maneuver = instruction.ManeuverType
+                maneuver = instruction.Maneuver
             })
             .ToList();
 

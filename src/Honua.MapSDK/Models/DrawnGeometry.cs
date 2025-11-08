@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Honua.MapSDK.Services.Drawing;
+using ServicesDrawingStyle = Honua.MapSDK.Services.Drawing.DrawingStyle;
 
 namespace Honua.MapSDK.Models;
 
@@ -41,7 +42,7 @@ public class DrawnGeometry
     /// <summary>
     /// Visual style
     /// </summary>
-    public required DrawingStyle Style { get; set; }
+    public required ServicesDrawingStyle Style { get; set; }
 
     /// <summary>
     /// When the geometry was created

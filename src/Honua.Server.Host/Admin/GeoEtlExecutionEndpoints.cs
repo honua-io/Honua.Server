@@ -40,7 +40,7 @@ public static class GeoEtlExecutionEndpoints
                 return Results.BadRequest(new { error = "UserId is required" });
             }
 
-            var workflow = await store.GetWorkflowAsync(request.WorkflowId, request.TenantId);
+            var workflow = await store.GetWorkflowAsync(request.WorkflowId, cancellationToken);
             if (workflow == null)
             {
                 return Results.NotFound(new { error = "Workflow not found" });
@@ -68,7 +68,7 @@ public static class GeoEtlExecutionEndpoints
             try
             {
                 var run = await engine.ExecuteAsync(workflow, options, cancellationToken);
-                return Results.Created($"/admin/api/geoetl/executions/{run.RunId}", run);
+                return Results.Created($"/admin/api/geoetl/executions/{run.Id}", run);
             }
             catch (Exception ex)
             {
@@ -84,9 +84,10 @@ public static class GeoEtlExecutionEndpoints
         // Get execution status
         group.MapGet("/{runId:guid}", async (
             [FromServices] IWorkflowStore store,
-            [FromRoute] Guid runId) =>
+            [FromRoute] Guid runId,
+            CancellationToken cancellationToken = default) =>
         {
-            var run = await store.GetRunAsync(runId);
+            var run = await store.GetRunAsync(runId, cancellationToken);
             if (run == null)
             {
                 return Results.NotFound(new { error = "Workflow run not found" });
@@ -102,9 +103,10 @@ public static class GeoEtlExecutionEndpoints
             [FromServices] IWorkflowStore store,
             [FromRoute] Guid workflowId,
             [FromQuery] int limit = 50,
-            [FromQuery] int offset = 0) =>
+            [FromQuery] int offset = 0,
+            CancellationToken cancellationToken = default) =>
         {
-            var runs = await store.ListRunsAsync(workflowId, limit, offset);
+            var runs = await store.ListRunsAsync(workflowId, cancellationToken);
             return Results.Ok(runs);
         })
         .WithName("ListWorkflowRuns")
@@ -115,9 +117,10 @@ public static class GeoEtlExecutionEndpoints
             [FromServices] IWorkflowStore store,
             [FromRoute] Guid tenantId,
             [FromQuery] int limit = 50,
-            [FromQuery] int offset = 0) =>
+            [FromQuery] int offset = 0,
+            CancellationToken cancellationToken = default) =>
         {
-            var runs = await store.ListRunsByTenantAsync(tenantId, limit, offset);
+            var runs = await store.ListRunsByTenantAsync(tenantId, limit, cancellationToken);
             return Results.Ok(runs);
         })
         .WithName("ListTenantWorkflowRuns")
@@ -128,10 +131,11 @@ public static class GeoEtlExecutionEndpoints
             [FromServices] IWorkflowStore store,
             [FromRoute] Guid workflowId,
             [FromQuery] DateTime? startDate,
-            [FromQuery] DateTime? endDate) =>
+            [FromQuery] DateTime? endDate,
+            CancellationToken cancellationToken = default) =>
         {
             // Get all runs for the workflow
-            var runs = await store.ListRunsAsync(workflowId, 1000, 0);
+            var runs = await store.ListRunsAsync(workflowId, cancellationToken);
 
             // Filter by date range if provided
             if (startDate.HasValue)
@@ -152,11 +156,11 @@ public static class GeoEtlExecutionEndpoints
                 runningRuns = runs.Count(r => r.Status == WorkflowRunStatus.Running),
                 totalFeatures = runs.Where(r => r.Status == WorkflowRunStatus.Completed).Sum(r => r.FeaturesProcessed),
                 avgDurationSeconds = runs
-                    .Where(r => r.Status == WorkflowRunStatus.Completed && r.CompletedAt.HasValue)
-                    .Select(r => (r.CompletedAt!.Value - r.StartedAt).TotalSeconds)
+                    .Where(r => r.Status == WorkflowRunStatus.Completed && r.CompletedAt.HasValue && r.StartedAt.HasValue)
+                    .Select(r => (r.CompletedAt!.Value - r.StartedAt!.Value).TotalSeconds)
                     .DefaultIfEmpty(0)
                     .Average(),
-                totalComputeCost = runs.Sum(r => r.Metrics?.ComputeCost ?? 0m),
+                totalComputeCost = 0, // TODO: Add cost calculation when available
                 recentRuns = runs.OrderByDescending(r => r.StartedAt).Take(10)
             };
 
@@ -168,9 +172,10 @@ public static class GeoEtlExecutionEndpoints
         // Get node-level execution details
         group.MapGet("/{runId:guid}/nodes", async (
             [FromServices] IWorkflowStore store,
-            [FromRoute] Guid runId) =>
+            [FromRoute] Guid runId,
+            CancellationToken cancellationToken = default) =>
         {
-            var run = await store.GetRunAsync(runId);
+            var run = await store.GetRunAsync(runId, cancellationToken);
             if (run == null)
             {
                 return Results.NotFound(new { error = "Workflow run not found" });
@@ -184,9 +189,10 @@ public static class GeoEtlExecutionEndpoints
         // Cancel a running workflow
         group.MapPost("/{runId:guid}/cancel", async (
             [FromServices] IWorkflowStore store,
-            [FromRoute] Guid runId) =>
+            [FromRoute] Guid runId,
+            CancellationToken cancellationToken = default) =>
         {
-            var run = await store.GetRunAsync(runId);
+            var run = await store.GetRunAsync(runId, cancellationToken);
             if (run == null)
             {
                 return Results.NotFound(new { error = "Workflow run not found" });
@@ -202,7 +208,7 @@ public static class GeoEtlExecutionEndpoints
             run.CompletedAt = DateTime.UtcNow;
             run.ErrorMessage = "Cancelled by user";
 
-            await store.UpdateRunAsync(run);
+            await store.UpdateRunAsync(run, cancellationToken);
 
             return Results.Ok(run);
         })
