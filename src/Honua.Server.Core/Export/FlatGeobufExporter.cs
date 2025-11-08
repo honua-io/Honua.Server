@@ -3,6 +3,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -147,9 +148,10 @@ public sealed class FlatGeobufExporter : IFlatGeobufExporter
                     {
                         File.Delete(tempPath);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Best effort cleanup
+                        // Best effort cleanup - log in debug builds only
+                        Debug.WriteLine($"Failed to delete temporary FlatGeobuf file {tempPath}: {ex.Message}");
                     }
                 }
             }

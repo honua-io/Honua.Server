@@ -96,8 +96,7 @@ public class VersionHistory<T> where T : VersionedEntityBase
     /// </summary>
     public T? Current => Versions
         .Where(v => !v.Entity.IsDeleted)
-        .OrderByDescending(v => v.Entity.Version)
-        .FirstOrDefault()?.Entity;
+        .MaxBy(v => v.Entity.Version)?.Entity;
 
     /// <summary>
     /// Get version at specific point in time
@@ -106,8 +105,7 @@ public class VersionHistory<T> where T : VersionedEntityBase
     {
         return Versions
             .Where(v => v.Entity.VersionCreatedAt <= timestamp)
-            .OrderByDescending(v => v.Entity.VersionCreatedAt)
-            .FirstOrDefault()?.Entity;
+            .MaxBy(v => v.Entity.VersionCreatedAt)?.Entity;
     }
 
     /// <summary>
