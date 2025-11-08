@@ -3,15 +3,19 @@
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
 @using Honua.Admin.Blazor.Components.Shared
+@using Microsoft.JSInterop
 @attribute [Authorize(Roles = "administrator,datapublisher")]
 @inject LayerApiClient LayerApi
 @inject ServiceApiClient ServiceApi
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject TouchGestureService TouchGestures
+@inject ILogger<LayerList> Logger
+@implements IAsyncDisposable
 
 <PageTitle>Layers - Honua Admin</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4" id="layers-container">
     <MudBreadcrumbs Items="_breadcrumbs" />
 
     <MudPaper Elevation="2" Class="pa-4 mt-4">
@@ -197,11 +201,58 @@
     private string? _errorMessage;
     private string? _serviceName;
     private List<BreadcrumbItem> _breadcrumbs = new();
+    private DotNetObjectReference<LayerList>? _dotNetRef;
+    private string? _pullToRefreshGestureId;
+    private string? _swipeNavGestureId;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadLayersAsync();
         UpdateBreadcrumbs();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Initialize touch gestures for mobile
+                _dotNetRef = DotNetObjectReference.Create(this);
+
+                // Pull-to-refresh
+                _pullToRefreshGestureId = await TouchGestures.InitializePullToRefreshAsync(
+                    "layers-container",
+                    _dotNetRef
+                );
+
+                // Swipe navigation (back to services or home)
+                _swipeNavGestureId = await TouchGestures.InitializeSwipeNavigationAsync(
+                    "layers-container",
+                    _dotNetRef
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error initializing touch gestures");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPullToRefresh()
+    {
+        await LoadLayersAsync();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnSwipeBack()
+    {
+        // Navigate back to service detail if filtering by service, otherwise to services list
+        var backUrl = !string.IsNullOrEmpty(ServiceId) ? $"/services/{ServiceId}" : "/services";
+        Navigation.NavigateTo(backUrl);
+        return Task.CompletedTask;
     }
 
     private async Task LoadLayersAsync()
@@ -309,4 +360,19 @@
         GeometryTypes.MultiPolygon => Color.Warning,
         _ => Color.Default
     };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_pullToRefreshGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_pullToRefreshGestureId);
+        }
+
+        if (_swipeNavGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_swipeNavGestureId);
+        }
+
+        _dotNetRef?.Dispose();
+    }
 }

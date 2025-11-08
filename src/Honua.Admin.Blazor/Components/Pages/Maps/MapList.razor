@@ -2,15 +2,19 @@
 @using Honua.Server.Core.Models
 @using Honua.Admin.Blazor.Components.Shared
 @using Honua.Admin.Blazor.Shared.Helpers
+@using Honua.Admin.Blazor.Shared.Services
+@using Microsoft.JSInterop
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
-@implements IDisposable
+@inject TouchGestureService TouchGestures
+@inject ILogger<MapList> Logger
+@implements IAsyncDisposable
 
 <PageTitle>Map Configurations</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4" id="maps-container">
     <MudPaper Class="pa-4 mb-4">
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h4">Map Configurations</MudText>
@@ -159,6 +163,9 @@
     private bool _searching = false;
     private string _searchText = string.Empty;
     private SearchDebouncer _searchDebouncer = new(300);
+    private DotNetObjectReference<MapList>? _dotNetRef;
+    private string? _pullToRefreshGestureId;
+    private string? _swipeNavGestureId;
 
     private IEnumerable<MapConfigurationListItem> _filteredConfigurations =>
         string.IsNullOrWhiteSpace(_searchText)
@@ -172,6 +179,54 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadConfigurations();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Initialize touch gestures for mobile
+                _dotNetRef = DotNetObjectReference.Create(this);
+
+                // Pull-to-refresh
+                _pullToRefreshGestureId = await TouchGestures.InitializePullToRefreshAsync(
+                    "maps-container",
+                    _dotNetRef
+                );
+
+                // Swipe navigation (back to home)
+                _swipeNavGestureId = await TouchGestures.InitializeSwipeNavigationAsync(
+                    "maps-container",
+                    _dotNetRef
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error initializing touch gestures");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPullToRefresh()
+    {
+        await LoadConfigurations();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnSwipeBack()
+    {
+        Navigation.NavigateTo("/");
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task OnSwipeDelete(string mapId)
+    {
+        await DeleteMap(mapId);
     }
 
     private void OnSearchTextChanged(string value)
@@ -286,8 +341,19 @@
         public int ViewCount { get; set; }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
+        if (_pullToRefreshGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_pullToRefreshGestureId);
+        }
+
+        if (_swipeNavGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_swipeNavGestureId);
+        }
+
+        _dotNetRef?.Dispose();
         _searchDebouncer?.Dispose();
     }
 }
