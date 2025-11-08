@@ -48,11 +48,9 @@ internal sealed class OgcFeaturesRenderingHandler : IOgcFeaturesRenderingHandler
         if (request.Headers.TryGetValue(HeaderNames.Accept, out var acceptValues) &&
             MediaTypeHeaderValue.TryParseList(acceptValues, out var parsedAccepts))
         {
-            var ordered = parsedAccepts
-                .OrderByDescending(value => value.Quality ?? 1.0)
-                .ToList();
-
-            foreach (var media in ordered)
+            // Use lazy evaluation - no need to materialize with ToList() when only iterating
+            foreach (var media in parsedAccepts
+                .OrderByDescending(value => value.Quality ?? 1.0))
             {
                 var mediaType = media.MediaType.ToString();
                 if (mediaType.IsNullOrWhiteSpace())
