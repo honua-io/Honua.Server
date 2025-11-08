@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Data.DuckDB;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Tests.Shared.TestConfiguration;
 using DuckDB.NET.Data;
 using Xunit;
 
@@ -12,6 +13,7 @@ namespace Honua.Server.Core.Tests.Data.Data.DuckDB;
 /// <summary>
 /// DuckDB data store provider integration tests.
 /// Uses DuckDB spatial extension for spatial operations.
+/// Respects DatabaseTestConfiguration - disabled by default, enabled in Full mode or via HONUA_ENABLE_DUCKDB_TESTS=1.
 /// </summary>
 [Collection("DatabaseTests")]
 [Trait("Category", "Integration")]
@@ -133,6 +135,14 @@ public class DuckDBDataStoreProviderTests : DataStoreProviderTestsBase<DuckDBDat
 
         public DuckDBFixture()
         {
+            // Check if DuckDB tests are enabled via configuration
+            if (!DatabaseTestConfiguration.IsDuckDbEnabled)
+            {
+                _skipReason = $"DuckDB tests disabled. Mode: {DatabaseTestConfiguration.Mode}. Set HONUA_DATABASE_TEST_MODE=full or HONUA_ENABLE_DUCKDB_TESTS=1 to enable.";
+                ShouldSkip = true;
+                return;
+            }
+
             try
             {
                 // Test if DuckDB is available
