@@ -26,6 +26,13 @@
         <Setter Property="LineHeight" Value="1.25" />
     </Style>
 
+    <Style x:Key="H4" TargetType="Label">
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="LineHeight" Value="1.3" />
+    </Style>
+
     <Style x:Key="BodyLarge" TargetType="Label">
         <Setter Property="FontSize" Value="16" />
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
@@ -40,6 +47,18 @@
 
     <Style x:Key="BodySmall" TargetType="Label">
         <Setter Property="FontSize" Value="12" />
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}" />
+        <Setter Property="LineHeight" Value="1.5" />
+    </Style>
+
+    <Style x:Key="CaptionText" TargetType="Label">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}" />
+        <Setter Property="LineHeight" Value="1.4" />
+    </Style>
+
+    <Style x:Key="SubtitleText" TargetType="Label">
+        <Setter Property="FontSize" Value="16" />
         <Setter Property="TextColor" Value="{StaticResource TextSecondary}" />
         <Setter Property="LineHeight" Value="1.5" />
     </Style>
@@ -66,8 +85,44 @@
         <Setter Property="BackgroundColor" Value="{StaticResource ErrorRed}" />
     </Style>
 
-    <!-- Entry Styles -->
+    <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+        <Setter Property="BackgroundColor" Value="{StaticResource SuccessGreen}" />
+    </Style>
+
+    <Style x:Key="TextButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource PrimaryBlue}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Padding" Value="12,8" />
+    </Style>
+
+    <Style x:Key="IconButton" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="WidthRequest" Value="40" />
+        <Setter Property="HeightRequest" Value="40" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!-- Entry/Editor Styles -->
     <Style x:Key="DefaultEntry" TargetType="Entry">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceDefault}" />
+        <Setter Property="HeightRequest" Value="48" />
+    </Style>
+
+    <Style x:Key="DefaultEditor" TargetType="Editor">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}" />
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceDefault}" />
+        <Setter Property="MinimumHeightRequest" Value="100" />
+    </Style>
+
+    <Style x:Key="SearchBar" TargetType="SearchBar">
         <Setter Property="FontSize" Value="16" />
         <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}" />
         <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
@@ -82,6 +137,102 @@
         <Setter Property="Padding" Value="16" />
         <Setter Property="HasShadow" Value="True" />
         <Setter Property="BorderColor" Value="{StaticResource BorderDefault}" />
+    </Style>
+
+    <Style x:Key="CardBorder" TargetType="Border">
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceDefault}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Stroke" Value="{StaticResource BorderDefault}" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+    </Style>
+
+    <Style x:Key="ElevatedCard" TargetType="Frame" BasedOn="{StaticResource CardFrame}">
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceElevated}" />
+    </Style>
+
+    <!-- List/Collection Styles -->
+    <Style x:Key="ListItemFrame" TargetType="Frame">
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceDefault}" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="12" />
+        <Setter Property="Margin" Value="0,4" />
+        <Setter Property="HasShadow" Value="False" />
+        <Setter Property="BorderColor" Value="{StaticResource BorderDefault}" />
+    </Style>
+
+    <!-- Checkbox/Switch Styles -->
+    <Style TargetType="CheckBox">
+        <Setter Property="Color" Value="{StaticResource PrimaryBlue}" />
+    </Style>
+
+    <Style TargetType="Switch">
+        <Setter Property="OnColor" Value="{StaticResource PrimaryBlue}" />
+        <Setter Property="ThumbColor" Value="{StaticResource White}" />
+    </Style>
+
+    <!-- Slider/Stepper Styles -->
+    <Style TargetType="Slider">
+        <Setter Property="MinimumTrackColor" Value="{StaticResource PrimaryBlue}" />
+        <Setter Property="MaximumTrackColor" Value="{StaticResource Gray300}" />
+        <Setter Property="ThumbColor" Value="{StaticResource PrimaryBlue}" />
+    </Style>
+
+    <!-- Progress/Activity Indicator -->
+    <Style TargetType="ActivityIndicator">
+        <Setter Property="Color" Value="{StaticResource PrimaryBlue}" />
+    </Style>
+
+    <Style TargetType="ProgressBar">
+        <Setter Property="ProgressColor" Value="{StaticResource PrimaryBlue}" />
+    </Style>
+
+    <!-- Picker Style -->
+    <Style TargetType="Picker">
+        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceDefault}" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
+    <!-- Badge Style -->
+    <Style x:Key="BadgeFrame" TargetType="Frame">
+        <Setter Property="BackgroundColor" Value="{StaticResource ErrorRed}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="6,2" />
+        <Setter Property="HasShadow" Value="False" />
+        <Setter Property="BorderColor" Value="Transparent" />
+    </Style>
+
+    <Style x:Key="BadgeLabel" TargetType="Label">
+        <Setter Property="TextColor" Value="{StaticResource White}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontAttributes" Value="Bold" />
+    </Style>
+
+    <!-- Section Header Style -->
+    <Style x:Key="SectionHeader" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource TextSecondary}" />
+        <Setter Property="TextTransform" Value="Uppercase" />
+        <Setter Property="Margin" Value="0,16,0,8" />
+    </Style>
+
+    <!-- Page Style -->
+    <Style TargetType="ContentPage">
+        <Setter Property="BackgroundColor" Value="{StaticResource BackgroundPrimary}" />
+    </Style>
+
+    <!-- Grid/Layout Styles -->
+    <Style x:Key="PageGrid" TargetType="Grid">
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="RowSpacing" Value="16" />
+        <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+
+    <Style x:Key="FormLayout" TargetType="VerticalStackLayout">
+        <Setter Property="Spacing" Value="16" />
+        <Setter Property="Padding" Value="16" />
     </Style>
 
 </ResourceDictionary>

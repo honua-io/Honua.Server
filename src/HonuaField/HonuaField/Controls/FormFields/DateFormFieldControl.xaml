@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:HonuaField.Models.FormBuilder"
+             x:Class="HonuaField.Controls.FormFields.DateFormFieldControl"
+             x:DataType="models:DateFormField"
+             x:Name="this">
+
+    <VerticalStackLayout Spacing="4">
+        <!-- Label -->
+        <Label>
+            <Label.FormattedText>
+                <FormattedString>
+                    <Span Text="{Binding Label}" FontAttributes="Bold" />
+                    <Span Text=" *" TextColor="Red" IsVisible="{Binding IsRequired}" />
+                </FormattedString>
+            </Label.FormattedText>
+        </Label>
+
+        <!-- DatePicker -->
+        <DatePicker Date="{Binding Value, Mode=TwoWay, Converter={StaticResource DateTimeToDateConverter}}"
+                    MinimumDate="{Binding MinimumDate, TargetNullValue='1900-01-01'}"
+                    MaximumDate="{Binding MaximumDate, TargetNullValue='2100-12-31'}"
+                    Format="{Binding DateFormat}"
+                    IsEnabled="{Binding IsReadOnly, Converter={StaticResource InvertedBoolConverter}}">
+            <DatePicker.Behaviors>
+                <DataTrigger TargetType="DatePicker"
+                           Binding="{Binding HasError}"
+                           Value="True">
+                    <Setter Property="TextColor" Value="Red" />
+                </DataTrigger>
+            </DatePicker.Behaviors>
+        </DatePicker>
+
+        <!-- Help Text -->
+        <Label Text="{Binding HelpText}"
+               FontSize="12"
+               TextColor="Gray"
+               IsVisible="{Binding HelpText, Converter={StaticResource IsNotNullConverter}}" />
+
+        <!-- Error Message -->
+        <Label Text="{Binding ErrorMessage}"
+               FontSize="12"
+               TextColor="Red"
+               IsVisible="{Binding HasError}" />
+    </VerticalStackLayout>
+
+</ContentView>

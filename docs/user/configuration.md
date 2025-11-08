@@ -299,7 +299,7 @@ Endpoint: `https://{host}/stac`
 
 ### Geometry Service
 
-Esri-compatible geometry operations (project, buffer, union, etc.)
+GeoServices REST compatible geometry operations (project, buffer, union, etc.)
 
 ```json
 "geometry": {

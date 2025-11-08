@@ -41,7 +41,7 @@ public static class PromptInjectionFilter
         @"override\s+(the\s+)?(system|previous)\s+instructions?",
 
         // Mode/role manipulation
-        @"(you\s+are\s+now|act\s+as|pretend\s+to\s+be)\s+(a\s+)?(developer|admin|god|sudo)\s+mode",
+        @"(you\s+are\s+now|act\s+as|pretend\s+to\s+be)\s+(a\s+)?(in\s+)?(developer|admin|god|sudo)\s+mode",
         @"enable\s+(developer|debug|admin|unrestricted)\s+mode",
         @"disable\s+(safety|security|ethics|content)\s+(filter|check|restriction)s?",
         @"jailbreak",
@@ -61,9 +61,9 @@ public static class PromptInjectionFilter
         @"===\s*system\s*===",
 
         // Prompt leaking attempts
-        @"(show|tell|reveal|display)\s+(me\s+)?(your|the)\s+(system\s+)?(prompt|instructions?)",
-        @"what\s+(are|were)\s+your\s+(original\s+)?instructions?",
-        @"repeat\s+(your|the)\s+instructions?",
+        @"(show|tell|reveal|display)\s+(me\s+)?(your|the)\s+(\w+\s+)?(system\s+)?(prompt|instructions?)",
+        @"what\s+(are|were)\s+your\s+(\w+\s+)?instructions?",
+        @"repeat\s+(your|the)\s+(\w+\s+)?instructions?",
 
         // Encoding/obfuscation attempts
         @"base64\s*:",
@@ -193,6 +193,10 @@ public static class PromptInjectionFilter
         }
 
         var processedInput = sanitize ? SanitizeUserInput(userInput) : userInput;
+
+        // Remove any delimiter markers from user input to prevent delimiter confusion
+        processedInput = processedInput.Replace("=== USER INPUT START ===", "[USER INPUT START]");
+        processedInput = processedInput.Replace("=== USER INPUT END ===", "[USER INPUT END]");
 
         return $@"=== USER INPUT START ===
 {processedInput}

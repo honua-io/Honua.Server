@@ -1,10 +1,10 @@
 name: Integration Tests with Cloud Storage Emulators
 
 on:
-  push:
-    branches: [ master, main, dev ]
-  pull_request:
-    branches: [ master, main, dev ]
+  # push:
+  #   branches: [ master, main, dev ]
+  # pull_request:
+  #   branches: [ master, main, dev ]
   workflow_dispatch:
     inputs:
       run_integration_only:

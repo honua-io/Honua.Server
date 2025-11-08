@@ -106,8 +106,8 @@ public sealed class S3CogCacheStorageDisposalTests
     [Fact]
     public void S3CogCacheStorage_Constructor_RequiresBucket()
     {
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
+        // Act & Assert - base class throws ArgumentException for empty bucket
+        Assert.Throws<ArgumentException>(() =>
             new S3CogCacheStorage(_mockS3Client.Object, null!, "prefix", _logger.Object));
     }
 

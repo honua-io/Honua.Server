@@ -1,0 +1,87 @@
+{
+  "id": "export-postgis-to-geopackage",
+  "name": "Export PostGIS to GeoPackage",
+  "description": "Export data from PostGIS database to portable GeoPackage format. Ideal for sharing data or offline use.",
+  "category": "Data Import/Export",
+  "icon": "download",
+  "difficulty": 0,
+  "estimatedMinutes": 3,
+  "tags": ["export", "postgis", "geopackage", "portable"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "PostGIS connection configured",
+    "Source table exists"
+  ],
+  "expectedOutputs": [
+    "GeoPackage file (.gpkg)"
+  ],
+  "useCases": [
+    "Creating portable data packages for field work",
+    "Sharing data with external partners",
+    "Archiving data snapshots"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Read from PostGIS",
+      "description": "Load features from PostGIS table",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "boundaries",
+        "schemaName": "public",
+        "whereClause": ""
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "geopackage_sink",
+      "name": "Write to GeoPackage",
+      "description": "Export to GeoPackage file",
+      "parameters": {
+        "filePath": "/data/output/export.gpkg",
+        "layerName": "boundaries",
+        "overwrite": true
+      },
+      "position": {
+        "x": 400,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "PostGIS source table name",
+      "defaultValue": "boundaries",
+      "required": true
+    },
+    "outputPath": {
+      "name": "outputPath",
+      "type": "string",
+      "description": "Output GeoPackage file path",
+      "defaultValue": "/data/output/export.gpkg",
+      "required": true
+    },
+    "layerName": {
+      "name": "layerName",
+      "type": "string",
+      "description": "GeoPackage layer name",
+      "defaultValue": "export",
+      "required": true
+    }
+  }
+}

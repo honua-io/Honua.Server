@@ -33,7 +33,7 @@ internal static class MigrationEndpointRouteBuilderExtensions
     /// - Getting details of specific migration jobs including layer progress
     /// - Cancelling running migration jobs
     ///
-    /// Supports migrating from ArcGIS Server, ArcGIS Online, and other Esri REST endpoints.
+    /// Supports migrating from ArcGIS Server, ArcGIS Online, and other Geoservices REST a.k.a. Esri REST endpoints.
     /// </remarks>
     /// <example>
     /// Example request to create a migration job:

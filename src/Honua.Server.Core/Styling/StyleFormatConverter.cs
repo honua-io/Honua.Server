@@ -725,4 +725,421 @@ public static class StyleFormatConverter
             return fraction.ToString("0.###", CultureInfo.InvariantCulture);
         }
     }
+
+    #region MapLibre Style Conversion
+
+    /// <summary>
+    /// Creates a MapLibre Style Specification v8 document from a Honua style definition
+    /// </summary>
+    public static JsonObject CreateMapLibreStyle(
+        StyleDefinition style,
+        string layerId,
+        string sourceId,
+        string? sourceLayer = null,
+        string? styleName = null)
+    {
+        Guard.NotNull(style);
+        Guard.NotNullOrWhiteSpace(layerId);
+        Guard.NotNullOrWhiteSpace(sourceId);
+
+        var mapLibreStyle = new JsonObject
+        {
+            ["version"] = 8,
+            ["name"] = styleName ?? style.Title ?? style.Id,
+            ["metadata"] = new JsonObject
+            {
+                ["honua:styleId"] = style.Id,
+                ["honua:renderer"] = style.Renderer ?? "simple"
+            }
+        };
+
+        // Create source reference (placeholder - client should populate with actual tile URL)
+        var sources = new JsonObject
+        {
+            [sourceId] = new JsonObject
+            {
+                ["type"] = "vector",
+                ["tiles"] = new JsonArray()
+            }
+        };
+        mapLibreStyle["sources"] = sources;
+
+        // Convert layers based on renderer type
+        var layers = new JsonArray();
+        var geometryType = NormalizeGeometryType(style.GeometryType);
+
+        if (style.Rules.Count > 0)
+        {
+            // Rule-based renderer - create multiple layers
+            foreach (var rule in style.Rules)
+            {
+                var layer = CreateMapLibreRuleLayer(
+                    $"{layerId}-{rule.Id}",
+                    sourceId,
+                    sourceLayer,
+                    rule,
+                    geometryType
+                );
+                layers.Add(layer);
+            }
+        }
+        else if (string.Equals(style.Renderer, "uniqueValue", StringComparison.OrdinalIgnoreCase)
+                 && style.UniqueValue is not null)
+        {
+            // Unique value renderer - single layer with match expression
+            var layer = CreateMapLibreUniqueValueLayer(
+                layerId,
+                sourceId,
+                sourceLayer,
+                style.UniqueValue,
+                geometryType
+            );
+            layers.Add(layer);
+        }
+        else
+        {
+            // Simple renderer - single layer with solid styling
+            var layer = CreateMapLibreSimpleLayer(
+                layerId,
+                sourceId,
+                sourceLayer,
+                style,
+                geometryType
+            );
+            layers.Add(layer);
+        }
+
+        mapLibreStyle["layers"] = layers;
+        return mapLibreStyle;
+    }
+
+    private static JsonObject CreateMapLibreSimpleLayer(
+        string layerId,
+        string sourceId,
+        string? sourceLayer,
+        StyleDefinition style,
+        string geometryType)
+    {
+        var symbol = ResolveSimpleSymbol(style) ?? new SimpleStyleDefinition();
+        var layerType = MapGeometryToLayerType(geometryType);
+
+        var layer = new JsonObject
+        {
+            ["id"] = layerId,
+            ["type"] = layerType,
+            ["source"] = sourceId
+        };
+
+        if (!string.IsNullOrWhiteSpace(sourceLayer))
+        {
+            layer["source-layer"] = sourceLayer;
+        }
+
+        // Create paint properties based on geometry type
+        layer["paint"] = CreateMapLibrePaint(symbol, layerType);
+
+        return layer;
+    }
+
+    private static JsonObject CreateMapLibreUniqueValueLayer(
+        string layerId,
+        string sourceId,
+        string? sourceLayer,
+        UniqueValueStyleDefinition uniqueValue,
+        string geometryType)
+    {
+        var layerType = MapGeometryToLayerType(geometryType);
+
+        var layer = new JsonObject
+        {
+            ["id"] = layerId,
+            ["type"] = layerType,
+            ["source"] = sourceId
+        };
+
+        if (!string.IsNullOrWhiteSpace(sourceLayer))
+        {
+            layer["source-layer"] = sourceLayer;
+        }
+
+        var paint = new JsonObject();
+
+        // Build match expression for fill/line/circle color
+        var colorProperty = GetColorPropertyName(layerType);
+        var matchExpression = new JsonArray { "match", new JsonArray { "get", uniqueValue.Field } };
+
+        foreach (var classItem in uniqueValue.Classes)
+        {
+            matchExpression.Add(classItem.Value);
+            var color = GetPrimaryColor(classItem.Symbol, layerType);
+            matchExpression.Add(ParseColorToHex(color));
+        }
+
+        // Default color
+        var defaultColor = uniqueValue.DefaultSymbol is not null
+            ? GetPrimaryColor(uniqueValue.DefaultSymbol, layerType)
+            : "#E0E0E0";
+        matchExpression.Add(ParseColorToHex(defaultColor));
+
+        paint[colorProperty] = matchExpression;
+
+        // Add opacity if any class has it
+        var firstSymbol = uniqueValue.Classes.FirstOrDefault()?.Symbol ?? uniqueValue.DefaultSymbol;
+        if (firstSymbol?.Opacity is double opacity)
+        {
+            var opacityProperty = GetOpacityPropertyName(layerType);
+            paint[opacityProperty] = opacity;
+        }
+
+        // Add stroke properties for fill layers
+        if (layerType == "fill" && firstSymbol?.StrokeColor.HasValue() == true)
+        {
+            paint["fill-outline-color"] = ParseColorToHex(firstSymbol.StrokeColor);
+        }
+
+        // Add line width for line layers
+        if (layerType == "line" && firstSymbol?.StrokeWidth is double lineWidth)
+        {
+            paint["line-width"] = lineWidth;
+        }
+
+        // Add circle properties
+        if (layerType == "circle")
+        {
+            if (firstSymbol?.Size is double size)
+            {
+                paint["circle-radius"] = size / 2; // Honua size is diameter, MapLibre uses radius
+            }
+            if (firstSymbol?.StrokeColor.HasValue() == true)
+            {
+                paint["circle-stroke-color"] = ParseColorToHex(firstSymbol.StrokeColor);
+            }
+            if (firstSymbol?.StrokeWidth is double strokeWidth)
+            {
+                paint["circle-stroke-width"] = strokeWidth;
+            }
+        }
+
+        layer["paint"] = paint;
+        return layer;
+    }
+
+    private static JsonObject CreateMapLibreRuleLayer(
+        string layerId,
+        string sourceId,
+        string? sourceLayer,
+        StyleRuleDefinition rule,
+        string geometryType)
+    {
+        var layerType = MapGeometryToLayerType(geometryType);
+
+        var layer = new JsonObject
+        {
+            ["id"] = layerId,
+            ["type"] = layerType,
+            ["source"] = sourceId
+        };
+
+        if (!string.IsNullOrWhiteSpace(sourceLayer))
+        {
+            layer["source-layer"] = sourceLayer;
+        }
+
+        // Add filter if rule has one
+        if (rule.Filter is { Field: var field, Value: var value })
+        {
+            layer["filter"] = new JsonArray { "==", new JsonArray { "get", field }, value };
+        }
+
+        // Add zoom constraints (scale to zoom conversion)
+        if (rule.MinScale.HasValue)
+        {
+            layer["minzoom"] = ScaleDenominatorToZoom(rule.MinScale.Value);
+        }
+        if (rule.MaxScale.HasValue)
+        {
+            layer["maxzoom"] = ScaleDenominatorToZoom(rule.MaxScale.Value);
+        }
+
+        // Create paint properties
+        layer["paint"] = CreateMapLibrePaint(rule.Symbolizer, layerType);
+
+        return layer;
+    }
+
+    private static JsonObject CreateMapLibrePaint(
+        SimpleStyleDefinition symbol,
+        string layerType)
+    {
+        var paint = new JsonObject();
+
+        switch (layerType)
+        {
+            case "fill":
+                if (!string.IsNullOrWhiteSpace(symbol.FillColor))
+                {
+                    paint["fill-color"] = ParseColorToHex(symbol.FillColor);
+                }
+                if (symbol.Opacity.HasValue)
+                {
+                    paint["fill-opacity"] = symbol.Opacity.Value;
+                }
+                if (!string.IsNullOrWhiteSpace(symbol.StrokeColor))
+                {
+                    paint["fill-outline-color"] = ParseColorToHex(symbol.StrokeColor);
+                }
+                break;
+
+            case "line":
+                if (!string.IsNullOrWhiteSpace(symbol.StrokeColor))
+                {
+                    paint["line-color"] = ParseColorToHex(symbol.StrokeColor);
+                }
+                if (symbol.StrokeWidth.HasValue)
+                {
+                    paint["line-width"] = symbol.StrokeWidth.Value;
+                }
+                if (symbol.Opacity.HasValue)
+                {
+                    paint["line-opacity"] = symbol.Opacity.Value;
+                }
+                break;
+
+            case "circle":
+                if (symbol.Size.HasValue)
+                {
+                    paint["circle-radius"] = symbol.Size.Value / 2; // Convert diameter to radius
+                }
+                if (!string.IsNullOrWhiteSpace(symbol.FillColor))
+                {
+                    paint["circle-color"] = ParseColorToHex(symbol.FillColor);
+                }
+                if (symbol.Opacity.HasValue)
+                {
+                    paint["circle-opacity"] = symbol.Opacity.Value;
+                }
+                if (!string.IsNullOrWhiteSpace(symbol.StrokeColor))
+                {
+                    paint["circle-stroke-color"] = ParseColorToHex(symbol.StrokeColor);
+                }
+                if (symbol.StrokeWidth.HasValue)
+                {
+                    paint["circle-stroke-width"] = symbol.StrokeWidth.Value;
+                }
+                break;
+
+            case "raster":
+                if (symbol.Opacity.HasValue)
+                {
+                    paint["raster-opacity"] = symbol.Opacity.Value;
+                }
+                break;
+        }
+
+        return paint;
+    }
+
+    private static string MapGeometryToLayerType(string geometryType)
+    {
+        return geometryType switch
+        {
+            "point" => "circle",
+            "line" => "line",
+            "polygon" => "fill",
+            "raster" => "raster",
+            _ => "fill"
+        };
+    }
+
+    private static string GetColorPropertyName(string layerType)
+    {
+        return layerType switch
+        {
+            "fill" => "fill-color",
+            "line" => "line-color",
+            "circle" => "circle-color",
+            "raster" => "raster-color",
+            _ => "fill-color"
+        };
+    }
+
+    private static string GetOpacityPropertyName(string layerType)
+    {
+        return layerType switch
+        {
+            "fill" => "fill-opacity",
+            "line" => "line-opacity",
+            "circle" => "circle-opacity",
+            "raster" => "raster-opacity",
+            _ => "fill-opacity"
+        };
+    }
+
+    private static string GetPrimaryColor(SimpleStyleDefinition symbol, string layerType)
+    {
+        return layerType switch
+        {
+            "line" => symbol.StrokeColor ?? "#000000",
+            _ => symbol.FillColor ?? "#000000"
+        };
+    }
+
+    private static string ParseColorToHex(string? color)
+    {
+        if (string.IsNullOrWhiteSpace(color))
+            return "#000000";
+
+        var hex = color.Trim();
+        if (!hex.StartsWith('#'))
+            return "#000000";
+
+        // Remove alpha channel if present (MapLibre uses separate opacity properties)
+        if (hex.Length == 9)
+        {
+            return hex[..7]; // Keep only #RRGGBB
+        }
+
+        return hex.Length == 7 ? hex : "#000000";
+    }
+
+    /// <summary>
+    /// Converts OGC scale denominator to approximate MapLibre zoom level
+    /// Based on standard web mercator tile pyramid
+    /// </summary>
+    private static int ScaleDenominatorToZoom(double scaleDenominator)
+    {
+        // Web Mercator zoom levels approximate scale denominators:
+        // z0: 559,082,264  z1: 279,541,132  z2: 139,770,566  z3: 69,885,283
+        // z4: 34,942,642   z5: 17,471,321   z6: 8,735,660    z7: 4,367,830
+        // z8: 2,183,915    z9: 1,091,958    z10: 545,979     z11: 272,989
+        // z12: 136,495     z13: 68,247      z14: 34,124      z15: 17,062
+        // z16: 8,531       z17: 4,265       z18: 2,133       z19: 1,066
+        // z20: 533         z21: 267         z22: 133
+
+        if (scaleDenominator >= 279_541_132) return 0;
+        if (scaleDenominator >= 139_770_566) return 1;
+        if (scaleDenominator >= 69_885_283) return 2;
+        if (scaleDenominator >= 34_942_642) return 3;
+        if (scaleDenominator >= 17_471_321) return 4;
+        if (scaleDenominator >= 8_735_660) return 5;
+        if (scaleDenominator >= 4_367_830) return 6;
+        if (scaleDenominator >= 2_183_915) return 7;
+        if (scaleDenominator >= 1_091_958) return 8;
+        if (scaleDenominator >= 545_979) return 9;
+        if (scaleDenominator >= 272_989) return 10;
+        if (scaleDenominator >= 136_495) return 11;
+        if (scaleDenominator >= 68_247) return 12;
+        if (scaleDenominator >= 34_124) return 13;
+        if (scaleDenominator >= 17_062) return 14;
+        if (scaleDenominator >= 8_531) return 15;
+        if (scaleDenominator >= 4_265) return 16;
+        if (scaleDenominator >= 2_133) return 17;
+        if (scaleDenominator >= 1_066) return 18;
+        if (scaleDenominator >= 533) return 19;
+        if (scaleDenominator >= 267) return 20;
+        if (scaleDenominator >= 133) return 21;
+        return 22;
+    }
+
+    #endregion
 }

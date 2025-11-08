@@ -1,0 +1,381 @@
+@*
+    Copyright (c) 2025 HonuaIO
+    Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+
+    Example component demonstrating HonuaMapLibre usage
+*@
+
+@page "/map/maplibre-example"
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Models
+@using Honua.Server.Core.LocationServices
+@inject IBasemapTileProvider? BasemapProvider
+
+<div class="maplibre-example">
+    <h1>HonuaMapLibre Example</h1>
+
+    <div class="controls-panel">
+        <button @onclick="FlyToSanFrancisco">Fly to San Francisco</button>
+        <button @onclick="FlyToNewYork">Fly to New York</button>
+        <button @onclick="AddMarker">Add Marker</button>
+        <button @onclick="RemoveMarker">Remove Marker</button>
+        <button @onclick="ToggleLayer">Toggle Layer</button>
+        <button @onclick="ChangeStyle">Change Style</button>
+        <button @onclick="LoadGeoJsonData">Load GeoJSON</button>
+        <button @onclick="QueryFeatures">Query Features</button>
+    </div>
+
+    <div class="map-container">
+        <HonuaMapLibre @ref="_map"
+                      Configuration="@_mapConfig"
+                      Height="600px"
+                      Width="100%"
+                      OnMapLoad="HandleMapLoad"
+                      OnMapClick="HandleMapClick"
+                      OnMapMove="HandleMapMove"
+                      OnViewportChange="HandleViewportChange"
+                      OnError="HandleError" />
+    </div>
+
+    <div class="info-panel">
+        <h3>Map Status</h3>
+        <p><strong>Status:</strong> @_status</p>
+        <p><strong>Center:</strong> @(_center ?? "N/A")</p>
+        <p><strong>Zoom:</strong> @_zoom</p>
+        <p><strong>Features Clicked:</strong> @_featuresClicked</p>
+        <p><strong>Last Event:</strong> @_lastEvent</p>
+
+        @if (_availableTilesets != null && _availableTilesets.Any())
+        {
+            <h4>Available Tilesets</h4>
+            <ul>
+                @foreach (var tileset in _availableTilesets)
+                {
+                    <li>@tileset.Name (@tileset.Format)</li>
+                }
+            </ul>
+        }
+    </div>
+</div>
+
+@code {
+    private HonuaMapLibre? _map;
+    private MapConfiguration _mapConfig = new()
+    {
+        Name = "Example Map",
+        Settings = new MapSettings
+        {
+            Style = "https://demotiles.maplibre.org/style.json",
+            Center = new[] { -122.4194, 37.7749 }, // San Francisco
+            Zoom = 12,
+            Pitch = 0,
+            Bearing = 0
+        }
+    };
+
+    private string _status = "Initializing...";
+    private string? _center;
+    private double _zoom = 0;
+    private int _featuresClicked = 0;
+    private string _lastEvent = "None";
+    private string? _currentMarkerId;
+    private bool _layerVisible = true;
+    private bool _usingDemoStyle = true;
+    private IReadOnlyList<Server.Core.LocationServices.Models.BasemapTileset>? _availableTilesets;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (BasemapProvider != null)
+        {
+            try
+            {
+                _availableTilesets = await BasemapProvider.GetAvailableTilesetsAsync();
+                _status = $"BasemapProvider available with {_availableTilesets.Count} tilesets";
+            }
+            catch (Exception ex)
+            {
+                _status = $"BasemapProvider error: {ex.Message}";
+            }
+        }
+    }
+
+    private void HandleMapLoad(MapLibreViewport viewport)
+    {
+        _status = "Map Loaded";
+        _center = $"{viewport.Center[0]:F4}, {viewport.Center[1]:F4}";
+        _zoom = viewport.Zoom;
+        _lastEvent = "Load";
+        StateHasChanged();
+    }
+
+    private void HandleMapClick(MapClickEventArgs args)
+    {
+        _center = $"{args.LngLat[0]:F4}, {args.LngLat[1]:F4}";
+        _featuresClicked = args.Features?.Count ?? 0;
+        _lastEvent = "Click";
+        StateHasChanged();
+    }
+
+    private void HandleMapMove(MapMoveEventArgs args)
+    {
+        _center = $"{args.Center[0]:F4}, {args.Center[1]:F4}";
+        _zoom = args.Zoom;
+        _lastEvent = "Move";
+        StateHasChanged();
+    }
+
+    private void HandleViewportChange(ViewportChangeEventArgs args)
+    {
+        _lastEvent = $"Viewport Change ({args.EventType})";
+        StateHasChanged();
+    }
+
+    private void HandleError(string error)
+    {
+        _status = $"Error: {error}";
+        _lastEvent = "Error";
+        StateHasChanged();
+    }
+
+    private async Task FlyToSanFrancisco()
+    {
+        if (_map != null)
+        {
+            await _map.FlyToAsync(new[] { -122.4194, 37.7749 }, zoom: 14, duration: 2000);
+            _lastEvent = "Fly to San Francisco";
+        }
+    }
+
+    private async Task FlyToNewYork()
+    {
+        if (_map != null)
+        {
+            await _map.FlyToAsync(new[] { -73.9352, 40.7306 }, zoom: 12, duration: 2000);
+            _lastEvent = "Fly to New York";
+        }
+    }
+
+    private async Task AddMarker()
+    {
+        if (_map != null)
+        {
+            var center = await _map.GetCenterAsync();
+            if (center != null)
+            {
+                var marker = new MapLibreMarker
+                {
+                    Position = center,
+                    Color = "#FF0000",
+                    Draggable = true,
+                    Popup = new MapLibrePopup
+                    {
+                        Html = $"<h3>Custom Marker</h3><p>Location: {center[0]:F4}, {center[1]:F4}</p>",
+                        CloseButton = true
+                    }
+                };
+
+                _currentMarkerId = await _map.AddMarkerAsync(marker);
+                _lastEvent = "Marker Added";
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task RemoveMarker()
+    {
+        if (_map != null && !string.IsNullOrEmpty(_currentMarkerId))
+        {
+            await _map.RemoveMarkerAsync(_currentMarkerId);
+            _currentMarkerId = null;
+            _lastEvent = "Marker Removed";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleLayer()
+    {
+        if (_map != null)
+        {
+            _layerVisible = !_layerVisible;
+            // This would toggle a specific layer if you have one added
+            _lastEvent = $"Layer {(_layerVisible ? "Shown" : "Hidden")}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ChangeStyle()
+    {
+        if (_map != null)
+        {
+            if (_usingDemoStyle)
+            {
+                // Try to use basemap provider if available
+                if (_availableTilesets != null && _availableTilesets.Any())
+                {
+                    var firstTileset = _availableTilesets.First();
+                    await _map.SetStyleAsync($"tileset://{BasemapProvider?.ProviderKey}/{firstTileset.Id}");
+                    _lastEvent = $"Changed to {firstTileset.Name}";
+                }
+            }
+            else
+            {
+                await _map.SetStyleAsync("https://demotiles.maplibre.org/style.json");
+                _lastEvent = "Changed to Demo Style";
+            }
+
+            _usingDemoStyle = !_usingDemoStyle;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadGeoJsonData()
+    {
+        if (_map != null)
+        {
+            var geoJson = new
+            {
+                type = "FeatureCollection",
+                features = new[]
+                {
+                    new
+                    {
+                        type = "Feature",
+                        geometry = new
+                        {
+                            type = "Point",
+                            coordinates = new[] { -122.4194, 37.7749 }
+                        },
+                        properties = new { name = "San Francisco", population = 883305 }
+                    },
+                    new
+                    {
+                        type = "Feature",
+                        geometry = new
+                        {
+                            type = "Point",
+                            coordinates = new[] { -73.9352, 40.7306 }
+                        },
+                        properties = new { name = "New York", population = 8336817 }
+                    },
+                    new
+                    {
+                        type = "Feature",
+                        geometry = new
+                        {
+                            type = "Point",
+                            coordinates = new[] { -118.2437, 34.0522 }
+                        },
+                        properties = new { name = "Los Angeles", population = 3979576 }
+                    }
+                }
+            };
+
+            var layer = new MapLibreLayer
+            {
+                Id = "cities",
+                Type = "circle",
+                Paint = new Dictionary<string, object>
+                {
+                    ["circle-radius"] = 8,
+                    ["circle-color"] = "#FF6B6B",
+                    ["circle-stroke-width"] = 2,
+                    ["circle-stroke-color"] = "#FFFFFF"
+                }
+            };
+
+            await _map.LoadGeoJsonAsync("cities-source", geoJson, layer);
+            _lastEvent = "GeoJSON Loaded (3 cities)";
+            StateHasChanged();
+        }
+    }
+
+    private async Task QueryFeatures()
+    {
+        if (_map != null)
+        {
+            var center = await _map.GetCenterAsync();
+            if (center != null)
+            {
+                // Query features at the center point (this would be screen coordinates in a real scenario)
+                var features = await _map.QueryRenderedFeaturesAsync(new[] { 0.0, 0.0 });
+                _featuresClicked = features?.Count ?? 0;
+                _lastEvent = $"Queried {_featuresClicked} features";
+                StateHasChanged();
+            }
+        }
+    }
+}
+
+<style>
+    .maplibre-example {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .controls-panel {
+        margin-bottom: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .controls-panel button {
+        padding: 10px 20px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.2s;
+    }
+
+    .controls-panel button:hover {
+        background-color: #2980b9;
+    }
+
+    .controls-panel button:active {
+        background-color: #1c598a;
+    }
+
+    .map-container {
+        margin-bottom: 20px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .info-panel {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+
+    .info-panel h3 {
+        margin-top: 0;
+        color: #2c3e50;
+    }
+
+    .info-panel h4 {
+        color: #34495e;
+        margin-top: 15px;
+    }
+
+    .info-panel p {
+        margin: 10px 0;
+        color: #555;
+    }
+
+    .info-panel ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .info-panel li {
+        padding: 5px 0;
+        color: #666;
+    }
+</style>

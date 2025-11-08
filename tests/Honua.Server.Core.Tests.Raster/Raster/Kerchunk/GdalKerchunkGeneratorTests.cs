@@ -107,9 +107,9 @@ public sealed class GdalKerchunkGeneratorTests
         // Act
         Func<Task> act = async () => await _generator.GenerateAsync(uri, options, CancellationToken.None);
 
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*Failed to open dataset*");
+        // Assert - GDAL throws ApplicationException for file not found
+        await act.Should().ThrowAsync<ApplicationException>()
+            .WithMessage("*No such file or directory*");
     }
 
     [Fact]

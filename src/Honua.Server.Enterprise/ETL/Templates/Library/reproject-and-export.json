@@ -1,0 +1,102 @@
+{
+  "id": "reproject-and-export",
+  "name": "Reproject and Export",
+  "description": "Change coordinate reference system (CRS) and export to target format. Essential for coordinate system transformations.",
+  "category": "Data Import/Export",
+  "icon": "globe",
+  "difficulty": 0,
+  "estimatedMinutes": 2,
+  "tags": ["reproject", "crs", "transform", "coordinate-system"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "Features in any CRS"
+  ],
+  "expectedOutputs": [
+    "Reprojected features in target CRS"
+  ],
+  "useCases": [
+    "Converting from WGS84 to local projection",
+    "Preparing data for specific applications",
+    "Standardizing coordinate systems"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Features",
+      "description": "Read source features",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "features_wgs84",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "reproject",
+      "name": "Reproject",
+      "description": "Transform coordinates",
+      "parameters": {
+        "sourceSrid": 4326,
+        "targetSrid": 3857
+      },
+      "position": {
+        "x": 300,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "geopackage_sink",
+      "name": "Export Reprojected",
+      "description": "Save in new CRS",
+      "parameters": {
+        "filePath": "/data/output/reprojected.gpkg",
+        "layerName": "features",
+        "overwrite": true
+      },
+      "position": {
+        "x": 500,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "Input features table",
+      "defaultValue": "features_wgs84",
+      "required": true
+    },
+    "targetSrid": {
+      "name": "targetSrid",
+      "type": "number",
+      "description": "Target SRID (e.g., 3857, 4326)",
+      "defaultValue": 3857,
+      "required": true
+    },
+    "outputPath": {
+      "name": "outputPath",
+      "type": "string",
+      "description": "Output file path",
+      "defaultValue": "/data/output/reprojected.gpkg",
+      "required": true
+    }
+  }
+}

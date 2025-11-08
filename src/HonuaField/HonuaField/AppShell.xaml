@@ -5,57 +5,130 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:HonuaField"
     xmlns:views="clr-namespace:HonuaField.Views"
-    Shell.FlyoutBehavior="Disabled"
-    Title="Honua Field">
+    xmlns:viewmodels="clr-namespace:HonuaField.ViewModels"
+    x:DataType="viewmodels:AppShellViewModel"
+    Title="Honua Field"
+    FlyoutBackgroundColor="{StaticResource BackgroundPrimary}">
 
-    <!--
-        The overall app visual hierarchy is defined here, along with navigation behavior and routes.
+    <!-- FlyoutHeader with user profile -->
+    <Shell.FlyoutHeader>
+        <Grid Padding="20"
+              BackgroundColor="{StaticResource PrimaryBlue}"
+              HeightRequest="200">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        https://learn.microsoft.com/dotnet/maui/fundamentals/shell/
-    -->
+            <!-- App Title -->
+            <Label Grid.Row="0"
+                   Text="Honua Field"
+                   Style="{StaticResource H3}"
+                   TextColor="{StaticResource White}"
+                   Margin="0,0,0,16" />
 
-    <!-- Authentication Pages (No TabBar) -->
-    <ShellContent
-        x:Name="LoginShellContent"
-        Title="Login"
-        ContentTemplate="{DataTemplate views:LoginPage}"
-        Route="Login"
-        Shell.NavBarIsVisible="False"
-        Shell.FlyoutBehavior="Disabled" />
+            <!-- User Avatar/Initials -->
+            <Frame Grid.Row="1"
+                   WidthRequest="80"
+                   HeightRequest="80"
+                   CornerRadius="40"
+                   BackgroundColor="{StaticResource White}"
+                   Padding="0"
+                   HasShadow="False"
+                   HorizontalOptions="Start"
+                   VerticalOptions="Center">
+                <Label Text="{Binding UserInitials}"
+                       Style="{StaticResource H2}"
+                       TextColor="{StaticResource PrimaryBlue}"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center" />
+            </Frame>
 
-    <ShellContent
-        x:Name="OnboardingShellContent"
-        Title="Welcome"
-        ContentTemplate="{DataTemplate views:OnboardingPage}"
-        Route="Onboarding"
-        Shell.NavBarIsVisible="False"
-        Shell.FlyoutBehavior="Disabled" />
+            <!-- User Info -->
+            <VerticalStackLayout Grid.Row="2" Spacing="4">
+                <Label Text="{Binding Username}"
+                       Style="{StaticResource BodyLarge}"
+                       TextColor="{StaticResource White}"
+                       FontAttributes="Bold" />
+                <Label Text="{Binding Email}"
+                       Style="{StaticResource BodySmall}"
+                       TextColor="{StaticResource White}"
+                       Opacity="0.9" />
 
-    <!-- Main App (With TabBar) -->
-    <TabBar Route="Main">
-        <ShellContent
-            Title="Map"
-            ContentTemplate="{DataTemplate views:MapPage}"
-            Route="Map"
-            Icon="{FontImage Glyph='🗺️', FontFamily='OpenSansRegular', Size=30}" />
+                <!-- Sync Status -->
+                <HorizontalStackLayout Spacing="8" Margin="0,8,0,0">
+                    <ActivityIndicator IsRunning="{Binding IsSyncing}"
+                                     IsVisible="{Binding IsSyncing}"
+                                     Color="{StaticResource White}"
+                                     WidthRequest="16"
+                                     HeightRequest="16"
+                                     VerticalOptions="Center" />
+                    <Label Text="{Binding SyncStatusText}"
+                           Style="{StaticResource CaptionText}"
+                           TextColor="{StaticResource White}"
+                           VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Grid>
+    </Shell.FlyoutHeader>
 
-        <ShellContent
-            Title="Features"
-            ContentTemplate="{DataTemplate views:FeatureListPage}"
-            Route="Features"
-            Icon="{FontImage Glyph='📍', FontFamily='OpenSansRegular', Size=30}" />
+    <!-- FlyoutFooter with Logout -->
+    <Shell.FlyoutFooter>
+        <VerticalStackLayout Padding="16" Spacing="8">
+            <BoxView HeightRequest="1" Color="{StaticResource BorderDefault}" />
+            <Button Text="Logout"
+                    Style="{StaticResource DangerButton}"
+                    Command="{Binding LogoutCommand}" />
+            <Label Text="{Binding Source={x:Static local:AppInfo.Current}, Path=VersionString, StringFormat='Version {0}'}"
+                   Style="{StaticResource CaptionText}"
+                   HorizontalOptions="Center"
+                   Margin="0,8,0,0" />
+        </VerticalStackLayout>
+    </Shell.FlyoutFooter>
 
-        <ShellContent
-            Title="Sync"
-            ContentTemplate="{DataTemplate views:SyncPage}"
-            Route="Sync"
-            Icon="{FontImage Glyph='🔄', FontFamily='OpenSansRegular', Size=30}" />
+    <!-- Main App Navigation -->
+    <FlyoutItem Title="Home" Icon="🏠">
+        <ShellContent Title="Dashboard"
+                      ContentTemplate="{DataTemplate views:MainPage}"
+                      Route="Main" />
+    </FlyoutItem>
 
-        <ShellContent
-            Title="Settings"
-            ContentTemplate="{DataTemplate views:SettingsPage}"
-            Route="Settings"
-            Icon="{FontImage Glyph='⚙️', FontFamily='OpenSansRegular', Size=30}" />
-    </TabBar>
+    <FlyoutItem Title="Map" Icon="🗺️">
+        <ShellContent Title="Map"
+                      ContentTemplate="{DataTemplate views:MapPage}"
+                      Route="Map" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Features" Icon="📍">
+        <ShellContent Title="Features"
+                      ContentTemplate="{DataTemplate views:FeatureListPage}"
+                      Route="Features" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Profile" Icon="👤">
+        <ShellContent Title="Profile"
+                      ContentTemplate="{DataTemplate views:ProfilePage}"
+                      Route="Profile" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Settings" Icon="⚙️">
+        <ShellContent Title="Settings"
+                      ContentTemplate="{DataTemplate views:SettingsPage}"
+                      Route="Settings" />
+    </FlyoutItem>
+
+    <!-- Menu Items -->
+    <MenuItem Text="Sync Now"
+              Command="{Binding TriggerSyncCommand}"
+              IconImageSource="sync.png" />
+
+    <MenuItem Text="Help"
+              Command="{Binding ShowHelpCommand}"
+              IconImageSource="help.png" />
+
+    <MenuItem Text="About"
+              Command="{Binding ShowAboutCommand}"
+              IconImageSource="info.png" />
 
 </Shell>

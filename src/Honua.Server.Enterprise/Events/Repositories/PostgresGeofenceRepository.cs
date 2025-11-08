@@ -100,6 +100,37 @@ public class PostgresGeofenceRepository : IGeofenceRepository
         return result != null ? MapToGeofence(result) : null;
     }
 
+    public async Task<List<Geofence>> GetByIdsAsync(IEnumerable<Guid> ids, string? tenantId = null, CancellationToken cancellationToken = default)
+    {
+        var idsList = ids.ToList();
+        if (!idsList.Any())
+        {
+            return new List<Geofence>();
+        }
+
+        var sql = @"
+            SELECT
+                id, name, description,
+                ST_AsBinary(geometry) as geometry_wkb,
+                properties, enabled_event_types, is_active, tenant_id,
+                created_at, updated_at, created_by, updated_by
+            FROM geofences
+            WHERE id = ANY(@Ids)";
+
+        if (!string.IsNullOrEmpty(tenantId))
+        {
+            sql += " AND tenant_id = @TenantId";
+        }
+
+        using var connection = new NpgsqlConnection(_connectionString);
+
+        var results = await connection.QueryAsync<GeofenceDto>(
+            sql,
+            new { Ids = idsList.ToArray(), TenantId = tenantId });
+
+        return results.Select(MapToGeofence).ToList();
+    }
+
     public async Task<List<Geofence>> GetAllAsync(
         bool? isActive = null,
         string? tenantId = null,

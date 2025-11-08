@@ -257,15 +257,41 @@ internal static class StacApiMapper
     {
         var properties = CloneObject(record.Properties);
 
+        // Per STAC spec, items must have either:
+        // 1. A datetime field with a valid datetime value, OR
+        // 2. Both start_datetime and end_datetime fields with datetime explicitly set to null
+
+        // Always remove any existing datetime fields from properties to avoid conflicts
+        // These will be set from the record fields below
+        properties.Remove("datetime");
+        properties.Remove("start_datetime");
+        properties.Remove("end_datetime");
+
         if (record.Datetime.HasValue)
         {
+            // Case 1: Single datetime value
             properties["datetime"] = record.Datetime.Value.ToString("O");
         }
-
-        if (record.StartDatetime.HasValue || record.EndDatetime.HasValue)
+        else if (record.StartDatetime.HasValue && record.EndDatetime.HasValue)
         {
-            properties["start_datetime"] = record.StartDatetime?.ToString("O");
-            properties["end_datetime"] = record.EndDatetime?.ToString("O");
+            // Case 2: Date range with start and end - datetime must be explicitly null per STAC spec
+            properties["datetime"] = null;
+            properties["start_datetime"] = record.StartDatetime.Value.ToString("O");
+            properties["end_datetime"] = record.EndDatetime.Value.ToString("O");
+        }
+        else if (record.StartDatetime.HasValue || record.EndDatetime.HasValue)
+        {
+            // Case 3: Only one of start/end is present - use it as datetime
+            // This handles edge cases where data might have incomplete temporal info
+            var fallbackDatetime = record.StartDatetime ?? record.EndDatetime;
+            properties["datetime"] = fallbackDatetime!.Value.ToString("O");
+        }
+        else
+        {
+            // Case 4: No temporal information available in record fields
+            // Check if datetime was already in the properties JSON blob
+            // If not, use Unix epoch as a fallback to indicate unknown acquisition time
+            properties["datetime"] = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero).ToString("O");
         }
 
         return properties;

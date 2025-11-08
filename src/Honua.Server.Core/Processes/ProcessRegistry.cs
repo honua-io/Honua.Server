@@ -29,6 +29,7 @@ internal sealed class ProcessRegistry : IProcessRegistry
 
     public void RegisterProcess(IProcess process)
     {
+        ArgumentNullException.ThrowIfNull(process);
         _processes[process.Description.Id] = process;
     }
 }

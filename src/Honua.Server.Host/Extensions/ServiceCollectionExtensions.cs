@@ -66,6 +66,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Ogc.Services.OgcLinkBuilder>();
         services.AddSingleton<Ogc.Services.OgcParameterParser>();
 
+        // Register additional OGC service layer components (Phase 1-4 refactoring)
+        services.AddSingleton<Ogc.Services.IOgcCollectionResolver, Ogc.Services.OgcCollectionResolver>();
+        services.AddSingleton<Ogc.Services.IOgcFeaturesGeoJsonHandler, Ogc.Services.OgcFeaturesGeoJsonHandler>();
+        services.AddSingleton<Ogc.Services.IOgcFeaturesQueryHandler, Ogc.Services.OgcFeaturesQueryHandler>();
+        services.AddSingleton<Ogc.Services.IOgcFeaturesEditingHandler, Ogc.Services.OgcFeaturesEditingHandler>();
+        services.AddSingleton<Ogc.Services.IOgcFeaturesAttachmentHandler, Ogc.Services.OgcFeaturesAttachmentHandler>();
+        services.AddSingleton<Ogc.Services.IOgcTilesHandler, Ogc.Services.OgcTilesHandler>();
+        services.AddSingleton<Ogc.Services.IOgcFeaturesRenderingHandler, Ogc.Services.OgcFeaturesRenderingHandler>();
+
         // Register WMS options with validation for memory management and limits
         services.AddOptions<WmsOptions>()
             .Bind(configuration.GetSection(WmsOptions.SectionName))
@@ -203,6 +212,32 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IRasterTileCacheMetrics, RasterTileCacheMetrics>();
 
+        // Register raster tile cache provider factory and provider
+        services.AddSingleton<Honua.Server.Core.Raster.Caching.IRasterTileCacheProviderFactory, Honua.Server.Core.Raster.Caching.RasterTileCacheProviderFactory>();
+        services.AddSingleton<Honua.Server.Core.Raster.Caching.IRasterTileCacheProvider>(sp =>
+        {
+            var factory = sp.GetRequiredService<Honua.Server.Core.Raster.Caching.IRasterTileCacheProviderFactory>();
+            var configService = sp.GetRequiredService<IHonuaConfigurationService>();
+            var rasterTileCacheConfig = configService.Current.Services.RasterTiles;
+            return factory.Create(rasterTileCacheConfig);
+        });
+
+        // Register raster source providers (required by IRasterSourceProviderRegistry)
+        // Only register providers without external dependencies for now
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.FileSystemRasterSourceProvider>();
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProvider, Honua.Server.Core.Raster.Sources.HttpRasterSourceProvider>();
+        // Cloud providers (S3, Azure, GCS) require their respective cloud SDK services to be registered first
+        // TODO: Register cloud raster source providers when cloud storage is configured
+
+        // Register raster source provider registry (required by IRasterRenderer)
+        services.AddSingleton<Honua.Server.Core.Raster.Sources.IRasterSourceProviderRegistry, Honua.Server.Core.Raster.Sources.RasterSourceProviderRegistry>();
+
+        // Register raster metadata cache (required by IRasterRenderer)
+        services.AddSingleton<Honua.Server.Core.Raster.RasterMetadataCache>();
+
+        // Register raster renderer (required by WMS/WCS)
+        services.AddSingleton<Honua.Server.Core.Raster.Rendering.IRasterRenderer, Honua.Server.Core.Raster.Rendering.SkiaSharpRasterRenderer>();
+
         // Register data ingestion service (BackgroundService)
         services.AddSingleton<Honua.Server.Core.Raster.Import.DataIngestionService>();
         services.AddSingleton<Honua.Server.Core.Raster.Import.IDataIngestionService>(sp =>
@@ -210,7 +245,11 @@ public static class ServiceCollectionExtensions
         services.AddHostedService(sp =>
             sp.GetRequiredService<Honua.Server.Core.Raster.Import.DataIngestionService>());
 
-        // TODO: RasterTilePreseedService has unregistered dependencies (IRasterRenderer, IRasterTileCacheProvider)
+        // Register export services
+        services.AddSingleton<Honua.Server.Core.Raster.Export.IGeoArrowExporter, Honua.Server.Core.Raster.Export.GeoArrowExporter>();
+        services.AddSingleton<Honua.Server.Core.Raster.Export.IGeoParquetExporter, Honua.Server.Core.Raster.Export.GeoParquetExporter>();
+
+        // TODO: RasterTilePreseedService has unregistered dependencies (IRasterTileCacheProvider)
         // Commenting out until Core.Raster services are properly registered
         // services.AddSingleton<RasterTilePreseedService>();
         // services.AddSingleton<IRasterTilePreseedService>(sp => sp.GetRequiredService<RasterTilePreseedService>());

@@ -53,6 +53,9 @@ internal static class VersionedEndpointExtensions
         // Create the v1 route group for all current API endpoints
         var v1 = app.MapGroup($"/{ApiVersioning.CurrentVersion}");
 
+        // Map top-level conformance endpoint (for OGC API compliance)
+        v1.MapGet("/conformance", Honua.Server.Host.Ogc.OgcLandingHandlers.GetConformance).AllowAnonymous();
+
         // Map OGC and geospatial API endpoints under /v1
         var configService = app.Services.GetService<IHonuaConfigurationService>();
 
@@ -189,6 +192,7 @@ internal static class VersionedEndpointExtensions
         group.MapVectorTilePreseedEndpoints();
         group.MapTracingConfiguration();
         group.MapDegradationStatusEndpoints();
+        group.MapGeofenceAlertAdministrationEndpoints();
 
         return group;
     }

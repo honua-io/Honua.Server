@@ -499,9 +499,9 @@ public static class Program
         services.AddSingleton<ILlmProvider>(sp =>
         {
             var factory = sp.GetRequiredService<ILlmProviderFactory>();
+            var logger = sp.GetRequiredService<ILogger<ResilientLlmProvider>>();
             var primary = factory.CreatePrimary();
-            var fallback = factory.CreateFallback();
-            return new ResilientLlmProvider(primary, fallback);
+            return new ResilientLlmProvider(primary, logger);
         });
 
         // Register Embedding Provider

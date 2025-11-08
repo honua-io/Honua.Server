@@ -5,13 +5,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Attachments;
 using Honua.Server.Core.Data;
+using Honua.Server.Core.Editing;
 using Honua.Server.Core.Export;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Query;
+using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Raster.Export;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Raster.Caching;
 using Honua.Server.Core.Tests.Shared;
 using Honua.Server.Host.Ogc;
+using Honua.Server.Host.Ogc.Services;
 using Honua.Server.Host.Raster;
 using NetTopologySuite.Geometries;
 using NtsGeometry = NetTopologySuite.Geometries.Geometry;
@@ -338,6 +342,30 @@ internal static class OgcTestUtilities
     }
 
     /// <summary>
+    /// Creates a stub OGC features attachment handler for testing.
+    /// </summary>
+    internal static IOgcFeaturesAttachmentHandler CreateOgcFeaturesAttachmentHandlerStub()
+    {
+        return new StubOgcFeaturesAttachmentHandler();
+    }
+
+    /// <summary>
+    /// Creates a stub OGC features editing handler for testing.
+    /// </summary>
+    internal static IOgcFeaturesEditingHandler CreateOgcFeaturesEditingHandlerStub()
+    {
+        return new StubOgcFeaturesEditingHandler();
+    }
+
+    /// <summary>
+    /// Creates a stub OGC tiles handler for testing.
+    /// </summary>
+    internal static Host.Ogc.Services.IOgcTilesHandler CreateOgcTilesHandlerStub()
+    {
+        return new StubOgcTilesHandler();
+    }
+
+    /// <summary>
     /// Creates a test HTTP context with the specified path and query string.
     /// </summary>
     /// <param name="path">The request path (e.g., "/ogc/collections/roads::roads-primary/items").</param>
@@ -584,6 +612,233 @@ internal static class OgcTestUtilities
             CancellationToken cancellationToken)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    private sealed class StubOgcFeaturesAttachmentHandler : IOgcFeaturesAttachmentHandler
+    {
+        public bool ShouldExposeAttachmentLinks(ServiceDefinition service, LayerDefinition layer)
+        {
+            return false;
+        }
+
+        public Task<IReadOnlyList<OgcLink>> CreateAttachmentLinksAsync(
+            HttpRequest request,
+            ServiceDefinition service,
+            LayerDefinition layer,
+            string collectionId,
+            FeatureComponents components,
+            IFeatureAttachmentOrchestrator attachmentOrchestrator,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<OgcLink>>(Array.Empty<OgcLink>());
+        }
+
+        public Task<IReadOnlyList<OgcLink>> CreateAttachmentLinksAsync(
+            HttpRequest request,
+            ServiceDefinition service,
+            LayerDefinition layer,
+            string collectionId,
+            FeatureComponents components,
+            IFeatureAttachmentOrchestrator attachmentOrchestrator,
+            IReadOnlyList<AttachmentDescriptor> preloadedDescriptors,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<OgcLink>>(Array.Empty<OgcLink>());
+        }
+
+        public int ResolveLayerIndex(ServiceDefinition service, LayerDefinition layer)
+        {
+            return -1;
+        }
+    }
+
+    private sealed class StubOgcFeaturesEditingHandler : IOgcFeaturesEditingHandler
+    {
+        public IResult CreateEditFailureProblem(FeatureEditError? error, int statusCode)
+        {
+            return Microsoft.AspNetCore.Http.Results.Problem(statusCode: statusCode);
+        }
+
+        public FeatureEditBatch CreateFeatureEditBatch(
+            IReadOnlyList<FeatureEditCommand> commands,
+            HttpRequest request)
+        {
+            return new FeatureEditBatch(
+                commands: commands,
+                rollbackOnFailure: true,
+                clientReference: null,
+                isAuthenticated: false,
+                userRoles: null);
+        }
+
+        public Task<List<(string? FeatureId, object Payload, string? Etag)>> FetchCreatedFeaturesWithETags(
+            IFeatureRepository repository,
+            FeatureContext context,
+            LayerDefinition layer,
+            string collectionId,
+            FeatureEditBatchResult editResult,
+            List<string?> fallbackIds,
+            FeatureQuery featureQuery,
+            HttpRequest request,
+            CancellationToken cancellationToken)
+        {
+            var results = new List<(string? FeatureId, object Payload, string? Etag)>();
+            return Task.FromResult(results);
+        }
+
+        public IResult BuildMutationResponse(
+            List<(string? FeatureId, object Payload, string? Etag)> createdFeatures,
+            string collectionId,
+            bool singleItemMode)
+        {
+            return Microsoft.AspNetCore.Http.Results.Ok();
+        }
+
+        public bool ValidateIfMatch(HttpRequest request, LayerDefinition layer, FeatureRecord record, out string currentEtag)
+        {
+            currentEtag = "W/\"test-etag\"";
+            return true;
+        }
+
+        public string ComputeFeatureEtag(LayerDefinition layer, FeatureRecord record)
+        {
+            return "W/\"test-etag\"";
+        }
+    }
+
+    private sealed class StubOgcTilesHandler : Host.Ogc.Services.IOgcTilesHandler
+    {
+        public int ResolveTileSize(HttpRequest request)
+        {
+            var query = request.Query;
+            if (query.TryGetValue("tileSize", out var value) && int.TryParse(value, out var size))
+            {
+                return size;
+            }
+            return 256;
+        }
+
+        public string ResolveTileFormat(HttpRequest request)
+        {
+            var query = request.Query;
+            if (query.TryGetValue("format", out var value))
+            {
+                return value.ToString();
+            }
+            if (query.TryGetValue("f", out var f))
+            {
+                return f.ToString();
+            }
+            return "png";
+        }
+
+        public object BuildTileMatrixSetSummary(HttpRequest request, string id, string uri, string crs)
+        {
+            return new { id, uri, crs };
+        }
+
+        public bool DatasetMatchesCollection(RasterDatasetDefinition dataset, ServiceDefinition service, LayerDefinition layer)
+        {
+            return string.Equals(dataset.ServiceId, service.Id, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(dataset.LayerId, layer.Id, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public (string Id, string Uri, string Crs)? NormalizeTileMatrixSet(string tileMatrixSetId)
+        {
+            if (string.Equals(tileMatrixSetId, OgcTileMatrixHelper.WorldCrs84QuadId, StringComparison.OrdinalIgnoreCase))
+            {
+                return (OgcTileMatrixHelper.WorldCrs84QuadId, OgcTileMatrixHelper.WorldCrs84QuadUri, OgcTileMatrixHelper.WorldCrs84QuadCrs);
+            }
+            if (string.Equals(tileMatrixSetId, OgcTileMatrixHelper.WorldWebMercatorQuadId, StringComparison.OrdinalIgnoreCase))
+            {
+                return (OgcTileMatrixHelper.WorldWebMercatorQuadId, OgcTileMatrixHelper.WorldWebMercatorQuadUri, OgcTileMatrixHelper.WorldWebMercatorQuadCrs);
+            }
+            return null;
+        }
+
+        public bool TryResolveStyle(RasterDatasetDefinition dataset, string? requestedStyleId, out string styleId, out string? unresolvedStyle)
+        {
+            if (string.IsNullOrWhiteSpace(requestedStyleId))
+            {
+                styleId = dataset.Styles.DefaultStyleId ?? string.Empty;
+                unresolvedStyle = null;
+                return true;
+            }
+
+            if (dataset.Styles.StyleIds.Contains(requestedStyleId, StringComparer.OrdinalIgnoreCase))
+            {
+                styleId = requestedStyleId;
+                unresolvedStyle = null;
+                return true;
+            }
+
+            styleId = string.Empty;
+            unresolvedStyle = requestedStyleId;
+            return false;
+        }
+
+        public Task<StyleDefinition?> ResolveStyleDefinitionAsync(
+            RasterDatasetDefinition dataset,
+            string? requestedStyleId,
+            IMetadataRegistry metadataRegistry,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<StyleDefinition?>(null);
+        }
+
+        public Task<StyleDefinition?> ResolveStyleDefinitionAsync(
+            string? styleId,
+            LayerDefinition layer,
+            IMetadataRegistry metadataRegistry,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<StyleDefinition?>(null);
+        }
+
+        public bool RequiresVectorOverlay(StyleDefinition? style)
+        {
+            return false;
+        }
+
+        public Task<IReadOnlyList<Geometry>> CollectVectorGeometriesAsync(
+            RasterDatasetDefinition dataset,
+            double[] bbox,
+            IMetadataRegistry metadataRegistry,
+            IFeatureRepository repository,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<Geometry>>(Array.Empty<Geometry>());
+        }
+
+        public Task<IReadOnlyList<Geometry>> CollectVectorGeometriesAsync(
+            RasterDatasetDefinition dataset,
+            double[] bbox,
+            MetadataSnapshot snapshot,
+            IFeatureRepository repository,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<Geometry>>(Array.Empty<Geometry>());
+        }
+
+        public Task<IResult> RenderVectorTileAsync(
+            ServiceDefinition service,
+            LayerDefinition layer,
+            RasterDatasetDefinition dataset,
+            double[] bbox,
+            int zoom,
+            int tileRow,
+            int tileCol,
+            string? datetime,
+            IFeatureRepository repository,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IResult>(Microsoft.AspNetCore.Http.Results.Ok());
+        }
+
+        public double[] ResolveBounds(LayerDefinition layer, RasterDatasetDefinition? dataset)
+        {
+            return new[] { -180.0, -90.0, 180.0, 90.0 };
         }
     }
 }

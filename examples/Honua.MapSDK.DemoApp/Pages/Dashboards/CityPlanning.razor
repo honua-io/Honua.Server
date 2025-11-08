@@ -1,0 +1,261 @@
+@page "/dashboards/city-planning"
+<PageTitle>City Planning Dashboard - Honua MapSDK</PageTitle>
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div>
+                <h1 class="dashboard-title">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="mr-2" />
+                    City Planning Dashboard
+                </h1>
+                <p class="dashboard-subtitle">
+                    Comprehensive urban planning tool with zoning analysis, parcel management, and reporting capabilities.
+                </p>
+            </div>
+            <div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print">
+                    Generate Report
+                </MudButton>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-with-sidebar">
+        <!-- Sidebar -->
+        <div class="dashboard-sidebar" style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Layer List -->
+            <MudPaper Class="pa-3" Elevation="2">
+                <div class="panel-header">
+                    <h3 class="panel-title">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" Class="mr-1" />
+                        Layers
+                    </h3>
+                </div>
+                <HonuaLayerList Id="planning-layer-list"
+                                SyncWith="planning-map"
+                                ShowOpacitySlider="true"
+                                ShowVisibilityToggle="true"
+                                AllowReordering="true"
+                                GroupLayers="true"
+                                Style="width: 100%;" />
+            </MudPaper>
+
+            <!-- Legend -->
+            <MudPaper Class="pa-3" Elevation="2">
+                <div class="panel-header">
+                    <h3 class="panel-title">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" />
+                        Legend
+                    </h3>
+                </div>
+                <HonuaLegend Id="planning-legend"
+                             SyncWith="planning-map"
+                             ShowLayerNames="true"
+                             Collapsible="true"
+                             Style="width: 100%;" />
+            </MudPaper>
+
+            <!-- Coordinate Display -->
+            <MudPaper Class="pa-3" Elevation="2">
+                <HonuaCoordinateDisplay Id="planning-coords"
+                                        SyncWith="planning-map"
+                                        Format="DecimalDegrees"
+                                        Precision="6"
+                                        ShowCopyButton="true"
+                                        Style="width: 100%;" />
+            </MudPaper>
+
+            <!-- Quick Stats -->
+            <MudPaper Class="pa-3" Elevation="2">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Zoning Summary</MudText>
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.Home" IconColor="Color.Primary">
+                        <MudText Typo="Typo.caption">Residential</MudText>
+                        <MudText Typo="Typo.body2">1,245 parcels</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Store" IconColor="Color.Success">
+                        <MudText Typo="Typo.caption">Commercial</MudText>
+                        <MudText Typo="Typo.body2">387 parcels</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Factory" IconColor="Color.Warning">
+                        <MudText Typo="Typo.caption">Industrial</MudText>
+                        <MudText Typo="Typo.body2">156 parcels</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Apartment" IconColor="Color.Info">
+                        <MudText Typo="Typo.caption">Mixed Use</MudText>
+                        <MudText Typo="Typo.body2">92 parcels</MudText>
+                    </MudListItem>
+                </MudList>
+            </MudPaper>
+        </div>
+
+        <!-- Main Content -->
+        <div class="dashboard-content">
+            <!-- Map and Editor -->
+            <MudPaper Elevation="2" Style="height: 500px; position: relative;">
+                <HonuaMap Id="planning-map"
+                          MapStyle="https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                          Center="new[] { -122.4194, 37.7749 }"
+                          Zoom="13"
+                          Style="width: 100%; height: 100%; border-radius: 8px;" />
+
+                <!-- Editor Toolbar -->
+                <div style="position: absolute; top: 16px; left: 16px; background: white; border-radius: 8px; padding: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; gap: 8px;">
+                    <MudTooltip Text="Draw Zone">
+                        <MudIconButton Icon="@Icons.Material.Filled.Draw" Color="Color.Primary" Size="Size.Small" />
+                    </MudTooltip>
+                    <MudTooltip Text="Edit Zone">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" Size="Size.Small" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete Zone">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" />
+                    </MudTooltip>
+                    <MudDivider Vertical="true" FlexItem="true" />
+                    <MudTooltip Text="Measure">
+                        <MudIconButton Icon="@Icons.Material.Filled.Straighten" Color="Color.Default" Size="Size.Small" />
+                    </MudTooltip>
+                    <MudTooltip Text="Print">
+                        <MudIconButton Icon="@Icons.Material.Filled.Print" Color="Color.Default" Size="Size.Small" />
+                    </MudTooltip>
+                </div>
+
+                <HonuaEditor Id="planning-editor"
+                             SyncWith="planning-map"
+                             AllowDraw="true"
+                             AllowEdit="true"
+                             AllowDelete="true"
+                             ShowAttributeEditor="true"
+                             Style="width: 100%; height: 100%;" />
+
+                <HonuaPopup Id="planning-popup"
+                            SyncWith="planning-map"
+                            TriggerMode="PopupTrigger.Click"
+                            ShowCloseButton="true"
+                            MaxWidth="400px">
+                    <ContentTemplate Context="feature">
+                        <MudCard>
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">@feature.Properties["zoneName"]</MudText>
+                                    <MudChip Size="Size.Small" Color="Color.Primary">@feature.Properties["zoneType"]</MudChip>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudGrid>
+                                    <MudItem xs="6">
+                                        <MudText Typo="Typo.caption">Area</MudText>
+                                        <MudText Typo="Typo.body2"><strong>@feature.Properties["area"] acres</strong></MudText>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudText Typo="Typo.caption">Max Height</MudText>
+                                        <MudText Typo="Typo.body2"><strong>@feature.Properties["maxHeight"] ft</strong></MudText>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudText Typo="Typo.caption">FAR</MudText>
+                                        <MudText Typo="Typo.body2"><strong>@feature.Properties["far"]</strong></MudText>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudText Typo="Typo.caption">Status</MudText>
+                                        <MudText Typo="Typo.body2"><strong>@feature.Properties["status"]</strong></MudText>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit">Edit</MudButton>
+                                <MudButton Variant="Variant.Text" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Info">Details</MudButton>
+                            </MudCardActions>
+                        </MudCard>
+                    </ContentTemplate>
+                </HonuaPopup>
+
+                <!-- Basemap Gallery (bottom right) -->
+                <div style="position: absolute; bottom: 16px; right: 16px;">
+                    <HonuaBasemapGallery Id="planning-basemaps"
+                                         SyncWith="planning-map"
+                                         ShowThumbnails="true"
+                                         Style="width: 200px;" />
+                </div>
+            </MudPaper>
+
+            <!-- Attribute Table and Charts -->
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudPaper Elevation="2" Style="height: 400px;">
+                        <HonuaAttributeTable Id="planning-table"
+                                             SyncWith="planning-map"
+                                             DataSource="data/zones.geojson"
+                                             Title="Zoning Parcels"
+                                             ShowToolbar="true"
+                                             AllowColumnSort="true"
+                                             AllowColumnFilter="true"
+                                             AllowInlineEdit="true"
+                                             ShowExport="true"
+                                             Dense="true"
+                                             PageSize="10"
+                                             Style="width: 100%; height: 100%;" />
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudStack Spacing="3">
+                        <MudPaper Elevation="2" Class="pa-3" Style="height: 190px;">
+                            <HonuaChart Id="planning-chart-1"
+                                        SyncWith="planning-map"
+                                        Type="ChartType.Pie"
+                                        Field="zoneType"
+                                        Title="Zoning Distribution"
+                                        ShowLegend="true"
+                                        LegendPosition="right"
+                                        EnableFilter="true"
+                                        Style="width: 100%; height: 100%;" />
+                        </MudPaper>
+                        <MudPaper Elevation="2" Class="pa-3" Style="height: 190px;">
+                            <HonuaChart Id="planning-chart-2"
+                                        SyncWith="planning-map"
+                                        Type="ChartType.Bar"
+                                        Field="status"
+                                        Title="Status"
+                                        Aggregation="AggregationType.Count"
+                                        EnableFilter="true"
+                                        Style="width: 100%; height: 100%;" />
+                        </MudPaper>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Action Buttons -->
+            <MudPaper Class="pa-3" Elevation="2">
+                <MudStack Row="true" Spacing="2" Justify="Justify.SpaceBetween">
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Save">
+                            Save Changes
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Cancel">
+                            Cancel
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Undo">
+                            Undo
+                        </MudButton>
+                    </MudStack>
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download">
+                            Export GIS Data
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print">
+                            Print Report
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </div>
+    </div>
+</div>
+
+<HonuaPrint Id="planning-print"
+            SyncWith="planning-map"
+            ShowPreview="false"
+            PaperSize="A3"
+            Orientation="landscape"
+            IncludeLegend="true"
+            Layout="city-planning"
+            Style="display: none;" />

@@ -60,6 +60,7 @@ internal static class OgcTilesHandlers
     /// <param name="resolver">Service for resolving collection context.</param>
     /// <param name="rasterRegistry">Registry for raster dataset definitions.</param>
     /// <param name="cacheHeaderService">Service for generating cache headers and ETags.</param>
+    /// <param name="tilesHandler">Handler for OGC tiles operations.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
     /// JSON response containing tileset metadata including tile matrix sets, zoom levels,
@@ -87,6 +88,7 @@ internal static class OgcTilesHandlers
         [FromServices] IFeatureContextResolver resolver,
         [FromServices] IRasterDatasetRegistry rasterRegistry,
         [FromServices] OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcTilesHandler tilesHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(request);
@@ -104,7 +106,7 @@ internal static class OgcTilesHandlers
 
         var datasets = await rasterRegistry.GetByServiceAsync(service.Id, cancellationToken).ConfigureAwait(false);
         var matchingDatasets = datasets
-            .Where(dataset => OgcSharedHandlers.DatasetMatchesCollection(dataset, service, layer))
+            .Where(dataset => tilesHandler.DatasetMatchesCollection(dataset, service, layer))
             .ToList();
 
         var tilesets = new List<object>(matchingDatasets.Count);
@@ -115,7 +117,7 @@ internal static class OgcTilesHandlers
                 ? dataset.Crs.Select(CrsHelper.NormalizeIdentifier).ToArray()
                 : new[] { CrsHelper.DefaultCrsIdentifier };
 
-            var bounds = OgcSharedHandlers.ResolveBounds(layer, dataset);
+            var bounds = tilesHandler.ResolveBounds(layer, dataset);
             var boundingBox = new
             {
                 lowerLeft = new[] { bounds[0], bounds[1] },
@@ -167,6 +169,7 @@ internal static class OgcTilesHandlers
         [FromServices] IFeatureContextResolver resolver,
         [FromServices] IRasterDatasetRegistry rasterRegistry,
         [FromServices] OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcTilesHandler tilesHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(request);
@@ -183,7 +186,7 @@ internal static class OgcTilesHandlers
         var layer = resolution.Value.Layer;
 
         var dataset = await rasterRegistry.FindAsync(tilesetId, cancellationToken).ConfigureAwait(false);
-        if (dataset is null || !OgcSharedHandlers.DatasetMatchesCollection(dataset, service, layer))
+        if (dataset is null || !tilesHandler.DatasetMatchesCollection(dataset, service, layer))
         {
             return Results.NotFound();
         }
@@ -236,6 +239,7 @@ internal static class OgcTilesHandlers
         [FromServices] IFeatureContextResolver resolver,
         [FromServices] IRasterDatasetRegistry rasterRegistry,
         [FromServices] OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcTilesHandler tilesHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(request);
@@ -252,7 +256,7 @@ internal static class OgcTilesHandlers
         var layer = resolution.Value.Layer;
 
         var dataset = await rasterRegistry.FindAsync(tilesetId, cancellationToken).ConfigureAwait(false);
-        if (dataset is null || !OgcSharedHandlers.DatasetMatchesCollection(dataset, service, layer))
+        if (dataset is null || !tilesHandler.DatasetMatchesCollection(dataset, service, layer))
         {
             return Results.NotFound();
         }
@@ -325,6 +329,7 @@ internal static class OgcTilesHandlers
         [FromServices] IFeatureContextResolver resolver,
         [FromServices] IRasterDatasetRegistry rasterRegistry,
         [FromServices] OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcTilesHandler tilesHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(request);
@@ -341,12 +346,12 @@ internal static class OgcTilesHandlers
         var layer = resolution.Value.Layer;
 
         var dataset = await rasterRegistry.FindAsync(tilesetId, cancellationToken).ConfigureAwait(false);
-        if (dataset is null || !OgcSharedHandlers.DatasetMatchesCollection(dataset, service, layer))
+        if (dataset is null || !tilesHandler.DatasetMatchesCollection(dataset, service, layer))
         {
             return Results.NotFound();
         }
 
-        var normalized = OgcSharedHandlers.NormalizeTileMatrixSet(tileMatrixSetId);
+        var normalized = tilesHandler.NormalizeTileMatrixSet(tileMatrixSetId);
         if (normalized is null)
         {
             return Results.NotFound();
@@ -399,6 +404,7 @@ internal static class OgcTilesHandlers
         [FromServices] IRasterTileCacheProvider tileCacheProvider,
         [FromServices] IRasterTileCacheMetrics tileCacheMetrics,
         [FromServices] OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcTilesHandler tilesHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(request);
@@ -441,6 +447,7 @@ internal static class OgcTilesHandlers
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -463,6 +470,7 @@ internal static class OgcTilesHandlers
     /// <param name="tileCacheProvider">Provider for tile caching.</param>
     /// <param name="tileCacheMetrics">Metrics collector for tile cache operations.</param>
     /// <param name="cacheHeaderService">Service for generating cache headers and ETags.</param>
+    /// <param name="tilesHandler">Handler for OGC tiles operations.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
     /// A file result containing the tile image (PNG, JPEG, WebP) or vector data (MVT, GeoJSON, PMTiles).
@@ -512,6 +520,7 @@ internal static class OgcTilesHandlers
         [FromServices] IRasterTileCacheProvider tileCacheProvider,
         [FromServices] IRasterTileCacheMetrics tileCacheMetrics,
         [FromServices] OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcTilesHandler tilesHandler,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(request);
@@ -534,12 +543,12 @@ internal static class OgcTilesHandlers
         var layer = resolution.Value.Layer;
 
         var dataset = await rasterRegistry.FindAsync(tilesetId, cancellationToken).ConfigureAwait(false);
-        if (dataset is null || !OgcSharedHandlers.DatasetMatchesCollection(dataset, service, layer))
+        if (dataset is null || !tilesHandler.DatasetMatchesCollection(dataset, service, layer))
         {
             return Results.NotFound();
         }
 
-        var normalized = OgcSharedHandlers.NormalizeTileMatrixSet(tileMatrixSetId);
+        var normalized = tilesHandler.NormalizeTileMatrixSet(tileMatrixSetId);
         if (normalized is null)
         {
             return Results.NotFound();
@@ -564,8 +573,8 @@ internal static class OgcTilesHandlers
         }
 
         var bbox = OgcTileMatrixHelper.GetBoundingBox(matrixId, zoom, tileRow, tileCol);
-        var tileSize = OgcSharedHandlers.ResolveTileSize(request);
-        var format = OgcSharedHandlers.ResolveTileFormat(request);
+        var tileSize = tilesHandler.ResolveTileSize(request);
+        var format = tilesHandler.ResolveTileFormat(request);
         var transparent = !string.Equals(request.Query["transparent"], "false", StringComparison.OrdinalIgnoreCase);
 
         var styleIdRaw = request.Query.TryGetValue("styleId", out var styleValues)

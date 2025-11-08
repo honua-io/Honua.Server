@@ -1,0 +1,88 @@
+{
+  "id": "import-shapefile-to-postgis",
+  "name": "Import Shapefile to PostGIS",
+  "description": "Import a Shapefile and store it in a PostGIS database table. Perfect for loading geographic data into your spatial database.",
+  "category": "Data Import/Export",
+  "icon": "upload",
+  "difficulty": 0,
+  "estimatedMinutes": 3,
+  "tags": ["import", "shapefile", "postgis", "database"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "Shapefile (.shp, .shx, .dbf)",
+    "PostGIS connection configured"
+  ],
+  "expectedOutputs": [
+    "PostGIS table with imported features"
+  ],
+  "useCases": [
+    "Loading administrative boundaries into database",
+    "Importing survey data for analysis",
+    "Migrating data from file-based to database storage"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "shapefile_source",
+      "name": "Read Shapefile",
+      "description": "Load features from Shapefile",
+      "parameters": {
+        "filePath": "/data/input/boundaries.shp",
+        "encoding": "UTF-8"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Write to PostGIS",
+      "description": "Store features in PostGIS",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "boundaries",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true,
+        "overwrite": false
+      },
+      "position": {
+        "x": 400,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "inputPath": {
+      "name": "inputPath",
+      "type": "string",
+      "description": "Path to the input Shapefile",
+      "defaultValue": "/data/input/boundaries.shp",
+      "required": true
+    },
+    "tableName": {
+      "name": "tableName",
+      "type": "string",
+      "description": "Target PostGIS table name",
+      "defaultValue": "imported_data",
+      "required": true
+    },
+    "overwrite": {
+      "name": "overwrite",
+      "type": "boolean",
+      "description": "Overwrite existing table",
+      "defaultValue": false,
+      "required": false
+    }
+  }
+}

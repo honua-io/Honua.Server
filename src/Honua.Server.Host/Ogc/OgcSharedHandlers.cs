@@ -387,7 +387,7 @@ internal static class OgcSharedHandlers
         return (new QueryFilter(expression), null);
     }
 
-    private static (IReadOnlyList<FeatureSortOrder>? SortOrders, IResult? Error) ParseSortOrders(string? raw, LayerDefinition layer)
+    internal static (IReadOnlyList<FeatureSortOrder>? SortOrders, IResult? Error) ParseSortOrders(string? raw, LayerDefinition layer)
     {
         if (raw.IsNullOrWhiteSpace())
         {
@@ -545,11 +545,9 @@ internal static class OgcSharedHandlers
         {
             if (MediaTypeHeaderValue.TryParseList(acceptValues, out var parsedAccepts))
             {
-                var ordered = parsedAccepts
-                    .OrderByDescending(value => value.Quality ?? 1.0)
-                    .ToList();
-
-                foreach (var media in ordered)
+                // Use lazy evaluation - no need to materialize with ToList() when only iterating
+                foreach (var media in parsedAccepts
+                    .OrderByDescending(value => value.Quality ?? 1.0))
                 {
                     var mediaType = media.MediaType.ToString();
                     if (mediaType.IsNullOrWhiteSpace())
@@ -568,7 +566,8 @@ internal static class OgcSharedHandlers
                     }
                 }
 
-                return (default, string.Empty, Results.StatusCode(StatusCodes.Status406NotAcceptable));
+                // If no Accept header media types matched, fall back to default format (GeoJSON)
+                // This is more lenient than returning 406 and aligns with OGC best practices
             }
         }
 
@@ -805,7 +804,7 @@ internal static class OgcSharedHandlers
         return new[] { CrsHelper.DefaultCrsIdentifier };
     }
 
-    private static bool LooksLikeJson(string? value)
+    internal static bool LooksLikeJson(string? value)
     {
         if (value.IsNullOrWhiteSpace())
         {
@@ -908,6 +907,7 @@ internal static class OgcSharedHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         CancellationToken cancellationToken)
     {
         static QueryCollection RemoveCollectionsParameter(IQueryCollection source)
@@ -972,6 +972,7 @@ internal static class OgcSharedHandlers
                 metadataRegistry,
                 apiMetrics,
                 cacheHeaderService,
+                attachmentHandler,
                 sanitized,
                 cancellationToken).ConfigureAwait(false);
         }

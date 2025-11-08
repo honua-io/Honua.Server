@@ -306,7 +306,7 @@ public sealed class WfsCapabilitiesBuilder : OgcCapabilitiesBuilder
             new XElement(WfsConstants.Wfs + "Format", WfsConstants.ShapefileFormat)));
 
         // Add WGS84 bounding box if available
-        var bbox = layer.Catalog?.SpatialExtent?.Bbox?.FirstOrDefault();
+        var bbox = layer.Extent?.Bbox?.FirstOrDefault();
         if (bbox is { Length: 4 })
         {
             featureType.Add(new XElement(WfsConstants.Wfs + "WGS84BoundingBox",

@@ -48,7 +48,7 @@ public class PostGisDataSinkNode : WorkflowNodeBase
         return Task.FromResult(result);
     }
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override async Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -182,7 +182,7 @@ public class GeoJsonExportNode : WorkflowNodeBase
     public override string DisplayName => "GeoJSON Export";
     public override string Description => "Exports features to GeoJSON format";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -198,13 +198,13 @@ public class GeoJsonExportNode : WorkflowNodeBase
             var inputNodeId = context.Inputs.Keys.FirstOrDefault();
             if (inputNodeId == null)
             {
-                return NodeExecutionResult.Fail("No input node connected");
+                return Task.FromResult(NodeExecutionResult.Fail("No input node connected"));
             }
 
             var inputResult = context.Inputs[inputNodeId];
             if (!inputResult.Data.TryGetValue("features", out var featuresObj) || featuresObj is not List<Dictionary<string, object>> features)
             {
-                return NodeExecutionResult.Fail("Input does not contain 'features' data");
+                return Task.FromResult(NodeExecutionResult.Fail("Input does not contain 'features' data"));
             }
 
             ReportProgress(context, 20, $"Exporting {features.Count} features");
@@ -239,7 +239,7 @@ public class GeoJsonExportNode : WorkflowNodeBase
 
             ReportProgress(context, 100, $"Exported {features.Count} features");
 
-            return new NodeExecutionResult
+            return Task.FromResult(new NodeExecutionResult
             {
                 Success = true,
                 Data = new Dictionary<string, object>
@@ -250,13 +250,13 @@ public class GeoJsonExportNode : WorkflowNodeBase
                 },
                 FeaturesProcessed = features.Count,
                 DurationMs = stopwatch.ElapsedMilliseconds
-            };
+            });
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             Logger.LogError(ex, "GeoJSON export node {NodeId} failed", context.NodeDefinition.Id);
-            return NodeExecutionResult.Fail($"GeoJSON export failed: {ex.Message}", ex.StackTrace);
+            return Task.FromResult(NodeExecutionResult.Fail($"GeoJSON export failed: {ex.Message}", ex.StackTrace));
         }
     }
 }
@@ -274,7 +274,7 @@ public class OutputNode : WorkflowNodeBase
     public override string DisplayName => "Output";
     public override string Description => "Stores workflow output for retrieval";
 
-    public override async Task<NodeExecutionResult> ExecuteAsync(
+    protected override Task<NodeExecutionResult> ExecuteInternalAsync(
         NodeExecutionContext context,
         CancellationToken cancellationToken = default)
     {
@@ -290,7 +290,7 @@ public class OutputNode : WorkflowNodeBase
             var inputNodeId = context.Inputs.Keys.FirstOrDefault();
             if (inputNodeId == null)
             {
-                return NodeExecutionResult.Fail("No input node connected");
+                return Task.FromResult(NodeExecutionResult.Fail("No input node connected"));
             }
 
             var inputResult = context.Inputs[inputNodeId];
@@ -306,7 +306,7 @@ public class OutputNode : WorkflowNodeBase
                 outputName,
                 stopwatch.ElapsedMilliseconds);
 
-            return new NodeExecutionResult
+            return Task.FromResult(new NodeExecutionResult
             {
                 Success = true,
                 Data = new Dictionary<string, object>
@@ -315,13 +315,13 @@ public class OutputNode : WorkflowNodeBase
                     ["stored"] = true
                 },
                 DurationMs = stopwatch.ElapsedMilliseconds
-            };
+            });
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             Logger.LogError(ex, "Output node {NodeId} failed", context.NodeDefinition.Id);
-            return NodeExecutionResult.Fail($"Output storage failed: {ex.Message}", ex.StackTrace);
+            return Task.FromResult(NodeExecutionResult.Fail($"Output storage failed: {ex.Message}", ex.StackTrace));
         }
     }
 }

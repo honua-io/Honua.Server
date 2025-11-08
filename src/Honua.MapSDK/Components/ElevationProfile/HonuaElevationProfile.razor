@@ -1,0 +1,967 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using ElevationProfile = Honua.MapSDK.Models.ElevationProfile
+@using Honua.MapSDK.Services.Drawing
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-elevation-profile @CssClass @GetPositionClass()" style="@GetContainerStyle()">
+    @if (ShowToolbar)
+    {
+        <div class="elevation-toolbar">
+            <div class="toolbar-section">
+                <MudTooltip Text="Draw path">
+                    <MudIconButton
+                        Icon="@Icons.Material.Filled.Timeline"
+                        Color="@(_drawMode ? Color.Primary : Color.Default)"
+                        Size="Size.Small"
+                        OnClick="@ToggleDrawMode"
+                        Disabled="@(!_mapReady || !AllowDraw)"
+                        Class="tool-button"
+                        aria-label="Draw path" />
+                </MudTooltip>
+
+                <MudTooltip Text="Import route">
+                    <MudIconButton
+                        Icon="@Icons.Material.Filled.FileUpload"
+                        Color="Color.Default"
+                        Size="Size.Small"
+                        OnClick="@ShowImportDialog"
+                        Disabled="@(!_mapReady)"
+                        Class="tool-button"
+                        aria-label="Import route" />
+                </MudTooltip>
+
+                @if (_currentProfile != null)
+                {
+                    <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                    <MudTooltip Text="Generate profile">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Analytics"
+                            Color="Color.Primary"
+                            Size="Size.Small"
+                            OnClick="@GenerateProfile"
+                            Disabled="@_isGenerating"
+                            Class="tool-button"
+                            aria-label="Generate elevation profile" />
+                    </MudTooltip>
+
+                    <MudTooltip Text="Clear">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Clear"
+                            Color="Color.Default"
+                            Size="Size.Small"
+                            OnClick="@ClearProfile"
+                            Class="tool-button"
+                            aria-label="Clear profile" />
+                    </MudTooltip>
+
+                    <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                    <MudTooltip Text="Export">
+                        <MudMenu Icon="@Icons.Material.Filled.FileDownload" Color="Color.Default" Size="Size.Small" Dense="true">
+                            <MudMenuItem Icon="@Icons.Material.Filled.InsertChart" OnClick="@(() => ExportProfile(ElevationExportFormat.PNG))">
+                                Export as PNG
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.TableChart" OnClick="@(() => ExportProfile(ElevationExportFormat.CSV))">
+                                Export as CSV
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Public" OnClick="@(() => ExportProfile(ElevationExportFormat.GPX))">
+                                Export as GPX
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Code" OnClick="@(() => ExportProfile(ElevationExportFormat.JSON))">
+                                Export as JSON
+                            </MudMenuItem>
+                        </MudMenu>
+                    </MudTooltip>
+                }
+
+                <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                <MudTooltip Text="Settings">
+                    <MudIconButton
+                        Icon="@Icons.Material.Filled.Settings"
+                        Color="Color.Default"
+                        Size="Size.Small"
+                        OnClick="@(() => _showSettings = !_showSettings)"
+                        Class="tool-button"
+                        aria-label="Settings" />
+                </MudTooltip>
+            </div>
+        </div>
+    }
+
+    @if (_showSettings)
+    {
+        <div class="elevation-settings">
+            <div class="settings-header">
+                <MudText Typo="Typo.body2">Elevation Profile Settings</MudText>
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.Close"
+                    Size="Size.Small"
+                    OnClick="@(() => _showSettings = false)"
+                    aria-label="Close settings" />
+            </div>
+            <div class="settings-content">
+                <MudSelect T="ElevationSource" Label="Elevation Source" @bind-Value="_elevationSource" Dense="true" Variant="Variant.Outlined">
+                    <MudSelectItem Value="ElevationSource.MapLibreTerrain">MapLibre Terrain</MudSelectItem>
+                    <MudSelectItem Value="ElevationSource.MapboxAPI">Mapbox API</MudSelectItem>
+                    <MudSelectItem Value="ElevationSource.OpenElevation">Open-Elevation (Free)</MudSelectItem>
+                    <MudSelectItem Value="ElevationSource.USGSAPI">USGS API</MudSelectItem>
+                    <MudSelectItem Value="ElevationSource.GoogleAPI">Google API</MudSelectItem>
+                </MudSelect>
+
+                @if (RequiresApiKey(_elevationSource))
+                {
+                    <MudTextField T="string" Label="API Key" @bind-Value="_apiKey" Variant="Variant.Outlined" Dense="true" />
+                }
+
+                <MudNumericField T="int" Label="Sample Points" @bind-Value="_samplePoints" Min="10" Max="500" Variant="Variant.Outlined" Dense="true" />
+
+                <MudSelect T="MeasurementUnitSystem" Label="Unit" @bind-Value="_unit" Dense="true" Variant="Variant.Outlined">
+                    <MudSelectItem Value="MeasurementUnitSystem.Metric">Metric</MudSelectItem>
+                    <MudSelectItem Value="MeasurementUnitSystem.Imperial">Imperial</MudSelectItem>
+                </MudSelect>
+
+                <MudSelect T="ActivityType" Label="Activity Type" @bind-Value="_activityType" Dense="true" Variant="Variant.Outlined">
+                    <MudSelectItem Value="ActivityType.Hiking">Hiking</MudSelectItem>
+                    <MudSelectItem Value="ActivityType.Running">Running</MudSelectItem>
+                    <MudSelectItem Value="ActivityType.Cycling">Cycling</MudSelectItem>
+                    <MudSelectItem Value="ActivityType.MountainBiking">Mountain Biking</MudSelectItem>
+                    <MudSelectItem Value="ActivityType.Walking">Walking</MudSelectItem>
+                </MudSelect>
+
+                <MudSwitch T="bool" Label="Show grade colors" @bind-Checked="_showGradeColors" Color="Color.Primary" />
+                <MudSwitch T="bool" Label="Show statistics" @bind-Checked="_showStatistics" Color="Color.Primary" />
+                <MudSwitch T="bool" Label="Calculate time estimates" @bind-Checked="_calculateTimeEstimates" Color="Color.Primary" />
+            </div>
+        </div>
+    }
+
+    @if (_isGenerating)
+    {
+        <div class="elevation-loading">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+            <MudText Typo="Typo.caption">Generating elevation profile...</MudText>
+        </div>
+    }
+    else if (_currentProfile != null)
+    {
+        <div class="elevation-chart-container">
+            <div id="@_chartId" class="elevation-chart" style="height: @(ChartHeight)px;"></div>
+            @if (_hoverPosition != null)
+            {
+                <div class="elevation-marker" style="left: @(_hoverPosition.Value)px;">
+                    <div class="marker-line"></div>
+                </div>
+            }
+        </div>
+
+        @if (ShowStatistics)
+        {
+            <div class="elevation-statistics">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" Color="Color.Info" />
+                        <div class="stat-content">
+                            <span class="stat-label">Distance</span>
+                            <span class="stat-value">@FormatDistance(_currentProfile.TotalDistance)</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" Color="Color.Success" />
+                        <div class="stat-content">
+                            <span class="stat-label">Elevation Gain</span>
+                            <span class="stat-value">@FormatElevation(_currentProfile.ElevationGain)</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Small" Color="Color.Error" />
+                        <div class="stat-content">
+                            <span class="stat-label">Elevation Loss</span>
+                            <span class="stat-value">@FormatElevation(_currentProfile.ElevationLoss)</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowUp" Size="Size.Small" Color="Color.Default" />
+                        <div class="stat-content">
+                            <span class="stat-label">Max Elevation</span>
+                            <span class="stat-value">@FormatElevation(_currentProfile.MaxElevation)</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" Color="Color.Default" />
+                        <div class="stat-content">
+                            <span class="stat-label">Min Elevation</span>
+                            <span class="stat-value">@FormatElevation(_currentProfile.MinElevation)</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <MudIcon Icon="@Icons.Material.Filled.ShowChart" Size="Size.Small" Color="Color.Warning" />
+                        <div class="stat-content">
+                            <span class="stat-label">Avg Grade</span>
+                            <span class="stat-value">@(_currentProfile.AverageGrade.ToString("F1"))%</span>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Error" />
+                        <div class="stat-content">
+                            <span class="stat-label">Max Grade</span>
+                            <span class="stat-value">@(_currentProfile.MaxGrade.ToString("F1"))%</span>
+                        </div>
+                    </div>
+                    @if (_currentProfile.TimeEstimate != null && _calculateTimeEstimates)
+                    {
+                        <div class="stat-item">
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Primary" />
+                            <div class="stat-content">
+                                <span class="stat-label">Est. Time</span>
+                                <span class="stat-value">@FormatTime(_currentProfile.TimeEstimate.TotalMinutes)</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_currentProfile.SteepSections.Count > 0 && Collapsible)
+        {
+            <div class="steep-sections">
+                <div class="section-header" @onclick="@(() => _isSteepSectionsCollapsed = !_isSteepSectionsCollapsed)">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" />
+                    <MudText Typo="Typo.body2" Class="section-title">
+                        Steep Sections (@_currentProfile.SteepSections.Count)
+                    </MudText>
+                    <MudIconButton
+                        Icon="@(_isSteepSectionsCollapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)"
+                        Size="Size.Small"
+                        aria-label="Toggle steep sections" />
+                </div>
+
+                @if (!_isSteepSectionsCollapsed)
+                {
+                    <div class="sections-list">
+                        @foreach (var section in _currentProfile.SteepSections.OrderByDescending(s => s.AverageGrade))
+                        {
+                            <div class="@($"section-item severity-{section.Severity.ToString().ToLower()}")">
+                                <div class="section-info">
+                                    <div class="section-distance">
+                                        @FormatDistance(section.StartDistance) - @FormatDistance(section.EndDistance)
+                                    </div>
+                                    <div class="section-stats">
+                                        <span class="grade-badge">@(section.AverageGrade.ToString("F1"))% avg</span>
+                                        <span class="length">@FormatDistance(section.Length)</span>
+                                        <span class="elevation-change">@FormatElevation(Math.Abs(section.ElevationChange))</span>
+                                    </div>
+                                </div>
+                                <MudIconButton
+                                    Icon="@Icons.Material.Filled.MyLocation"
+                                    Size="Size.Small"
+                                    OnClick="@(() => ZoomToSection(section))"
+                                    aria-label="Zoom to section" />
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_currentProfile.Waypoints.Count > 0 && Collapsible)
+        {
+            <div class="waypoints-list">
+                <div class="section-header" @onclick="@(() => _isWaypointsCollapsed = !_isWaypointsCollapsed)">
+                    <MudIcon Icon="@Icons.Material.Filled.Room" Size="Size.Small" Color="Color.Info" />
+                    <MudText Typo="Typo.body2" Class="section-title">
+                        Waypoints (@_currentProfile.Waypoints.Count)
+                    </MudText>
+                    <MudIconButton
+                        Icon="@(_isWaypointsCollapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)"
+                        Size="Size.Small"
+                        aria-label="Toggle waypoints" />
+                </div>
+
+                @if (!_isWaypointsCollapsed)
+                {
+                    <div class="waypoint-items">
+                        @foreach (var waypoint in _currentProfile.Waypoints)
+                        {
+                            <div class="waypoint-item">
+                                <MudIcon Icon="@GetWaypointIcon(waypoint.Type)" Size="Size.Small" Color="@GetWaypointColor(waypoint.Type)" />
+                                <div class="waypoint-info">
+                                    <div class="waypoint-name">@waypoint.Name</div>
+                                    <div class="waypoint-details">
+                                        @FormatDistance(waypoint.Distance) • @FormatElevation(waypoint.Elevation)
+                                    </div>
+                                </div>
+                                <MudIconButton
+                                    Icon="@Icons.Material.Filled.MyLocation"
+                                    Size="Size.Small"
+                                    OnClick="@(() => ZoomToWaypoint(waypoint))"
+                                    aria-label="Zoom to waypoint" />
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+    else if (!_isGenerating && _pathCoordinates.Count == 0)
+    {
+        <div class="elevation-empty">
+            <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.body1">Draw a path or import a route</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Default">
+                Click the draw button to trace a path on the map
+            </MudText>
+        </div>
+    }
+
+    @if (_errorMessage != null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="elevation-error" CloseIconClicked="@(() => _errorMessage = null)">
+            @_errorMessage
+        </MudAlert>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the elevation profile component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"elevation-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Elevation data source
+    /// </summary>
+    [Parameter]
+    public ElevationSource ElevationSource { get; set; } = ElevationSource.OpenElevation;
+
+    /// <summary>
+    /// API key for external elevation services
+    /// </summary>
+    [Parameter]
+    public string? ApiKey { get; set; }
+
+    /// <summary>
+    /// Number of points to sample along the route
+    /// </summary>
+    [Parameter]
+    public int SamplePoints { get; set; } = 100;
+
+    /// <summary>
+    /// Measurement unit
+    /// </summary>
+    [Parameter]
+    public MeasurementUnitSystem Unit { get; set; } = MeasurementUnitSystem.Metric;
+
+    /// <summary>
+    /// Show statistics panel
+    /// </summary>
+    [Parameter]
+    public bool ShowStatistics { get; set; } = true;
+
+    /// <summary>
+    /// Show grade colors on chart
+    /// </summary>
+    [Parameter]
+    public bool ShowGradeColors { get; set; } = true;
+
+    /// <summary>
+    /// Chart height in pixels
+    /// </summary>
+    [Parameter]
+    public int ChartHeight { get; set; } = 300;
+
+    /// <summary>
+    /// Allow drawing path on map
+    /// </summary>
+    [Parameter]
+    public bool AllowDraw { get; set; } = true;
+
+    /// <summary>
+    /// Show toolbar
+    /// </summary>
+    [Parameter]
+    public bool ShowToolbar { get; set; } = true;
+
+    /// <summary>
+    /// Collapsible sections
+    /// </summary>
+    [Parameter]
+    public bool Collapsible { get; set; } = true;
+
+    /// <summary>
+    /// Position on the map
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Width of the component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "400px";
+
+    /// <summary>
+    /// Event callback when profile is generated
+    /// </summary>
+    [Parameter]
+    public EventCallback<ElevationProfile> OnProfileGenerated { get; set; }
+
+    /// <summary>
+    /// Event callback when profile generation fails
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    private ElevationProfile? _currentProfile;
+    private List<double[]> _pathCoordinates = new();
+    private bool _mapReady = false;
+    private bool _isGenerating = false;
+    private bool _drawMode = false;
+    private bool _showSettings = false;
+    private bool _isSteepSectionsCollapsed = false;
+    private bool _isWaypointsCollapsed = false;
+    private string? _errorMessage;
+    private double? _hoverPosition;
+    private string _chartId = $"chart-{Guid.NewGuid():N}";
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaElevationProfile>? _dotNetRef;
+
+    // Settings state
+    private ElevationSource _elevationSource;
+    private string? _apiKey;
+    private int _samplePoints;
+    private MeasurementUnitSystem _unit;
+    private bool _showGradeColors;
+    private bool _showStatistics;
+    private bool _calculateTimeEstimates = true;
+    private ActivityType _activityType = ActivityType.Hiking;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize settings from parameters
+        _elevationSource = ElevationSource;
+        _apiKey = ApiKey;
+        _samplePoints = SamplePoints;
+        _unit = Unit;
+        _showGradeColors = ShowGradeColors;
+        _showStatistics = ShowStatistics;
+
+        SetupSubscriptions();
+        _dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-elevation.js"
+                );
+
+                if (_mapReady && SyncWith != null)
+                {
+                    await InitializeElevationProfile();
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Error loading elevation module: {ex.Message}";
+                Console.Error.WriteLine($"Error loading elevation JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                _ = InitializeElevationProfile();
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for feature drawn messages (from draw component)
+        Bus.Subscribe<FeatureDrawnMessage>(args =>
+        {
+            if (args.Message.GeometryType.ToLowerInvariant().Contains("line"))
+            {
+                _ = ProcessDrawnFeature(args.Message.Geometry);
+            }
+        });
+
+        // Listen for data imported messages (GPX/KML routes)
+        Bus.Subscribe<DataImportedMessage>(args =>
+        {
+            if (args.Message.Format.ToLowerInvariant() == "gpx" ||
+                args.Message.Format.ToLowerInvariant() == "kml")
+            {
+                _ = ProcessImportedRoute(args.Message.LayerId);
+            }
+        });
+    }
+
+    private async Task InitializeElevationProfile()
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("initializeElevationProfile", SyncWith, Id, _dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error initializing elevation profile: {ex.Message}";
+            Console.Error.WriteLine($"Error initializing elevation profile: {ex.Message}");
+        }
+    }
+
+    private async Task ToggleDrawMode()
+    {
+        if (!_mapReady || !AllowDraw) return;
+
+        _drawMode = !_drawMode;
+
+        if (_drawMode)
+        {
+            // Request drawing mode
+            await Bus.PublishAsync(new StartDrawingRequestMessage
+            {
+                MapId = SyncWith ?? "",
+                Mode = "Line",
+                ComponentId = Id
+            }, Id);
+
+            try
+            {
+                if (_jsModule != null)
+                {
+                    await _jsModule.InvokeVoidAsync("enableDrawPath", SyncWith);
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Error enabling draw mode: {ex.Message}";
+            }
+        }
+        else
+        {
+            await Bus.PublishAsync(new StopDrawingRequestMessage
+            {
+                MapId = SyncWith ?? "",
+                ComponentId = Id
+            }, Id);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ProcessDrawnFeature(object geometry)
+    {
+        try
+        {
+            var geoJson = JsonSerializer.Serialize(geometry);
+            var geometryDict = JsonSerializer.Deserialize<Dictionary<string, object>>(geoJson);
+
+            if (geometryDict != null && geometryDict.ContainsKey("coordinates"))
+            {
+                var coordsJson = JsonSerializer.Serialize(geometryDict["coordinates"]);
+                var coords = JsonSerializer.Deserialize<List<double[]>>(coordsJson);
+
+                if (coords != null && coords.Count >= 2)
+                {
+                    _pathCoordinates = coords;
+                    _drawMode = false;
+                    await GenerateProfile();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error processing drawn feature: {ex.Message}";
+            Console.Error.WriteLine($"Error processing drawn feature: {ex.Message}");
+        }
+    }
+
+    private async Task ProcessImportedRoute(string layerId)
+    {
+        // This would extract coordinates from an imported layer
+        // Implementation would depend on how imported data is stored
+        await Task.CompletedTask;
+    }
+
+    private async Task GenerateProfile()
+    {
+        if (_pathCoordinates.Count < 2)
+        {
+            _errorMessage = "Path must have at least 2 points";
+            return;
+        }
+
+        _isGenerating = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var options = new ElevationProfileOptions
+            {
+                SamplePoints = _samplePoints,
+                Source = _elevationSource,
+                ApiKey = _apiKey,
+                Unit = _unit,
+                SteepGradeThreshold = 10.0,
+                ActivityType = _activityType,
+                CalculateTimeEstimates = _calculateTimeEstimates
+            };
+
+            if (_jsModule != null)
+            {
+                var profileJson = await _jsModule.InvokeAsync<string>(
+                    "generateElevationProfile",
+                    JsonSerializer.Serialize(_pathCoordinates),
+                    JsonSerializer.Serialize(options)
+                );
+
+                var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                _currentProfile = JsonSerializer.Deserialize<ElevationProfile>(profileJson, jsonOptions);
+
+                if (_currentProfile != null)
+                {
+                    await CreateChart();
+
+                    // Publish message
+                    await Bus.PublishAsync(new ElevationProfileGeneratedMessage
+                    {
+                        ProfileId = _currentProfile.Id,
+                        TotalDistance = _currentProfile.TotalDistance,
+                        ElevationGain = _currentProfile.ElevationGain,
+                        ElevationLoss = _currentProfile.ElevationLoss,
+                        ComponentId = Id
+                    }, Id);
+
+                    // Invoke callback
+                    await OnProfileGenerated.InvokeAsync(_currentProfile);
+
+                    // Highlight steep sections on map
+                    if (_currentProfile.SteepSections.Count > 0)
+                    {
+                        await _jsModule.InvokeVoidAsync("highlightSteepSections", SyncWith,
+                            JsonSerializer.Serialize(_currentProfile.SteepSections));
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error generating elevation profile: {ex.Message}";
+            Console.Error.WriteLine($"Error generating profile: {ex.Message}");
+            await OnError.InvokeAsync(ex.Message);
+        }
+        finally
+        {
+            _isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateChart()
+    {
+        if (_jsModule == null || _currentProfile == null) return;
+
+        try
+        {
+            var chartConfig = new ElevationChartConfig
+            {
+                Height = ChartHeight,
+                ShowGradeColors = _showGradeColors,
+                ShowWaypoints = true,
+                Theme = "light",
+                EnableZoom = true
+            };
+
+            await _jsModule.InvokeVoidAsync(
+                "createElevationChart",
+                _chartId,
+                JsonSerializer.Serialize(_currentProfile),
+                JsonSerializer.Serialize(chartConfig),
+                _dotNetRef
+            );
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error creating chart: {ex.Message}";
+            Console.Error.WriteLine($"Error creating chart: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnChartHover(double? distance, int? index)
+    {
+        if (_jsModule == null || _currentProfile == null || !distance.HasValue) return;
+
+        try
+        {
+            var point = _currentProfile.Points.FirstOrDefault(p => Math.Abs(p.Distance - distance.Value) < 10);
+            if (point != null)
+            {
+                await _jsModule.InvokeVoidAsync("updateMapMarker", SyncWith, point.Coordinates);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error on chart hover: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnChartClick(double distance)
+    {
+        if (_currentProfile == null) return;
+
+        try
+        {
+            var point = _currentProfile.Points.OrderBy(p => Math.Abs(p.Distance - distance)).FirstOrDefault();
+            if (point != null)
+            {
+                await Bus.PublishAsync(new FlyToRequestMessage
+                {
+                    MapId = SyncWith ?? "",
+                    Center = point.Coordinates,
+                    Zoom = 15
+                }, Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error on chart click: {ex.Message}");
+        }
+    }
+
+    private async Task ZoomToSection(SteepSection section)
+    {
+        if (section.StartCoordinates == null || section.EndCoordinates == null) return;
+
+        try
+        {
+            var bounds = CalculateBounds(section.StartCoordinates, section.EndCoordinates);
+            await Bus.PublishAsync(new FitBoundsRequestMessage
+            {
+                MapId = SyncWith ?? "",
+                Bounds = bounds,
+                Padding = 50
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error zooming to section: {ex.Message}");
+        }
+    }
+
+    private async Task ZoomToWaypoint(ElevationWaypoint waypoint)
+    {
+        try
+        {
+            await Bus.PublishAsync(new FlyToRequestMessage
+            {
+                MapId = SyncWith ?? "",
+                Center = waypoint.Coordinates,
+                Zoom = 16
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error zooming to waypoint: {ex.Message}");
+        }
+    }
+
+    private async Task ClearProfile()
+    {
+        _currentProfile = null;
+        _pathCoordinates.Clear();
+        _errorMessage = null;
+
+        if (_jsModule != null && SyncWith != null)
+        {
+            await _jsModule.InvokeVoidAsync("clearElevationProfile", SyncWith);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ExportProfile(ElevationExportFormat format)
+    {
+        if (_jsModule == null || _currentProfile == null) return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("exportElevationProfile",
+                _chartId,
+                JsonSerializer.Serialize(_currentProfile),
+                format.ToString().ToLower()
+            );
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error exporting profile: {ex.Message}";
+            Console.Error.WriteLine($"Error exporting: {ex.Message}");
+        }
+    }
+
+    private async Task ShowImportDialog()
+    {
+        // This would trigger a file picker or import wizard
+        await Task.CompletedTask;
+    }
+
+    private bool RequiresApiKey(ElevationSource source)
+    {
+        return source == ElevationSource.MapboxAPI ||
+               source == ElevationSource.GoogleAPI;
+    }
+
+    private string FormatDistance(double meters)
+    {
+        return _unit switch
+        {
+            MeasurementUnitSystem.Imperial => meters >= 1609.34
+                ? $"{(meters / 1609.34):F2} mi"
+                : $"{(meters * 3.28084):F0} ft",
+            _ => meters >= 1000
+                ? $"{(meters / 1000):F2} km"
+                : $"{meters:F0} m"
+        };
+    }
+
+    private string FormatElevation(double meters)
+    {
+        return _unit switch
+        {
+            MeasurementUnitSystem.Imperial => $"{(meters * 3.28084):F0} ft",
+            _ => $"{meters:F0} m"
+        };
+    }
+
+    private string FormatTime(double minutes)
+    {
+        var hours = (int)(minutes / 60);
+        var mins = (int)(minutes % 60);
+        return hours > 0 ? $"{hours}h {mins}m" : $"{mins}m";
+    }
+
+    private string GetWaypointIcon(ElevationWaypointType type)
+    {
+        return type switch
+        {
+            ElevationWaypointType.Start => Icons.Material.Filled.PlayArrow,
+            ElevationWaypointType.End => Icons.Material.Filled.Flag,
+            ElevationWaypointType.Summit => Icons.Material.Filled.Terrain,
+            ElevationWaypointType.Valley => Icons.Material.Filled.Landscape,
+            ElevationWaypointType.Junction => Icons.Material.Filled.CallSplit,
+            ElevationWaypointType.Viewpoint => Icons.Material.Filled.Visibility,
+            ElevationWaypointType.Water => Icons.Material.Filled.Water,
+            ElevationWaypointType.Campsite => Icons.Material.Filled.Cabin,
+            ElevationWaypointType.Hazard => Icons.Material.Filled.Warning,
+            _ => Icons.Material.Filled.Room
+        };
+    }
+
+    private Color GetWaypointColor(ElevationWaypointType type)
+    {
+        return type switch
+        {
+            ElevationWaypointType.Start => Color.Success,
+            ElevationWaypointType.End => Color.Error,
+            ElevationWaypointType.Summit => Color.Primary,
+            ElevationWaypointType.Hazard => Color.Warning,
+            _ => Color.Info
+        };
+    }
+
+    private double[] CalculateBounds(double[] coord1, double[] coord2)
+    {
+        var minLon = Math.Min(coord1[0], coord2[0]);
+        var minLat = Math.Min(coord1[1], coord2[1]);
+        var maxLon = Math.Max(coord1[0], coord2[0]);
+        var maxLat = Math.Max(coord1[1], coord2[1]);
+        return new[] { minLon, minLat, maxLon, maxLat };
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "elevation-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "elevation-floating elevation-top-right",
+            "top-left" => "elevation-floating elevation-top-left",
+            "bottom-right" => "elevation-floating elevation-bottom-right",
+            "bottom-left" => "elevation-floating elevation-bottom-left",
+            _ => "elevation-embedded"
+        };
+    }
+
+    private string GetContainerStyle()
+    {
+        var styles = new List<string>();
+
+        if (!string.IsNullOrEmpty(Width))
+        {
+            styles.Add($"width: {Width}");
+        }
+
+        if (!string.IsNullOrEmpty(Style))
+        {
+            styles.Add(Style);
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("cleanup", SyncWith);
+                await _jsModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

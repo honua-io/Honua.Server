@@ -47,6 +47,15 @@ public sealed class ODataQueryService
         _logger = Guard.NotNull(logger);
     }
 
+    /// <summary>
+    /// Builds an OData query options object and translates it into a FeatureQuery for execution.
+    /// </summary>
+    /// <param name="request">The HTTP request containing OData query parameters ($filter, $top, $skip, etc.)</param>
+    /// <param name="metadata">Metadata describing the OData entity structure and properties</param>
+    /// <param name="entityType">The EDM entity type definition</param>
+    /// <param name="path">Optional OData path object for advanced routing scenarios</param>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>A tuple containing the parsed OData query options and the translated feature query</returns>
     public async Task<(ODataQueryOptions Options, FeatureQuery Query)> BuildFeatureQueryAsync(
         HttpRequest request,
         ODataEntityMetadata metadata,
@@ -54,6 +63,9 @@ public sealed class ODataQueryService
         object? path,
         CancellationToken cancellationToken = default)
     {
+        Guard.NotNull(request);
+        Guard.NotNull(metadata);
+
         var descriptor = await _modelCache
             .GetOrCreateAsync(cancellationToken)
             .ConfigureAwait(false);

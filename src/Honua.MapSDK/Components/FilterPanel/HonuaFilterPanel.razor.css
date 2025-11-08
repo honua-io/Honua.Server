@@ -1,0 +1,251 @@
+.honua-filter-panel {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+}
+
+.filter-panel-header {
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #fafafa;
+}
+
+.filter-panel-header h6 {
+    margin: 0;
+    font-weight: 600;
+    color: #333;
+}
+
+/* Active Filters Display */
+.filter-chips-container {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f5f5f5;
+}
+
+.filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.filter-chips .mud-chip {
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Filter Sections */
+.filter-section {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.filter-section:last-of-type {
+    border-bottom: none;
+}
+
+.filter-content {
+    padding: 16px;
+}
+
+/* Quick Filters */
+.quick-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.quick-filters button {
+    flex: 1;
+    min-width: 100px;
+}
+
+/* Filter Actions */
+.filter-actions {
+    padding: 16px;
+    border-top: 1px solid #e0e0e0;
+    background: #fafafa;
+    margin-top: auto;
+}
+
+/* Expansion Panel Customization */
+::deep .mud-expand-panel {
+    background: transparent !important;
+}
+
+::deep .mud-expand-panel-header {
+    padding: 12px 16px;
+    font-weight: 500;
+    color: #333;
+}
+
+::deep .mud-expand-panel-content {
+    padding: 0 !important;
+}
+
+/* Form Elements Spacing */
+.filter-content .mud-input-control {
+    margin-bottom: 0;
+}
+
+.filter-content .mud-select {
+    margin-bottom: 0;
+}
+
+/* Radio Group */
+::deep .mud-radio-group .mud-radio {
+    margin-bottom: 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    .quick-filters button {
+        flex: 1 1 100%;
+    }
+
+    .filter-chips {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-chips .mud-chip {
+        justify-content: space-between;
+    }
+}
+
+/* Hover Effects */
+.honua-filter-panel ::deep .mud-button:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+}
+
+/* Loading State */
+.honua-filter-panel.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Empty State */
+.filter-empty-state {
+    padding: 32px 16px;
+    text-align: center;
+    color: #757575;
+}
+
+.filter-empty-state svg {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+/* Validation Errors */
+.filter-content .mud-input-error ::deep .mud-input-control-input-container {
+    border-color: #f44336 !important;
+}
+
+/* Helper Text */
+.filter-content ::deep .mud-input-helper-text {
+    font-size: 0.75rem;
+    color: #757575;
+    margin-top: 4px;
+}
+
+/* Panel Variants */
+.honua-filter-panel.compact {
+    box-shadow: none;
+    border: 1px solid #e0e0e0;
+}
+
+.honua-filter-panel.compact .filter-panel-header {
+    padding: 12px;
+}
+
+.honua-filter-panel.compact .filter-content {
+    padding: 12px;
+}
+
+.honua-filter-panel.floating {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 320px;
+    max-height: calc(100% - 32px);
+    z-index: 1000;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .honua-filter-panel {
+        background: #1e1e1e;
+        color: #e0e0e0;
+    }
+
+    .filter-panel-header {
+        background: #2d2d2d;
+        border-bottom-color: #404040;
+    }
+
+    .filter-chips-container {
+        background: #252525;
+        border-bottom-color: #404040;
+    }
+
+    .filter-section {
+        border-bottom-color: #404040;
+    }
+
+    .filter-actions {
+        background: #2d2d2d;
+        border-top-color: #404040;
+    }
+
+    .honua-filter-panel.compact {
+        border-color: #404040;
+    }
+}
+
+/* Accessibility */
+.honua-filter-panel:focus-within {
+    outline: 2px solid #2196f3;
+    outline-offset: 2px;
+}
+
+/* Smooth Transitions */
+.filter-content,
+.filter-chips-container,
+.filter-actions {
+    transition: all 0.3s ease;
+}
+
+/* Custom Scrollbar */
+.honua-filter-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.honua-filter-panel::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.honua-filter-panel::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.honua-filter-panel::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

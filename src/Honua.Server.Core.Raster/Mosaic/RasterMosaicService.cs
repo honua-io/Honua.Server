@@ -244,8 +244,8 @@ public sealed class RasterMosaicService : IRasterMosaicService
 
         return method switch
         {
-            RasterMosaicMethod.Min => values.OrderBy(c => c.Red + c.Green + c.Blue).First(),
-            RasterMosaicMethod.Max => values.OrderByDescending(c => c.Red + c.Green + c.Blue).First(),
+            RasterMosaicMethod.Min => values.MinBy(c => c.Red + c.Green + c.Blue),
+            RasterMosaicMethod.Max => values.MaxBy(c => c.Red + c.Green + c.Blue),
             RasterMosaicMethod.Mean => AverageColor(values),
             RasterMosaicMethod.Median => MedianColor(values),
             _ => values.First()

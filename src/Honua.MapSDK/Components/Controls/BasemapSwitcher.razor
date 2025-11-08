@@ -1,0 +1,475 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@inject ComponentBus Bus
+
+<div class="honua-basemap-switcher @CssClass" style="@Style">
+    <div class="basemap-switcher-header">
+        <h3>@Title</h3>
+        @if (Collapsible)
+        {
+            <button class="btn btn-sm btn-link"
+                    @onclick="ToggleExpanded"
+                    title="@(IsExpanded ? "Collapse" : "Expand")">
+                <i class="bi @(IsExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
+            </button>
+        }
+    </div>
+
+    @if (IsExpanded)
+    {
+        <div class="basemap-switcher-body">
+            @if (ShowSearch && _basemaps.Count > 6)
+            {
+                <div class="basemap-search">
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           placeholder="Search basemaps..."
+                           @bind="_searchQuery"
+                           @bind:event="oninput" />
+                </div>
+            }
+
+            <div class="basemap-grid" style="@GetGridStyle()">
+                @foreach (var basemap in GetFilteredBasemaps())
+                {
+                    <div class="basemap-item @(IsCurrentBasemap(basemap) ? "active" : "")"
+                         @onclick="() => SelectBasemap(basemap)"
+                         title="@basemap.Description">
+                        <div class="basemap-thumbnail">
+                            @if (!string.IsNullOrWhiteSpace(basemap.ThumbnailUrl))
+                            {
+                                <img src="@basemap.ThumbnailUrl" alt="@basemap.Name" loading="lazy" />
+                            }
+                            else
+                            {
+                                <div class="basemap-placeholder" style="background-color: @(basemap.PreviewColor ?? "#e0e0e0")">
+                                    <i class="bi bi-map"></i>
+                                </div>
+                            }
+                            @if (IsCurrentBasemap(basemap))
+                            {
+                                <div class="basemap-checkmark">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                </div>
+                            }
+                        </div>
+                        <div class="basemap-name">@basemap.Name</div>
+                        @if (ShowAttribution && !string.IsNullOrWhiteSpace(basemap.Attribution))
+                        {
+                            <div class="basemap-attribution" title="@basemap.Attribution">
+                                @basemap.Attribution
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (!GetFilteredBasemaps().Any())
+            {
+                <div class="basemap-empty">
+                    @if (!string.IsNullOrWhiteSpace(_searchQuery))
+                    {
+                        <p>No basemaps match "@_searchQuery"</p>
+                    }
+                    else
+                    {
+                        <p>No basemaps available</p>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string MapId { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Title { get; set; } = "Basemaps";
+
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    [Parameter]
+    public string Style { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool Collapsible { get; set; } = true;
+
+    [Parameter]
+    public bool InitiallyExpanded { get; set; } = false;
+
+    [Parameter]
+    public bool ShowSearch { get; set; } = true;
+
+    [Parameter]
+    public bool ShowAttribution { get; set; } = false;
+
+    [Parameter]
+    public int Columns { get; set; } = 3;
+
+    [Parameter]
+    public List<BasemapDefinition> Basemaps { get; set; } = new();
+
+    [Parameter]
+    public string? CurrentBasemapId { get; set; }
+
+    [Parameter]
+    public EventCallback<BasemapDefinition> OnBasemapChanged { get; set; }
+
+    private bool IsExpanded;
+    private string _searchQuery = string.Empty;
+    private List<BasemapDefinition> _basemaps = new();
+
+    protected override void OnInitialized()
+    {
+        IsExpanded = InitiallyExpanded;
+
+        // Initialize with default basemaps if none provided
+        if (!Basemaps.Any())
+        {
+            _basemaps = GetDefaultBasemaps();
+        }
+        else
+        {
+            _basemaps = Basemaps;
+        }
+
+        // Set current basemap to first if not specified
+        if (string.IsNullOrWhiteSpace(CurrentBasemapId) && _basemaps.Any())
+        {
+            CurrentBasemapId = _basemaps[0].Id;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Basemaps.Any())
+        {
+            _basemaps = Basemaps;
+        }
+    }
+
+    private void ToggleExpanded()
+    {
+        IsExpanded = !IsExpanded;
+    }
+
+    private IEnumerable<BasemapDefinition> GetFilteredBasemaps()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery))
+            return _basemaps;
+
+        var query = _searchQuery.ToLower();
+        return _basemaps.Where(b =>
+            b.Name.ToLower().Contains(query) ||
+            (b.Description?.ToLower().Contains(query) ?? false) ||
+            (b.Tags?.Any(t => t.ToLower().Contains(query)) ?? false)
+        );
+    }
+
+    private bool IsCurrentBasemap(BasemapDefinition basemap)
+    {
+        return basemap.Id == CurrentBasemapId;
+    }
+
+    private async Task SelectBasemap(BasemapDefinition basemap)
+    {
+        if (IsCurrentBasemap(basemap))
+            return;
+
+        CurrentBasemapId = basemap.Id;
+
+        // Publish basemap change to ComponentBus
+        await Bus.PublishAsync(new BasemapChangedMessage
+        {
+            MapId = MapId,
+            Style = basemap.StyleUrl
+        });
+
+        // Invoke callback
+        await OnBasemapChanged.InvokeAsync(basemap);
+    }
+
+    private string GetGridStyle()
+    {
+        return $"grid-template-columns: repeat({Columns}, 1fr);";
+    }
+
+    private List<BasemapDefinition> GetDefaultBasemaps()
+    {
+        return new List<BasemapDefinition>
+        {
+            new BasemapDefinition
+            {
+                Id = "osm-standard",
+                Name = "OpenStreetMap",
+                Description = "Standard OpenStreetMap style",
+                StyleUrl = "https://demotiles.maplibre.org/style.json",
+                ThumbnailUrl = "https://wiki.openstreetmap.org/w/images/7/79/Osm_logo.svg",
+                Attribution = "© OpenStreetMap contributors",
+                Tags = new[] { "street", "standard", "free" }
+            },
+            new BasemapDefinition
+            {
+                Id = "osm-humanitarian",
+                Name = "OSM Humanitarian",
+                Description = "Humanitarian OpenStreetMap style",
+                StyleUrl = "https://tile.openstreetmap.org/hot/{z}/{x}/{y}.png",
+                PreviewColor = "#f0f0f0",
+                Attribution = "© OpenStreetMap contributors",
+                Tags = new[] { "humanitarian", "street" }
+            },
+            new BasemapDefinition
+            {
+                Id = "carto-light",
+                Name = "Light",
+                Description = "Light basemap by Carto",
+                StyleUrl = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                PreviewColor = "#f5f5f5",
+                Attribution = "© CARTO",
+                Tags = new[] { "light", "minimal", "clean" }
+            },
+            new BasemapDefinition
+            {
+                Id = "carto-dark",
+                Name = "Dark",
+                Description = "Dark basemap by Carto",
+                StyleUrl = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+                PreviewColor = "#2c3e50",
+                Attribution = "© CARTO",
+                Tags = new[] { "dark", "night" }
+            },
+            new BasemapDefinition
+            {
+                Id = "satellite",
+                Name = "Satellite",
+                Description = "Satellite imagery",
+                StyleUrl = "satellite://default",
+                PreviewColor = "#34495e",
+                Attribution = "Satellite imagery",
+                Tags = new[] { "satellite", "imagery", "aerial" }
+            },
+            new BasemapDefinition
+            {
+                Id = "terrain",
+                Name = "Terrain",
+                Description = "Topographic terrain map",
+                StyleUrl = "terrain://default",
+                PreviewColor = "#d4c5a9",
+                Attribution = "Terrain data",
+                Tags = new[] { "terrain", "topographic", "elevation" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Add a basemap to the switcher
+    /// </summary>
+    public void AddBasemap(BasemapDefinition basemap)
+    {
+        if (!_basemaps.Any(b => b.Id == basemap.Id))
+        {
+            _basemaps.Add(basemap);
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Remove a basemap from the switcher
+    /// </summary>
+    public void RemoveBasemap(string basemapId)
+    {
+        _basemaps.RemoveAll(b => b.Id == basemapId);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Set the current basemap
+    /// </summary>
+    public async Task SetCurrentBasemap(string basemapId)
+    {
+        var basemap = _basemaps.FirstOrDefault(b => b.Id == basemapId);
+        if (basemap != null)
+        {
+            await SelectBasemap(basemap);
+        }
+    }
+}
+
+<style>
+    .honua-basemap-switcher {
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        width: 320px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+    }
+
+    .basemap-switcher-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .basemap-switcher-header h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .basemap-switcher-body {
+        padding: 12px;
+    }
+
+    .basemap-search {
+        margin-bottom: 12px;
+    }
+
+    .basemap-grid {
+        display: grid;
+        gap: 12px;
+    }
+
+    .basemap-item {
+        cursor: pointer;
+        border-radius: 4px;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 2px solid transparent;
+    }
+
+    .basemap-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .basemap-item.active {
+        border-color: #007bff;
+    }
+
+    .basemap-thumbnail {
+        position: relative;
+        width: 100%;
+        padding-top: 75%;
+        background: #f5f5f5;
+        overflow: hidden;
+    }
+
+    .basemap-thumbnail img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .basemap-placeholder {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: #999;
+    }
+
+    .basemap-checkmark {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        color: #007bff;
+        font-size: 24px;
+        filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
+    }
+
+    .basemap-name {
+        padding: 8px;
+        font-weight: 500;
+        text-align: center;
+        background: white;
+    }
+
+    .basemap-attribution {
+        padding: 4px 8px;
+        font-size: 11px;
+        color: #666;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        background: #f9f9f9;
+    }
+
+    .basemap-empty {
+        text-align: center;
+        padding: 24px;
+        color: #999;
+    }
+
+    /* Mobile responsive */
+    @@media (max-width: 768px) {
+        .honua-basemap-switcher {
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .basemap-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+    }
+
+    /* Dark theme support */
+    @@media (prefers-color-scheme: dark) {
+        .honua-basemap-switcher {
+            background: #2d2d2d;
+            color: #e0e0e0;
+        }
+
+        .basemap-switcher-header {
+            border-bottom-color: #444;
+        }
+
+        .basemap-name {
+            background: #2d2d2d;
+        }
+
+        .basemap-attribution {
+            background: #3a3a3a;
+            color: #aaa;
+        }
+
+        .basemap-thumbnail {
+            background: #3a3a3a;
+        }
+
+        .basemap-placeholder {
+            color: #666;
+        }
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Basemap definition for the switcher
+    /// </summary>
+    public class BasemapDefinition
+    {
+        public required string Id { get; set; }
+        public required string Name { get; set; }
+        public string? Description { get; set; }
+        public required string StyleUrl { get; set; }
+        public string? ThumbnailUrl { get; set; }
+        public string? PreviewColor { get; set; }
+        public string? Attribution { get; set; }
+        public string[]? Tags { get; set; }
+    }
+}

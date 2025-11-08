@@ -1,0 +1,108 @@
+{
+  "id": "simple-buffer-fixed-distance",
+  "name": "Simple Buffer with Fixed Distance",
+  "description": "Create fixed-distance buffers around input features. The most common buffer operation for proximity analysis.",
+  "category": "Buffer Operations",
+  "icon": "circle",
+  "difficulty": 0,
+  "estimatedMinutes": 2,
+  "tags": ["buffer", "proximity", "distance"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "Point, line, or polygon features"
+  ],
+  "expectedOutputs": [
+    "Polygon features representing buffer zones"
+  ],
+  "useCases": [
+    "Creating protection zones around sensitive areas",
+    "Analyzing service areas around facilities",
+    "Defining impact zones for planning"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Features",
+      "description": "Read input features",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "points",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "buffer",
+      "name": "Create Buffer",
+      "description": "Generate buffer zones",
+      "parameters": {
+        "distance": 1000.0,
+        "units": "meters",
+        "quadrantSegments": 8,
+        "endCapStyle": "round"
+      },
+      "position": {
+        "x": 300,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Buffers",
+      "description": "Store buffer results",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "buffers",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 500,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "bufferDistance": {
+      "name": "bufferDistance",
+      "type": "number",
+      "description": "Buffer distance in meters",
+      "defaultValue": 1000.0,
+      "required": true,
+      "min": 0
+    },
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "Input feature table",
+      "defaultValue": "points",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Output buffer table",
+      "defaultValue": "buffers",
+      "required": true
+    }
+  }
+}

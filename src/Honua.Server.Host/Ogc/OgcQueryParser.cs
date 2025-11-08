@@ -79,11 +79,9 @@ internal static class OgcQueryParser
         {
             if (MediaTypeHeaderValue.TryParseList(acceptValues, out var parsedAccepts))
             {
-                var ordered = parsedAccepts
-                    .OrderByDescending(value => value.Quality ?? 1.0)
-                    .ToList();
-
-                foreach (var media in ordered)
+                // Use lazy evaluation - no need to materialize with ToList() when only iterating
+                foreach (var media in parsedAccepts
+                    .OrderByDescending(value => value.Quality ?? 1.0))
                 {
                     var mediaType = media.MediaType.ToString();
                     if (mediaType.IsNullOrWhiteSpace())
@@ -102,7 +100,8 @@ internal static class OgcQueryParser
                     }
                 }
 
-                return (default, string.Empty, OgcProblemDetails.CreateNotAcceptableProblem("None of the requested media types are supported."));
+                // If no Accept header media types matched, fall back to default format (GeoJSON)
+                // This is more lenient than returning 406 and aligns with OGC best practices
             }
         }
 

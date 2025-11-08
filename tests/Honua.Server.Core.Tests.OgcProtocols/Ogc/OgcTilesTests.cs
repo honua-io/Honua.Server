@@ -28,6 +28,7 @@ public class OgcTilesTests
         var resolver = OgcTestUtilities.CreateResolver(metadataRegistry);
         var rasterRegistry = new RasterDatasetRegistry(metadataRegistry);
         var cacheHeaderService = OgcTestUtilities.CreateCacheHeaderService();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext("/ogc/collections/roads::roads-primary/tiles", string.Empty);
 
         var result = await OgcTilesHandlers.GetCollectionTileSets(
@@ -36,6 +37,7 @@ public class OgcTilesTests
             resolver,
             rasterRegistry,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
         await result.ExecuteAsync(context);
 
@@ -64,6 +66,7 @@ public class OgcTilesTests
         var resolver = OgcTestUtilities.CreateResolver(metadataRegistry);
         var rasterRegistry = new RasterDatasetRegistry(metadataRegistry);
         var cacheHeaderService = OgcTestUtilities.CreateCacheHeaderService();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext("/ogc/collections/roads::roads-primary/tiles/roads-imagery", string.Empty);
 
         var result = await OgcTilesHandlers.GetCollectionTileSet(
@@ -73,6 +76,7 @@ public class OgcTilesTests
             resolver,
             rasterRegistry,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
         await result.ExecuteAsync(context);
 
@@ -97,6 +101,7 @@ public class OgcTilesTests
         var resolver = OgcTestUtilities.CreateResolver(metadataRegistry);
         var rasterRegistry = new RasterDatasetRegistry(metadataRegistry);
         var cacheHeaderService = OgcTestUtilities.CreateCacheHeaderService();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext("/ogc/collections/roads::roads-primary/tiles/roads-imagery/tilejson", string.Empty);
 
         var result = await OgcTilesHandlers.GetCollectionTileJson(
@@ -106,6 +111,7 @@ public class OgcTilesTests
             resolver,
             rasterRegistry,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
         await result.ExecuteAsync(context);
 
@@ -145,6 +151,7 @@ public class OgcTilesTests
         var resolver = OgcTestUtilities.CreateResolver(metadataRegistry);
         var rasterRegistry = new RasterDatasetRegistry(metadataRegistry);
         var cacheHeaderService = OgcTestUtilities.CreateCacheHeaderService();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var queryString = string.Join('&', new[]
         {
             "tileMatrixSet=WorldCRS84Quad",
@@ -164,6 +171,7 @@ public class OgcTilesTests
             resolver,
             rasterRegistry,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
         await result.ExecuteAsync(context);
 
@@ -207,6 +215,7 @@ public class OgcTilesTests
         var resolver = OgcTestUtilities.CreateResolver(metadataRegistry);
         var rasterRegistry = new RasterDatasetRegistry(metadataRegistry);
         var cacheHeaderService = OgcTestUtilities.CreateCacheHeaderService();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad",
             string.Empty);
@@ -219,6 +228,7 @@ public class OgcTilesTests
             resolver,
             rasterRegistry,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -245,6 +255,7 @@ public class OgcTilesTests
         var resolver = OgcTestUtilities.CreateResolver(metadataRegistry);
         var rasterRegistry = new RasterDatasetRegistry(metadataRegistry);
         var cacheHeaderService = OgcTestUtilities.CreateCacheHeaderService();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldWebMercatorQuad",
             string.Empty);
@@ -257,6 +268,7 @@ public class OgcTilesTests
             resolver,
             rasterRegistry,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -287,6 +299,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad/0/0/0",
             "tileSize=128&format=png");
@@ -308,6 +321,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -329,6 +343,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldWebMercatorQuad/0/0/0",
             "tileSize=128&format=png");
@@ -350,6 +365,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -371,6 +387,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         async Task<byte[]> RenderAsync(string query)
         {
             var context = OgcTestUtilities.CreateHttpContext(
@@ -394,6 +411,7 @@ public class OgcTilesTests
                 tileCacheProvider,
                 tileCacheMetrics,
                 cacheHeaderService,
+                tilesHandler,
                 CancellationToken.None);
 
             await result.ExecuteAsync(context);
@@ -421,6 +439,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad/0/0/0",
             "styleId=unknown");
@@ -442,6 +461,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -461,6 +481,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-vectortiles/WorldCRS84Quad/0/0/0",
             "format=pmtiles");
@@ -482,6 +503,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -510,6 +532,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad/0/0/0",
             "datetime=2024-01-01");
@@ -531,6 +554,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -553,6 +577,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad/0/0/0",
             $"datetime={Uri.EscapeDataString(datetime)}");
@@ -574,6 +599,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -596,6 +622,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad/0/0/0",
             $"datetime={Uri.EscapeDataString(interval)}");
@@ -617,6 +644,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -639,6 +667,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad/0/0/0",
             $"datetime={datetime}");
@@ -660,6 +689,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -679,6 +709,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad/0/0/0",
             "datetime=2024-12-31..2024-01-01"); // start > end
@@ -700,6 +731,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -719,6 +751,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext(
             "/ogc/collections/roads::roads-primary/tiles/roads-imagery/WorldCRS84Quad/0/0/0",
             "datetime=2024-01-01..P1M"); // 1 month duration
@@ -740,6 +773,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -758,6 +792,7 @@ public class OgcTilesTests
         var resolver = OgcTestUtilities.CreateResolver(metadataRegistry);
         var rasterRegistry = new RasterDatasetRegistry(metadataRegistry);
         var cacheHeaderService = OgcTestUtilities.CreateCacheHeaderService();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext("/ogc/collections/roads::roads-primary/tiles/roads-imagery", string.Empty);
 
         var result = await OgcTilesHandlers.GetCollectionTileSet(
@@ -767,6 +802,7 @@ public class OgcTilesTests
             resolver,
             rasterRegistry,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
         await result.ExecuteAsync(context);
 
@@ -794,6 +830,7 @@ public class OgcTilesTests
         var resolver = OgcTestUtilities.CreateResolver(metadataRegistry);
         var rasterRegistry = new RasterDatasetRegistry(metadataRegistry);
         var cacheHeaderService = OgcTestUtilities.CreateCacheHeaderService();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
         var context = OgcTestUtilities.CreateHttpContext("/ogc/collections/roads::roads-primary/tiles/roads-imagery", string.Empty);
 
         var result = await OgcTilesHandlers.GetCollectionTileSet(
@@ -803,6 +840,7 @@ public class OgcTilesTests
             resolver,
             rasterRegistry,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
         await result.ExecuteAsync(context);
 
@@ -849,6 +887,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
 
         // Use standard OGC pattern without tilesetId
         var context = OgcTestUtilities.CreateHttpContext(
@@ -871,6 +910,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -892,6 +932,7 @@ public class OgcTilesTests
         var pmTilesExporter = OgcTestUtilities.CreatePmTilesExporter();
         var tileCacheProvider = OgcTestUtilities.CreateRasterTileCacheProvider();
         var tileCacheMetrics = OgcTestUtilities.CreateRasterTileCacheMetrics();
+        var tilesHandler = OgcTestUtilities.CreateOgcTilesHandlerStub();
 
         // Use standard OGC pattern without tilesetId
         var context = OgcTestUtilities.CreateHttpContext(
@@ -914,6 +955,7 @@ public class OgcTilesTests
             tileCacheProvider,
             tileCacheMetrics,
             cacheHeaderService,
+            tilesHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

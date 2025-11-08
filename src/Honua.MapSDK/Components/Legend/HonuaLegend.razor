@@ -1,0 +1,533 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@implements IDisposable
+@inject ComponentBus Bus
+
+<div class="honua-legend @CssClass @GetPositionClass()" style="@Style">
+    @if (Collapsible)
+    {
+        <div class="legend-header" @onclick="ToggleCollapsed">
+            <div class="legend-title">
+                <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Small" />
+                <span>@Title</span>
+                <span class="layer-count">(@_layers.Count)</span>
+            </div>
+            <MudIconButton
+                Icon="@(IsCollapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)"
+                Size="Size.Small"
+                aria-label="Toggle legend" />
+        </div>
+    }
+    else
+    {
+        <div class="legend-header">
+            <div class="legend-title">
+                <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Small" />
+                <span>@Title</span>
+                <span class="layer-count">(@_layers.Count)</span>
+            </div>
+        </div>
+    }
+
+    @if (!IsCollapsed)
+    {
+        <div class="legend-content">
+            @if (_layers.Count == 0)
+            {
+                <div class="empty-state">
+                    <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">No layers added yet</MudText>
+                </div>
+            }
+            else
+            {
+                @if (ShowGroups)
+                {
+                    @* Basemap Group *@
+                    @if (_layers.Any(l => l.Group == "basemap"))
+                    {
+                        <div class="layer-group">
+                            <div class="group-header" @onclick='() => ToggleGroup("basemap")'>
+                                <MudIcon Icon="@(_expandedGroups.Contains("basemap") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                                <span>Basemaps</span>
+                                <span class="layer-count">(@_layers.Count(l => l.Group == "basemap"))</span>
+                            </div>
+                            @if (_expandedGroups.Contains("basemap"))
+                            {
+                                <div class="group-content">
+                                    @foreach (var layer in _layers.Where(l => l.Group == "basemap").OrderBy(l => l.ZIndex))
+                                    {
+                                        @RenderLayer(layer)
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @* Overlays Group *@
+                    @if (_layers.Any(l => l.Group == "overlay"))
+                    {
+                        <div class="layer-group">
+                            <div class="group-header" @onclick='() => ToggleGroup("overlay")'>
+                                <MudIcon Icon="@(_expandedGroups.Contains("overlay") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                                <span>Overlays</span>
+                                <span class="layer-count">(@_layers.Count(l => l.Group == "overlay"))</span>
+                            </div>
+                            @if (_expandedGroups.Contains("overlay"))
+                            {
+                                <div class="group-content">
+                                    @foreach (var layer in _layers.Where(l => l.Group == "overlay").OrderByDescending(l => l.ZIndex))
+                                    {
+                                        @RenderLayer(layer)
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @* Default Group (no explicit group) *@
+                    @if (_layers.Any(l => l.Group == "default"))
+                    {
+                        <div class="layer-group">
+                            <div class="group-header" @onclick='() => ToggleGroup("default")'>
+                                <MudIcon Icon="@(_expandedGroups.Contains("default") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                                <span>Layers</span>
+                                <span class="layer-count">(@_layers.Count(l => l.Group == "default"))</span>
+                            </div>
+                            @if (_expandedGroups.Contains("default"))
+                            {
+                                <div class="group-content">
+                                    @foreach (var layer in _layers.Where(l => l.Group == "default").OrderByDescending(l => l.ZIndex))
+                                    {
+                                        @RenderLayer(layer)
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    @* Flat list without groups *@
+                    <div class="layer-list">
+                        @foreach (var layer in _layers.OrderByDescending(l => l.ZIndex))
+                        {
+                            @RenderLayer(layer)
+                        }
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the legend component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"legend-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with (if specified, only shows layers for this map)
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Title displayed in legend header
+    /// </summary>
+    [Parameter]
+    public string Title { get; set; } = "Map Layers";
+
+    /// <summary>
+    /// Position on the map: top-right, top-left, bottom-right, bottom-left, or null for embedded
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; }
+
+    /// <summary>
+    /// Whether the legend can be collapsed
+    /// </summary>
+    [Parameter]
+    public bool Collapsible { get; set; } = true;
+
+    /// <summary>
+    /// Initial collapsed state
+    /// </summary>
+    [Parameter]
+    public bool InitiallyCollapsed { get; set; } = false;
+
+    /// <summary>
+    /// Show opacity sliders for each layer
+    /// </summary>
+    [Parameter]
+    public bool ShowOpacity { get; set; } = true;
+
+    /// <summary>
+    /// Show drag handles for reordering (future feature)
+    /// </summary>
+    [Parameter]
+    public bool ShowReorder { get; set; } = false;
+
+    /// <summary>
+    /// Group layers by type (basemap, overlay, etc.)
+    /// </summary>
+    [Parameter]
+    public bool ShowGroups { get; set; } = true;
+
+    /// <summary>
+    /// Show layer type icons
+    /// </summary>
+    [Parameter]
+    public bool ShowTypeIcons { get; set; } = true;
+
+    /// <summary>
+    /// Show legend symbols/swatches
+    /// </summary>
+    [Parameter]
+    public bool ShowSymbols { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Maximum height of legend content
+    /// </summary>
+    [Parameter]
+    public string MaxHeight { get; set; } = "400px";
+
+    private bool IsCollapsed { get; set; }
+    private List<LegendLayer> _layers = new();
+    private HashSet<string> _expandedGroups = new() { "basemap", "overlay", "default" };
+
+    protected override void OnInitialized()
+    {
+        IsCollapsed = InitiallyCollapsed;
+        SetupSubscriptions();
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for layers being added
+        Bus.Subscribe<LayerAddedMessage>(args =>
+        {
+            var layer = new LegendLayer
+            {
+                Id = args.Message.LayerId,
+                Name = args.Message.LayerName,
+                Visible = true,
+                Opacity = 1.0,
+                Type = LayerType.Vector,
+                Group = DetermineLayerGroup(args.Message.LayerName),
+                ZIndex = _layers.Count
+            };
+
+            _layers.Add(layer);
+            InvokeAsync(StateHasChanged);
+        });
+
+        // Listen for layers being removed
+        Bus.Subscribe<LayerRemovedMessage>(args =>
+        {
+            var layer = _layers.FirstOrDefault(l => l.Id == args.Message.LayerId);
+            if (layer != null)
+            {
+                _layers.Remove(layer);
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for visibility changes from other sources
+        Bus.Subscribe<LayerVisibilityChangedMessage>(args =>
+        {
+            var layer = _layers.FirstOrDefault(l => l.Id == args.Message.LayerId);
+            if (layer != null && layer.Visible != args.Message.Visible)
+            {
+                layer.Visible = args.Message.Visible;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for opacity changes from other sources
+        Bus.Subscribe<LayerOpacityChangedMessage>(args =>
+        {
+            var layer = _layers.FirstOrDefault(l => l.Id == args.Message.LayerId);
+            if (layer != null && Math.Abs(layer.Opacity - args.Message.Opacity) > 0.01)
+            {
+                layer.Opacity = args.Message.Opacity;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private RenderFragment RenderLayer(LegendLayer layer) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "layer-item");
+        builder.AddAttribute(2, "data-layer-id", layer.Id);
+
+        // Layer info section
+        builder.OpenElement(3, "div");
+        builder.AddAttribute(4, "class", "layer-info");
+
+        // Visibility toggle
+        builder.OpenComponent<MudCheckBox<bool>>(5);
+        builder.AddAttribute(6, "Checked", layer.Visible);
+        builder.AddAttribute(7, "CheckedChanged", EventCallback.Factory.Create<bool>(this, value => OnVisibilityChanged(layer, value)));
+        builder.AddAttribute(8, "Color", Color.Primary);
+        builder.AddAttribute(9, "Size", Size.Small);
+        builder.AddAttribute(10, "Class", "layer-visibility-toggle");
+        builder.CloseComponent();
+
+        // Layer symbol/icon
+        if (ShowSymbols || ShowTypeIcons)
+        {
+            builder.OpenElement(11, "div");
+            builder.AddAttribute(12, "class", "layer-symbol");
+
+            if (ShowSymbols && layer.Style != null)
+            {
+                builder.OpenElement(13, "div");
+                builder.AddAttribute(14, "class", $"symbol-swatch {GetSymbolClass(layer.Type)}");
+                builder.AddAttribute(15, "style", GetSymbolStyle(layer));
+                builder.CloseElement();
+            }
+            else if (ShowTypeIcons)
+            {
+                builder.OpenComponent<MudIcon>(16);
+                builder.AddAttribute(17, "Icon", GetLayerIcon(layer.Type));
+                builder.AddAttribute(18, "Size", Size.Small);
+                builder.AddAttribute(19, "Color", Color.Default);
+                builder.CloseComponent();
+            }
+
+            builder.CloseElement();
+        }
+
+        // Layer name and type
+        builder.OpenElement(20, "div");
+        builder.AddAttribute(21, "class", "layer-details");
+
+        builder.OpenComponent<MudText>(22);
+        builder.AddAttribute(23, "Typo", Typo.body2);
+        builder.AddAttribute(24, "Class", "layer-name");
+        builder.AddAttribute(25, "ChildContent", (RenderFragment)(b2 =>
+        {
+            b2.AddContent(26, layer.Name);
+        }));
+        builder.CloseComponent();
+
+        builder.OpenComponent<MudText>(27);
+        builder.AddAttribute(28, "Typo", Typo.caption);
+        builder.AddAttribute(29, "Color", Color.Secondary);
+        builder.AddAttribute(30, "Class", "layer-type");
+        builder.AddAttribute(31, "ChildContent", (RenderFragment)(b2 =>
+        {
+            b2.AddContent(32, layer.Type.ToString());
+        }));
+        builder.CloseComponent();
+
+        builder.CloseElement(); // layer-details
+
+        builder.CloseElement(); // layer-info
+
+        // Opacity slider (if enabled)
+        if (ShowOpacity)
+        {
+            builder.OpenElement(33, "div");
+            builder.AddAttribute(34, "class", "layer-opacity");
+
+            builder.OpenComponent<MudSlider<double>>(35);
+            builder.AddAttribute(36, "Value", layer.Opacity * 100);
+            builder.AddAttribute(37, "ValueChanged", EventCallback.Factory.Create<double>(this, value => OnOpacityChanged(layer, value / 100.0)));
+            builder.AddAttribute(38, "Min", 0.0);
+            builder.AddAttribute(39, "Max", 100.0);
+            builder.AddAttribute(40, "Step", 5.0);
+            builder.AddAttribute(41, "Size", Size.Small);
+            builder.AddAttribute(42, "Color", Color.Primary);
+            builder.AddAttribute(43, "Class", "layer-opacity-slider");
+            builder.CloseComponent();
+
+            builder.OpenComponent<MudText>(44);
+            builder.AddAttribute(45, "Typo", Typo.caption);
+            builder.AddAttribute(46, "Class", "opacity-value");
+            builder.AddAttribute(47, "ChildContent", (RenderFragment)(b2 =>
+            {
+                b2.AddContent(48, $"{layer.Opacity * 100:F0}%");
+            }));
+            builder.CloseComponent();
+
+            builder.CloseElement(); // layer-opacity
+        }
+
+        builder.CloseElement(); // layer-item
+    };
+
+    private async Task OnVisibilityChanged(LegendLayer layer, bool visible)
+    {
+        layer.Visible = visible;
+
+        await Bus.PublishAsync(new LayerVisibilityChangedMessage
+        {
+            LayerId = layer.Id,
+            Visible = visible
+        }, Id);
+
+        StateHasChanged();
+    }
+
+    private async Task OnOpacityChanged(LegendLayer layer, double opacity)
+    {
+        layer.Opacity = Math.Clamp(opacity, 0.0, 1.0);
+
+        await Bus.PublishAsync(new LayerOpacityChangedMessage
+        {
+            LayerId = layer.Id,
+            Opacity = layer.Opacity
+        }, Id);
+
+        StateHasChanged();
+    }
+
+    private void ToggleCollapsed()
+    {
+        IsCollapsed = !IsCollapsed;
+    }
+
+    private void ToggleGroup(string groupName)
+    {
+        if (_expandedGroups.Contains(groupName))
+        {
+            _expandedGroups.Remove(groupName);
+        }
+        else
+        {
+            _expandedGroups.Add(groupName);
+        }
+    }
+
+    private string DetermineLayerGroup(string layerName)
+    {
+        var lower = layerName.ToLowerInvariant();
+
+        if (lower.Contains("basemap") || lower.Contains("base") || lower.Contains("background"))
+            return "basemap";
+
+        if (lower.Contains("overlay") || lower.Contains("vector") || lower.Contains("feature"))
+            return "overlay";
+
+        return "default";
+    }
+
+    private string GetLayerIcon(LayerType type)
+    {
+        return type switch
+        {
+            LayerType.Vector => Icons.Material.Filled.Layers,
+            LayerType.Raster => Icons.Material.Filled.Image,
+            LayerType.ThreeD => Icons.Material.Filled.ViewInAr,
+            LayerType.Heatmap => Icons.Material.Filled.Gradient,
+            LayerType.Cluster => Icons.Material.Filled.BubbleChart,
+            LayerType.Line => Icons.Material.Filled.Timeline,
+            LayerType.Fill => Icons.Material.Filled.Rectangle,
+            LayerType.Symbol => Icons.Material.Filled.Place,
+            _ => Icons.Material.Filled.Layers
+        };
+    }
+
+    private string GetSymbolClass(LayerType type)
+    {
+        return type switch
+        {
+            LayerType.Line => "symbol-line",
+            LayerType.Fill => "symbol-fill",
+            LayerType.Symbol => "symbol-point",
+            LayerType.Heatmap => "symbol-heatmap",
+            _ => "symbol-generic"
+        };
+    }
+
+    private string GetSymbolStyle(LegendLayer layer)
+    {
+        if (layer.Style == null) return "";
+
+        var styles = new List<string>();
+
+        if (layer.Style.FillColor != null)
+        {
+            var color = GetColorString(layer.Style.FillColor);
+            styles.Add($"background-color: {color}");
+        }
+
+        if (layer.Style.LineColor != null)
+        {
+            var color = GetColorString(layer.Style.LineColor);
+            var width = layer.Style.LineWidth ?? 2;
+            styles.Add($"border: {width}px solid {color}");
+        }
+
+        if (layer.Style.CircleColor != null)
+        {
+            var color = GetColorString(layer.Style.CircleColor);
+            styles.Add($"background-color: {color}");
+            styles.Add("border-radius: 50%");
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    private string GetColorString(object colorObj)
+    {
+        if (colorObj is string colorStr)
+            return colorStr;
+
+        // For more complex color expressions, default to a standard color
+        return "#4A90E2";
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "legend-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "legend-floating legend-top-right",
+            "top-left" => "legend-floating legend-top-left",
+            "bottom-right" => "legend-floating legend-bottom-right",
+            "bottom-left" => "legend-floating legend-bottom-left",
+            _ => "legend-embedded"
+        };
+    }
+
+    public void Dispose()
+    {
+        // Subscriptions are automatically cleaned up by the ComponentBus
+    }
+
+    /// <summary>
+    /// Internal class to track layer state in the legend
+    /// </summary>
+    private class LegendLayer
+    {
+        public required string Id { get; set; }
+        public required string Name { get; set; }
+        public bool Visible { get; set; }
+        public double Opacity { get; set; }
+        public LayerType Type { get; set; }
+        public string Group { get; set; } = "default";
+        public int ZIndex { get; set; }
+        public LayerStyle? Style { get; set; }
+    }
+}

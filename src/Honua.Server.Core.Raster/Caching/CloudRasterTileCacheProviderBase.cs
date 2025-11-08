@@ -29,6 +29,7 @@ public abstract class CloudRasterTileCacheProviderBase<TClient, TException> : IR
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
     private volatile bool _containerReady;
     private readonly ResiliencePipeline _circuitBreaker;
+    private int _disposed;
 
     /// <summary>
     /// Initializes a new instance of the cloud raster tile cache provider.
@@ -287,6 +288,11 @@ public abstract class CloudRasterTileCacheProviderBase<TClient, TException> : IR
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return; // Already disposed
+        }
+
         _initializationLock.Dispose();
 
         if (_ownsClient)

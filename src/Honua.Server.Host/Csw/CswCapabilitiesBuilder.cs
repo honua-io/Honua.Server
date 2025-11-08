@@ -19,8 +19,11 @@ public sealed class CswCapabilitiesBuilder : OgcCapabilitiesBuilder
 {
     private static readonly XNamespace Csw = "http://www.opengis.net/cat/csw/2.0.2";
     private static readonly XNamespace Ogc = "http://www.opengis.net/ogc";
+    private static readonly XNamespace OwsCsw = "http://www.opengis.net/ows";
 
     protected override XName GetRootElementName() => Csw + "Capabilities";
+
+    protected override XNamespace GetOwsNamespace() => OwsCsw;
 
     protected override string GetServiceName() => "CSW";
 
@@ -40,7 +43,7 @@ public sealed class CswCapabilitiesBuilder : OgcCapabilitiesBuilder
 
         yield return new XAttribute(XNamespace.Xmlns + "csw", Csw);
         yield return new XAttribute(XNamespace.Xmlns + "ogc", Ogc);
-        yield return new XAttribute(XNamespace.Xmlns + "ows", Ows);
+        yield return new XAttribute(XNamespace.Xmlns + "ows", OwsCsw);
         yield return new XAttribute(Xsi + "schemaLocation",
             "http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd");
     }

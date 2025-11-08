@@ -1,0 +1,427 @@
+@using Honua.Admin.Blazor.Shared.Models
+
+<MudStack Spacing="4" Class="mt-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <div>
+            <MudText Typo="Typo.h6">Data Filter (Optional)</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Add a WHERE clause to filter which rows are included in the layer
+            </MudText>
+        </div>
+        <MudSwitch @bind-Value="_useFilter"
+                   Label="Enable Filter"
+                   Color="Color.Primary" />
+    </MudStack>
+
+    @if (_useFilter)
+    {
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                <MudText Typo="Typo.caption">
+                    Build filter conditions or write SQL directly. Only rows matching the filter will be included.
+                </MudText>
+            </MudAlert>
+
+            <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+                <MudTabPanel Text="Builder" Icon="@Icons.Material.Filled.Build">
+                    <MudStack Spacing="3" Class="pa-4">
+                        @for (int i = 0; i < _conditions.Count; i++)
+                        {
+                            var index = i;
+                            var condition = _conditions[index];
+
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                @if (index > 0)
+                                {
+                                    <MudSelect @bind-Value="condition.LogicalOperator"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense"
+                                               Style="max-width: 100px;">
+                                        <MudSelectItem Value="@("AND")">AND</MudSelectItem>
+                                        <MudSelectItem Value="@("OR")">OR</MudSelectItem>
+                                    </MudSelect>
+                                }
+
+                                <MudSelect @bind-Value="condition.Field"
+                                           Label="Field"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Style="flex: 1;">
+                                    @if (TableInfo != null)
+                                    {
+                                        @foreach (var column in TableInfo.Columns.Where(c => c.Name != TableInfo.GeometryColumn))
+                                        {
+                                            <MudSelectItem Value="@column.Name">@column.Name</MudSelectItem>
+                                        }
+                                    }
+                                </MudSelect>
+
+                                <MudSelect @bind-Value="condition.Operator"
+                                           Label="Operator"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Style="max-width: 150px;">
+                                    <MudSelectItem Value="@("=")">Equals (=)</MudSelectItem>
+                                    <MudSelectItem Value="@("!=")">Not Equals (!=)</MudSelectItem>
+                                    <MudSelectItem Value="@(">")">Greater Than (&gt;)</MudSelectItem>
+                                    <MudSelectItem Value="@("<")">Less Than (&lt;)</MudSelectItem>
+                                    <MudSelectItem Value="@(">=")">Greater or Equal (&gt;=)</MudSelectItem>
+                                    <MudSelectItem Value="@("<=")">Less or Equal (&lt;=)</MudSelectItem>
+                                    <MudSelectItem Value="@("LIKE")">Like</MudSelectItem>
+                                    <MudSelectItem Value="@("IN")">In</MudSelectItem>
+                                    <MudSelectItem Value="@("IS NULL")">Is Null</MudSelectItem>
+                                    <MudSelectItem Value="@("IS NOT NULL")">Is Not Null</MudSelectItem>
+                                </MudSelect>
+
+                                @if (condition.Operator != "IS NULL" && condition.Operator != "IS NOT NULL")
+                                {
+                                    <MudTextField @bind-Value="condition.Value"
+                                                  Label="Value"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Style="flex: 1;"
+                                                  HelperText="@GetValueHelper(condition.Operator)" />
+                                }
+
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="Color.Error"
+                                               Size="Size.Small"
+                                               OnClick="@(() => RemoveCondition(index))" />
+                            </MudStack>
+                        }
+
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Outlined"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddCondition">
+                            Add Condition
+                        </MudButton>
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="SQL" Icon="@Icons.Material.Filled.Code">
+                    <MudStack Spacing="2" Class="pa-4">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Write the WHERE clause manually (without the WHERE keyword)
+                        </MudText>
+
+                        <MudTextField @bind-Value="_manualSql"
+                                      Label="WHERE Clause"
+                                      Variant="Variant.Outlined"
+                                      Lines="5"
+                                      HelperText="Example: status = 'active' AND category IN ('A', 'B')" />
+                    </MudStack>
+                </MudTabPanel>
+            </MudTabs>
+
+            <MudPaper Outlined="true" Class="pa-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">SQL Preview:</MudText>
+                    <MudButton Size="Size.Small"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.PlayArrow"
+                               OnClick="TestQuery"
+                               Disabled="@(_testingQuery || string.IsNullOrWhiteSpace(GetWhereClause()))">
+                        @if (_testingQuery)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <span class="ml-2">Testing...</span>
+                        }
+                        else
+                        {
+                            <text>Test Query</text>
+                        }
+                    </MudButton>
+                </MudStack>
+                <MudText Typo="Typo.body2" Style="font-family: monospace; word-break: break-all;" Class="mb-2">
+                    <code>WHERE @GetWhereClause()</code>
+                </MudText>
+
+                @if (_validationResult != null)
+                {
+                    <MudAlert Severity="@(_validationResult.IsValid ? Severity.Success : Severity.Error)"
+                              Dense="true"
+                              Class="mt-2">
+                        @if (_validationResult.IsValid)
+                        {
+                            <MudText Typo="Typo.body2">
+                                <strong>Query Valid!</strong> No syntax errors detected.
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2">
+                                <strong>Validation Error:</strong> @_validationResult.ErrorMessage
+                            </MudText>
+                        }
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudStack>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Dense="true">
+            No filter applied. All rows from the table will be included in the layer.
+        </MudAlert>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public TableInfo? TableInfo { get; set; }
+
+    [Parameter]
+    public string WhereClause { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> WhereClauseChanged { get; set; }
+
+    private bool _useFilter;
+    private List<FilterCondition> _conditions = new();
+    private string _manualSql = string.Empty;
+    private bool _testingQuery;
+    private QueryValidationResult? _validationResult;
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(WhereClause) && !_useFilter)
+        {
+            _useFilter = true;
+            _manualSql = WhereClause;
+        }
+    }
+
+    private void AddCondition()
+    {
+        _conditions.Add(new FilterCondition());
+        UpdateWhereClause();
+    }
+
+    private void RemoveCondition(int index)
+    {
+        _conditions.RemoveAt(index);
+        UpdateWhereClause();
+    }
+
+    private void UpdateWhereClause()
+    {
+        var clause = GetWhereClause();
+        WhereClause = clause;
+        WhereClauseChanged.InvokeAsync(clause);
+    }
+
+    private string GetWhereClause()
+    {
+        if (!_useFilter)
+            return string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(_manualSql))
+            return _manualSql;
+
+        if (!_conditions.Any())
+            return string.Empty;
+
+        var parts = new List<string>();
+
+        for (int i = 0; i < _conditions.Count; i++)
+        {
+            var condition = _conditions[i];
+
+            if (string.IsNullOrWhiteSpace(condition.Field))
+                continue;
+
+            var part = string.Empty;
+
+            if (i > 0 && !string.IsNullOrEmpty(condition.LogicalOperator))
+            {
+                part += $"{condition.LogicalOperator} ";
+            }
+
+            if (condition.Operator == "IS NULL" || condition.Operator == "IS NOT NULL")
+            {
+                part += $"{condition.Field} {condition.Operator}";
+            }
+            else if (condition.Operator == "IN")
+            {
+                var value = string.IsNullOrWhiteSpace(condition.Value) ? "()" : $"({condition.Value})";
+                part += $"{condition.Field} IN {value}";
+            }
+            else if (condition.Operator == "LIKE")
+            {
+                var value = string.IsNullOrWhiteSpace(condition.Value) ? "'%%'" : $"'%{condition.Value}%'";
+                part += $"{condition.Field} LIKE {value}";
+            }
+            else
+            {
+                var value = string.IsNullOrWhiteSpace(condition.Value) ? "NULL" : QuoteValue(condition.Value);
+                part += $"{condition.Field} {condition.Operator} {value}";
+            }
+
+            parts.Add(part);
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    private string QuoteValue(string value)
+    {
+        // Simple heuristic: if it's a number, don't quote
+        if (double.TryParse(value, out _))
+            return value;
+
+        // Otherwise quote as string
+        return $"'{value.Replace("'", "''")}'";
+    }
+
+    private string GetValueHelper(string op)
+    {
+        return op switch
+        {
+            "LIKE" => "Enter search term (% wildcards added automatically)",
+            "IN" => "Enter comma-separated values: 1, 2, 3 or 'A', 'B', 'C'",
+            _ => "Enter value"
+        };
+    }
+
+    private async Task TestQuery()
+    {
+        _testingQuery = true;
+        _validationResult = null;
+
+        try
+        {
+            // Simulate API call delay
+            await Task.Delay(500);
+
+            var whereClause = GetWhereClause();
+
+            // TODO: Call backend endpoint to validate query against actual database
+            // For now, perform basic client-side validation
+            var result = ValidateWhereClause(whereClause);
+
+            _validationResult = result;
+        }
+        finally
+        {
+            _testingQuery = false;
+        }
+    }
+
+    private QueryValidationResult ValidateWhereClause(string whereClause)
+    {
+        if (string.IsNullOrWhiteSpace(whereClause))
+        {
+            return new QueryValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = "WHERE clause cannot be empty"
+            };
+        }
+
+        // Basic SQL injection pattern detection
+        var dangerousPatterns = new[]
+        {
+            @";\s*DROP\s+",
+            @";\s*DELETE\s+",
+            @";\s*UPDATE\s+",
+            @";\s*INSERT\s+",
+            @"--",
+            @"/\*",
+            @"\*/",
+            @"xp_",
+            @"sp_"
+        };
+
+        foreach (var pattern in dangerousPatterns)
+        {
+            if (System.Text.RegularExpressions.Regex.IsMatch(whereClause, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                return new QueryValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Query contains potentially dangerous SQL patterns"
+                };
+            }
+        }
+
+        // Check for balanced parentheses
+        int parenCount = 0;
+        foreach (char c in whereClause)
+        {
+            if (c == '(') parenCount++;
+            else if (c == ')') parenCount--;
+
+            if (parenCount < 0)
+            {
+                return new QueryValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Unbalanced parentheses: closing parenthesis without opening"
+                };
+            }
+        }
+
+        if (parenCount != 0)
+        {
+            return new QueryValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = $"Unbalanced parentheses: {Math.Abs(parenCount)} {(parenCount > 0 ? "opening" : "closing")} parenthesis without match"
+            };
+        }
+
+        // Check for balanced quotes
+        bool inSingleQuote = false;
+        bool inDoubleQuote = false;
+        for (int i = 0; i < whereClause.Length; i++)
+        {
+            char c = whereClause[i];
+
+            if (c == '\'' && !inDoubleQuote)
+            {
+                // Check if it's escaped
+                if (i + 1 < whereClause.Length && whereClause[i + 1] == '\'')
+                {
+                    i++; // Skip escaped quote
+                    continue;
+                }
+                inSingleQuote = !inSingleQuote;
+            }
+            else if (c == '"' && !inSingleQuote)
+            {
+                inDoubleQuote = !inDoubleQuote;
+            }
+        }
+
+        if (inSingleQuote || inDoubleQuote)
+        {
+            return new QueryValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = "Unbalanced quotes: missing closing quote"
+            };
+        }
+
+        // If all checks pass, query is valid
+        return new QueryValidationResult
+        {
+            IsValid = true
+        };
+    }
+
+    private class FilterCondition
+    {
+        public string LogicalOperator { get; set; } = "AND";
+        public string Field { get; set; } = string.Empty;
+        public string Operator { get; set; } = "=";
+        public string Value { get; set; } = string.Empty;
+    }
+
+    private class QueryValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
+    }
+}

@@ -17,6 +17,7 @@ using Honua.Server.Core.Catalog;
 using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Data.Auth;
+using Honua.Server.Core.Data.DuckDB;
 using Honua.Server.Core.Data.MySql;
 using Honua.Server.Core.Data.Postgres;
 using Honua.Server.Core.Data.Sqlite;
@@ -201,6 +202,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDataStoreProviderFactory, DataStoreProviderFactory>();
         services.AddSingleton<IFeatureContextResolver, FeatureContextResolver>();
         services.AddKeyedSingleton<IDataStoreProvider>(SqliteDataStoreProvider.ProviderKey, (_, _) => new SqliteDataStoreProvider());
+        services.AddKeyedSingleton<IDataStoreProvider>(DuckDBDataStoreProvider.ProviderKey, (_, _) => new DuckDBDataStoreProvider());
         services.AddKeyedSingleton<IDataStoreProvider>(PostgresDataStoreProvider.ProviderKey, (_, _) => new PostgresDataStoreProvider());
         services.AddKeyedSingleton<IDataStoreProvider>(SqlServerDataStoreProvider.ProviderKey, (_, _) => new SqlServerDataStoreProvider());
         services.AddKeyedSingleton<IDataStoreProvider>(MySqlDataStoreProvider.ProviderKey, (_, _) => new MySqlDataStoreProvider());

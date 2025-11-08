@@ -173,8 +173,8 @@ internal static class RuntimeConfigurationEndpointRouteBuilderExtensions
         group.MapPatch("/services/{protocol}", async (
             string protocol,
             ToggleRequest request,
-            HonuaConfigurationService configService,
-            IMetadataRegistry metadataRegistry) =>
+            [FromServices] HonuaConfigurationService configService,
+            [FromServices] IMetadataRegistry metadataRegistry) =>
         {
             if (quickStartMode)
             {
@@ -272,8 +272,8 @@ internal static class RuntimeConfigurationEndpointRouteBuilderExtensions
         // GET /admin/config/services/{serviceId} - Get service-level API configuration
         group.MapGet("/services/{serviceId}", async (
             string serviceId,
-            IMetadataRegistry metadataRegistry,
-            HonuaConfigurationService configService) =>
+            [FromServices] IMetadataRegistry metadataRegistry,
+            [FromServices] HonuaConfigurationService configService) =>
         {
             await metadataRegistry.EnsureInitializedAsync(default).ConfigureAwait(false);
             var snapshot = await metadataRegistry.GetSnapshotAsync(default).ConfigureAwait(false);

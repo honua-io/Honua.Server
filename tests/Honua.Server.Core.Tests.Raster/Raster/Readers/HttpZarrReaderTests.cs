@@ -206,7 +206,10 @@ public sealed class HttpZarrReaderTests
                 "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.NotFound));
+            .ReturnsAsync(() => new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                Content = new StringContent("Not Found")
+            });
 
         using var httpClient = new HttpClient(mockHandler.Object);
         var decompressor = CreateMockDecompressor();

@@ -110,6 +110,9 @@ internal static class WfsHelpers
     /// </summary>
     public static IResult MapResolutionError(Error error, string typeNamesRaw)
     {
+        ArgumentNullException.ThrowIfNull(error);
+        ArgumentException.ThrowIfNullOrWhiteSpace(typeNamesRaw);
+
         return error.Code switch
         {
             "not_found" => CreateException("InvalidParameterValue", "typeNames", error.Message ?? $"Layer '{typeNamesRaw}' was not found."),

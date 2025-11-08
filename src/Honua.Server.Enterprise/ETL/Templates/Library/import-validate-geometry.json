@@ -1,0 +1,105 @@
+{
+  "id": "import-validate-geometry",
+  "name": "Import and Validate Geometry",
+  "description": "Import data from Shapefile, validate geometries, and store only valid features in PostGIS. Ensures data quality.",
+  "category": "Data Import/Export",
+  "icon": "check-circle",
+  "difficulty": 1,
+  "estimatedMinutes": 4,
+  "tags": ["import", "validation", "quality", "postgis"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "Shapefile (.shp, .shx, .dbf)",
+    "PostGIS connection configured"
+  ],
+  "expectedOutputs": [
+    "PostGIS table with validated features",
+    "Validation report"
+  ],
+  "useCases": [
+    "Importing untrusted data sources",
+    "Quality control for spatial data",
+    "Preparing data for spatial analysis"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "shapefile_source",
+      "name": "Read Shapefile",
+      "description": "Load features from Shapefile",
+      "parameters": {
+        "filePath": "/data/input/data.shp",
+        "encoding": "UTF-8"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "validate_geometry",
+      "name": "Validate Geometries",
+      "description": "Check and fix invalid geometries",
+      "parameters": {
+        "autoFix": true,
+        "removeInvalid": false
+      },
+      "position": {
+        "x": 300,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Write to PostGIS",
+      "description": "Store validated features",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "validated_data",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 500,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "inputPath": {
+      "name": "inputPath",
+      "type": "string",
+      "description": "Input Shapefile path",
+      "defaultValue": "/data/input/data.shp",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "PostGIS output table",
+      "defaultValue": "validated_data",
+      "required": true
+    },
+    "autoFix": {
+      "name": "autoFix",
+      "type": "boolean",
+      "description": "Automatically fix invalid geometries",
+      "defaultValue": true,
+      "required": false
+    }
+  }
+}

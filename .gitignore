@@ -101,3 +101,15 @@ service-account*.json
 id_rsa
 id_rsa.pub
 *.ppk
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json.backup
+
+# Backup files
+*.backup
+*.bak.cs
+*.cs.backup

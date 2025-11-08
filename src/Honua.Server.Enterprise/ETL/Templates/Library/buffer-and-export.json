@@ -1,0 +1,104 @@
+{
+  "id": "buffer-and-export",
+  "name": "Buffer and Export to GeoPackage",
+  "description": "Create buffers and immediately export to portable GeoPackage format. Complete workflow from buffer creation to file export.",
+  "category": "Buffer Operations",
+  "icon": "save",
+  "difficulty": 0,
+  "estimatedMinutes": 3,
+  "tags": ["buffer", "export", "geopackage", "workflow"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "PostGIS features to buffer"
+  ],
+  "expectedOutputs": [
+    "GeoPackage file with buffer results"
+  ],
+  "useCases": [
+    "Creating deliverables for clients",
+    "Sharing buffer analysis results",
+    "Archiving buffer outputs"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Features",
+      "description": "Read input features",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "features",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "buffer",
+      "name": "Create Buffer",
+      "description": "Generate buffers",
+      "parameters": {
+        "distance": 500.0,
+        "units": "meters",
+        "quadrantSegments": 8
+      },
+      "position": {
+        "x": 300,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "geopackage_sink",
+      "name": "Export GeoPackage",
+      "description": "Save to GeoPackage file",
+      "parameters": {
+        "filePath": "/data/output/buffers.gpkg",
+        "layerName": "buffers",
+        "overwrite": true
+      },
+      "position": {
+        "x": 500,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "Input feature table",
+      "defaultValue": "features",
+      "required": true
+    },
+    "bufferDistance": {
+      "name": "bufferDistance",
+      "type": "number",
+      "description": "Buffer distance in meters",
+      "defaultValue": 500.0,
+      "required": true,
+      "min": 0
+    },
+    "outputPath": {
+      "name": "outputPath",
+      "type": "string",
+      "description": "Output GeoPackage path",
+      "defaultValue": "/data/output/buffers.gpkg",
+      "required": true
+    }
+  }
+}

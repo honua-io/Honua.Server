@@ -42,6 +42,9 @@ public static class LicensingServiceCollectionExtensions
         services.AddSingleton<ILicenseValidator, LicenseValidator>();
         services.AddSingleton<ILicenseManager, LicenseManager>();
 
+        // Register feature flag service
+        services.AddSingleton<Features.ILicenseFeatureFlagService, Features.LicenseFeatureFlagService>();
+
         // Note: ICredentialRevocationService implementation is registered in Core.Cloud
         // via AddCloudCredentialRevocation extension method
 
@@ -77,6 +80,9 @@ public static class LicensingServiceCollectionExtensions
         // Register core services
         services.AddSingleton<ILicenseValidator, LicenseValidator>();
         services.AddSingleton<ILicenseManager, LicenseManager>();
+
+        // Register feature flag service
+        services.AddSingleton<Features.ILicenseFeatureFlagService, Features.LicenseFeatureFlagService>();
 
         // Note: ICredentialRevocationService implementation is registered in Core.Cloud
         // via AddCloudCredentialRevocation extension method
@@ -137,7 +143,7 @@ internal sealed class LicenseOptionsValidator : IValidateOptions<LicenseOptions>
         // Validate provider
         var validProviders = new[] { "postgres", "postgresql", "mysql", "sqlite" };
         var provider = options.Provider?.ToLowerInvariant();
-        if (string.IsNullOrWhiteSpace(provider) || Array.IndexOf(validProviders, provider) == -1)
+        if (string.IsNullOrWhiteSpace(provider) || !Array.Exists(validProviders, p => p == provider))
         {
             failures.Add($"Provider must be one of: {string.Join(", ", validProviders)}");
         }

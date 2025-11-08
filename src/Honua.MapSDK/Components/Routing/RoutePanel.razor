@@ -1,0 +1,549 @@
+@*
+  Copyright (c) 2025 HonuaIO
+  Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+
+<div class="route-panel" role="region" aria-label="Route Planning Panel">
+    <div class="route-panel-header">
+        <h3>Route Planning</h3>
+        <button class="btn-close" @onclick="OnClose" aria-label="Close route panel">
+            &times;
+        </button>
+    </div>
+
+    <div class="route-panel-content">
+        @* Provider Selection *@
+        <div class="form-group">
+            <label for="provider-select">Routing Provider</label>
+            <select id="provider-select"
+                    class="form-control"
+                    @bind="SelectedProvider"
+                    @bind:after="OnProviderChanged">
+                @foreach (var provider in AvailableProviders)
+                {
+                    <option value="@provider.Key">@provider.Value</option>
+                }
+            </select>
+        </div>
+
+        @* Travel Mode Selection *@
+        <div class="form-group">
+            <label>Travel Mode</label>
+            <div class="travel-mode-buttons">
+                <button class="travel-mode-btn @(TravelMode == "car" ? "active" : "")"
+                        @onclick='() => SetTravelMode("car")'
+                        title="Car">
+                    🚗
+                </button>
+                <button class="travel-mode-btn @(TravelMode == "truck" ? "active" : "")"
+                        @onclick='() => SetTravelMode("truck")'
+                        title="Truck">
+                    🚚
+                </button>
+                <button class="travel-mode-btn @(TravelMode == "bicycle" ? "active" : "")"
+                        @onclick='() => SetTravelMode("bicycle")'
+                        title="Bicycle">
+                    🚴
+                </button>
+                <button class="travel-mode-btn @(TravelMode == "pedestrian" ? "active" : "")"
+                        @onclick='() => SetTravelMode("pedestrian")'
+                        title="Walk">
+                    🚶
+                </button>
+            </div>
+        </div>
+
+        @* Waypoints List *@
+        <div class="waypoints-section">
+            <label>Waypoints</label>
+            <div class="waypoints-list"
+                 @ondrop="HandleDrop"
+                 @ondragover:preventDefault
+                 @ondragover="HandleDragOver">
+                @for (int i = 0; i < Waypoints.Count; i++)
+                {
+                    var index = i;
+                    var waypoint = Waypoints[i];
+                    <div class="waypoint-item @(waypoint.Order == DraggedWaypointIndex ? "dragging" : "")"
+                         draggable="true"
+                         @ondragstart="() => HandleDragStart(index)"
+                         @ondragend="HandleDragEnd">
+                        <span class="waypoint-handle" aria-label="Drag to reorder">⋮⋮</span>
+                        <span class="waypoint-icon">
+                            @if (index == 0)
+                            {
+                                <text>📍</text>
+                            }
+                            else if (index == Waypoints.Count - 1)
+                            {
+                                <text>🏁</text>
+                            }
+                            else
+                            {
+                                <text>📌</text>
+                            }
+                        </span>
+                        <input type="text"
+                               class="form-control waypoint-input"
+                               placeholder="@(index == 0 ? "Start location" : index == Waypoints.Count - 1 ? "End location" : $"Stop {index}")"
+                               value="@(waypoint.Address ?? "")"
+                               @onchange="(e) => UpdateWaypointAddress(index, e.Value?.ToString())"
+                               aria-label="@(index == 0 ? "Start location" : "Stop location")" />
+                        @if (Waypoints.Count > 2)
+                        {
+                            <button class="btn-remove"
+                                    @onclick="() => RemoveWaypoint(index)"
+                                    aria-label="Remove waypoint">
+                                ×
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+            <button class="btn-add-waypoint" @onclick="AddWaypoint">
+                + Add Stop
+            </button>
+        </div>
+
+        @* Route Options *@
+        <div class="route-options">
+            <label>Route Options</label>
+            <div class="form-check">
+                <input type="checkbox"
+                       id="avoid-tolls"
+                       class="form-check-input"
+                       @bind="AvoidTolls" />
+                <label for="avoid-tolls" class="form-check-label">Avoid tolls</label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox"
+                       id="avoid-highways"
+                       class="form-check-input"
+                       @bind="AvoidHighways" />
+                <label for="avoid-highways" class="form-check-label">Avoid highways</label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox"
+                       id="avoid-ferries"
+                       class="form-check-input"
+                       @bind="AvoidFerries" />
+                <label for="avoid-ferries" class="form-check-label">Avoid ferries</label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox"
+                       id="use-traffic"
+                       class="form-check-input"
+                       @bind="UseTraffic" />
+                <label for="use-traffic" class="form-check-label">Use live traffic</label>
+            </div>
+        </div>
+
+        @* Truck Routing Options *@
+        @if (TravelMode == "truck")
+        {
+            <div class="truck-options">
+                <label>Vehicle Specifications</label>
+                <div class="form-row">
+                    <div class="form-group col">
+                        <label for="vehicle-weight">Weight (kg)</label>
+                        <input type="number"
+                               id="vehicle-weight"
+                               class="form-control"
+                               @bind="VehicleWeight"
+                               min="0"
+                               step="100" />
+                    </div>
+                    <div class="form-group col">
+                        <label for="vehicle-height">Height (m)</label>
+                        <input type="number"
+                               id="vehicle-height"
+                               class="form-control"
+                               @bind="VehicleHeight"
+                               min="0"
+                               step="0.1" />
+                    </div>
+                </div>
+                <div class="form-check">
+                    <input type="checkbox"
+                           id="hazmat"
+                           class="form-check-input"
+                           @bind="IsHazmat" />
+                    <label for="hazmat" class="form-check-label">Hazardous materials</label>
+                </div>
+            </div>
+        }
+
+        @* Action Buttons *@
+        <div class="route-actions">
+            <button class="btn btn-primary btn-block"
+                    @onclick="CalculateRoute"
+                    disabled="@IsCalculating">
+                @if (IsCalculating)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <text> Calculating...</text>
+                }
+                else
+                {
+                    <text>Calculate Route</text>
+                }
+            </button>
+            <button class="btn btn-secondary btn-sm"
+                    @onclick="ReverseRoute"
+                    disabled="@IsCalculating"
+                    title="Reverse direction">
+                ⇄ Reverse
+            </button>
+            <button class="btn btn-secondary btn-sm"
+                    @onclick="ClearRoute"
+                    disabled="@IsCalculating"
+                    title="Clear route">
+                🗑 Clear
+            </button>
+        </div>
+
+        @* Error Message *@
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                @ErrorMessage
+            </div>
+        }
+
+        @* Route Results *@
+        @if (CalculatedRoutes.Count > 0)
+        {
+            <div class="route-results">
+                <h4>Route Options (@CalculatedRoutes.Count)</h4>
+                @foreach (var (route, index) in CalculatedRoutes.Select((r, i) => (r, i)))
+                {
+                    <div class="route-option @(index == SelectedRouteIndex ? "selected" : "")"
+                         @onclick="() => SelectRoute(index)">
+                        <div class="route-option-header">
+                            <strong>Route @(index + 1)</strong>
+                            @if (index == 0)
+                            {
+                                <span class="badge badge-primary">Fastest</span>
+                            }
+                        </div>
+                        <div class="route-option-details">
+                            <span>@FormatDistance(route.DistanceMeters)</span>
+                            <span>@FormatDuration(route.DurationSeconds)</span>
+                        </div>
+                        @if (route.DurationWithTrafficSeconds.HasValue && route.DurationWithTrafficSeconds.Value > 0)
+                        {
+                            <div class="route-traffic-info">
+                                With traffic: @FormatDuration(route.DurationWithTrafficSeconds.Value)
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* Export Options *@
+            <div class="export-options">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportGpx">
+                    📥 GPX
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ExportKml">
+                    📥 KML
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ShareRoute">
+                    🔗 Share
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="PrintRoute">
+                    🖨 Print
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .route-panel {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        width: 380px;
+        max-height: 90vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .route-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .route-panel-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .btn-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #666;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        line-height: 1;
+    }
+
+    .route-panel-content {
+        padding: 15px;
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .travel-mode-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .travel-mode-btn {
+        flex: 1;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        background: white;
+        border-radius: 4px;
+        font-size: 24px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .travel-mode-btn:hover {
+        border-color: #4285F4;
+    }
+
+    .travel-mode-btn.active {
+        border-color: #4285F4;
+        background: #E8F0FE;
+    }
+
+    .waypoints-section {
+        margin-bottom: 15px;
+    }
+
+    .waypoints-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .waypoint-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        cursor: move;
+    }
+
+    .waypoint-item.dragging {
+        opacity: 0.5;
+    }
+
+    .waypoint-handle {
+        color: #999;
+        cursor: grab;
+    }
+
+    .waypoint-icon {
+        font-size: 18px;
+    }
+
+    .waypoint-input {
+        flex: 1;
+    }
+
+    .btn-remove {
+        background: none;
+        border: none;
+        color: #dc3545;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 0 5px;
+    }
+
+    .btn-add-waypoint {
+        width: 100%;
+        padding: 10px;
+        border: 2px dashed #ddd;
+        background: white;
+        border-radius: 4px;
+        color: #4285F4;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .btn-add-waypoint:hover {
+        border-color: #4285F4;
+        background: #f8f9fa;
+    }
+
+    .route-options, .truck-options {
+        margin-bottom: 15px;
+    }
+
+    .form-check {
+        margin-bottom: 8px;
+    }
+
+    .form-check-input {
+        margin-right: 8px;
+    }
+
+    .route-actions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 15px;
+    }
+
+    .btn {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #4285F4;
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background: #1967D2;
+    }
+
+    .btn-primary:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .btn-secondary {
+        background: #f1f3f4;
+        color: #5f6368;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: #e8eaed;
+    }
+
+    .btn-block {
+        width: 100%;
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+
+    .route-results {
+        margin-bottom: 15px;
+    }
+
+    .route-option {
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .route-option:hover {
+        border-color: #4285F4;
+    }
+
+    .route-option.selected {
+        border-color: #4285F4;
+        background: #E8F0FE;
+    }
+
+    .route-option-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .route-option-details {
+        display: flex;
+        gap: 15px;
+        font-size: 14px;
+        color: #666;
+    }
+
+    .route-warnings small {
+        display: block;
+        color: #f57c00;
+        margin-top: 5px;
+    }
+
+    .export-options {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .btn-outline-secondary {
+        border: 1px solid #ddd;
+        background: white;
+        color: #5f6368;
+    }
+
+    .alert {
+        padding: 12px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+
+    .alert-danger {
+        background: #fdecea;
+        color: #d32f2f;
+        border: 1px solid #ef9a9a;
+    }
+
+    .badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .badge-primary {
+        background: #4285F4;
+        color: white;
+    }
+</style>

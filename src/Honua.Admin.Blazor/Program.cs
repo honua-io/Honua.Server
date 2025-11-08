@@ -3,6 +3,7 @@
 
 using Honua.Admin.Blazor.Components;
 using Honua.Admin.Blazor.Shared.Services;
+using Honua.MapSDK;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 
@@ -65,18 +66,28 @@ builder.Services.AddScoped<EditorState>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SearchStateService>();
 
+// Register MapSDK services (visual map builder)
+builder.Services.AddHonuaMapSDK();
+
 // Register API clients
 builder.Services.AddScoped<ServiceApiClient>();
 builder.Services.AddScoped<LayerApiClient>();
 builder.Services.AddScoped<FolderApiClient>();
+builder.Services.AddScoped<DataSourceApiClient>();
 builder.Services.AddScoped<ImportApiClient>();
 builder.Services.AddScoped<SnapshotApiClient>();
 builder.Services.AddScoped<AuditLogApiClient>();
 builder.Services.AddScoped<CacheApiClient>();
 builder.Services.AddScoped<UserApiClient>();
+builder.Services.AddScoped<CorsApiClient>();
+builder.Services.AddScoped<RbacApiClient>();
+builder.Services.AddScoped<FeatureFlagService>();
 
 // Register SignalR hub service for real-time updates
 builder.Services.AddScoped<MetadataHubService>();
+
+// Register GeoETL progress service for real-time workflow execution tracking
+builder.Services.AddScoped<Honua.Admin.Blazor.Services.GeoEtlProgressService>();
 
 var app = builder.Build();
 

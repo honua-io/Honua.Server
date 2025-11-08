@@ -22,23 +22,38 @@ public partial class App : Application
 		MainPage = new AppShell();
 	}
 
-	protected override async void OnStart()
+	protected override void OnStart()
 	{
 		base.OnStart();
 
-		// Initialize database
-		await _databaseService.InitializeAsync();
+		// Fire and forget with proper exception handling
+		_ = OnStartAsync();
+	}
 
-		// Check authentication status
-		var isAuthenticated = await _authService.IsAuthenticatedAsync();
-
-		if (!isAuthenticated)
+	private async Task OnStartAsync()
+	{
+		try
 		{
-			await _navigationService.NavigateToAsync("//Login");
+			// Initialize database
+			await _databaseService.InitializeAsync();
+
+			// Check authentication status
+			var isAuthenticated = await _authService.IsAuthenticatedAsync();
+
+			if (!isAuthenticated)
+			{
+				await _navigationService.NavigateToAsync("//Login");
+			}
+			else
+			{
+				await _navigationService.NavigateToAsync("//Main");
+			}
 		}
-		else
+		catch (Exception ex)
 		{
-			await _navigationService.NavigateToAsync("//Main");
+			// Log or handle the exception appropriately
+			System.Diagnostics.Debug.WriteLine($"Error during app startup: {ex}");
+			// Optionally navigate to an error page or show a message to the user
 		}
 	}
 

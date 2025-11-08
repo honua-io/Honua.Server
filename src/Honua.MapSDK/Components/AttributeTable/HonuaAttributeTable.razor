@@ -1,0 +1,322 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using System.Text.Json
+
+<div class="honua-attribute-table @CssClass" style="@Style">
+    <MudDataGrid T="FeatureRecord"
+                 @ref="_dataGrid"
+                 Items="@_displayedFeatures"
+                 Loading="@_isLoading"
+                 ReadOnly="@(!AllowEdit)"
+                 Elevation="0"
+                 Dense="true"
+                 Hover="true"
+                 Bordered="true"
+                 Striped="true"
+                 MultiSelection="@(SelectionMode == MapSDK.Models.SelectionMode.Multiple)"
+                 SelectOnRowClick="true"
+                 SelectedItem="_selectedFeature"
+                 SelectedItemChanged="OnFeatureSelected"
+                 SelectedItems="_selectedFeatures"
+                 SelectedItemsChanged="OnMultipleFeaturesSelected"
+                 Filterable="true"
+                 FilterMode="@DataGridFilterMode.ColumnFilterRow"
+                 FilterCaseSensitivity="@DataGridFilterCaseSensitivity.CaseInsensitive"
+                 Sortable="true"
+                 SortMode="@SortMode.Multiple"
+                 Hideable="true"
+                 ShowMenuIcon="true"
+                 ColumnResizeMode="@ResizeMode.Column"
+                 QuickFilter="@_quickFilterFunc"
+                 RowsPerPage="@PageSize">
+
+        <ToolBarContent>
+            @if (ShowToolbar)
+            {
+                <MudText Typo="Typo.h6">@Title</MudText>
+                <MudSpacer />
+
+                <!-- Quick Search -->
+                <MudTextField @bind-Value="_searchString"
+                              Placeholder="Search all columns..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium"
+                              Immediate="true"
+                              DebounceInterval="300"
+                              Clearable="true"
+                              Class="mr-2"
+                              Style="max-width: 300px;">
+                </MudTextField>
+
+                <!-- Filter Menu -->
+                <MudMenu Icon="@Icons.Material.Filled.FilterList"
+                         Color="Color.Primary"
+                         Variant="Variant.Text"
+                         Dense="true"
+                         AnchorOrigin="Origin.BottomRight"
+                         TransformOrigin="Origin.TopRight">
+                    <MudMenuItem OnClick="@ShowFilterBuilder">Advanced Filter...</MudMenuItem>
+                    <MudMenuItem OnClick="@ShowFilterPresets" Disabled="@(_filterPresets.Count == 0)">
+                        Load Preset (@_filterPresets.Count)
+                    </MudMenuItem>
+                    <MudMenuItem OnClick="@SaveCurrentFilter" Disabled="@(_activeFilter == null)">
+                        Save Current Filter
+                    </MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem OnClick="@ClearAllFilters" Disabled="@(_activeFilter == null && string.IsNullOrEmpty(_searchString))">
+                        Clear All Filters
+                    </MudMenuItem>
+                    <MudMenuItem OnClick="@ShowSelectedOnly" Disabled="@(_selectedFeatures.Count == 0)">
+                        Show Selected Only (@_selectedFeatures.Count)
+                    </MudMenuItem>
+                </MudMenu>
+
+                <!-- Export Menu -->
+                @if (AllowExport)
+                {
+                    <MudMenu Icon="@Icons.Material.Filled.FileDownload"
+                             Color="Color.Primary"
+                             Variant="Variant.Text"
+                             Dense="true"
+                             AnchorOrigin="Origin.BottomRight"
+                             TransformOrigin="Origin.TopRight">
+                        <MudMenuItem OnClick="@(() => ExportData(ExportFormat.CSV))">
+                            <MudIcon Icon="@Icons.Material.Filled.TableChart" Class="mr-2" />
+                            Export to CSV
+                        </MudMenuItem>
+                        <MudMenuItem OnClick="@(() => ExportData(ExportFormat.Excel))">
+                            <MudIcon Icon="@Icons.Material.Filled.GridOn" Class="mr-2" />
+                            Export to Excel
+                        </MudMenuItem>
+                        <MudMenuItem OnClick="@(() => ExportData(ExportFormat.JSON))">
+                            <MudIcon Icon="@Icons.Material.Filled.Code" Class="mr-2" />
+                            Export to JSON
+                        </MudMenuItem>
+                        <MudMenuItem OnClick="@(() => ExportData(ExportFormat.GeoJSON))" Disabled="@(!_hasGeometry)">
+                            <MudIcon Icon="@Icons.Material.Filled.Map" Class="mr-2" />
+                            Export to GeoJSON
+                        </MudMenuItem>
+                        <MudDivider />
+                        <MudMenuItem OnClick="@CopySelectedToClipboard" Disabled="@(_selectedFeatures.Count == 0)">
+                            <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Class="mr-2" />
+                            Copy Selected
+                        </MudMenuItem>
+                        <MudMenuItem OnClick="@PrintTable">
+                            <MudIcon Icon="@Icons.Material.Filled.Print" Class="mr-2" />
+                            Print Table
+                        </MudMenuItem>
+                    </MudMenu>
+                }
+
+                <!-- Column Visibility Toggle -->
+                <MudMenu Icon="@Icons.Material.Filled.ViewColumn"
+                         Color="Color.Primary"
+                         Variant="Variant.Text"
+                         Dense="true"
+                         AnchorOrigin="Origin.BottomRight"
+                         TransformOrigin="Origin.TopRight">
+                    @foreach (var col in _columns)
+                    {
+                        <MudMenuItem>
+                            <MudCheckBox T="bool"
+                                         Checked="@col.Visible"
+                                         CheckedChanged="@((bool val) => ToggleColumnVisibility(col, val))"
+                                         Dense="true">
+                                @col.DisplayName
+                            </MudCheckBox>
+                        </MudMenuItem>
+                    }
+                </MudMenu>
+
+                <!-- Actions Menu -->
+                @if (AllowEdit || AllowDelete)
+                {
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                             Color="Color.Primary"
+                             Variant="Variant.Text"
+                             Dense="true"
+                             Disabled="@(_selectedFeatures.Count == 0)"
+                             AnchorOrigin="Origin.BottomRight"
+                             TransformOrigin="Origin.TopRight">
+                        @if (AllowEdit)
+                        {
+                            <MudMenuItem OnClick="@ShowBulkEditDialog">
+                                <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+                                Bulk Edit (@_selectedFeatures.Count)
+                            </MudMenuItem>
+                            <MudMenuItem OnClick="@ShowCalculateFieldDialog">
+                                <MudIcon Icon="@Icons.Material.Filled.Functions" Class="mr-2" />
+                                Calculate Field
+                            </MudMenuItem>
+                        }
+                        @if (AllowDelete)
+                        {
+                            <MudDivider />
+                            <MudMenuItem OnClick="@DeleteSelected">
+                                <MudIcon Icon="@Icons.Material.Filled.Delete" Class="mr-2" Color="Color.Error" />
+                                <span style="color: var(--mud-palette-error);">Delete Selected</span>
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                }
+
+                <!-- Map Sync Indicator -->
+                @if (SyncWith != null && _isSynced)
+                {
+                    <MudChip T="string" Size="Size.Small"
+                             Color="Color.Success"
+                             Icon="@Icons.Material.Filled.Sync"
+                             OnClose="@DisableSync">
+                        Synced with @SyncWith
+                    </MudChip>
+                }
+
+                @if (HighlightSelected && _selectedFeatures.Count > 0)
+                {
+                    <MudTooltip Text="Zoom to selected features">
+                        <MudIconButton Icon="@Icons.Material.Filled.MyLocation"
+                                       Color="Color.Secondary"
+                                       Size="Size.Small"
+                                       OnClick="@ZoomToSelected" />
+                    </MudTooltip>
+                }
+
+                @ToolbarContent
+            }
+        </ToolBarContent>
+
+        <Columns>
+            @if (Columns != null)
+            {
+                @Columns
+            }
+            else if (_autoGenerateColumns && _columns.Count > 0)
+            {
+                @foreach (var col in _columns.Where(c => c.Visible))
+                {
+                    <PropertyColumn Property="@(f => GetPropertyValue(f, col.FieldName))"
+                                    Title="@col.DisplayName"
+                                    Sortable="true"
+                                    Filterable="true"
+                                    Hideable="true"
+                                    Resizable="true">
+                        <CellTemplate>
+                            @{
+                                var value = GetPropertyValue(context.Item, col.FieldName);
+                                var formattedValue = FormatValue(value, col);
+                                var conditionalStyle = GetConditionalStyle(value, col);
+                            }
+                            <div style="@conditionalStyle">
+                                @if (col.DataType == ColumnDataType.Geometry)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                                        @formattedValue
+                                    </MudChip>
+                                }
+                                else if (col.DataType == ColumnDataType.Boolean)
+                                {
+                                    <MudIcon Icon="@(value?.ToString() == "True" ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)"
+                                             Color="@(value?.ToString() == "True" ? Color.Success : Color.Default)"
+                                             Size="Size.Small" />
+                                }
+                                else if (col.DataType == ColumnDataType.Url)
+                                {
+                                    <MudLink Href="@value?.ToString()" Target="_blank">@formattedValue</MudLink>
+                                }
+                                else
+                                {
+                                    @formattedValue
+                                }
+                            </div>
+                        </CellTemplate>
+                        <EditTemplate>
+                            @if (AllowEdit && col.Editable)
+                            {
+                                @if (col.DataType == ColumnDataType.Boolean)
+                                {
+                                    <MudCheckBox T="bool?"
+                                                 Value="@(GetPropertyValue(context.Item, col.FieldName) as bool?)"
+                                                 ValueChanged="@((bool? val) => UpdatePropertyValue(context.Item, col.FieldName, val))" />
+                                }
+                                else if (col.DataType == ColumnDataType.Number || col.DataType == ColumnDataType.Integer)
+                                {
+                                    <MudNumericField T="double?"
+                                                     Value="@(Convert.ToDouble(GetPropertyValue(context.Item, col.FieldName)))"
+                                                     ValueChanged="@((double? val) => UpdatePropertyValue(context.Item, col.FieldName, val))"
+                                                     Variant="Variant.Text" />
+                                }
+                                else
+                                {
+                                    <MudTextField T="string"
+                                                  Value="@(GetPropertyValue(context.Item, col.FieldName)?.ToString())"
+                                                  ValueChanged="@((string val) => UpdatePropertyValue(context.Item, col.FieldName, val))"
+                                                  Variant="Variant.Text" />
+                                }
+                            }
+                        </EditTemplate>
+                    </PropertyColumn>
+                }
+            }
+        </Columns>
+
+        <PagerContent>
+            @if (ShowPagination)
+            {
+                <MudDataGridPager T="FeatureRecord"
+                                  PageSizeOptions="@(new[] { 25, 50, 100, 250, 500, 1000 })"
+                                  InfoFormat="{first_item}-{last_item} of {all_items} features" />
+            }
+        </PagerContent>
+
+        <NoRecordsContent>
+            <MudText Typo="Typo.body1" Align="Align.Center" Class="my-4">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                    <br />
+                    <text>Loading features...</text>
+                }
+                else if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+                }
+                else if (_showSelectedOnly)
+                {
+                    <text>No selected features to display</text>
+                }
+                else
+                {
+                    <text>No features found</text>
+                }
+            </MudText>
+        </NoRecordsContent>
+    </MudDataGrid>
+
+    @if ((_configuration?.ShowSummary ?? false) && _displayedFeatures.Count > 0)
+    {
+        <div class="attribute-table-summary">
+            <MudPaper Elevation="1" Class="pa-2">
+                <MudText Typo="Typo.caption">
+                    <strong>Summary:</strong>
+                    @if (_selectedFeatures.Count > 0)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@_selectedFeatures.Count selected</MudChip>
+                    }
+                    @foreach (var summary in _configuration.Summaries)
+                    {
+                        <span class="ml-2">
+                            <strong>@(summary.Label ?? summary.FieldName):</strong>
+                            @CalculateSummary(summary)
+                        </span>
+                    }
+                </MudText>
+            </MudPaper>
+        </div>
+    }
+</div>
+
+@code {
+    private MudDataGrid<FeatureRecord>? _dataGrid;
+}

@@ -27,6 +27,7 @@ public sealed class S3KerchunkCacheProvider : IKerchunkCacheProvider, IAsyncDisp
     private readonly string _prefix;
     private readonly ILogger<S3KerchunkCacheProvider> _logger;
     private readonly ResiliencePipeline _circuitBreaker;
+    private int _disposed;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -208,6 +209,11 @@ public sealed class S3KerchunkCacheProvider : IKerchunkCacheProvider, IAsyncDisp
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return; // Already disposed
+        }
+
         if (_ownsClient)
         {
             if (_s3Client is IAsyncDisposable asyncDisposable)
@@ -219,5 +225,7 @@ public sealed class S3KerchunkCacheProvider : IKerchunkCacheProvider, IAsyncDisp
                 disposable.Dispose();
             }
         }
+
+        GC.SuppressFinalize(this);
     }
 }

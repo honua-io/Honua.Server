@@ -18,6 +18,11 @@ public interface IGeofenceRepository
     Task<Geofence?> GetByIdAsync(Guid id, string? tenantId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Get multiple geofences by IDs (batch query to avoid N+1 problem)
+    /// </summary>
+    Task<List<Geofence>> GetByIdsAsync(IEnumerable<Guid> ids, string? tenantId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Get all geofences (with optional filters)
     /// </summary>
     Task<List<Geofence>> GetAllAsync(

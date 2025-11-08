@@ -10,10 +10,10 @@ name: Comprehensive Integration Tests (QGIS + Python)
 # - Real-world client compatibility testing
 
 on:
-  push:
-    branches: [master, main, dev]
-  pull_request:
-    branches: [master, main, dev]
+  # push:
+  #   branches: [master, main, dev]
+  # pull_request:
+  #   branches: [master, main, dev]
   workflow_dispatch:
     inputs:
       run_slow_tests:

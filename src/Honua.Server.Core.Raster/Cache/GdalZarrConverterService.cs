@@ -245,8 +245,9 @@ public sealed class GdalZarrConverterService : IZarrTimeSeriesService
             using var driver = Gdal.GetDriverByName("Zarr");
             return driver != null;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogDebug(ex, "Error checking GDAL Zarr driver availability");
             return false;
         }
     }

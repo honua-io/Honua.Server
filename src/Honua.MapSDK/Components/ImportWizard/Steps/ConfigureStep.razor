@@ -1,0 +1,337 @@
+@using Honua.MapSDK.Models.Import
+@using FieldType = Honua.MapSDK.Models.Import.FieldType
+
+<div class="import-step configure-step">
+    <MudText Typo="Typo.h6" Class="mb-4">Configure Import</MudText>
+
+    @if (Data != null && Configuration != null)
+    {
+        <MudGrid>
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3">Layer Settings</MudText>
+
+                    <MudTextField @bind-Value="Configuration.LayerName"
+                                  Label="Layer Name"
+                                  Variant="Variant.Outlined"
+                                  HelperText="Name for the imported layer"
+                                  Class="mb-3" />
+
+                    <MudSelect @bind-Value="Configuration.GeometryType"
+                               Label="Geometry Type"
+                               Variant="Variant.Outlined"
+                               Class="mb-3">
+                        <MudSelectItem Value="GeometryType.Point">Point</MudSelectItem>
+                        <MudSelectItem Value="GeometryType.LineString">Line</MudSelectItem>
+                        <MudSelectItem Value="GeometryType.Polygon">Polygon</MudSelectItem>
+                    </MudSelect>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3">Geometry Source</MudText>
+
+                    <MudRadioGroup T="GeometrySource" @bind-SelectedOption="Configuration.GeometrySource">
+                        @if (HasExistingGeometry())
+                        {
+                            <MudRadio T="GeometrySource" Option="GeometrySource.ExistingGeometry" Color="Color.Primary">
+                                <div class="radio-option">
+                                    <MudText Typo="Typo.body1">Use existing geometry in file</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @GetGeometryCount() geometries found
+                                    </MudText>
+                                </div>
+                            </MudRadio>
+                        }
+
+                        @if (HasLatLonFields())
+                        {
+                            <MudRadio T="GeometrySource" Option="GeometrySource.LatLonColumns" Color="Color.Primary">
+                                <div class="radio-option">
+                                    <MudText Typo="Typo.body1">Create from Latitude/Longitude columns</MudText>
+                                    @if (Configuration.GeometrySource == GeometrySource.LatLonColumns)
+                                    {
+                                        <div class="mt-2">
+                                            <MudSelect @bind-Value="Configuration.LatitudeField"
+                                                       Label="Latitude Field"
+                                                       Variant="Variant.Outlined"
+                                                       Dense="true"
+                                                       Class="mb-2">
+                                                @foreach (var field in GetNumericFields())
+                                                {
+                                                    <MudSelectItem Value="@field.Name">
+                                                        @field.Name
+                                                        @if (field.IsLikelyLatitude)
+                                                        {
+                                                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Suggested</MudChip>
+                                                        }
+                                                    </MudSelectItem>
+                                                }
+                                            </MudSelect>
+
+                                            <MudSelect @bind-Value="Configuration.LongitudeField"
+                                                       Label="Longitude Field"
+                                                       Variant="Variant.Outlined"
+                                                       Dense="true">
+                                                @foreach (var field in GetNumericFields())
+                                                {
+                                                    <MudSelectItem Value="@field.Name">
+                                                        @field.Name
+                                                        @if (field.IsLikelyLongitude)
+                                                        {
+                                                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Suggested</MudChip>
+                                                        }
+                                                    </MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                        </div>
+                                    }
+                                </div>
+                            </MudRadio>
+                        }
+
+                        @if (HasAddressFields())
+                        {
+                            <MudRadio T="GeometrySource" Option="GeometrySource.AddressColumn" Color="Color.Primary">
+                                <div class="radio-option">
+                                    <MudText Typo="Typo.body1">Geocode from Address column</MudText>
+                                    @if (Configuration.GeometrySource == GeometrySource.AddressColumn)
+                                    {
+                                        <div class="mt-2">
+                                            <MudSelect @bind-Value="Configuration.AddressField"
+                                                       Label="Address Field"
+                                                       Variant="Variant.Outlined"
+                                                       Dense="true"
+                                                       Class="mb-2">
+                                                @foreach (var field in Data.Fields)
+                                                {
+                                                    <MudSelectItem Value="@field.Name">
+                                                        @field.Name
+                                                        @if (field.IsLikelyAddress)
+                                                        {
+                                                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Suggested</MudChip>
+                                                        }
+                                                    </MudSelectItem>
+                                                }
+                                            </MudSelect>
+
+                                            <MudSwitch T="bool" @bind-Checked="Configuration.EnableGeocoding"
+                                                       Label="Enable geocoding"
+                                                       Color="Color.Primary"
+                                                       Class="mb-2" />
+
+                                            <MudAlert Severity="Severity.Info" Dense="true">
+                                                Geocoding may take several minutes for large datasets
+                                            </MudAlert>
+                                        </div>
+                                    }
+                                </div>
+                            </MudRadio>
+                        }
+                    </MudRadioGroup>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3">Field Mapping</MudText>
+
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        Map source fields to target fields and set data types
+                    </MudText>
+
+                    <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                        <thead>
+                            <tr>
+                                <th>Source Field</th>
+                                <th>Target Name</th>
+                                <th>Type</th>
+                                <th>Sample</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var field in Data.Fields.Take(10))
+                            {
+                                var mapping = GetOrCreateMapping(field);
+                                <tr>
+                                    <td>
+                                        <MudText Typo="Typo.body2">@field.Name</MudText>
+                                    </td>
+                                    <td>
+                                        <MudTextField @bind-Value="mapping.TargetField"
+                                                      Variant="Variant.Text"
+                                                      Margin="Margin.Dense"
+                                                      Clearable="false" />
+                                    </td>
+                                    <td>
+                                        <MudSelect @bind-Value="mapping.FieldType"
+                                                   Variant="Variant.Text"
+                                                   Margin="Margin.Dense"
+                                                   Dense="true">
+                                            <MudSelectItem Value="FieldType.String">String</MudSelectItem>
+                                            <MudSelectItem Value="FieldType.Number">Number</MudSelectItem>
+                                            <MudSelectItem Value="FieldType.Integer">Integer</MudSelectItem>
+                                            <MudSelectItem Value="FieldType.Boolean">Boolean</MudSelectItem>
+                                            <MudSelectItem Value="FieldType.Date">Date</MudSelectItem>
+                                            <MudSelectItem Value="FieldType.DateTime">DateTime</MudSelectItem>
+                                        </MudSelect>
+                                    </td>
+                                    <td>
+                                        <MudText Typo="Typo.caption" Class="sample-value">
+                                            @GetSampleValue(field)
+                                        </MudText>
+                                    </td>
+                                </tr>
+                            }
+                            @if (Data.Fields.Count > 10)
+                            {
+                                <tr>
+                                    <td colspan="4">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">
+                                            ... and @(Data.Fields.Count - 10) more fields
+                                        </MudText>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="pa-4">
+                    <MudText Typo="Typo.subtitle1" Class="mb-3">Import Options</MudText>
+
+                    <MudSwitch T="bool" @bind-Checked="Configuration.SkipErrors"
+                               Label="Skip rows with errors"
+                               Color="Color.Primary"
+                               Class="mb-2" />
+
+                    <MudSwitch T="bool" @bind-Checked="Configuration.AutoZoom"
+                               Label="Auto-zoom to imported data"
+                               Color="Color.Primary"
+                               Class="mb-2" />
+
+                    <MudNumericField @bind-Value="Configuration.MaxFeatures"
+                                     Label="Maximum features (0 = unlimited)"
+                                     Variant="Variant.Outlined"
+                                     Min="0"
+                                     Class="mt-2" />
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@code {
+    [Parameter] public ParsedData? Data { get; set; }
+    [Parameter] public ImportConfiguration? Configuration { get; set; }
+
+    private bool HasExistingGeometry()
+    {
+        return Data?.Features.Any(f => f.Geometry != null) ?? false;
+    }
+
+    private bool HasLatLonFields()
+    {
+        if (Data == null) return false;
+
+        var hasLat = Data.Fields.Any(f => f.IsLikelyLatitude && (f.Type == FieldType.Number || f.Type == FieldType.Integer));
+        var hasLon = Data.Fields.Any(f => f.IsLikelyLongitude && (f.Type == FieldType.Number || f.Type == FieldType.Integer));
+
+        return hasLat && hasLon;
+    }
+
+    private bool HasAddressFields()
+    {
+        return Data?.Fields.Any(f => f.IsLikelyAddress) ?? false;
+    }
+
+    private int GetGeometryCount()
+    {
+        return Data?.Features.Count(f => f.Geometry != null) ?? 0;
+    }
+
+    private List<FieldDefinition> GetNumericFields()
+    {
+        return Data?.Fields
+            .Where(f => f.Type == FieldType.Number || f.Type == FieldType.Integer)
+            .ToList() ?? new List<FieldDefinition>();
+    }
+
+    private FieldMapping GetOrCreateMapping(FieldDefinition field)
+    {
+        if (Configuration == null) return new FieldMapping { SourceField = field.Name, TargetField = field.Name };
+
+        if (!Configuration.FieldMappings.TryGetValue(field.Name, out var mapping))
+        {
+            mapping = new FieldMapping
+            {
+                SourceField = field.Name,
+                TargetField = field.DisplayName ?? field.Name,
+                FieldType = field.Type
+            };
+            Configuration.FieldMappings[field.Name] = mapping;
+        }
+
+        return mapping;
+    }
+
+    private string GetSampleValue(FieldDefinition field)
+    {
+        var sample = field.SampleValues.FirstOrDefault(v => v != null);
+        if (sample == null) return "(null)";
+
+        var str = sample.ToString() ?? string.Empty;
+        return str.Length > 30 ? str.Substring(0, 30) + "..." : str;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Configuration != null && Data != null)
+        {
+            // Auto-select lat/lon fields if not already set
+            if (string.IsNullOrEmpty(Configuration.LatitudeField))
+            {
+                var latField = Data.Fields.FirstOrDefault(f => f.IsLikelyLatitude);
+                if (latField != null)
+                {
+                    Configuration.LatitudeField = latField.Name;
+                }
+            }
+
+            if (string.IsNullOrEmpty(Configuration.LongitudeField))
+            {
+                var lonField = Data.Fields.FirstOrDefault(f => f.IsLikelyLongitude);
+                if (lonField != null)
+                {
+                    Configuration.LongitudeField = lonField.Name;
+                }
+            }
+
+            if (string.IsNullOrEmpty(Configuration.AddressField))
+            {
+                var addressField = Data.Fields.FirstOrDefault(f => f.IsLikelyAddress);
+                if (addressField != null)
+                {
+                    Configuration.AddressField = addressField.Name;
+                }
+            }
+
+            // Set default geometry source
+            if (HasExistingGeometry())
+            {
+                Configuration.GeometrySource = GeometrySource.ExistingGeometry;
+            }
+            else if (HasLatLonFields())
+            {
+                Configuration.GeometrySource = GeometrySource.LatLonColumns;
+            }
+            else if (HasAddressFields())
+            {
+                Configuration.GeometrySource = GeometrySource.AddressColumn;
+            }
+        }
+    }
+}

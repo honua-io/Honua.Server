@@ -45,7 +45,7 @@ public sealed class WarmupHealthCheck : IHealthCheck
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<HealthCheckResult> CheckHealthAsync(
+    public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
@@ -72,32 +72,32 @@ public sealed class WarmupHealthCheck : IHealthCheck
                 }
             }, cancellationToken);
 
-            return HealthCheckResult.Degraded(
+            return Task.FromResult(HealthCheckResult.Degraded(
                 "Service warmup in progress",
                 data: new Dictionary<string, object>
                 {
                     ["warmupStatus"] = "in_progress"
-                });
+                }));
         }
 
         // Warmup in progress
         if (warmupStatus == 1)
         {
-            return HealthCheckResult.Degraded(
+            return Task.FromResult(HealthCheckResult.Degraded(
                 "Service warmup in progress",
                 data: new Dictionary<string, object>
                 {
                     ["warmupStatus"] = "in_progress"
-                });
+                }));
         }
 
         // Warmup completed
-        return HealthCheckResult.Healthy(
+        return Task.FromResult(HealthCheckResult.Healthy(
             "All services warmed up",
             data: new Dictionary<string, object>
             {
                 ["warmupStatus"] = "completed"
-            });
+            }));
     }
 
     private async Task WarmupServicesAsync(CancellationToken cancellationToken)

@@ -1,0 +1,76 @@
+{
+  "id": "convert-shapefile-to-geojson",
+  "name": "Convert Shapefile to GeoJSON",
+  "description": "Convert Shapefile format to GeoJSON for web mapping and JavaScript applications. Quick format conversion.",
+  "category": "Data Import/Export",
+  "icon": "transform",
+  "difficulty": 0,
+  "estimatedMinutes": 2,
+  "tags": ["convert", "shapefile", "geojson", "web"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "isFeatured": true,
+  "inputRequirements": [
+    "Shapefile (.shp, .shx, .dbf)"
+  ],
+  "expectedOutputs": [
+    "GeoJSON file (.geojson)"
+  ],
+  "useCases": [
+    "Preparing data for web maps",
+    "Converting legacy formats for modern applications",
+    "Creating API-friendly data formats"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "shapefile_source",
+      "name": "Read Shapefile",
+      "description": "Load features from Shapefile",
+      "parameters": {
+        "filePath": "/data/input/data.shp",
+        "encoding": "UTF-8"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "geojson_sink",
+      "name": "Write GeoJSON",
+      "description": "Export to GeoJSON format",
+      "parameters": {
+        "filePath": "/data/output/data.geojson",
+        "prettyPrint": true
+      },
+      "position": {
+        "x": 400,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "inputPath": {
+      "name": "inputPath",
+      "type": "string",
+      "description": "Input Shapefile path",
+      "defaultValue": "/data/input/data.shp",
+      "required": true
+    },
+    "outputPath": {
+      "name": "outputPath",
+      "type": "string",
+      "description": "Output GeoJSON path",
+      "defaultValue": "/data/output/data.geojson",
+      "required": true
+    }
+  }
+}

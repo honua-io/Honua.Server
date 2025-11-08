@@ -1,0 +1,350 @@
+@page "/geoetl/failed-workflows"
+@using Honua.Server.Enterprise.ETL.Resilience
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Failed Workflows - Dead Letter Queue</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Failed Workflows</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">
+    Review and retry failed GeoETL workflow executions. Failed workflows are automatically added here for investigation.
+</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect @bind-Value="_selectedStatus" Label="Status" T="string" Clearable="true">
+                <MudSelectItem Value="@("Pending")">Pending</MudSelectItem>
+                <MudSelectItem Value="@("Investigating")">Investigating</MudSelectItem>
+                <MudSelectItem Value="@("Retrying")">Retrying</MudSelectItem>
+                <MudSelectItem Value="@("Resolved")">Resolved</MudSelectItem>
+                <MudSelectItem Value="@("Abandoned")">Abandoned</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect @bind-Value="_selectedCategory" Label="Error Category" T="string" Clearable="true">
+                <MudSelectItem Value="@("Transient")">Transient</MudSelectItem>
+                <MudSelectItem Value="@("Data")">Data</MudSelectItem>
+                <MudSelectItem Value="@("Resource")">Resource</MudSelectItem>
+                <MudSelectItem Value="@("Configuration")">Configuration</MudSelectItem>
+                <MudSelectItem Value="@("External")">External</MudSelectItem>
+                <MudSelectItem Value="@("Logic")">Logic</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudTextField @bind-Value="_searchText" Label="Search" Placeholder="Search errors..."
+                         Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadFailedWorkflows" StartIcon="@Icons.Material.Filled.Refresh">
+                Search
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_statistics != null && !_loading)
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">@_statistics.TotalFailures</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Total Failures</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Color="Color.Warning">@_statistics.PendingFailures</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Pending Review</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Color="Color.Success">@_statistics.ResolvedFailures</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Resolved</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6">@_statistics.AverageRetryCount.ToString("F1")</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Avg Retries</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+<MudTable Items="@_failedWorkflows" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@_loading"
+          LoadingProgressColor="Color.Info" Dense="true">
+    <HeaderContent>
+        <MudTh>Workflow</MudTh>
+        <MudTh>Failed At</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Category</MudTh>
+        <MudTh>Priority</MudTh>
+        <MudTh>Node</MudTh>
+        <MudTh>Error</MudTh>
+        <MudTh>Retries</MudTh>
+        <MudTh>Actions</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Workflow">
+            <MudText Typo="Typo.body2">@context.WorkflowName</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">@context.WorkflowId</MudText>
+        </MudTd>
+        <MudTd DataLabel="Failed At">
+            <MudText Typo="Typo.body2">@context.FailedAt.ToString("g")</MudText>
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip Size="Size.Small" Color="GetStatusColor(context.Status)">
+                @context.Status
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Category">
+            <MudChip Size="Size.Small" Color="GetCategoryColor(context.ErrorCategory)">
+                @context.ErrorCategory
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Priority">
+            <MudChip Size="Size.Small" Color="GetPriorityColor(context.Priority)">
+                @context.Priority
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Node">
+            <MudText Typo="Typo.caption">@context.FailedNodeType</MudText>
+        </MudTd>
+        <MudTd DataLabel="Error">
+            <MudText Typo="Typo.body2" Class="mud-text-truncate" Style="max-width: 300px;">
+                @context.ErrorMessage
+            </MudText>
+        </MudTd>
+        <MudTd DataLabel="Retries">@context.RetryCount</MudTd>
+        <MudTd DataLabel="Actions">
+            <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined">
+                <MudButton StartIcon="@Icons.Material.Filled.Visibility" OnClick="@(() => ViewDetails(context))">
+                    Details
+                </MudButton>
+                @if (context.Status == FailedWorkflowStatus.Pending || context.Status == FailedWorkflowStatus.Investigating)
+                {
+                    <MudButton StartIcon="@Icons.Material.Filled.Replay" Color="Color.Primary"
+                               OnClick="@(() => RetryWorkflow(context))">
+                        Retry
+                    </MudButton>
+                    <MudButton StartIcon="@Icons.Material.Filled.Block" Color="Color.Error"
+                               OnClick="@(() => AbandonWorkflow(context))">
+                        Abandon
+                    </MudButton>
+                }
+            </MudButtonGroup>
+        </MudTd>
+    </RowTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+</MudTable>
+
+@if (_selectedWorkflow != null)
+{
+    <MudDialog @bind-IsVisible="_showDetailsDialog" Options="new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true }">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Failed Workflow Details</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Workflow Information</MudText>
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <tbody>
+                            <tr><td><strong>Workflow ID:</strong></td><td>@_selectedWorkflow.WorkflowId</td></tr>
+                            <tr><td><strong>Run ID:</strong></td><td>@_selectedWorkflow.WorkflowRunId</td></tr>
+                            <tr><td><strong>Failed At:</strong></td><td>@_selectedWorkflow.FailedAt.ToString("F")</td></tr>
+                            <tr><td><strong>Status:</strong></td><td><MudChip Size="Size.Small" Color="GetStatusColor(_selectedWorkflow.Status)">@_selectedWorkflow.Status</MudChip></td></tr>
+                            <tr><td><strong>Priority:</strong></td><td><MudChip Size="Size.Small" Color="GetPriorityColor(_selectedWorkflow.Priority)">@_selectedWorkflow.Priority</MudChip></td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Error Information</MudText>
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <tbody>
+                            <tr><td><strong>Category:</strong></td><td><MudChip Size="Size.Small" Color="GetCategoryColor(_selectedWorkflow.ErrorCategory)">@_selectedWorkflow.ErrorCategory</MudChip></td></tr>
+                            <tr><td><strong>Node Type:</strong></td><td>@_selectedWorkflow.FailedNodeType</td></tr>
+                            <tr><td><strong>Node ID:</strong></td><td>@_selectedWorkflow.FailedNodeId</td></tr>
+                            <tr><td><strong>Retry Count:</strong></td><td>@_selectedWorkflow.RetryCount</td></tr>
+                            <tr><td><strong>Last Retry:</strong></td><td>@(_selectedWorkflow.LastRetryAt?.ToString("F") ?? "Never")</td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" GutterBottom="true">Error Message</MudText>
+                    <MudPaper Class="pa-3" Outlined="true">
+                        <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@_selectedWorkflow.ErrorMessage</MudText>
+                    </MudPaper>
+                </MudItem>
+                @if (!string.IsNullOrWhiteSpace(_selectedWorkflow.ErrorDetailsJson))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" GutterBottom="true">Full Error Details</MudText>
+                        <MudPaper Class="pa-3" Outlined="true" Style="max-height: 300px; overflow-y: auto;">
+                            <MudText Typo="Typo.body2" Style="white-space: pre-wrap; font-family: monospace; font-size: 0.875rem;">
+                                @_selectedWorkflow.ErrorDetailsJson
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                }
+            </MudGrid>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _showDetailsDialog = false)">Close</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => RetryWorkflow(_selectedWorkflow))">
+                Retry Workflow
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+@code {
+    private List<FailedWorkflow> _failedWorkflows = new();
+    private ErrorStatistics? _statistics;
+    private FailedWorkflow? _selectedWorkflow;
+    private bool _loading = true;
+    private bool _showDetailsDialog = false;
+    private string? _selectedStatus;
+    private string? _selectedCategory;
+    private string? _searchText;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatistics();
+        await LoadFailedWorkflows();
+    }
+
+    private async Task LoadStatistics()
+    {
+        try
+        {
+            _statistics = await Http.GetFromJsonAsync<ErrorStatistics>("/admin/api/geoetl/error-stats");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load statistics: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadFailedWorkflows()
+    {
+        _loading = true;
+        try
+        {
+            var query = new List<string>();
+            if (!string.IsNullOrWhiteSpace(_selectedStatus)) query.Add($"status={_selectedStatus}");
+            if (!string.IsNullOrWhiteSpace(_selectedCategory)) query.Add($"errorCategory={_selectedCategory}");
+            if (!string.IsNullOrWhiteSpace(_searchText)) query.Add($"searchText={Uri.EscapeDataString(_searchText)}");
+
+            var url = "/admin/api/geoetl/failed-workflows" + (query.Any() ? "?" + string.Join("&", query) : "");
+            var result = await Http.GetFromJsonAsync<PagedResult<FailedWorkflow>>(url);
+            _failedWorkflows = result?.Items ?? new List<FailedWorkflow>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load workflows: {ex.Message}", Severity.Error);
+            _failedWorkflows = new List<FailedWorkflow>();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ViewDetails(FailedWorkflow workflow)
+    {
+        _selectedWorkflow = workflow;
+        _showDetailsDialog = true;
+    }
+
+    private async Task RetryWorkflow(FailedWorkflow workflow)
+    {
+        try
+        {
+            var options = new RetryOptions
+            {
+                FromPoint = RetryFromPoint.FailedNode,
+                ForceRetry = false
+            };
+
+            var response = await Http.PostAsJsonAsync($"/admin/api/geoetl/failed-workflows/{workflow.Id}/retry", options);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Workflow retry initiated successfully", Severity.Success);
+                await LoadFailedWorkflows();
+                _showDetailsDialog = false;
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to retry workflow: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error retrying workflow: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task AbandonWorkflow(FailedWorkflow workflow)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/admin/api/geoetl/failed-workflows/{workflow.Id}/abandon",
+                new { Reason = "Manually abandoned by user" });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Workflow marked as abandoned", Severity.Success);
+                await LoadFailedWorkflows();
+            }
+            else
+            {
+                Snackbar.Add("Failed to abandon workflow", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error abandoning workflow: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetStatusColor(FailedWorkflowStatus status) => status switch
+    {
+        FailedWorkflowStatus.Pending => Color.Warning,
+        FailedWorkflowStatus.Investigating => Color.Info,
+        FailedWorkflowStatus.Retrying => Color.Primary,
+        FailedWorkflowStatus.Resolved => Color.Success,
+        FailedWorkflowStatus.Abandoned => Color.Dark,
+        _ => Color.Default
+    };
+
+    private Color GetCategoryColor(ErrorCategory category) => category switch
+    {
+        ErrorCategory.Transient => Color.Info,
+        ErrorCategory.Data => Color.Warning,
+        ErrorCategory.Resource => Color.Error,
+        ErrorCategory.Configuration => Color.Error,
+        ErrorCategory.External => Color.Warning,
+        ErrorCategory.Logic => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetPriorityColor(FailedWorkflowPriority priority) => priority switch
+    {
+        FailedWorkflowPriority.Critical => Color.Error,
+        FailedWorkflowPriority.High => Color.Warning,
+        FailedWorkflowPriority.Medium => Color.Info,
+        FailedWorkflowPriority.Low => Color.Default,
+        _ => Color.Default
+    };
+}

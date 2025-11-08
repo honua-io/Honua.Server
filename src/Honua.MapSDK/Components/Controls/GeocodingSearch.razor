@@ -1,0 +1,157 @@
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services
+@using Honua.MapSDK.Components.Map
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="honua-geocoding-search @CssClass @(Options.EnableRTL ? "rtl" : "")" @ref="_containerRef">
+    <div class="search-header">
+        <!-- Main search input -->
+        <div class="search-input-container">
+            <span class="search-icon">search</span>
+            <input type="text"
+                   class="search-input"
+                   placeholder="@Options.PlaceholderText"
+                   @bind-value="_searchQuery"
+                   @bind-value:event="oninput"
+                   @onkeydown="HandleKeyDown"
+                   @onfocus="HandleInputFocus"
+                   @ref="_inputRef" />
+
+            @if (!string.IsNullOrEmpty(_searchQuery))
+            {
+                <button class="clear-button" @onclick="ClearSearch" title="Clear search">
+                    <span class="material-icons">close</span>
+                </button>
+            }
+
+            @if (_isSearching)
+            {
+                <span class="loading-spinner"></span>
+            }
+        </div>
+
+        <!-- Options row -->
+        <div class="search-options">
+            @if (Options.ShowProviderSelector && _availableProviders.Count > 1)
+            {
+                <div class="provider-selector">
+                    <select @bind="_selectedProvider" class="provider-dropdown">
+                        @foreach (var provider in _availableProviders)
+                        {
+                            <option value="@provider.ProviderKey">@provider.ProviderName</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            @if (Options.ShowSearchThisAreaToggle && Map != null)
+            {
+                <label class="search-area-toggle">
+                    <input type="checkbox" @bind="_searchThisArea" />
+                    <span>Search this area</span>
+                </label>
+            }
+        </div>
+    </div>
+
+    <!-- Results dropdown -->
+    @if (_showResults && (_searchResults.Any() || _historyItems.Any()))
+    {
+        <div class="search-results-dropdown" @ref="_dropdownRef">
+            @if (_searchResults.Any())
+            {
+                <div class="results-section">
+                    <div class="results-header">Results</div>
+                    @for (int i = 0; i < _searchResults.Count; i++)
+                    {
+                        var index = i;
+                        var result = _searchResults[i];
+                        var isSelected = index == _selectedResultIndex;
+
+                        <div class="result-item @(isSelected ? "selected" : "")"
+                             @onclick="() => SelectResult(result)"
+                             @onmouseenter="() => _selectedResultIndex = index">
+
+                            @if (Options.ShowResultIcons)
+                            {
+                                <span class="result-icon material-icons">@result.Icon</span>
+                            }
+
+                            <div class="result-content">
+                                <div class="result-primary">@result.DisplayAddress</div>
+                                @if (!string.IsNullOrEmpty(result.SecondaryText))
+                                {
+                                    <div class="result-secondary">@result.SecondaryText</div>
+                                }
+                            </div>
+
+                            @if (Options.ShowDistanceInResults && result.DistanceFromCenter.HasValue)
+                            {
+                                <span class="result-distance">@result.GetDistanceDisplay()</span>
+                            }
+
+                            @if (Options.ShowRelevanceScores)
+                            {
+                                <span class="result-score">@result.RelevanceScore.ToString("F0")</span>
+                            }
+
+                            @if (Options.ShowExportOptions)
+                            {
+                                <div class="result-actions" @onclick:stopPropagation="true">
+                                    <button @onclick="() => CopyCoordinates(result)"
+                                            title="Copy coordinates"
+                                            class="action-button">
+                                        <span class="material-icons">content_copy</span>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (_historyItems.Any() && string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                <div class="results-section">
+                    <div class="results-header">
+                        <span>Recent Searches</span>
+                        @if (Options.EnableHistory)
+                        {
+                            <button class="clear-history-button" @onclick="ClearHistory">
+                                <span class="material-icons">delete</span>
+                            </button>
+                        }
+                    </div>
+                    @foreach (var item in _historyItems)
+                    {
+                        <div class="result-item history-item" @onclick="() => SelectHistoryItem(item)">
+                            <span class="result-icon material-icons">history</span>
+                            <div class="result-content">
+                                <div class="result-primary">@item.Query</div>
+                                <div class="result-secondary">@item.FormattedAddress</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (_showNoResults && !_isSearching)
+    {
+        <div class="search-results-dropdown">
+            <div class="no-results">
+                <span class="material-icons">search_off</span>
+                <span>No results found</span>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ElementReference _containerRef;
+    private ElementReference _inputRef;
+    private ElementReference _dropdownRef;
+}

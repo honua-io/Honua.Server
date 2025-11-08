@@ -74,7 +74,8 @@ internal static class WmtsHandlers
         }
         catch (Exception ex)
         {
-            return CreateExceptionReport("NoApplicableCode", null, $"Error processing request: {ex.Message}");
+            // Include exception type to aid debugging when stack traces aren't available
+            return CreateExceptionReport("NoApplicableCode", null, $"Error processing request: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -242,9 +243,9 @@ internal static class WmtsHandlers
 
         public BytesResultWithHeaders(byte[] content, string contentType, string cacheControl)
         {
-            _content = content;
-            _contentType = contentType;
-            _cacheControl = cacheControl;
+            _content = Guard.NotNull(content);
+            _contentType = Guard.NotNullOrWhiteSpace(contentType);
+            _cacheControl = Guard.NotNullOrWhiteSpace(cacheControl);
         }
 
         public Task ExecuteAsync(HttpContext httpContext)
@@ -412,7 +413,7 @@ internal static class WmtsHandlers
             id = index + 1,
             geometry = (object?)null,
             properties = attributes
-        });
+        }).ToList();  // Materialize immediately to avoid lazy evaluation issues
 
         return new
         {

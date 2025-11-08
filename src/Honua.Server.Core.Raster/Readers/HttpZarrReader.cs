@@ -139,7 +139,7 @@ public sealed class HttpZarrReader : IZarrReader
         int[] chunkCoords,
         CancellationToken cancellationToken)
     {
-        var chunkPath = string.Join(".", chunkCoords);
+        var chunkPath = BuildChunkPath(chunkCoords, array.Metadata.ZarrFormat);
         var chunkUri = BuildChunkUri(array.Uri, array.VariableName, chunkPath);
 
         try
@@ -300,19 +300,48 @@ public sealed class HttpZarrReader : IZarrReader
 
     public async Task<ZarrArrayMetadata> GetMetadataAsync(string uri, string variableName, CancellationToken cancellationToken = default)
     {
-        // Read .zarray metadata file
-        var metadataUri = BuildMetadataUri(uri, variableName);
+        // Try v3 first (zarr.json), then fall back to v2 (.zarray)
+        var v3MetadataUri = BuildV3MetadataUri(uri, variableName);
 
-        _logger.LogDebug("Reading Zarr metadata: {MetadataUri}", metadataUri);
+        _logger.LogDebug("Attempting to read Zarr v3 metadata: {MetadataUri}", v3MetadataUri);
 
-        var response = await _httpClient.GetAsync(metadataUri, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        HttpResponseMessage? response = null;
+        try
+        {
+            response = await _httpClient.GetAsync(v3MetadataUri, cancellationToken);
 
+            if (response != null && response.IsSuccessStatusCode)
+            {
+                return await ParseV3MetadataAsync(response, cancellationToken);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or FileNotFoundException or DirectoryNotFoundException or InvalidOperationException)
+        {
+            // v3 metadata not available, fall back to v2
+            _logger.LogDebug(ex, "Zarr v3 metadata not found at {MetadataUri}, falling back to v2", v3MetadataUri);
+        }
+        finally
+        {
+            response?.Dispose();
+        }
+
+        // Fall back to v2
+        _logger.LogDebug("Reading Zarr v2 metadata");
+        var v2MetadataUri = BuildMetadataUri(uri, variableName);
+        _logger.LogDebug("Zarr v2 metadata URI: {MetadataUri}", v2MetadataUri);
+        var v2Response = await _httpClient.GetAsync(v2MetadataUri, cancellationToken);
+        v2Response.EnsureSuccessStatusCode();
+
+        return await ParseV2MetadataAsync(v2Response, cancellationToken);
+    }
+
+    private async Task<ZarrArrayMetadata> ParseV2MetadataAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
-        // Parse .zarray JSON
+        // Parse .zarray JSON (v2 format)
         var shape = root.GetProperty("shape").EnumerateArray().Select(e => e.GetInt32()).ToArray();
         var chunks = root.GetProperty("chunks").EnumerateArray().Select(e => e.GetInt32()).ToArray();
         var dtype = root.GetProperty("dtype").GetString() ?? "float32";
@@ -347,6 +376,63 @@ public sealed class HttpZarrReader : IZarrReader
         };
     }
 
+    private async Task<ZarrArrayMetadata> ParseV3MetadataAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        // Parse zarr.json (v3 format)
+        var zarrFormat = root.GetProperty("zarr_format").GetInt32();
+        var shape = root.GetProperty("shape").EnumerateArray().Select(e => e.GetInt32()).ToArray();
+        var dataType = root.GetProperty("data_type").GetString() ?? "float32";
+
+        // Extract chunk shape from chunk_grid
+        var chunkGrid = root.GetProperty("chunk_grid");
+        var configuration = chunkGrid.GetProperty("configuration");
+        var chunkShape = configuration.GetProperty("chunk_shape").EnumerateArray().Select(e => e.GetInt32()).ToArray();
+
+        // Extract compressor from codecs
+        string compressor = "null";
+        if (root.TryGetProperty("codecs", out var codecs) && codecs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var codec in codecs.EnumerateArray())
+            {
+                var codecName = codec.GetProperty("name").GetString();
+                if (codecName != "bytes" && codecName != null)
+                {
+                    compressor = codecName;
+                    break;
+                }
+            }
+        }
+
+        object? fillValue = null;
+        if (root.TryGetProperty("fill_value", out var fv) && fv.ValueKind != JsonValueKind.Null)
+        {
+            fillValue = fv.ValueKind switch
+            {
+                JsonValueKind.Number when fv.TryGetInt64(out var longValue) => longValue,
+                JsonValueKind.Number => fv.GetDouble(),
+                JsonValueKind.String => fv.GetString(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                _ => null
+            };
+        }
+
+        return new ZarrArrayMetadata
+        {
+            Shape = shape,
+            Chunks = chunkShape,
+            DType = dataType,
+            Compressor = compressor,
+            ZarrFormat = zarrFormat,
+            Order = "C", // v3 always uses C order
+            FillValue = fillValue
+        };
+    }
+
     private string BuildChunkUri(string baseUri, string variableName, string chunkPath)
     {
         // Zarr store structure: {baseUri}/{variableName}/{chunkPath}
@@ -356,6 +442,25 @@ public sealed class HttpZarrReader : IZarrReader
     private string BuildMetadataUri(string baseUri, string variableName)
     {
         return $"{baseUri.TrimEnd('/')}/{variableName}/.zarray";
+    }
+
+    private string BuildV3MetadataUri(string baseUri, string variableName)
+    {
+        return $"{baseUri.TrimEnd('/')}/{variableName}/zarr.json";
+    }
+
+    private string BuildChunkPath(int[] chunkCoords, int zarrFormat)
+    {
+        if (zarrFormat == 3)
+        {
+            // v3 format: c/0/1/2
+            return $"c/{string.Join("/", chunkCoords)}";
+        }
+        else
+        {
+            // v2 format: 0.1.2
+            return string.Join(".", chunkCoords);
+        }
     }
 
     private byte[] DecompressChunk(byte[] compressedData, string compressor)

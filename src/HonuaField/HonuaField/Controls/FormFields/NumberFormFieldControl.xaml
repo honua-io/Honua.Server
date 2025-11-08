@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:HonuaField.Models.FormBuilder"
+             x:Class="HonuaField.Controls.FormFields.NumberFormFieldControl"
+             x:DataType="models:NumberFormField">
+
+    <VerticalStackLayout Spacing="4">
+        <!-- Label -->
+        <Label>
+            <Label.FormattedText>
+                <FormattedString>
+                    <Span Text="{Binding Label}" FontAttributes="Bold" />
+                    <Span Text=" *" TextColor="Red" IsVisible="{Binding IsRequired}" />
+                </FormattedString>
+            </Label.FormattedText>
+        </Label>
+
+        <!-- Input -->
+        <Entry Text="{Binding Value, Mode=TwoWay}"
+               Placeholder="{Binding Placeholder}"
+               Keyboard="Numeric"
+               IsReadOnly="{Binding IsReadOnly}"
+               ReturnType="Next">
+            <Entry.Behaviors>
+                <DataTrigger TargetType="Entry"
+                           Binding="{Binding HasError}"
+                           Value="True">
+                    <Setter Property="TextColor" Value="Red" />
+                </DataTrigger>
+            </Entry.Behaviors>
+        </Entry>
+
+        <!-- Help Text -->
+        <Label Text="{Binding HelpText}"
+               FontSize="12"
+               TextColor="Gray"
+               IsVisible="{Binding HelpText, Converter={StaticResource IsNotNullConverter}}" />
+
+        <!-- Error Message -->
+        <Label Text="{Binding ErrorMessage}"
+               FontSize="12"
+               TextColor="Red"
+               IsVisible="{Binding HasError}" />
+    </VerticalStackLayout>
+
+</ContentView>

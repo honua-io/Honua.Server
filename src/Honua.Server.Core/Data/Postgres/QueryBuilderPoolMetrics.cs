@@ -76,33 +76,45 @@ internal sealed class QueryBuilderPoolMetrics : IDisposable
 
     public void RecordPoolHit(string serviceId, string layerId)
     {
+        ArgumentNullException.ThrowIfNull(serviceId);
+        ArgumentNullException.ThrowIfNull(layerId);
         _poolHitsCounter.Add(1, new("service", serviceId), new("layer", layerId));
     }
 
     public void RecordPoolMiss(string serviceId, string layerId)
     {
+        ArgumentNullException.ThrowIfNull(serviceId);
+        ArgumentNullException.ThrowIfNull(layerId);
         _poolMissesCounter.Add(1, new("service", serviceId), new("layer", layerId));
     }
 
     public void RecordObjectCreated(string serviceId, string layerId)
     {
+        ArgumentNullException.ThrowIfNull(serviceId);
+        ArgumentNullException.ThrowIfNull(layerId);
         _objectsCreatedCounter.Add(1, new("service", serviceId), new("layer", layerId));
         System.Threading.Interlocked.Increment(ref _currentPoolSize);
     }
 
     public void RecordObjectReturned(string serviceId, string layerId)
     {
+        ArgumentNullException.ThrowIfNull(serviceId);
+        ArgumentNullException.ThrowIfNull(layerId);
         _objectsReturnedCounter.Add(1, new("service", serviceId), new("layer", layerId));
     }
 
     public void RecordObjectDiscarded(string serviceId, string layerId)
     {
+        ArgumentNullException.ThrowIfNull(serviceId);
+        ArgumentNullException.ThrowIfNull(layerId);
         _objectsDiscardedCounter.Add(1, new("service", serviceId), new("layer", layerId));
         System.Threading.Interlocked.Decrement(ref _currentPoolSize);
     }
 
     public void RecordGetDuration(double milliseconds, string serviceId, string layerId)
     {
+        ArgumentNullException.ThrowIfNull(serviceId);
+        ArgumentNullException.ThrowIfNull(layerId);
         _poolGetDuration.Record(milliseconds, new("service", serviceId), new("layer", layerId));
     }
 

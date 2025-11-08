@@ -1,0 +1,1015 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Routing
+@using Honua.MapSDK.Services.Routing
+@using Microsoft.JSInterop
+@using RoutingWaypoint = Honua.MapSDK.Models.Routing.Waypoint
+@using RoutingWaypointType = Honua.MapSDK.Models.Routing.WaypointType
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-routing @CssClass" style="@GetContainerStyle()">
+    <MudPaper Elevation="@Elevation" Class="routing-paper">
+        <div class="routing-header">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.Directions" Size="Size.Small" />
+                Routing
+            </MudText>
+            @if (ShowCloseButton)
+            {
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.Close"
+                    Size="Size.Small"
+                    OnClick="@OnCloseClicked"
+                    aria-label="Close routing" />
+            }
+        </div>
+
+        <div class="routing-content">
+            @* Waypoint inputs *@
+            <div class="waypoint-list">
+                @for (int i = 0; i < _waypoints.Count; i++)
+                {
+                    var index = i;
+                    var waypoint = _waypoints[i];
+                    <div class="waypoint-item">
+                        <div class="waypoint-handle">
+                            <MudIcon Icon="@GetWaypointIcon(waypoint.Type)" Size="Size.Small" Color="@GetWaypointColor(waypoint.Type)" />
+                            <span class="waypoint-label">@waypoint.Label</span>
+                        </div>
+                        <MudTextField
+                            T="string"
+                            @bind-Value="waypoint.Name"
+                            Placeholder="@GetWaypointPlaceholder(waypoint.Type)"
+                            Variant="Variant.Outlined"
+                            Dense="true"
+                            Immediate="true"
+                            Class="waypoint-input"
+                            Adornment="Adornment.End"
+                            AdornmentIcon="@Icons.Material.Filled.Search"
+                            OnAdornmentClick="@(() => OnSearchWaypoint(index))" />
+                        @if (_waypoints.Count > 2 && waypoint.Type == RoutingWaypointType.Via)
+                        {
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.Close"
+                                Size="Size.Small"
+                                OnClick="@(() => RemoveWaypoint(index))"
+                                aria-label="Remove waypoint" />
+                        }
+                    </div>
+                }
+
+                @if (AllowMultipleWaypoints && _waypoints.Count < MaxWaypoints)
+                {
+                    <MudButton
+                        StartIcon="@Icons.Material.Filled.Add"
+                        Variant="Variant.Text"
+                        Size="Size.Small"
+                        OnClick="@AddViaWaypoint"
+                        Class="add-waypoint-button">
+                        Add Waypoint
+                    </MudButton>
+                }
+            </div>
+
+            @* Routing options *@
+            <div class="routing-options">
+                <MudSelect
+                    T="TravelMode"
+                    Value="@_travelMode"
+                    Label="Travel Mode"
+                    Variant="Variant.Outlined"
+                    Dense="true"
+                    AnchorOrigin="Origin.BottomCenter"
+                    ValueChanged="@OnTravelModeChanged">
+                    @foreach (var mode in _supportedModes)
+                    {
+                        <MudSelectItem Value="@mode">
+                            <div class="travel-mode-option">
+                                <MudIcon Icon="@GetTravelModeIcon(mode)" Size="Size.Small" />
+                                <span>@mode.ToString()</span>
+                            </div>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+
+                <MudSelect
+                    T="RoutePreference"
+                    Value="@_preference"
+                    Label="Preference"
+                    Variant="Variant.Outlined"
+                    Dense="true"
+                    AnchorOrigin="Origin.BottomCenter"
+                    ValueChanged="@OnPreferenceChanged">
+                    <MudSelectItem Value="RoutePreference.Fastest">Fastest</MudSelectItem>
+                    <MudSelectItem Value="RoutePreference.Shortest">Shortest</MudSelectItem>
+                    <MudSelectItem Value="RoutePreference.Recommended">Recommended</MudSelectItem>
+                    @if (_travelMode == TravelMode.Driving || _travelMode == TravelMode.DrivingTraffic)
+                    {
+                        <MudSelectItem Value="RoutePreference.Efficient">Most Efficient</MudSelectItem>
+                    }
+                </MudSelect>
+            </div>
+
+            @* Avoid options *@
+            @if (ShowAvoidOptions && _travelMode == TravelMode.Driving)
+            {
+                <div class="avoid-options">
+                    <MudChipSet T="AvoidOption" MultiSelection="true" @bind-SelectedValues="_selectedAvoidOptions">
+                        <MudChip T="AvoidOption" Value="AvoidOption.Tolls" Color="Color.Default" Size="Size.Small">Avoid Tolls</MudChip>
+                        <MudChip T="AvoidOption" Value="AvoidOption.Highways" Color="Color.Default" Size="Size.Small">Avoid Highways</MudChip>
+                        <MudChip T="AvoidOption" Value="AvoidOption.Ferries" Color="Color.Default" Size="Size.Small">Avoid Ferries</MudChip>
+                    </MudChipSet>
+                </div>
+            }
+
+            @* Calculate button *@
+            <MudButton
+                Variant="Variant.Filled"
+                Color="Color.Primary"
+                FullWidth="true"
+                StartIcon="@Icons.Material.Filled.DirectionsRun"
+                OnClick="@CalculateRoute"
+                Disabled="@(!CanCalculateRoute() || _isCalculating)"
+                Class="calculate-button">
+                @if (_isCalculating)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <span>Calculating...</span>
+                }
+                else
+                {
+                    <span>Get Directions</span>
+                }
+            </MudButton>
+
+            @* Route summary *@
+            @if (_currentRoute != null)
+            {
+                <div class="route-summary">
+                    <div class="summary-header">
+                        <MudIcon Icon="@GetTravelModeIcon(_currentRoute.TravelMode)" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1"><strong>@_currentRoute.Summary.FormattedDistance</strong> · @_currentRoute.Summary.FormattedDuration</MudText>
+                    </div>
+                    @if (_currentRoute.Summary.MainRoads.Any())
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="via-roads">
+                            Via @string.Join(", ", _currentRoute.Summary.MainRoads.Take(3))
+                        </MudText>
+                    }
+
+                    @* Alternative routes *@
+                    @if (ShowAlternatives && _alternatives.Any())
+                    {
+                        <div class="alternatives">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Alternative Routes</MudText>
+                            @foreach (var alt in _alternatives.Take(MaxAlternatives))
+                            {
+                                <div class="alternative-route @(alt == _selectedAlternative ? "selected" : "")"
+                                     @onclick="@(() => SelectAlternative(alt))">
+                                    <MudText Typo="Typo.body2">
+                                        <strong>@alt.Summary.FormattedDistance</strong> · @alt.Summary.FormattedDuration
+                                    </MudText>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @* Turn-by-turn directions *@
+                @if (ShowInstructions && _currentRoute.Instructions.Any())
+                {
+                    <MudExpansionPanels>
+                        <MudExpansionPanel Text="Directions" IsInitiallyExpanded="true">
+                            <div class="directions-list">
+                                @foreach (var instruction in _currentRoute.Instructions)
+                                {
+                                    <div class="direction-item @(_selectedInstructionIndex == instruction.Index ? "selected" : "")"
+                                         @onclick="@(() => OnInstructionClicked(instruction))">
+                                        <div class="direction-icon">
+                                            <MudIcon Icon="@GetManeuverIcon(instruction.Maneuver)" Size="Size.Small" />
+                                        </div>
+                                        <div class="direction-content">
+                                            <MudText Typo="Typo.body2">@instruction.Text</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @FormatDistance(instruction.Distance) · @FormatDuration(instruction.Time)
+                                            </MudText>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                }
+            }
+
+            @* Isochrone section *@
+            @if (ShowIsochroneOptions)
+            {
+                <MudExpansionPanels Class="mt-4">
+                    <MudExpansionPanel Text="Service Area Analysis">
+                        <div class="isochrone-options">
+                            <MudText Typo="Typo.body2" Class="mb-2">Show areas reachable within:</MudText>
+                            <MudChipSet T="int" MultiSelection="true" @bind-SelectedValues="_selectedIntervals">
+                                <MudChip T="int" Value="5" Color="Color.Default" Size="Size.Small">5 min</MudChip>
+                                <MudChip T="int" Value="10" Color="Color.Default" Size="Size.Small">10 min</MudChip>
+                                <MudChip T="int" Value="15" Color="Color.Default" Size="Size.Small">15 min</MudChip>
+                                <MudChip T="int" Value="30" Color="Color.Default" Size="Size.Small">30 min</MudChip>
+                            </MudChipSet>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                Size="Size.Small"
+                                OnClick="@CalculateIsochrone"
+                                Disabled="@(_waypoints.Count == 0 || _selectedIntervals?.Count == 0)"
+                                Class="mt-2">
+                                Calculate Service Area
+                            </MudButton>
+                        </div>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+
+            @* Export options *@
+            @if (_currentRoute != null && ShowExportOptions)
+            {
+                <div class="export-options">
+                    <MudButton
+                        Variant="Variant.Text"
+                        Size="Size.Small"
+                        StartIcon="@Icons.Material.Filled.Download"
+                        OnClick="@(() => ExportRoute("gpx"))">
+                        Export GPX
+                    </MudButton>
+                    <MudButton
+                        Variant="Variant.Text"
+                        Size="Size.Small"
+                        StartIcon="@Icons.Material.Filled.Share"
+                        OnClick="@ShareRoute">
+                        Share
+                    </MudButton>
+                    <MudButton
+                        Variant="Variant.Text"
+                        Size="Size.Small"
+                        StartIcon="@Icons.Material.Filled.Clear"
+                        OnClick="@ClearRoute"
+                        Color="Color.Error">
+                        Clear
+                    </MudButton>
+                </div>
+            }
+
+            @* Error message *@
+            @if (_errorMessage != null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2" CloseIconClicked="@(() => _errorMessage = null)">
+                    @_errorMessage
+                </MudAlert>
+            }
+        </div>
+    </MudPaper>
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the routing component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"routing-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Routing engine to use
+    /// </summary>
+    [Parameter]
+    public RoutingEngine RoutingEngine { get; set; } = RoutingEngine.OSRM;
+
+    /// <summary>
+    /// API key for commercial routing services (Mapbox, GraphHopper, etc.)
+    /// </summary>
+    [Parameter]
+    public string? ApiKey { get; set; }
+
+    /// <summary>
+    /// Custom routing service (for RoutingEngine.Custom)
+    /// </summary>
+    [Parameter]
+    public IRoutingService? CustomRoutingService { get; set; }
+
+    /// <summary>
+    /// Default travel mode
+    /// </summary>
+    [Parameter]
+    public TravelMode TravelMode { get; set; } = TravelMode.Driving;
+
+    /// <summary>
+    /// Show turn-by-turn instructions
+    /// </summary>
+    [Parameter]
+    public bool ShowInstructions { get; set; } = true;
+
+    /// <summary>
+    /// Show alternative routes
+    /// </summary>
+    [Parameter]
+    public bool ShowAlternatives { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of alternative routes
+    /// </summary>
+    [Parameter]
+    public int MaxAlternatives { get; set; } = 3;
+
+    /// <summary>
+    /// Allow adding multiple waypoints
+    /// </summary>
+    [Parameter]
+    public bool AllowMultipleWaypoints { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of waypoints
+    /// </summary>
+    [Parameter]
+    public int MaxWaypoints { get; set; } = 10;
+
+    /// <summary>
+    /// Allow reordering waypoints by dragging
+    /// </summary>
+    [Parameter]
+    public bool AllowWaypointReorder { get; set; } = true;
+
+    /// <summary>
+    /// Show avoid options (tolls, highways, etc.)
+    /// </summary>
+    [Parameter]
+    public bool ShowAvoidOptions { get; set; } = true;
+
+    /// <summary>
+    /// Show isochrone/service area options
+    /// </summary>
+    [Parameter]
+    public bool ShowIsochroneOptions { get; set; } = true;
+
+    /// <summary>
+    /// Show export options
+    /// </summary>
+    [Parameter]
+    public bool ShowExportOptions { get; set; } = true;
+
+    /// <summary>
+    /// Show close button
+    /// </summary>
+    [Parameter]
+    public bool ShowCloseButton { get; set; } = false;
+
+    /// <summary>
+    /// Paper elevation
+    /// </summary>
+    [Parameter]
+    public int Elevation { get; set; } = 2;
+
+    /// <summary>
+    /// Width of the component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "400px";
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Event callback when route is calculated
+    /// </summary>
+    [Parameter]
+    public EventCallback<Route> OnRouteCalculated { get; set; }
+
+    /// <summary>
+    /// Event callback when routing error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnRoutingError { get; set; }
+
+    /// <summary>
+    /// Event callback when waypoint is added
+    /// </summary>
+    [Parameter]
+    public EventCallback<RoutingWaypoint> OnWaypointAdded { get; set; }
+
+    /// <summary>
+    /// Event callback when close is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private IRoutingService? _routingService;
+    private HttpClient? _httpClient;
+    private IJSObjectReference? _jsModule;
+    private bool _mapReady = false;
+    private bool _isCalculating = false;
+    private string? _errorMessage;
+
+    private List<RoutingWaypoint> _waypoints = new();
+    private Route? _currentRoute;
+    private List<Route> _alternatives = new();
+    private Route? _selectedAlternative;
+    private int? _selectedInstructionIndex;
+
+    private TravelMode _travelMode;
+    private RoutePreference _preference = RoutePreference.Fastest;
+    private IReadOnlyCollection<AvoidOption>? _selectedAvoidOptions;
+    private IReadOnlyCollection<int>? _selectedIntervals;
+
+    private List<TravelMode> _supportedModes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _travelMode = TravelMode;
+        InitializeRoutingService();
+        InitializeWaypoints();
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-routing.js"
+                );
+
+                if (!string.IsNullOrEmpty(SyncWith))
+                {
+                    await _jsModule.InvokeVoidAsync("initializeRouting", SyncWith, new
+                    {
+                        allowMapClick = false,
+                        draggableWaypoints = AllowWaypointReorder
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading routing JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void InitializeRoutingService()
+    {
+        _httpClient = new HttpClient();
+
+        _routingService = RoutingEngine switch
+        {
+            RoutingEngine.OSRM => new OsrmRoutingService(_httpClient),
+            RoutingEngine.Custom when CustomRoutingService != null => CustomRoutingService,
+            _ => new OsrmRoutingService(_httpClient) // Default to OSRM
+        };
+
+        if (_routingService == null)
+        {
+            _errorMessage = "Failed to initialize routing service. Using default provider.";
+            _routingService = new OsrmRoutingService(_httpClient);
+        }
+
+        _supportedModes = _routingService.SupportedTravelModes;
+    }
+
+    private void InitializeWaypoints()
+    {
+        // Initialize with start and end waypoints
+        _waypoints.Add(new RoutingWaypoint
+        {
+            Coordinates = new double[2],
+            Type = RoutingWaypointType.Start,
+            Label = "A"
+        });
+
+        _waypoints.Add(new RoutingWaypoint
+        {
+            Coordinates = new double[2],
+            Type = RoutingWaypointType.End,
+            Label = "B"
+        });
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for search result selection (for waypoints)
+        Bus.Subscribe<SearchResultSelectedMessage>(args =>
+        {
+            // Could auto-add search results as waypoints
+        });
+    }
+
+    private void AddViaWaypoint()
+    {
+        if (_waypoints.Count >= MaxWaypoints) return;
+
+        // Insert before the last waypoint (end)
+        var viaWaypoint = new RoutingWaypoint
+        {
+            Coordinates = new double[2],
+            Type = RoutingWaypointType.Via,
+            Label = GetWaypointLabel(_waypoints.Count - 1)
+        };
+
+        _waypoints.Insert(_waypoints.Count - 1, viaWaypoint);
+
+        // Update labels
+        UpdateWaypointLabels();
+        StateHasChanged();
+    }
+
+    private void RemoveWaypoint(int index)
+    {
+        if (_waypoints.Count <= 2) return;
+        if (_waypoints[index].Type != RoutingWaypointType.Via) return;
+
+        _waypoints.RemoveAt(index);
+        UpdateWaypointLabels();
+        StateHasChanged();
+    }
+
+    private void UpdateWaypointLabels()
+    {
+        for (int i = 0; i < _waypoints.Count; i++)
+        {
+            _waypoints[i].Label = GetWaypointLabel(i);
+        }
+    }
+
+    private string GetWaypointLabel(int index)
+    {
+        return ((char)('A' + index)).ToString();
+    }
+
+    private async Task CalculateRoute()
+    {
+        if (!CanCalculateRoute()) return;
+
+        _isCalculating = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // Validate waypoints have coordinates
+            var validWaypoints = _waypoints.Where(w =>
+                w.Latitude != 0 && w.Longitude != 0
+            ).ToList();
+
+            if (validWaypoints.Count < 2)
+            {
+                throw new Exception("Please set at least start and end locations");
+            }
+
+            var options = new RouteOptions
+            {
+                TravelMode = _travelMode,
+                Preference = _preference,
+                MaxAlternatives = ShowAlternatives ? MaxAlternatives : 0,
+                IncludeInstructions = ShowInstructions,
+                Avoid = GetAvoidOptions()
+            };
+
+            if (_routingService == null)
+            {
+                throw new Exception("Routing service not initialized");
+            }
+
+            // Calculate main route
+            _currentRoute = await _routingService.CalculateRouteAsync(validWaypoints, options);
+
+            // Display on map
+            if (_jsModule != null && !string.IsNullOrEmpty(SyncWith))
+            {
+                await _jsModule.InvokeVoidAsync("displayRoute", SyncWith, new
+                {
+                    id = _currentRoute.Id,
+                    geometry = _currentRoute.Geometry,
+                    travelMode = _currentRoute.TravelMode.ToString(),
+                    isAlternative = false,
+                    alternativeIndex = 0
+                }, new { fitBounds = true });
+            }
+
+            // Get alternatives if enabled
+            if (ShowAlternatives && MaxAlternatives > 0)
+            {
+                try
+                {
+                    _alternatives = await _routingService.GetAlternativesAsync(validWaypoints, options);
+
+                    // Display alternatives on map
+                    if (_jsModule != null && !string.IsNullOrEmpty(SyncWith))
+                    {
+                        for (int i = 1; i < _alternatives.Count; i++)
+                        {
+                            await _jsModule.InvokeVoidAsync("displayRoute", SyncWith, new
+                            {
+                                id = _alternatives[i].Id,
+                                geometry = _alternatives[i].Geometry,
+                                travelMode = _alternatives[i].TravelMode.ToString(),
+                                isAlternative = true,
+                                alternativeIndex = i
+                            }, new { fitBounds = false });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Failed to get alternatives: {ex.Message}");
+                }
+            }
+
+            // Publish success message
+            await Bus.PublishAsync(new RouteCalculatedMessage
+            {
+                RoutingId = Id,
+                RouteId = _currentRoute.Id,
+                Distance = _currentRoute.Distance,
+                Duration = _currentRoute.Duration,
+                FormattedDistance = _currentRoute.Summary.FormattedDistance,
+                FormattedDuration = _currentRoute.Summary.FormattedDuration,
+                TravelMode = _currentRoute.TravelMode.ToString(),
+                ComponentId = Id,
+                WaypointCount = validWaypoints.Count,
+                InstructionCount = _currentRoute.Instructions.Count,
+                IsAlternative = false,
+                AlternativeIndex = 0
+            }, Id);
+
+            // Invoke callback
+            await OnRouteCalculated.InvokeAsync(_currentRoute);
+        }
+        catch (RoutingException ex)
+        {
+            _errorMessage = ex.Message;
+            await Bus.PublishAsync(new RoutingErrorMessage
+            {
+                RoutingId = Id,
+                ErrorMessage = ex.Message,
+                ComponentId = Id,
+                ErrorCode = ex.ErrorCode,
+                RoutingEngine = ex.RoutingEngine
+            }, Id);
+            await OnRoutingError.InvokeAsync(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to calculate route: {ex.Message}";
+            Console.Error.WriteLine($"Routing error: {ex}");
+            await OnRoutingError.InvokeAsync(_errorMessage);
+        }
+        finally
+        {
+            _isCalculating = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<AvoidOption> GetAvoidOptions()
+    {
+        var options = new List<AvoidOption>();
+        if (_selectedAvoidOptions != null)
+        {
+            foreach (var item in _selectedAvoidOptions)
+            {
+                if (item is AvoidOption avoid)
+                {
+                    options.Add(avoid);
+                }
+            }
+        }
+        return options;
+    }
+
+    private bool CanCalculateRoute()
+    {
+        return _waypoints.Count >= 2 &&
+               _waypoints.Any(w => w.Latitude != 0 && w.Longitude != 0);
+    }
+
+    private async Task OnInstructionClicked(RouteInstruction instruction)
+    {
+        _selectedInstructionIndex = instruction.Index;
+
+        // Highlight segment on map
+        if (_jsModule != null && !string.IsNullOrEmpty(SyncWith))
+        {
+            await _jsModule.InvokeVoidAsync("highlightRouteSegment", SyncWith, instruction.Index);
+        }
+
+        // Publish message
+        await Bus.PublishAsync(new RouteInstructionSelectedMessage
+        {
+            RoutingId = Id,
+            InstructionIndex = instruction.Index,
+            Text = instruction.Text,
+            Distance = instruction.Distance,
+            Coordinate = instruction.Coordinate,
+            ComponentId = Id
+        }, Id);
+
+        StateHasChanged();
+    }
+
+    private async Task SelectAlternative(Route alternative)
+    {
+        _selectedAlternative = alternative;
+        _currentRoute = alternative;
+
+        // Update display
+        if (_jsModule != null && !string.IsNullOrEmpty(SyncWith))
+        {
+            await _jsModule.InvokeVoidAsync("displayRoute", SyncWith, new
+            {
+                id = alternative.Id,
+                geometry = alternative.Geometry,
+                travelMode = alternative.TravelMode.ToString(),
+                isAlternative = false,
+                alternativeIndex = 0
+            }, new { fitBounds = true });
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task CalculateIsochrone()
+    {
+        if (_waypoints.Count == 0 || _selectedIntervals?.Count == 0) return;
+
+        try
+        {
+            var firstWaypoint = _waypoints.First(w => w.Latitude != 0 && w.Longitude != 0);
+
+            var intervals = _selectedIntervals.OfType<int>().OrderBy(i => i).ToList();
+
+            var options = new IsochroneOptions
+            {
+                Center = new[] { firstWaypoint.Longitude, firstWaypoint.Latitude },
+                Intervals = intervals,
+                TravelMode = _travelMode
+            };
+
+            if (_routingService == null) return;
+
+            var result = await _routingService.CalculateIsochroneAsync(options);
+
+            // Display on map
+            if (_jsModule != null && !string.IsNullOrEmpty(SyncWith))
+            {
+                await _jsModule.InvokeVoidAsync("displayIsochrone", SyncWith, new
+                {
+                    center = result.Center,
+                    polygons = result.Polygons.Select(p => new
+                    {
+                        interval = p.Interval,
+                        geometry = p.Geometry,
+                        color = p.Color,
+                        opacity = p.Opacity
+                    })
+                });
+            }
+
+            await Bus.PublishAsync(new IsochroneCalculatedMessage
+            {
+                RoutingId = Id,
+                Center = result.Center,
+                TravelMode = result.TravelMode.ToString(),
+                Intervals = intervals,
+                ComponentId = Id,
+                PolygonCount = result.Polygons.Count
+            }, Id);
+        }
+        catch (NotSupportedException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to calculate service area: {ex.Message}";
+            Console.Error.WriteLine($"Isochrone error: {ex}");
+        }
+    }
+
+    private async Task ExportRoute(string format)
+    {
+        if (_currentRoute == null || _jsModule == null) return;
+
+        try
+        {
+            var exportData = await _jsModule.InvokeAsync<string>("exportRoute", SyncWith, format);
+            if (exportData == null) return;
+
+            var fileName = $"route-{DateTime.Now:yyyy-MM-dd-HHmmss}.{format.ToLower()}";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(exportData);
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JS.InvokeVoidAsync("eval", $@"
+                const link = document.createElement('a');
+                link.download = '{fileName}';
+                link.href = 'data:application/octet-stream;base64,{base64}';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            ");
+
+            await Bus.PublishAsync(new RouteExportedMessage
+            {
+                RoutingId = Id,
+                RouteId = _currentRoute.Id,
+                Format = format,
+                ComponentId = Id,
+                FileName = fileName
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to export route: {ex.Message}";
+        }
+    }
+
+    private async Task ShareRoute()
+    {
+        if (_currentRoute == null) return;
+
+        // Generate shareable URL or copy route details
+        var summary = $"Route: {_currentRoute.Summary.FormattedDistance}, {_currentRoute.Summary.FormattedDuration}";
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", summary);
+            // Could show a success snackbar here
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to share route: {ex.Message}");
+        }
+    }
+
+    private async Task ClearRoute()
+    {
+        if (_jsModule != null && !string.IsNullOrEmpty(SyncWith))
+        {
+            await _jsModule.InvokeVoidAsync("clearRoute", SyncWith, false);
+        }
+
+        _currentRoute = null;
+        _alternatives.Clear();
+        _selectedAlternative = null;
+        _selectedInstructionIndex = null;
+
+        await Bus.PublishAsync(new RouteClearedMessage
+        {
+            RoutingId = Id,
+            ComponentId = Id
+        }, Id);
+
+        StateHasChanged();
+    }
+
+    private async Task OnCloseClicked()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private Task OnSearchWaypoint(int index)
+    {
+        // Could integrate with search component here
+        return Task.CompletedTask;
+    }
+
+    private Task OnTravelModeChanged(TravelMode mode)
+    {
+        _travelMode = mode;
+        return Task.CompletedTask;
+    }
+
+    private Task OnPreferenceChanged(RoutePreference pref)
+    {
+        _preference = pref;
+        return Task.CompletedTask;
+    }
+
+    // UI Helper methods
+    private string GetWaypointIcon(RoutingWaypointType type)
+    {
+        return type switch
+        {
+            RoutingWaypointType.Start => Icons.Material.Filled.FlagCircle,
+            RoutingWaypointType.End => Icons.Material.Filled.LocationOn,
+            _ => Icons.Material.Filled.Circle
+        };
+    }
+
+    private Color GetWaypointColor(RoutingWaypointType type)
+    {
+        return type switch
+        {
+            RoutingWaypointType.Start => Color.Success,
+            RoutingWaypointType.End => Color.Error,
+            _ => Color.Primary
+        };
+    }
+
+    private string GetWaypointPlaceholder(RoutingWaypointType type)
+    {
+        return type switch
+        {
+            RoutingWaypointType.Start => "Start location",
+            RoutingWaypointType.End => "End location",
+            _ => "Waypoint"
+        };
+    }
+
+    private string GetTravelModeIcon(TravelMode mode)
+    {
+        return mode switch
+        {
+            TravelMode.Driving or TravelMode.DrivingTraffic => Icons.Material.Filled.DirectionsCar,
+            TravelMode.Walking => Icons.Material.Filled.DirectionsWalk,
+            TravelMode.Cycling => Icons.Material.Filled.DirectionsBike,
+            TravelMode.Transit => Icons.Material.Filled.DirectionsBus,
+            _ => Icons.Material.Filled.Directions
+        };
+    }
+
+    private string GetManeuverIcon(ManeuverType maneuver)
+    {
+        return maneuver switch
+        {
+            ManeuverType.TurnLeft => Icons.Material.Filled.TurnLeft,
+            ManeuverType.TurnRight => Icons.Material.Filled.TurnRight,
+            ManeuverType.TurnSlightLeft => Icons.Material.Filled.TurnSlightLeft,
+            ManeuverType.TurnSlightRight => Icons.Material.Filled.TurnSlightRight,
+            ManeuverType.TurnSharpLeft => Icons.Material.Filled.TurnSharpLeft,
+            ManeuverType.TurnSharpRight => Icons.Material.Filled.TurnSharpRight,
+            ManeuverType.UTurn => Icons.Material.Filled.UTurnLeft,
+            ManeuverType.Straight or ManeuverType.Continue => Icons.Material.Filled.Straight,
+            ManeuverType.Merge => Icons.Material.Filled.Merge,
+            ManeuverType.Fork => Icons.Material.Filled.CallSplit,
+            ManeuverType.Roundabout => Icons.Material.Filled.RotateRight,
+            ManeuverType.Arrive => Icons.Material.Filled.Place,
+            ManeuverType.Depart => Icons.Material.Filled.NearMe,
+            _ => Icons.Material.Filled.ArrowForward
+        };
+    }
+
+    private string FormatDistance(double meters)
+    {
+        if (meters < 1000)
+        {
+            return $"{meters:F0} m";
+        }
+        return $"{meters / 1000:F1} km";
+    }
+
+    private string FormatDuration(int seconds)
+    {
+        var minutes = seconds / 60;
+        if (minutes < 60)
+        {
+            return $"{minutes} min";
+        }
+        var hours = minutes / 60;
+        var remainingMinutes = minutes % 60;
+        return remainingMinutes > 0 ? $"{hours}h {remainingMinutes}min" : $"{hours}h";
+    }
+
+    private string GetContainerStyle()
+    {
+        return $"width: {Width};";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+
+        _httpClient?.Dispose();
+    }
+}

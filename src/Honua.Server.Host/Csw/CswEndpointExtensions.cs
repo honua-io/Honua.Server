@@ -31,6 +31,9 @@ public static class CswEndpointExtensions
         cswGroup.MapPost("", CswHandlers.HandleAsync)
             .WithName("CSW-POST")
             .WithSummary("CSW 2.0.2 POST request handler")
+            .Accepts<string>("application/xml")
+            .Accepts<string>("text/xml")
+            .DisableAntiforgery()
             .Produces(200, contentType: "application/xml")
             .Produces(400, contentType: "application/xml");
 

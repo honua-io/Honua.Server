@@ -2,6 +2,7 @@
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Data.SqlServer;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Tests.Shared.TestConfiguration;
 using Testcontainers.MsSql;
 using Xunit;
 using Microsoft.Data.SqlClient;
@@ -11,6 +12,7 @@ namespace Honua.Server.Core.Tests.Data.Data.SqlServer;
 /// <summary>
 /// SQL Server data store provider integration tests.
 /// Uses SQL Server 2022 container with spatial support.
+/// Respects DatabaseTestConfiguration - disabled by default, enabled in Full mode or via HONUA_ENABLE_SQLSERVER_TESTS=1.
 /// </summary>
 [Collection("DatabaseTests")]
 [Trait("Category", "Integration")]
@@ -44,11 +46,11 @@ public sealed class SqlServerDataStoreProviderFixture : IAsyncLifetime
 
     public SqlServerDataStoreProviderFixture()
     {
-        var enabled = Environment.GetEnvironmentVariable("HONUA_ENABLE_SQLSERVER_TESTS");
-        if (!string.Equals(enabled, "1", StringComparison.OrdinalIgnoreCase) && !string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase))
+        // Check if SQL Server tests are enabled via unified configuration
+        if (!DatabaseTestConfiguration.IsSqlServerEnabled)
         {
             _skip = true;
-            _skipReason = "SQL Server integration tests disabled. Set HONUA_ENABLE_SQLSERVER_TESTS=1 to enable.";
+            _skipReason = $"SQL Server tests disabled. Mode: {DatabaseTestConfiguration.Mode}. Set HONUA_DATABASE_TEST_MODE=full or HONUA_ENABLE_SQLSERVER_TESTS=1 to enable.";
             return;
         }
 

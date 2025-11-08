@@ -457,8 +457,9 @@ public sealed class GdalCogCacheService : DisposableBase, IRasterCacheService
 
             return Path.GetFileNameWithoutExtension(cachedUri);
         }
-        catch
+        catch (Exception)
         {
+            // Silently return null for invalid URIs
             return null;
         }
     }
@@ -651,14 +652,15 @@ public sealed class GdalCogCacheService : DisposableBase, IRasterCacheService
         if (_conversionLock != null)
         {
             // Wait for all slots to be available (no conversions in progress)
-            var maxSlots = _conversionLock.CurrentCount;
-            for (int i = 0; i < Environment.ProcessorCount - maxSlots; i++)
+            // Acquire all slots to ensure no conversions are running
+            var maxSlots = Environment.ProcessorCount;
+            for (int i = 0; i < maxSlots; i++)
             {
                 await _conversionLock.WaitAsync().ConfigureAwait(false);
             }
 
             // Release all acquired slots
-            for (int i = 0; i < Environment.ProcessorCount - maxSlots; i++)
+            for (int i = 0; i < maxSlots; i++)
             {
                 _conversionLock.Release();
             }

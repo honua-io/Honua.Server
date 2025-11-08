@@ -1,0 +1,849 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services.BookmarkStorage
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+@if (Layout == "dropdown")
+{
+    <div class="honua-bookmarks honua-bookmarks-dropdown @CssClass" style="@Style">
+        <MudSelect T="string"
+                   Label="@Title"
+                   Variant="Variant.Outlined"
+                   Margin="Margin.Dense"
+                   ValueChanged="OnDropdownSelectionChanged"
+                   Placeholder="Select a bookmark...">
+            @foreach (var bookmark in _bookmarks)
+            {
+                <MudSelectItem Value="@bookmark.Id">@bookmark.Name</MudSelectItem>
+            }
+        </MudSelect>
+    </div>
+}
+else if (Layout == "compact")
+{
+    <div class="honua-bookmarks honua-bookmarks-compact @GetPositionClass() @CssClass" style="@Style">
+        <MudPaper Class="bookmarks-container" Elevation="2">
+            <div class="bookmarks-header">
+                <MudIcon Icon="@Icons.Material.Filled.Bookmarks" Size="Size.Small" />
+                <span class="bookmarks-title">@Title (@_bookmarks.Count)</span>
+                @if (AllowAdd)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="AddCurrentView"
+                                   title="Save current view" />
+                }
+            </div>
+            <div class="bookmarks-list-compact">
+                @foreach (var bookmark in _bookmarks)
+                {
+                    <div class="bookmark-item-compact" @onclick="() => NavigateToBookmark(bookmark)">
+                        @if (EnableThumbnails && !string.IsNullOrEmpty(bookmark.ThumbnailUrl))
+                        {
+                            <img src="@bookmark.ThumbnailUrl" alt="@bookmark.Name" class="bookmark-thumbnail-small" />
+                        }
+                        else
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Place" Size="Size.Small" />
+                        }
+                        <span>@bookmark.Name</span>
+                    </div>
+                }
+            </div>
+        </MudPaper>
+    </div>
+}
+else
+{
+    <div class="honua-bookmarks honua-bookmarks-list @GetPositionClass() @CssClass" style="@Style">
+        <MudPaper Class="bookmarks-container" Elevation="2">
+            <div class="bookmarks-header">
+                <div class="header-left">
+                    <MudIcon Icon="@Icons.Material.Filled.Bookmarks" Size="Size.Small" />
+                    <span class="bookmarks-title">@Title (@_bookmarks.Count)</span>
+                </div>
+                <div class="header-actions">
+                    @if (AllowImportExport)
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Upload" OnClick="ExportBookmarks">Export</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Download" OnClick="ImportBookmarks">Import</MudMenuItem>
+                            <MudDivider />
+                            <MudMenuItem Icon="@Icons.Material.Filled.CreateNewFolder" OnClick="CreateFolder">New Folder</MudMenuItem>
+                        </MudMenu>
+                    }
+                    @if (AllowAdd)
+                    {
+                        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   Variant="Variant.Filled"
+                                   OnClick="AddCurrentView">
+                            Add Bookmark
+                        </MudButton>
+                    }
+                </div>
+            </div>
+
+            @if (ShowSearch && _bookmarks.Count > 3)
+            {
+                <div class="bookmarks-search">
+                    <MudTextField @bind-Value="_searchQuery"
+                                  Placeholder="Search bookmarks..."
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  OnDebounceIntervalElapsed="PerformSearch"
+                                  DebounceInterval="300"
+                                  Clearable="true" />
+                </div>
+            }
+
+            <div class="bookmarks-content">
+                @if (_isLoading)
+                {
+                    <div class="loading-state">
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                        <MudText Typo="Typo.body2">Loading bookmarks...</MudText>
+                    </div>
+                }
+                else if (_filteredBookmarks.Count == 0)
+                {
+                    <div class="empty-state">
+                        <MudIcon Icon="@Icons.Material.Filled.BookmarkBorder" Size="Size.Large" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @(string.IsNullOrEmpty(_searchQuery) ? "No bookmarks yet" : "No bookmarks found")
+                        </MudText>
+                        @if (AllowAdd && string.IsNullOrEmpty(_searchQuery))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Save your first bookmark to get started
+                            </MudText>
+                        }
+                    </div>
+                }
+                else
+                {
+                    @if (ShowFolders && _folders.Count > 0)
+                    {
+                        @* Bookmarks organized by folder *@
+                        @foreach (var folder in _folders)
+                        {
+                            var folderBookmarks = _filteredBookmarks.Where(b => b.FolderId == folder.Id).ToList();
+                            if (folderBookmarks.Any())
+                            {
+                                <div class="bookmark-folder">
+                                    <div class="folder-header" @onclick="() => ToggleFolder(folder.Id)">
+                                        <MudIcon Icon="@(_expandedFolders.Contains(folder.Id) ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                                        <MudIcon Icon="@(folder.Icon ?? Icons.Material.Filled.Folder)" Size="Size.Small" Color="Color.Primary" />
+                                        <span class="folder-name">@folder.Name</span>
+                                        <span class="folder-count">(@folderBookmarks.Count)</span>
+                                        @if (AllowEdit)
+                                        {
+                                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert"
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => ShowFolderMenu(folder))" />
+                                        }
+                                    </div>
+                                    @if (_expandedFolders.Contains(folder.Id))
+                                    {
+                                        <div class="folder-content">
+                                            @foreach (var bookmark in folderBookmarks)
+                                            {
+                                                @RenderBookmarkCard(bookmark)
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+
+                        @* Bookmarks without folder *@
+                        var unfoldered = _filteredBookmarks.Where(b => string.IsNullOrEmpty(b.FolderId)).ToList();
+                        if (unfoldered.Any())
+                        {
+                            <div class="bookmark-folder">
+                                <div class="folder-header" @onclick='() => ToggleFolder("_uncategorized")'>
+                                    <MudIcon Icon="@(_expandedFolders.Contains("_uncategorized") ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                                    <MudIcon Icon="@Icons.Material.Filled.BookmarkBorder" Size="Size.Small" Color="Color.Default" />
+                                    <span class="folder-name">Uncategorized</span>
+                                    <span class="folder-count">(@unfoldered.Count)</span>
+                                </div>
+                                @if (_expandedFolders.Contains("_uncategorized"))
+                                {
+                                    <div class="folder-content">
+                                        @foreach (var bookmark in unfoldered)
+                                        {
+                                            @RenderBookmarkCard(bookmark)
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @* Flat list without folders *@
+                        @if (ViewMode == "grid")
+                        {
+                            <div class="bookmarks-grid">
+                                @foreach (var bookmark in _filteredBookmarks)
+                                {
+                                    @RenderBookmarkGridCard(bookmark)
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="bookmarks-list">
+                                @foreach (var bookmark in _filteredBookmarks)
+                                {
+                                    @RenderBookmarkCard(bookmark)
+                                }
+                            </div>
+                        }
+                    }
+                }
+            </div>
+        </MudPaper>
+    </div>
+}
+
+@code {
+    /// <summary>
+    /// Unique identifier for the bookmarks component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"bookmarks-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Title displayed in header
+    /// </summary>
+    [Parameter]
+    public string Title { get; set; } = "Bookmarks";
+
+    /// <summary>
+    /// Layout mode: "list" (default), "grid", "compact", "dropdown"
+    /// </summary>
+    [Parameter]
+    public string Layout { get; set; } = "list";
+
+    /// <summary>
+    /// View mode for non-folder layouts: "list" or "grid"
+    /// </summary>
+    [Parameter]
+    public string ViewMode { get; set; } = "list";
+
+    /// <summary>
+    /// Position when floating: top-right, top-left, bottom-right, bottom-left, or null for embedded
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; }
+
+    /// <summary>
+    /// Show folder organization
+    /// </summary>
+    [Parameter]
+    public bool ShowFolders { get; set; } = true;
+
+    /// <summary>
+    /// Show search box
+    /// </summary>
+    [Parameter]
+    public bool ShowSearch { get; set; } = true;
+
+    /// <summary>
+    /// Enable thumbnail capture and display
+    /// </summary>
+    [Parameter]
+    public bool EnableThumbnails { get; set; } = true;
+
+    /// <summary>
+    /// Allow adding new bookmarks
+    /// </summary>
+    [Parameter]
+    public bool AllowAdd { get; set; } = true;
+
+    /// <summary>
+    /// Allow editing bookmarks
+    /// </summary>
+    [Parameter]
+    public bool AllowEdit { get; set; } = true;
+
+    /// <summary>
+    /// Allow deleting bookmarks
+    /// </summary>
+    [Parameter]
+    public bool AllowDelete { get; set; } = true;
+
+    /// <summary>
+    /// Allow sharing bookmarks
+    /// </summary>
+    [Parameter]
+    public bool AllowShare { get; set; } = true;
+
+    /// <summary>
+    /// Allow import/export
+    /// </summary>
+    [Parameter]
+    public bool AllowImportExport { get; set; } = true;
+
+    /// <summary>
+    /// Custom storage provider
+    /// </summary>
+    [Parameter]
+    public IBookmarkStorage? Storage { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Callback when bookmark is selected
+    /// </summary>
+    [Parameter]
+    public EventCallback<Bookmark> OnBookmarkSelected { get; set; }
+
+    /// <summary>
+    /// Callback when bookmark is created
+    /// </summary>
+    [Parameter]
+    public EventCallback<Bookmark> OnBookmarkCreated { get; set; }
+
+    /// <summary>
+    /// Callback when bookmark is deleted
+    /// </summary>
+    [Parameter]
+    public EventCallback<Bookmark> OnBookmarkDeleted { get; set; }
+
+    /// <summary>
+    /// Callback when bookmark is updated
+    /// </summary>
+    [Parameter]
+    public EventCallback<Bookmark> OnBookmarkUpdated { get; set; }
+
+    private IBookmarkStorage _storage = null!;
+    private List<Bookmark> _bookmarks = new();
+    private List<Bookmark> _filteredBookmarks = new();
+    private List<BookmarkFolder> _folders = new();
+    private HashSet<string> _expandedFolders = new() { "_uncategorized" };
+    private string _searchQuery = string.Empty;
+    private bool _isLoading = true;
+    private bool _mapReady = false;
+    private IJSObjectReference? _captureModule;
+    private double[] _currentCenter = new[] { 0.0, 0.0 };
+    private double _currentZoom = 2;
+    private double _currentBearing = 0;
+    private double _currentPitch = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize storage
+        _storage = Storage ?? new LocalStorageBookmarkStorage(JS);
+
+        // Load bookmarks and folders
+        await LoadBookmarksAsync();
+
+        // Setup subscriptions
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && EnableThumbnails)
+        {
+            try
+            {
+                _captureModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/bookmark-capture.js"
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading capture module: {ex.Message}");
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready
+        Bus.Subscribe<MapReadyMessage>(async args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                _currentCenter = args.Message.Center;
+                _currentZoom = args.Message.Zoom;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Track map extent changes
+        Bus.Subscribe<MapExtentChangedMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _currentCenter = args.Message.Center;
+                _currentZoom = args.Message.Zoom;
+                _currentBearing = args.Message.Bearing;
+                _currentPitch = args.Message.Pitch;
+            }
+        });
+    }
+
+    private async Task LoadBookmarksAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            _bookmarks = await _storage.GetAllAsync();
+            _folders = await _storage.GetFoldersAsync();
+
+            // Expand all folders by default
+            _expandedFolders = _folders.Select(f => f.Id).ToHashSet();
+            _expandedFolders.Add("_uncategorized");
+
+            await ApplySearchFilter();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading bookmarks: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ApplySearchFilter()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            _filteredBookmarks = _bookmarks.OrderByDescending(b => b.CreatedAt).ToList();
+        }
+        else
+        {
+            _filteredBookmarks = await _storage.SearchAsync(_searchQuery);
+        }
+    }
+
+    private async Task PerformSearch()
+    {
+        await ApplySearchFilter();
+        StateHasChanged();
+    }
+
+    private async Task AddCurrentView()
+    {
+        if (!_mapReady)
+        {
+            // Show error: map not ready
+            return;
+        }
+
+        var bookmark = new Bookmark
+        {
+            Name = $"View {DateTime.Now:MMM d, HH:mm}",
+            Center = _currentCenter,
+            Zoom = _currentZoom,
+            Bearing = _currentBearing,
+            Pitch = _currentPitch,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Capture thumbnail if enabled
+        if (EnableThumbnails && _captureModule != null && !string.IsNullOrEmpty(SyncWith))
+        {
+            try
+            {
+                var thumbnail = await _captureModule.InvokeAsync<string>("captureMapThumbnail", SyncWith, 200, 150);
+                bookmark.ThumbnailUrl = thumbnail;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error capturing thumbnail: {ex.Message}");
+            }
+        }
+
+        // Show edit dialog
+        await ShowEditDialog(bookmark, true);
+    }
+
+    private async Task NavigateToBookmark(Bookmark bookmark)
+    {
+        // Update access stats
+        bookmark.LastAccessedAt = DateTime.UtcNow;
+        bookmark.AccessCount++;
+        await _storage.SaveAsync(bookmark);
+
+        // Publish message to navigate map
+        var message = new BookmarkSelectedMessage
+        {
+            BookmarkId = bookmark.Id,
+            BookmarkName = bookmark.Name,
+            Center = bookmark.Center,
+            Zoom = bookmark.Zoom,
+            Bearing = bookmark.Bearing,
+            Pitch = bookmark.Pitch,
+            ComponentId = Id
+        };
+
+        await Bus.PublishAsync(message, Id);
+
+        // Also send FlyTo request if we have a specific map
+        if (!string.IsNullOrEmpty(SyncWith))
+        {
+            await Bus.PublishAsync(new FlyToRequestMessage
+            {
+                MapId = SyncWith,
+                Center = bookmark.Center,
+                Zoom = bookmark.Zoom,
+                Bearing = bookmark.Bearing,
+                Pitch = bookmark.Pitch,
+                Duration = 1500
+            }, Id);
+        }
+
+        // Invoke callback
+        await OnBookmarkSelected.InvokeAsync(bookmark);
+    }
+
+    private async Task OnDropdownSelectionChanged(string bookmarkId)
+    {
+        var bookmark = _bookmarks.FirstOrDefault(b => b.Id == bookmarkId);
+        if (bookmark != null)
+        {
+            await NavigateToBookmark(bookmark);
+        }
+    }
+
+    private async Task EditBookmark(Bookmark bookmark)
+    {
+        await ShowEditDialog(bookmark, false);
+    }
+
+    private async Task DeleteBookmark(Bookmark bookmark)
+    {
+        // TODO: Show confirmation dialog
+        await _storage.DeleteAsync(bookmark.Id);
+        await LoadBookmarksAsync();
+
+        await Bus.PublishAsync(new BookmarkDeletedMessage
+        {
+            BookmarkId = bookmark.Id,
+            ComponentId = Id
+        }, Id);
+
+        await OnBookmarkDeleted.InvokeAsync(bookmark);
+    }
+
+    private async Task ShareBookmark(Bookmark bookmark)
+    {
+        // Generate share URL
+        var baseUrl = await JS.InvokeAsync<string>("eval", "window.location.origin + window.location.pathname");
+        var shareUrl = $"{baseUrl}?bookmark={bookmark.Id}&center={bookmark.Center[0]},{bookmark.Center[1]}&zoom={bookmark.Zoom}";
+
+        if (bookmark.Bearing != 0)
+            shareUrl += $"&bearing={bookmark.Bearing}";
+        if (bookmark.Pitch != 0)
+            shareUrl += $"&pitch={bookmark.Pitch}";
+
+        bookmark.ShareUrl = shareUrl;
+        await _storage.SaveAsync(bookmark);
+
+        // Copy to clipboard
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", shareUrl);
+
+        // TODO: Show success message
+    }
+
+    private async Task ShowEditDialog(Bookmark bookmark, bool isNew)
+    {
+        // This would typically use MudBlazor's DialogService
+        // For now, we'll just save with generated name
+        if (isNew)
+        {
+            var id = await _storage.SaveAsync(bookmark);
+            bookmark.Id = id;
+            await LoadBookmarksAsync();
+
+            await Bus.PublishAsync(new BookmarkCreatedMessage
+            {
+                BookmarkId = bookmark.Id,
+                BookmarkName = bookmark.Name,
+                ComponentId = Id,
+                Center = bookmark.Center,
+                Zoom = bookmark.Zoom
+            }, Id);
+
+            await OnBookmarkCreated.InvokeAsync(bookmark);
+        }
+    }
+
+    private void ToggleFolder(string folderId)
+    {
+        if (_expandedFolders.Contains(folderId))
+        {
+            _expandedFolders.Remove(folderId);
+        }
+        else
+        {
+            _expandedFolders.Add(folderId);
+        }
+    }
+
+    private void ShowFolderMenu(BookmarkFolder folder)
+    {
+        // TODO: Show folder options menu
+    }
+
+    private async Task CreateFolder()
+    {
+        var folder = new BookmarkFolder
+        {
+            Name = "New Folder",
+            Icon = Icons.Material.Filled.Folder,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _storage.SaveFolderAsync(folder);
+        await LoadBookmarksAsync();
+    }
+
+    private async Task ExportBookmarks()
+    {
+        try
+        {
+            var json = await _storage.ExportAsync();
+            var fileName = $"bookmarks-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+
+            await JS.InvokeVoidAsync("eval", $@"
+                const blob = new Blob([{System.Text.Json.JsonSerializer.Serialize(json)}], {{ type: 'application/json' }});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '{fileName}';
+                a.click();
+                URL.revokeObjectURL(url);
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error exporting bookmarks: {ex.Message}");
+        }
+    }
+
+    private async Task ImportBookmarks()
+    {
+        // TODO: Show file picker and import
+        Console.WriteLine("Import bookmarks - not yet implemented");
+    }
+
+    private RenderFragment RenderBookmarkCard(Bookmark bookmark) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "bookmark-card");
+
+        builder.OpenElement(2, "div");
+        builder.AddAttribute(3, "class", "bookmark-main");
+        builder.AddAttribute(4, "onclick", EventCallback.Factory.Create(this, () => NavigateToBookmark(bookmark)));
+
+        // Thumbnail or icon
+        if (EnableThumbnails && !string.IsNullOrEmpty(bookmark.ThumbnailUrl))
+        {
+            builder.OpenElement(5, "img");
+            builder.AddAttribute(6, "src", bookmark.ThumbnailUrl);
+            builder.AddAttribute(7, "alt", bookmark.Name);
+            builder.AddAttribute(8, "class", "bookmark-thumbnail");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(9, "div");
+            builder.AddAttribute(10, "class", "bookmark-icon");
+            builder.OpenComponent<MudIcon>(11);
+            builder.AddAttribute(12, "Icon", Icons.Material.Filled.Place);
+            builder.AddAttribute(13, "Size", Size.Medium);
+            builder.AddAttribute(14, "Color", Color.Primary);
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+
+        // Details
+        builder.OpenElement(15, "div");
+        builder.AddAttribute(16, "class", "bookmark-details");
+
+        builder.OpenComponent<MudText>(17);
+        builder.AddAttribute(18, "Typo", Typo.body2);
+        builder.AddAttribute(19, "Class", "bookmark-name");
+        builder.AddAttribute(20, "ChildContent", (RenderFragment)(b => b.AddContent(21, bookmark.Name)));
+        builder.CloseComponent();
+
+        if (!string.IsNullOrEmpty(bookmark.Description))
+        {
+            builder.OpenComponent<MudText>(22);
+            builder.AddAttribute(23, "Typo", Typo.caption);
+            builder.AddAttribute(24, "Color", Color.Secondary);
+            builder.AddAttribute(25, "Class", "bookmark-description");
+            builder.AddAttribute(26, "ChildContent", (RenderFragment)(b => b.AddContent(27, bookmark.Description)));
+            builder.CloseComponent();
+        }
+
+        builder.OpenElement(28, "div");
+        builder.AddAttribute(29, "class", "bookmark-meta");
+        builder.OpenComponent<MudText>(30);
+        builder.AddAttribute(31, "Typo", Typo.caption);
+        builder.AddAttribute(32, "Color", Color.Secondary);
+        builder.AddAttribute(33, "ChildContent", (RenderFragment)(b =>
+        {
+            b.AddContent(34, $"Zoom: {bookmark.Zoom:F1}");
+            if (bookmark.AccessCount > 0)
+            {
+                b.AddContent(35, $" • Used {bookmark.AccessCount}x");
+            }
+        }));
+        builder.CloseComponent();
+        builder.CloseElement();
+
+        builder.CloseElement(); // bookmark-details
+
+        builder.CloseElement(); // bookmark-main
+
+        // Actions
+        if (AllowEdit || AllowDelete || AllowShare)
+        {
+            builder.OpenElement(36, "div");
+            builder.AddAttribute(37, "class", "bookmark-actions");
+
+            if (AllowShare)
+            {
+                builder.OpenComponent<MudIconButton>(38);
+                builder.AddAttribute(39, "Icon", Icons.Material.Filled.Share);
+                builder.AddAttribute(40, "Size", Size.Small);
+                builder.AddAttribute(41, "OnClick", EventCallback.Factory.Create(this, () => ShareBookmark(bookmark)));
+                builder.AddAttribute(42, "title", "Share");
+                builder.CloseComponent();
+            }
+
+            if (AllowEdit)
+            {
+                builder.OpenComponent<MudIconButton>(43);
+                builder.AddAttribute(44, "Icon", Icons.Material.Filled.Edit);
+                builder.AddAttribute(45, "Size", Size.Small);
+                builder.AddAttribute(46, "OnClick", EventCallback.Factory.Create(this, () => EditBookmark(bookmark)));
+                builder.AddAttribute(47, "title", "Edit");
+                builder.CloseComponent();
+            }
+
+            if (AllowDelete)
+            {
+                builder.OpenComponent<MudIconButton>(48);
+                builder.AddAttribute(49, "Icon", Icons.Material.Filled.Delete);
+                builder.AddAttribute(50, "Size", Size.Small);
+                builder.AddAttribute(51, "Color", Color.Error);
+                builder.AddAttribute(52, "OnClick", EventCallback.Factory.Create(this, () => DeleteBookmark(bookmark)));
+                builder.AddAttribute(53, "title", "Delete");
+                builder.CloseComponent();
+            }
+
+            builder.CloseElement(); // bookmark-actions
+        }
+
+        builder.CloseElement(); // bookmark-card
+    };
+
+    private RenderFragment RenderBookmarkGridCard(Bookmark bookmark) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "bookmark-grid-card");
+        builder.AddAttribute(2, "onclick", EventCallback.Factory.Create(this, () => NavigateToBookmark(bookmark)));
+
+        if (EnableThumbnails && !string.IsNullOrEmpty(bookmark.ThumbnailUrl))
+        {
+            builder.OpenElement(3, "img");
+            builder.AddAttribute(4, "src", bookmark.ThumbnailUrl);
+            builder.AddAttribute(5, "alt", bookmark.Name);
+            builder.AddAttribute(6, "class", "bookmark-thumbnail-grid");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(7, "div");
+            builder.AddAttribute(8, "class", "bookmark-thumbnail-grid bookmark-thumbnail-placeholder");
+            builder.OpenComponent<MudIcon>(9);
+            builder.AddAttribute(10, "Icon", Icons.Material.Filled.Place);
+            builder.AddAttribute(11, "Size", Size.Large);
+            builder.AddAttribute(12, "Color", Color.Primary);
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+
+        builder.OpenElement(13, "div");
+        builder.AddAttribute(14, "class", "bookmark-grid-info");
+
+        builder.OpenComponent<MudText>(15);
+        builder.AddAttribute(16, "Typo", Typo.body2);
+        builder.AddAttribute(17, "Class", "bookmark-grid-name");
+        builder.AddAttribute(18, "ChildContent", (RenderFragment)(b => b.AddContent(19, bookmark.Name)));
+        builder.CloseComponent();
+
+        builder.OpenComponent<MudText>(20);
+        builder.AddAttribute(21, "Typo", Typo.caption);
+        builder.AddAttribute(22, "Color", Color.Secondary);
+        builder.AddAttribute(23, "ChildContent", (RenderFragment)(b => b.AddContent(24, $"Zoom: {bookmark.Zoom:F1}")));
+        builder.CloseComponent();
+
+        builder.CloseElement(); // bookmark-grid-info
+
+        builder.CloseElement(); // bookmark-grid-card
+    };
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "bookmarks-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "bookmarks-floating bookmarks-top-right",
+            "top-left" => "bookmarks-floating bookmarks-top-left",
+            "bottom-right" => "bookmarks-floating bookmarks-bottom-right",
+            "bottom-left" => "bookmarks-floating bookmarks-bottom-left",
+            _ => "bookmarks-embedded"
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_captureModule != null)
+        {
+            await _captureModule.DisposeAsync();
+        }
+    }
+}

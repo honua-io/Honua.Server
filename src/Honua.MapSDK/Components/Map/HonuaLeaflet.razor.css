@@ -1,0 +1,71 @@
+.honua-leaflet {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Ensure Leaflet controls are styled properly */
+.honua-leaflet ::deep .leaflet-control-container {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Custom styling for Leaflet attribution */
+.honua-leaflet ::deep .leaflet-control-attribution {
+    font-size: 0.75rem;
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Marker cluster styling */
+.honua-leaflet ::deep .marker-cluster-small {
+    background-color: rgba(181, 226, 140, 0.6);
+}
+
+.honua-leaflet ::deep .marker-cluster-small div {
+    background-color: rgba(110, 204, 57, 0.6);
+}
+
+.honua-leaflet ::deep .marker-cluster-medium {
+    background-color: rgba(241, 211, 87, 0.6);
+}
+
+.honua-leaflet ::deep .marker-cluster-medium div {
+    background-color: rgba(240, 194, 12, 0.6);
+}
+
+.honua-leaflet ::deep .marker-cluster-large {
+    background-color: rgba(253, 156, 115, 0.6);
+}
+
+.honua-leaflet ::deep .marker-cluster-large div {
+    background-color: rgba(241, 128, 23, 0.6);
+}
+
+/* Drawing tools styling */
+.honua-leaflet ::deep .leaflet-draw-toolbar {
+    margin-top: 12px;
+}
+
+/* Measure tool styling */
+.honua-leaflet ::deep .leaflet-measure-path {
+    stroke-dasharray: 5, 5;
+    stroke-width: 2;
+}
+
+/* Fullscreen control */
+.honua-leaflet ::deep .leaflet-control-fullscreen {
+    background-color: white;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+/* Popup styling */
+.honua-leaflet ::deep .leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4);
+}
+
+.honua-leaflet ::deep .leaflet-popup-content {
+    margin: 13px 19px;
+    line-height: 1.4;
+}

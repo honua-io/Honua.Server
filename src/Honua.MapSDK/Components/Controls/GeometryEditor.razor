@@ -1,0 +1,396 @@
+@using Honua.MapSDK.Services.Drawing
+@using Honua.MapSDK.Models
+@using DrawingDrawingStyle = Honua.MapSDK.Services.Drawing.DrawingStyle
+@inject IDrawingManager DrawingManager
+
+<div class="honua-geometry-editor @CssClass" style="@Style">
+    @if (SelectedGeometry != null)
+    {
+        <div class="editor-panel">
+            <div class="editor-header">
+                <h4>Edit Geometry</h4>
+                <button class="close-button" @onclick="CloseEditor" aria-label="Close">×</button>
+            </div>
+
+            <div class="editor-content">
+                <!-- Geometry Info -->
+                <div class="geometry-info">
+                    <div class="info-item">
+                        <label>Type:</label>
+                        <span>@SelectedGeometry.Type</span>
+                    </div>
+                    <div class="info-item">
+                        <label>ID:</label>
+                        <span class="geometry-id">@SelectedGeometry.Id.Substring(0, 8)...</span>
+                    </div>
+                </div>
+
+                <!-- Properties Editor -->
+                <div class="properties-section">
+                    <h5>Properties</h5>
+                    <div class="form-group">
+                        <label for="name-input">Name</label>
+                        <input id="name-input" type="text" @bind="EditedName" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label for="description-input">Description</label>
+                        <textarea id="description-input" @bind="EditedDescription" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- Vertex Editor -->
+                @if (ShowVertexEditor && SelectedGeometry.Type != GeometryType.Point)
+                {
+                    <div class="vertex-section">
+                        <h5>Vertices</h5>
+                        <div class="vertex-hint">
+                            <small>Click vertices on the map to edit, or use the buttons below</small>
+                        </div>
+                        <!-- Vertex list would be populated dynamically based on geometry coordinates -->
+                    </div>
+                }
+
+                <!-- Advanced Operations -->
+                <div class="operations-section">
+                    <h5>Operations</h5>
+
+                    @if (ShowSplitOperation && CanSplit)
+                    {
+                        <button class="operation-button" @onclick="SplitGeometry" title="Split geometry at selected vertex">
+                            <span>✂️</span> Split
+                        </button>
+                    }
+
+                    @if (ShowMergeOperation && CanMerge)
+                    {
+                        <button class="operation-button" @onclick="MergeGeometries" title="Merge with another geometry">
+                            <span>🔗</span> Merge
+                        </button>
+                    }
+
+                    @if (ShowBufferOperation)
+                    {
+                        <div class="buffer-operation">
+                            <label>Buffer Distance (m):</label>
+                            <div class="buffer-controls">
+                                <input type="number" @bind="BufferDistance" class="form-control" step="10" min="0" />
+                                <button class="operation-button" @onclick="ApplyBuffer" title="Create buffer zone">
+                                    <span>◯</span> Buffer
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (ShowSimplifyOperation && CanSimplify)
+                    {
+                        <div class="simplify-operation">
+                            <label>Simplify Tolerance:</label>
+                            <div class="simplify-controls">
+                                <input type="range" @bind="SimplifyTolerance" min="0.0001" max="0.01" step="0.0001" />
+                                <span>@SimplifyTolerance.ToString("F4")</span>
+                                <button class="operation-button" @onclick="SimplifyGeometry" title="Simplify geometry">
+                                    <span>↓</span> Simplify
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (ShowUnionOperation && CanUnion)
+                    {
+                        <button class="operation-button" @onclick="UnionGeometries" title="Union with another geometry">
+                            <span>⊔</span> Union
+                        </button>
+                    }
+
+                    @if (ShowIntersectOperation && CanIntersect)
+                    {
+                        <button class="operation-button" @onclick="IntersectGeometries" title="Intersect with another geometry">
+                            <span>⊓</span> Intersect
+                        </button>
+                    }
+
+                    @if (ShowDifferenceOperation && CanDifference)
+                    {
+                        <button class="operation-button" @onclick="DifferenceGeometries" title="Difference with another geometry">
+                            <span>−</span> Difference
+                        </button>
+                    }
+                </div>
+
+                <!-- Style Editor -->
+                <div class="style-section">
+                    <h5>Style</h5>
+                    <div class="style-grid">
+                        <div class="style-item">
+                            <label>Stroke Color</label>
+                            <input type="color" @bind="EditedStyle.StrokeColor" />
+                        </div>
+                        <div class="style-item">
+                            <label>Stroke Width</label>
+                            <input type="range" min="1" max="10" @bind="EditedStyle.StrokeWidth" />
+                            <span>@EditedStyle.StrokeWidth px</span>
+                        </div>
+                        <div class="style-item">
+                            <label>Fill Color</label>
+                            <input type="color" @bind="EditedStyle.FillColor" />
+                        </div>
+                        <div class="style-item">
+                            <label>Fill Opacity</label>
+                            <input type="range" min="0" max="1" step="0.1" @bind="EditedStyle.FillOpacity" />
+                            <span>@(EditedStyle.FillOpacity * 100)%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metadata -->
+                @if (ShowMetadata)
+                {
+                    <div class="metadata-section">
+                        <h5>Metadata</h5>
+                        <div class="metadata-grid">
+                            <div class="metadata-item">
+                                <span class="metadata-label">Created:</span>
+                                <span>@SelectedGeometry.CreatedAt.ToString("g")</span>
+                            </div>
+                            <div class="metadata-item">
+                                <span class="metadata-label">Modified:</span>
+                                <span>@SelectedGeometry.ModifiedAt.ToString("g")</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(SelectedGeometry.CreatedBy))
+                            {
+                                <div class="metadata-item">
+                                    <span class="metadata-label">Created By:</span>
+                                    <span>@SelectedGeometry.CreatedBy</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="editor-footer">
+                <button class="btn-save" @onclick="SaveChanges">Save Changes</button>
+                <button class="btn-cancel" @onclick="CancelChanges">Cancel</button>
+                <button class="btn-delete" @onclick="DeleteGeometry">Delete</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="editor-empty">
+            <p>Select a geometry to edit</p>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    [Parameter]
+    public string? Style { get; set; }
+
+    [Parameter]
+    public bool ShowVertexEditor { get; set; } = true;
+
+    [Parameter]
+    public bool ShowSplitOperation { get; set; } = true;
+
+    [Parameter]
+    public bool ShowMergeOperation { get; set; } = true;
+
+    [Parameter]
+    public bool ShowBufferOperation { get; set; } = true;
+
+    [Parameter]
+    public bool ShowSimplifyOperation { get; set; } = true;
+
+    [Parameter]
+    public bool ShowUnionOperation { get; set; } = true;
+
+    [Parameter]
+    public bool ShowIntersectOperation { get; set; } = true;
+
+    [Parameter]
+    public bool ShowDifferenceOperation { get; set; } = true;
+
+    [Parameter]
+    public bool ShowMetadata { get; set; } = true;
+
+    [Parameter]
+    public EventCallback<DrawnGeometry> OnGeometryUpdated { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnGeometryDeleted { get; set; }
+
+    private DrawnGeometry? SelectedGeometry => DrawingManager.SelectedGeometry;
+    private string? EditedName { get; set; }
+    private string? EditedDescription { get; set; }
+    private DrawingDrawingStyle EditedStyle { get; set; } = DrawingDrawingStyle.Defaults.Polygon;
+    private double BufferDistance { get; set; } = 100;
+    private double SimplifyTolerance { get; set; } = 0.001;
+
+    private bool CanSplit => SelectedGeometry?.Type == GeometryType.LineString || SelectedGeometry?.Type == GeometryType.Polygon;
+    private bool CanMerge => DrawingManager.Geometries.Count > 1;
+    private bool CanSimplify => SelectedGeometry?.Type == GeometryType.LineString || SelectedGeometry?.Type == GeometryType.Polygon;
+    private bool CanUnion => DrawingManager.Geometries.Count > 1;
+    private bool CanIntersect => DrawingManager.Geometries.Count > 1;
+    private bool CanDifference => DrawingManager.Geometries.Count > 1;
+
+    protected override void OnInitialized()
+    {
+        DrawingManager.GeometrySelected += OnGeometrySelected;
+        DrawingManager.GeometryDeselected += OnGeometryDeselected;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedGeometry != null)
+        {
+            LoadGeometryForEditing();
+        }
+    }
+
+    private void LoadGeometryForEditing()
+    {
+        if (SelectedGeometry == null) return;
+
+        EditedName = SelectedGeometry.Name;
+        EditedDescription = SelectedGeometry.Description;
+        EditedStyle = SelectedGeometry.Style.Clone();
+    }
+
+    private async Task SaveChanges()
+    {
+        if (SelectedGeometry == null) return;
+
+        // Update properties
+        var properties = new Dictionary<string, object>(SelectedGeometry.Properties)
+        {
+            ["name"] = EditedName ?? "",
+            ["description"] = EditedDescription ?? ""
+        };
+
+        await DrawingManager.UpdateGeometryPropertiesAsync(SelectedGeometry.Id, properties);
+        await DrawingManager.UpdateGeometryStyleAsync(SelectedGeometry.Id, EditedStyle);
+
+        SelectedGeometry.Name = EditedName;
+        SelectedGeometry.Description = EditedDescription;
+
+        await OnGeometryUpdated.InvokeAsync(SelectedGeometry);
+        StateHasChanged();
+    }
+
+    private async Task CancelChanges()
+    {
+        await DrawingManager.DeselectGeometryAsync();
+        StateHasChanged();
+    }
+
+    private async Task DeleteGeometry()
+    {
+        if (SelectedGeometry == null) return;
+
+        if (await ConfirmDelete())
+        {
+            var id = SelectedGeometry.Id;
+            await DrawingManager.DeleteGeometryAsync(id);
+            await OnGeometryDeleted.InvokeAsync(id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseEditor()
+    {
+        await DrawingManager.DeselectGeometryAsync();
+        StateHasChanged();
+    }
+
+    // Advanced Operations
+
+    private async Task SplitGeometry()
+    {
+        if (SelectedGeometry == null) return;
+
+        // Implementation would split the geometry at a selected vertex
+        // This requires NetTopologySuite for proper geometry operations
+        Console.WriteLine("Split operation not yet implemented");
+    }
+
+    private async Task MergeGeometries()
+    {
+        if (SelectedGeometry == null) return;
+
+        // Implementation would merge with another selected geometry
+        // This requires NetTopologySuite for proper geometry operations
+        Console.WriteLine("Merge operation not yet implemented");
+    }
+
+    private async Task ApplyBuffer()
+    {
+        if (SelectedGeometry == null) return;
+
+        // Implementation would create a buffer zone around the geometry
+        // This requires NetTopologySuite for proper geometry operations
+        Console.WriteLine($"Buffer operation not yet implemented (distance: {BufferDistance}m)");
+    }
+
+    private async Task SimplifyGeometry()
+    {
+        if (SelectedGeometry == null) return;
+
+        // Implementation would simplify the geometry using Douglas-Peucker algorithm
+        // This requires NetTopologySuite for proper geometry operations
+        Console.WriteLine($"Simplify operation not yet implemented (tolerance: {SimplifyTolerance})");
+    }
+
+    private async Task UnionGeometries()
+    {
+        if (SelectedGeometry == null) return;
+
+        // Implementation would compute union with another geometry
+        // This requires NetTopologySuite for proper geometry operations
+        Console.WriteLine("Union operation not yet implemented");
+    }
+
+    private async Task IntersectGeometries()
+    {
+        if (SelectedGeometry == null) return;
+
+        // Implementation would compute intersection with another geometry
+        // This requires NetTopologySuite for proper geometry operations
+        Console.WriteLine("Intersect operation not yet implemented");
+    }
+
+    private async Task DifferenceGeometries()
+    {
+        if (SelectedGeometry == null) return;
+
+        // Implementation would compute difference with another geometry
+        // This requires NetTopologySuite for proper geometry operations
+        Console.WriteLine("Difference operation not yet implemented");
+    }
+
+    private async Task<bool> ConfirmDelete()
+    {
+        // In a real implementation, show a confirmation dialog
+        return true;
+    }
+
+    private void OnGeometrySelected(object? sender, GeometrySelectedEventArgs e)
+    {
+        LoadGeometryForEditing();
+        StateHasChanged();
+    }
+
+    private void OnGeometryDeselected(object? sender, GeometryDeselectedEventArgs e)
+    {
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        DrawingManager.GeometrySelected -= OnGeometrySelected;
+        DrawingManager.GeometryDeselected -= OnGeometryDeselected;
+    }
+}

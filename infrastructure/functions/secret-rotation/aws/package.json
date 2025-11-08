@@ -8,7 +8,9 @@
     "deploy": "zip -r function.zip . && aws lambda update-function-code --function-name honua-secret-rotation --zip-file fileb://function.zip"
   },
   "dependencies": {
-    "aws-sdk": "^2.1400.0",
+    "@aws-sdk/client-secrets-manager": "^3.679.0",
+    "@aws-sdk/client-sns": "^3.679.0",
+    "@aws-sdk/client-ssm": "^3.679.0",
     "pg": "^8.11.0"
   },
   "devDependencies": {

@@ -86,10 +86,20 @@ public sealed class ResourceAuthorizationCache : IResourceAuthorizationCache
         // Check if we're at the cache size limit
         if (_options.MaxCacheSize > 0 && _cacheKeys.Count >= _options.MaxCacheSize)
         {
-            _logger.LogWarning(
-                "Authorization cache has reached maximum size limit of {MaxSize}. " +
-                "Entry will be cached but may be evicted immediately. Consider increasing MaxCacheSize.",
-                _options.MaxCacheSize);
+            // Evict oldest entry to make room for new entry
+            var oldestKey = _cacheKeys.Keys.FirstOrDefault();
+            if (oldestKey != null)
+            {
+                _cache.Remove(oldestKey);
+                _cacheKeys.TryRemove(oldestKey, out _);
+                Interlocked.Increment(ref _evictions);
+
+                _logger.LogDebug(
+                    "Authorization cache has reached maximum size limit of {MaxSize}. " +
+                    "Evicted oldest entry {OldestKey} to make room for new entry.",
+                    _options.MaxCacheSize,
+                    oldestKey);
+            }
         }
 
         var cacheOptions = new CacheOptionsBuilder()

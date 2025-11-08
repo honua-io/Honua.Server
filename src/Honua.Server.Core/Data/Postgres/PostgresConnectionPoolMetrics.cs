@@ -86,6 +86,9 @@ public sealed class PostgresConnectionPoolMetrics : IDisposable
     /// </summary>
     public void RecordConnectionFailure(string connectionString, Exception exception)
     {
+        ArgumentNullException.ThrowIfNull(connectionString);
+        ArgumentNullException.ThrowIfNull(exception);
+
         var tags = new TagList
         {
             { "error.type", exception.GetType().Name },
@@ -106,6 +109,8 @@ public sealed class PostgresConnectionPoolMetrics : IDisposable
     /// </summary>
     public void RecordConnectionOpened(string connectionString)
     {
+        ArgumentNullException.ThrowIfNull(connectionString);
+
         var masked = MaskConnectionString(connectionString);
         var tags = new TagList { { "connection.masked", masked } };
         _connectionOpenedCounter.Add(1, tags);

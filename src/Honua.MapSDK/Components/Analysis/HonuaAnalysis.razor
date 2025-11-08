@@ -1,0 +1,946 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services.Analysis
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-analysis @CssClass" style="@Style">
+    <div class="analysis-container">
+        @if (ShowToolbar)
+        {
+            <div class="analysis-toolbar">
+                <div class="toolbar-section">
+                    <MudText Typo="Typo.h6" Class="toolbar-title">
+                        <MudIcon Icon="@Icons.Material.Filled.QueryStats" Size="Size.Small" />
+                        Spatial Analysis
+                    </MudText>
+
+                    @if (_hasResults)
+                    {
+                        <MudTooltip Text="Clear all results">
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.Clear"
+                                Size="Size.Small"
+                                OnClick="@ClearAllResults"
+                                aria-label="Clear all" />
+                        </MudTooltip>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="analysis-content">
+            @if (!_operationSelected)
+            {
+                <!-- Operation Selection -->
+                <div class="operation-selector">
+                    <MudText Typo="Typo.subtitle2" Class="section-title">Select Analysis Operation</MudText>
+
+                    <div class="operation-groups">
+                        <!-- Buffer Operations -->
+                        <div class="operation-group">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Buffer Analysis</MudText>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.RadioButtonUnchecked"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Buffer))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Buffer
+                            </MudButton>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.Album"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.MultiRingBuffer))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Multi-Ring Buffer
+                            </MudButton>
+                        </div>
+
+                        <!-- Overlay Operations -->
+                        <div class="operation-group">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Overlay Analysis</MudText>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.Merge"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Intersect))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Intersect
+                            </MudButton>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.UnfoldMore"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Union))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Union
+                            </MudButton>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.Remove"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Difference))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Difference
+                            </MudButton>
+                        </div>
+
+                        <!-- Proximity Analysis -->
+                        <div class="operation-group">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Proximity Analysis</MudText>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.NearMe"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.NearestNeighbor))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Nearest Neighbor
+                            </MudButton>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.Circle"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Within))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Within Distance
+                            </MudButton>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.FilterCenterFocus"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.PointInPolygon))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Point in Polygon
+                            </MudButton>
+                        </div>
+
+                        <!-- Measurement -->
+                        <div class="operation-group">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Measurement</MudText>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.SquareFoot"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Area))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Calculate Area
+                            </MudButton>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.Straighten"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Length))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Calculate Length
+                            </MudButton>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.CenterFocusStrong"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Centroid))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Centroid
+                            </MudButton>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.CropSquare"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.BoundingBox))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Bounding Box
+                            </MudButton>
+                        </div>
+
+                        <!-- Aggregation -->
+                        <div class="operation-group">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Aggregation</MudText>
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.BlurOn"
+                                OnClick="@(() => SelectOperation(AnalysisOperationType.Dissolve))"
+                                Disabled="@(!_mapReady)"
+                                FullWidth="true"
+                                Class="operation-button">
+                                Dissolve
+                            </MudButton>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Parameter Configuration -->
+                <div class="parameter-panel">
+                    <div class="panel-header">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.ArrowBack"
+                            Size="Size.Small"
+                            OnClick="@BackToOperationSelect"
+                            aria-label="Back" />
+                        <MudText Typo="Typo.subtitle1">@GetOperationTitle(_selectedOperation)</MudText>
+                    </div>
+
+                    <div class="parameters">
+                        @if (_selectedOperation == AnalysisOperationType.Buffer)
+                        {
+                            <MudNumericField
+                                @bind-Value="_bufferDistance"
+                                Label="Distance"
+                                Variant="Variant.Outlined"
+                                Min="0"
+                                Step="10"
+                                HelperText="Buffer distance" />
+
+                            <MudSelect
+                                @bind-Value="_distanceUnit"
+                                Label="Unit"
+                                Variant="Variant.Outlined">
+                                <MudSelectItem Value="@DistanceUnit.Meters">Meters</MudSelectItem>
+                                <MudSelectItem Value="@DistanceUnit.Kilometers">Kilometers</MudSelectItem>
+                                <MudSelectItem Value="@DistanceUnit.Miles">Miles</MudSelectItem>
+                                <MudSelectItem Value="@DistanceUnit.Feet">Feet</MudSelectItem>
+                            </MudSelect>
+
+                            <MudNumericField
+                                @bind-Value="_bufferSteps"
+                                Label="Steps"
+                                Variant="Variant.Outlined"
+                                Min="4"
+                                Max="64"
+                                HelperText="Higher values = smoother curves" />
+                        }
+                        else if (_selectedOperation == AnalysisOperationType.MultiRingBuffer)
+                        {
+                            <MudTextField
+                                @bind-Value="_multiRingDistances"
+                                Label="Distances (comma-separated)"
+                                Variant="Variant.Outlined"
+                                HelperText="e.g., 100,250,500,1000" />
+
+                            <MudSelect
+                                @bind-Value="_distanceUnit"
+                                Label="Unit"
+                                Variant="Variant.Outlined">
+                                <MudSelectItem Value="@DistanceUnit.Meters">Meters</MudSelectItem>
+                                <MudSelectItem Value="@DistanceUnit.Kilometers">Kilometers</MudSelectItem>
+                                <MudSelectItem Value="@DistanceUnit.Miles">Miles</MudSelectItem>
+                            </MudSelect>
+                        }
+                        else if (_selectedOperation == AnalysisOperationType.Within)
+                        {
+                            <MudNumericField
+                                @bind-Value="_proximityDistance"
+                                Label="Search Distance"
+                                Variant="Variant.Outlined"
+                                Min="0"
+                                Step="100" />
+
+                            <MudSelect
+                                @bind-Value="_distanceUnit"
+                                Label="Unit"
+                                Variant="Variant.Outlined">
+                                <MudSelectItem Value="@DistanceUnit.Meters">Meters</MudSelectItem>
+                                <MudSelectItem Value="@DistanceUnit.Kilometers">Kilometers</MudSelectItem>
+                                <MudSelectItem Value="@DistanceUnit.Miles">Miles</MudSelectItem>
+                            </MudSelect>
+                        }
+                        else if (_selectedOperation == AnalysisOperationType.NearestNeighbor)
+                        {
+                            <MudNumericField
+                                @bind-Value="_neighborCount"
+                                Label="Number of Neighbors"
+                                Variant="Variant.Outlined"
+                                Min="1"
+                                Max="100" />
+                        }
+                        else if (_selectedOperation == AnalysisOperationType.Dissolve)
+                        {
+                            <MudTextField
+                                @bind-Value="_dissolveField"
+                                Label="Field Name"
+                                Variant="Variant.Outlined"
+                                HelperText="Attribute field to dissolve by" />
+                        }
+
+                        <div class="parameter-info">
+                            <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true">
+                                @GetOperationDescription(_selectedOperation)
+                            </MudAlert>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        @if (ShowPreview)
+                        {
+                            <MudButton
+                                Variant="Variant.Outlined"
+                                Color="Color.Info"
+                                OnClick="@PreviewAnalysis"
+                                Disabled="@_isProcessing"
+                                FullWidth="true">
+                                Preview
+                            </MudButton>
+                        }
+
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="@RunAnalysis"
+                            Disabled="@_isProcessing"
+                            FullWidth="true">
+                            @if (_isProcessing)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <span>Run Analysis</span>
+                            }
+                        </MudButton>
+                    </div>
+                </div>
+            }
+
+            @if (_currentResult != null)
+            {
+                <!-- Results Display -->
+                <div class="results-panel">
+                    <div class="panel-header">
+                        <MudIcon Icon="@Icons.Material.Filled.Assessment" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle2">Analysis Results</MudText>
+                    </div>
+
+                    <div class="results-stats">
+                        @if (_currentResult.Success)
+                        {
+                            <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small">
+                                Success
+                            </MudChip>
+
+                            @if (_currentResult.FeatureCount > 0)
+                            {
+                                <div class="stat-item">
+                                    <span class="stat-label">Features:</span>
+                                    <span class="stat-value">@_currentResult.FeatureCount</span>
+                                </div>
+                            }
+
+                            <div class="stat-item">
+                                <span class="stat-label">Time:</span>
+                                <span class="stat-value">@_currentResult.ExecutionTime.ToString("F1") ms</span>
+                            </div>
+
+                            @foreach (var stat in _currentResult.Statistics)
+                            {
+                                <div class="stat-item">
+                                    <span class="stat-label">@FormatStatLabel(stat.Key):</span>
+                                    <span class="stat-value">@FormatStatValue(stat.Key, stat.Value)</span>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true">
+                                @_currentResult.ErrorMessage
+                            </MudAlert>
+                        }
+                    </div>
+
+                    @if (_currentResult.Success && AllowExport)
+                    {
+                        <div class="result-actions">
+                            <MudButton
+                                Variant="Variant.Text"
+                                Color="Color.Primary"
+                                StartIcon="@Icons.Material.Filled.Layers"
+                                OnClick="@AddResultToMap"
+                                Size="Size.Small">
+                                Add to Map
+                            </MudButton>
+
+                            <MudButton
+                                Variant="Variant.Text"
+                                Color="Color.Default"
+                                StartIcon="@Icons.Material.Filled.FileDownload"
+                                OnClick="@ExportResult"
+                                Size="Size.Small">
+                                Export
+                            </MudButton>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (_resultLayers.Count > 0)
+            {
+                <!-- Result Layers List -->
+                <div class="result-layers">
+                    <div class="panel-header">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" />
+                        <MudText Typo="Typo.subtitle2">Result Layers (@_resultLayers.Count)</MudText>
+                    </div>
+
+                    <div class="layer-list">
+                        @foreach (var layer in _resultLayers)
+                        {
+                            <div class="layer-item">
+                                <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Small" />
+                                <span class="layer-name">@layer.Value</span>
+                                <MudIconButton
+                                    Icon="@Icons.Material.Filled.Delete"
+                                    Size="Size.Small"
+                                    Color="Color.Error"
+                                    OnClick="@(() => RemoveResultLayer(layer.Key))"
+                                    aria-label="Remove layer" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (_errorMessage != null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="analysis-error" CloseIconClicked="@(() => _errorMessage = null)">
+                @_errorMessage
+            </MudAlert>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the analysis component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"analysis-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Available analysis operations (null = all)
+    /// </summary>
+    [Parameter]
+    public List<AnalysisOperationType>? AvailableOperations { get; set; }
+
+    /// <summary>
+    /// Show preview option
+    /// </summary>
+    [Parameter]
+    public bool ShowPreview { get; set; } = true;
+
+    /// <summary>
+    /// Allow export of results
+    /// </summary>
+    [Parameter]
+    public bool AllowExport { get; set; } = true;
+
+    /// <summary>
+    /// Show toolbar
+    /// </summary>
+    [Parameter]
+    public bool ShowToolbar { get; set; } = true;
+
+    /// <summary>
+    /// Prefix for result layer names
+    /// </summary>
+    [Parameter]
+    public string ResultLayerPrefix { get; set; } = "Analysis_";
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Event callback when analysis completes
+    /// </summary>
+    [Parameter]
+    public EventCallback<AnalysisResult> OnAnalysisCompleted { get; set; }
+
+    /// <summary>
+    /// Event callback when analysis error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnAnalysisError { get; set; }
+
+    private bool _mapReady = false;
+    private bool _operationSelected = false;
+    private bool _isProcessing = false;
+    private bool _hasResults = false;
+    private AnalysisOperationType _selectedOperation;
+    private AnalysisResult? _currentResult;
+    private string? _errorMessage;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaAnalysis>? _dotNetRef;
+
+    // Parameters for different operations
+    private double _bufferDistance = 100;
+    private int _bufferSteps = 8;
+    private DistanceUnit _distanceUnit = DistanceUnit.Meters;
+    private string _multiRingDistances = "100,250,500";
+    private double _proximityDistance = 500;
+    private int _neighborCount = 1;
+    private string _dissolveField = "";
+
+    // Result layers
+    private Dictionary<string, string> _resultLayers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetupSubscriptions();
+        _dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-analysis.js"
+                );
+
+                if (_mapReady && SyncWith != null)
+                {
+                    await InitializeAnalysis();
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Error loading analysis module: {ex.Message}";
+                Console.Error.WriteLine($"Error loading analysis JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                _ = InitializeAnalysis();
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for layer selected message
+        Bus.Subscribe<LayerSelectedMessage>(args =>
+        {
+            // Could use this to automatically select input layers
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task InitializeAnalysis()
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        try
+        {
+            var config = new
+            {
+                mapId = SyncWith,
+                componentId = Id
+            };
+
+            await _jsModule.InvokeVoidAsync("initializeAnalysis", SyncWith, Id, config, _dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error initializing analysis: {ex.Message}";
+            Console.Error.WriteLine($"Error initializing analysis: {ex.Message}");
+        }
+    }
+
+    private void SelectOperation(AnalysisOperationType operation)
+    {
+        _selectedOperation = operation;
+        _operationSelected = true;
+        _currentResult = null;
+    }
+
+    private void BackToOperationSelect()
+    {
+        _operationSelected = false;
+        _currentResult = null;
+    }
+
+    private async Task RunAnalysis()
+    {
+        if (!_mapReady || _jsModule == null)
+        {
+            _errorMessage = "Map is not ready for analysis";
+            return;
+        }
+
+        _isProcessing = true;
+        _errorMessage = null;
+
+        try
+        {
+            // This is a placeholder - in a real implementation, you would:
+            // 1. Get selected features from the map
+            // 2. Call appropriate JS function based on operation type
+            // 3. Process the result
+
+            var dummyFeature = new
+            {
+                type = "Feature",
+                geometry = new { type = "Point", coordinates = new[] { -122.4, 37.8 } },
+                properties = new { }
+            };
+
+            var featureJson = JsonSerializer.Serialize(dummyFeature);
+            object jsResult = null;
+
+            switch (_selectedOperation)
+            {
+                case AnalysisOperationType.Buffer:
+                    jsResult = await _jsModule.InvokeAsync<object>("performBuffer",
+                        Id, featureJson, _bufferDistance, _distanceUnit.ToString(), _bufferSteps);
+                    break;
+
+                case AnalysisOperationType.MultiRingBuffer:
+                    var distances = _multiRingDistances.Split(',').Select(d => double.Parse(d.Trim())).ToList();
+                    jsResult = await _jsModule.InvokeAsync<object>("performMultiRingBuffer",
+                        Id, featureJson, distances, _distanceUnit.ToString());
+                    break;
+
+                case AnalysisOperationType.Area:
+                    jsResult = await _jsModule.InvokeAsync<object>("calculateArea",
+                        Id, featureJson, _distanceUnit.ToString());
+                    break;
+
+                case AnalysisOperationType.Length:
+                    jsResult = await _jsModule.InvokeAsync<object>("calculateLength",
+                        Id, featureJson, _distanceUnit.ToString());
+                    break;
+
+                case AnalysisOperationType.Centroid:
+                    jsResult = await _jsModule.InvokeAsync<object>("calculateCentroid",
+                        Id, featureJson);
+                    break;
+
+                case AnalysisOperationType.BoundingBox:
+                    jsResult = await _jsModule.InvokeAsync<object>("calculateBoundingBox",
+                        Id, featureJson);
+                    break;
+
+                // Add more cases for other operations...
+            }
+
+            if (jsResult != null)
+            {
+                var resultJson = JsonSerializer.Serialize(jsResult);
+                var resultDict = JsonSerializer.Deserialize<Dictionary<string, object>>(resultJson);
+
+                _currentResult = new AnalysisResult
+                {
+                    OperationType = _selectedOperation.ToString(),
+                    Result = jsResult,
+                    Success = resultDict.ContainsKey("success") && (bool)resultDict["success"],
+                    ExecutionTime = 0,
+                    FeatureCount = resultDict.ContainsKey("featureCount") ? Convert.ToInt32(resultDict["featureCount"]) : 0
+                };
+
+                if (resultDict.ContainsKey("statistics"))
+                {
+                    var stats = JsonSerializer.Deserialize<Dictionary<string, object>>(
+                        JsonSerializer.Serialize(resultDict["statistics"]));
+                    if (stats != null)
+                    {
+                        foreach (var kvp in stats)
+                        {
+                            try
+                            {
+                                _currentResult.Statistics[kvp.Key] = Convert.ToDouble(kvp.Value);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                _hasResults = true;
+
+                // Publish completion message
+                await Bus.PublishAsync(new AnalysisCompletedMessage
+                {
+                    ComponentId = Id,
+                    OperationType = _selectedOperation.ToString(),
+                    Success = _currentResult.Success,
+                    FeatureCount = _currentResult.FeatureCount
+                }, Id);
+
+                await OnAnalysisCompleted.InvokeAsync(_currentResult);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error running analysis: {ex.Message}";
+            await OnAnalysisError.InvokeAsync(ex.Message);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PreviewAnalysis()
+    {
+        // Similar to RunAnalysis but with preview mode
+        await RunAnalysis();
+    }
+
+    private async Task AddResultToMap()
+    {
+        if (_currentResult == null || _jsModule == null) return;
+
+        try
+        {
+            var resultJson = JsonSerializer.Serialize(_currentResult.Result);
+            var layerName = $"{ResultLayerPrefix}{_selectedOperation}_{DateTime.Now:HHmmss}";
+
+            var style = new AnalysisStyle();
+
+            var result = await _jsModule.InvokeAsync<object>("addResultToMap",
+                Id, resultJson, layerName, style);
+
+            var resultDict = JsonSerializer.Deserialize<Dictionary<string, object>>(
+                JsonSerializer.Serialize(result));
+
+            if (resultDict != null && resultDict.ContainsKey("success") && (bool)resultDict["success"])
+            {
+                var layerId = resultDict["layerId"].ToString();
+                _resultLayers[layerId!] = layerName;
+
+                await Bus.PublishAsync(new AnalysisResultAddedMessage
+                {
+                    ComponentId = Id,
+                    LayerId = layerId!,
+                    LayerName = layerName,
+                    OperationType = _selectedOperation.ToString()
+                }, Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error adding result to map: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveResultLayer(string layerId)
+    {
+        if (_jsModule == null) return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("removeResultLayer", Id, layerId);
+            _resultLayers.Remove(layerId);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error removing layer: {ex.Message}";
+        }
+    }
+
+    private async Task ClearAllResults()
+    {
+        if (_jsModule == null) return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("clearAllResults", Id);
+            _resultLayers.Clear();
+            _currentResult = null;
+            _hasResults = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error clearing results: {ex.Message}";
+        }
+    }
+
+    private async Task ExportResult()
+    {
+        if (_currentResult == null) return;
+
+        // Export as GeoJSON
+        var json = JsonSerializer.Serialize(_currentResult.Result, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+
+        var filename = $"analysis_{_selectedOperation}_{DateTime.Now:yyyyMMdd_HHmmss}.geojson";
+
+        await JS.InvokeVoidAsync("eval",
+            $"const blob = new Blob([{JsonSerializer.Serialize(json)}], {{ type: 'application/json' }});" +
+            $"const url = URL.createObjectURL(blob);" +
+            $"const a = document.createElement('a');" +
+            $"a.href = url;" +
+            $"a.download = '{filename}';" +
+            $"a.click();" +
+            $"URL.revokeObjectURL(url);");
+    }
+
+    private string GetOperationTitle(AnalysisOperationType operation)
+    {
+        return operation switch
+        {
+            AnalysisOperationType.Buffer => "Buffer Analysis",
+            AnalysisOperationType.MultiRingBuffer => "Multi-Ring Buffer",
+            AnalysisOperationType.Intersect => "Intersection Analysis",
+            AnalysisOperationType.Union => "Union Analysis",
+            AnalysisOperationType.Difference => "Difference Analysis",
+            AnalysisOperationType.Within => "Within Distance",
+            AnalysisOperationType.NearestNeighbor => "Nearest Neighbor",
+            AnalysisOperationType.PointInPolygon => "Point in Polygon",
+            AnalysisOperationType.Area => "Calculate Area",
+            AnalysisOperationType.Length => "Calculate Length",
+            AnalysisOperationType.Centroid => "Calculate Centroid",
+            AnalysisOperationType.BoundingBox => "Calculate Bounding Box",
+            AnalysisOperationType.Dissolve => "Dissolve Features",
+            _ => operation.ToString()
+        };
+    }
+
+    private string GetOperationDescription(AnalysisOperationType operation)
+    {
+        return operation switch
+        {
+            AnalysisOperationType.Buffer => "Create a buffer zone around selected features at a specified distance.",
+            AnalysisOperationType.MultiRingBuffer => "Create multiple concentric buffer rings at different distances.",
+            AnalysisOperationType.Intersect => "Find the common area where two features overlap.",
+            AnalysisOperationType.Union => "Combine multiple features into a single feature.",
+            AnalysisOperationType.Difference => "Subtract one feature from another.",
+            AnalysisOperationType.Within => "Find features within a specified distance of a target feature.",
+            AnalysisOperationType.NearestNeighbor => "Find the closest feature(s) to a target feature.",
+            AnalysisOperationType.PointInPolygon => "Find points that fall within a polygon boundary.",
+            AnalysisOperationType.Area => "Calculate the area of a polygon feature.",
+            AnalysisOperationType.Length => "Calculate the length of a line or perimeter of a polygon.",
+            AnalysisOperationType.Centroid => "Find the geometric center point of a feature.",
+            AnalysisOperationType.BoundingBox => "Calculate the minimum bounding rectangle of a feature.",
+            AnalysisOperationType.Dissolve => "Merge adjacent features based on a common attribute value.",
+            _ => "Perform spatial analysis operation."
+        };
+    }
+
+    private string FormatStatLabel(string key)
+    {
+        return key switch
+        {
+            "area" => "Area",
+            "areaHectares" => "Area (ha)",
+            "areaAcres" => "Area (acres)",
+            "length" => "Length",
+            "lengthKm" => "Length (km)",
+            "lengthMi" => "Length (mi)",
+            "distance" => "Distance",
+            "nearestDistance" => "Nearest",
+            "inputFeatureCount" => "Input Features",
+            "outputFeatureCount" => "Output Features",
+            _ => key
+        };
+    }
+
+    private string FormatStatValue(string key, double value)
+    {
+        if (key.Contains("area") || key.Contains("Area"))
+        {
+            return $"{value:N2}";
+        }
+        else if (key.Contains("length") || key.Contains("Length") || key.Contains("distance") || key.Contains("Distance"))
+        {
+            return $"{value:N2}";
+        }
+        else if (key.Contains("count") || key.Contains("Count"))
+        {
+            return $"{value:N0}";
+        }
+
+        return $"{value:N2}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("cleanup", Id);
+                await _jsModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}
+
+// ComponentBus messages for analysis
+public class AnalysisCompletedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string OperationType { get; init; }
+    public bool Success { get; init; }
+    public int FeatureCount { get; init; }
+}
+
+public class AnalysisResultAddedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string LayerId { get; init; }
+    public required string LayerName { get; init; }
+    public required string OperationType { get; init; }
+}

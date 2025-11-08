@@ -43,6 +43,8 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+        [FromServices] Services.IOgcFeaturesQueryHandler queryHandler,
         [FromServices] ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -60,7 +62,7 @@ internal static partial class OgcFeaturesHandlers
 
         try
         {
-            var result = await OgcSharedHandlers.ExecuteSearchAsync(
+            var result = await queryHandler.ExecuteSearchAsync(
                 request,
                 collections,
                 request.Query,
@@ -75,6 +77,7 @@ internal static partial class OgcFeaturesHandlers
                 metadataRegistry,
                 apiMetrics,
                 cacheHeaderService,
+                attachmentHandler,
                 cancellationToken).ConfigureAwait(false);
 
             stopwatch.Stop();
@@ -116,12 +119,15 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+        [FromServices] Services.IOgcFeaturesGeoJsonHandler geoJsonHandler,
+        [FromServices] Services.IOgcFeaturesQueryHandler queryHandler,
         [FromServices] ILogger logger,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
 
-        using var document = await OgcSharedHandlers.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
+        using var document = await geoJsonHandler.ParseJsonDocumentAsync(request, cancellationToken).ConfigureAwait(false);
         if (document is null)
         {
             logger.LogWarning("POST search request rejected: invalid JSON payload from {RemoteIp}",
@@ -134,7 +140,7 @@ internal static partial class OgcFeaturesHandlers
         {
             logger.LogWarning("POST search request rejected: missing or invalid 'collections' array from {RemoteIp}",
                 request.HttpContext.Connection.RemoteIpAddress);
-            return OgcSharedHandlers.CreateValidationProblem("Payload must include a 'collections' array.", "collections");
+            return OgcSharedHandlers.CreateValidationProblem("Request body must contain a 'collections' array.", "collections");
         }
 
         var collections = new List<string>();
@@ -150,7 +156,7 @@ internal static partial class OgcFeaturesHandlers
         {
             logger.LogWarning("POST search request rejected: empty 'collections' array from {RemoteIp}",
                 request.HttpContext.Connection.RemoteIpAddress);
-            return OgcSharedHandlers.CreateValidationProblem("Collections array must contain at least one identifier.", "collections");
+            return OgcSharedHandlers.CreateValidationProblem("'collections' array must contain at least one collection ID.", "collections");
         }
 
         logger.LogInformation("Initiating POST OGC search for {Count} collections: {Collections} from {RemoteIp}",
@@ -244,7 +250,7 @@ internal static partial class OgcFeaturesHandlers
 
         try
         {
-            var result = await OgcSharedHandlers.ExecuteSearchAsync(
+            var result = await queryHandler.ExecuteSearchAsync(
                 request,
                 collections,
                 queryCollection,
@@ -259,6 +265,7 @@ internal static partial class OgcFeaturesHandlers
                 metadataRegistry,
                 apiMetrics,
                 cacheHeaderService,
+                attachmentHandler,
                 cancellationToken).ConfigureAwait(false);
 
             stopwatch.Stop();

@@ -1,6 +1,6 @@
 # Honua Documentation
 
-**Last Updated**: 2025-10-17
+**Last Updated**: 2025-11-06
 **Status**: ✅ Comprehensive & Current
 
 Complete documentation for Honua - a cloud-native geospatial server built on .NET 9.
@@ -24,7 +24,7 @@ Honua (Hawaiian for "Earth") is a modern geospatial server designed to serve vec
 **Key Features**:
 - OGC Standards (WFS, WMS, WMTS, WCS, CSW)
 - OGC API (Features, Tiles, Records)
-- Esri REST API compatibility
+- Geoservices REST a.k.a. Esri REST API compatibility
 - STAC 1.0 catalog
 - 12+ export formats
 - OpenTelemetry observability
@@ -44,7 +44,7 @@ Get Honua running in 5 minutes:
 #### [API Reference](api/)
 Complete endpoint documentation:
 - OGC API Features, WFS, WMS, WMTS, WCS, CSW
-- Esri REST API (FeatureServer, MapServer)
+- Geoservices REST a.k.a. Esri REST API (FeatureServer, MapServer)
 - STAC 1.0 catalog and search
 - Authentication and authorization
 - Export formats
@@ -148,7 +148,7 @@ Step-by-step incident response:
 
 **API Reference** (5 docs):
 - OGC API Features with CQL2 filtering
-- Esri REST API complete reference
+- Geoservices REST a.k.a. Esri REST API complete reference
 - STAC 1.0 catalog implementation
 - Export formats (GeoJSON, Shapefile, GeoPackage, etc.)
 - Control Plane API (admin endpoints)
@@ -184,7 +184,7 @@ Each document includes:
 ### API Documentation
 - [OGC API Features](api/README.md#ogc-api-features)
 - [WFS/WMS/WMTS](api/README.md#wfs-20)
-- [Esri REST API](api/README.md#esri-rest-api)
+- [Geoservices REST a.k.a. Esri REST API](api/README.md#esri-rest-api)
 - [STAC Catalog](api/README.md#stac-10)
 - [Export Formats](api/README.md#export-formats)
 
@@ -215,7 +215,7 @@ Each document includes:
 
 ✅ **Complete Coverage**:
 - All OGC protocols (WFS, WMS, WMTS, WCS, CSW)
-- All modern APIs (OGC API Features, STAC, Esri REST)
+- All modern APIs (OGC API Features, STAC, Geoservices REST a.k.a. Esri REST)
 - All authentication modes (Local, JWT, OIDC, API Keys)
 - All 12+ export formats
 - Docker, Kubernetes, and cloud deployment
@@ -247,17 +247,11 @@ Each document includes:
 - **Configuration Snippets**: 150+
 - **Operational Procedures**: 8 detailed runbooks
 
-## Archive
-
-Previous documentation (2025-10-15 and earlier) archived at: [archive/](archive/)
-
 ## Maintenance
 
 Documentation is kept current with the codebase:
-- **Last Full Rebuild**: 2025-10-15
-- **Process Framework Addition**: 2025-10-17
+- **Last Documentation Cleanup**: 2025-11-06
 - **Update Policy**: Update when features change
-- **Version Control**: Timestamped archives
 - **Quality Assurance**: All examples tested
 
 ## Contributing

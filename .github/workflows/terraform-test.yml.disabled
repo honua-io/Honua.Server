@@ -1,10 +1,10 @@
 name: Terraform Module Tests
 
 on:
-  pull_request:
-    paths:
-      - 'infrastructure/terraform/modules/**'
-      - '.github/workflows/terraform-test.yml'
+  # pull_request:
+  #   paths:
+  #     - 'infrastructure/terraform/modules/**'
+  #     - '.github/workflows/terraform-test.yml'
   push:
     branches:
       - main

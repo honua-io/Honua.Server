@@ -1,12 +1,13 @@
 {
   "IsEncrypted": false,
+  "_comment": "LOCAL DEVELOPMENT ONLY - Replace placeholder values with your actual configuration",
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "PostgresConnectionString": "Host=localhost;Database=honua;Username=postgres;Password=postgres",
+    "PostgresConnectionString": "Host=localhost;Database=honua;Username=postgres;Password=YOUR_PASSWORD_HERE",
     "AzureSubscriptionId": "YOUR_SUBSCRIPTION_ID",
-    "DnsResourceGroupName": "honua-dns-rg",
-    "DnsZoneName": "honua.io",
-    "GatewayPublicIp": "20.185.123.45"
+    "DnsResourceGroupName": "YOUR_DNS_RESOURCE_GROUP",
+    "DnsZoneName": "YOUR_DNS_ZONE",
+    "GatewayPublicIp": "YOUR_GATEWAY_IP"
   }
 }

@@ -254,7 +254,7 @@ Protect against abuse and DoS attacks with configurable rate limits.
 | `Default` | 100/min | General endpoints |
 | `OgcApi` | 200/min | OGC API Features (read-heavy) |
 | `OpenRosa` | 50/min | Form submissions (write-heavy) |
-| `Geoservices` | 150/min | Esri REST API |
+| `Geoservices` | 150/min | Geoservices REST a.k.a. Esri REST API |
 
 ### Examples
 

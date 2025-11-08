@@ -1,0 +1,1109 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services.Editing
+@using Honua.MapSDK.Components.Editor
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject FeatureEditService EditService
+
+<div class="honua-editor @CssClass @GetPositionClass()" style="@GetContainerStyle()">
+    @if (ShowToolbar)
+    {
+        <div class="editor-toolbar">
+            <div class="toolbar-section">
+                @if (!_isEditing)
+                {
+                    <MudTooltip Text="Start editing">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Edit"
+                            Color="Color.Success"
+                            Size="Size.Small"
+                            OnClick="@StartEditing"
+                            Disabled="@(!_mapReady || EditableLayers.Count == 0)"
+                            Class="tool-button"
+                            aria-label="Start editing" />
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudTooltip Text="Save changes">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Save"
+                            Color="Color.Success"
+                            Size="Size.Small"
+                            OnClick="@SaveChanges"
+                            Disabled="@(!_session?.IsDirty ?? true)"
+                            Class="tool-button"
+                            aria-label="Save changes" />
+                    </MudTooltip>
+
+                    <MudTooltip Text="Cancel editing">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.Cancel"
+                            Color="Color.Error"
+                            Size="Size.Small"
+                            OnClick="@CancelEditing"
+                            Class="tool-button"
+                            aria-label="Cancel editing" />
+                    </MudTooltip>
+
+                    <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                    @if (AllowCreate)
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Small"
+                                 Dense="true" Label="Create" aria-label="Create new feature">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Place" OnClick="@(() => SetDrawMode("point"))">
+                                Point
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Timeline" OnClick="@(() => SetDrawMode("line"))">
+                                Line
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Pentagon" OnClick="@(() => SetDrawMode("polygon"))">
+                                Polygon
+                            </MudMenuItem>
+                        </MudMenu>
+
+                        <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+                    }
+
+                    <MudTooltip Text="Select feature">
+                        <MudIconButton
+                            Icon="@Icons.Material.Filled.NearMe"
+                            Color="@(_editMode == EditMode.Select ? Color.Primary : Color.Default)"
+                            Size="Size.Small"
+                            OnClick="@(() => SetEditMode(EditMode.Select))"
+                            Class="tool-button"
+                            aria-label="Select mode" />
+                    </MudTooltip>
+
+                    @if (_selectedFeature != null && AllowUpdate)
+                    {
+                        <MudTooltip Text="Edit vertices">
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.Edit"
+                                Color="@(_editMode == EditMode.EditVertices ? Color.Primary : Color.Default)"
+                                Size="Size.Small"
+                                OnClick="@(() => SetEditMode(EditMode.EditVertices))"
+                                Class="tool-button"
+                                aria-label="Edit vertices" />
+                        </MudTooltip>
+
+                        <MudTooltip Text="Move feature">
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.OpenWith"
+                                Color="@(_editMode == EditMode.Move ? Color.Primary : Color.Default)"
+                                Size="Size.Small"
+                                OnClick="@(() => SetEditMode(EditMode.Move))"
+                                Class="tool-button"
+                                aria-label="Move feature" />
+                        </MudTooltip>
+                    }
+
+                    @if (_selectedFeature != null && ShowAttributeForm)
+                    {
+                        <MudTooltip Text="Edit attributes">
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.Description"
+                                Color="Color.Info"
+                                Size="Size.Small"
+                                OnClick="@(() => _showAttributeDialog = true)"
+                                Class="tool-button"
+                                aria-label="Edit attributes" />
+                        </MudTooltip>
+                    }
+
+                    @if (_selectedFeature != null && AllowDelete)
+                    {
+                        <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                        <MudTooltip Text="Delete feature">
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.Delete"
+                                Color="Color.Error"
+                                Size="Size.Small"
+                                OnClick="@DeleteSelectedFeature"
+                                Class="tool-button"
+                                aria-label="Delete feature" />
+                        </MudTooltip>
+                    }
+
+                    @if (_session?.CanUndo ?? false)
+                    {
+                        <MudDivider Vertical="true" FlexItem="true" Class="toolbar-divider" />
+
+                        <MudTooltip Text="Undo">
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.Undo"
+                                Color="Color.Default"
+                                Size="Size.Small"
+                                OnClick="@Undo"
+                                Class="tool-button"
+                                aria-label="Undo" />
+                        </MudTooltip>
+                    }
+
+                    @if (_session?.CanRedo ?? false)
+                    {
+                        <MudTooltip Text="Redo">
+                            <MudIconButton
+                                Icon="@Icons.Material.Filled.Redo"
+                                Color="Color.Default"
+                                Size="Size.Small"
+                                OnClick="@Redo"
+                                Class="tool-button"
+                                aria-label="Redo" />
+                        </MudTooltip>
+                    }
+                }
+            </div>
+        </div>
+    }
+
+    @if (_isEditing)
+    {
+        <div class="editor-status">
+            <div class="status-indicator @(_session?.IsDirty ?? false ? "dirty" : "clean")"></div>
+            <MudText Typo="Typo.caption" Class="status-text">
+                @if (_session?.IsDirty ?? false)
+                {
+                    <text>@_session.Statistics.UnsyncedCount unsaved change@(_session.Statistics.UnsyncedCount != 1 ? "s" : "")</text>
+                }
+                else
+                {
+                    <text>No unsaved changes</text>
+                }
+            </MudText>
+
+            @if (_currentDrawMode != null)
+            {
+                <div class="draw-hint">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Color="Color.Info" />
+                    <MudText Typo="Typo.caption">@GetDrawHint()</MudText>
+                </div>
+            }
+        </div>
+
+        @if (_session != null && _session.Operations.Count > 0)
+        {
+            <div class="edit-history">
+                <div class="panel-header">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                    <MudText Typo="Typo.body2" Class="panel-title">
+                        Edit History (@_session.Statistics.TotalOperations)
+                    </MudText>
+                    @if (Collapsible)
+                    {
+                        <MudIconButton
+                            Icon="@(_isHistoryCollapsed ? Icons.Material.Filled.ExpandMore : Icons.Material.Filled.ExpandLess)"
+                            Size="Size.Small"
+                            OnClick="@(() => _isHistoryCollapsed = !_isHistoryCollapsed)"
+                            aria-label="Toggle history" />
+                    }
+                </div>
+
+                @if (!_isHistoryCollapsed)
+                {
+                    <div class="history-items">
+                        @foreach (var op in _session.Operations.TakeLast(10).Reverse())
+                        {
+                            <div class="history-item @(op.IsSynced ? "synced" : "pending")">
+                                <MudIcon Icon="@GetOperationIcon(op.Type)" Size="Size.Small" />
+                                <div class="history-info">
+                                    <div class="history-description">@op.Description</div>
+                                    <div class="history-time">@op.Timestamp.ToString("HH:mm:ss")</div>
+                                </div>
+                                <MudIcon
+                                    Icon="@(op.IsSynced ? Icons.Material.Filled.CloudDone : Icons.Material.Filled.CloudQueue)"
+                                    Size="Size.Small"
+                                    Color="@(op.IsSynced ? Color.Success : Color.Warning)" />
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_session != null && _session.ValidationErrors.Count > 0)
+        {
+            <div class="validation-errors">
+                <MudAlert Severity="Severity.Error" Dense="true" Class="validation-alert">
+                    <div class="error-header">Validation Errors (@_session.ValidationErrors.Count)</div>
+                    @foreach (var error in _session.ValidationErrors.Take(5))
+                    {
+                        <div class="error-item">
+                            <strong>@error.Field:</strong> @error.Message
+                        </div>
+                    }
+                    @if (_session.ValidationErrors.Count > 5)
+                    {
+                        <div class="error-item">
+                            ...and @(_session.ValidationErrors.Count - 5) more
+                        </div>
+                    }
+                </MudAlert>
+            </div>
+        }
+    }
+
+    @if (_errorMessage != null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="editor-error" CloseIconClicked="@(() => _errorMessage = null)">
+            @_errorMessage
+        </MudAlert>
+    }
+
+    @if (_successMessage != null)
+    {
+        <MudAlert Severity="Severity.Success" Dense="true" Class="editor-success" CloseIconClicked="@(() => _successMessage = null)">
+            @_successMessage
+        </MudAlert>
+    }
+</div>
+
+@* Attribute Edit Dialog *@
+<MudDialog @bind-IsVisible="_showAttributeDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Edit Attributes</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_selectedFeature != null)
+        {
+            <div class="attribute-form">
+                @foreach (var rule in GetValidationRules(_selectedFeature.LayerId ?? ""))
+                {
+                    <div class="form-field">
+                        @if (rule.Type == ValidationType.Domain)
+                        {
+                            <MudSelect T="object"
+                                      Label="@(rule.DisplayName ?? rule.FieldName)"
+                                      Value="@GetAttributeValue(rule.FieldName)"
+                                      ValueChanged="@((object val) => SetAttributeValue(rule.FieldName, val))"
+                                      Required="@rule.IsRequired"
+                                      Variant="Variant.Outlined">
+                                @foreach (var domain in rule.DomainValues.Where(d => d.IsActive).OrderBy(d => d.SortOrder))
+                                {
+                                    <MudSelectItem Value="@domain.Code">@domain.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                        else if (rule.Type == ValidationType.Date)
+                        {
+                            <MudDatePicker
+                                Label="@(rule.DisplayName ?? rule.FieldName)"
+                                Date="@GetAttributeAsDate(rule.FieldName)"
+                                DateChanged="@((DateTime? date) => SetAttributeValue(rule.FieldName, date))"
+                                Required="@rule.IsRequired"
+                                Variant="Variant.Outlined" />
+                        }
+                        else if (rule.Type == ValidationType.Boolean)
+                        {
+                            <MudCheckBox
+                                T="bool"
+                                Label="@(rule.DisplayName ?? rule.FieldName)"
+                                Checked="@GetAttributeAsBool(rule.FieldName)"
+                                CheckedChanged="@((bool val) => SetAttributeValue(rule.FieldName, val))" />
+                        }
+                        else if (rule.Type == ValidationType.Number || rule.Type == ValidationType.Integer)
+                        {
+                            <MudNumericField
+                                T="double?"
+                                Label="@(rule.DisplayName ?? rule.FieldName)"
+                                Value="@GetAttributeAsNumber(rule.FieldName)"
+                                ValueChanged="@((double? val) => SetAttributeValue(rule.FieldName, val))"
+                                Required="@rule.IsRequired"
+                                Min="@rule.MinValue"
+                                Max="@rule.MaxValue"
+                                Variant="Variant.Outlined" />
+                        }
+                        else
+                        {
+                            <MudTextField
+                                T="string"
+                                Label="@(rule.DisplayName ?? rule.FieldName)"
+                                Value="@GetAttributeValue(rule.FieldName)?.ToString()"
+                                ValueChanged="@((string val) => SetAttributeValue(rule.FieldName, val))"
+                                Required="@rule.IsRequired"
+                                MaxLength="@(rule.MaxLength ?? 0)"
+                                Variant="Variant.Outlined" />
+                        }
+                    </div>
+                }
+
+                @* Show fields that don't have validation rules *@
+                @foreach (var attr in _selectedFeature.Attributes.Where(a => !GetValidationRules(_selectedFeature.LayerId ?? "").Any(r => r.FieldName == a.Key)))
+                {
+                    <div class="form-field">
+                        <MudTextField
+                            T="string"
+                            Label="@attr.Key"
+                            Value="@attr.Value?.ToString()"
+                            ValueChanged="@((string val) => SetAttributeValue(attr.Key, val))"
+                            Variant="Variant.Outlined" />
+                    </div>
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAttributeDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="@SaveAttributes" Variant="Variant.Filled">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the editor component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"editor-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Layers that can be edited
+    /// </summary>
+    [Parameter]
+    public List<string> EditableLayers { get; set; } = new();
+
+    /// <summary>
+    /// Allow creating new features
+    /// </summary>
+    [Parameter]
+    public bool AllowCreate { get; set; } = true;
+
+    /// <summary>
+    /// Allow updating features
+    /// </summary>
+    [Parameter]
+    public bool AllowUpdate { get; set; } = true;
+
+    /// <summary>
+    /// Allow deleting features
+    /// </summary>
+    [Parameter]
+    public bool AllowDelete { get; set; } = true;
+
+    /// <summary>
+    /// Show attribute form dialog
+    /// </summary>
+    [Parameter]
+    public bool ShowAttributeForm { get; set; } = true;
+
+    /// <summary>
+    /// Validation rules by layer ID
+    /// </summary>
+    [Parameter]
+    public Dictionary<string, List<ValidationRule>> ValidationRules { get; set; } = new();
+
+    /// <summary>
+    /// Auto-save changes
+    /// </summary>
+    [Parameter]
+    public bool AutoSave { get; set; }
+
+    /// <summary>
+    /// API endpoint for feature operations
+    /// </summary>
+    [Parameter]
+    public string ApiEndpoint { get; set; } = "/api/features";
+
+    /// <summary>
+    /// Show toolbar
+    /// </summary>
+    [Parameter]
+    public bool ShowToolbar { get; set; } = true;
+
+    /// <summary>
+    /// Component can be collapsed
+    /// </summary>
+    [Parameter]
+    public bool Collapsible { get; set; } = true;
+
+    /// <summary>
+    /// Position on the map
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Width of the component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "350px";
+
+    /// <summary>
+    /// Event callback when feature is created
+    /// </summary>
+    [Parameter]
+    public EventCallback<Feature> OnFeatureCreated { get; set; }
+
+    /// <summary>
+    /// Event callback when feature is updated
+    /// </summary>
+    [Parameter]
+    public EventCallback<Feature> OnFeatureUpdated { get; set; }
+
+    /// <summary>
+    /// Event callback when feature is deleted
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnFeatureDeleted { get; set; }
+
+    /// <summary>
+    /// Event callback when edit error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnEditError { get; set; }
+
+    private bool _mapReady;
+    private bool _isEditing;
+    private EditSession? _session;
+    private Feature? _selectedFeature;
+    private EditMode _editMode = EditMode.None;
+    private string? _currentDrawMode;
+    private bool _showAttributeDialog;
+    private bool _isHistoryCollapsed;
+    private string? _errorMessage;
+    private string? _successMessage;
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaEditor>? _dotNetRef;
+    private Dictionary<string, Feature> _tempAttributes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetupSubscriptions();
+        _dotNetRef = DotNetObjectReference.Create(this);
+
+        // Set validation rules
+        foreach (var kvp in ValidationRules)
+        {
+            EditService.SetValidationRules(kvp.Key, kvp.Value);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-editor.js"
+                );
+
+                if (_mapReady && SyncWith != null)
+                {
+                    await InitializeEditor();
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Error loading editor module: {ex.Message}";
+                Console.Error.WriteLine($"Error loading editor JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                _ = InitializeEditor();
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for layer selection
+        Bus.Subscribe<LayerSelectedMessage>(args =>
+        {
+            if (!EditableLayers.Contains(args.Message.LayerId))
+            {
+                EditableLayers.Add(args.Message.LayerId);
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for feature clicks
+        Bus.Subscribe<FeatureClickedMessage>(args =>
+        {
+            if (_isEditing && EditableLayers.Contains(args.Message.LayerId))
+            {
+                _ = SelectFeatureFromMap(args.Message.FeatureId, args.Message.LayerId, args.Message.Geometry, args.Message.Properties);
+            }
+        });
+    }
+
+    private async Task InitializeEditor()
+    {
+        if (_jsModule == null || SyncWith == null) return;
+
+        try
+        {
+            var config = new
+            {
+                mapId = SyncWith,
+                componentId = Id,
+                editableLayers = EditableLayers,
+                allowCreate = AllowCreate,
+                allowUpdate = AllowUpdate,
+                allowDelete = AllowDelete
+            };
+
+            await _jsModule.InvokeVoidAsync("initializeEditor", SyncWith, Id, config, _dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error initializing editor: {ex.Message}";
+            Console.Error.WriteLine($"Error initializing editor: {ex.Message}");
+        }
+    }
+
+    private async Task StartEditing()
+    {
+        if (_isEditing) return;
+
+        _isEditing = true;
+        var sessionId = $"{Id}-session-{DateTime.UtcNow.Ticks}";
+
+        var config = new EditSessionConfiguration
+        {
+            AllowCreate = AllowCreate,
+            AllowUpdate = AllowUpdate,
+            AllowDelete = AllowDelete,
+            AutoSave = AutoSave,
+            RequireValidation = ValidationRules.Count > 0,
+            ValidateGeometry = true
+        };
+
+        _session = EditService.StartSession(sessionId, config);
+        _session.EditableLayers = EditableLayers;
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("startEditMode", SyncWith);
+        }
+
+        // Publish message
+        await Bus.PublishAsync(new EditSessionStartedMessage
+        {
+            SessionId = sessionId,
+            ComponentId = Id,
+            EditableLayers = EditableLayers
+        }, Id);
+
+        StateHasChanged();
+    }
+
+    private async Task SaveChanges()
+    {
+        if (_session == null) return;
+
+        try
+        {
+            var result = await EditService.SaveSessionAsync(_session.Id, ApiEndpoint);
+
+            if (result.Success)
+            {
+                _successMessage = $"Saved {result.SavedCount} change(s) successfully";
+                PublishSessionStateChanged();
+            }
+            else
+            {
+                _errorMessage = $"Error saving changes: {result.Message}";
+                await OnEditError.InvokeAsync(_errorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error saving: {ex.Message}";
+            await OnEditError.InvokeAsync(_errorMessage);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task CancelEditing()
+    {
+        if (_session == null) return;
+
+        var hasChanges = _session.IsDirty;
+
+        if (hasChanges)
+        {
+            // In a real app, show confirmation dialog
+            EditService.RollbackSession(_session.Id);
+        }
+
+        EditService.EndSession(_session.Id, false);
+
+        // Publish message
+        await Bus.PublishAsync(new EditSessionEndedMessage
+        {
+            SessionId = _session.Id,
+            ComponentId = Id,
+            ChangesSaved = false,
+            OperationCount = _session.Operations.Count
+        }, Id);
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("stopEditMode", SyncWith);
+        }
+
+        _isEditing = false;
+        _session = null;
+        _selectedFeature = null;
+        _editMode = EditMode.None;
+        _currentDrawMode = null;
+
+        StateHasChanged();
+    }
+
+    private async Task SetDrawMode(string mode)
+    {
+        _currentDrawMode = mode;
+        _editMode = EditMode.Draw;
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("enableDrawMode", SyncWith, mode);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SetEditMode(EditMode mode)
+    {
+        _editMode = mode;
+        _currentDrawMode = null;
+
+        if (_jsModule != null)
+        {
+            var modeStr = mode switch
+            {
+                EditMode.Select => "select",
+                EditMode.EditVertices => "edit_vertices",
+                EditMode.Move => "move",
+                _ => "none"
+            };
+
+            await _jsModule.InvokeVoidAsync("setEditMode", SyncWith, modeStr, _selectedFeature?.Id);
+        }
+
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnFeatureCreatedFromJS(string featureJson, string layerId)
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var geoJson = JsonSerializer.Deserialize<Dictionary<string, object>>(featureJson, options);
+
+            if (geoJson == null || _session == null) return;
+
+            var feature = new Feature
+            {
+                Id = Guid.NewGuid().ToString(),
+                LayerId = layerId,
+                GeometryType = GetGeometryType(geoJson),
+                Geometry = geoJson["geometry"],
+                Attributes = GetProperties(geoJson)
+            };
+
+            // Create through service (with validation)
+            var createdFeature = await EditService.CreateFeatureAsync(_session.Id, feature, AutoSave ? ApiEndpoint : null);
+
+            // Publish message
+            await Bus.PublishAsync(new FeatureCreatedMessage
+            {
+                FeatureId = createdFeature.Id,
+                LayerId = layerId,
+                GeometryType = createdFeature.GeometryType,
+                Geometry = createdFeature.Geometry,
+                Attributes = createdFeature.Attributes,
+                ComponentId = Id
+            }, Id);
+
+            await OnFeatureCreated.InvokeAsync(createdFeature);
+            PublishSessionStateChanged();
+
+            _currentDrawMode = null;
+            StateHasChanged();
+        }
+        catch (Services.Editing.ValidationException vex)
+        {
+            _errorMessage = $"Validation failed: {string.Join(", ", vex.Errors.Select(e => e.Message))}";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error creating feature: {ex.Message}";
+            await OnEditError.InvokeAsync(_errorMessage);
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnGeometryUpdatedFromJS(string featureId, string geometryJson)
+    {
+        try
+        {
+            if (_session == null || _selectedFeature == null) return;
+
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var geometry = JsonSerializer.Deserialize<object>(geometryJson, options);
+
+            var previousState = _selectedFeature.Clone();
+            _selectedFeature.Geometry = geometry!;
+
+            // Update through service
+            var updatedFeature = await EditService.UpdateFeatureAsync(
+                _session.Id,
+                _selectedFeature,
+                previousState,
+                AutoSave ? ApiEndpoint : null
+            );
+
+            // Publish message
+            await Bus.PublishAsync(new FeatureUpdatedMessage
+            {
+                FeatureId = featureId,
+                LayerId = _selectedFeature.LayerId ?? "",
+                Geometry = geometry,
+                UpdateType = "geometry",
+                ComponentId = Id
+            }, Id);
+
+            await OnFeatureUpdated.InvokeAsync(updatedFeature);
+            PublishSessionStateChanged();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error updating geometry: {ex.Message}";
+            await OnEditError.InvokeAsync(_errorMessage);
+            StateHasChanged();
+        }
+    }
+
+    private async Task SelectFeatureFromMap(string featureId, string layerId, object? geometry, Dictionary<string, object> properties)
+    {
+        _selectedFeature = new Feature
+        {
+            Id = featureId,
+            LayerId = layerId,
+            GeometryType = geometry?.GetType().Name ?? "Unknown",
+            Geometry = geometry!,
+            Attributes = properties
+        };
+
+        await Bus.PublishAsync(new EditorFeatureSelectedMessage
+        {
+            FeatureId = featureId,
+            LayerId = layerId,
+            ComponentId = Id,
+            Attributes = properties
+        }, Id);
+
+        StateHasChanged();
+    }
+
+    private async Task DeleteSelectedFeature()
+    {
+        if (_selectedFeature == null || _session == null) return;
+
+        try
+        {
+            await EditService.DeleteFeatureAsync(_session.Id, _selectedFeature, AutoSave ? ApiEndpoint : null);
+
+            if (_jsModule != null)
+            {
+                await _jsModule.InvokeVoidAsync("deleteFeature", SyncWith, _selectedFeature.Id);
+            }
+
+            // Publish message
+            await Bus.PublishAsync(new FeatureDeletedMessage
+            {
+                FeatureId = _selectedFeature.Id,
+                ComponentId = Id
+            }, Id);
+
+            await OnFeatureDeleted.InvokeAsync(_selectedFeature.Id);
+            PublishSessionStateChanged();
+
+            _selectedFeature = null;
+            _editMode = EditMode.Select;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error deleting feature: {ex.Message}";
+            await OnEditError.InvokeAsync(_errorMessage);
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveAttributes()
+    {
+        if (_selectedFeature == null || _session == null) return;
+
+        try
+        {
+            var previousState = _selectedFeature.Clone();
+
+            // Update through service (with validation)
+            var updatedFeature = await EditService.UpdateFeatureAsync(
+                _session.Id,
+                _selectedFeature,
+                previousState,
+                AutoSave ? ApiEndpoint : null
+            );
+
+            // Publish message
+            await Bus.PublishAsync(new FeatureUpdatedMessage
+            {
+                FeatureId = _selectedFeature.Id,
+                LayerId = _selectedFeature.LayerId ?? "",
+                Attributes = _selectedFeature.Attributes,
+                UpdateType = "attributes",
+                ComponentId = Id
+            }, Id);
+
+            await OnFeatureUpdated.InvokeAsync(updatedFeature);
+            PublishSessionStateChanged();
+
+            _showAttributeDialog = false;
+            _successMessage = "Attributes updated successfully";
+            StateHasChanged();
+        }
+        catch (Services.Editing.ValidationException vex)
+        {
+            _errorMessage = $"Validation failed: {string.Join(", ", vex.Errors.Select(e => e.Message))}";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error saving attributes: {ex.Message}";
+            await OnEditError.InvokeAsync(_errorMessage);
+            StateHasChanged();
+        }
+    }
+
+    private async Task Undo()
+    {
+        if (_session == null) return;
+
+        var operation = EditService.Undo(_session.Id);
+        if (operation != null && _jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("undo", SyncWith);
+            PublishSessionStateChanged();
+            StateHasChanged();
+        }
+    }
+
+    private async Task Redo()
+    {
+        if (_session == null) return;
+
+        var operation = EditService.Redo(_session.Id);
+        if (operation != null && _jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("redo", SyncWith);
+            PublishSessionStateChanged();
+            StateHasChanged();
+        }
+    }
+
+    private void PublishSessionStateChanged()
+    {
+        if (_session == null) return;
+
+        _ = Bus.PublishAsync(new EditSessionStateChangedMessage
+        {
+            SessionId = _session.Id,
+            ComponentId = Id,
+            IsDirty = _session.IsDirty,
+            UnsavedChanges = _session.Statistics.UnsyncedCount,
+            CanUndo = _session.CanUndo,
+            CanRedo = _session.CanRedo
+        }, Id);
+    }
+
+    private List<ValidationRule> GetValidationRules(string layerId)
+    {
+        return EditService.GetValidationRules(layerId);
+    }
+
+    private object? GetAttributeValue(string fieldName)
+    {
+        return _selectedFeature?.Attributes.TryGetValue(fieldName, out var value) == true ? value : null;
+    }
+
+    private void SetAttributeValue(string fieldName, object? value)
+    {
+        if (_selectedFeature != null)
+        {
+            if (value == null)
+            {
+                _selectedFeature.Attributes.Remove(fieldName);
+            }
+            else
+            {
+                _selectedFeature.Attributes[fieldName] = value;
+            }
+        }
+    }
+
+    private DateTime? GetAttributeAsDate(string fieldName)
+    {
+        var value = GetAttributeValue(fieldName);
+        if (value is DateTime dt) return dt;
+        if (value != null && DateTime.TryParse(value.ToString(), out var parsed)) return parsed;
+        return null;
+    }
+
+    private bool GetAttributeAsBool(string fieldName)
+    {
+        var value = GetAttributeValue(fieldName);
+        if (value is bool b) return b;
+        if (value != null && bool.TryParse(value.ToString(), out var parsed)) return parsed;
+        return false;
+    }
+
+    private double? GetAttributeAsNumber(string fieldName)
+    {
+        var value = GetAttributeValue(fieldName);
+        if (value is double d) return d;
+        if (value is int i) return i;
+        if (value != null && double.TryParse(value.ToString(), out var parsed)) return parsed;
+        return null;
+    }
+
+    private string GetGeometryType(Dictionary<string, object> geoJson)
+    {
+        if (geoJson.TryGetValue("geometry", out var geom) && geom is JsonElement geomElement)
+        {
+            if (geomElement.TryGetProperty("type", out var typeElement))
+            {
+                return typeElement.GetString() ?? "Unknown";
+            }
+        }
+        return "Unknown";
+    }
+
+    private Dictionary<string, object> GetProperties(Dictionary<string, object> geoJson)
+    {
+        if (geoJson.TryGetValue("properties", out var props) && props is JsonElement propsElement)
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, object>>(propsElement.GetRawText()) ?? new();
+        }
+        return new();
+    }
+
+    private string GetDrawHint()
+    {
+        return _currentDrawMode switch
+        {
+            "point" => "Click to place a point",
+            "line" => "Click to add points, double-click to finish",
+            "polygon" => "Click to add points, double-click to close",
+            _ => ""
+        };
+    }
+
+    private string GetOperationIcon(EditOperationType type)
+    {
+        return type switch
+        {
+            EditOperationType.Create => Icons.Material.Filled.Add,
+            EditOperationType.Update => Icons.Material.Filled.Edit,
+            EditOperationType.Delete => Icons.Material.Filled.Delete,
+            EditOperationType.Move => Icons.Material.Filled.OpenWith,
+            EditOperationType.Reshape => Icons.Material.Filled.Edit,
+            EditOperationType.AttributeUpdate => Icons.Material.Filled.Description,
+            _ => Icons.Material.Filled.Circle
+        };
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "editor-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "editor-floating editor-top-right",
+            "top-left" => "editor-floating editor-top-left",
+            "bottom-right" => "editor-floating editor-bottom-right",
+            "bottom-left" => "editor-floating editor-bottom-left",
+            _ => "editor-embedded"
+        };
+    }
+
+    private string GetContainerStyle()
+    {
+        var styles = new List<string>();
+
+        if (!string.IsNullOrEmpty(Width))
+        {
+            styles.Add($"width: {Width}");
+        }
+
+        if (!string.IsNullOrEmpty(Style))
+        {
+            styles.Add(Style);
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_isEditing && _session != null)
+        {
+            EditService.EndSession(_session.Id, AutoSave);
+        }
+
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("cleanup", SyncWith);
+                await _jsModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

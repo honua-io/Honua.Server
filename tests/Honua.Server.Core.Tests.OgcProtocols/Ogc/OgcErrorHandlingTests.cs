@@ -35,6 +35,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "crs=EPSG:99999"); // Invalid CRS code
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -49,6 +50,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -76,6 +78,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "bbox=invalid,bbox,values"); // Malformed bbox
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -90,6 +93,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -117,6 +121,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "filter=name INVALID_OPERATOR value"); // Invalid CQL syntax
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -131,6 +136,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -158,6 +164,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "nonexistent::collection",
             context.Request,
@@ -172,6 +179,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -200,6 +208,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "limit=-1"); // Negative limit
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -214,6 +223,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -247,6 +257,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "limit=999999"); // Excessive limit
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -261,6 +272,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -287,6 +299,8 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
+        var editingHandler = OgcTestUtilities.CreateOgcFeaturesEditingHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItem(
             "roads::roads-primary",
             "99999", // Non-existent item ID
@@ -296,6 +310,8 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.AttachmentOrchestrator,
             _fixture.Registry,
             _fixture.CacheHeaderService,
+            attachmentHandler,
+            editingHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -323,6 +339,8 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "f=geojson");
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
+        var editingHandler = OgcTestUtilities.CreateOgcFeaturesEditingHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItem(
             "roads::roads-primary",
             "1';DROP TABLE roads;--", // SQL injection attempt
@@ -332,6 +350,8 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.AttachmentOrchestrator,
             _fixture.Registry,
             _fixture.CacheHeaderService,
+            attachmentHandler,
+            editingHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -363,6 +383,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "bbox=200,-100,210,-90"); // Longitude 200 is outside valid range [-180, 180]
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -377,6 +398,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -404,6 +426,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "bbox=-122.0,45.5,-122.5,45.7"); // minx=-122.0 > maxx=-122.5 (inverted)
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -418,6 +441,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -510,6 +534,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "filter=name='First'"); // CQL-text filter
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -524,6 +549,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -550,6 +576,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             "filter="); // Empty filter
 
         // Act
+        var attachmentHandler = OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub();
         var result = await OgcFeaturesHandlers.GetCollectionItems(
             "roads::roads-primary",
             context.Request,
@@ -564,6 +591,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.Registry,
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
+            attachmentHandler,
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

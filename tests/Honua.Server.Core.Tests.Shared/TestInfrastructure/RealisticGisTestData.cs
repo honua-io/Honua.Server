@@ -389,14 +389,17 @@ public static class RealisticGisTestData
     /// </summary>
     public static Polygon CreateNorthPolePolygon()
     {
+        // Create a valid polygon around the North Pole with varying latitudes
+        // Avoid spanning the antimeridian by staying within -179 to +179
         var shell = Factory4326.CreateLinearRing(new[]
         {
-            new Coordinate(-180.0, 89.0),
+            new Coordinate(-179.0, 85.0),
             new Coordinate(-90.0, 89.0),
-            new Coordinate(0.0, 89.0),
+            new Coordinate(0.0, 89.5),
             new Coordinate(90.0, 89.0),
-            new Coordinate(180.0, 89.0),
-            new Coordinate(-180.0, 89.0) // Close ring
+            new Coordinate(179.0, 85.0),
+            new Coordinate(0.0, 85.0),
+            new Coordinate(-179.0, 85.0) // Close ring
         });
 
         return Factory4326.CreatePolygon(shell);
@@ -408,14 +411,17 @@ public static class RealisticGisTestData
     /// </summary>
     public static Polygon CreateSouthPolePolygon()
     {
+        // Create a valid polygon around the South Pole with varying latitudes
+        // Avoid spanning the antimeridian by staying within -179 to +179
         var shell = Factory4326.CreateLinearRing(new[]
         {
-            new Coordinate(-180.0, -89.0),
+            new Coordinate(-179.0, -85.0),
             new Coordinate(-90.0, -89.0),
-            new Coordinate(0.0, -89.0),
+            new Coordinate(0.0, -89.5),
             new Coordinate(90.0, -89.0),
-            new Coordinate(180.0, -89.0),
-            new Coordinate(-180.0, -89.0) // Close ring
+            new Coordinate(179.0, -85.0),
+            new Coordinate(0.0, -85.0),
+            new Coordinate(-179.0, -85.0) // Close ring
         });
 
         return Factory4326.CreatePolygon(shell);

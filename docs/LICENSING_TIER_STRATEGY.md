@@ -94,8 +94,8 @@ This document defines the **Free**, **Professional**, and **Enterprise** tiers f
 | **WFS 2.0** | ✅ | ✅ | ✅ |
 | **WCS 2.0** | ✅ | ✅ | ✅ |
 | **STAC 1.0** | ❌ | ✅ | ✅ |
-| **Esri REST (FeatureServer)** | ✅ | ✅ | ✅ |
-| **Esri REST (MapServer)** | ✅ | ✅ | ✅ |
+| **Geoservices REST a.k.a. Esri REST (FeatureServer)** | ✅ | ✅ | ✅ |
+| **Geoservices REST a.k.a. Esri REST (MapServer)** | ✅ | ✅ | ✅ |
 | **OData v4** | ❌ | ✅ | ✅ |
 
 **Rationale:**

@@ -247,8 +247,9 @@ public sealed class GeoJsonFeatureCollectionStreamingWriter : StreamingFeatureCo
             var geoJsonReader = new GeoJsonReader();
             return geoJsonReader.Read<Geometry>(text);
         }
-        catch
+        catch (JsonException)
         {
+            // Invalid GeoJSON - return null
             return null;
         }
     }

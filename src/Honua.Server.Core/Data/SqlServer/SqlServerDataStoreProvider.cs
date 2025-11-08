@@ -1,10 +1,11 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Data.Common;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -21,12 +22,11 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
-using Polly;
 using Honua.Server.Core.Extensions;
 
 namespace Honua.Server.Core.Data.SqlServer;
 
-public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvider
+public sealed class SqlServerDataStoreProvider : RelationalDataStoreProviderBase<SqlConnection, SqlTransaction, SqlCommand, SqlDataReader>
 {
     private const int BulkBatchSize = 1000;
 
@@ -36,9 +36,6 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
 
     private readonly ConcurrentDictionary<string, GeometryColumnInfo> _geometryCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, SqlConnectionStringBuilder> _connectionBuilders = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, Task<string>> _decryptionCache = new(StringComparer.Ordinal);
-    private readonly ResiliencePipeline _retryPipeline;
-    private readonly IConnectionStringEncryptionService? _encryptionService;
     private readonly DataAccessOptions _options;
 
     public const string ProviderKey = "sqlserver";
@@ -46,17 +43,279 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
     public SqlServerDataStoreProvider(
         IOptions<DataAccessOptions>? options = null,
         IConnectionStringEncryptionService? encryptionService = null)
+        : base(ProviderKey, DatabaseRetryPolicy.CreateSqlServerRetryPipeline(), encryptionService)
     {
-        _retryPipeline = DatabaseRetryPolicy.CreateSqlServerRetryPipeline();
-        _encryptionService = encryptionService;
         _options = options?.Value ?? new DataAccessOptions();
     }
 
-    public string Provider => ProviderKey;
+    public override string Provider => ProviderKey;
 
-    public IDataStoreCapabilities Capabilities => SqlServerDataStoreCapabilities.Instance;
+    public override IDataStoreCapabilities Capabilities => SqlServerDataStoreCapabilities.Instance;
 
-    public async IAsyncEnumerable<FeatureRecord> QueryAsync(
+    protected override int DefaultCommandTimeoutSeconds => _options.DefaultCommandTimeoutSeconds;
+
+    // ========================================
+    // ABSTRACT METHOD IMPLEMENTATIONS
+    // ========================================
+
+    protected override SqlConnection CreateConnectionCore(string connectionString)
+    {
+        var builder = _connectionBuilders.GetOrAdd(connectionString, cs =>
+        {
+            var b = new SqlConnectionStringBuilder(cs);
+
+            // Configure connection pooling
+            b.Pooling = _options.SqlServer.Pooling;
+            b.MinPoolSize = _options.SqlServer.MinPoolSize;
+            b.MaxPoolSize = _options.SqlServer.MaxPoolSize;
+            b.ConnectTimeout = _options.SqlServer.ConnectTimeout;
+            b.LoadBalanceTimeout = _options.SqlServer.ConnectionLifetime;
+
+            // Set application name if not specified
+            if (b.ApplicationName.IsNullOrWhiteSpace())
+            {
+                b.ApplicationName = _options.SqlServer.ApplicationName;
+            }
+
+            return b;
+        });
+
+        return new SqlConnection(builder.ConnectionString);
+    }
+
+    protected override string NormalizeConnectionString(string connectionString)
+    {
+        // SECURITY: Validate connection string for SQL injection and malformed input
+        ConnectionStringValidator.Validate(connectionString, ProviderKey);
+        return connectionString;
+    }
+
+    protected override QueryDefinition BuildSelectQuery(
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid,
+        FeatureQuery query)
+    {
+        // Need to determine geometry type synchronously - use cached value if available
+        var geometryInfo = GetGeometryInfoSync(layer);
+        var builder = new SqlServerFeatureQueryBuilder(service, layer, storageSrid, targetSrid, geometryInfo.IsGeography);
+        var definition = builder.BuildSelect(query);
+        return new QueryDefinition(definition.Sql, definition.Parameters);
+    }
+
+    protected override QueryDefinition BuildCountQuery(
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid,
+        FeatureQuery query)
+    {
+        var geometryInfo = GetGeometryInfoSync(layer);
+        var builder = new SqlServerFeatureQueryBuilder(service, layer, storageSrid, targetSrid, geometryInfo.IsGeography);
+        var definition = builder.BuildCount(query);
+        return new QueryDefinition(definition.Sql, definition.Parameters);
+    }
+
+    protected override QueryDefinition BuildByIdQuery(
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid,
+        string featureId)
+    {
+        var geometryInfo = GetGeometryInfoSync(layer);
+        var builder = new SqlServerFeatureQueryBuilder(service, layer, storageSrid, targetSrid, geometryInfo.IsGeography);
+        var definition = builder.BuildById(featureId);
+        return new QueryDefinition(definition.Sql, definition.Parameters);
+    }
+
+    protected override QueryDefinition BuildInsertQuery(LayerDefinition layer, FeatureRecord record)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var geometryInfo = GetGeometryInfoSync(layer);
+        var normalized = NormalizeRecord(layer, record.Attributes, includeKey: true, geometryInfo.IsGeography);
+
+        if (normalized.Columns.Count == 0)
+        {
+            throw new InvalidOperationException($"Create operation for layer '{layer.Id}' did not include any columns.");
+        }
+
+        var columnList = string.Join(", ", normalized.Columns.Select(c => c.ColumnName));
+        var valueList = string.Join(", ", normalized.Columns.Select(c => BuildValueExpression(c, normalized.Srid, normalized.IsGeography)));
+        var keyIdentifier = SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn);
+        var sql = $"INSERT INTO {table} ({columnList}) OUTPUT inserted.{keyIdentifier} VALUES ({valueList})";
+
+        return new QueryDefinition(sql, normalized.Parameters);
+    }
+
+    protected override QueryDefinition BuildUpdateQuery(LayerDefinition layer, string featureId, FeatureRecord record)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var geometryInfo = GetGeometryInfoSync(layer);
+        var normalized = NormalizeRecord(layer, record.Attributes, includeKey: false, geometryInfo.IsGeography);
+
+        if (normalized.Columns.Count == 0)
+        {
+            // Return empty update that won't affect any rows
+            return new QueryDefinition($"SELECT 0", new Dictionary<string, object?>());
+        }
+
+        var assignments = string.Join(", ", normalized.Columns.Select(c => $"{c.ColumnName} = {BuildValueExpression(c, normalized.Srid, normalized.IsGeography)}"));
+        var parameters = new Dictionary<string, object?>(normalized.Parameters, StringComparer.Ordinal)
+        {
+            ["@key"] = NormalizeKeyParameter(layer, featureId)
+        };
+
+        var sql = $"UPDATE {table} SET {assignments} WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key";
+        return new QueryDefinition(sql, new ReadOnlyDictionary<string, object?>(parameters));
+    }
+
+    protected override QueryDefinition BuildDeleteQuery(LayerDefinition layer, string featureId)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var sql = $"DELETE FROM {table} WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key";
+        var parameters = new Dictionary<string, object?> { ["@key"] = NormalizeKeyParameter(layer, featureId) };
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildSoftDeleteQuery(LayerDefinition layer, string featureId, string? deletedBy)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var sql = $@"
+            UPDATE {table}
+            SET is_deleted = 1,
+                deleted_at = GETUTCDATE(),
+                deleted_by = @deletedBy
+            WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key
+              AND (is_deleted IS NULL OR is_deleted = 0)";
+
+        var parameters = new Dictionary<string, object?>
+        {
+            ["@key"] = NormalizeKeyParameter(layer, featureId),
+            ["@deletedBy"] = (object?)deletedBy ?? DBNull.Value
+        };
+
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildRestoreQuery(LayerDefinition layer, string featureId)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var sql = $@"
+            UPDATE {table}
+            SET is_deleted = 0,
+                deleted_at = NULL,
+                deleted_by = NULL
+            WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key
+              AND is_deleted = 1";
+
+        var parameters = new Dictionary<string, object?> { ["@key"] = NormalizeKeyParameter(layer, featureId) };
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override QueryDefinition BuildHardDeleteQuery(LayerDefinition layer, string featureId)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var sql = $"DELETE FROM {table} WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key";
+        var parameters = new Dictionary<string, object?> { ["@key"] = NormalizeKeyParameter(layer, featureId) };
+        return new QueryDefinition(sql, parameters);
+    }
+
+    protected override FeatureRecord CreateFeatureRecord(
+        SqlDataReader reader,
+        LayerDefinition layer,
+        int storageSrid,
+        int targetSrid)
+    {
+        // SQL Server uses STAsText() to return geometry as WKT in special columns
+        var skipColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            SqlServerFeatureQueryBuilder.GeometryWktAlias,
+            SqlServerFeatureQueryBuilder.GeometrySridAlias,
+            layer.GeometryField
+        };
+
+        string? geometryText = null;
+        int? geometrySrid = null;
+
+        // Extract geometry WKT and SRID from the special columns
+        for (var index = 0; index < reader.FieldCount; index++)
+        {
+            var columnName = reader.GetName(index);
+
+            if (string.Equals(columnName, SqlServerFeatureQueryBuilder.GeometryWktAlias, StringComparison.OrdinalIgnoreCase))
+            {
+                geometryText = reader.IsDBNull(index) ? null : reader.GetString(index);
+            }
+            else if (string.Equals(columnName, SqlServerFeatureQueryBuilder.GeometrySridAlias, StringComparison.OrdinalIgnoreCase))
+            {
+                geometrySrid = reader.IsDBNull(index) ? null : reader.GetInt32(index);
+            }
+        }
+
+        return FeatureRecordReader.ReadFeatureRecordWithCustomGeometry(
+            reader,
+            layer,
+            layer.GeometryField,
+            skipColumns,
+            () => GeometryReader.ReadWktGeometry(geometryText, geometrySrid ?? storageSrid, targetSrid));
+    }
+
+    protected override async Task<string> ExecuteInsertAsync(
+        SqlConnection connection,
+        SqlTransaction? transaction,
+        LayerDefinition layer,
+        FeatureRecord record,
+        CancellationToken cancellationToken)
+    {
+        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
+        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
+        var geometryInfo = await ResolveGeometryInfoAsync(connection, layer, cancellationToken).ConfigureAwait(false);
+        var normalized = NormalizeRecord(layer, record.Attributes, includeKey: true, geometryInfo.IsGeography);
+
+        if (normalized.Columns.Count == 0)
+        {
+            throw new InvalidOperationException($"Create operation for layer '{layer.Id}' did not include any columns.");
+        }
+
+        var columnList = string.Join(", ", normalized.Columns.Select(c => c.ColumnName));
+        var valueList = string.Join(", ", normalized.Columns.Select(c => BuildValueExpression(c, normalized.Srid, normalized.IsGeography)));
+
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        var keyIdentifier = SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn);
+        command.CommandText = $"INSERT INTO {table} ({columnList}) OUTPUT inserted.{keyIdentifier} VALUES ({valueList})";
+        command.CommandTimeout = DefaultCommandTimeoutSeconds;
+        command.CommandType = CommandType.Text;
+        AddParameters(command, normalized.Parameters);
+
+        var insertedKey = await RetryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        var keyValue = TryResolveKey(record.Attributes, keyColumn) ?? Convert.ToString(insertedKey, CultureInfo.InvariantCulture);
+        return keyValue ?? throw new InvalidOperationException("Failed to obtain key for inserted feature.");
+    }
+
+    protected override void AddParameters(DbCommand command, IReadOnlyDictionary<string, object?> parameters)
+    {
+        SqlParameterHelper.AddParameters(command, parameters);
+    }
+
+    protected override IsolationLevel GetDefaultIsolationLevel() => IsolationLevel.RepeatableRead;
+
+    // ========================================
+    // OVERRIDE QUERY METHODS TO RESOLVE GEOMETRY INFO
+    // ========================================
+
+    public override async IAsyncEnumerable<FeatureRecord> QueryAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -64,7 +323,6 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-
         Guard.NotNull(dataSource);
         Guard.NotNull(service);
         Guard.NotNull(layer);
@@ -73,423 +331,34 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
         var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
 
-        await using var connection = CreateConnection(dataSource);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
+        // Resolve geometry info and cache it
         var geometryInfo = await ResolveGeometryInfoAsync(connection, layer, cancellationToken).ConfigureAwait(false);
+
         var builder = new SqlServerFeatureQueryBuilder(service, layer, storageSrid, targetSrid, geometryInfo.IsGeography);
         var definition = builder.BuildSelect(normalizedQuery);
 
-        await using var command = CreateCommand(connection, definition);
-        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
+        await using var command = CreateCommand(connection, new QueryDefinition(definition.Sql, definition.Parameters));
+        await using var reader = await RetryPipeline.ExecuteAsync(async ct =>
             await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return CreateFeatureRecord(reader, layer, storageSrid, targetSrid);
+            yield return CreateFeatureRecord((SqlDataReader)reader, layer, storageSrid, targetSrid);
         }
     }
 
-    public async Task<long> CountAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
+    // ========================================
+    // BULK OPERATIONS (Provider-specific)
+    // ========================================
 
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-
-        var normalizedQuery = query ?? new FeatureQuery();
-        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
-        var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
-
-        await using var connection = CreateConnection(dataSource);
-        await _retryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        var geometryInfo = await ResolveGeometryInfoAsync(connection, layer, cancellationToken).ConfigureAwait(false);
-        var builder = new SqlServerFeatureQueryBuilder(service, layer, storageSrid, targetSrid, geometryInfo.IsGeography);
-        var definition = builder.BuildCount(normalizedQuery);
-
-        await using var command = CreateCommand(connection, definition);
-        var result = await _retryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-        if (result is null || result is DBNull)
-        {
-            return 0;
-        }
-
-        return Convert.ToInt64(result, CultureInfo.InvariantCulture);
-    }
-
-    public async Task<FeatureRecord?> GetAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        FeatureQuery? query,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        var normalizedQuery = query ?? new FeatureQuery();
-        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
-        var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
-
-        await using var connection = CreateConnection(dataSource);
-        await _retryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        var geometryInfo = await ResolveGeometryInfoAsync(connection, layer, cancellationToken).ConfigureAwait(false);
-        var builder = new SqlServerFeatureQueryBuilder(service, layer, storageSrid, targetSrid, geometryInfo.IsGeography);
-        var definition = builder.BuildById(featureId);
-
-        await using var command = CreateCommand(connection, definition);
-        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return CreateFeatureRecord(reader, layer, storageSrid, targetSrid);
-        }
-
-        return null;
-    }
-
-    public async Task<FeatureRecord> CreateAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        FeatureRecord record,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        // BUG FIX #17: Flow transaction through CRUD operations
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNull(record);
-
-        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
-
-        var (connection, sqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            var geometryInfo = await ResolveGeometryInfoAsync(connection, layer, cancellationToken).ConfigureAwait(false);
-            var normalized = NormalizeRecord(layer, record.Attributes, includeKey: true, geometryInfo.IsGeography);
-            if (normalized.Columns.Count == 0)
-            {
-                throw new InvalidOperationException($"Create operation for layer '{layer.Id}' did not include any columns.");
-            }
-
-            var columnList = string.Join(", ", normalized.Columns.Select(c => c.ColumnName));
-            var valueList = string.Join(", ", normalized.Columns.Select(c => BuildValueExpression(c, normalized.Srid, normalized.IsGeography)));
-
-            await using (var command = connection.CreateCommand())
-            {
-                command.Transaction = sqlTransaction;
-                var keyIdentifier = SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn);
-                command.CommandText = $"insert into {table} ({columnList}) output inserted.{keyIdentifier} values ({valueList})";
-                command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
-                command.CommandType = CommandType.Text;
-                AddParameters(command, normalized.Parameters);
-
-                var insertedKey = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-                var keyValue = TryResolveKey(record.Attributes, keyColumn) ?? Convert.ToString(insertedKey, CultureInfo.InvariantCulture);
-                if (keyValue.IsNullOrWhiteSpace())
-                {
-                    throw new InvalidOperationException("Failed to obtain key for inserted feature.");
-                }
-
-                return await GetAsync(dataSource, service, layer, keyValue!, null, cancellationToken).ConfigureAwait(false)
-                       ?? throw new InvalidOperationException("Failed to load feature after insert.");
-            }
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public async Task<FeatureRecord?> UpdateAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        FeatureRecord record,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        // BUG FIX #17: Flow transaction through CRUD operations
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-        Guard.NotNull(record);
-
-        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
-
-        var (connection, sqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            var geometryInfo = await ResolveGeometryInfoAsync(connection, layer, cancellationToken).ConfigureAwait(false);
-            var normalized = NormalizeRecord(layer, record.Attributes, includeKey: false, geometryInfo.IsGeography);
-            if (normalized.Columns.Count == 0)
-            {
-                return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
-            }
-
-            var assignments = string.Join(", ", normalized.Columns.Select(c => $"{c.ColumnName} = {BuildValueExpression(c, normalized.Srid, normalized.IsGeography)}"));
-            var parameters = new Dictionary<string, object?>(normalized.Parameters, StringComparer.Ordinal)
-            {
-                ["@key"] = NormalizeKeyParameter(layer, featureId)
-            };
-
-            await using (var command = connection.CreateCommand())
-            {
-                command.Transaction = sqlTransaction;
-                command.CommandText = $"update {table} set {assignments} where {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key";
-                command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
-                command.CommandType = CommandType.Text;
-                AddParameters(command, new ReadOnlyDictionary<string, object?>(parameters));
-                var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-                if (affected == 0)
-                {
-                    return null;
-                }
-            }
-
-            return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public async Task<bool> DeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        // BUG FIX #17: Flow transaction through CRUD operations
-
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
-
-        var (connection, sqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.Transaction = sqlTransaction;
-            command.CommandText = $"delete from {table} where {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key";
-            command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
-            command.CommandType = CommandType.Text;
-            command.Parameters.AddWithValue("@key", NormalizeKeyParameter(layer, featureId));
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-            return affected > 0;
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public async Task<bool> SoftDeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        string? deletedBy,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
-
-        var (connection, sqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.Transaction = sqlTransaction;
-            command.CommandText = $@"
-                UPDATE {table}
-                SET is_deleted = 1,
-                    deleted_at = GETUTCDATE(),
-                    deleted_by = @deletedBy
-                WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key
-                  AND (is_deleted IS NULL OR is_deleted = 0)";
-            command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
-            command.CommandType = CommandType.Text;
-            command.Parameters.AddWithValue("@key", NormalizeKeyParameter(layer, featureId));
-            command.Parameters.AddWithValue("@deletedBy", (object?)deletedBy ?? DBNull.Value);
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-            return affected > 0;
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public async Task<bool> RestoreAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
-
-        var (connection, sqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.Transaction = sqlTransaction;
-            command.CommandText = $@"
-                UPDATE {table}
-                SET is_deleted = 0,
-                    deleted_at = NULL,
-                    deleted_by = NULL
-                WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key
-                  AND is_deleted = 1";
-            command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
-            command.CommandType = CommandType.Text;
-            command.Parameters.AddWithValue("@key", NormalizeKeyParameter(layer, featureId));
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-            return affected > 0;
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public async Task<bool> HardDeleteAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        string featureId,
-        string? deletedBy,
-        IDataStoreTransaction? transaction = null,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        Guard.NotNull(dataSource);
-        Guard.NotNull(service);
-        Guard.NotNull(layer);
-        Guard.NotNullOrWhiteSpace(featureId);
-
-        var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
-        var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
-
-        var (connection, sqlTransaction, shouldDisposeConnection) = await GetConnectionAndTransactionAsync(
-            dataSource, transaction, cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.Transaction = sqlTransaction;
-            command.CommandText = $"DELETE FROM {table} WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key";
-            command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
-            command.CommandType = CommandType.Text;
-            command.Parameters.AddWithValue("@key", NormalizeKeyParameter(layer, featureId));
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
-                await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-            return affected > 0;
-        }
-        finally
-        {
-            if (shouldDisposeConnection && connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public async Task<int> BulkInsertAsync(
+    public override async Task<int> BulkInsertAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -503,8 +372,8 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         Guard.NotNull(layer);
         Guard.NotNull(records);
 
-        await using var connection = CreateConnection(dataSource);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -562,7 +431,7 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         using var bulkCopy = new SqlBulkCopy(connection);
         bulkCopy.DestinationTableName = table;
         bulkCopy.BatchSize = BulkBatchSize;
-        bulkCopy.BulkCopyTimeout = _options.DefaultCommandTimeoutSeconds;
+        bulkCopy.BulkCopyTimeout = DefaultCommandTimeoutSeconds;
 
         // Map columns
         foreach (DataColumn column in dataTable.Columns)
@@ -575,7 +444,7 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         return count;
     }
 
-    public async Task<int> BulkUpdateAsync(
+    public override async Task<int> BulkUpdateAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -592,8 +461,8 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
         var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
 
-        await using var connection = CreateConnection(dataSource);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -622,7 +491,7 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         return count;
     }
 
-    public async Task<int> BulkDeleteAsync(
+    public override async Task<int> BulkDeleteAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -639,8 +508,8 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         var table = LayerMetadataHelper.GetTableExpression(layer, SqlServerFeatureQueryBuilder.QuoteIdentifier);
         var keyColumn = LayerMetadataHelper.GetPrimaryKeyColumn(layer);
 
-        await using var connection = CreateConnection(dataSource);
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await RetryPipeline.ExecuteAsync(async ct =>
             await connection.OpenAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
 
@@ -727,7 +596,7 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
                 await using var command = connection.CreateCommand();
                 command.Transaction = transaction;
                 command.CommandText = $"UPDATE {table} SET {assignments} WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} = @key";
-                command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
+                command.CommandTimeout = DefaultCommandTimeoutSeconds;
                 command.CommandType = CommandType.Text;
                 AddParameters(command, new ReadOnlyDictionary<string, object?>(parameters));
 
@@ -784,11 +653,11 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
 
             await using var command = connection.CreateCommand();
             command.CommandText = $"DELETE FROM {table} WHERE {SqlServerFeatureQueryBuilder.QuoteIdentifier(keyColumn)} IN ({inClause})";
-            command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
+            command.CommandTimeout = DefaultCommandTimeoutSeconds;
             command.CommandType = CommandType.Text;
             AddParameters(command, new ReadOnlyDictionary<string, object?>(parameters));
 
-            var affected = await _retryPipeline.ExecuteAsync(async ct =>
+            var affected = await RetryPipeline.ExecuteAsync(async ct =>
                 await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false),
                 cancellationToken).ConfigureAwait(false);
 
@@ -798,55 +667,11 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         return totalAffected;
     }
 
-    public Task<byte[]?> GenerateMvtTileAsync(
-        DataSourceDefinition dataSource,
-        ServiceDefinition service,
-        LayerDefinition layer,
-        int zoom,
-        int x,
-        int y,
-        string? datetime = null,
-        CancellationToken cancellationToken = default)
-    {
-        // SQL Server does not support native MVT generation
-        return Task.FromResult<byte[]?>(null);
-    }
+    // ========================================
+    // AGGREGATION OPERATIONS (Fallback)
+    // ========================================
 
-    public async Task<IDataStoreTransaction?> BeginTransactionAsync(
-        DataSourceDefinition dataSource,
-        CancellationToken cancellationToken = default)
-    {
-        // BUG FIX #17: Implement transaction support for SQL Server following Postgres pattern
-        ThrowIfDisposed();
-
-        SqlConnection? connection = null;
-        try
-        {
-            connection = CreateConnection(dataSource);
-            await _retryPipeline.ExecuteAsync(async ct =>
-                await connection.OpenAsync(ct).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-
-            // Use REPEATABLE READ isolation level for government data integrity
-            // This prevents non-repeatable reads and phantom reads during transaction execution
-            var transaction = (SqlTransaction)await connection.BeginTransactionAsync(
-                System.Data.IsolationLevel.RepeatableRead,
-                cancellationToken).ConfigureAwait(false);
-
-            return new RelationalDataStoreTransaction<SqlConnection, SqlTransaction>(connection, transaction);
-        }
-        catch
-        {
-            // CRITICAL: Dispose connection on any failure to prevent connection pool exhaustion
-            if (connection != null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
-            }
-            throw;
-        }
-    }
-
-    public Task<IReadOnlyList<StatisticsResult>> QueryStatisticsAsync(
+    public override Task<IReadOnlyList<StatisticsResult>> QueryStatisticsAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -863,7 +688,7 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
             cancellationToken);
     }
 
-    public Task<IReadOnlyList<DistinctResult>> QueryDistinctAsync(
+    public override Task<IReadOnlyList<DistinctResult>> QueryDistinctAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -878,7 +703,7 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
             cancellationToken);
     }
 
-    public Task<BoundingBox?> QueryExtentAsync(
+    public override Task<BoundingBox?> QueryExtentAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -893,114 +718,101 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
             cancellationToken);
     }
 
-    public async Task TestConnectivityAsync(
+    public override Task<byte[]?> GenerateMvtTileAsync(
         DataSourceDefinition dataSource,
+        ServiceDefinition service,
+        LayerDefinition layer,
+        int zoom,
+        int x,
+        int y,
+        string? datetime = null,
         CancellationToken cancellationToken = default)
     {
-        Guard.NotNull(dataSource);
-        SqlExceptionHelper.ValidateConnectionStringForHealthCheck(dataSource.ConnectionString, dataSource.Id);
+        // SQL Server does not support native MVT generation
+        return Task.FromResult<byte[]?>(null);
+    }
 
-        await using var connection = CreateConnection(dataSource);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+    // ========================================
+    // HELPER METHODS
+    // ========================================
+
+    private GeometryColumnInfo GetGeometryInfoSync(LayerDefinition layer)
+    {
+        var table = layer.Storage?.Table ?? layer.Id;
+        var geometryColumn = layer.Storage?.GeometryColumn ?? layer.GeometryField;
+        var cacheKey = $"{table}|{geometryColumn}";
+
+        if (_geometryCache.TryGetValue(cacheKey, out var cached))
+        {
+            return cached;
+        }
+
+        // Default to geometry if not cached yet (will be updated on first connection)
+        return new GeometryColumnInfo(false);
+    }
+
+    private async Task<GeometryColumnInfo> ResolveGeometryInfoAsync(SqlConnection connection, LayerDefinition layer, CancellationToken cancellationToken)
+    {
+        var table = layer.Storage?.Table ?? layer.Id;
+        var geometryColumn = layer.Storage?.GeometryColumn ?? layer.GeometryField;
+        var cacheKey = $"{table}|{geometryColumn}";
+
+        if (_geometryCache.TryGetValue(cacheKey, out var cached))
+        {
+            return cached;
+        }
+
+        var (schema, tableName) = SplitTableName(table);
+        const string sql = @"select top(1) t.name from sys.columns c inner join sys.types t on c.user_type_id = t.user_type_id inner join sys.objects o on o.object_id = c.object_id inner join sys.schemas s on s.schema_id = o.schema_id where s.name = @schema and o.name = @table and c.name = @column";
 
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1";
-        command.CommandTimeout = 5; // 5 second timeout for health checks
-
-        await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    private FeatureRecord CreateFeatureRecord(SqlDataReader reader, LayerDefinition layer, int storageSrid, int targetSrid)
-    {
-        // SQL Server uses STAsText() to return geometry as WKT in special columns
-        var skipColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            SqlServerFeatureQueryBuilder.GeometryWktAlias,
-            SqlServerFeatureQueryBuilder.GeometrySridAlias,
-            layer.GeometryField
-        };
-
-        string? geometryText = null;
-        int? geometrySrid = null;
-
-        // Extract geometry WKT and SRID from the special columns
-        for (var index = 0; index < reader.FieldCount; index++)
-        {
-            var columnName = reader.GetName(index);
-
-            if (string.Equals(columnName, SqlServerFeatureQueryBuilder.GeometryWktAlias, StringComparison.OrdinalIgnoreCase))
-            {
-                geometryText = reader.IsDBNull(index) ? null : reader.GetString(index);
-            }
-            else if (string.Equals(columnName, SqlServerFeatureQueryBuilder.GeometrySridAlias, StringComparison.OrdinalIgnoreCase))
-            {
-                geometrySrid = reader.IsDBNull(index) ? null : reader.GetInt32(index);
-            }
-        }
-
-        return FeatureRecordReader.ReadFeatureRecordWithCustomGeometry(
-            reader,
-            layer,
-            layer.GeometryField,
-            skipColumns,
-            () => GeometryReader.ReadWktGeometry(geometryText, geometrySrid ?? storageSrid, targetSrid));
-    }
-
-    private SqlConnection CreateConnection(DataSourceDefinition dataSource)
-    {
-        SqlExceptionHelper.ValidateConnectionString(dataSource.ConnectionString, dataSource.Id);
-
-        // BUG FIX #38: Decrypt connection string before building SqlConnectionStringBuilder
-        // Note: This is a synchronous wrapper; callers should use async patterns where possible
-        var decryptedConnectionString = DecryptConnectionStringAsync(dataSource.ConnectionString, CancellationToken.None).GetAwaiter().GetResult();
-
-        var builder = _connectionBuilders.GetOrAdd(decryptedConnectionString, cs =>
-        {
-            // SECURITY: Validate connection string for SQL injection and malformed input
-            ConnectionStringValidator.Validate(cs, ProviderKey);
-
-            var b = new SqlConnectionStringBuilder(cs);
-
-            // Configure connection pooling
-            b.Pooling = _options.SqlServer.Pooling;
-            b.MinPoolSize = _options.SqlServer.MinPoolSize;
-            b.MaxPoolSize = _options.SqlServer.MaxPoolSize;
-            b.ConnectTimeout = _options.SqlServer.ConnectTimeout;
-            b.LoadBalanceTimeout = _options.SqlServer.ConnectionLifetime;
-
-            // Set application name if not specified
-            if (b.ApplicationName.IsNullOrWhiteSpace())
-            {
-                b.ApplicationName = _options.SqlServer.ApplicationName;
-            }
-
-            return b;
-        });
-
-        return new SqlConnection(builder.ConnectionString);
-    }
-
-    private async Task<string> DecryptConnectionStringAsync(string connectionString, CancellationToken cancellationToken = default)
-    {
-        if (_encryptionService == null)
-        {
-            return connectionString;
-        }
-
-        return await _decryptionCache.GetOrAdd(connectionString,
-            async cs => await _encryptionService.DecryptAsync(cs, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
-    }
-
-    private SqlCommand CreateCommand(SqlConnection connection, SqlServerQueryDefinition definition)
-    {
-        var command = connection.CreateCommand();
-        command.CommandText = definition.Sql;
-        command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
+        command.CommandText = sql;
+        command.CommandTimeout = DefaultCommandTimeoutSeconds;
         command.CommandType = CommandType.Text;
-        AddParameters(command, definition.Parameters);
-        return command;
+        command.Parameters.AddWithValue("@schema", schema);
+        command.Parameters.AddWithValue("@table", tableName);
+        command.Parameters.AddWithValue("@column", TrimIdentifier(geometryColumn));
+
+        var result = await RetryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+        var typeName = Convert.ToString(result, CultureInfo.InvariantCulture);
+        var info = new GeometryColumnInfo(string.Equals(typeName, "geography", StringComparison.OrdinalIgnoreCase));
+        _geometryCache[cacheKey] = info;
+        return info;
     }
 
+    private static (string Schema, string Table) SplitTableName(string table)
+    {
+        var parts = table.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return ("dbo", TrimIdentifier(table));
+        }
+
+        if (parts.Length == 1)
+        {
+            return ("dbo", TrimIdentifier(parts[0]));
+        }
+
+        return (TrimIdentifier(parts[^2]), TrimIdentifier(parts[^1]));
+    }
+
+    private static string TrimIdentifier(string identifier)
+    {
+        if (identifier.IsNullOrWhiteSpace())
+        {
+            return identifier;
+        }
+
+        var trimmed = identifier.Trim();
+        if (trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal))
+        {
+            trimmed = trimmed[1..^1];
+        }
+
+        return trimmed.Replace("]]", "]", StringComparison.Ordinal);
+    }
 
     private NormalizedRecord NormalizeRecord(LayerDefinition layer, IReadOnlyDictionary<string, object?> attributes, bool includeKey, bool isGeography)
     {
@@ -1102,95 +914,24 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
         return SqlParameterHelper.TryResolveKey(attributes, keyColumn);
     }
 
-    private static void AddParameters(SqlCommand command, IReadOnlyDictionary<string, object?> parameters)
+    // ========================================
+    // DISPOSAL
+    // ========================================
+
+    protected override void Dispose(bool disposing)
     {
-        SqlParameterHelper.AddParameters(command, parameters);
+        if (disposing)
+        {
+            _geometryCache.Clear();
+            _connectionBuilders.Clear();
+        }
+
+        base.Dispose(disposing);
     }
 
-    private async Task<(SqlConnection Connection, SqlTransaction? Transaction, bool ShouldDispose)> GetConnectionAndTransactionAsync(
-        DataSourceDefinition dataSource,
-        IDataStoreTransaction? transaction,
-        CancellationToken cancellationToken)
-    {
-        if (transaction is RelationalDataStoreTransaction<SqlConnection, SqlTransaction> sqlDataStoreTransaction)
-        {
-            // Transaction owns the connection - caller should NOT dispose it
-            return (sqlDataStoreTransaction.Connection, sqlDataStoreTransaction.Transaction, false);
-        }
-
-        // No transaction provided - create new connection, open it, caller MUST dispose it
-        var connection = CreateConnection(dataSource);
-        await _retryPipeline.ExecuteAsync(async ct =>
-            await connection.OpenAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-
-        return (connection, null, true);
-    }
-
-    private async Task<GeometryColumnInfo> ResolveGeometryInfoAsync(SqlConnection connection, LayerDefinition layer, CancellationToken cancellationToken)
-    {
-        var table = layer.Storage?.Table ?? layer.Id;
-        var geometryColumn = layer.Storage?.GeometryColumn ?? layer.GeometryField;
-        var cacheKey = $"{table}|{geometryColumn}";
-
-        if (_geometryCache.TryGetValue(cacheKey, out var cached))
-        {
-            return cached;
-        }
-
-        var (schema, tableName) = SplitTableName(table);
-        const string sql = @"select top(1) t.name from sys.columns c inner join sys.types t on c.user_type_id = t.user_type_id inner join sys.objects o on o.object_id = c.object_id inner join sys.schemas s on s.schema_id = o.schema_id where s.name = @schema and o.name = @table and c.name = @column";
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.CommandTimeout = _options.DefaultCommandTimeoutSeconds;
-        command.CommandType = CommandType.Text;
-        command.Parameters.AddWithValue("@schema", schema);
-        command.Parameters.AddWithValue("@table", tableName);
-        command.Parameters.AddWithValue("@column", TrimIdentifier(geometryColumn));
-
-        var result = await _retryPipeline.ExecuteAsync(async ct =>
-            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
-            cancellationToken).ConfigureAwait(false);
-        var typeName = Convert.ToString(result, CultureInfo.InvariantCulture);
-        var info = new GeometryColumnInfo(string.Equals(typeName, "geography", StringComparison.OrdinalIgnoreCase));
-        _geometryCache[cacheKey] = info;
-        return info;
-    }
-
-    private static (string Schema, string Table) SplitTableName(string table)
-    {
-        var parts = table.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length == 0)
-        {
-            return ("dbo", TrimIdentifier(table));
-        }
-
-        if (parts.Length == 1)
-        {
-            return ("dbo", TrimIdentifier(parts[0]));
-        }
-
-        return (TrimIdentifier(parts[^2]), TrimIdentifier(parts[^1]));
-    }
-
-    private static string TrimIdentifier(string identifier)
-    {
-        if (identifier.IsNullOrWhiteSpace())
-        {
-            return identifier;
-        }
-
-        var trimmed = identifier.Trim();
-        if (trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal))
-        {
-            trimmed = trimmed[1..^1];
-        }
-
-        return trimmed.Replace("]]", "]", StringComparison.Ordinal);
-    }
-
-
+    // ========================================
+    // INTERNAL RECORDS
+    // ========================================
 
     private sealed record NormalizedColumn(string ColumnName, string ParameterName, object? Value, bool IsGeometry)
     {
@@ -1200,12 +941,4 @@ public sealed class SqlServerDataStoreProvider : DisposableBase, IDataStoreProvi
     private sealed record NormalizedRecord(IReadOnlyList<NormalizedColumn> Columns, IReadOnlyDictionary<string, object?> Parameters, int Srid, bool IsGeography);
 
     private sealed record GeometryColumnInfo(bool IsGeography);
-
-    protected override void DisposeCore()
-    {
-        _geometryCache.Clear();
-        _connectionBuilders.Clear();
-        _decryptionCache.Clear();
-    }
 }
-

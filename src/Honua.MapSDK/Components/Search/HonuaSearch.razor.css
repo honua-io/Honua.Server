@@ -1,0 +1,403 @@
+/* Base search container */
+.honua-search {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+}
+
+/* Embedded search (in a sidebar or container) */
+.search-embedded {
+    width: 100%;
+    box-shadow: none;
+    border: 1px solid #e0e0e0;
+}
+
+/* Floating search positioning */
+.search-floating {
+    position: absolute;
+    z-index: 1000;
+    margin: 10px;
+}
+
+.search-top-right {
+    top: 0;
+    right: 0;
+}
+
+.search-top-left {
+    top: 0;
+    left: 0;
+}
+
+.search-bottom-right {
+    bottom: 0;
+    right: 0;
+}
+
+.search-bottom-left {
+    bottom: 0;
+    left: 0;
+}
+
+/* Search container with locate button */
+.search-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.locate-button {
+    flex-shrink: 0;
+}
+
+.search-autocomplete {
+    flex: 1;
+}
+
+/* Search result item styling */
+.search-result-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border-radius: 4px;
+}
+
+.search-result-item:hover {
+    background: #f5f5f5;
+}
+
+.result-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0f7ff;
+    border-radius: 50%;
+}
+
+.result-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.result-name {
+    font-weight: 500;
+    font-size: 14px;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.result-details {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #666;
+}
+
+.result-type-chip {
+    height: 18px;
+    font-size: 10px;
+    text-transform: uppercase;
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.result-location {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* No results state */
+.no-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 8px;
+    color: #999;
+}
+
+/* Recent searches */
+.recent-searches {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e0e0e0;
+    animation: slideDown 0.2s ease;
+}
+
+.recent-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+}
+
+.recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.recent-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border-radius: 4px;
+}
+
+.recent-item:hover {
+    background: #f5f5f5;
+}
+
+.recent-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.recent-name {
+    font-size: 13px;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recent-time {
+    font-size: 11px;
+    color: #999;
+}
+
+/* Error message */
+.search-error {
+    margin-top: 8px;
+    animation: slideDown 0.2s ease;
+}
+
+/* Animations */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Loading state */
+.honua-search ::deep .mud-input-adornment {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Focus styles */
+.honua-search ::deep .mud-input-root:focus-within {
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .honua-search {
+        min-width: 280px;
+        max-width: calc(100vw - 20px);
+    }
+
+    .search-floating {
+        margin: 5px;
+    }
+
+    .result-name {
+        font-size: 13px;
+    }
+
+    .result-details {
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .honua-search {
+        min-width: 250px;
+    }
+
+    .search-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .locate-button {
+        width: 100%;
+    }
+
+    .result-type-chip {
+        display: none;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .honua-search {
+        background: #2d2d2d;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .search-embedded {
+        border-color: #444;
+    }
+
+    .search-result-item:hover,
+    .recent-item:hover {
+        background: #3a3a3a;
+    }
+
+    .result-icon {
+        background: rgba(25, 118, 210, 0.2);
+    }
+
+    .result-name,
+    .recent-name {
+        color: #e0e0e0;
+    }
+
+    .result-details,
+    .recent-time {
+        color: #aaa;
+    }
+
+    .result-type-chip {
+        background: rgba(25, 118, 210, 0.3);
+        color: #90caf9;
+    }
+
+    .recent-searches {
+        border-top-color: #444;
+    }
+
+    .no-results {
+        color: #666;
+    }
+}
+
+/* Print styles */
+@media print {
+    .honua-search {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        page-break-inside: avoid;
+    }
+
+    .search-floating {
+        position: relative;
+        margin: 10px 0;
+    }
+
+    .locate-button {
+        display: none;
+    }
+
+    .recent-searches {
+        display: none;
+    }
+}
+
+/* Accessibility */
+.honua-search:focus-within {
+    outline: 2px solid #1976d2;
+    outline-offset: 2px;
+}
+
+.search-result-item:focus,
+.recent-item:focus {
+    outline: 2px solid #1976d2;
+    outline-offset: -2px;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .honua-search {
+        border: 2px solid currentColor;
+    }
+
+    .search-result-item:hover,
+    .recent-item:hover {
+        background: HighlightText;
+        color: Highlight;
+    }
+
+    .result-icon {
+        border: 1px solid currentColor;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .honua-search,
+    .honua-search *,
+    .honua-search ::deep * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* RTL support */
+[dir="rtl"] .search-top-right {
+    right: auto;
+    left: 0;
+}
+
+[dir="rtl"] .search-top-left {
+    left: auto;
+    right: 0;
+}
+
+[dir="rtl"] .search-bottom-right {
+    right: auto;
+    left: 0;
+}
+
+[dir="rtl"] .search-bottom-left {
+    left: auto;
+    right: 0;
+}
+
+/* Loading indicator for autocomplete */
+.honua-search ::deep .mud-progress-circular {
+    width: 20px !important;
+    height: 20px !important;
+}

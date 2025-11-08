@@ -35,6 +35,12 @@ def ensure_shared_test_env():
     except requests.exceptions.RequestException:
         pass
 
+    # Check if user wants to skip environment startup
+    if os.environ.get("SKIP_START_ENV"):
+        print(f"\n✓ Skipping environment startup (SKIP_START_ENV=1). Assuming environment is running at {base_url}\n")
+        yield
+        return
+
     # Start shared test environment
     print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("  Starting Shared Test Environment...")
@@ -227,7 +233,7 @@ def wmts_base_url(honua_api_base_url: str) -> str:
 @pytest.fixture(scope="module")
 def wcs_base_url(honua_api_base_url: str) -> str:
     """Base URL for WCS tests."""
-    return f"{honua_api_base_url}/wcs"
+    return f"{honua_api_base_url}/v1/wcs"
 
 
 @pytest.fixture(scope="module")

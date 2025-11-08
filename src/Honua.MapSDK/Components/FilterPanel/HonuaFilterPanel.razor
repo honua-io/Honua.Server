@@ -1,0 +1,747 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using MudBlazor
+@using MapFieldType = Honua.MapSDK.Models.FieldType
+@using MapFilterType = Honua.MapSDK.Models.FilterType
+@inject ComponentBus Bus
+
+<div class="honua-filter-panel @CssClass">
+    @if (!string.IsNullOrEmpty(Title))
+    {
+        <div class="filter-panel-header">
+            <MudText Typo="Typo.h6">@Title</MudText>
+        </div>
+    }
+
+    @* Active Filters Display *@
+    @if (_activeFilters.Any())
+    {
+        <div class="filter-chips-container">
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">Active Filters</MudText>
+            <div class="filter-chips">
+                @foreach (var filter in _activeFilters)
+                {
+                    <MudChip T="string"
+                             Color="Color.Primary"
+                             Size="Size.Small"
+                             OnClose="() => RemoveFilter(filter)"
+                             CloseIcon="@Icons.Material.Filled.Close">
+                        @filter.ToString()
+                    </MudChip>
+                }
+                <MudButton Size="Size.Small"
+                          Variant="Variant.Text"
+                          Color="Color.Error"
+                          OnClick="ClearAllFilters"
+                          StartIcon="@Icons.Material.Filled.Clear">
+                    Clear All
+                </MudButton>
+            </div>
+        </div>
+    }
+
+    @* Spatial Filters Section *@
+    @if (ShowSpatial)
+    {
+        <MudExpansionPanels Class="filter-section" Elevation="0">
+            <MudExpansionPanel Text="Spatial Filters" IsExpanded="_spatialExpanded">
+                <div class="filter-content">
+                    <MudRadioGroup @bind-Value="_spatialType">
+                        <MudRadio T="SpatialFilterType" Value="SpatialFilterType.BoundingBox" Color="Color.Primary">
+                            Current Map Extent
+                        </MudRadio>
+                        <MudRadio T="SpatialFilterType" Value="SpatialFilterType.Circle" Color="Color.Primary">
+                            Circle (Center + Radius)
+                        </MudRadio>
+                        <MudRadio T="SpatialFilterType" Value="SpatialFilterType.WithinDistance" Color="Color.Primary">
+                            Within Distance of Point
+                        </MudRadio>
+                        <MudRadio T="SpatialFilterType" Value="SpatialFilterType.Polygon" Color="Color.Primary">
+                            Draw Polygon
+                        </MudRadio>
+                    </MudRadioGroup>
+
+                    @if (_spatialType == SpatialFilterType.BoundingBox)
+                    {
+                        <div class="mt-3">
+                            <MudButton Variant="Variant.Filled"
+                                      Color="Color.Primary"
+                                      OnClick="UseCurrentExtent"
+                                      Disabled="@(_currentExtent == null)"
+                                      StartIcon="@Icons.Material.Filled.CropFree"
+                                      FullWidth="true">
+                                Use Current Map Extent
+                            </MudButton>
+                            @if (_currentExtent != null)
+                            {
+                                <MudText Typo="Typo.caption" Class="mt-2">
+                                    Current extent: [@string.Format("{0:F4}, {1:F4}, {2:F4}, {3:F4}", _currentExtent[0], _currentExtent[1], _currentExtent[2], _currentExtent[3])]
+                                </MudText>
+                            }
+                        </div>
+                    }
+                    else if (_spatialType == SpatialFilterType.Circle || _spatialType == SpatialFilterType.WithinDistance)
+                    {
+                        <div class="mt-3">
+                            <MudTextField @bind-Value="_spatialLongitude"
+                                         Label="Longitude"
+                                         Variant="Variant.Outlined"
+                                         T="double"
+                                         Margin="Margin.Dense" />
+                            <MudTextField @bind-Value="_spatialLatitude"
+                                         Label="Latitude"
+                                         Variant="Variant.Outlined"
+                                         T="double"
+                                         Margin="Margin.Dense"
+                                         Class="mt-2" />
+                            <MudTextField @bind-Value="_spatialRadius"
+                                         Label="@(_spatialType == SpatialFilterType.Circle ? "Radius (meters)" : "Distance (meters)")"
+                                         Variant="Variant.Outlined"
+                                         T="double"
+                                         Margin="Margin.Dense"
+                                         Class="mt-2" />
+                            <MudButton Variant="Variant.Filled"
+                                      Color="Color.Primary"
+                                      OnClick="ApplySpatialFilter"
+                                      Class="mt-3"
+                                      FullWidth="true">
+                                Apply Spatial Filter
+                            </MudButton>
+                        </div>
+                    }
+                    else if (_spatialType == SpatialFilterType.Polygon)
+                    {
+                        <div class="mt-3">
+                            <MudAlert Severity="Severity.Info" Dense="true">
+                                Click "Draw Polygon" to draw a polygon on the map. The filter will be applied to features within the drawn area.
+                            </MudAlert>
+                            <MudButton Variant="Variant.Filled"
+                                      Color="Color.Primary"
+                                      OnClick="StartDrawPolygon"
+                                      StartIcon="@Icons.Material.Filled.Draw"
+                                      Class="mt-2"
+                                      FullWidth="true">
+                                Draw Polygon
+                            </MudButton>
+                        </div>
+                    }
+                </div>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
+
+    @* Attribute Filters Section *@
+    @if (ShowAttribute)
+    {
+        <MudExpansionPanels Class="filter-section" Elevation="0">
+            <MudExpansionPanel Text="Attribute Filters" IsExpanded="_attributeExpanded">
+                <div class="filter-content">
+                    @if (AttributeFields != null && AttributeFields.Any())
+                    {
+                        <MudSelect @bind-Value="_selectedField"
+                                  Label="Field"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense">
+                            @foreach (var field in AttributeFields)
+                            {
+                                <MudSelectItem Value="@field">@field.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudTextField @bind-Value="_attributeFieldName"
+                                     Label="Field Name"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" />
+                    }
+
+                    @if (_selectedField != null || !string.IsNullOrEmpty(_attributeFieldName))
+                    {
+                        <MudSelect @bind-Value="_attributeOperator"
+                                  Label="Operator"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Class="mt-2">
+                            @foreach (var op in _availableOperators)
+                            {
+                                <MudSelectItem Value="@op">@GetOperatorLabel(op)</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        @if (_attributeOperator != AttributeOperator.IsNull && _attributeOperator != AttributeOperator.IsNotNull)
+                        {
+                            @if (_attributeOperator == AttributeOperator.In || _attributeOperator == AttributeOperator.NotIn)
+                            {
+                                <MudTextField @bind-Value="_attributeValues"
+                                             Label="Values (comma-separated)"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             Class="mt-2"
+                                             HelperText="Enter values separated by commas" />
+                            }
+                            else
+                            {
+                                @if (_selectedField?.Type == MapFieldType.Date)
+                                {
+                                    <MudDatePicker @bind-Date="_attributeDateValue"
+                                                  Label="Value"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Class="mt-2" />
+                                }
+                                else if (_selectedField?.Type == MapFieldType.Number)
+                                {
+                                    <MudNumericField @bind-Value="_attributeNumberValue"
+                                                    Label="Value"
+                                                    Variant="Variant.Outlined"
+                                                    Margin="Margin.Dense"
+                                                    T="double"
+                                                    Class="mt-2" />
+                                }
+                                else if (_selectedField?.Type == MapFieldType.Boolean)
+                                {
+                                    <MudSwitch @bind-Value="_attributeBoolValue"
+                                              Label="Value"
+                                              Color="Color.Primary"
+                                              Class="mt-2" />
+                                }
+                                else
+                                {
+                                    <MudTextField @bind-Value="_attributeValue"
+                                                 Label="Value"
+                                                 Variant="Variant.Outlined"
+                                                 Margin="Margin.Dense"
+                                                 Class="mt-2" />
+                                }
+                            }
+                        }
+
+                        <MudButton Variant="Variant.Filled"
+                                  Color="Color.Primary"
+                                  OnClick="ApplyAttributeFilter"
+                                  Class="mt-3"
+                                  FullWidth="true"
+                                  StartIcon="@Icons.Material.Filled.Add">
+                            Add Attribute Filter
+                        </MudButton>
+                    }
+                </div>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
+
+    @* Temporal Filters Section *@
+    @if (ShowTemporal)
+    {
+        <MudExpansionPanels Class="filter-section" Elevation="0">
+            <MudExpansionPanel Text="Temporal Filters" IsExpanded="_temporalExpanded">
+                <div class="filter-content">
+                    <MudTextField @bind-Value="_temporalField"
+                                 Label="Date Field"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 HelperText="Name of the date field to filter" />
+
+                    <MudSelect @bind-Value="_temporalType"
+                              Label="Filter Type"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Class="mt-2">
+                        <MudSelectItem Value="TemporalFilterType.Before">Before Date</MudSelectItem>
+                        <MudSelectItem Value="TemporalFilterType.After">After Date</MudSelectItem>
+                        <MudSelectItem Value="TemporalFilterType.Between">Between Dates</MudSelectItem>
+                        <MudSelectItem Value="TemporalFilterType.LastN">Last N Days/Weeks/Months</MudSelectItem>
+                    </MudSelect>
+
+                    @if (_temporalType == TemporalFilterType.LastN)
+                    {
+                        <div class="mt-3">
+                            <MudText Typo="Typo.caption" Class="mb-2">Quick Filters</MudText>
+                            <div class="quick-filters">
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetRelativeFilter(7, RelativeTimeUnit.Days)">Last 7 Days</MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetRelativeFilter(30, RelativeTimeUnit.Days)">Last 30 Days</MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetRelativeFilter(90, RelativeTimeUnit.Days)">Last 90 Days</MudButton>
+                            </div>
+                            <div class="mt-3 d-flex gap-2">
+                                <MudNumericField @bind-Value="_relativeValue"
+                                                Label="Value"
+                                                Variant="Variant.Outlined"
+                                                Margin="Margin.Dense"
+                                                T="int"
+                                                Style="flex: 1" />
+                                <MudSelect @bind-Value="_relativeUnit"
+                                          Label="Unit"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Style="flex: 1">
+                                    <MudSelectItem Value="RelativeTimeUnit.Days">Days</MudSelectItem>
+                                    <MudSelectItem Value="RelativeTimeUnit.Weeks">Weeks</MudSelectItem>
+                                    <MudSelectItem Value="RelativeTimeUnit.Months">Months</MudSelectItem>
+                                    <MudSelectItem Value="RelativeTimeUnit.Years">Years</MudSelectItem>
+                                </MudSelect>
+                            </div>
+                        </div>
+                    }
+                    else if (_temporalType == TemporalFilterType.Before || _temporalType == TemporalFilterType.After)
+                    {
+                        <MudDatePicker @bind-Date="_temporalStartDate"
+                                      Label="Date"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Class="mt-3" />
+                    }
+                    else if (_temporalType == TemporalFilterType.Between)
+                    {
+                        <MudDatePicker @bind-Date="_temporalStartDate"
+                                      Label="Start Date"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Class="mt-3" />
+                        <MudDatePicker @bind-Date="_temporalEndDate"
+                                      Label="End Date"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Class="mt-2" />
+                    }
+
+                    <MudButton Variant="Variant.Filled"
+                              Color="Color.Primary"
+                              OnClick="ApplyTemporalFilter"
+                              Class="mt-3"
+                              FullWidth="true"
+                              StartIcon="@Icons.Material.Filled.DateRange">
+                        Apply Temporal Filter
+                    </MudButton>
+                </div>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
+
+    @* Action Buttons *@
+    @if (ShowApplyButton)
+    {
+        <div class="filter-actions">
+            <MudButton Variant="Variant.Filled"
+                      Color="Color.Primary"
+                      OnClick="ApplyAllFilters"
+                      FullWidth="true">
+                Apply Filters
+            </MudButton>
+            @if (_activeFilters.Any())
+            {
+                <MudButton Variant="Variant.Outlined"
+                          Color="Color.Default"
+                          OnClick="ClearAllFilters"
+                          FullWidth="true"
+                          Class="mt-2">
+                    Reset All
+                </MudButton>
+            }
+        </div>
+    }
+
+    @* Child Content *@
+    @if (ChildContent != null)
+    {
+        @ChildContent
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this filter panel
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"filter-panel-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Title displayed at the top of the panel
+    /// </summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>
+    /// Show spatial filters section
+    /// </summary>
+    [Parameter]
+    public bool ShowSpatial { get; set; } = true;
+
+    /// <summary>
+    /// Show attribute filters section
+    /// </summary>
+    [Parameter]
+    public bool ShowAttribute { get; set; } = true;
+
+    /// <summary>
+    /// Show temporal filters section
+    /// </summary>
+    [Parameter]
+    public bool ShowTemporal { get; set; } = true;
+
+    /// <summary>
+    /// Show apply/reset buttons at the bottom
+    /// </summary>
+    [Parameter]
+    public bool ShowApplyButton { get; set; } = false;
+
+    /// <summary>
+    /// Predefined fields for attribute filtering
+    /// </summary>
+    [Parameter]
+    public List<FilterFieldConfig>? AttributeFields { get; set; }
+
+    /// <summary>
+    /// Default date field for temporal filters
+    /// </summary>
+    [Parameter]
+    public string? DefaultDateField { get; set; }
+
+    /// <summary>
+    /// Additional CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Child content (for custom filter UI)
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Event fired when filters are applied
+    /// </summary>
+    [Parameter]
+    public EventCallback<List<FilterDefinition>> OnFiltersApplied { get; set; }
+
+    /// <summary>
+    /// Event fired when filters are cleared
+    /// </summary>
+    [Parameter]
+    public EventCallback OnFiltersCleared { get; set; }
+
+    // State
+    private List<FilterDefinition> _activeFilters = new();
+    private double[]? _currentExtent;
+
+    // Spatial filter state
+    private bool _spatialExpanded = true;
+    private SpatialFilterType _spatialType = SpatialFilterType.BoundingBox;
+    private double _spatialLongitude = 0;
+    private double _spatialLatitude = 0;
+    private double _spatialRadius = 1000;
+
+    // Attribute filter state
+    private bool _attributeExpanded = false;
+    private string _attributeFieldName = string.Empty;
+    private FilterFieldConfig? _selectedField;
+    private AttributeOperator _attributeOperator = AttributeOperator.Equals;
+    private string _attributeValue = string.Empty;
+    private double _attributeNumberValue = 0;
+    private DateTime? _attributeDateValue;
+    private bool _attributeBoolValue = false;
+    private string _attributeValues = string.Empty;
+
+    // Temporal filter state
+    private bool _temporalExpanded = false;
+    private string _temporalField = string.Empty;
+    private TemporalFilterType _temporalType = TemporalFilterType.Between;
+    private DateTime? _temporalStartDate;
+    private DateTime? _temporalEndDate;
+    private int _relativeValue = 30;
+    private RelativeTimeUnit _relativeUnit = RelativeTimeUnit.Days;
+
+    private readonly List<AttributeOperator> _availableOperators = new()
+    {
+        AttributeOperator.Equals,
+        AttributeOperator.NotEquals,
+        AttributeOperator.GreaterThan,
+        AttributeOperator.LessThan,
+        AttributeOperator.GreaterThanOrEqual,
+        AttributeOperator.LessThanOrEqual,
+        AttributeOperator.Contains,
+        AttributeOperator.StartsWith,
+        AttributeOperator.EndsWith,
+        AttributeOperator.In,
+        AttributeOperator.NotIn,
+        AttributeOperator.IsNull,
+        AttributeOperator.IsNotNull
+    };
+
+    protected override void OnInitialized()
+    {
+        SetupSubscriptions();
+
+        if (!string.IsNullOrEmpty(DefaultDateField))
+        {
+            _temporalField = DefaultDateField;
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Subscribe to map extent changes
+        Bus.Subscribe<MapExtentChangedMessage>(args =>
+        {
+            if (string.IsNullOrEmpty(SyncWith) || args.Message.MapId == SyncWith)
+            {
+                _currentExtent = args.Message.Bounds;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private async Task UseCurrentExtent()
+    {
+        if (_currentExtent == null) return;
+
+        var filter = new SpatialFilter
+        {
+            Label = "Map Extent",
+            SpatialType = SpatialFilterType.BoundingBox,
+            BoundingBox = _currentExtent,
+            IsActive = true
+        };
+
+        await AddFilter(filter);
+    }
+
+    private async Task ApplySpatialFilter()
+    {
+        try
+        {
+            var filter = new SpatialFilter
+            {
+                SpatialType = _spatialType,
+                IsActive = true
+            };
+
+            if (_spatialType == SpatialFilterType.Circle)
+            {
+                filter.Center = new[] { _spatialLongitude, _spatialLatitude };
+                filter.Radius = _spatialRadius;
+                filter.Label = $"Circle ({_spatialRadius}m)";
+            }
+            else if (_spatialType == SpatialFilterType.WithinDistance)
+            {
+                filter.Center = new[] { _spatialLongitude, _spatialLatitude };
+                filter.Distance = _spatialRadius;
+                filter.Label = $"Within {_spatialRadius}m";
+            }
+
+            await AddFilter(filter);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error applying spatial filter: {ex.Message}");
+        }
+    }
+
+    private Task StartDrawPolygon()
+    {
+        // TODO: Implement polygon drawing - would require additional JS interop
+        Console.WriteLine("Polygon drawing not yet implemented");
+        return Task.CompletedTask;
+    }
+
+    private async Task ApplyAttributeFilter()
+    {
+        try
+        {
+            var fieldName = _selectedField?.Field ?? _attributeFieldName;
+            if (string.IsNullOrEmpty(fieldName)) return;
+
+            var filter = new AttributeFilter
+            {
+                Field = fieldName,
+                Label = _selectedField?.Label ?? fieldName,
+                Operator = _attributeOperator,
+                FieldType = _selectedField?.Type ?? MapFieldType.String,
+                IsActive = true
+            };
+
+            // Set value based on operator and field type
+            if (_attributeOperator != AttributeOperator.IsNull && _attributeOperator != AttributeOperator.IsNotNull)
+            {
+                if (_attributeOperator == AttributeOperator.In || _attributeOperator == AttributeOperator.NotIn)
+                {
+                    var values = _attributeValues.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    filter.Values = values.Cast<object>().ToList();
+                }
+                else
+                {
+                    filter.Value = _selectedField?.Type switch
+                    {
+                        MapFieldType.Number => _attributeNumberValue,
+                        MapFieldType.Date => _attributeDateValue?.ToString("o"),
+                        MapFieldType.Boolean => _attributeBoolValue,
+                        _ => _attributeValue
+                    };
+                }
+            }
+
+            await AddFilter(filter);
+
+            // Reset form
+            _attributeValue = string.Empty;
+            _attributeNumberValue = 0;
+            _attributeDateValue = null;
+            _attributeBoolValue = false;
+            _attributeValues = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error applying attribute filter: {ex.Message}");
+        }
+    }
+
+    private async Task ApplyTemporalFilter()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_temporalField)) return;
+
+            var filter = new TemporalFilter
+            {
+                DateField = _temporalField,
+                TemporalType = _temporalType,
+                IsActive = true
+            };
+
+            if (_temporalType == TemporalFilterType.LastN)
+            {
+                filter.RelativeValue = _relativeValue;
+                filter.RelativeUnit = _relativeUnit;
+                filter.Label = $"Last {_relativeValue} {_relativeUnit}";
+            }
+            else if (_temporalType == TemporalFilterType.Before || _temporalType == TemporalFilterType.After)
+            {
+                filter.StartDate = _temporalStartDate;
+                filter.Label = $"{_temporalType} {_temporalStartDate:yyyy-MM-dd}";
+            }
+            else if (_temporalType == TemporalFilterType.Between)
+            {
+                filter.StartDate = _temporalStartDate;
+                filter.EndDate = _temporalEndDate;
+                filter.Label = $"{_temporalStartDate:yyyy-MM-dd} - {_temporalEndDate:yyyy-MM-dd}";
+            }
+
+            await AddFilter(filter);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error applying temporal filter: {ex.Message}");
+        }
+    }
+
+    private void SetRelativeFilter(int value, RelativeTimeUnit unit)
+    {
+        _relativeValue = value;
+        _relativeUnit = unit;
+    }
+
+    private async Task AddFilter(FilterDefinition filter)
+    {
+        // Remove any existing filters of the same type (for spatial and temporal)
+        // Allow multiple attribute filters
+        if (filter.Type != MapFilterType.Attribute)
+        {
+            _activeFilters.RemoveAll(f => f.Type == filter.Type);
+        }
+
+        _activeFilters.Add(filter);
+
+        // Publish filter applied message
+        await Bus.PublishAsync(new FilterAppliedMessage
+        {
+            FilterId = filter.Id,
+            Type = (Honua.MapSDK.Core.Messages.FilterType)(int)filter.Type,
+            Expression = filter.ToExpression()
+        }, Id);
+
+        await OnFiltersApplied.InvokeAsync(_activeFilters);
+    }
+
+    private async Task RemoveFilter(FilterDefinition filter)
+    {
+        _activeFilters.Remove(filter);
+
+        // Publish filter cleared message
+        await Bus.PublishAsync(new FilterClearedMessage
+        {
+            FilterId = filter.Id
+        }, Id);
+
+        StateHasChanged();
+    }
+
+    private async Task ClearAllFilters()
+    {
+        _activeFilters.Clear();
+
+        // Publish all filters cleared message
+        await Bus.PublishAsync(new AllFiltersClearedMessage
+        {
+            Source = Id
+        }, Id);
+
+        await OnFiltersCleared.InvokeAsync();
+    }
+
+    private Task ApplyAllFilters()
+    {
+        // All filters are applied immediately in this implementation
+        // This button can be used for batch apply if needed
+        return Task.CompletedTask;
+    }
+
+    private string GetOperatorLabel(AttributeOperator op)
+    {
+        return op switch
+        {
+            AttributeOperator.Equals => "Equals (=)",
+            AttributeOperator.NotEquals => "Not Equals (≠)",
+            AttributeOperator.GreaterThan => "Greater Than (>)",
+            AttributeOperator.LessThan => "Less Than (<)",
+            AttributeOperator.GreaterThanOrEqual => "Greater Than or Equal (≥)",
+            AttributeOperator.LessThanOrEqual => "Less Than or Equal (≤)",
+            AttributeOperator.Contains => "Contains",
+            AttributeOperator.StartsWith => "Starts With",
+            AttributeOperator.EndsWith => "Ends With",
+            AttributeOperator.In => "In List",
+            AttributeOperator.NotIn => "Not In List",
+            AttributeOperator.IsNull => "Is Null",
+            AttributeOperator.IsNotNull => "Is Not Null",
+            _ => op.ToString()
+        };
+    }
+
+    /// <summary>
+    /// Public API: Get all active filters
+    /// </summary>
+    public List<FilterDefinition> GetActiveFilters() => _activeFilters.ToList();
+
+    /// <summary>
+    /// Public API: Clear all filters
+    /// </summary>
+    public async Task ClearFiltersAsync()
+    {
+        await ClearAllFilters();
+    }
+
+    /// <summary>
+    /// Public API: Add a filter programmatically
+    /// </summary>
+    public async Task AddFilterAsync(FilterDefinition filter)
+    {
+        await AddFilter(filter);
+    }
+}

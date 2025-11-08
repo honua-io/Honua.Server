@@ -1,0 +1,227 @@
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject DataSourceApiClient DataSourceApi
+@inject ISnackbar Snackbar
+
+<MudStack Spacing="4" Class="mt-4">
+    <MudText Typo="Typo.h6">Select a table from the database</MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+        <MudText Align="Align.Center" Color="Color.Secondary">Loading tables...</MudText>
+    }
+    else if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+    }
+    else if (!_tables.Any())
+    {
+        <MudAlert Severity="Severity.Warning">
+            No spatial tables found in this data source. Make sure your database has tables with geometry columns.
+        </MudAlert>
+    }
+    else
+    {
+        <MudTextField @bind-Value="_searchTerm"
+                      Label="Search Tables"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" />
+
+        <MudTable Items="@FilteredTables"
+                  Hover="true"
+                  Breakpoint="Breakpoint.Sm"
+                  Dense="true"
+                  SelectedItemChanged="OnTableSelected">
+            <HeaderContent>
+                <MudTh>Schema.Table</MudTh>
+                <MudTh>Geometry</MudTh>
+                <MudTh>SRID</MudTh>
+                <MudTh>Rows</MudTh>
+                <MudTh>Columns</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Table">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.TableChart" Color="Color.Primary" Size="Size.Small" />
+                        <MudText><b>@context.Schema.@context.Table</b></MudText>
+                    </MudStack>
+                </MudTd>
+                <MudTd DataLabel="Geometry">
+                    @if (!string.IsNullOrEmpty(context.GeometryColumn))
+                    {
+                        <MudChip Size="Size.Small" Color="@GetGeometryTypeColor(context.GeometryType)" Variant="Variant.Outlined">
+                            @context.GeometryType
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">No geometry</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="SRID">
+                    @if (context.Srid.HasValue)
+                    {
+                        <MudText Typo="Typo.caption">@context.Srid</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Rows">
+                    @if (context.RowCount.HasValue)
+                    {
+                        <MudText Typo="Typo.caption">@context.RowCount.Value.ToString("N0")</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Columns">
+                    <MudText Typo="Typo.caption">@context.Columns.Count</MudText>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        @if (_selectedTable != null)
+        {
+            <MudPaper Outlined="true" Class="pa-4 mt-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-3">Table Preview: @_selectedTable.Schema.@_selectedTable.Table</MudText>
+
+                <MudSimpleTable Dense="true" Hover="true">
+                    <thead>
+                        <tr>
+                            <th>Column</th>
+                            <th>Type</th>
+                            <th>Nullable</th>
+                            <th>Primary Key</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var column in _selectedTable.Columns.Take(10))
+                        {
+                            <tr>
+                                <td>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        @if (column.Name == _selectedTable.GeometryColumn)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Place" Color="Color.Primary" Size="Size.Small" />
+                                        }
+                                        @if (column.IsPrimaryKey)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Key" Color="Color.Warning" Size="Size.Small" />
+                                        }
+                                        <MudText>@column.Name</MudText>
+                                    </MudStack>
+                                </td>
+                                <td><code>@column.DataType</code></td>
+                                <td>
+                                    @if (column.IsNullable)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                    }
+                                </td>
+                                <td>
+                                    @if (column.IsPrimaryKey)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Primary" Size="Size.Small" />
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @if (_selectedTable.Columns.Count > 10)
+                        {
+                            <tr>
+                                <td colspan="4">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        ... and @(_selectedTable.Columns.Count - 10) more columns
+                                    </MudText>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+        }
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public string? DataSourceId { get; set; }
+
+    [Parameter]
+    public EventCallback<TableInfo> OnTableSelected { get; set; }
+
+    private List<TableInfo> _tables = new();
+    private TableInfo? _selectedTable;
+    private string _searchTerm = string.Empty;
+    private bool _loading;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(DataSourceId))
+        {
+            await LoadTablesAsync();
+        }
+    }
+
+    private async Task LoadTablesAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+        _tables.Clear();
+
+        try
+        {
+            _tables = await DataSourceApi.GetTablesAsync(DataSourceId!);
+
+            if (!_tables.Any())
+            {
+                _errorMessage = "No spatial tables found in this data source";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading tables: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IEnumerable<TableInfo> FilteredTables
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_searchTerm))
+                return _tables;
+
+            var search = _searchTerm.ToLowerInvariant();
+            return _tables.Where(t =>
+                t.Table.ToLowerInvariant().Contains(search) ||
+                t.Schema.ToLowerInvariant().Contains(search));
+        }
+    }
+
+    private async Task OnTableSelected(TableInfo? table)
+    {
+        _selectedTable = table;
+
+        if (table != null && OnTableSelected.HasDelegate)
+        {
+            await OnTableSelected.InvokeAsync(table);
+        }
+    }
+
+    private Color GetGeometryTypeColor(string? geometryType)
+    {
+        return geometryType?.ToUpperInvariant() switch
+        {
+            "POINT" or "MULTIPOINT" => Color.Primary,
+            "LINESTRING" or "MULTILINESTRING" => Color.Info,
+            "POLYGON" or "MULTIPOLYGON" => Color.Success,
+            "GEOMETRY" or "GEOMETRYCOLLECTION" => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+}

@@ -1,0 +1,80 @@
+{
+  "id": "batch-geopackage-to-postgis",
+  "name": "Batch GeoPackage to PostGIS",
+  "description": "Import multiple GeoPackage layers into PostGIS database tables. Efficient batch loading for multi-layer datasets.",
+  "category": "Data Import/Export",
+  "icon": "database",
+  "difficulty": 1,
+  "estimatedMinutes": 5,
+  "tags": ["batch", "geopackage", "postgis", "import"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "GeoPackage file with multiple layers",
+    "PostGIS connection configured"
+  ],
+  "expectedOutputs": [
+    "Multiple PostGIS tables"
+  ],
+  "useCases": [
+    "Loading comprehensive datasets with multiple layers",
+    "Migrating from GeoPackage to PostGIS",
+    "Importing survey data with various feature types"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "geopackage_source",
+      "name": "Read GeoPackage",
+      "description": "Load features from GeoPackage",
+      "parameters": {
+        "filePath": "/data/input/dataset.gpkg",
+        "layerName": "layer1"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Write to PostGIS",
+      "description": "Store in PostGIS database",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "imported_layer",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true,
+        "overwrite": false
+      },
+      "position": {
+        "x": 400,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "inputPath": {
+      "name": "inputPath",
+      "type": "string",
+      "description": "Input GeoPackage file path",
+      "defaultValue": "/data/input/dataset.gpkg",
+      "required": true
+    },
+    "schemaName": {
+      "name": "schemaName",
+      "type": "string",
+      "description": "Target PostGIS schema",
+      "defaultValue": "public",
+      "required": true
+    }
+  }
+}

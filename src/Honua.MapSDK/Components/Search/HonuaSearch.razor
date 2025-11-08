@@ -1,0 +1,662 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Services.Geocoding
+@using Microsoft.JSInterop
+@using GeocodingSearchResult = Honua.MapSDK.Services.Geocoding.SearchResult
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-search @CssClass @GetPositionClass()" style="@GetContainerStyle()">
+    <div class="search-container">
+        @if (ShowLocateButton)
+        {
+            <MudTooltip Text="Use my location">
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.MyLocation"
+                    Color="Color.Primary"
+                    Size="Size.Small"
+                    OnClick="@OnLocateMeClicked"
+                    Disabled="@(!_mapReady || _isLocating)"
+                    Class="locate-button"
+                    aria-label="Use my location" />
+            </MudTooltip>
+        }
+
+        <MudAutocomplete T="GeocodingSearchResult"
+                         Value="@_selectedResult"
+                         SearchFunc="@SearchAsync"
+                         ToStringFunc="@(r => r?.DisplayName ?? "")"
+                         Placeholder="@Placeholder"
+                         Variant="@Variant"
+                         Dense="@Dense"
+                         Clearable="true"
+                         ResetValueOnEmptyText="true"
+                         CoerceText="false"
+                         CoerceValue="false"
+                         MinCharacters="@MinSearchLength"
+                         DebounceInterval="@DebounceInterval"
+                         MaxItems="@MaxResults"
+                         ShowProgressIndicator="true"
+                         ProgressIndicatorColor="Color.Primary"
+                         AdornmentIcon="@Icons.Material.Filled.Search"
+                         AdornmentColor="Color.Primary"
+                         ValueChanged="@HandleResultSelected"
+                         Class="search-autocomplete"
+                         aria-label="@Placeholder">
+            <ItemTemplate Context="result">
+                <div class="search-result-item">
+                    <div class="result-icon">
+                        <MudIcon Icon="@GetCategoryIcon(result.Category)" Size="Size.Small" Color="Color.Primary" />
+                    </div>
+                    <div class="result-content">
+                        <div class="result-name">@result.DisplayName</div>
+                        <div class="result-details">
+                            @if (!string.IsNullOrEmpty(result.Type))
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="result-type-chip">
+                                    @result.Type
+                                </MudChip>
+                            }
+                            @if (!string.IsNullOrEmpty(result.City) || !string.IsNullOrEmpty(result.Country))
+                            {
+                                <span class="result-location">
+                                    @GetLocationText(result)
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </ItemTemplate>
+            <NoItemsTemplate>
+                <div class="no-results">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Small" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">No results found</MudText>
+                </div>
+            </NoItemsTemplate>
+        </MudAutocomplete>
+    </div>
+
+    @if (ShowRecentSearches && _recentSearches.Count > 0 && !_hideRecent)
+    {
+        <div class="recent-searches">
+            <div class="recent-header">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Recent Searches</MudText>
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.Clear"
+                    Size="Size.Small"
+                    OnClick="@ClearRecentSearches"
+                    aria-label="Clear recent searches" />
+            </div>
+            <div class="recent-list">
+                @foreach (var recent in _recentSearches.Take(5))
+                {
+                    <div class="recent-item" @onclick="@(() => OnRecentSearchClicked(recent))">
+                        <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" Color="Color.Secondary" />
+                        <div class="recent-content">
+                            <div class="recent-name">@recent.DisplayName</div>
+                            <div class="recent-time">@GetRelativeTime(recent.Timestamp)</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_errorMessage != null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="search-error" CloseIconClicked="@(() => _errorMessage = null)">
+            @_errorMessage
+        </MudAlert>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the search component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"search-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Geocoding provider to use
+    /// </summary>
+    [Parameter]
+    public GeocodeProvider Provider { get; set; } = GeocodeProvider.Nominatim;
+
+    /// <summary>
+    /// API key for geocoding provider (required for Mapbox, Google)
+    /// </summary>
+    [Parameter]
+    public string? ApiKey { get; set; }
+
+    /// <summary>
+    /// Custom geocoding provider (for GeocodeProvider.Custom)
+    /// </summary>
+    [Parameter]
+    public IGeocoder? CustomGeocoder { get; set; }
+
+    /// <summary>
+    /// Placeholder text for search input
+    /// </summary>
+    [Parameter]
+    public string Placeholder { get; set; } = "Search for a location...";
+
+    /// <summary>
+    /// Position on the map: top-right, top-left, bottom-right, bottom-left, or null for embedded
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; }
+
+    /// <summary>
+    /// Width of search component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "350px";
+
+    /// <summary>
+    /// Variant for the autocomplete input
+    /// </summary>
+    [Parameter]
+    public Variant Variant { get; set; } = Variant.Outlined;
+
+    /// <summary>
+    /// Dense mode for compact display
+    /// </summary>
+    [Parameter]
+    public bool Dense { get; set; } = false;
+
+    /// <summary>
+    /// Minimum number of characters before search begins
+    /// </summary>
+    [Parameter]
+    public int MinSearchLength { get; set; } = 2;
+
+    /// <summary>
+    /// Debounce interval in milliseconds
+    /// </summary>
+    [Parameter]
+    public int DebounceInterval { get; set; } = 300;
+
+    /// <summary>
+    /// Maximum number of results to display
+    /// </summary>
+    [Parameter]
+    public int MaxResults { get; set; } = 10;
+
+    /// <summary>
+    /// Show recent searches
+    /// </summary>
+    [Parameter]
+    public bool ShowRecentSearches { get; set; } = true;
+
+    /// <summary>
+    /// Show "Locate Me" button for geolocation
+    /// </summary>
+    [Parameter]
+    public bool ShowLocateButton { get; set; } = true;
+
+    /// <summary>
+    /// Enable reverse geocoding when using geolocation
+    /// </summary>
+    [Parameter]
+    public bool ReverseGeocodeOnLocate { get; set; } = true;
+
+    /// <summary>
+    /// Zoom level when flying to selected result
+    /// </summary>
+    [Parameter]
+    public double DefaultZoom { get; set; } = 14;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Event callback when search result is selected
+    /// </summary>
+    [Parameter]
+    public EventCallback<GeocodingSearchResult> OnResultSelected { get; set; }
+
+    /// <summary>
+    /// Event callback when geolocation is successful
+    /// </summary>
+    [Parameter]
+    public EventCallback<(double Latitude, double Longitude)> OnLocationFound { get; set; }
+
+    private IGeocoder? _geocoder;
+    private HttpClient? _httpClient;
+    private GeocodingSearchResult? _selectedResult;
+    private List<RecentSearch> _recentSearches = new();
+    private bool _mapReady = false;
+    private bool _isLocating = false;
+    private bool _hideRecent = false;
+    private string? _errorMessage;
+    private IJSObjectReference? _jsModule;
+    private const string RecentSearchesKey = "honua-search-recent";
+
+    protected override async Task OnInitializedAsync()
+    {
+        InitializeGeocoder();
+        await LoadRecentSearches();
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-search.js"
+                );
+
+                // Load recent searches after JS module is loaded
+                await LoadRecentSearchesFromStorage();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading search JS module: {ex.Message}");
+            }
+        }
+    }
+
+    private void InitializeGeocoder()
+    {
+        _httpClient = new HttpClient();
+
+        _geocoder = Provider switch
+        {
+            GeocodeProvider.Nominatim => new NominatimGeocoder(_httpClient),
+            GeocodeProvider.Mapbox when !string.IsNullOrWhiteSpace(ApiKey) =>
+                new MapboxGeocoder(_httpClient, ApiKey),
+            GeocodeProvider.Custom when CustomGeocoder != null => CustomGeocoder,
+            _ => new NominatimGeocoder(_httpClient) // Default to Nominatim
+        };
+
+        if (_geocoder == null)
+        {
+            _errorMessage = "Failed to initialize geocoding provider. Using default provider.";
+            _geocoder = new NominatimGeocoder(_httpClient);
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private async Task<IEnumerable<GeocodingSearchResult>> SearchAsync(string searchText, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(searchText) || searchText.Length < MinSearchLength)
+        {
+            return Enumerable.Empty<GeocodingSearchResult>();
+        }
+
+        _hideRecent = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (_geocoder == null)
+            {
+                return Enumerable.Empty<GeocodingSearchResult>();
+            }
+
+            var results = await _geocoder.SearchAsync(searchText, MaxResults);
+            return results ?? Enumerable.Empty<GeocodingSearchResult>();
+        }
+        catch (GeocodingException ex)
+        {
+            _errorMessage = ex.Message;
+            return Enumerable.Empty<GeocodingSearchResult>();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "An error occurred while searching. Please try again.";
+            Console.Error.WriteLine($"Search error: {ex.Message}");
+            return Enumerable.Empty<GeocodingSearchResult>();
+        }
+    }
+
+    private async Task HandleResultSelected(GeocodingSearchResult? result)
+    {
+        if (result == null) return;
+
+        _hideRecent = false;
+        _errorMessage = null;
+
+        try
+        {
+            // Add to recent searches
+            await AddToRecentSearches(result);
+
+            // Publish search result selected message
+            await Bus.PublishAsync(new SearchResultSelectedMessage
+            {
+                SearchId = Id,
+                DisplayName = result.DisplayName,
+                Latitude = result.Latitude,
+                Longitude = result.Longitude,
+                BoundingBox = result.BoundingBox,
+                Type = result.Type,
+                Metadata = result.Metadata
+            }, Id);
+
+            // Fly to result on map
+            var targetMapId = SyncWith ?? "*";
+
+            if (result.BoundingBox != null && result.BoundingBox.Length >= 4)
+            {
+                // Use bounding box for better framing
+                await Bus.PublishAsync(new FitBoundsRequestMessage
+                {
+                    MapId = targetMapId,
+                    Bounds = result.BoundingBox,
+                    Padding = 50
+                }, Id);
+            }
+            else
+            {
+                // Fly to point
+                await Bus.PublishAsync(new FlyToRequestMessage
+                {
+                    MapId = targetMapId,
+                    Center = new[] { result.Longitude, result.Latitude },
+                    Zoom = DefaultZoom,
+                    Duration = 1500
+                }, Id);
+            }
+
+            // Invoke callback
+            await OnResultSelected.InvokeAsync(result);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Failed to navigate to location.";
+            Console.Error.WriteLine($"Error selecting result: {ex.Message}");
+        }
+    }
+
+    private async Task OnLocateMeClicked()
+    {
+        if (_isLocating || !_mapReady) return;
+
+        _isLocating = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            if (_jsModule == null)
+            {
+                throw new Exception("JavaScript module not loaded");
+            }
+
+            // Get user's location from browser
+            var location = await _jsModule.InvokeAsync<double[]>("getCurrentPosition");
+
+            if (location == null || location.Length < 2)
+            {
+                throw new Exception("Failed to get location");
+            }
+
+            var lat = location[0];
+            var lon = location[1];
+
+            // Fly to user's location
+            var targetMapId = SyncWith ?? "*";
+            await Bus.PublishAsync(new FlyToRequestMessage
+            {
+                MapId = targetMapId,
+                Center = new[] { lon, lat },
+                Zoom = 15,
+                Duration = 1500
+            }, Id);
+
+            // Optionally reverse geocode to show address
+            if (ReverseGeocodeOnLocate && _geocoder != null)
+            {
+                try
+                {
+                    var result = await _geocoder.ReverseGeocodeAsync(lat, lon);
+                    if (result != null)
+                    {
+                        _selectedResult = result;
+                        await AddToRecentSearches(result);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Reverse geocoding failed: {ex.Message}");
+                }
+            }
+
+            // Invoke callback
+            await OnLocationFound.InvokeAsync((lat, lon));
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Unable to get your location. Please check browser permissions.";
+            Console.Error.WriteLine($"Geolocation error: {ex.Message}");
+        }
+        finally
+        {
+            _isLocating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnRecentSearchClicked(RecentSearch recent)
+    {
+        var result = new GeocodingSearchResult
+        {
+            Id = recent.Id,
+            DisplayName = recent.DisplayName,
+            Latitude = recent.Latitude,
+            Longitude = recent.Longitude,
+            BoundingBox = recent.BoundingBox,
+            Type = recent.Type
+        };
+
+        _selectedResult = result;
+        await HandleResultSelected(result);
+    }
+
+    private async Task AddToRecentSearches(GeocodingSearchResult result)
+    {
+        var recent = new RecentSearch
+        {
+            Id = result.Id,
+            DisplayName = result.DisplayName,
+            Latitude = result.Latitude,
+            Longitude = result.Longitude,
+            BoundingBox = result.BoundingBox,
+            Type = result.Type,
+            Timestamp = DateTime.UtcNow
+        };
+
+        // Remove if already exists
+        _recentSearches.RemoveAll(r => r.DisplayName == recent.DisplayName);
+
+        // Add to front
+        _recentSearches.Insert(0, recent);
+
+        // Keep only last 10
+        if (_recentSearches.Count > 10)
+        {
+            _recentSearches = _recentSearches.Take(10).ToList();
+        }
+
+        await SaveRecentSearches();
+    }
+
+    private async Task LoadRecentSearches()
+    {
+        // Note: This will be called from OnAfterRenderAsync when JS module is loaded
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadRecentSearchesFromStorage()
+    {
+        try
+        {
+            if (_jsModule != null)
+            {
+                var json = await _jsModule.InvokeAsync<string>("getLocalStorage", RecentSearchesKey);
+                if (!string.IsNullOrEmpty(json))
+                {
+                    var saved = System.Text.Json.JsonSerializer.Deserialize<List<RecentSearch>>(json);
+                    if (saved != null)
+                    {
+                        _recentSearches = saved;
+                        StateHasChanged();
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading recent searches: {ex.Message}");
+        }
+    }
+
+    private async Task SaveRecentSearches()
+    {
+        try
+        {
+            if (_jsModule != null)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(_recentSearches);
+                await _jsModule.InvokeVoidAsync("setLocalStorage", RecentSearchesKey, json);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error saving recent searches: {ex.Message}");
+        }
+    }
+
+    private async Task ClearRecentSearches()
+    {
+        _recentSearches.Clear();
+        await SaveRecentSearches();
+        StateHasChanged();
+    }
+
+    private string GetCategoryIcon(SearchResultCategory category)
+    {
+        return category switch
+        {
+            SearchResultCategory.City => Icons.Material.Filled.LocationCity,
+            SearchResultCategory.Town => Icons.Material.Filled.LocationCity,
+            SearchResultCategory.Village => Icons.Material.Filled.Home,
+            SearchResultCategory.Street => Icons.Material.Filled.Route,
+            SearchResultCategory.Building => Icons.Material.Filled.Apartment,
+            SearchResultCategory.PointOfInterest => Icons.Material.Filled.Place,
+            SearchResultCategory.Park => Icons.Material.Filled.Park,
+            SearchResultCategory.Water => Icons.Material.Filled.Water,
+            SearchResultCategory.Mountain => Icons.Material.Filled.Terrain,
+            SearchResultCategory.Administrative => Icons.Material.Filled.Public,
+            SearchResultCategory.Transportation => Icons.Material.Filled.DirectionsBus,
+            SearchResultCategory.Restaurant => Icons.Material.Filled.Restaurant,
+            SearchResultCategory.Hotel => Icons.Material.Filled.Hotel,
+            SearchResultCategory.Shop => Icons.Material.Filled.ShoppingCart,
+            _ => Icons.Material.Filled.LocationOn
+        };
+    }
+
+    private string GetLocationText(GeocodingSearchResult result)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(result.City)) parts.Add(result.City);
+        if (!string.IsNullOrEmpty(result.State)) parts.Add(result.State);
+        if (!string.IsNullOrEmpty(result.Country)) parts.Add(result.Country);
+        return string.Join(", ", parts);
+    }
+
+    private string GetRelativeTime(DateTime timestamp)
+    {
+        var timeSpan = DateTime.UtcNow - timestamp;
+
+        if (timeSpan.TotalMinutes < 1)
+            return "Just now";
+        if (timeSpan.TotalMinutes < 60)
+            return $"{(int)timeSpan.TotalMinutes}m ago";
+        if (timeSpan.TotalHours < 24)
+            return $"{(int)timeSpan.TotalHours}h ago";
+        if (timeSpan.TotalDays < 7)
+            return $"{(int)timeSpan.TotalDays}d ago";
+
+        return timestamp.ToString("MMM d");
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "search-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "search-floating search-top-right",
+            "top-left" => "search-floating search-top-left",
+            "bottom-right" => "search-floating search-bottom-right",
+            "bottom-left" => "search-floating search-bottom-left",
+            _ => "search-embedded"
+        };
+    }
+
+    private string GetContainerStyle()
+    {
+        var styles = new List<string>();
+
+        if (!string.IsNullOrEmpty(Width))
+        {
+            styles.Add($"width: {Width}");
+        }
+
+        return string.Join("; ", styles);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+
+        _httpClient?.Dispose();
+    }
+
+    /// <summary>
+    /// Recent search item for localStorage
+    /// </summary>
+    private class RecentSearch
+    {
+        public string Id { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double[]? BoundingBox { get; set; }
+        public string? Type { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+}

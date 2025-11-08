@@ -14,18 +14,21 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
     private readonly IGeofenceRepository _geofenceRepository;
     private readonly IEntityStateRepository _entityStateRepository;
     private readonly IGeofenceEventRepository _eventRepository;
+    private readonly IGeofenceToAlertBridgeService? _alertBridgeService;
     private readonly ILogger<GeofenceEvaluationService> _logger;
 
     public GeofenceEvaluationService(
         IGeofenceRepository geofenceRepository,
         IEntityStateRepository entityStateRepository,
         IGeofenceEventRepository eventRepository,
-        ILogger<GeofenceEvaluationService> logger)
+        ILogger<GeofenceEvaluationService> logger,
+        IGeofenceToAlertBridgeService? alertBridgeService = null)
     {
         _geofenceRepository = geofenceRepository ?? throw new ArgumentNullException(nameof(geofenceRepository));
         _entityStateRepository = entityStateRepository ?? throw new ArgumentNullException(nameof(entityStateRepository));
         _eventRepository = eventRepository ?? throw new ArgumentNullException(nameof(eventRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _alertBridgeService = alertBridgeService; // Optional - allows gradual rollout
     }
 
     public async Task<GeofenceEvaluationResult> EvaluateLocationAsync(
@@ -129,6 +132,13 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
             }
 
             // Generate EXIT events
+            // Batch query all exit geofences to avoid N+1 problem
+            var exitGeofences = exitGeofenceIds.Any()
+                ? await _geofenceRepository.GetByIdsAsync(exitGeofenceIds, tenantId, cancellationToken)
+                : new List<Geofence>();
+
+            var exitGeofenceMap = exitGeofences.ToDictionary(g => g.Id);
+
             foreach (var exitGeofenceId in exitGeofenceIds)
             {
                 var previousState = currentStates.FirstOrDefault(s => s.GeofenceId == exitGeofenceId);
@@ -137,13 +147,9 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
                     continue;
                 }
 
-                // Get geofence details (we need name for the event)
-                var geofence = await _geofenceRepository.GetByIdAsync(
-                    exitGeofenceId,
-                    tenantId,
-                    cancellationToken);
-
-                if (geofence == null || !geofence.EnabledEventTypes.HasFlag(GeofenceEventTypes.Exit))
+                // Get geofence details from batch query result
+                if (!exitGeofenceMap.TryGetValue(exitGeofenceId, out var geofence) ||
+                    !geofence.EnabledEventTypes.HasFlag(GeofenceEventTypes.Exit))
                 {
                     continue;
                 }
@@ -210,6 +216,34 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
             if (events.Any())
             {
                 await _eventRepository.CreateBatchAsync(events, cancellationToken);
+
+                // 7. Process events for alert generation (if bridge service is configured)
+                if (_alertBridgeService != null)
+                {
+                    foreach (var geofenceEvent in events)
+                    {
+                        try
+                        {
+                            // Process each event asynchronously for alert generation
+                            // We don't await here to avoid blocking the evaluation response
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    await _alertBridgeService.ProcessGeofenceEventAsync(geofenceEvent, CancellationToken.None);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Error processing geofence event {EventId} for alerts", geofenceEvent.Id);
+                                }
+                            }, CancellationToken.None);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to queue alert processing for event {EventId}", geofenceEvent.Id);
+                        }
+                    }
+                }
             }
 
             stopwatch.Stop();

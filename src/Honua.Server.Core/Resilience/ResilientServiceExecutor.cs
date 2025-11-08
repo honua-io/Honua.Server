@@ -30,6 +30,10 @@ public sealed class ResilientServiceExecutor
         string operationName,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(primary);
+        ArgumentNullException.ThrowIfNull(fallback);
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationName);
+
         try
         {
             var result = await primary(cancellationToken).ConfigureAwait(false);
@@ -62,6 +66,9 @@ public sealed class ResilientServiceExecutor
         string operationName,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(primary);
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationName);
+
         try
         {
             var result = await primary(cancellationToken).ConfigureAwait(false);
@@ -91,6 +98,10 @@ public sealed class ResilientServiceExecutor
         string operationName,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(primary);
+        ArgumentNullException.ThrowIfNull(fallbacks);
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationName);
+
         try
         {
             var result = await primary(cancellationToken).ConfigureAwait(false);

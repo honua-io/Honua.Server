@@ -1,0 +1,96 @@
+{
+  "id": "convex-hull-generation",
+  "name": "Convex Hull Generation",
+  "description": "Generate convex hulls (minimum bounding polygons) around point clusters. Perfect for outlining groups of points.",
+  "category": "Geometry Processing",
+  "icon": "hexagon",
+  "difficulty": 0,
+  "estimatedMinutes": 2,
+  "tags": ["convex-hull", "envelope", "boundary", "clustering"],
+  "author": "HonuaIO",
+  "version": "1.0",
+  "inputRequirements": [
+    "Point or multipoint features"
+  ],
+  "expectedOutputs": [
+    "Convex hull polygons"
+  ],
+  "useCases": [
+    "Creating extent polygons for point distributions",
+    "Outlining service areas from facility points",
+    "Defining approximate boundaries from sparse data"
+  ],
+  "nodes": [
+    {
+      "id": "source_1",
+      "type": "postgis_source",
+      "name": "Load Points",
+      "description": "Read point features",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "points",
+        "schemaName": "public"
+      },
+      "position": {
+        "x": 100,
+        "y": 100
+      }
+    },
+    {
+      "id": "geo_1",
+      "type": "convex_hull",
+      "name": "Generate Hulls",
+      "description": "Create convex hulls",
+      "parameters": {
+        "groupBy": null
+      },
+      "position": {
+        "x": 300,
+        "y": 100
+      }
+    },
+    {
+      "id": "sink_1",
+      "type": "postgis_sink",
+      "name": "Save Hulls",
+      "description": "Store convex hulls",
+      "parameters": {
+        "connectionString": "Host=localhost;Database=gis;Username=gis;Password=gis",
+        "tableName": "convex_hulls",
+        "schemaName": "public",
+        "srid": 4326,
+        "createTable": true
+      },
+      "position": {
+        "x": 500,
+        "y": 100
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_1",
+      "to": "geo_1"
+    },
+    {
+      "from": "geo_1",
+      "to": "sink_1"
+    }
+  ],
+  "parameters": {
+    "sourceTable": {
+      "name": "sourceTable",
+      "type": "string",
+      "description": "Input points table",
+      "defaultValue": "points",
+      "required": true
+    },
+    "outputTable": {
+      "name": "outputTable",
+      "type": "string",
+      "description": "Output hulls table",
+      "defaultValue": "convex_hulls",
+      "required": true
+    }
+  }
+}

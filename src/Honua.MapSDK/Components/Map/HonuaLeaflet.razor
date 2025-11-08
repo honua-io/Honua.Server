@@ -1,0 +1,457 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-map honua-leaflet @CssClass" @ref="_mapContainer" id="@Id" style="@Style">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = $"leaflet-map-{Guid.NewGuid():N}";
+
+    [Parameter]
+    public string? TileUrl { get; set; }
+
+    [Parameter]
+    public string Attribution { get; set; } = "&copy; OpenStreetMap contributors";
+
+    [Parameter]
+    public double[] Center { get; set; } = new[] { 0.0, 0.0 };
+
+    [Parameter]
+    public double Zoom { get; set; } = 2;
+
+    [Parameter]
+    public double[]? MaxBounds { get; set; }
+
+    [Parameter]
+    public double? MinZoom { get; set; }
+
+    [Parameter]
+    public double? MaxZoom { get; set; }
+
+    [Parameter]
+    public bool EnableFullscreen { get; set; } = true;
+
+    [Parameter]
+    public bool EnableMeasure { get; set; } = false;
+
+    [Parameter]
+    public bool EnableDraw { get; set; } = false;
+
+    [Parameter]
+    public bool EnableMarkerCluster { get; set; } = false;
+
+    [Parameter]
+    public int MaxClusterRadius { get; set; } = 80;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    [Parameter]
+    public string Style { get; set; } = "width: 100%; height: 100%;";
+
+    [Parameter]
+    public EventCallback<MapReadyMessage> OnMapReady { get; set; }
+
+    [Parameter]
+    public EventCallback<MapExtentChangedMessage> OnExtentChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<FeatureClickedMessage> OnFeatureClicked { get; set; }
+
+    [Parameter]
+    public EventCallback<Dictionary<string, object>> OnDrawCreated { get; set; }
+
+    [Parameter]
+    public EventCallback<Dictionary<string, object>> OnMeasureComplete { get; set; }
+
+    private ElementReference _mapContainer;
+    private IJSObjectReference? _leafletModule;
+    private IJSObjectReference? _mapInstance;
+    private DotNetObjectReference<HonuaLeaflet>? _dotNetRef;
+    private bool _isInitialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeMap();
+            SetupSubscriptions();
+        }
+    }
+
+    private async Task InitializeMap()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load Leaflet interop module
+            _leafletModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/leaflet-interop.js"
+            );
+
+            // Create map instance
+            _mapInstance = await _leafletModule.InvokeAsync<IJSObjectReference>(
+                "createLeafletMap",
+                _mapContainer,
+                new
+                {
+                    id = Id,
+                    tileUrl = TileUrl ?? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    attribution = Attribution,
+                    center = new[] { Center[1], Center[0] }, // Leaflet uses lat, lng
+                    zoom = Zoom,
+                    maxBounds = MaxBounds != null ? new[] {
+                        new[] { MaxBounds[1], MaxBounds[0] },
+                        new[] { MaxBounds[3], MaxBounds[2] }
+                    } : null,
+                    minZoom = MinZoom,
+                    maxZoom = MaxZoom,
+                    enableFullscreen = EnableFullscreen,
+                    enableMeasure = EnableMeasure,
+                    enableDraw = EnableDraw,
+                    enableMarkerCluster = EnableMarkerCluster,
+                    maxClusterRadius = MaxClusterRadius
+                },
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+
+            // Publish map ready message
+            var readyMessage = new MapReadyMessage
+            {
+                MapId = Id,
+                Center = Center,
+                Zoom = Zoom
+            };
+
+            await Bus.PublishAsync(readyMessage, Id);
+            await OnMapReady.InvokeAsync(readyMessage);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing Leaflet map: {ex.Message}");
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for fly-to requests
+        Bus.Subscribe<FlyToRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == Id && _mapInstance != null)
+            {
+                await _mapInstance.InvokeVoidAsync("flyTo", new
+                {
+                    center = new[] { args.Message.Center[1], args.Message.Center[0] }, // lat, lng
+                    zoom = args.Message.Zoom,
+                    duration = args.Message.Duration
+                });
+            }
+        });
+
+        // Listen for fit bounds requests
+        Bus.Subscribe<FitBoundsRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == Id && _mapInstance != null)
+            {
+                await _mapInstance.InvokeVoidAsync("fitBounds",
+                    new[] {
+                        new[] { args.Message.Bounds[1], args.Message.Bounds[0] },
+                        new[] { args.Message.Bounds[3], args.Message.Bounds[2] }
+                    },
+                    args.Message.Padding
+                );
+            }
+        });
+
+        // Listen for basemap changes
+        Bus.Subscribe<BasemapChangedMessage>(async args =>
+        {
+            if (args.Message.MapId == Id && _mapInstance != null && !string.IsNullOrEmpty(args.Message.TileUrl))
+            {
+                await _mapInstance.InvokeVoidAsync("setTileLayer", args.Message.TileUrl, args.Message.Attribution ?? Attribution);
+            }
+        });
+
+        // Listen for layer visibility changes
+        Bus.Subscribe<LayerVisibilityChangedMessage>(async args =>
+        {
+            if (_mapInstance != null)
+            {
+                await _mapInstance.InvokeVoidAsync("setLayerVisibility",
+                    args.Message.LayerId,
+                    args.Message.Visible
+                );
+            }
+        });
+
+        // Listen for layer opacity changes
+        Bus.Subscribe<LayerOpacityChangedMessage>(async args =>
+        {
+            if (_mapInstance != null)
+            {
+                await _mapInstance.InvokeVoidAsync("setLayerOpacity",
+                    args.Message.LayerId,
+                    args.Message.Opacity
+                );
+            }
+        });
+
+        // Listen for data row selection (highlight on map)
+        Bus.Subscribe<DataRowSelectedMessage>(async args =>
+        {
+            if (_mapInstance != null && args.Message.Geometry != null)
+            {
+                await HighlightFeature(args.Message.RowId, args.Message.Geometry);
+            }
+        });
+
+        // Listen for highlight requests
+        Bus.Subscribe<HighlightFeaturesRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == Id && _mapInstance != null)
+            {
+                await _mapInstance.InvokeVoidAsync("highlightFeatures",
+                    args.Message.FeatureIds,
+                    args.Message.LayerId
+                );
+            }
+        });
+
+        // Listen for clear highlights
+        Bus.Subscribe<ClearHighlightsRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == Id && _mapInstance != null)
+            {
+                await _mapInstance.InvokeVoidAsync("clearHighlights");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Called from JavaScript when map extent changes
+    /// </summary>
+    [JSInvokable]
+    public async Task OnExtentChangedInternal(double[] bounds, double zoom, double[] center)
+    {
+        var message = new MapExtentChangedMessage
+        {
+            MapId = Id,
+            Bounds = new[] { bounds[1], bounds[0], bounds[3], bounds[2] }, // Convert to lng, lat format
+            Zoom = zoom,
+            Center = new[] { center[1], center[0] }, // Convert to lng, lat format
+            Bearing = 0,
+            Pitch = 0
+        };
+
+        await Bus.PublishAsync(message, Id);
+        await OnExtentChanged.InvokeAsync(message);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when feature is clicked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureClickedInternal(string layerId, string featureId, Dictionary<string, object> properties, object? geometry)
+    {
+        var message = new FeatureClickedMessage
+        {
+            MapId = Id,
+            LayerId = layerId,
+            FeatureId = featureId,
+            Properties = properties,
+            Geometry = geometry
+        };
+
+        await Bus.PublishAsync(message, Id);
+        await OnFeatureClicked.InvokeAsync(message);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when feature is hovered
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureHoveredInternal(string? featureId, string? layerId, Dictionary<string, object>? properties)
+    {
+        await Bus.PublishAsync(new FeatureHoveredMessage
+        {
+            MapId = Id,
+            FeatureId = featureId,
+            LayerId = layerId,
+            Properties = properties
+        }, Id);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when drawing is completed
+    /// </summary>
+    [JSInvokable]
+    public async Task OnDrawCreatedInternal(Dictionary<string, object> data)
+    {
+        await OnDrawCreated.InvokeAsync(data);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when measurement is completed
+    /// </summary>
+    [JSInvokable]
+    public async Task OnMeasureCompleteInternal(Dictionary<string, object> data)
+    {
+        await OnMeasureComplete.InvokeAsync(data);
+    }
+
+    private async Task HighlightFeature(string featureId, object geometry)
+    {
+        if (_mapInstance != null)
+        {
+            await _mapInstance.InvokeVoidAsync("highlightFeature", featureId, geometry);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Add GeoJSON layer
+    /// </summary>
+    public async Task AddGeoJsonLayerAsync(string layerId, object geoJson, Dictionary<string, object>? style = null)
+    {
+        if (_mapInstance != null)
+        {
+            await _mapInstance.InvokeVoidAsync("addGeoJsonLayer", layerId, geoJson, style);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Add WMS layer
+    /// </summary>
+    public async Task AddWmsLayerAsync(string layerId, string url, Dictionary<string, object> options)
+    {
+        if (_mapInstance != null)
+        {
+            await _mapInstance.InvokeVoidAsync("addWmsLayer", layerId, url, options);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Add marker
+    /// </summary>
+    public async Task AddMarkerAsync(string markerId, double[] position, string? popupContent = null, Dictionary<string, object>? options = null)
+    {
+        if (_mapInstance != null)
+        {
+            await _mapInstance.InvokeVoidAsync("addMarker", markerId, new[] { position[1], position[0] }, popupContent, options);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Remove marker
+    /// </summary>
+    public async Task RemoveMarkerAsync(string markerId)
+    {
+        if (_mapInstance != null)
+        {
+            await _mapInstance.InvokeVoidAsync("removeMarker", markerId);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Remove layer
+    /// </summary>
+    public async Task RemoveLayerAsync(string layerId)
+    {
+        if (_mapInstance != null)
+        {
+            await _mapInstance.InvokeVoidAsync("removeLayer", layerId);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Fly to location
+    /// </summary>
+    public async Task FlyToAsync(double[] center, double? zoom = null)
+    {
+        await Bus.PublishAsync(new FlyToRequestMessage
+        {
+            MapId = Id,
+            Center = center,
+            Zoom = zoom
+        }, "API");
+    }
+
+    /// <summary>
+    /// Public API: Fit to bounds
+    /// </summary>
+    public async Task FitBoundsAsync(double[] bounds, int padding = 50)
+    {
+        await Bus.PublishAsync(new FitBoundsRequestMessage
+        {
+            MapId = Id,
+            Bounds = bounds,
+            Padding = padding
+        }, "API");
+    }
+
+    /// <summary>
+    /// Public API: Get current map bounds
+    /// </summary>
+    public async Task<double[]?> GetBoundsAsync()
+    {
+        if (_mapInstance == null) return null;
+        var bounds = await _mapInstance.InvokeAsync<double[]>("getBounds");
+        // Convert from lat/lng to lng/lat
+        return new[] { bounds[1], bounds[0], bounds[3], bounds[2] };
+    }
+
+    /// <summary>
+    /// Public API: Get current map center
+    /// </summary>
+    public async Task<double[]?> GetCenterAsync()
+    {
+        if (_mapInstance == null) return null;
+        var center = await _mapInstance.InvokeAsync<double[]>("getCenter");
+        // Convert from lat/lng to lng/lat
+        return new[] { center[1], center[0] };
+    }
+
+    /// <summary>
+    /// Public API: Get current zoom level
+    /// </summary>
+    public async Task<double?> GetZoomAsync()
+    {
+        if (_mapInstance == null) return null;
+        return await _mapInstance.InvokeAsync<double>("getZoom");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_mapInstance != null)
+        {
+            try
+            {
+                await _mapInstance.InvokeVoidAsync("dispose");
+                await _mapInstance.DisposeAsync();
+            }
+            catch
+            {
+                // Ignore disposal errors
+            }
+        }
+
+        if (_leafletModule != null)
+        {
+            await _leafletModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

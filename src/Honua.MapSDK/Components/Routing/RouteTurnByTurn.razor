@@ -1,0 +1,555 @@
+@*
+  Copyright (c) 2025 HonuaIO
+  Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+@using Honua.Server.Core.LocationServices.Models
+@using Honua.MapSDK.Models.Routing
+@using Honua.MapSDK.Services.Routing
+@inject RouteExportService ExportService
+@inject IJSRuntime JSRuntime
+
+<div class="turn-by-turn-panel" role="region" aria-label="Turn-by-turn directions">
+    <div class="panel-header">
+        <h3>Directions</h3>
+        <div class="header-actions">
+            @if (ShowPrintButton)
+            {
+                <button class="btn-icon" @onclick="PrintDirections" title="Print directions">
+                    🖨
+                </button>
+            }
+            @if (ShowShareButton)
+            {
+                <button class="btn-icon" @onclick="ShareDirections" title="Share directions">
+                    🔗
+                </button>
+            }
+            @if (ShowExportButton)
+            {
+                <button class="btn-icon" @onclick="ToggleExportMenu" title="Export directions">
+                    📥
+                </button>
+            }
+            @if (OnClose.HasDelegate)
+            {
+                <button class="btn-icon" @onclick="OnClose" title="Close">
+                    ×
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (ShowExportMenu)
+    {
+        <div class="export-menu">
+            <button class="export-option" @onclick="ExportGpx">Export as GPX</button>
+            <button class="export-option" @onclick="ExportKml">Export as KML</button>
+            <button class="export-option" @onclick="ExportGeoJson">Export as GeoJSON</button>
+            <button class="export-option" @onclick="ExportCsv">Export as CSV</button>
+        </div>
+    }
+
+    @if (Route != null)
+    {
+        @* Route Summary *@
+        <div class="route-summary-header">
+            <div class="summary-item">
+                <span class="summary-icon">📏</span>
+                <div>
+                    <div class="summary-value">@FormatDistance(Route.DistanceMeters)</div>
+                    <div class="summary-label">Total Distance</div>
+                </div>
+            </div>
+            <div class="summary-item">
+                <span class="summary-icon">⏱</span>
+                <div>
+                    <div class="summary-value">@FormatDuration(Route.DurationSeconds)</div>
+                    <div class="summary-label">Total Time</div>
+                </div>
+            </div>
+        </div>
+
+        @if (Route.DurationWithTrafficSeconds.HasValue)
+        {
+            <div class="traffic-notice">
+                <span class="traffic-icon">🚦</span>
+                <span>With current traffic: @FormatDuration(Route.DurationWithTrafficSeconds.Value)</span>
+            </div>
+        }
+
+        @* Filter Options *@
+        @if (ShowFilterOptions)
+        {
+            <div class="filter-options">
+                <label>
+                    <input type="checkbox" @bind="ShowAllSteps" @bind:after="StateHasChanged" />
+                    Show all steps
+                </label>
+                <label>
+                    <input type="checkbox" @bind="ShowDistances" @bind:after="StateHasChanged" />
+                    Show distances
+                </label>
+            </div>
+        }
+
+        @* Turn-by-turn Instructions *@
+        <div class="instructions-container" role="list">
+            @if (Instructions.Count > 0)
+            {
+                var cumulativeDistance = 0.0;
+                var cumulativeTime = 0.0;
+
+                @foreach (var (instruction, index) in Instructions.Select((i, idx) => (i, idx)))
+                {
+                    var isCurrentStep = CurrentStepIndex == index;
+                    var stepClass = isCurrentStep ? "instruction-step current" : "instruction-step";
+
+                    <div class="@stepClass"
+                         role="listitem"
+                         @onclick="() => SelectInstruction(index)"
+                         @onmouseenter="() => HighlightInstruction(index, true)"
+                         @onmouseleave="() => HighlightInstruction(index, false)"
+                         aria-current="@(isCurrentStep ? "step" : null)">
+
+                        <div class="step-marker">
+                            <div class="step-number">@(index + 1)</div>
+                        </div>
+
+                        <div class="step-content">
+                            <div class="step-header">
+                                <span class="maneuver-icon" role="img" aria-label="@instruction.ManeuverType">
+                                    @ManeuverIcons.GetIcon(instruction.ManeuverType)
+                                </span>
+                                <span class="maneuver-text">@GetManeuverText(instruction.ManeuverType)</span>
+                            </div>
+
+                            <div class="step-instruction">
+                                @instruction.Text
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(instruction.RoadName))
+                            {
+                                <div class="step-road-name">
+                                    on <strong>@instruction.RoadName</strong>
+                                </div>
+                            }
+
+                            @if (ShowDistances)
+                            {
+                                <div class="step-details">
+                                    <span class="step-distance">@FormatDistance(instruction.DistanceMeters)</span>
+                                    @if (ShowAllSteps)
+                                    {
+                                        <span class="step-duration">@FormatDuration(instruction.DurationSeconds)</span>
+                                    }
+                                </div>
+                            }
+
+                            @if (ShowCumulativeMetrics)
+                            {
+                                cumulativeDistance += instruction.DistanceMeters;
+                                cumulativeTime += instruction.DurationSeconds;
+                                <div class="step-cumulative">
+                                    Total: @FormatDistance(cumulativeDistance) • @FormatDuration(cumulativeTime)
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @* Final destination step *@
+                <div class="instruction-step destination">
+                    <div class="step-marker">
+                        <div class="step-number">🏁</div>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-header">
+                            <strong>Arrive at destination</strong>
+                        </div>
+                        @if (DestinationAddress != null)
+                        {
+                            <div class="step-instruction">
+                                @DestinationAddress
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else if (Route.Legs != null && Route.Legs.Count > 0)
+            {
+                @* Fallback to showing legs if no detailed instructions *@
+                @foreach (var (leg, index) in Route.Legs.Select((l, i) => (l, i)))
+                {
+                    <div class="instruction-step">
+                        <div class="step-marker">
+                            <div class="step-number">@(index + 1)</div>
+                        </div>
+                        <div class="step-content">
+                            <div class="step-instruction">
+                                @if (leg.StartAddress != null)
+                                {
+                                    <div>From: <strong>@leg.StartAddress</strong></div>
+                                }
+                                @if (leg.EndAddress != null)
+                                {
+                                    <div>To: <strong>@leg.EndAddress</strong></div>
+                                }
+                            </div>
+                            <div class="step-details">
+                                <span class="step-distance">@FormatDistance(leg.DistanceMeters)</span>
+                                <span class="step-duration">@FormatDuration(leg.DurationSeconds)</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="no-instructions">
+                    <p>Detailed turn-by-turn directions are not available for this route.</p>
+                    <p>Route distance: @FormatDistance(Route.DistanceMeters)</p>
+                    <p>Estimated time: @FormatDuration(Route.DurationSeconds)</p>
+                </div>
+            }
+        </div>
+
+        @* Navigation Controls *@
+        @if (ShowNavigationControls && Instructions.Count > 0)
+        {
+            <div class="navigation-controls">
+                <button class="btn btn-nav"
+                        @onclick="PreviousStep"
+                        disabled="@(CurrentStepIndex <= 0)">
+                    ← Previous
+                </button>
+                <div class="step-counter">
+                    Step @(CurrentStepIndex + 1) of @Instructions.Count
+                </div>
+                <button class="btn btn-nav"
+                        @onclick="NextStep"
+                        disabled="@(CurrentStepIndex >= Instructions.Count - 1)">
+                    Next →
+                </button>
+            </div>
+        }
+
+        @* Route Warnings *@
+        @if (Route.Warnings?.Count > 0)
+        {
+            <div class="route-warnings-section">
+                <h4>Route Warnings</h4>
+                @foreach (var warning in Route.Warnings)
+                {
+                    <div class="warning-item">
+                        <span class="warning-icon">⚠️</span>
+                        <span>@warning</span>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="no-route">
+            <p>No route selected</p>
+            <p class="text-muted">Calculate a route to see turn-by-turn directions</p>
+        </div>
+    }
+</div>
+
+<style>
+    .turn-by-turn-panel {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+        width: 400px;
+    }
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .panel-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-icon {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px;
+        color: #5f6368;
+    }
+
+    .btn-icon:hover {
+        color: #202124;
+    }
+
+    .export-menu {
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .export-option {
+        background: white;
+        border: 1px solid #e0e0e0;
+        padding: 8px 12px;
+        text-align: left;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .export-option:hover {
+        background: #e8f0fe;
+        border-color: #4285F4;
+    }
+
+    .route-summary-header {
+        display: flex;
+        justify-content: space-around;
+        padding: 15px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .summary-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .summary-icon {
+        font-size: 24px;
+    }
+
+    .summary-value {
+        font-size: 18px;
+        font-weight: 600;
+        color: #202124;
+    }
+
+    .summary-label {
+        font-size: 12px;
+        color: #5f6368;
+    }
+
+    .traffic-notice {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 15px;
+        background: #fff3cd;
+        border-bottom: 1px solid #ffc107;
+        font-size: 14px;
+    }
+
+    .filter-options {
+        padding: 10px 15px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        gap: 15px;
+        font-size: 13px;
+    }
+
+    .filter-options label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+    }
+
+    .instructions-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+    }
+
+    .instruction-step {
+        display: flex;
+        gap: 12px;
+        padding: 15px;
+        border-left: 3px solid #e0e0e0;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-radius: 4px;
+    }
+
+    .instruction-step:hover {
+        background: #f8f9fa;
+        border-left-color: #4285F4;
+    }
+
+    .instruction-step.current {
+        background: #e8f0fe;
+        border-left-color: #4285F4;
+    }
+
+    .instruction-step.destination {
+        border-left-color: #4CAF50;
+        background: #f1f8f4;
+    }
+
+    .step-marker {
+        flex-shrink: 0;
+    }
+
+    .step-number {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #f1f3f4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .current .step-number {
+        background: #4285F4;
+        color: white;
+    }
+
+    .step-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .step-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .maneuver-icon {
+        font-size: 20px;
+    }
+
+    .maneuver-text {
+        font-size: 14px;
+        color: #5f6368;
+    }
+
+    .step-instruction {
+        font-size: 15px;
+        color: #202124;
+        margin-bottom: 5px;
+        line-height: 1.4;
+    }
+
+    .step-road-name {
+        font-size: 13px;
+        color: #5f6368;
+        margin-bottom: 5px;
+    }
+
+    .step-details {
+        display: flex;
+        gap: 15px;
+        font-size: 13px;
+        color: #5f6368;
+        margin-top: 5px;
+    }
+
+    .step-cumulative {
+        font-size: 12px;
+        color: #5f6368;
+        margin-top: 5px;
+        font-style: italic;
+    }
+
+    .navigation-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        border-top: 1px solid #e0e0e0;
+        background: #f8f9fa;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #4285F4;
+        color: white;
+    }
+
+    .btn:hover:not(:disabled) {
+        background: #1967D2;
+    }
+
+    .btn:disabled {
+        background: #e0e0e0;
+        color: #9e9e9e;
+        cursor: not-allowed;
+    }
+
+    .btn-nav {
+        font-size: 14px;
+    }
+
+    .step-counter {
+        font-size: 14px;
+        color: #5f6368;
+        font-weight: 500;
+    }
+
+    .route-warnings-section {
+        padding: 15px;
+        background: #fff3cd;
+        border-top: 1px solid #ffc107;
+    }
+
+    .route-warnings-section h4 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .warning-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .no-route, .no-instructions {
+        padding: 40px 20px;
+        text-align: center;
+        color: #5f6368;
+    }
+
+    .text-muted {
+        color: #9e9e9e;
+        font-size: 14px;
+    }
+</style>

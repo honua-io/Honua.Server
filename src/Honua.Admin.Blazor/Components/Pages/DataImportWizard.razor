@@ -7,6 +7,8 @@
 @inject ServiceApiClient ServiceApi
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
 
 <PageTitle>Import Data - Honua Admin</PageTitle>
 
@@ -30,14 +32,32 @@
 
                         @if (_wizardState.SelectedFile == null)
                         {
-                            <label for="fileInput" style="cursor: pointer; width: 100%;">
-                                <MudPaper Outlined="true" Class="pa-8 text-center" Style="border: 2px dashed #ccc;">
-                                    <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
-                                    <MudText Typo="Typo.h6">Click to select a file</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">or drag and drop</MudText>
-                                    <MudText Typo="Typo.caption" Class="mt-2">Max file size: 500 MB</MudText>
-                                </MudPaper>
-                            </label>
+                            <MudPaper id="fileDropZone"
+                                      Outlined="true"
+                                      Class="pa-8 text-center cursor-pointer @(_isDraggingOver ? "drag-over" : "")"
+                                      @onclick="@(() => document.getElementById("fileInput").click())"
+                                      @ondragenter="HandleDragEnter"
+                                      @ondragover="HandleDragOver"
+                                      @ondragleave="HandleDragLeave"
+                                      @ondrop="HandleDrop"
+                                      Style="border: 2px dashed @(_isDraggingOver ? "var(--mud-palette-primary)" : "#ccc"); background-color: @(_isDraggingOver ? "var(--mud-palette-primary-lighten)" : "transparent"); transition: all 0.2s ease;">
+                                <MudIcon Icon="@Icons.Material.Filled.CloudUpload"
+                                         Size="Size.Large"
+                                         Color="@(_isDraggingOver ? Color.Primary : Color.Default)"
+                                         Class="mb-2" />
+                                <MudText Typo="Typo.h6" Color="@(_isDraggingOver ? Color.Primary : Color.Default)">
+                                    @if (_isDraggingOver)
+                                    {
+                                        <text>Drop file here</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Click to select a file</text>
+                                    }
+                                </MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">or drag and drop</MudText>
+                                <MudText Typo="Typo.caption" Class="mt-2">Max file size: 500 MB</MudText>
+                            </MudPaper>
                             <InputFile id="fileInput" OnChange="@HandleFileSelected" hidden accept=".zip,.geojson,.json,.gpkg,.kml,.gml,.csv" />
                         }
                         else
@@ -164,10 +184,45 @@
 
                         @if (_importing)
                         {
-                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
-                            <MudText Typo="Typo.body1" Align="Align.Center">
-                                Uploading and processing file...
-                            </MudText>
+                            <MudPaper Outlined="true" Class="pa-4 my-4">
+                                <MudStack Spacing="2">
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                        <MudText Typo="Typo.body1">
+                                            @if (_uploadProgress < 100)
+                                            {
+                                                <text>Uploading file...</text>
+                                            }
+                                            else
+                                            {
+                                                <text>Processing file...</text>
+                                            }
+                                        </MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Primary">
+                                            <b>@($"{_uploadProgress:F1}%")</b>
+                                        </MudText>
+                                    </MudStack>
+
+                                    <MudProgressLinear Value="@_uploadProgress" Color="Color.Primary" Size="Size.Medium" />
+
+                                    @if (_uploadProgress < 100 && _uploadProgress > 0)
+                                    {
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @FormatFileSize((long)(_wizardState.FileSize * _uploadProgress / 100)) / @FormatFileSize(_wizardState.FileSize)
+                                            </MudText>
+                                            @if (_uploadStartTime.HasValue)
+                                            {
+                                                var elapsed = DateTime.Now - _uploadStartTime.Value;
+                                                var bytesUploaded = (long)(_wizardState.FileSize * _uploadProgress / 100);
+                                                var speed = elapsed.TotalSeconds > 0 ? bytesUploaded / elapsed.TotalSeconds : 0;
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @($"{FormatFileSize((long)speed)}/s")
+                                                </MudText>
+                                            }
+                                        </MudStack>
+                                    }
+                                </MudStack>
+                            </MudPaper>
                         }
 
                         @if (_wizardState.JobId.HasValue)
@@ -224,10 +279,35 @@
     private IBrowserFile? _selectedFile;
     private List<ServiceListItem> _services = new();
     private bool _importing = false;
+    private bool _isDraggingOver = false;
+    private IJSObjectReference? _dragDropModule;
+    private bool _dragDropInitialized = false;
+    private double _uploadProgress = 0;
+    private DateTime? _uploadStartTime;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadServicesAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_dragDropInitialized)
+        {
+            try
+            {
+                _dragDropModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "initializeDragAndDrop",
+                    "fileDropZone",
+                    "fileInput");
+                _dragDropInitialized = true;
+            }
+            catch (Exception ex)
+            {
+                // Silently fail - drag and drop is an enhancement, not critical
+                Console.WriteLine($"Failed to initialize drag and drop: {ex.Message}");
+            }
+        }
     }
 
     private async Task LoadServicesAsync()
@@ -258,6 +338,29 @@
         _selectedFile = null;
         _wizardState.SelectedFile = null;
         _wizardState.FileSize = 0;
+    }
+
+    // Drag and drop event handlers
+    private void HandleDragEnter(DragEventArgs e)
+    {
+        _isDraggingOver = true;
+    }
+
+    private void HandleDragOver(DragEventArgs e)
+    {
+        // Prevent default to allow drop
+        _isDraggingOver = true;
+    }
+
+    private void HandleDragLeave(DragEventArgs e)
+    {
+        _isDraggingOver = false;
+    }
+
+    private void HandleDrop(DragEventArgs e)
+    {
+        _isDraggingOver = false;
+        // JavaScript handles the actual file transfer to InputFile component
     }
 
     private bool IsConfigurationValid()
@@ -297,11 +400,15 @@
         }
 
         _importing = true;
+        _uploadProgress = 0;
+        _uploadStartTime = DateTime.Now;
+
         try
         {
             var progress = new Progress<double>(percent =>
             {
-                // Update progress UI if needed
+                _uploadProgress = percent;
+                InvokeAsync(StateHasChanged);
             });
 
             var job = await ImportApi.CreateImportJobAsync(
@@ -328,6 +435,8 @@
         finally
         {
             _importing = false;
+            _uploadProgress = 0;
+            _uploadStartTime = null;
         }
     }
 
@@ -336,5 +445,21 @@
         _wizardState = new ImportWizardState();
         _selectedFile = null;
         _activeStep = 0;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dragDropModule != null)
+        {
+            try
+            {
+                await _dragDropModule.InvokeVoidAsync("dispose");
+                await _dragDropModule.DisposeAsync();
+            }
+            catch
+            {
+                // Ignore disposal errors
+            }
+        }
     }
 }

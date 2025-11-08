@@ -328,9 +328,9 @@ public sealed class MetadataPlugin
                 enhancements,
                 priority = new
                 {
-                    critical = enhancements.Where(e => ((dynamic)e).priority == "High").Count(),
-                    recommended = enhancements.Where(e => ((dynamic)e).priority == "Medium").Count(),
-                    optional = enhancements.Where(e => ((dynamic)e).priority == "Low").Count()
+                    critical = enhancements.Count(e => ((dynamic)e).priority == "High"),
+                    recommended = enhancements.Count(e => ((dynamic)e).priority == "Medium"),
+                    optional = enhancements.Count(e => ((dynamic)e).priority == "Low")
                 },
                 seoTips = new[]
                 {

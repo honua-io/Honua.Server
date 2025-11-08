@@ -1,0 +1,233 @@
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_model.Name"
+                              Label="Schedule Name"
+                              Required="true"
+                              RequiredError="Name is required"
+                              Variant="Variant.Outlined" />
+
+                <MudTextField @bind-Value="_model.Description"
+                              Label="Description"
+                              Lines="2"
+                              Variant="Variant.Outlined" />
+
+                <MudSelect @bind-Value="_model.WorkflowId"
+                           Label="Workflow"
+                           Required="true"
+                           RequiredError="Workflow is required"
+                           Variant="Variant.Outlined">
+                    @if (Workflows != null)
+                    {
+                        @foreach (var workflow in Workflows)
+                        {
+                            <MudSelectItem Value="@workflow.Id">@workflow.Metadata?.Name</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+
+                <MudTextField @bind-Value="_model.CronExpression"
+                              Label="Cron Expression"
+                              Required="true"
+                              RequiredError="Cron expression is required"
+                              HelperText="e.g., 0 0 * * * for daily at midnight"
+                              Variant="Variant.Outlined" />
+
+                <MudPaper Class="pa-3" Outlined="true">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Common Schedules:</MudText>
+                    <MudChipSet>
+                        <MudChip OnClick="@(() => _model.CronExpression = "*/15 * * * *")" Size="Size.Small">Every 15 min</MudChip>
+                        <MudChip OnClick="@(() => _model.CronExpression = "0 * * * *")" Size="Size.Small">Hourly</MudChip>
+                        <MudChip OnClick="@(() => _model.CronExpression = "0 0 * * *")" Size="Size.Small">Daily</MudChip>
+                        <MudChip OnClick="@(() => _model.CronExpression = "0 9 * * MON-FRI")" Size="Size.Small">Weekdays 9AM</MudChip>
+                        <MudChip OnClick="@(() => _model.CronExpression = "0 0 * * 0")" Size="Size.Small">Weekly</MudChip>
+                        <MudChip OnClick="@(() => _model.CronExpression = "0 0 1 * *")" Size="Size.Small">Monthly</MudChip>
+                    </MudChipSet>
+                </MudPaper>
+
+                <MudTextField @bind-Value="_model.Timezone"
+                              Label="Timezone"
+                              HelperText="IANA timezone (e.g., America/New_York, UTC)"
+                              Variant="Variant.Outlined" />
+
+                <MudSwitch @bind-Value="_model.Enabled"
+                           Label="Enabled"
+                           Color="Color.Primary" />
+
+                <MudExpansionPanels>
+                    <MudExpansionPanel Text="Advanced Options">
+                        <MudStack Spacing="3">
+                            <MudNumericField @bind-Value="_model.MaxConcurrentExecutions"
+                                             Label="Max Concurrent Executions"
+                                             Min="0"
+                                             HelperText="0 = unlimited"
+                                             Variant="Variant.Outlined" />
+
+                            <MudNumericField @bind-Value="_model.RetryAttempts"
+                                             Label="Retry Attempts on Failure"
+                                             Min="0"
+                                             Max="5"
+                                             Variant="Variant.Outlined" />
+
+                            <MudNumericField @bind-Value="_model.RetryDelayMinutes"
+                                             Label="Retry Delay (minutes)"
+                                             Min="1"
+                                             Variant="Variant.Outlined" />
+
+                            <MudDatePicker @bind-Date="_expirationDate"
+                                           Label="Expiration Date (optional)"
+                                           Variant="Variant.Outlined"
+                                           Clearable="true" />
+                        </MudStack>
+                    </MudExpansionPanel>
+
+                    <MudExpansionPanel Text="Notifications">
+                        <MudStack Spacing="3">
+                            <MudSwitch @bind-Value="_notifyOnSuccess"
+                                       Label="Notify on Success"
+                                       Color="Color.Success" />
+
+                            <MudSwitch @bind-Value="_notifyOnFailure"
+                                       Label="Notify on Failure"
+                                       Color="Color.Error" />
+
+                            <MudTextField @bind-Value="_emailAddresses"
+                                          Label="Email Addresses (comma-separated)"
+                                          Variant="Variant.Outlined" />
+
+                            <MudTextField @bind-Value="_webhookUrls"
+                                          Label="Webhook URLs (comma-separated)"
+                                          Variant="Variant.Outlined" />
+
+                            <MudTextField @bind-Value="_slackWebhook"
+                                          Label="Slack Webhook URL"
+                                          Variant="Variant.Outlined" />
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudStack>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="!_isValid">
+            @(Schedule == null ? "Create" : "Update")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public WorkflowSchedules.WorkflowScheduleDto? Schedule { get; set; }
+    [Parameter] public List<WorkflowSchedules.WorkflowDto>? Workflows { get; set; }
+
+    private MudForm? _form;
+    private bool _isValid;
+    private ScheduleModel _model = new();
+
+    private DateTime? _expirationDate;
+    private bool _notifyOnSuccess;
+    private bool _notifyOnFailure = true;
+    private string _emailAddresses = "";
+    private string _webhookUrls = "";
+    private string _slackWebhook = "";
+
+    protected override void OnInitialized()
+    {
+        if (Schedule != null)
+        {
+            _model = new ScheduleModel
+            {
+                Name = Schedule.Name,
+                Description = Schedule.Description,
+                WorkflowId = Schedule.WorkflowId,
+                CronExpression = Schedule.CronExpression,
+                Timezone = Schedule.Timezone,
+                Enabled = Schedule.Enabled,
+                MaxConcurrentExecutions = 1,
+                RetryAttempts = 0,
+                RetryDelayMinutes = 5
+            };
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private async Task Submit()
+    {
+        if (!_isValid) return;
+
+        try
+        {
+            var request = new
+            {
+                tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001"), // TODO: Get from auth
+                workflowId = _model.WorkflowId,
+                createdBy = Guid.Parse("00000000-0000-0000-0000-000000000001"), // TODO: Get from auth
+                updatedBy = Guid.Parse("00000000-0000-0000-0000-000000000001"), // TODO: Get from auth
+                name = _model.Name,
+                description = _model.Description,
+                cronExpression = _model.CronExpression,
+                timezone = _model.Timezone,
+                enabled = _model.Enabled,
+                maxConcurrentExecutions = _model.MaxConcurrentExecutions,
+                retryAttempts = _model.RetryAttempts,
+                retryDelayMinutes = _model.RetryDelayMinutes,
+                expiresAt = _expirationDate.HasValue ? (DateTimeOffset?)new DateTimeOffset(_expirationDate.Value) : null,
+                notificationConfig = (_notifyOnSuccess || _notifyOnFailure) ? new
+                {
+                    notifyOnSuccess = _notifyOnSuccess,
+                    notifyOnFailure = _notifyOnFailure,
+                    emailAddresses = _emailAddresses.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim()).ToList(),
+                    webhookUrls = _webhookUrls.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(u => u.Trim()).ToList(),
+                    slackWebhookUrl = string.IsNullOrWhiteSpace(_slackWebhook) ? null : _slackWebhook
+                } : null
+            };
+
+            HttpResponseMessage response;
+            if (Schedule == null)
+            {
+                response = await Http.PostAsJsonAsync("/admin/api/geoetl/schedules", request);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"/admin/api/geoetl/schedules/{Schedule.Id}", request);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(Schedule == null ? "Schedule created" : "Schedule updated", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Error: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving schedule: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private class ScheduleModel
+    {
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public Guid WorkflowId { get; set; }
+        public string CronExpression { get; set; } = "0 0 * * *";
+        public string Timezone { get; set; } = "UTC";
+        public bool Enabled { get; set; } = true;
+        public int MaxConcurrentExecutions { get; set; } = 1;
+        public int RetryAttempts { get; set; } = 0;
+        public int RetryDelayMinutes { get; set; } = 5;
+    }
+}

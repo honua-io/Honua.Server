@@ -10,6 +10,7 @@ using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
 using Honua.Server.Host.Carto;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
@@ -86,7 +87,7 @@ public sealed class CartoSecurityTests
         };
 
         var resolver = CreateResolver(service, layerView);
-        var executor = new CartoSqlQueryExecutor(resolver, parser, repoMock.Object);
+        var executor = new CartoSqlQueryExecutor(resolver, parser, repoMock.Object, NullLogger<CartoSqlQueryExecutor>.Instance);
 
         var result = await executor.ExecuteAsync("SELECT COUNT(*) FROM service1.layer1", CancellationToken.None);
 
@@ -162,7 +163,7 @@ public sealed class CartoSecurityTests
         repoMock.Setup(x => x.CountAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<FeatureQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0L);
 
-        var executor = new CartoSqlQueryExecutor(resolver, parser, repoMock.Object);
+        var executor = new CartoSqlQueryExecutor(resolver, parser, repoMock.Object, NullLogger<CartoSqlQueryExecutor>.Instance);
 
         var result = await executor.ExecuteAsync("SELECT * FROM service1.layer1 LIMIT 1000", CancellationToken.None);
 

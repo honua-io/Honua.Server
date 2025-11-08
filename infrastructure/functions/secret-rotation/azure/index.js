@@ -182,13 +182,16 @@ async function rotatePostgresPassword(context, currentSecret) {
   const masterSecret = await secretClient.getSecret(masterSecretName);
   const masterValue = JSON.parse(masterSecret.value);
 
+  // SECURITY: SSL certificate verification is enabled to prevent man-in-the-middle attacks
+  // and ensure we're connecting to the legitimate database server. This protects sensitive
+  // credentials during transmission.
   const client = new Client({
     host: currentValue.host,
     port: currentValue.port || 5432,
     database: currentValue.database || 'postgres',
     user: masterValue.username,
     password: masterValue.password,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: true }
   });
 
   try {
@@ -199,6 +202,18 @@ async function rotatePostgresPassword(context, currentSecret) {
     await client.query(query, [newPassword]);
 
     context.log('Password updated in PostgreSQL');
+  } catch (error) {
+    // Provide helpful error message for SSL certificate issues
+    if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        error.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+        error.code === 'CERT_HAS_EXPIRED') {
+      throw new Error(
+        `SSL certificate verification failed: ${error.message}. ` +
+        `Ensure your database has a valid SSL certificate. ` +
+        `For Azure PostgreSQL, verify the SSL certificate is properly configured.`
+      );
+    }
+    throw error;
   } finally {
     await client.end();
   }
@@ -230,13 +245,16 @@ async function rotateApiKey(context, currentSecret) {
   const dbSecret = await secretClient.getSecret(dbSecretName);
   const dbValue = JSON.parse(dbSecret.value);
 
+  // SECURITY: SSL certificate verification is enabled to prevent man-in-the-middle attacks
+  // and ensure we're connecting to the legitimate database server. This protects sensitive
+  // credentials during transmission.
   const client = new Client({
     host: dbValue.host,
     port: dbValue.port || 5432,
     database: dbValue.database,
     user: dbValue.username,
     password: dbValue.password,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: true }
   });
 
   try {
@@ -253,6 +271,18 @@ async function rotateApiKey(context, currentSecret) {
     await client.query(query, [newApiKey, currentValue.keyId]);
 
     context.log('API key updated in database');
+  } catch (error) {
+    // Provide helpful error message for SSL certificate issues
+    if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        error.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+        error.code === 'CERT_HAS_EXPIRED') {
+      throw new Error(
+        `SSL certificate verification failed while updating API key: ${error.message}. ` +
+        `Ensure your database has a valid SSL certificate. ` +
+        `For Azure PostgreSQL, verify the SSL certificate is properly configured.`
+      );
+    }
+    throw error;
   } finally {
     await client.end();
   }
@@ -317,13 +347,16 @@ async function testSecret(context, secretType, secretValue) {
  * Test PostgreSQL connection
  */
 async function testPostgresConnection(secretValue) {
+  // SECURITY: SSL certificate verification is enabled to prevent man-in-the-middle attacks
+  // and ensure we're connecting to the legitimate database server. This protects sensitive
+  // credentials during transmission.
   const client = new Client({
     host: secretValue.host,
     port: secretValue.port || 5432,
     database: secretValue.database || 'honua',
     user: secretValue.username,
     password: secretValue.password,
-    ssl: { rejectUnauthorized: false },
+    ssl: { rejectUnauthorized: true },
     connectionTimeoutMillis: 5000
   });
 
@@ -334,6 +367,18 @@ async function testPostgresConnection(secretValue) {
     if (result.rows[0].test !== 1) {
       throw new Error('Connection test query failed');
     }
+  } catch (error) {
+    // Provide helpful error message for SSL certificate issues
+    if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        error.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+        error.code === 'CERT_HAS_EXPIRED') {
+      throw new Error(
+        `SSL certificate verification failed during connection test: ${error.message}. ` +
+        `Ensure your database has a valid SSL certificate. ` +
+        `For Azure PostgreSQL, verify the SSL certificate is properly configured.`
+      );
+    }
+    throw error;
   } finally {
     await client.end();
   }
