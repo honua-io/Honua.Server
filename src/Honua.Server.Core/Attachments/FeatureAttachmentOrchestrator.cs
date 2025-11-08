@@ -588,15 +588,16 @@ public sealed class FeatureAttachmentOrchestrator : IFeatureAttachmentOrchestrat
         }
     }
 
-    private static async Task SafeDeletePointerAsync(IAttachmentStore store, AttachmentPointer pointer, CancellationToken cancellationToken)
+    private async Task SafeDeletePointerAsync(IAttachmentStore store, AttachmentPointer pointer, CancellationToken cancellationToken)
     {
         try
         {
             await store.DeleteAsync(pointer, cancellationToken).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
-            // Intentionally swallow to avoid bubbling storage cleanup errors; metrics/logs can be added later.
+            // Log cleanup failures but don't bubble - orphaned blobs are tracked via metrics
+            _logger.LogWarning(ex, "Failed to delete orphaned attachment blob with storage key {StorageKey}", pointer.StorageKey);
         }
     }
 
