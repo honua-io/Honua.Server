@@ -85,6 +85,9 @@ public sealed class SecurityAuditLogger : ISecurityAuditLogger
 
     public void LogConfigurationChange(string username, string configKey, string? oldValue, string? newValue, string? ipAddress)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentException.ThrowIfNullOrWhiteSpace(configKey);
+
         var safeOldValue = SensitiveDataRedactor.Redact(oldValue);
         var safeNewValue = SensitiveDataRedactor.Redact(newValue);
 
