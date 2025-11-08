@@ -102,29 +102,123 @@ public interface IAuthRepository
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     ValueTask CreateOidcAdministratorAsync(string subject, string? username, string? email, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Retrieves user credentials by username for local authentication.
+    /// </summary>
+    /// <param name="username">The username to look up (case-insensitive).</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>User credentials including password hash and salt if found, null if username does not exist.</returns>
     ValueTask<AuthUserCredentials?> GetCredentialsByUsernameAsync(string username, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Retrieves user credentials by user ID.
+    /// </summary>
+    /// <param name="userId">The unique user identifier.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>User credentials including password hash and salt if found, null if user ID does not exist.</returns>
     ValueTask<AuthUserCredentials?> GetCredentialsByIdAsync(string userId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Updates user account state after a failed login attempt.
+    /// Increments failure count and optionally locks the account after excessive failures.
+    /// </summary>
+    /// <param name="userId">The unique user identifier.</param>
+    /// <param name="failedAttempts">The new total count of consecutive failed login attempts.</param>
+    /// <param name="failedAtUtc">The timestamp of the failed login attempt.</param>
+    /// <param name="lockUser">Whether to lock the user account due to excessive failures.</param>
+    /// <param name="auditContext">Optional audit context for tracking who made the change.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
     ValueTask UpdateLoginFailureAsync(string userId, int failedAttempts, DateTimeOffset failedAtUtc, bool lockUser, AuditContext? auditContext = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Updates user account state after a successful login.
+    /// Resets failure count and updates last login timestamp.
+    /// </summary>
+    /// <param name="userId">The unique user identifier.</param>
+    /// <param name="loginAtUtc">The timestamp of the successful login.</param>
+    /// <param name="auditContext">Optional audit context for tracking who made the change.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
     ValueTask UpdateLoginSuccessAsync(string userId, DateTimeOffset loginAtUtc, AuditContext? auditContext = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Creates a new local user account with password-based authentication.
+    /// </summary>
+    /// <param name="username">The unique username for the account.</param>
+    /// <param name="email">The optional email address for the account.</param>
+    /// <param name="passwordHash">The hashed password bytes (from IPasswordHasher).</param>
+    /// <param name="salt">The salt bytes used during password hashing.</param>
+    /// <param name="hashAlgorithm">The hashing algorithm name (e.g., "PBKDF2").</param>
+    /// <param name="hashParameters">The algorithm parameters (e.g., iteration count, key length).</param>
+    /// <param name="roles">The initial roles to assign to the user.</param>
+    /// <param name="auditContext">Optional audit context for tracking who created the user.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>The unique user ID of the newly created account.</returns>
     ValueTask<string> CreateLocalUserAsync(string username, string? email, byte[] passwordHash, byte[] salt, string hashAlgorithm, string hashParameters, IReadOnlyCollection<string> roles, AuditContext? auditContext = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Updates the password for an existing local user account.
+    /// Used for password reset and password change operations.
+    /// </summary>
+    /// <param name="userId">The unique user identifier.</param>
+    /// <param name="passwordHash">The new hashed password bytes (from IPasswordHasher).</param>
+    /// <param name="salt">The new salt bytes used during password hashing.</param>
+    /// <param name="hashAlgorithm">The hashing algorithm name (e.g., "PBKDF2").</param>
+    /// <param name="hashParameters">The algorithm parameters (e.g., iteration count, key length).</param>
+    /// <param name="auditContext">Optional audit context for tracking who changed the password.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
     ValueTask SetLocalUserPasswordAsync(string userId, byte[] passwordHash, byte[] salt, string hashAlgorithm, string hashParameters, AuditContext? auditContext = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Assigns roles to a user account, replacing any existing role assignments.
+    /// </summary>
+    /// <param name="userId">The unique user identifier.</param>
+    /// <param name="roles">The roles to assign (e.g., "admin", "user", "viewer").</param>
+    /// <param name="auditContext">Optional audit context for tracking who assigned the roles.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
     ValueTask AssignRolesAsync(string userId, IReadOnlyCollection<string> roles, AuditContext? auditContext = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Retrieves user account details including roles and status.
+    /// </summary>
+    /// <param name="username">The username to look up (case-insensitive).</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>User account details if found, null if username does not exist.</returns>
     ValueTask<AuthUser?> GetUserAsync(string username, CancellationToken cancellationToken = default);
 
-    // Audit log queries
+    /// <summary>
+    /// Retrieves audit records for a specific user.
+    /// </summary>
+    /// <param name="userId">The unique user identifier.</param>
+    /// <param name="limit">Maximum number of records to return (default 100).</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>List of audit records ordered by timestamp descending.</returns>
     ValueTask<IReadOnlyList<AuditRecord>> GetAuditRecordsAsync(string userId, int limit = 100, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Retrieves audit records for a specific action type across all users.
+    /// </summary>
+    /// <param name="action">The action type to filter by (e.g., "login", "password_change").</param>
+    /// <param name="limit">Maximum number of records to return (default 100).</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>List of audit records ordered by timestamp descending.</returns>
     ValueTask<IReadOnlyList<AuditRecord>> GetAuditRecordsByActionAsync(string action, int limit = 100, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Retrieves recent failed authentication attempts within a time window.
+    /// Used for detecting brute-force attacks and suspicious activity.
+    /// </summary>
+    /// <param name="window">The time window to search (e.g., last 1 hour).</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>List of failed authentication audit records ordered by timestamp descending.</returns>
     ValueTask<IReadOnlyList<AuditRecord>> GetRecentFailedAuthenticationsAsync(TimeSpan window, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Purges old audit records beyond the retention period.
+    /// Used for GDPR compliance and database maintenance.
+    /// </summary>
+    /// <param name="retentionPeriod">Records older than this period will be deleted.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>The number of audit records deleted.</returns>
     ValueTask<int> PurgeOldAuditRecordsAsync(TimeSpan retentionPeriod, CancellationToken cancellationToken = default);
 }
 
