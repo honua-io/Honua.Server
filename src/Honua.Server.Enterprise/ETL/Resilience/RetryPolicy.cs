@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 namespace Honua.Server.Enterprise.ETL.Resilience;
 
@@ -123,8 +124,9 @@ public class RetryPolicy
         if (UseJitter && delaySeconds > 0)
         {
             var jitterAmount = delaySeconds * JitterFactor;
-            var random = new Random();
-            var jitter = (random.NextDouble() * 2 - 1) * jitterAmount; // Random between -jitterAmount and +jitterAmount
+            // Use cryptographically secure random number generator
+            var randomValue = RandomNumberGenerator.GetInt32(0, int.MaxValue) / (double)int.MaxValue;
+            var jitter = (randomValue * 2 - 1) * jitterAmount; // Random between -jitterAmount and +jitterAmount
             delaySeconds = Math.Max(0, delaySeconds + jitter);
         }
 

@@ -91,9 +91,18 @@ public class SqlViewSchemaDetector
     /// Builds a query that returns schema information without fetching data.
     /// Uses LIMIT 0 or TOP 0 depending on the database provider.
     /// </summary>
+    /// <remarks>
+    /// SECURITY NOTE: While this method uses string interpolation of SQL, it is safe because:
+    /// 1. The SQL parameter comes from SqlViewDefinition which is validated in MetadataSnapshot.cs
+    /// 2. Validation ensures SQL starts with SELECT and blocks dangerous keywords (DROP, INSERT, UPDATE, etc.)
+    /// 3. The query is executed with CommandBehavior.SchemaOnly which prevents data modification
+    /// 4. Parameters are properly added using parameterized queries (AddParameterToCommand)
+    /// This approach is necessary because SQL subquery structure cannot be parameterized.
+    /// </remarks>
     private string BuildSchemaQuery(string sql, string provider)
     {
         // Wrap the SQL in a subquery with LIMIT 0 to get schema only
+        // Note: sql parameter is pre-validated by SqlViewDefinition validation rules
         return provider.ToLowerInvariant() switch
         {
             "postgres" => $"SELECT * FROM ({sql}) AS schema_detect LIMIT 0",

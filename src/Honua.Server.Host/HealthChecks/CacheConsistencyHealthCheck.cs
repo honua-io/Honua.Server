@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Configuration;
@@ -104,9 +105,9 @@ public sealed class CacheConsistencyHealthCheck : HealthCheckBase
             var sampleSize = Math.Min(config.HealthCheckSampleSize, freshSnapshot.Layers.Count);
             if (sampleSize > 0)
             {
-                var random = new Random();
+                // Use cryptographically secure random number generator for sampling
                 var sampledIndices = Enumerable.Range(0, freshSnapshot.Layers.Count)
-                    .OrderBy(_ => random.Next())
+                    .OrderBy(_ => RandomNumberGenerator.GetInt32(0, int.MaxValue))
                     .Take(sampleSize)
                     .ToList();
 
