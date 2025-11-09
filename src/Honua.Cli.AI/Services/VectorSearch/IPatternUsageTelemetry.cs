@@ -131,6 +131,64 @@ public interface IPatternUsageTelemetry
         bool ultimatelySucceeded,
         List<string> failureReasons,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Tracks detailed pattern interaction feedback including config modifications and timing.
+    /// </summary>
+    Task TrackPatternInteractionAsync(
+        PatternInteractionFeedback feedback,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates pattern interaction with user decision and timing.
+    /// </summary>
+    Task UpdatePatternDecisionAsync(
+        Guid interactionId,
+        bool wasAccepted,
+        DateTime decisionTimestamp,
+        string? actualConfigJson = null,
+        string? configModificationsJson = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records user satisfaction feedback for a pattern interaction.
+    /// </summary>
+    Task RecordUserSatisfactionAsync(
+        Guid interactionId,
+        int rating,
+        string? feedbackText = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Increments the follow-up questions counter for a pattern interaction.
+    /// </summary>
+    Task IncrementFollowUpQuestionsAsync(
+        Guid interactionId,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Detailed pattern interaction feedback for learning loop.
+/// </summary>
+public sealed class PatternInteractionFeedback
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required string PatternId { get; init; }
+    public string? DeploymentId { get; init; }
+    public DateTime RecommendedAt { get; init; } = DateTime.UtcNow;
+    public int RecommendationRank { get; init; }
+    public decimal ConfidenceScore { get; init; }
+    public string? RecommendedConfigJson { get; init; }
+    public DateTime? DecisionTimestamp { get; set; }
+    public int? TimeToDecisionSeconds { get; set; }
+    public bool? WasAccepted { get; set; }
+    public bool WasModified { get; set; }
+    public string? ActualConfigJson { get; set; }
+    public string? ConfigModificationsJson { get; set; }
+    public int FollowUpQuestionsCount { get; set; }
+    public string? UserHesitationIndicatorsJson { get; set; }
+    public int? UserSatisfactionRating { get; set; }
+    public string? UserFeedbackText { get; set; }
 }
 
 /// <summary>

@@ -953,6 +953,193 @@ public sealed class PostgreSqlTelemetryService : IPatternUsageTelemetry
             return new List<PatternPerformance>();
         }
     }
+
+    /// <inheritdoc />
+    public async Task TrackPatternInteractionAsync(
+        VectorSearch.PatternInteractionFeedback feedback,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            var insertQuery = @"
+                INSERT INTO pattern_interaction_feedback (
+                    id, pattern_id, deployment_id, recommended_at, recommendation_rank,
+                    confidence_score, recommended_config, decision_timestamp, time_to_decision_seconds,
+                    was_accepted, was_modified, actual_config, config_modifications,
+                    follow_up_questions_count, user_hesitation_indicators,
+                    user_satisfaction_rating, user_feedback_text
+                )
+                VALUES (
+                    @Id, @PatternId, @DeploymentId, @RecommendedAt, @RecommendationRank,
+                    @ConfidenceScore, @RecommendedConfig::jsonb, @DecisionTimestamp, @TimeToDecisionSeconds,
+                    @WasAccepted, @WasModified, @ActualConfig::jsonb, @ConfigModifications::jsonb,
+                    @FollowUpQuestionsCount, @UserHesitationIndicators::jsonb,
+                    @UserSatisfactionRating, @UserFeedbackText
+                )
+            ";
+
+            var command = new CommandDefinition(
+                insertQuery,
+                new
+                {
+                    feedback.Id,
+                    feedback.PatternId,
+                    feedback.DeploymentId,
+                    feedback.RecommendedAt,
+                    feedback.RecommendationRank,
+                    feedback.ConfidenceScore,
+                    RecommendedConfig = feedback.RecommendedConfigJson,
+                    feedback.DecisionTimestamp,
+                    feedback.TimeToDecisionSeconds,
+                    feedback.WasAccepted,
+                    feedback.WasModified,
+                    ActualConfig = feedback.ActualConfigJson,
+                    ConfigModifications = feedback.ConfigModificationsJson,
+                    feedback.FollowUpQuestionsCount,
+                    UserHesitationIndicators = feedback.UserHesitationIndicatorsJson,
+                    feedback.UserSatisfactionRating,
+                    feedback.UserFeedbackText
+                },
+                cancellationToken: cancellationToken);
+
+            await connection.ExecuteAsync(command);
+
+            _logger.LogDebug("Tracked pattern interaction: {PatternId} rank={Rank}",
+                feedback.PatternId, feedback.RecommendationRank);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to track pattern interaction");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task UpdatePatternDecisionAsync(
+        Guid interactionId,
+        bool wasAccepted,
+        DateTime decisionTimestamp,
+        string? actualConfigJson = null,
+        string? configModificationsJson = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            var updateQuery = @"
+                UPDATE pattern_interaction_feedback
+                SET
+                    was_accepted = @WasAccepted,
+                    decision_timestamp = @DecisionTimestamp,
+                    time_to_decision_seconds = EXTRACT(EPOCH FROM (@DecisionTimestamp - recommended_at))::INTEGER,
+                    was_modified = CASE WHEN @ConfigModifications IS NOT NULL THEN true ELSE was_modified END,
+                    actual_config = COALESCE(@ActualConfig::jsonb, actual_config),
+                    config_modifications = COALESCE(@ConfigModifications::jsonb, config_modifications),
+                    updated_at = NOW()
+                WHERE id = @InteractionId
+            ";
+
+            var command = new CommandDefinition(
+                updateQuery,
+                new
+                {
+                    InteractionId = interactionId,
+                    WasAccepted = wasAccepted,
+                    DecisionTimestamp = decisionTimestamp,
+                    ActualConfig = actualConfigJson,
+                    ConfigModifications = configModificationsJson
+                },
+                cancellationToken: cancellationToken);
+
+            await connection.ExecuteAsync(command);
+
+            _logger.LogDebug("Updated pattern decision: {InteractionId} accepted={Accepted}",
+                interactionId, wasAccepted);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update pattern decision");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task RecordUserSatisfactionAsync(
+        Guid interactionId,
+        int rating,
+        string? feedbackText = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            var updateQuery = @"
+                UPDATE pattern_interaction_feedback
+                SET
+                    user_satisfaction_rating = @Rating,
+                    user_feedback_text = COALESCE(@FeedbackText, user_feedback_text),
+                    updated_at = NOW()
+                WHERE id = @InteractionId
+            ";
+
+            var command = new CommandDefinition(
+                updateQuery,
+                new
+                {
+                    InteractionId = interactionId,
+                    Rating = rating,
+                    FeedbackText = feedbackText
+                },
+                cancellationToken: cancellationToken);
+
+            await connection.ExecuteAsync(command);
+
+            _logger.LogDebug("Recorded user satisfaction: {InteractionId} rating={Rating}",
+                interactionId, rating);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to record user satisfaction");
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task IncrementFollowUpQuestionsAsync(
+        Guid interactionId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            var updateQuery = @"
+                UPDATE pattern_interaction_feedback
+                SET
+                    follow_up_questions_count = follow_up_questions_count + 1,
+                    updated_at = NOW()
+                WHERE id = @InteractionId
+            ";
+
+            var command = new CommandDefinition(
+                updateQuery,
+                new { InteractionId = interactionId },
+                cancellationToken: cancellationToken);
+
+            await connection.ExecuteAsync(command);
+
+            _logger.LogDebug("Incremented follow-up questions for interaction: {InteractionId}", interactionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to increment follow-up questions");
+        }
+    }
 }
 
 /// <summary>

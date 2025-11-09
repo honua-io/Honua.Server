@@ -124,6 +124,55 @@ CREATE INDEX IF NOT EXISTS idx_pattern_recommendations_analyzed_at ON pattern_re
 CREATE INDEX IF NOT EXISTS idx_pattern_recommendations_cloud_provider ON pattern_recommendations(cloud_provider);
 
 -- ============================================================================
+-- Pattern Interaction Feedback
+-- ============================================================================
+-- Stores detailed user interaction data for each pattern recommendation.
+-- Tracks config modifications, timing, questions, and satisfaction for learning loop.
+
+CREATE TABLE IF NOT EXISTS pattern_interaction_feedback (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pattern_id VARCHAR(200) NOT NULL,
+    deployment_id VARCHAR(100),
+
+    -- Recommendation context
+    recommended_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    recommendation_rank INTEGER NOT NULL,
+    confidence_score DECIMAL(5,4) NOT NULL,
+
+    -- User interaction timing
+    decision_timestamp TIMESTAMP WITH TIME ZONE,
+    time_to_decision_seconds INTEGER, -- How long user took to decide
+
+    -- User decision
+    was_accepted BOOLEAN,
+    was_modified BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Configuration changes (what user changed from recommended config)
+    recommended_config JSONB,
+    actual_config JSONB,
+    config_modifications JSONB, -- Structured diff of changes
+
+    -- Interaction signals
+    follow_up_questions_count INTEGER NOT NULL DEFAULT 0,
+    user_hesitation_indicators JSONB, -- Backtracking, re-reading, etc.
+
+    -- Explicit feedback
+    user_satisfaction_rating INTEGER, -- 1-5 scale (optional)
+    user_feedback_text TEXT,
+
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for learning analysis
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_pattern_id ON pattern_interaction_feedback(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_recommended_at ON pattern_interaction_feedback(recommended_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_accepted ON pattern_interaction_feedback(was_accepted);
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_modified ON pattern_interaction_feedback(was_modified);
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_satisfaction ON pattern_interaction_feedback(user_satisfaction_rating);
+
+-- ============================================================================
 -- Known Issues
 -- ============================================================================
 -- Stores known deployment issues for proactive troubleshooting.
@@ -297,6 +346,59 @@ WHERE started_at >= NOW() - INTERVAL '30 days'
 GROUP BY agent_name, action
 ORDER BY execution_count DESC;
 
+-- Pattern learning metrics view
+CREATE OR REPLACE VIEW pattern_learning_metrics AS
+SELECT
+    pattern_id,
+    COUNT(*) as total_recommendations,
+    COUNT(*) FILTER (WHERE was_accepted = true) as accepted_count,
+    COUNT(*) FILTER (WHERE was_modified = true) as modified_count,
+    AVG(confidence_score) as avg_confidence,
+    AVG(time_to_decision_seconds) as avg_decision_time_seconds,
+    AVG(follow_up_questions_count) as avg_questions,
+    AVG(user_satisfaction_rating) as avg_satisfaction,
+    AVG(CASE WHEN was_accepted = true THEN 1.0 ELSE 0.0 END) as acceptance_rate,
+    AVG(CASE WHEN was_modified = true THEN 1.0 ELSE 0.0 END) as modification_rate
+FROM pattern_interaction_feedback
+WHERE recommended_at >= NOW() - INTERVAL '90 days'
+GROUP BY pattern_id
+ORDER BY total_recommendations DESC;
+
+-- Pattern confidence trends over time (weekly)
+CREATE OR REPLACE VIEW pattern_confidence_trends AS
+SELECT
+    pattern_id,
+    DATE_TRUNC('week', recommended_at) as week,
+    COUNT(*) as recommendation_count,
+    AVG(confidence_score) as avg_confidence,
+    AVG(CASE WHEN was_accepted = true THEN 1.0 ELSE 0.0 END) as acceptance_rate,
+    AVG(time_to_decision_seconds) as avg_decision_time
+FROM pattern_interaction_feedback
+WHERE recommended_at >= NOW() - INTERVAL '180 days'
+GROUP BY pattern_id, DATE_TRUNC('week', recommended_at)
+ORDER BY pattern_id, week DESC;
+
+-- Feature importance analysis
+CREATE OR REPLACE VIEW feature_importance_analysis AS
+WITH config_changes AS (
+    SELECT
+        pattern_id,
+        jsonb_object_keys(config_modifications) as changed_field,
+        COUNT(*) as change_count
+    FROM pattern_interaction_feedback
+    WHERE was_modified = true
+      AND config_modifications IS NOT NULL
+      AND recommended_at >= NOW() - INTERVAL '90 days'
+    GROUP BY pattern_id, jsonb_object_keys(config_modifications)
+)
+SELECT
+    pattern_id,
+    changed_field,
+    change_count,
+    ROUND((change_count::DECIMAL / SUM(change_count) OVER (PARTITION BY pattern_id)) * 100, 2) as change_percentage
+FROM config_changes
+ORDER BY pattern_id, change_count DESC;
+
 -- ============================================================================
 -- Functions
 -- ============================================================================
@@ -321,6 +423,9 @@ CREATE TRIGGER update_known_issues_updated_at BEFORE UPDATE ON known_issues
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_cost_optimization_updated_at BEFORE UPDATE ON cost_optimization_recommendations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_pattern_interaction_feedback_updated_at BEFORE UPDATE ON pattern_interaction_feedback
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
