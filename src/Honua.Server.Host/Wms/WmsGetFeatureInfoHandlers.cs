@@ -33,6 +33,7 @@ internal static class WmsGetFeatureInfoHandlers
     /// </summary>
     public static async Task<IResult> HandleGetFeatureInfoAsync(
         HttpRequest request,
+        [FromServices] IMetadataRegistry metadataRegistry,
         [FromServices] IRasterDatasetRegistry rasterRegistry,
         [FromServices] IFeatureRepository featureRepository,
         CancellationToken cancellationToken) =>
@@ -43,7 +44,8 @@ internal static class WmsGetFeatureInfoHandlers
             async activity =>
             {
                 var query = request.Query;
-                var layerContexts = await ResolveDatasetContextsAsync(query, rasterRegistry, cancellationToken).ConfigureAwait(false);
+                var snapshot = await metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+                var layerContexts = await ResolveDatasetContextsAsync(query, snapshot, rasterRegistry, cancellationToken).ConfigureAwait(false);
                 var targetContext = layerContexts[0];
                 var dataset = targetContext.Dataset;
                 var requestedLayerName = targetContext.RequestedLayerName;
@@ -177,6 +179,7 @@ internal static class WmsGetFeatureInfoHandlers
 
     private static async Task<IReadOnlyList<WmsLayerContext>> ResolveDatasetContextsAsync(
         IQueryCollection query,
+        MetadataSnapshot snapshot,
         IRasterDatasetRegistry rasterRegistry,
         CancellationToken cancellationToken)
     {
@@ -192,17 +195,45 @@ internal static class WmsGetFeatureInfoHandlers
             throw new InvalidOperationException("Parameter 'layers' must include at least one entry.");
         }
 
-        var contexts = new List<WmsLayerContext>(layerNames.Count);
+        var contexts = new List<WmsLayerContext>();
+
         foreach (var requestedLayerName in layerNames)
         {
-            var dataset = await WmsSharedHelpers.ResolveDatasetAsync(requestedLayerName, rasterRegistry, cancellationToken).ConfigureAwait(false);
-            if (dataset is null)
+            // Try to resolve as a layer group first (format: serviceId:groupId)
+            if (WmsSharedHelpers.TryResolveLayerGroup(requestedLayerName, snapshot, out var layerGroup) &&
+                layerGroup is not null)
             {
-                throw new InvalidOperationException($"Layer '{requestedLayerName}' was not found.");
-            }
+                // Expand layer group to raster datasets
+                var expandedDatasets = await WmsSharedHelpers.ExpandLayerGroupToRasterDatasetsAsync(
+                    layerGroup,
+                    snapshot,
+                    rasterRegistry,
+                    cancellationToken).ConfigureAwait(false);
 
-            var canonicalLayerName = WmsSharedHelpers.BuildLayerName(dataset);
-            contexts.Add(new WmsLayerContext(dataset, requestedLayerName, canonicalLayerName));
+                // Add each expanded member as a context
+                foreach (var expandedMember in expandedDatasets)
+                {
+                    var canonicalLayerName = WmsSharedHelpers.BuildLayerName(expandedMember.Dataset);
+                    contexts.Add(new WmsLayerContext(expandedMember.Dataset, requestedLayerName, canonicalLayerName));
+                }
+            }
+            else
+            {
+                // Try to resolve as a regular raster dataset
+                var dataset = await WmsSharedHelpers.ResolveDatasetAsync(requestedLayerName, rasterRegistry, cancellationToken).ConfigureAwait(false);
+                if (dataset is null)
+                {
+                    throw new InvalidOperationException($"Layer '{requestedLayerName}' was not found.");
+                }
+
+                var canonicalLayerName = WmsSharedHelpers.BuildLayerName(dataset);
+                contexts.Add(new WmsLayerContext(dataset, requestedLayerName, canonicalLayerName));
+            }
+        }
+
+        if (contexts.Count == 0)
+        {
+            throw new InvalidOperationException("No valid layers found.");
         }
 
         return contexts;

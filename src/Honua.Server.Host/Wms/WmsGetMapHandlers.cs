@@ -30,7 +30,12 @@ namespace Honua.Server.Host.Wms;
 /// </summary>
 internal static class WmsGetMapHandlers
 {
-    private sealed record WmsLayerContext(RasterDatasetDefinition Dataset, string RequestedLayerName, string CanonicalLayerName);
+    private sealed record WmsLayerContext(
+        RasterDatasetDefinition Dataset,
+        string RequestedLayerName,
+        string CanonicalLayerName,
+        double Opacity = 1.0,
+        string? StyleIdOverride = null);
 
     /// <summary>
     /// Handles the WMS GetMap request.
@@ -52,7 +57,7 @@ internal static class WmsGetMapHandlers
             {
                 var options = wmsOptions.Value;
                 var query = request.Query;
-                var layerContexts = await ResolveDatasetContextsAsync(query, rasterRegistry, cancellationToken).ConfigureAwait(false);
+                var layerContexts = await ResolveDatasetContextsAsync(query, snapshot, rasterRegistry, cancellationToken).ConfigureAwait(false);
                 var primaryContext = layerContexts[0];
                 var dataset = primaryContext.Dataset;
 
@@ -117,7 +122,10 @@ internal static class WmsGetMapHandlers
                 }
 
                 var styleTokens = ParseStyleTokens(stylesParam, layerContexts.Count);
-                var primaryStyleId = WmsSharedHelpers.ResolveRequestedStyleId(dataset, styleTokens[0]);
+
+                // For primary layer, prefer StyleIdOverride from group (if present) over STYLES parameter
+                var primaryStyleToken = primaryContext.StyleIdOverride ?? styleTokens[0];
+                var primaryStyleId = WmsSharedHelpers.ResolveRequestedStyleId(dataset, primaryStyleToken);
                 var primaryStyleDefinition = WmsSharedHelpers.ResolveStyleDefinition(snapshot, primaryStyleId);
 
                 var overlays = new List<RasterLayerRequest>();
@@ -126,12 +134,23 @@ internal static class WmsGetMapHandlers
                     for (var index = 1; index < layerContexts.Count; index++)
                     {
                         var overlayContext = layerContexts[index];
-                        var overlayStyleId = WmsSharedHelpers.ResolveRequestedStyleId(overlayContext.Dataset, styleTokens[index]);
+
+                        // For overlay layers, prefer StyleIdOverride from group (if present) over STYLES parameter
+                        var overlayStyleToken = overlayContext.StyleIdOverride ?? styleTokens[index];
+                        var overlayStyleId = WmsSharedHelpers.ResolveRequestedStyleId(overlayContext.Dataset, overlayStyleToken);
                         var overlayStyleDefinition = WmsSharedHelpers.ResolveStyleDefinition(snapshot, overlayStyleId);
+
                         // Validate TIME independently for each overlay using the raw request value
                         var overlayTimeValue = overlayContext.Dataset.Temporal.Enabled
                             ? WmsSharedHelpers.ValidateTimeParameter(rawTimeValue, overlayContext.Dataset.Temporal)
                             : null;
+
+                        // TODO: Apply opacity from overlayContext.Opacity during rendering
+                        // Layer group members can specify opacity (0.0-1.0) which should be applied to the rendered layer
+                        // This may require:
+                        // 1. Extending RasterLayerRequest to include an Opacity property
+                        // 2. Updating the raster renderer to apply opacity during image compositing
+                        // 3. OR post-processing the rendered image to apply opacity before compositing
                         overlays.Add(new RasterLayerRequest(overlayContext.Dataset, overlayStyleId, overlayStyleDefinition, overlayTimeValue));
                     }
                 }
@@ -343,6 +362,7 @@ internal static class WmsGetMapHandlers
 
     private static async Task<IReadOnlyList<WmsLayerContext>> ResolveDatasetContextsAsync(
         IQueryCollection query,
+        MetadataSnapshot snapshot,
         IRasterDatasetRegistry rasterRegistry,
         CancellationToken cancellationToken)
     {
@@ -358,17 +378,50 @@ internal static class WmsGetMapHandlers
             throw new InvalidOperationException("Parameter 'layers' must include at least one entry.");
         }
 
-        var contexts = new List<WmsLayerContext>(layerNames.Count);
+        var contexts = new List<WmsLayerContext>();
+
         foreach (var requestedLayerName in layerNames)
         {
-            var dataset = await WmsSharedHelpers.ResolveDatasetAsync(requestedLayerName, rasterRegistry, cancellationToken).ConfigureAwait(false);
-            if (dataset is null)
+            // Try to resolve as a layer group first (format: serviceId:groupId)
+            if (WmsSharedHelpers.TryResolveLayerGroup(requestedLayerName, snapshot, out var layerGroup) &&
+                layerGroup is not null)
             {
-                throw new InvalidOperationException($"Layer '{requestedLayerName}' was not found.");
-            }
+                // Expand layer group to raster datasets
+                var expandedDatasets = await WmsSharedHelpers.ExpandLayerGroupToRasterDatasetsAsync(
+                    layerGroup,
+                    snapshot,
+                    rasterRegistry,
+                    cancellationToken).ConfigureAwait(false);
 
-            var canonicalLayerName = WmsSharedHelpers.BuildLayerName(dataset);
-            contexts.Add(new WmsLayerContext(dataset, requestedLayerName, canonicalLayerName));
+                // Add each expanded member as a context with its opacity
+                foreach (var expandedMember in expandedDatasets)
+                {
+                    var canonicalLayerName = WmsSharedHelpers.BuildLayerName(expandedMember.Dataset);
+                    contexts.Add(new WmsLayerContext(
+                        expandedMember.Dataset,
+                        requestedLayerName,
+                        canonicalLayerName,
+                        expandedMember.Opacity,
+                        expandedMember.StyleId));
+                }
+            }
+            else
+            {
+                // Try to resolve as a regular raster dataset
+                var dataset = await WmsSharedHelpers.ResolveDatasetAsync(requestedLayerName, rasterRegistry, cancellationToken).ConfigureAwait(false);
+                if (dataset is null)
+                {
+                    throw new InvalidOperationException($"Layer '{requestedLayerName}' was not found.");
+                }
+
+                var canonicalLayerName = WmsSharedHelpers.BuildLayerName(dataset);
+                contexts.Add(new WmsLayerContext(dataset, requestedLayerName, canonicalLayerName, 1.0, null));
+            }
+        }
+
+        if (contexts.Count == 0)
+        {
+            throw new InvalidOperationException("No valid layers found to render.");
         }
 
         return contexts;

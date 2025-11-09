@@ -507,4 +507,130 @@ internal static class WmsSharedHelpers
             ? value
             : null;
     }
+
+    /// <summary>
+    /// Tries to resolve a layer group by name (format: serviceId:groupId).
+    /// </summary>
+    public static bool TryResolveLayerGroup(
+        string layerName,
+        MetadataSnapshot snapshot,
+        out LayerGroupDefinition? layerGroup)
+    {
+        layerGroup = null;
+
+        if (!layerName.Contains(':', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var parts = layerName.Split(':', 2, StringSplitOptions.TrimEntries);
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        var serviceId = parts[0];
+        var groupId = parts[1];
+
+        return snapshot.TryGetLayerGroup(serviceId, groupId, out layerGroup);
+    }
+
+    /// <summary>
+    /// Expands a layer group to raster datasets for rendering.
+    /// </summary>
+    public static async ValueTask<IReadOnlyList<ExpandedRasterMember>> ExpandLayerGroupToRasterDatasetsAsync(
+        LayerGroupDefinition layerGroup,
+        MetadataSnapshot snapshot,
+        IRasterDatasetRegistry rasterRegistry,
+        CancellationToken cancellationToken)
+    {
+        // Expand the layer group to get component layers
+        var expandedLayers = LayerGroupExpander.ExpandLayerGroup(layerGroup, snapshot);
+
+        var result = new List<ExpandedRasterMember>();
+
+        // For each expanded layer, find its corresponding raster dataset
+        foreach (var expandedMember in expandedLayers)
+        {
+            var layer = expandedMember.Layer;
+
+            // Find the raster dataset for this layer
+            // Raster datasets can be linked to layers via ServiceId and LayerId
+            var rasterDataset = await FindRasterDatasetForLayerAsync(
+                layer,
+                rasterRegistry,
+                cancellationToken).ConfigureAwait(false);
+
+            if (rasterDataset is not null)
+            {
+                result.Add(new ExpandedRasterMember(
+                    rasterDataset,
+                    expandedMember.Opacity,
+                    expandedMember.StyleId,
+                    expandedMember.Order));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Finds the raster dataset associated with a layer.
+    /// </summary>
+    private static async ValueTask<RasterDatasetDefinition?> FindRasterDatasetForLayerAsync(
+        LayerDefinition layer,
+        IRasterDatasetRegistry rasterRegistry,
+        CancellationToken cancellationToken)
+    {
+        // Get all raster datasets and find one that matches this layer
+        var allDatasets = await rasterRegistry.GetAllAsync(cancellationToken).ConfigureAwait(false);
+
+        foreach (var dataset in allDatasets)
+        {
+            if (dataset.ServiceId.HasValue() &&
+                dataset.LayerId.HasValue() &&
+                string.Equals(dataset.ServiceId, layer.ServiceId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(dataset.LayerId, layer.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                return dataset;
+            }
+        }
+
+        return null;
+    }
+}
+
+/// <summary>
+/// Represents a raster dataset that has been expanded from a layer group,
+/// including its effective opacity and style.
+/// </summary>
+public sealed record ExpandedRasterMember
+{
+    /// <summary>
+    /// The raster dataset definition.
+    /// </summary>
+    public required RasterDatasetDefinition Dataset { get; init; }
+
+    /// <summary>
+    /// The cumulative opacity (0.0 - 1.0) from all parent groups.
+    /// </summary>
+    public double Opacity { get; init; } = 1.0;
+
+    /// <summary>
+    /// The style ID to use for rendering (may be overridden from the dataset's default).
+    /// </summary>
+    public string? StyleId { get; init; }
+
+    /// <summary>
+    /// The order value from the group member.
+    /// </summary>
+    public int Order { get; init; }
+
+    public ExpandedRasterMember(RasterDatasetDefinition dataset, double opacity, string? styleId, int order)
+    {
+        Dataset = dataset;
+        Opacity = opacity;
+        StyleId = styleId;
+        Order = order;
+    }
 }
