@@ -5,6 +5,34 @@
 
 Welcome to the Honua user documentation! This guide will help you get started with Honua Server, configure it for your needs, and integrate it into your applications.
 
+---
+
+## All User Documentation
+
+Quick overview of all available user documentation:
+
+| Document | Purpose | Time | Level |
+|----------|---------|------|-------|
+| **Getting Started** |||
+| [5-Minute Quick Start](../quickstart/README.md) | Get Honua running ASAP | 5 min | Beginner |
+| [Getting Started Guide](getting-started.md) | Complete first-time setup | 15-30 min | Beginner |
+| [Quick Reference](quick-reference.md) | Common tasks and commands | 2-5 min/task | All |
+| [Troubleshooting](troubleshooting.md) | Diagnose and fix issues | 5-15 min | All |
+| **Configuration & Setup** |||
+| [Authentication](authentication.md) | User auth and security | 10-15 min | Intermediate |
+| [Configuration](configuration.md) | Complete config reference | 20-30 min | Intermediate |
+| [Data Ingestion](data-ingestion.md) | Loading data into Honua | 10-15 min | Intermediate |
+| [Metadata Authoring](metadata-authoring.md) | Creating metadata | 15-20 min | Intermediate |
+| **API Reference** |||
+| [API Endpoints](endpoints.md) | Complete API reference | 30-45 min | Intermediate |
+| [Admin API](admin-api.md) | Administration API | 15-20 min | Advanced |
+| [Format Matrix](format-matrix.md) | Supported formats | 10 min | All |
+| **Other** |||
+| [Roadmap](roadmap.md) | Feature roadmap | 5 min | All |
+| [Support](support/README.md) | Getting help | 5 min | All |
+
+---
+
 ## What is Honua?
 
 Honua (Hawaiian for "Earth") is a cloud-native geospatial server that provides:
@@ -19,20 +47,93 @@ Honua (Hawaiian for "Earth") is a cloud-native geospatial server that provides:
 
 ## Quick Start
 
-New to Honua? Start here:
+**Choose your learning path:**
 
-1. **[Getting Started](../quickstart/README.md)** - Get Honua running in 5 minutes
-2. **[First API Request](../quickstart/README.md#first-api-requests)** - Make your first API call
-3. **[Authentication Setup](authentication.md)** - Configure user authentication
-4. **[Deploy to Production](../deployment/README.md)** - Production deployment guide
+### For First-Time Users
+1. **[5-Minute Quick Start](../quickstart/README.md)** - Get Honua running immediately
+2. **[Getting Started Guide](getting-started.md)** - Comprehensive first-time setup (15-30 min)
+3. **[Quick Reference](quick-reference.md)** - Common tasks and commands
+
+### For Experienced Users
+- **[Quick Reference](quick-reference.md)** - Copy-paste solutions for common tasks
+- **[Troubleshooting](troubleshooting.md)** - Diagnose and fix issues quickly
+- **[API Endpoints](endpoints.md)** - Complete API reference
+
+---
+
+## Documentation Hierarchy
+
+Honua's user documentation is organized in three levels:
+
+**Level 1: Getting Started** (Beginner-friendly)
+- [5-Minute Quick Start](../quickstart/README.md) - Fastest path to running Honua
+- [Getting Started Guide](getting-started.md) - Comprehensive first-time setup
+- [Quick Reference](quick-reference.md) - Common tasks at a glance
+
+**Level 2: Guides** (How-to and concepts)
+- [Authentication Guide](authentication.md) - User authentication and security
+- [Configuration Guide](configuration.md) - Configuring Honua
+- [Data Ingestion](data-ingestion.md) - Loading data
+- [Metadata Authoring](metadata-authoring.md) - Creating metadata
+- [Troubleshooting](troubleshooting.md) - Diagnosing issues
+
+**Level 3: Reference** (Complete details)
+- [API Endpoints](endpoints.md) - Complete API reference
+- [Admin API](admin-api.md) - Administration API
+- [Format Matrix](format-matrix.md) - All supported formats
+- [Configuration Reference](../configuration/README.md) - All config options
 
 ---
 
 ## Core User Documentation
 
+### 🚀 Getting Started
+
+**[Getting Started Guide](getting-started.md)** - **Start here if you're new!**
+Complete walkthrough for first-time users:
+- Installation options (Docker, container image, from source)
+- Configuration basics
+- Creating your first service and layer
+- Understanding Honua's APIs
+- Authentication setup
+- Common tasks and troubleshooting
+
+**Time**: 15-30 minutes | **Level**: Beginner
+
+---
+
+**[Quick Reference](quick-reference.md)** - **Quick answers**
+Fast, copy-paste solutions for common tasks:
+- API endpoints at a glance
+- Authentication commands
+- Common queries (spatial, attribute, export)
+- Export format examples
+- Docker commands
+- Metadata quick start
+- Troubleshooting checklist
+
+**Time**: 2-5 minutes per task | **Level**: All levels
+
+---
+
+**[Troubleshooting Guide](troubleshooting.md)** - **Fix issues quickly**
+Comprehensive problem diagnosis and solutions:
+- Quick diagnostic commands
+- Installation and startup issues
+- Database connection problems
+- Authentication errors
+- Metadata and configuration issues
+- API request problems
+- Performance optimization
+- Docker issues
+
+**Time**: 5-15 minutes | **Level**: All levels
+
+---
+
 ### 🔐 Authentication & Security
 
-**[Authentication Guide](authentication.md)**
+**[Authentication Guide](authentication.md)** - **Complete auth reference**
 - Local user authentication with bcrypt
 - OAuth 2.0 / OIDC integration
 - SAML 2.0 for enterprise SSO
