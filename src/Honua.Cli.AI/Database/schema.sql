@@ -173,6 +173,88 @@ CREATE INDEX IF NOT EXISTS idx_pattern_feedback_modified ON pattern_interaction_
 CREATE INDEX IF NOT EXISTS idx_pattern_feedback_satisfaction ON pattern_interaction_feedback(user_satisfaction_rating);
 
 -- ============================================================================
+-- Online Learning Updates
+-- ============================================================================
+-- Tracks real-time confidence updates based on acceptance/rejection signals.
+
+CREATE TABLE IF NOT EXISTS pattern_online_learning_updates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pattern_id VARCHAR(200) NOT NULL,
+    previous_confidence DECIMAL(5,4) NOT NULL,
+    new_confidence DECIMAL(5,4) NOT NULL,
+    signal_type VARCHAR(50) NOT NULL, -- acceptance | rejection | reconciliation
+    learning_rate DECIMAL(5,4) NOT NULL,
+    update_timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    reconciliation_metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_online_learning_pattern_id ON pattern_online_learning_updates(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_online_learning_timestamp ON pattern_online_learning_updates(update_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_online_learning_signal_type ON pattern_online_learning_updates(signal_type);
+
+-- ============================================================================
+-- Transfer Learning Bootstraps
+-- ============================================================================
+-- Records transfer learning bootstraps for new patterns.
+
+CREATE TABLE IF NOT EXISTS transfer_learning_bootstraps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pattern_id VARCHAR(200) NOT NULL,
+    bootstrapped_confidence DECIMAL(5,4) NOT NULL,
+    source_patterns JSONB NOT NULL,
+    bootstrap_timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfer_learning_pattern_id ON transfer_learning_bootstraps(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_learning_timestamp ON transfer_learning_bootstraps(bootstrap_timestamp DESC);
+
+-- ============================================================================
+-- Pattern Tuning History
+-- ============================================================================
+-- Records applied pattern configuration tunings.
+
+CREATE TABLE IF NOT EXISTS pattern_tuning_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pattern_id VARCHAR(200) NOT NULL,
+    field_name VARCHAR(100) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    modification_count INTEGER NOT NULL,
+    modification_rate DECIMAL(5,4) NOT NULL,
+    consensus_rate DECIMAL(5,4) NOT NULL,
+    confidence DECIMAL(5,4) NOT NULL,
+    approved_by VARCHAR(100),
+    applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pattern_tuning_pattern_id ON pattern_tuning_history(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_pattern_tuning_applied_at ON pattern_tuning_history(applied_at DESC);
+
+-- ============================================================================
+-- Active Learning Requests
+-- ============================================================================
+-- Tracks when and why feedback was requested from users.
+
+CREATE TABLE IF NOT EXISTS active_learning_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    interaction_id UUID NOT NULL,
+    pattern_id VARCHAR(200) NOT NULL,
+    request_type VARCHAR(50) NOT NULL, -- low_confidence | uncertainty | cold_start | etc
+    priority VARCHAR(20) NOT NULL, -- low | medium | high
+    questions JSONB NOT NULL,
+    requested_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_active_learning_interaction_id ON active_learning_requests(interaction_id);
+CREATE INDEX IF NOT EXISTS idx_active_learning_pattern_id ON active_learning_requests(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_active_learning_requested_at ON active_learning_requests(requested_at DESC);
+CREATE INDEX IF NOT EXISTS idx_active_learning_request_type ON active_learning_requests(request_type);
+
+-- ============================================================================
 -- Known Issues
 -- ============================================================================
 -- Stores known deployment issues for proactive troubleshooting.
