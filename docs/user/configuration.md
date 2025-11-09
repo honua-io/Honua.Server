@@ -81,7 +81,11 @@ HONUA__AUTHENTICATION__ENFORCE=false
 
 ### Mode: Local
 
-Local mode maintains a file-based user database with hashed passwords.
+Local mode maintains a database-backed user store with Argon2id-hashed passwords.
+
+**Security**: Uses Argon2id with 64MB memory cost and 4 iterations - more secure than bcrypt.
+
+**Storage**: Supports SQLite (default), PostgreSQL, MySQL, and SQL Server.
 
 ```json
 "authentication": {
@@ -89,10 +93,11 @@ Local mode maintains a file-based user database with hashed passwords.
   "enforce": true,
   "local": {
     "sessionLifetimeMinutes": 480,
-    "storePath": "data/users",
+    "storePath": "data/auth",
     "signingKeyPath": "data/signing-key.pem",
     "maxFailedLoginAttempts": 5,
-    "lockoutDurationMinutes": 15
+    "lockoutDurationMinutes": 15,
+    "provider": "sqlite"
   },
   "bootstrap": {
     "adminUsername": "admin",
