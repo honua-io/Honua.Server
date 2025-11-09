@@ -321,15 +321,29 @@ public sealed class WfsCapabilitiesBuilder : OgcCapabilitiesBuilder
             new XElement(WfsConstants.Wfs + "Format", WfsConstants.CsvFormat),
             new XElement(WfsConstants.Wfs + "Format", WfsConstants.ShapefileFormat)));
 
-        // Add WGS84 bounding box if available
+        // Add WGS84 bounding box if available (supports 2D and 3D)
         var bbox = layer.Extent?.Bbox?.FirstOrDefault();
-        if (bbox is { Length: 4 })
+        if (bbox is { Length: >= 4 })
         {
-            featureType.Add(new XElement(WfsConstants.Wfs + "WGS84BoundingBox",
-                new XElement(WfsConstants.Ows + "LowerCorner",
-                    $"{FormatDouble(bbox[0])} {FormatDouble(bbox[1])}"),
-                new XElement(WfsConstants.Ows + "UpperCorner",
-                    $"{FormatDouble(bbox[2])} {FormatDouble(bbox[3])}")));
+            var lowerCorner = bbox.Length >= 6
+                ? $"{FormatDouble(bbox[0])} {FormatDouble(bbox[1])} {FormatDouble(bbox[2])}" // 3D: minX minY minZ
+                : $"{FormatDouble(bbox[0])} {FormatDouble(bbox[1])}"; // 2D: minX minY
+
+            var upperCorner = bbox.Length >= 6
+                ? $"{FormatDouble(bbox[3])} {FormatDouble(bbox[4])} {FormatDouble(bbox[5])}" // 3D: maxX maxY maxZ
+                : $"{FormatDouble(bbox[2])} {FormatDouble(bbox[3])}"; // 2D: maxX maxY
+
+            var bboxElement = new XElement(WfsConstants.Wfs + "WGS84BoundingBox",
+                new XElement(WfsConstants.Ows + "LowerCorner", lowerCorner),
+                new XElement(WfsConstants.Ows + "UpperCorner", upperCorner));
+
+            // Add dimensions attribute for 3D bounding boxes
+            if (bbox.Length >= 6)
+            {
+                bboxElement.Add(new XAttribute("dimensions", "3"));
+            }
+
+            featureType.Add(bboxElement);
         }
 
         // Add metadata URL if present
@@ -399,18 +413,31 @@ public sealed class WfsCapabilitiesBuilder : OgcCapabilitiesBuilder
             new XElement(WfsConstants.Wfs + "Format", WfsConstants.CsvFormat),
             new XElement(WfsConstants.Wfs + "Format", WfsConstants.ShapefileFormat)));
 
-        // Add WGS84 bounding box from calculated group extent
+        // Add WGS84 bounding box from calculated group extent (supports 2D and 3D)
         var extent = LayerGroupExpander.CalculateGroupExtent(layerGroup, metadata);
         if (extent?.Bbox is { Count: > 0 })
         {
             var bbox = extent.Bbox[0];
             if (bbox.Length >= 4)
             {
-                featureType.Add(new XElement(WfsConstants.Wfs + "WGS84BoundingBox",
-                    new XElement(WfsConstants.Ows + "LowerCorner",
-                        $"{FormatDouble(bbox[0])} {FormatDouble(bbox[1])}"),
-                    new XElement(WfsConstants.Ows + "UpperCorner",
-                        $"{FormatDouble(bbox[2])} {FormatDouble(bbox[3])}")));
+                var lowerCorner = bbox.Length >= 6
+                    ? $"{FormatDouble(bbox[0])} {FormatDouble(bbox[1])} {FormatDouble(bbox[2])}" // 3D
+                    : $"{FormatDouble(bbox[0])} {FormatDouble(bbox[1])}"; // 2D
+
+                var upperCorner = bbox.Length >= 6
+                    ? $"{FormatDouble(bbox[3])} {FormatDouble(bbox[4])} {FormatDouble(bbox[5])}" // 3D
+                    : $"{FormatDouble(bbox[2])} {FormatDouble(bbox[3])}"; // 2D
+
+                var bboxElement = new XElement(WfsConstants.Wfs + "WGS84BoundingBox",
+                    new XElement(WfsConstants.Ows + "LowerCorner", lowerCorner),
+                    new XElement(WfsConstants.Ows + "UpperCorner", upperCorner));
+
+                if (bbox.Length >= 6)
+                {
+                    bboxElement.Add(new XAttribute("dimensions", "3"));
+                }
+
+                featureType.Add(bboxElement);
             }
         }
 
