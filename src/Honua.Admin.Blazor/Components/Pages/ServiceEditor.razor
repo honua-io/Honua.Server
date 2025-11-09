@@ -2,12 +2,11 @@
 @page "/services/{Id}/edit"
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Components
+@inherits AutoSaveFormBase<ServiceEditor.ServiceEditorModel>
 @inject ServiceApiClient ServiceApi
 @inject DataSourceApiClient DataSourceApi
 @inject FolderApiClient FolderApi
-@inject NavigationManager Navigation
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
 @inject EditorState EditorState
 
 <PageTitle>@(_isEditMode ? "Edit Service" : "Create Service") - Honua Admin</PageTitle>
@@ -16,9 +15,12 @@
     <MudBreadcrumbs Items="_breadcrumbs" />
 
     <MudPaper Elevation="2" Class="pa-6 mt-4">
-        <MudText Typo="Typo.h4" Class="mb-4">
-            @(_isEditMode ? $"Edit Service: {_model.Title}" : "Create New Service")
-        </MudText>
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">
+                @(_isEditMode ? $"Edit Service: {_model.Title}" : "Create New Service")
+            </MudText>
+            @RenderDraftStatus()
+        </MudStack>
 
         @if (_loading)
         {
@@ -50,6 +52,7 @@
                 <MudItem xs="12" md="6">
                     <MudTextField @ref="_serviceIdField"
                                   @bind-Value="_model.Id"
+                                  @bind-Value:after="OnModelChanged"
                                   Label="Service ID"
                                   Required="true"
                                   Disabled="@_isEditMode"
@@ -64,6 +67,7 @@
 
                 <MudItem xs="12" md="6">
                     <MudSelect @bind-Value="_model.ServiceType"
+                               @bind-Value:after="OnModelChanged"
                                Label="Service Type"
                                Required="true"
                                Disabled="@_isEditMode"
@@ -78,6 +82,7 @@
 
                 <MudItem xs="12" md="6">
                     <MudSelect @bind-Value="_model.DataSourceId"
+                               @bind-Value:after="OnModelChanged"
                                Label="Data Source"
                                Required="@(!_isEditMode)"
                                Disabled="@_isEditMode"
@@ -111,6 +116,7 @@
 
                 <MudItem xs="12" md="6">
                     <MudSelect @bind-Value="_model.FolderId"
+                               @bind-Value:after="OnModelChanged"
                                Label="Folder"
                                Clearable="true"
                                HelperText="Optional folder to organize services">
@@ -125,6 +131,7 @@
                 <MudItem xs="12">
                     <MudTextField @ref="_titleField"
                                   @bind-Value="_model.Title"
+                                  @bind-Value:after="OnModelChanged"
                                   Label="Title"
                                   Required="true"
                                   Immediate="true"
@@ -138,6 +145,7 @@
 
                 <MudItem xs="12">
                     <MudTextField @bind-Value="_model.Description"
+                                  @bind-Value:after="OnModelChanged"
                                   Label="Description"
                                   Lines="3"
                                   HelperText="Optional description of the service" />
@@ -231,8 +239,47 @@
     private Dictionary<string, bool> _fieldTouched = new();
     private List<string> _validationErrors = new();
 
+    // Auto-save implementation
+    protected override string GetDraftKey() => $"service_{Id ?? "new"}";
+
+    protected override async Task PerformSaveAsync()
+    {
+        if (_isEditMode)
+        {
+            var request = new UpdateServiceRequest
+            {
+                Title = _model.Title,
+                Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
+                FolderId = _model.FolderId ?? string.Empty,
+                OgcOptions = _model.OgcOptions
+            };
+
+            await ServiceApi.UpdateServiceAsync(Id!, request);
+        }
+        else
+        {
+            var request = new CreateServiceRequest
+            {
+                Id = _model.Id,
+                Title = _model.Title,
+                Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
+                ServiceType = _model.ServiceType,
+                DataSourceId = _model.DataSourceId!,
+                FolderId = string.IsNullOrWhiteSpace(_model.FolderId) ? null : _model.FolderId,
+                OgcOptions = _model.OgcOptions
+            };
+
+            await ServiceApi.CreateServiceAsync(request);
+        }
+    }
+
+    protected override bool ShouldLoadDraft() => !_isEditMode; // Only load drafts for new services
+
     protected override async Task OnInitializedAsync()
     {
+        // Call base to load drafts
+        await base.OnInitializedAsync();
+
         UpdateBreadcrumbs();
 
         // Load data sources and folders in parallel
@@ -247,8 +294,11 @@
         }
         else
         {
-            // Set defaults for new service
-            _model.ServiceType = "WMS";
+            // Set defaults for new service if not loaded from draft
+            if (string.IsNullOrEmpty(_model.ServiceType))
+            {
+                _model.ServiceType = "WMS";
+            }
         }
     }
 
@@ -332,50 +382,23 @@
             return;
         }
 
+        if (!_isEditMode && string.IsNullOrWhiteSpace(_model.DataSourceId))
+        {
+            Snackbar.Add("Please select a data source", Severity.Error);
+            return;
+        }
+
         _saving = true;
         _errorMessage = null;
 
         try
         {
-            if (_isEditMode)
-            {
-                var request = new UpdateServiceRequest
-                {
-                    Title = _model.Title,
-                    Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
-                    FolderId = _model.FolderId ?? string.Empty,
-                    OgcOptions = _model.OgcOptions
-                };
+            // Use auto-save base method which handles draft cleanup
+            await SaveAsync();
 
-                await ServiceApi.UpdateServiceAsync(Id!, request);
-                Snackbar.Add("Service updated successfully!", Severity.Success);
-                EditorState.MarkClean("service-editor");
-                Navigation.NavigateTo("/services");
-            }
-            else
-            {
-                if (string.IsNullOrWhiteSpace(_model.DataSourceId))
-                {
-                    Snackbar.Add("Please select a data source", Severity.Error);
-                    return;
-                }
-
-                var request = new CreateServiceRequest
-                {
-                    Id = _model.Id,
-                    Title = _model.Title,
-                    Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
-                    ServiceType = _model.ServiceType,
-                    DataSourceId = _model.DataSourceId,
-                    FolderId = string.IsNullOrWhiteSpace(_model.FolderId) ? null : _model.FolderId,
-                    OgcOptions = _model.OgcOptions
-                };
-
-                await ServiceApi.CreateServiceAsync(request);
-                Snackbar.Add("Service created successfully!", Severity.Success);
-                EditorState.MarkClean("service-editor");
-                Navigation.NavigateTo("/services");
-            }
+            Snackbar.Add(_isEditMode ? "Service updated successfully!" : "Service created successfully!", Severity.Success);
+            EditorState.MarkClean("service-editor");
+            Navigation.NavigateTo("/services");
         }
         catch (HttpRequestException ex)
         {
@@ -544,8 +567,8 @@
         EditorState.MarkDirty("service-editor");
     }
 
-    // Local model for form binding
-    private class ServiceEditorModel
+    // Local model for form binding (public for auto-save)
+    public class ServiceEditorModel
     {
         public string Id { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;

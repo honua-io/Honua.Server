@@ -9,8 +9,10 @@
 @inject ServiceApiClient ServiceApi
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject TouchGestureService TouchGestures
 @inject ILogger<LayerList> Logger
+@inject DataExportService ExportService
 @implements IAsyncDisposable
 
 <PageTitle>Layers - Honua Admin</PageTitle>
@@ -46,6 +48,37 @@
                                OnClick="@(() => _isDense = !_isDense)"
                                Title="Toggle Density" />
             </MudTooltip>
+            <MudMenu Icon="@Icons.Material.Filled.FileDownload"
+                     Label="Export"
+                     Variant="Variant.Outlined"
+                     Size="Size.Small"
+                     Disabled="@(!_filteredLayers.Any())">
+                <MudMenuItem OnClick="@(() => ExportToCsv())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.TableChart" Size="Size.Small" />
+                        <MudText>Export to CSV</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => ExportToExcel())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.GridOn" Size="Size.Small" />
+                        <MudText>Export to Excel</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => ExportToPdf())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" />
+                        <MudText>Export to PDF</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="@ShowExportDialog">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" />
+                        <MudText>Custom Export...</MudText>
+                    </MudStack>
+                </MudMenuItem>
+            </MudMenu>
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Add"
@@ -116,7 +149,20 @@
             }
             else
             {
+                <BulkActionsToolbar TItem="LayerListItem"
+                                    SelectedCount="@_selectedItems.Count"
+                                    IsProcessing="@_bulkActionInProgress"
+                                    ShowDelete="true"
+                                    ShowEnable="false"
+                                    ShowDisable="false"
+                                    OnDelete="BulkDelete"
+                                    OnClear="ClearSelection" />
+
                 <MudTable Items="@_filteredLayers"
+                          @ref="_table"
+                          MultiSelection="true"
+                          @bind-SelectedItems="_selectedItems"
+                          SelectOnRowClick="false"
                           Hover="true"
                           Breakpoint="Breakpoint.Sm"
                           Dense="@_isDense"
@@ -125,6 +171,12 @@
                           SortLabel="Sort By"
                           Class="sticky-header">
                     <HeaderContent>
+                        <MudTh Style="width: 50px;">
+                            <MudCheckBox T="bool"
+                                         Value="@_selectAll"
+                                         ValueChanged="SelectAllChanged"
+                                         Color="Color.Primary" />
+                        </MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<LayerListItem, object>(x => x.Id)">Layer ID</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<LayerListItem, object>(x => x.Title)">Title</MudTableSortLabel></MudTh>
                         @if (string.IsNullOrEmpty(ServiceId))
@@ -136,6 +188,12 @@
                         <MudTh>Actions</MudTh>
                     </HeaderContent>
                     <RowTemplate>
+                        <MudTd DataLabel="Select">
+                            <MudCheckBox T="bool"
+                                         Value="@_selectedItems.Contains(context)"
+                                         ValueChanged="@((bool value) => ToggleSelection(context, value))"
+                                         Color="Color.Primary" />
+                        </MudTd>
                         <MudTd DataLabel="Layer ID">
                             <MudText Typo="Typo.body2" Class="text-monospace">@context.Id</MudText>
                         </MudTd>
@@ -218,6 +276,10 @@
     private DotNetObjectReference<LayerList>? _dotNetRef;
     private string? _pullToRefreshGestureId;
     private string? _swipeNavGestureId;
+    private HashSet<LayerListItem> _selectedItems = new();
+    private bool _selectAll = false;
+    private bool _bulkActionInProgress = false;
+    private MudTable<LayerListItem>? _table;
 
     protected override async Task OnInitializedAsync()
     {
@@ -374,6 +436,300 @@
         GeometryTypes.MultiPolygon => Color.Warning,
         _ => Color.Default
     };
+
+    private void SelectAllChanged(bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedItems = _filteredLayers.ToHashSet();
+            _selectAll = true;
+        }
+        else
+        {
+            _selectedItems.Clear();
+            _selectAll = false;
+        }
+    }
+
+    private void ToggleSelection(LayerListItem layer, bool isSelected)
+    {
+        if (isSelected)
+        {
+            _selectedItems.Add(layer);
+        }
+        else
+        {
+            _selectedItems.Remove(layer);
+            _selectAll = false;
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedItems.Clear();
+        _selectAll = false;
+    }
+
+    private async Task BulkDelete()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Bulk Delete",
+            $"Delete {_selectedItems.Count} layer(s)? This cannot be undone.",
+            yesText: "Delete All",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", "Deleting Layers" },
+                { "Message", "Deleting layers..." },
+                { "Total", _selectedItems.Count }
+            };
+
+            var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+            var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+            var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+            _bulkActionInProgress = true;
+            int succeeded = 0;
+            int failed = 0;
+            int current = 0;
+            var itemsToDelete = _selectedItems.ToList();
+
+            foreach (var item in itemsToDelete)
+            {
+                current++;
+                try
+                {
+                    await LayerApi.DeleteLayerAsync(item.Id);
+                    _layers.Remove(item);
+                    _filteredLayers.Remove(item);
+                    succeeded++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Logger.LogError(ex, "Error deleting layer {LayerId}", item.Id);
+                }
+
+                progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                    $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+            }
+
+            progressDialog.Close();
+
+            Snackbar.Add($"Deleted {succeeded} layer(s). {failed} failed.",
+                failed > 0 ? Severity.Warning : Severity.Success);
+
+            _selectedItems.Clear();
+            _selectAll = false;
+            _bulkActionInProgress = false;
+            StateHasChanged();
+        }
+    }
+
+    // Export methods
+    private async Task ExportToCsv()
+    {
+        try
+        {
+            var data = _filteredLayers.ToList();
+            var columns = string.IsNullOrEmpty(ServiceId)
+                ? new[] { "Layer ID", "Title", "Service", "Geometry Type", "Last Updated" }
+                : new[] { "Layer ID", "Title", "Geometry Type", "Last Updated" };
+
+            await ExportService.ExportToCsvAsync(
+                data,
+                $"layers_{DateTime.Now:yyyyMMdd_HHmmss}.csv",
+                columns,
+                item => MapLayerToStringArray(item, columns));
+
+            Snackbar.Add("Layers exported to CSV successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting layers to CSV");
+        }
+    }
+
+    private async Task ExportToExcel()
+    {
+        try
+        {
+            var data = _filteredLayers.ToList();
+            var columns = string.IsNullOrEmpty(ServiceId)
+                ? new[] { "Layer ID", "Title", "Service", "Geometry Type", "Last Updated" }
+                : new[] { "Layer ID", "Title", "Geometry Type", "Last Updated" };
+
+            await ExportService.ExportToExcelAsync(
+                data,
+                $"layers_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
+                "Layers",
+                columns,
+                item => MapLayerToObjectArray(item, columns),
+                "Honua Layers Export");
+
+            Snackbar.Add("Layers exported to Excel successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting layers to Excel");
+        }
+    }
+
+    private async Task ExportToPdf()
+    {
+        try
+        {
+            var data = _filteredLayers.ToList();
+            var columns = string.IsNullOrEmpty(ServiceId)
+                ? new[] { "Layer ID", "Title", "Service", "Geometry Type", "Last Updated" }
+                : new[] { "Layer ID", "Title", "Geometry Type", "Last Updated" };
+
+            await ExportService.ExportToPdfAsync(
+                data,
+                $"layers_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
+                "Honua Layers Export",
+                columns,
+                item => MapLayerToStringArray(item, columns));
+
+            Snackbar.Add("Layers exported to PDF successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting layers to PDF");
+        }
+    }
+
+    private async Task ShowExportDialog()
+    {
+        var columns = new List<ExportDialog.ExportColumnDefinition>
+        {
+            new() { FieldName = "Id", DisplayName = "Layer ID", IsSelected = true },
+            new() { FieldName = "Title", DisplayName = "Title", IsSelected = true },
+            new() { FieldName = "GeometryType", DisplayName = "Geometry Type", IsSelected = true },
+            new() { FieldName = "UpdatedAt", DisplayName = "Last Updated", IsSelected = true }
+        };
+
+        if (string.IsNullOrEmpty(ServiceId))
+        {
+            columns.Insert(2, new() { FieldName = "ServiceId", DisplayName = "Service", IsSelected = true });
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "AvailableColumns", columns },
+            { "TotalCount", _layers.Count },
+            { "FilteredCount", _filteredLayers.Count },
+            { "DefaultFilename", $"layers_{DateTime.Now:yyyyMMdd_HHmmss}" }
+        };
+
+        var dialog = await DialogService.ShowAsync<ExportDialog>("Export Layers", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is ExportDialog.ExportConfiguration config)
+        {
+            try
+            {
+                var dataToExport = config.ExportFilteredOnly ? _filteredLayers : _layers;
+
+                switch (config.Format)
+                {
+                    case ExportDialog.ExportFormat.Csv:
+                        await ExportService.ExportToCsvAsync(
+                            dataToExport,
+                            $"{config.Filename}.csv",
+                            config.SelectedColumnNames,
+                            item => MapLayerToColumns(item, config.SelectedColumns));
+                        break;
+
+                    case ExportDialog.ExportFormat.Excel:
+                        await ExportService.ExportToExcelAsync(
+                            dataToExport,
+                            $"{config.Filename}.xlsx",
+                            "Layers",
+                            config.SelectedColumnNames,
+                            item => MapLayerToColumns(item, config.SelectedColumns).Select(v => (object)v).ToArray(),
+                            "Honua Layers Export");
+                        break;
+
+                    case ExportDialog.ExportFormat.Pdf:
+                        await ExportService.ExportToPdfAsync(
+                            dataToExport,
+                            $"{config.Filename}.pdf",
+                            "Honua Layers Export",
+                            config.SelectedColumnNames,
+                            item => MapLayerToColumns(item, config.SelectedColumns));
+                        break;
+                }
+
+                Snackbar.Add($"Layers exported successfully to {config.Format}", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error in custom export");
+            }
+        }
+    }
+
+    private string[] MapLayerToStringArray(LayerListItem layer, string[] columns)
+    {
+        var values = new List<string>();
+        foreach (var column in columns)
+        {
+            values.Add(column switch
+            {
+                "Layer ID" => layer.Id,
+                "Title" => layer.Title,
+                "Service" => layer.ServiceId,
+                "Geometry Type" => GeometryTypes.GetDisplayName(layer.GeometryType),
+                "Last Updated" => layer.UpdatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-",
+                _ => string.Empty
+            });
+        }
+        return values.ToArray();
+    }
+
+    private object[] MapLayerToObjectArray(LayerListItem layer, string[] columns)
+    {
+        var values = new List<object>();
+        foreach (var column in columns)
+        {
+            values.Add(column switch
+            {
+                "Layer ID" => layer.Id,
+                "Title" => layer.Title,
+                "Service" => layer.ServiceId,
+                "Geometry Type" => GeometryTypes.GetDisplayName(layer.GeometryType),
+                "Last Updated" => (object)(layer.UpdatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-"),
+                _ => string.Empty
+            });
+        }
+        return values.ToArray();
+    }
+
+    private string[] MapLayerToColumns(LayerListItem layer, string[] selectedColumns)
+    {
+        var values = new List<string>();
+        foreach (var column in selectedColumns)
+        {
+            values.Add(column switch
+            {
+                "Id" => layer.Id,
+                "Title" => layer.Title,
+                "ServiceId" => layer.ServiceId,
+                "GeometryType" => GeometryTypes.GetDisplayName(layer.GeometryType),
+                "UpdatedAt" => layer.UpdatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-",
+                _ => string.Empty
+            });
+        }
+        return values.ToArray();
+    }
 
     public async ValueTask DisposeAsync()
     {

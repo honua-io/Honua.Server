@@ -25,6 +25,10 @@
 
     <!-- Authorization -->
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.0" />
+
+    <!-- Export functionality -->
+    <PackageReference Include="ClosedXML" Version="0.102.3" />
+    <PackageReference Include="QuestPDF" Version="2024.10.3" />
   </ItemGroup>
 
   <ItemGroup>

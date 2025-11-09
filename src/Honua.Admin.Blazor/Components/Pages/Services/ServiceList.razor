@@ -11,6 +11,7 @@
 @inject ILogger<ServiceList> Logger
 @inject TouchGestureService TouchGestures
 @inject NavigationManager Navigation
+@inject DataExportService ExportService
 @implements IAsyncDisposable
 
 <PageTitle>Services - Honua Admin</PageTitle>
@@ -35,6 +36,37 @@
                                OnClick="@(() => _isDense = !_isDense)"
                                Title="Toggle Density" />
             </MudTooltip>
+            <MudMenu Icon="@Icons.Material.Filled.FileDownload"
+                     Label="Export"
+                     Variant="Variant.Outlined"
+                     Size="Size.Small"
+                     Disabled="@(!_filteredServices.Any())">
+                <MudMenuItem OnClick="@(() => ExportToCsv())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.TableChart" Size="Size.Small" />
+                        <MudText>Export to CSV</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => ExportToExcel())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.GridOn" Size="Size.Small" />
+                        <MudText>Export to Excel</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => ExportToPdf())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" />
+                        <MudText>Export to PDF</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="@ShowExportDialog">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" />
+                        <MudText>Custom Export...</MudText>
+                    </MudStack>
+                </MudMenuItem>
+            </MudMenu>
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Add"
@@ -80,7 +112,22 @@
             }
             else
             {
+                <BulkActionsToolbar TItem="ServiceListItem"
+                                    SelectedCount="@_selectedItems.Count"
+                                    IsProcessing="@_actionInProgress"
+                                    ShowDelete="true"
+                                    ShowEnable="true"
+                                    ShowDisable="true"
+                                    OnDelete="BulkDelete"
+                                    OnEnable="BulkEnable"
+                                    OnDisable="BulkDisable"
+                                    OnClear="ClearSelection" />
+
                 <MudTable Items="@_filteredServices"
+                          @ref="_table"
+                          MultiSelection="true"
+                          @bind-SelectedItems="_selectedItems"
+                          SelectOnRowClick="false"
                           Hover="true"
                           Breakpoint="Breakpoint.Sm"
                           Dense="@_isDense"
@@ -89,6 +136,12 @@
                           SortLabel="Sort By"
                           Class="sticky-header">
                     <HeaderContent>
+                        <MudTh Style="width: 50px;">
+                            <MudCheckBox T="bool"
+                                         Value="@_selectAll"
+                                         ValueChanged="SelectAllChanged"
+                                         Color="Color.Primary" />
+                        </MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ServiceListItem, object>(x => x.Title)">Name</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ServiceListItem, object>(x => x.ServiceType)">Type</MudTableSortLabel></MudTh>
                         <MudTh><MudTableSortLabel SortBy="new Func<ServiceListItem, object>(x => x.FolderId ?? string.Empty)">Folder</MudTableSortLabel></MudTh>
@@ -97,6 +150,12 @@
                         <MudTh>Actions</MudTh>
                     </HeaderContent>
                     <RowTemplate>
+                        <MudTd DataLabel="Select">
+                            <MudCheckBox T="bool"
+                                         Value="@_selectedItems.Contains(context)"
+                                         ValueChanged="@((bool value) => ToggleSelection(context, value))"
+                                         Color="Color.Primary" />
+                        </MudTd>
                         <MudTd DataLabel="Name">
                             <MudLink Href="@($"/services/{context.Id}")" Class="service-link">
                                 <b>@context.Title</b>
@@ -207,6 +266,9 @@
     private DotNetObjectReference<ServiceList>? _dotNetRef;
     private string? _pullToRefreshGestureId;
     private string? _swipeNavGestureId;
+    private HashSet<ServiceListItem> _selectedItems = new();
+    private bool _selectAll = false;
+    private MudTable<ServiceListItem>? _table;
 
     private IEnumerable<ServiceListItem> _filteredServices =>
         string.IsNullOrWhiteSpace(_searchText)
@@ -409,6 +471,379 @@
                 _actionInProgress = false;
             }
         }
+    }
+
+    private void SelectAllChanged(bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedItems = _filteredServices.ToHashSet();
+            _selectAll = true;
+        }
+        else
+        {
+            _selectedItems.Clear();
+            _selectAll = false;
+        }
+    }
+
+    private void ToggleSelection(ServiceListItem service, bool isSelected)
+    {
+        if (isSelected)
+        {
+            _selectedItems.Add(service);
+        }
+        else
+        {
+            _selectedItems.Remove(service);
+            _selectAll = false;
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedItems.Clear();
+        _selectAll = false;
+    }
+
+    private async Task BulkDelete()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Bulk Delete",
+            $"Delete {_selectedItems.Count} service(s)? This cannot be undone.",
+            yesText: "Delete All",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", "Deleting Services" },
+                { "Message", "Deleting services..." },
+                { "Total", _selectedItems.Count }
+            };
+
+            var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+            var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+            var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+            _actionInProgress = true;
+            int succeeded = 0;
+            int failed = 0;
+            int current = 0;
+            var itemsToDelete = _selectedItems.ToList();
+
+            foreach (var item in itemsToDelete)
+            {
+                current++;
+                try
+                {
+                    await ServiceApi.DeleteServiceAsync(item.Id);
+                    _services.Remove(item);
+                    succeeded++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Logger.LogError(ex, "Error deleting service {ServiceId}", item.Id);
+                }
+
+                progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                    $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+            }
+
+            progressDialog.Close();
+
+            Snackbar.Add($"Deleted {succeeded} service(s). {failed} failed.",
+                failed > 0 ? Severity.Warning : Severity.Success);
+
+            _selectedItems.Clear();
+            _selectAll = false;
+            _actionInProgress = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task BulkEnable()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Enabling Services" },
+            { "Message", "Enabling services..." },
+            { "Total", _selectedItems.Count }
+        };
+
+        var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+        var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+        var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+        _actionInProgress = true;
+        int succeeded = 0;
+        int failed = 0;
+        int current = 0;
+
+        foreach (var item in _selectedItems.ToList())
+        {
+            current++;
+            try
+            {
+                await ServiceApi.EnableServiceAsync(item.Id);
+                item.Enabled = true;
+                succeeded++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                Logger.LogError(ex, "Error enabling service {ServiceId}", item.Id);
+            }
+
+            progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+        }
+
+        progressDialog.Close();
+
+        Snackbar.Add($"Enabled {succeeded} service(s). {failed} failed.",
+            failed > 0 ? Severity.Warning : Severity.Success);
+
+        _selectedItems.Clear();
+        _selectAll = false;
+        _actionInProgress = false;
+        StateHasChanged();
+    }
+
+    private async Task BulkDisable()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Bulk Disable",
+            $"Disable {_selectedItems.Count} service(s)? They will no longer be accessible.",
+            yesText: "Disable All",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", "Disabling Services" },
+                { "Message", "Disabling services..." },
+                { "Total", _selectedItems.Count }
+            };
+
+            var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+            var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+            var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+            _actionInProgress = true;
+            int succeeded = 0;
+            int failed = 0;
+            int current = 0;
+
+            foreach (var item in _selectedItems.ToList())
+            {
+                current++;
+                try
+                {
+                    await ServiceApi.DisableServiceAsync(item.Id);
+                    item.Enabled = false;
+                    succeeded++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Logger.LogError(ex, "Error disabling service {ServiceId}", item.Id);
+                }
+
+                progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                    $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+            }
+
+            progressDialog.Close();
+
+            Snackbar.Add($"Disabled {succeeded} service(s). {failed} failed.",
+                failed > 0 ? Severity.Warning : Severity.Success);
+
+            _selectedItems.Clear();
+            _selectAll = false;
+            _actionInProgress = false;
+            StateHasChanged();
+        }
+    }
+
+    // Export methods
+    private async Task ExportToCsv()
+    {
+        try
+        {
+            var data = _filteredServices.ToList();
+            var columns = new[] { "Title", "Type", "Folder", "Layers", "Status" };
+
+            await ExportService.ExportToCsvAsync(
+                data,
+                $"services_{DateTime.Now:yyyyMMdd_HHmmss}.csv",
+                columns,
+                item => new[]
+                {
+                    item.Title,
+                    item.ServiceType,
+                    item.FolderId ?? "Root",
+                    item.LayerCount.ToString(),
+                    item.Enabled ? "Running" : "Stopped"
+                });
+
+            Snackbar.Add("Services exported to CSV successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting services to CSV");
+        }
+    }
+
+    private async Task ExportToExcel()
+    {
+        try
+        {
+            var data = _filteredServices.ToList();
+            var columns = new[] { "Title", "Type", "Folder", "Layers", "Status" };
+
+            await ExportService.ExportToExcelAsync(
+                data,
+                $"services_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
+                "Services",
+                columns,
+                item => new object[]
+                {
+                    item.Title,
+                    item.ServiceType,
+                    item.FolderId ?? "Root",
+                    item.LayerCount,
+                    item.Enabled ? "Running" : "Stopped"
+                },
+                "Honua Services Export");
+
+            Snackbar.Add("Services exported to Excel successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting services to Excel");
+        }
+    }
+
+    private async Task ExportToPdf()
+    {
+        try
+        {
+            var data = _filteredServices.ToList();
+            var columns = new[] { "Title", "Type", "Folder", "Layers", "Status" };
+
+            await ExportService.ExportToPdfAsync(
+                data,
+                $"services_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
+                "Honua Services Export",
+                columns,
+                item => new[]
+                {
+                    item.Title,
+                    item.ServiceType,
+                    item.FolderId ?? "Root",
+                    item.LayerCount.ToString(),
+                    item.Enabled ? "Running" : "Stopped"
+                });
+
+            Snackbar.Add("Services exported to PDF successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting services to PDF");
+        }
+    }
+
+    private async Task ShowExportDialog()
+    {
+        var columns = new List<ExportDialog.ExportColumnDefinition>
+        {
+            new() { FieldName = "Title", DisplayName = "Service Name", IsSelected = true },
+            new() { FieldName = "ServiceType", DisplayName = "Type", IsSelected = true },
+            new() { FieldName = "FolderId", DisplayName = "Folder", IsSelected = true },
+            new() { FieldName = "LayerCount", DisplayName = "Number of Layers", IsSelected = true },
+            new() { FieldName = "Enabled", DisplayName = "Status", IsSelected = true }
+        };
+
+        var parameters = new DialogParameters
+        {
+            { "AvailableColumns", columns },
+            { "TotalCount", _services.Count },
+            { "FilteredCount", _filteredServices.Count() },
+            { "DefaultFilename", $"services_{DateTime.Now:yyyyMMdd_HHmmss}" }
+        };
+
+        var dialog = await DialogService.ShowAsync<ExportDialog>("Export Services", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is ExportDialog.ExportConfiguration config)
+        {
+            try
+            {
+                var dataToExport = config.ExportFilteredOnly ? _filteredServices.ToList() : _services;
+
+                switch (config.Format)
+                {
+                    case ExportDialog.ExportFormat.Csv:
+                        await ExportService.ExportToCsvAsync(
+                            dataToExport,
+                            $"{config.Filename}.csv",
+                            config.SelectedColumnNames,
+                            item => MapServiceToColumns(item, config.SelectedColumns));
+                        break;
+
+                    case ExportDialog.ExportFormat.Excel:
+                        await ExportService.ExportToExcelAsync(
+                            dataToExport,
+                            $"{config.Filename}.xlsx",
+                            "Services",
+                            config.SelectedColumnNames,
+                            item => MapServiceToColumns(item, config.SelectedColumns).Select(v => (object)v).ToArray(),
+                            "Honua Services Export");
+                        break;
+
+                    case ExportDialog.ExportFormat.Pdf:
+                        await ExportService.ExportToPdfAsync(
+                            dataToExport,
+                            $"{config.Filename}.pdf",
+                            "Honua Services Export",
+                            config.SelectedColumnNames,
+                            item => MapServiceToColumns(item, config.SelectedColumns));
+                        break;
+                }
+
+                Snackbar.Add($"Services exported successfully to {config.Format}", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error in custom export");
+            }
+        }
+    }
+
+    private string[] MapServiceToColumns(ServiceListItem service, string[] selectedColumns)
+    {
+        var values = new List<string>();
+        foreach (var column in selectedColumns)
+        {
+            values.Add(column switch
+            {
+                "Title" => service.Title,
+                "ServiceType" => service.ServiceType,
+                "FolderId" => service.FolderId ?? "Root",
+                "LayerCount" => service.LayerCount.ToString(),
+                "Enabled" => service.Enabled ? "Running" : "Stopped",
+                _ => string.Empty
+            });
+        }
+        return values.ToArray();
     }
 
     public async ValueTask DisposeAsync()

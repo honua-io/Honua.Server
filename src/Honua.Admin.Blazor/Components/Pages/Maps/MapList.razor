@@ -60,11 +60,30 @@
         }
         else
         {
+            <BulkActionsToolbar TItem="MapConfigurationListItem"
+                                SelectedCount="@_selectedItems.Count"
+                                IsProcessing="@_bulkActionInProgress"
+                                ShowDelete="true"
+                                ShowEnable="false"
+                                ShowDisable="false"
+                                OnDelete="BulkDelete"
+                                OnClear="ClearSelection" />
+
             <MudTable Items="@_filteredConfigurations"
+                     @ref="_table"
+                     MultiSelection="true"
+                     @bind-SelectedItems="_selectedItems"
+                     SelectOnRowClick="false"
                      Hover="true"
                      Breakpoint="Breakpoint.Sm"
                      LoadingProgressColor="Color.Primary">
                 <HeaderContent>
+                <MudTh Style="width: 50px;">
+                    <MudCheckBox T="bool"
+                                 Value="@_selectAll"
+                                 ValueChanged="SelectAllChanged"
+                                 Color="Color.Primary" />
+                </MudTh>
                 <MudTh>Name</MudTh>
                 <MudTh>Description</MudTh>
                 <MudTh>Created By</MudTh>
@@ -74,6 +93,12 @@
                 <MudTh>Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
+                <MudTd DataLabel="Select">
+                    <MudCheckBox T="bool"
+                                 Value="@_selectedItems.Contains(context)"
+                                 ValueChanged="@((bool value) => ToggleSelection(context, value))"
+                                 Color="Color.Primary" />
+                </MudTd>
                 <MudTd DataLabel="Name">
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                         @if (!string.IsNullOrEmpty(context.ThumbnailUrl))
@@ -166,6 +191,10 @@
     private DotNetObjectReference<MapList>? _dotNetRef;
     private string? _pullToRefreshGestureId;
     private string? _swipeNavGestureId;
+    private HashSet<MapConfigurationListItem> _selectedItems = new();
+    private bool _selectAll = false;
+    private bool _bulkActionInProgress = false;
+    private MudTable<MapConfigurationListItem>? _table;
 
     private IEnumerable<MapConfigurationListItem> _filteredConfigurations =>
         string.IsNullOrWhiteSpace(_searchText)
@@ -323,6 +352,104 @@
     {
         var url = $"/admin/api/map-configurations/{id}/export/{format}";
         Navigation.NavigateTo(url, forceLoad: true);
+    }
+
+    private void SelectAllChanged(bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedItems = _filteredConfigurations.ToHashSet();
+            _selectAll = true;
+        }
+        else
+        {
+            _selectedItems.Clear();
+            _selectAll = false;
+        }
+    }
+
+    private void ToggleSelection(MapConfigurationListItem map, bool isSelected)
+    {
+        if (isSelected)
+        {
+            _selectedItems.Add(map);
+        }
+        else
+        {
+            _selectedItems.Remove(map);
+            _selectAll = false;
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedItems.Clear();
+        _selectAll = false;
+    }
+
+    private async Task BulkDelete()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Bulk Delete",
+            $"Delete {_selectedItems.Count} map configuration(s)? This cannot be undone.",
+            yesText: "Delete All",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", "Deleting Map Configurations" },
+                { "Message", "Deleting map configurations..." },
+                { "Total", _selectedItems.Count }
+            };
+
+            var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+            var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+            var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+            _bulkActionInProgress = true;
+            int succeeded = 0;
+            int failed = 0;
+            int current = 0;
+            var itemsToDelete = _selectedItems.ToList();
+
+            foreach (var item in itemsToDelete)
+            {
+                current++;
+                try
+                {
+                    var response = await Http.DeleteAsync($"/admin/api/map-configurations/{item.Id}");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _configurations.Remove(item);
+                        succeeded++;
+                    }
+                    else
+                    {
+                        failed++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Logger.LogError(ex, "Error deleting map configuration {MapId}", item.Id);
+                }
+
+                progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                    $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+            }
+
+            progressDialog.Close();
+
+            Snackbar.Add($"Deleted {succeeded} map configuration(s). {failed} failed.",
+                failed > 0 ? Severity.Warning : Severity.Success);
+
+            _selectedItems.Clear();
+            _selectAll = false;
+            _bulkActionInProgress = false;
+            StateHasChanged();
+        }
     }
 
     // DTO for list view

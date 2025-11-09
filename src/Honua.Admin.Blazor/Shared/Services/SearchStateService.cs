@@ -16,10 +16,12 @@ public sealed class SearchStateService
     private readonly ILogger<SearchStateService> _logger;
     private const string PresetStorageKey = "honua.search.presets";
     private const string HistoryStorageKey = "honua.search.history";
+    private const string AdvancedPresetStorageKey = "honua.search.advanced.presets";
     private const int MaxHistoryEntries = 50;
 
     private List<FilterPreset> _presets = new();
     private List<SearchHistoryEntry> _history = new();
+    private Dictionary<string, List<AdvancedFilterPreset>> _advancedPresets = new();
     private bool _isInitialized = false;
 
     public event EventHandler? OnChange;
@@ -57,11 +59,69 @@ public sealed class SearchStateService
         {
             await LoadPresetsAsync();
             await LoadHistoryAsync();
+            await LoadAdvancedPresetsAsync();
             _isInitialized = true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error initializing search state");
+        }
+    }
+
+    /// <summary>
+    /// Gets advanced filter presets for a specific table type.
+    /// </summary>
+    public IReadOnlyList<AdvancedFilterPreset> GetAdvancedPresets(string tableType)
+    {
+        if (_advancedPresets.TryGetValue(tableType, out var presets))
+        {
+            return presets.AsReadOnly();
+        }
+        return new List<AdvancedFilterPreset>().AsReadOnly();
+    }
+
+    /// <summary>
+    /// Saves an advanced filter preset.
+    /// </summary>
+    public async Task<AdvancedFilterPreset> SaveAdvancedPresetAsync(string tableType, string name, string? description, List<ColumnFilter> filters)
+    {
+        var preset = new AdvancedFilterPreset
+        {
+            Name = name,
+            Description = description,
+            TableType = tableType,
+            Filters = filters.Select(f => new ColumnFilter
+            {
+                Column = f.Column,
+                Operator = f.Operator,
+                Value = f.Value,
+                SecondValue = f.SecondValue,
+                Values = new List<string>(f.Values)
+            }).ToList()
+        };
+
+        if (!_advancedPresets.ContainsKey(tableType))
+        {
+            _advancedPresets[tableType] = new List<AdvancedFilterPreset>();
+        }
+
+        _advancedPresets[tableType].Add(preset);
+        await SaveAdvancedPresetsAsync();
+        NotifyStateChanged();
+
+        return preset;
+    }
+
+    /// <summary>
+    /// Deletes an advanced filter preset.
+    /// </summary>
+    public async Task DeleteAdvancedPresetAsync(string tableType, string presetId)
+    {
+        if (_advancedPresets.TryGetValue(tableType, out var presets))
+        {
+            presets.RemoveAll(p => p.Id == presetId);
+            await SaveAdvancedPresetsAsync();
+            NotifyStateChanged();
         }
     }
 
@@ -216,6 +276,36 @@ public sealed class SearchStateService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error saving search history to localStorage");
+        }
+    }
+
+    private async Task LoadAdvancedPresetsAsync()
+    {
+        try
+        {
+            var json = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", AdvancedPresetStorageKey);
+            if (!string.IsNullOrEmpty(json))
+            {
+                _advancedPresets = JsonSerializer.Deserialize<Dictionary<string, List<AdvancedFilterPreset>>>(json)
+                    ?? new Dictionary<string, List<AdvancedFilterPreset>>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error loading advanced filter presets from localStorage");
+        }
+    }
+
+    private async Task SaveAdvancedPresetsAsync()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(_advancedPresets);
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", AdvancedPresetStorageKey, json);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error saving advanced filter presets to localStorage");
         }
     }
 

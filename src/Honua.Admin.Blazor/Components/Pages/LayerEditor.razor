@@ -3,11 +3,10 @@
 @page "/services/{ServiceId}/layers/new"
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Components
+@inherits AutoSaveFormBase<LayerEditor.LayerEditorModel>
 @inject LayerApiClient LayerApi
 @inject ServiceApiClient ServiceApi
-@inject NavigationManager Navigation
-@inject ISnackbar Snackbar
-@inject IDialogService DialogService
 @inject EditorState EditorState
 
 <PageTitle>@(_isEditMode ? "Edit Layer" : "Create Layer") - Honua Admin</PageTitle>
@@ -16,9 +15,12 @@
     <MudBreadcrumbs Items="_breadcrumbs" />
 
     <MudPaper Elevation="2" Class="pa-6 mt-4">
-        <MudText Typo="Typo.h4" Class="mb-4">
-            @(_isEditMode ? $"Edit Layer: {_model.Title}" : "Create New Layer")
-        </MudText>
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">
+                @(_isEditMode ? $"Edit Layer: {_model.Title}" : "Create New Layer")
+            </MudText>
+            @RenderDraftStatus()
+        </MudStack>
 
         @if (_loading)
         {
@@ -50,6 +52,7 @@
                 <MudItem xs="12" md="6">
                     <MudTextField @ref="_layerIdField"
                                   @bind-Value="_model.Id"
+                                  @bind-Value:after="OnModelChanged"
                                   Label="Layer ID"
                                   Required="true"
                                   Disabled="@_isEditMode"
@@ -64,6 +67,7 @@
 
                 <MudItem xs="12" md="6">
                     <MudSelect @bind-Value="_model.ServiceId"
+                               @bind-Value:after="OnModelChanged"
                                Label="Service"
                                Required="true"
                                Disabled="@(_isEditMode || !string.IsNullOrEmpty(ServiceId))"
@@ -78,6 +82,7 @@
                 <MudItem xs="12">
                     <MudTextField @ref="_titleField"
                                   @bind-Value="_model.Title"
+                                  @bind-Value:after="OnModelChanged"
                                   Label="Title"
                                   Required="true"
                                   Immediate="true"
@@ -91,6 +96,7 @@
 
                 <MudItem xs="12">
                     <MudTextField @bind-Value="_model.Description"
+                                  @bind-Value:after="OnModelChanged"
                                   Label="Description"
                                   Lines="3"
                                   HelperText="Optional description of the layer" />
@@ -250,6 +256,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Call base to load drafts
+        await base.OnInitializedAsync();
+
         await LoadServicesAsync();
 
         if (_isEditMode && !string.IsNullOrEmpty(Id))
@@ -258,14 +267,26 @@
         }
         else
         {
-            // Set defaults for new layer
-            _model.GeometryType = GeometryTypes.Point;
-            _model.IdField = "id";
-            _model.GeometryField = "geom";
-            _model.Crs.Add("EPSG:4326");
+            // Set defaults for new layer if not loaded from draft
+            if (string.IsNullOrEmpty(_model.GeometryType))
+            {
+                _model.GeometryType = GeometryTypes.Point;
+            }
+            if (string.IsNullOrEmpty(_model.IdField))
+            {
+                _model.IdField = "id";
+            }
+            if (string.IsNullOrEmpty(_model.GeometryField))
+            {
+                _model.GeometryField = "geom";
+            }
+            if (_model.Crs.Count == 0)
+            {
+                _model.Crs.Add("EPSG:4326");
+            }
 
             // Pre-select service if provided in URL
-            if (!string.IsNullOrEmpty(ServiceId))
+            if (!string.IsNullOrEmpty(ServiceId) && string.IsNullOrEmpty(_model.ServiceId))
             {
                 _model.ServiceId = ServiceId;
             }
@@ -361,44 +382,12 @@
 
         try
         {
-            if (_isEditMode)
-            {
-                var request = new UpdateLayerRequest
-                {
-                    Title = _model.Title,
-                    Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
-                    GeometryType = _model.GeometryType,
-                    IdField = _model.IdField,
-                    GeometryField = _model.GeometryField,
-                    DisplayField = string.IsNullOrWhiteSpace(_model.DisplayField) ? null : _model.DisplayField,
-                    Crs = _model.Crs
-                };
+            // Use auto-save base method which handles draft cleanup
+            await SaveAsync();
 
-                await LayerApi.UpdateLayerAsync(Id!, request);
-                Snackbar.Add("Layer updated successfully!", Severity.Success);
-                EditorState.MarkClean("layer-editor");
-                NavigateToLayerList();
-            }
-            else
-            {
-                var request = new CreateLayerRequest
-                {
-                    Id = _model.Id,
-                    ServiceId = _model.ServiceId,
-                    Title = _model.Title,
-                    Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
-                    GeometryType = _model.GeometryType,
-                    IdField = _model.IdField,
-                    GeometryField = _model.GeometryField,
-                    DisplayField = string.IsNullOrWhiteSpace(_model.DisplayField) ? null : _model.DisplayField,
-                    Crs = _model.Crs
-                };
-
-                await LayerApi.CreateLayerAsync(request);
-                Snackbar.Add("Layer created successfully!", Severity.Success);
-                EditorState.MarkClean("layer-editor");
-                NavigateToLayerList();
-            }
+            Snackbar.Add(_isEditMode ? "Layer updated successfully!" : "Layer created successfully!", Severity.Success);
+            EditorState.MarkClean("layer-editor");
+            NavigateToLayerList();
         }
         catch (HttpRequestException ex)
         {
@@ -643,8 +632,49 @@
         }
     }
 
-    // Local model for form binding
-    private class LayerEditorModel
+    // Auto-save implementation
+    protected override string GetDraftKey() => $"layer_{Id ?? "new"}";
+
+    protected override async Task PerformSaveAsync()
+    {
+        if (_isEditMode)
+        {
+            var request = new UpdateLayerRequest
+            {
+                Title = _model.Title,
+                Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
+                GeometryType = _model.GeometryType,
+                IdField = _model.IdField,
+                GeometryField = _model.GeometryField,
+                DisplayField = string.IsNullOrWhiteSpace(_model.DisplayField) ? null : _model.DisplayField,
+                Crs = _model.Crs
+            };
+
+            await LayerApi.UpdateLayerAsync(Id!, request);
+        }
+        else
+        {
+            var request = new CreateLayerRequest
+            {
+                Id = _model.Id,
+                ServiceId = _model.ServiceId,
+                Title = _model.Title,
+                Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
+                GeometryType = _model.GeometryType,
+                IdField = _model.IdField,
+                GeometryField = _model.GeometryField,
+                DisplayField = string.IsNullOrWhiteSpace(_model.DisplayField) ? null : _model.DisplayField,
+                Crs = _model.Crs
+            };
+
+            await LayerApi.CreateLayerAsync(request);
+        }
+    }
+
+    protected override bool ShouldLoadDraft() => !_isEditMode;
+
+    // Local model for form binding (public for auto-save)
+    public class LayerEditorModel
     {
         public string Id { get; set; } = string.Empty;
         public string ServiceId { get; set; } = string.Empty;

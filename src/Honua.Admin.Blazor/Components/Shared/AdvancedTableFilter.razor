@@ -1,0 +1,242 @@
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject SearchStateService SearchState
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4 mb-4" Elevation="2">
+    <MudStack Spacing="3">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h6">Advanced Filters</MudText>
+            <MudSpacer />
+            <MudButton StartIcon="@Icons.Material.Filled.Add"
+                       Size="Size.Small"
+                       Variant="Variant.Outlined"
+                       OnClick="AddFilter">
+                Add Filter
+            </MudButton>
+            <MudButton StartIcon="@Icons.Material.Filled.Bookmark"
+                       Size="Size.Small"
+                       Variant="Variant.Outlined"
+                       OnClick="ShowSavePresetDialog"
+                       Disabled="@(!_activeFilters.Any())">
+                Save Preset
+            </MudButton>
+            <MudButton StartIcon="@Icons.Material.Filled.Clear"
+                       Size="Size.Small"
+                       Color="Color.Default"
+                       OnClick="ClearAllFilters"
+                       Disabled="@(!_activeFilters.Any())">
+                Clear All
+            </MudButton>
+        </MudStack>
+
+        @if (_activeFilters.Any())
+        {
+            <MudDivider />
+
+            @* Active Filters *@
+            foreach (var filter in _activeFilters)
+            {
+                <MudPaper Outlined="true" Class="pa-3">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudSelect T="string"
+                                   @bind-Value="filter.Column"
+                                   Label="Column"
+                                   Variant="Variant.Outlined"
+                                   Dense="true"
+                                   Style="min-width: 150px;"
+                                   OnChange="@(() => OnFilterChanged())">
+                            @foreach (var col in AvailableColumns)
+                            {
+                                <MudSelectItem Value="@col.Key">@col.Value</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudSelect T="FilterOperator"
+                                   @bind-Value="filter.Operator"
+                                   Label="Operator"
+                                   Variant="Variant.Outlined"
+                                   Dense="true"
+                                   Style="min-width: 150px;"
+                                   OnChange="@(() => OnFilterChanged())">
+                            @foreach (FilterOperator op in Enum.GetValues(typeof(FilterOperator)))
+                            {
+                                <MudSelectItem Value="@op">@FilterOptions.GetOperatorDisplayName(op)</MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        @if (filter.Operator == FilterOperator.Between)
+                        {
+                            <MudTextField T="string"
+                                          @bind-Value="filter.Value"
+                                          Label="From"
+                                          Variant="Variant.Outlined"
+                                          Dense="true"
+                                          OnDebounceIntervalElapsed="OnFilterChanged"
+                                          DebounceInterval="300" />
+                            <MudTextField T="string"
+                                          @bind-Value="filter.SecondValue"
+                                          Label="To"
+                                          Variant="Variant.Outlined"
+                                          Dense="true"
+                                          OnDebounceIntervalElapsed="OnFilterChanged"
+                                          DebounceInterval="300" />
+                        }
+                        else if (filter.Operator == FilterOperator.IsNull || filter.Operator == FilterOperator.IsNotNull)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Style="flex: 1;">
+                                No value needed
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudTextField T="string"
+                                          @bind-Value="filter.Value"
+                                          Label="Value"
+                                          Variant="Variant.Outlined"
+                                          Dense="true"
+                                          Style="flex: 1;"
+                                          OnDebounceIntervalElapsed="OnFilterChanged"
+                                          DebounceInterval="300" />
+                        }
+
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => RemoveFilter(filter))" />
+                    </MudStack>
+                </MudPaper>
+            }
+        }
+
+        @* Saved Presets *@
+        @if (_savedPresets.Any())
+        {
+            <MudDivider />
+            <MudText Typo="Typo.subtitle2">Saved Presets</MudText>
+            <MudStack Row="true" Spacing="2" Style="flex-wrap: wrap;">
+                @foreach (var preset in _savedPresets)
+                {
+                    <MudChip T="string"
+                             Color="Color.Primary"
+                             Variant="Variant.Outlined"
+                             OnClick="@(() => LoadPreset(preset))"
+                             OnClose="@(() => DeletePreset(preset))">
+                        @preset.Name
+                    </MudChip>
+                }
+            </MudStack>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter]
+    public Dictionary<string, string> AvailableColumns { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<ColumnFilter>> OnFiltersChanged { get; set; }
+
+    [Parameter]
+    public string TableType { get; set; } = string.Empty;
+
+    private List<ColumnFilter> _activeFilters = new();
+    private List<AdvancedFilterPreset> _savedPresets = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchState.InitializeAsync();
+        await LoadPresetsAsync();
+    }
+
+    private async Task LoadPresetsAsync()
+    {
+        _savedPresets = SearchState.GetAdvancedPresets(TableType).ToList();
+        StateHasChanged();
+    }
+
+    private void AddFilter()
+    {
+        var firstColumn = AvailableColumns.FirstOrDefault();
+        _activeFilters.Add(new ColumnFilter
+        {
+            Column = firstColumn.Key ?? string.Empty,
+            Operator = FilterOperator.Contains,
+            Value = string.Empty
+        });
+        StateHasChanged();
+    }
+
+    private void RemoveFilter(ColumnFilter filter)
+    {
+        _activeFilters.Remove(filter);
+        OnFilterChanged();
+    }
+
+    private void ClearAllFilters()
+    {
+        _activeFilters.Clear();
+        OnFilterChanged();
+    }
+
+    private async void OnFilterChanged()
+    {
+        await OnFiltersChanged.InvokeAsync(_activeFilters);
+        StateHasChanged();
+    }
+
+    private async Task ShowSavePresetDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Save Filter Preset" }
+        };
+
+        var dialog = await DialogService.ShowAsync<SavePresetDialog>("Save Preset", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is (string name, string description))
+        {
+            try
+            {
+                await SearchState.SaveAdvancedPresetAsync(TableType, name, description, _activeFilters);
+                await LoadPresetsAsync();
+                Snackbar.Add($"Filter preset '{name}' saved successfully", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error saving preset: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private void LoadPreset(AdvancedFilterPreset preset)
+    {
+        _activeFilters = preset.Filters.Select(f => new ColumnFilter
+        {
+            Column = f.Column,
+            Operator = f.Operator,
+            Value = f.Value,
+            SecondValue = f.SecondValue,
+            Values = new List<string>(f.Values)
+        }).ToList();
+
+        OnFilterChanged();
+        Snackbar.Add($"Loaded preset '{preset.Name}'", Severity.Info);
+    }
+
+    private async Task DeletePreset(AdvancedFilterPreset preset)
+    {
+        try
+        {
+            await SearchState.DeleteAdvancedPresetAsync(TableType, preset.Id);
+            await LoadPresetsAsync();
+            Snackbar.Add($"Preset '{preset.Name}' deleted", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting preset: {ex.Message}", Severity.Error);
+        }
+    }
+}

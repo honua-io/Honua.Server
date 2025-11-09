@@ -103,14 +103,35 @@
             }
             else
             {
+                <BulkActionsToolbar TItem="UserResponse"
+                                    SelectedCount="@_selectedItems.Count"
+                                    IsProcessing="@_bulkActionInProgress"
+                                    ShowDelete="true"
+                                    ShowEnable="true"
+                                    ShowDisable="true"
+                                    OnDelete="BulkDelete"
+                                    OnEnable="BulkEnable"
+                                    OnDisable="BulkDisable"
+                                    OnClear="ClearSelection" />
+
                 @* Users Table *@
                 <MudTable Items="@_users"
+                  @ref="_table"
+                  MultiSelection="true"
+                  @bind-SelectedItems="_selectedItems"
+                  SelectOnRowClick="false"
                   Hover="true"
                   Breakpoint="Breakpoint.Sm"
                   Loading="@_loading"
                   LoadingProgressColor="Color.Primary"
                   Dense="false">
             <HeaderContent>
+                <MudTh Style="width: 50px;">
+                    <MudCheckBox T="bool"
+                                 Value="@_selectAll"
+                                 ValueChanged="SelectAllChanged"
+                                 Color="Color.Primary" />
+                </MudTh>
                 <MudTh>Username</MudTh>
                 <MudTh>Display Name</MudTh>
                 <MudTh>Email</MudTh>
@@ -120,6 +141,12 @@
                 <MudTh>Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
+                <MudTd DataLabel="Select">
+                    <MudCheckBox T="bool"
+                                 Value="@_selectedItems.Contains(context)"
+                                 ValueChanged="@((bool value) => ToggleSelection(context, value))"
+                                 Color="Color.Primary" />
+                </MudTd>
                 <MudTd DataLabel="Username">
                     <MudStack Row="false" Spacing="1">
                         <MudText Typo="Typo.body1"><b>@context.Username</b></MudText>
@@ -232,6 +259,10 @@
     private string? _errorMessage;
     private List<UserResponse> _users = new();
     private UserStatistics? _statistics;
+    private HashSet<UserResponse> _selectedItems = new();
+    private bool _selectAll = false;
+    private bool _bulkActionInProgress = false;
+    private MudTable<UserResponse>? _table;
 
     protected override async Task OnInitializedAsync()
     {
@@ -499,6 +530,205 @@
             "viewer" => Color.Info,
             _ => Color.Default
         };
+    }
+
+    private void SelectAllChanged(bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedItems = _users.ToHashSet();
+            _selectAll = true;
+        }
+        else
+        {
+            _selectedItems.Clear();
+            _selectAll = false;
+        }
+    }
+
+    private void ToggleSelection(UserResponse user, bool isSelected)
+    {
+        if (isSelected)
+        {
+            _selectedItems.Add(user);
+        }
+        else
+        {
+            _selectedItems.Remove(user);
+            _selectAll = false;
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedItems.Clear();
+        _selectAll = false;
+    }
+
+    private async Task BulkDelete()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Bulk Delete",
+            $"Delete {_selectedItems.Count} user(s)? This cannot be undone.",
+            yesText: "Delete All",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", "Deleting Users" },
+                { "Message", "Deleting users..." },
+                { "Total", _selectedItems.Count }
+            };
+
+            var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+            var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+            var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+            _bulkActionInProgress = true;
+            int succeeded = 0;
+            int failed = 0;
+            int current = 0;
+            var itemsToDelete = _selectedItems.ToList();
+
+            foreach (var item in itemsToDelete)
+            {
+                current++;
+                try
+                {
+                    await UserApi.DeleteUserAsync(item.Id);
+                    _users.Remove(item);
+                    succeeded++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _logger.LogError(ex, "Error deleting user {UserId}", item.Id);
+                }
+
+                progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                    $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+            }
+
+            progressDialog.Close();
+
+            Snackbar.Add($"Deleted {succeeded} user(s). {failed} failed.",
+                failed > 0 ? Severity.Warning : Severity.Success);
+
+            _selectedItems.Clear();
+            _selectAll = false;
+            _bulkActionInProgress = false;
+            await LoadStatisticsAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task BulkEnable()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Enabling Users" },
+            { "Message", "Enabling users..." },
+            { "Total", _selectedItems.Count }
+        };
+
+        var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+        var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+        var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+        _bulkActionInProgress = true;
+        int succeeded = 0;
+        int failed = 0;
+        int current = 0;
+
+        foreach (var item in _selectedItems.ToList())
+        {
+            current++;
+            try
+            {
+                await UserApi.EnableUserAsync(item.Id);
+                item.IsEnabled = true;
+                succeeded++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                _logger.LogError(ex, "Error enabling user {UserId}", item.Id);
+            }
+
+            progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+        }
+
+        progressDialog.Close();
+
+        Snackbar.Add($"Enabled {succeeded} user(s). {failed} failed.",
+            failed > 0 ? Severity.Warning : Severity.Success);
+
+        _selectedItems.Clear();
+        _selectAll = false;
+        _bulkActionInProgress = false;
+        await LoadStatisticsAsync();
+        StateHasChanged();
+    }
+
+    private async Task BulkDisable()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Bulk Disable",
+            $"Disable {_selectedItems.Count} user(s)? They will not be able to log in.",
+            yesText: "Disable All",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", "Disabling Users" },
+                { "Message", "Disabling users..." },
+                { "Total", _selectedItems.Count }
+            };
+
+            var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+            var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+            var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+            _bulkActionInProgress = true;
+            int succeeded = 0;
+            int failed = 0;
+            int current = 0;
+
+            foreach (var item in _selectedItems.ToList())
+            {
+                current++;
+                try
+                {
+                    await UserApi.DisableUserAsync(item.Id);
+                    item.IsEnabled = false;
+                    succeeded++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    _logger.LogError(ex, "Error disabling user {UserId}", item.Id);
+                }
+
+                progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                    $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+            }
+
+            progressDialog.Close();
+
+            Snackbar.Add($"Disabled {succeeded} user(s). {failed} failed.",
+                failed > 0 ? Severity.Warning : Severity.Success);
+
+            _selectedItems.Clear();
+            _selectAll = false;
+            _bulkActionInProgress = false;
+            await LoadStatisticsAsync();
+            StateHasChanged();
+        }
     }
 
     private string GetRelativeTime(DateTimeOffset time)
