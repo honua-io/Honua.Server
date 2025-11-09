@@ -1,0 +1,242 @@
+@page "/layer-groups"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject LayerGroupApiClient LayerGroupApi
+@inject ServiceApiClient ServiceApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Layer Groups - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Layer Groups</MudText>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudStack Row="true" Spacing="2">
+                <MudTextField @bind-Value="_searchString"
+                             Placeholder="Search layer groups..."
+                             Adornment="Adornment.Start"
+                             AdornmentIcon="@Icons.Material.Filled.Search"
+                             Immediate="true"
+                             Class="flex-grow-1" />
+
+                <MudSelect @bind-Value="_filterServiceId"
+                          Label="Filter by Service"
+                          Clearable="true"
+                          T="string">
+                    @foreach (var service in _services)
+                    {
+                        <MudSelectItem Value="@service.Id">@service.Title</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+
+            <MudButton Variant="Variant.Filled"
+                      Color="Color.Primary"
+                      StartIcon="@Icons.Material.Filled.Add"
+                      OnClick="CreateLayerGroup">
+                New Layer Group
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_layerGroups != null)
+    {
+        <MudTable Items="@FilteredLayerGroups"
+                 Hover="true"
+                 Breakpoint="Breakpoint.Sm"
+                 Dense="true"
+                 Striped="true">
+            <HeaderContent>
+                <MudTh>ID</MudTh>
+                <MudTh>Title</MudTh>
+                <MudTh>Service</MudTh>
+                <MudTh>Members</MudTh>
+                <MudTh>Render Mode</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="ID">
+                    <MudText Typo="Typo.body2" Style="font-family: monospace;">@context.Id</MudText>
+                </MudTd>
+                <MudTd DataLabel="Title">
+                    <MudText Typo="Typo.body2">@context.Title</MudText>
+                </MudTd>
+                <MudTd DataLabel="Service">
+                    <MudChip Size="Size.Small" Color="Color.Info">
+                        @GetServiceTitle(context.ServiceId)
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Members">
+                    <MudChip Size="Size.Small" Icon="@Icons.Material.Filled.Layers">
+                        @context.MemberCount member@(context.MemberCount != 1 ? "s" : "")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Render Mode">
+                    <MudChip Size="Size.Small" Color="@GetRenderModeColor(context.RenderMode)">
+                        @context.RenderMode
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    @if (context.Enabled)
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+                            Enabled
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <MudChip Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Cancel">
+                            Disabled
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                      Size="Size.Small"
+                                      Color="Color.Primary"
+                                      OnClick="@(() => EditLayerGroup(context.Id))"
+                                      Title="Edit" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                      Size="Size.Small"
+                                      Color="Color.Error"
+                                      OnClick="@(() => DeleteLayerGroup(context))"
+                                      Title="Delete" />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+                    No layer groups found. Click "New Layer Group" to create one.
+                </MudText>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<LayerGroupListItem>? _layerGroups;
+    private List<ServiceListItem> _services = new();
+    private bool _loading = true;
+    private string _searchString = "";
+    private string? _filterServiceId;
+
+    private IEnumerable<LayerGroupListItem> FilteredLayerGroups
+    {
+        get
+        {
+            if (_layerGroups is null)
+                return Enumerable.Empty<LayerGroupListItem>();
+
+            return _layerGroups.Where(lg =>
+            {
+                // Service filter
+                if (!string.IsNullOrEmpty(_filterServiceId) &&
+                    !lg.ServiceId.Equals(_filterServiceId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                // Search filter
+                if (string.IsNullOrWhiteSpace(_searchString))
+                    return true;
+
+                return lg.Id.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                       lg.Title.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                       lg.ServiceId.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            var tasksToRun = new[]
+            {
+                LayerGroupApi.GetLayerGroupsAsync(),
+                ServiceApi.GetServicesAsync()
+            };
+
+            await Task.WhenAll(tasksToRun);
+
+            _layerGroups = await tasksToRun[0];
+            _services = await tasksToRun[1];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string GetServiceTitle(string serviceId)
+    {
+        var service = _services.FirstOrDefault(s => s.Id.Equals(serviceId, StringComparison.OrdinalIgnoreCase));
+        return service?.Title ?? serviceId;
+    }
+
+    private Color GetRenderModeColor(string renderMode) => renderMode switch
+    {
+        "Single" => Color.Primary,
+        "Opaque" => Color.Secondary,
+        "Transparent" => Color.Tertiary,
+        _ => Color.Default
+    };
+
+    private void CreateLayerGroup()
+    {
+        Navigation.NavigateTo("/layer-groups/new");
+    }
+
+    private void EditLayerGroup(string id)
+    {
+        Navigation.NavigateTo($"/layer-groups/{id}");
+    }
+
+    private async Task DeleteLayerGroup(LayerGroupListItem group)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to delete layer group '{group.Title}'? This action cannot be undone.",
+            ["ButtonText"] = "Delete",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<Components.Shared.ConfirmDialog>("Delete Layer Group", parameters);
+        var result = await dialog.Result;
+
+        if (result.Canceled)
+        {
+            return;
+        }
+
+        try
+        {
+            await LayerGroupApi.DeleteLayerGroupAsync(group.Id);
+            Snackbar.Add($"Layer group '{group.Title}' deleted successfully", Severity.Success);
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting layer group: {ex.Message}", Severity.Error);
+        }
+    }
+}

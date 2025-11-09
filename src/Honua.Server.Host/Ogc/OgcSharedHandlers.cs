@@ -1490,6 +1490,66 @@ internal static class OgcSharedHandlers
         });
     }
 
+    internal static string RenderLayerGroupCollectionHtml(
+        HttpRequest request,
+        ServiceDefinition service,
+        LayerGroupDefinition layerGroup,
+        string collectionId,
+        IReadOnlyList<string> crs,
+        IReadOnlyList<OgcLink> links)
+    {
+        return RenderHtmlDocument(layerGroup.Title ?? collectionId, body =>
+        {
+            body.Append("<h1>")
+                .Append(HtmlEncode(layerGroup.Title ?? collectionId))
+                .AppendLine("</h1>");
+
+            if (layerGroup.Description.HasValue())
+            {
+                body.Append("<p>")
+                    .Append(HtmlEncode(layerGroup.Description))
+                    .AppendLine("</p>");
+            }
+
+            body.AppendLine("<table><tbody>");
+            AppendMetadataRow(body, "Collection ID", collectionId);
+            AppendMetadataRow(body, "Service", service.Title ?? service.Id);
+            AppendMetadataRow(body, "Type", "Layer Group");
+            AppendMetadataRow(body, "Item Type", "feature");
+            AppendMetadataRow(body, "Supported CRS", string.Join(", ", crs));
+            AppendMetadataRow(body, "Default Style", layerGroup.DefaultStyleId);
+            AppendMetadataRow(body, "Styles", string.Join(", ", BuildOrderedStyleIds(layerGroup)));
+            AppendMetadataRow(body, "Members", layerGroup.Members.Count.ToString());
+            body.AppendLine("</tbody></table>");
+
+            // Show members
+            if (layerGroup.Members.Count > 0)
+            {
+                body.AppendLine("<h2>Members</h2>");
+                body.AppendLine("<table><thead><tr><th>Order</th><th>Type</th><th>ID</th><th>Opacity</th></tr></thead><tbody>");
+                foreach (var member in layerGroup.Members.OrderBy(m => m.Order))
+                {
+                    body.Append("<tr><td>")
+                        .Append(HtmlEncode(member.Order.ToString()))
+                        .Append("</td><td>")
+                        .Append(HtmlEncode(member.Type.ToString()))
+                        .Append("</td><td>")
+                        .Append(HtmlEncode(member.LayerId ?? member.GroupId ?? ""))
+                        .Append("</td><td>")
+                        .Append(HtmlEncode(member.Opacity.ToString("0.00")))
+                        .AppendLine("</td></tr>");
+                }
+                body.AppendLine("</tbody></table>");
+            }
+
+            AppendLinksHtml(body, links);
+
+            body.Append("<p><a href=\"")
+                .Append(HtmlEncode(BuildHref(request, "/ogc/collections", null, null)))
+                .AppendLine("\">Back to collections</a></p>");
+        });
+    }
+
     internal static string RenderFeatureCollectionHtml(
         string title,
         string? subtitle,
@@ -3256,6 +3316,49 @@ internal static async Task<IReadOnlyList<Geometry>> CollectVectorGeometriesAsync
 
     internal static string BuildCollectionId(ServiceDefinition service, LayerDefinition layer)
         => $"{service.Id}{CollectionIdSeparator}{layer.Id}";
+
+    internal static string BuildLayerGroupCollectionId(ServiceDefinition service, LayerGroupDefinition layerGroup)
+        => $"{service.Id}{CollectionIdSeparator}{layerGroup.Id}";
+
+    internal static List<OgcLink> BuildLayerGroupCollectionLinks(HttpRequest request, ServiceDefinition service, LayerGroupDefinition layerGroup, string collectionId)
+    {
+        var links = new List<OgcLink>(layerGroup.Links.Select(ToLink));
+        links.AddRange(new[]
+        {
+            BuildLink(request, $"/ogc/collections/{collectionId}", "self", "application/json", "This collection"),
+            BuildLink(request, $"/ogc/collections/{collectionId}", "alternate", "text/html", "This collection as HTML"),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "items", "application/geo+json", "Features in this layer group"),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "http://www.opengis.net/def/rel/ogc/1.0/items", "application/geo+json", "Features")
+        });
+
+        if (layerGroup.StyleIds.Count > 0)
+        {
+            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles", "styles", "application/json", "Styles for this layer group"));
+        }
+
+        return links;
+    }
+
+    internal static IReadOnlyList<string> BuildOrderedStyleIds(LayerGroupDefinition layerGroup)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var results = new List<string>();
+
+        if (layerGroup.DefaultStyleId.HasValue() && seen.Add(layerGroup.DefaultStyleId))
+        {
+            results.Add(layerGroup.DefaultStyleId);
+        }
+
+        foreach (var styleId in layerGroup.StyleIds)
+        {
+            if (styleId.HasValue() && seen.Add(styleId))
+            {
+                results.Add(styleId);
+            }
+        }
+
+        return results;
+    }
 
     internal static IResult CreateValidationProblem(string detail, string parameter)
     {

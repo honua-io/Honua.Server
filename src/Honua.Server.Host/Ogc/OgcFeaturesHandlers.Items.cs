@@ -110,6 +110,27 @@ internal static partial class OgcFeaturesHandlers
         var (context, contextError) = await OgcSharedHandlers.TryResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);
         if (contextError is not null)
         {
+            // Check if this is a layer group before returning error
+            var snapshot = await metadataRegistry.GetInitializedSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var parts = collectionId.Split(new[] { "::" }, StringSplitOptions.None);
+            if (parts.Length == 2 && snapshot.TryGetService(parts[0], out var groupService) &&
+                snapshot.TryGetLayerGroup(parts[0], parts[1], out var layerGroup))
+            {
+                // This is a layer group - handle it
+                return await GetLayerGroupItemsAsync(
+                    layerGroup,
+                    groupService,
+                    snapshot,
+                    collectionId,
+                    request,
+                    repository,
+                    metadataRegistry,
+                    apiMetrics,
+                    cacheHeaderService,
+                    queryOverrides,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             return contextError;
         }
         var service = context.Service;
@@ -1234,5 +1255,202 @@ internal static partial class OgcFeaturesHandlers
 
         private static string HtmlEncode(string? value)
             => WebUtility.HtmlEncode(value ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Gets items (features) from a layer group by querying all member layers and aggregating results.
+    /// </summary>
+    private static async Task<IResult> GetLayerGroupItemsAsync(
+        LayerGroupDefinition layerGroup,
+        ServiceDefinition service,
+        MetadataSnapshot snapshot,
+        string collectionId,
+        HttpRequest request,
+        IFeatureRepository repository,
+        IMetadataRegistry metadataRegistry,
+        IApiMetrics apiMetrics,
+        OgcCacheHeaderService cacheHeaderService,
+        IQueryCollection? queryOverrides,
+        CancellationToken cancellationToken)
+    {
+        var (format, contentType, formatError) = OgcSharedHandlers.ResolveResponseFormat(request, queryOverrides);
+        if (formatError is not null)
+        {
+            return formatError;
+        }
+
+        // For simplicity, we only support GeoJSON format for layer groups initially
+        if (format != OgcSharedHandlers.OgcResponseFormat.GeoJson &&
+            format != OgcSharedHandlers.OgcResponseFormat.Html)
+        {
+            return OgcSharedHandlers.CreateValidationProblem(
+                "Layer groups currently only support GeoJSON and HTML output formats.",
+                "f");
+        }
+
+        // Parse query parameters - use first member layer as a reference for supported params
+        var expandedMembers = LayerGroupExpander.ExpandLayerGroup(layerGroup, snapshot);
+        if (expandedMembers.Count == 0)
+        {
+            return Results.Ok(new
+            {
+                type = "FeatureCollection",
+                features = Array.Empty<object>(),
+                numberMatched = 0,
+                numberReturned = 0,
+                links = Array.Empty<OgcLink>()
+            });
+        }
+
+        var firstLayer = expandedMembers[0].Layer;
+        var (query, contentCrs, includeCount, error) = OgcSharedHandlers.ParseItemsQuery(request, service, firstLayer, queryOverrides);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        // Collect features from all member layers
+        var allFeatures = new List<object>();
+        var logger = metadataRegistry as Microsoft.Extensions.Logging.ILogger;
+
+        foreach (var member in expandedMembers.OrderBy(m => m.Order))
+        {
+            try
+            {
+                // Build query for this member layer
+                var memberQuery = query with
+                {
+                    // Don't apply limit/offset per layer - we'll aggregate first
+                    Limit = null,
+                    Offset = null
+                };
+
+                // Query features from this layer
+                var featureCount = 0;
+                await foreach (var record in repository.QueryAsync(service.Id, member.Layer.Id, memberQuery, cancellationToken).ConfigureAwait(false))
+                {
+                    // Convert to GeoJSON feature
+                    var feature = OgcSharedHandlers.ToFeature(request, collectionId, member.Layer, record, memberQuery, null, null);
+
+                    // Add metadata about source layer and opacity
+                    if (feature is Dictionary<string, object?> featureDict)
+                    {
+                        if (!featureDict.ContainsKey("properties"))
+                        {
+                            featureDict["properties"] = new Dictionary<string, object?>();
+                        }
+
+                        if (featureDict["properties"] is Dictionary<string, object?> props)
+                        {
+                            props["_sourceLayer"] = member.Layer.Id;
+                            props["_opacity"] = member.Opacity;
+                        }
+                    }
+
+                    allFeatures.Add(feature);
+                    featureCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log and continue - don't fail entire query if one layer fails
+                System.Diagnostics.Debug.WriteLine($"Warning: Failed to query layer {member.Layer.Id} in group {layerGroup.Id}: {ex.Message}");
+            }
+        }
+
+        // Apply pagination to aggregated results
+        var totalCount = allFeatures.Count;
+        var offset = query.Offset ?? 0;
+        var limit = query.Limit ?? 10;
+        var paginatedFeatures = allFeatures
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+
+        if (paginatedFeatures.Count > 0)
+        {
+            apiMetrics.RecordFeaturesReturned("ogc-api-features", service.Id, layerGroup.Id, paginatedFeatures.Count);
+        }
+
+        // Build links
+        var links = new List<OgcLink>
+        {
+            OgcSharedHandlers.BuildLink(request, $"/ogc/collections/{collectionId}/items", "self", "application/geo+json", "This page"),
+            OgcSharedHandlers.BuildLink(request, $"/ogc/collections/{collectionId}", "collection", "application/json", "Parent collection")
+        };
+
+        // Add pagination links if needed
+        if (offset + limit < totalCount)
+        {
+            var nextOffset = offset + limit;
+            var nextHref = $"/ogc/collections/{collectionId}/items?offset={nextOffset}&limit={limit}";
+            links.Add(OgcSharedHandlers.BuildLink(request, nextHref, "next", "application/geo+json", "Next page"));
+        }
+
+        if (offset > 0)
+        {
+            var prevOffset = Math.Max(0, offset - limit);
+            var prevHref = $"/ogc/collections/{collectionId}/items?offset={prevOffset}&limit={limit}";
+            links.Add(OgcSharedHandlers.BuildLink(request, prevHref, "prev", "application/geo+json", "Previous page"));
+        }
+
+        if (format == OgcSharedHandlers.OgcResponseFormat.Html)
+        {
+            var htmlComponents = new List<FeatureComponents>();
+            foreach (var feature in paginatedFeatures)
+            {
+                // Extract feature components from the feature object
+                // This is a simplified approach - in production you'd want to reconstruct components properly
+                if (feature is Dictionary<string, object?> featureDict &&
+                    featureDict.TryGetValue("properties", out var propsObj) &&
+                    propsObj is Dictionary<string, object?> props)
+                {
+                    var featureId = featureDict.TryGetValue("id", out var idObj) ? idObj?.ToString() : null;
+                    var geometry = featureDict.TryGetValue("geometry", out var geomObj) ? geomObj : null;
+
+                    htmlComponents.Add(new FeatureComponents(
+                        RawId: idObj,
+                        FeatureId: featureId ?? "unknown",
+                        Geometry: geometry,
+                        GeometryNode: null,
+                        Properties: props,
+                        DisplayName: props.TryGetValue("displayName", out var dn) ? dn?.ToString() : featureId));
+                }
+            }
+
+            var htmlEntries = htmlComponents
+                .Select(components => new OgcSharedHandlers.HtmlFeatureEntry(collectionId, layerGroup.Title ?? collectionId, components))
+                .ToList();
+
+            var html = OgcSharedHandlers.RenderFeatureCollectionHtml(
+                layerGroup.Title ?? collectionId,
+                layerGroup.Description,
+                htmlEntries,
+                totalCount,
+                paginatedFeatures.Count,
+                contentCrs,
+                links,
+                false);
+
+            var htmlEtag = cacheHeaderService.GenerateETag(html);
+            return Results.Content(html, OgcSharedHandlers.HtmlContentType)
+                .WithFeatureCacheHeaders(cacheHeaderService, htmlEtag);
+        }
+
+        // Return GeoJSON FeatureCollection
+        var response = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["type"] = "FeatureCollection",
+            ["features"] = paginatedFeatures,
+            ["timeStamp"] = DateTimeOffset.UtcNow,
+            ["numberReturned"] = paginatedFeatures.Count,
+            ["numberMatched"] = totalCount,
+            ["links"] = links
+        };
+
+        var jsonResult = Results.Json(response, OgcSharedHandlers.GeoJsonSerializerOptions, contentType);
+        jsonResult = OgcSharedHandlers.WithContentCrsHeader(jsonResult, contentCrs);
+        var responseEtag = cacheHeaderService.GenerateETagForObject(response);
+        return jsonResult.WithFeatureCacheHeaders(cacheHeaderService, responseEtag);
     }
 }

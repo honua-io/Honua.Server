@@ -382,6 +382,168 @@ GET /ogc/collections/high_population_cities/items?min_population=500000&region=e
 
 Parameters are validated and passed to the SQL view.
 
+## Schema Detection
+
+SQL Views support automatic schema detection, allowing you to discover field types from your SQL query without manually defining them.
+
+### Overview
+
+Schema detection executes your SQL query with default parameter values and inspects the result metadata to determine:
+- Field names
+- Field data types (mapped to Esri field types)
+- Nullable status
+- Field lengths (for string fields)
+
+This is particularly useful for:
+- Complex queries with many fields
+- Quickly prototyping SQL views
+- Ensuring field type accuracy
+
+### Using Schema Detection
+
+#### Via Admin API
+
+```bash
+POST /admin/metadata/layers/{layerId}/sqlview/detect-schema
+Content-Type: application/json
+
+{
+  "sql": "SELECT id, name, population, created_at FROM cities WHERE region = :region",
+  "parameters": {
+    "region": "west"
+  }
+}
+```
+
+#### Response
+
+```json
+{
+  "success": true,
+  "fields": [
+    {
+      "name": "id",
+      "type": "esriFieldTypeInteger",
+      "nullable": false,
+      "isGeometry": false
+    },
+    {
+      "name": "name",
+      "type": "esriFieldTypeString",
+      "nullable": true,
+      "isGeometry": false
+    },
+    {
+      "name": "population",
+      "type": "esriFieldTypeInteger",
+      "nullable": true,
+      "isGeometry": false
+    },
+    {
+      "name": "created_at",
+      "type": "esriFieldTypeDate",
+      "nullable": true,
+      "isGeometry": false
+    }
+  ],
+  "geometryField": "location",
+  "geometryType": "Point",
+  "idField": "id"
+}
+```
+
+### Supported Providers
+
+Schema detection is available for the following database providers:
+- PostgreSQL/PostGIS
+- SQL Server
+- MySQL
+- SQLite/SpatiaLite
+
+### Type Mapping
+
+.NET types from the database are automatically mapped to Esri field types:
+
+| Database Type        | .NET Type  | Esri Field Type              |
+|----------------------|------------|------------------------------|
+| INTEGER, INT         | int        | esriFieldTypeInteger         |
+| BIGINT               | long       | esriFieldTypeBigInteger      |
+| REAL, FLOAT          | float      | esriFieldTypeDouble          |
+| DOUBLE PRECISION     | double     | esriFieldTypeDouble          |
+| NUMERIC, DECIMAL     | decimal    | esriFieldTypeDouble          |
+| VARCHAR, TEXT        | string     | esriFieldTypeString          |
+| TIMESTAMP, DATETIME  | DateTime   | esriFieldTypeDate            |
+| BOOLEAN, BIT         | bool       | esriFieldTypeSmallInteger    |
+| UUID, UNIQUEIDENTIFIER | Guid     | esriFieldTypeGUID            |
+| BLOB, BYTEA          | byte[]     | esriFieldTypeBlob            |
+
+### How It Works
+
+1. **Query Wrapping**: The SQL query is wrapped in a LIMIT 0 query (or TOP 0 for SQL Server) to fetch only schema metadata without actual data
+2. **Parameter Substitution**: Default parameter values are used for the schema query
+3. **Schema Inspection**: The database returns column metadata including names, types, and constraints
+4. **Type Mapping**: .NET types are mapped to Esri field types
+5. **Result**: A list of detected fields is returned
+
+### Example Workflow
+
+1. Create a layer with a SQL view:
+
+```json
+{
+  "id": "my_sql_view",
+  "serviceId": "demo",
+  "title": "My SQL View",
+  "geometryType": "Point",
+  "idField": "id",
+  "geometryField": "location",
+  "sqlView": {
+    "sql": "SELECT id, name, population, location FROM cities WHERE region = :region",
+    "parameters": [
+      {
+        "name": "region",
+        "type": "string",
+        "defaultValue": "west"
+      }
+    ]
+  }
+}
+```
+
+2. Detect schema via API:
+
+```bash
+curl -X POST http://localhost:5000/admin/metadata/layers/my_sql_view/sqlview/detect-schema \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+3. Use the detected fields to populate your layer's `fields` property
+
+### Limitations
+
+- **Read-Only Detection**: Schema detection does not modify your layer configuration
+- **Default Values Required**: Parameters without default values need to be provided in the request
+- **Timeout**: Schema queries timeout after 5 seconds
+- **Complex Types**: Some complex types may be mapped to generic types
+
+### Error Handling
+
+If schema detection fails, the response will include an error message:
+
+```json
+{
+  "success": false,
+  "errorMessage": "Failed to retrieve schema from SQL view: Syntax error near 'FROM'"
+}
+```
+
+Common errors:
+- **Invalid SQL**: Check your SQL syntax
+- **Missing Parameters**: Provide default values for all parameters
+- **Connection Issues**: Verify the data source connection
+- **Unsupported Provider**: Check if your database provider supports schema detection
+
 ## Best Practices
 
 ### 1. Use Parameter Validation

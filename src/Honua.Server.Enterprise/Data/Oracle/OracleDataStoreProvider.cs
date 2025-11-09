@@ -80,6 +80,8 @@ public sealed class OracleDataStoreProvider : RelationalDataStoreProviderBase<Or
         return builder.ConnectionString;
     }
 
+    protected override string GetProviderName() => "oracle";
+
     protected override string GetConnectivityTestQuery() => "SELECT 1 FROM DUAL";
 
     protected override QueryDefinition BuildSelectQuery(

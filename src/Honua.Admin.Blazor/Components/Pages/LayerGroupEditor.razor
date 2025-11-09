@@ -1,0 +1,584 @@
+@page "/layer-groups/new"
+@page "/layer-groups/{Id}"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject LayerGroupApiClient LayerGroupApi
+@inject ServiceApiClient ServiceApi
+@inject LayerApiClient LayerApi
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>@(_isNew ? "New Layer Group" : $"Edit {_model?.Title}") - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudPaper Class="pa-6">
+        <MudText Typo="Typo.h4" Class="mb-4">
+            @(_isNew ? "Create New Layer Group" : $"Edit Layer Group: {_model?.Title}")
+        </MudText>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+        else if (_model != null)
+        {
+            <MudForm @ref="_form" @bind-IsValid="@_isValid">
+                <MudGrid>
+                    <!-- Basic Info -->
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.h6" Class="mb-2">Basic Information</MudText>
+                        <MudDivider Class="mb-4" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.Id"
+                                     Label="ID"
+                                     Required="true"
+                                     ReadOnly="!_isNew"
+                                     HelperText="Unique identifier (alphanumeric, hyphens, underscores)" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.Title"
+                                     Label="Title"
+                                     Required="true"
+                                     HelperText="Display name for the layer group" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Description"
+                                     Label="Description"
+                                     Lines="3"
+                                     HelperText="Optional description of the layer group" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect @bind-Value="_model.ServiceId"
+                                  Label="Service"
+                                  Required="true"
+                                  Disabled="!_isNew"
+                                  T="string">
+                            @foreach (var service in _services)
+                            {
+                                <MudSelectItem Value="@service.Id">@service.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSelect @bind-Value="_model.RenderMode"
+                                  Label="Render Mode"
+                                  T="string"
+                                  HelperText="How layers are composited">
+                            <MudSelectItem Value="@("Single")">Single - Composite into one image (fastest)</MudSelectItem>
+                            <MudSelectItem Value="@("Opaque")">Opaque - Separate opaque layers</MudSelectItem>
+                            <MudSelectItem Value="@("Transparent")">Transparent - Separate transparent layers</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSwitch @bind-Checked="_model.Enabled" Color="Color.Primary">Enabled</MudSwitch>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudSwitch @bind-Checked="_model.Queryable" Color="Color.Primary">Queryable</MudSwitch>
+                    </MudItem>
+
+                    <!-- Members Section -->
+                    <MudItem xs="12" Class="mt-4">
+                        <MudText Typo="Typo.h6" Class="mb-2">Layer Group Members</MudText>
+                        <MudDivider Class="mb-4" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background-color: var(--mud-palette-background-grey)">
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.body2">
+                                    <b>Note:</b> Members are rendered from bottom to top (first member at bottom).
+                                    Drag and drop to reorder.
+                                </MudText>
+
+                                <MudButton Variant="Variant.Outlined"
+                                          StartIcon="@Icons.Material.Filled.Add"
+                                          OnClick="AddMember"
+                                          Size="Size.Small">
+                                    Add Member
+                                </MudButton>
+                            </MudStack>
+                        </MudPaper>
+
+                        @if (_model.Members.Any())
+                        {
+                            <MudStack Spacing="2">
+                                @for (int i = 0; i < _model.Members.Count; i++)
+                                {
+                                    var index = i;
+                                    var member = _model.Members[i];
+
+                                    <MudPaper Class="pa-4" Elevation="2">
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+                                            <MudStack Style="flex: 1;">
+                                                <MudStack Row="true" Spacing="2">
+                                                    <MudSelect @bind-Value="member.Type"
+                                                              Label="Type"
+                                                              Variant="Variant.Outlined"
+                                                              Margin="Margin.Dense"
+                                                              T="string"
+                                                              Style="min-width: 150px;">
+                                                        <MudSelectItem Value="@("Layer")">Layer</MudSelectItem>
+                                                        <MudSelectItem Value="@("Group")">Nested Group</MudSelectItem>
+                                                    </MudSelect>
+
+                                                    @if (member.Type == "Layer")
+                                                    {
+                                                        <MudSelect @bind-Value="member.LayerId"
+                                                                  Label="Layer"
+                                                                  Variant="Variant.Outlined"
+                                                                  Margin="Margin.Dense"
+                                                                  T="string"
+                                                                  Style="flex: 1;">
+                                                            @foreach (var layer in _layers)
+                                                            {
+                                                                <MudSelectItem Value="@layer.Id">@layer.Title (@layer.Id)</MudSelectItem>
+                                                            }
+                                                        </MudSelect>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudSelect @bind-Value="member.GroupId"
+                                                                  Label="Nested Group"
+                                                                  Variant="Variant.Outlined"
+                                                                  Margin="Margin.Dense"
+                                                                  T="string"
+                                                                  Style="flex: 1;">
+                                                            @foreach (var group in _availableGroups)
+                                                            {
+                                                                <MudSelectItem Value="@group.Id">@group.Title</MudSelectItem>
+                                                            }
+                                                        </MudSelect>
+                                                    }
+                                                </MudStack>
+
+                                                <MudStack Row="true" Spacing="2">
+                                                    <MudNumericField @bind-Value="member.Opacity"
+                                                                    Label="Opacity"
+                                                                    Min="0.0"
+                                                                    Max="1.0"
+                                                                    Step="0.1"
+                                                                    Variant="Variant.Outlined"
+                                                                    Margin="Margin.Dense"
+                                                                    T="double"
+                                                                    Style="min-width: 150px;" />
+
+                                                    <MudSwitch @bind-Checked="member.Enabled" Color="Color.Primary" Size="Size.Small">
+                                                        Enabled
+                                                    </MudSwitch>
+                                                </MudStack>
+                                            </MudStack>
+
+                                            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">Order: @(index + 1)</MudText>
+                                                <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward"
+                                                              Size="Size.Small"
+                                                              OnClick="@(() => MoveMemberUp(index))"
+                                                              Disabled="@(index == 0)"
+                                                              Title="Move Up" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward"
+                                                              Size="Size.Small"
+                                                              OnClick="@(() => MoveMemberDown(index))"
+                                                              Disabled="@(index == _model.Members.Count - 1)"
+                                                              Title="Move Down" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                              Color="Color.Error"
+                                                              Size="Size.Small"
+                                                              OnClick="@(() => RemoveMember(index))"
+                                                              Title="Remove" />
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info">
+                                No members added yet. Click "Add Member" to add layers or nested groups.
+                            </MudAlert>
+                        }
+                    </MudItem>
+
+                    <!-- Scale Limits -->
+                    <MudItem xs="12" Class="mt-4">
+                        <MudText Typo="Typo.h6" Class="mb-2">Scale Limits (Optional)</MudText>
+                        <MudDivider Class="mb-4" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="_model.MinScale"
+                                        Label="Minimum Scale"
+                                        Min="0"
+                                        T="double?"
+                                        Clearable="true"
+                                        HelperText="Minimum scale denominator (0 = always visible at small scales)" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudNumericField @bind-Value="_model.MaxScale"
+                                        Label="Maximum Scale"
+                                        Min="0"
+                                        T="double?"
+                                        Clearable="true"
+                                        HelperText="Maximum scale denominator (0 = always visible at large scales)" />
+                    </MudItem>
+
+                    <!-- Actions -->
+                    <MudItem xs="12" Class="mt-4">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Variant="Variant.Filled"
+                                          Color="Color.Primary"
+                                          OnClick="Save"
+                                          Disabled="@(!_isValid || _saving)">
+                                    @if (_saving)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    }
+                                    @(_isNew ? "Create Layer Group" : "Save Changes")
+                                </MudButton>
+
+                                <MudButton Variant="Variant.Outlined"
+                                          Color="Color.Default"
+                                          OnClick="Cancel"
+                                          Disabled="@_saving">
+                                    Cancel
+                                </MudButton>
+                            </MudStack>
+
+                            @if (!_isNew)
+                            {
+                                <MudButton Variant="Variant.Filled"
+                                          Color="Color.Error"
+                                          OnClick="Delete"
+                                          Disabled="@_saving">
+                                    Delete Layer Group
+                                </MudButton>
+                            }
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+
+    private bool _isNew => string.IsNullOrEmpty(Id);
+    private MudForm? _form;
+    private bool _isValid;
+    private bool _loading = true;
+    private bool _saving;
+    private string? _errorMessage;
+
+    private LayerGroupEditorModel? _model;
+    private List<ServiceListItem> _services = new();
+    private List<LayerListItem> _layers = new();
+    private List<LayerGroupListItem> _availableGroups = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Load services first
+            _services = await ServiceApi.GetServicesAsync();
+
+            if (!_isNew && !string.IsNullOrEmpty(Id))
+            {
+                // Load existing layer group
+                var layerGroup = await LayerGroupApi.GetLayerGroupByIdAsync(Id);
+                if (layerGroup == null)
+                {
+                    _errorMessage = $"Layer group '{Id}' not found.";
+                    return;
+                }
+
+                _model = new LayerGroupEditorModel
+                    {
+                        Id = layerGroup.Id,
+                        Title = layerGroup.Title,
+                        ServiceId = layerGroup.ServiceId,
+                        Description = layerGroup.Description ?? string.Empty,
+                        RenderMode = layerGroup.RenderMode,
+                        Members = layerGroup.Members.Select(m => new LayerGroupMemberDto
+                        {
+                            Type = m.Type,
+                            LayerId = m.LayerId,
+                            GroupId = m.GroupId,
+                            Order = m.Order,
+                            Opacity = m.Opacity,
+                            StyleId = m.StyleId,
+                            Enabled = m.Enabled
+                        }).ToList(),
+                        DefaultStyleId = layerGroup.DefaultStyleId,
+                        StyleIds = layerGroup.StyleIds,
+                        Keywords = layerGroup.Keywords,
+                        MinScale = layerGroup.MinScale,
+                        MaxScale = layerGroup.MaxScale,
+                        Enabled = layerGroup.Enabled,
+                        Queryable = layerGroup.Queryable
+                    };
+
+                // Load layers and groups for the service
+                await LoadServiceDataAsync(_model.ServiceId);
+            }
+            else
+            {
+                // New layer group
+                _model = new LayerGroupEditorModel();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading data: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadServiceDataAsync(string serviceId)
+    {
+        if (string.IsNullOrEmpty(serviceId))
+        {
+            _layers = new();
+            _availableGroups = new();
+            return;
+        }
+
+        try
+        {
+            _layers = await LayerApi.GetLayersAsync(serviceId);
+            var allGroups = await LayerGroupApi.GetLayerGroupsAsync(serviceId);
+            // Filter out the current group to prevent self-reference
+            _availableGroups = allGroups
+                .Where(g => _isNew || !g.Id.Equals(Id, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading service data: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private void AddMember()
+    {
+        if (_model == null) return;
+
+        var newMember = new LayerGroupMemberDto
+            {
+                Type = "Layer",
+                Order = _model.Members.Count,
+                Opacity = 1.0,
+                Enabled = true
+            };
+
+        _model.Members.Add(newMember);
+        StateHasChanged();
+    }
+
+    private void RemoveMember(int index)
+    {
+        if (_model == null) return;
+
+        _model.Members.RemoveAt(index);
+        // Reorder remaining members
+        for (int i = 0; i < _model.Members.Count; i++)
+        {
+            _model.Members[i].Order = i;
+        }
+        StateHasChanged();
+    }
+
+    private void MoveMemberUp(int index)
+    {
+        if (_model == null || index <= 0) return;
+
+        var member = _model.Members[index];
+        _model.Members.RemoveAt(index);
+        _model.Members.Insert(index - 1, member);
+
+        // Update order
+        for (int i = 0; i < _model.Members.Count; i++)
+        {
+            _model.Members[i].Order = i;
+        }
+        StateHasChanged();
+    }
+
+    private void MoveMemberDown(int index)
+    {
+        if (_model == null || index >= _model.Members.Count - 1) return;
+
+        var member = _model.Members[index];
+        _model.Members.RemoveAt(index);
+        _model.Members.Insert(index + 1, member);
+
+        // Update order
+        for (int i = 0; i < _model.Members.Count; i++)
+        {
+            _model.Members[i].Order = i;
+        }
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        if (_model == null) return;
+
+        await _form!.Validate();
+        if (!_isValid)
+        {
+            Snackbar.Add("Please fix validation errors before saving.", Severity.Error);
+            return;
+        }
+
+        _saving = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (_isNew)
+            {
+                var request = new CreateLayerGroupRequest
+                    {
+                        Id = _model.Id,
+                        Title = _model.Title,
+                        ServiceId = _model.ServiceId,
+                        Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
+                        RenderMode = _model.RenderMode,
+                        Members = _model.Members,
+                        DefaultStyleId = _model.DefaultStyleId,
+                        StyleIds = _model.StyleIds,
+                        Keywords = _model.Keywords,
+                        MinScale = _model.MinScale,
+                        MaxScale = _model.MaxScale,
+                        Enabled = _model.Enabled,
+                        Queryable = _model.Queryable
+                    };
+
+                await LayerGroupApi.CreateLayerGroupAsync(request);
+                Snackbar.Add("Layer group created successfully!", Severity.Success);
+            }
+            else
+            {
+                var request = new UpdateLayerGroupRequest
+                    {
+                        Title = _model.Title,
+                        Description = string.IsNullOrWhiteSpace(_model.Description) ? null : _model.Description,
+                        RenderMode = _model.RenderMode,
+                        Members = _model.Members,
+                        DefaultStyleId = _model.DefaultStyleId,
+                        StyleIds = _model.StyleIds,
+                        Keywords = _model.Keywords,
+                        MinScale = _model.MinScale,
+                        MaxScale = _model.MaxScale,
+                        Enabled = _model.Enabled,
+                        Queryable = _model.Queryable
+                    };
+
+                await LayerGroupApi.UpdateLayerGroupAsync(Id!, request);
+                Snackbar.Add("Layer group updated successfully!", Severity.Success);
+            }
+
+            Navigation.NavigateTo("/layer-groups");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error saving layer group: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/layer-groups");
+    }
+
+    private async Task Delete()
+    {
+        if (_isNew || string.IsNullOrEmpty(Id) || _model == null) return;
+
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = $"Are you sure you want to delete layer group '{_model.Title}'? This action cannot be undone.",
+            ["ButtonText"] = "Delete",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<Components.Shared.ConfirmDialog>("Delete Layer Group", parameters);
+        var result = await dialog.Result;
+
+        if (result.Canceled)
+        {
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            await LayerGroupApi.DeleteLayerGroupAsync(Id);
+            Snackbar.Add("Layer group deleted successfully.", Severity.Success);
+            Navigation.NavigateTo("/layer-groups");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error deleting layer group: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // Local model for form binding
+    private class LayerGroupEditorModel
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string ServiceId { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string RenderMode { get; set; } = "Single";
+        public List<LayerGroupMemberDto> Members { get; set; } = new();
+        public string? DefaultStyleId { get; set; }
+        public List<string> StyleIds { get; set; } = new();
+        public List<string> Keywords { get; set; } = new();
+        public double? MinScale { get; set; }
+        public double? MaxScale { get; set; }
+        public bool Enabled { get; set; } = true;
+        public bool Queryable { get; set; } = true;
+    }
+}
