@@ -78,6 +78,7 @@ builder.Services.AddHonuaMapSDK();
 builder.Services.AddScoped<ServiceApiClient>();
 builder.Services.AddScoped<LayerApiClient>();
 builder.Services.AddScoped<LayerGroupApiClient>();
+builder.Services.AddScoped<SqlViewApiClient>();
 builder.Services.AddScoped<FolderApiClient>();
 builder.Services.AddScoped<DataSourceApiClient>();
 builder.Services.AddScoped<ImportApiClient>();

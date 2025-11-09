@@ -1,0 +1,708 @@
+@page "/layers/{LayerId}/sqlview"
+@using Honua.Admin.Blazor.Shared.Services
+@using Honua.Admin.Blazor.Shared.Models
+@inject SqlViewApiClient SqlViewApi
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>SQL View Configuration - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudBreadcrumbs Items="_breadcrumbs" />
+
+    <MudPaper Elevation="2" Class="pa-6 mt-4">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudText Typo="Typo.h4">SQL View Configuration</MudText>
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        @if (!_loading)
+        {
+            <!-- SQL Query Editor -->
+            <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-3">SQL Query</MudText>
+
+                <MudTextField @bind-Value="_model.Sql"
+                             Label="SQL Query"
+                             Lines="12"
+                             Variant="Variant.Outlined"
+                             HelperText="Only SELECT queries are allowed. Use :parameter_name for parameters (e.g., :min_value)"
+                             T="string"
+                             Class="mb-3" />
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled"
+                              Color="Color.Primary"
+                              StartIcon="@Icons.Material.Filled.PlayArrow"
+                              OnClick="TestQuery"
+                              Disabled="string.IsNullOrWhiteSpace(_model.Sql) || _testing">
+                        @if (_testing)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Test Query
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Outlined"
+                              StartIcon="@Icons.Material.Filled.AutoFixHigh"
+                              OnClick="DetectSchema"
+                              Disabled="string.IsNullOrWhiteSpace(_model.Sql) || _detectingSchema">
+                        @if (_detectingSchema)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        }
+                        Detect Schema
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Text"
+                              StartIcon="@Icons.Material.Filled.Security"
+                              OnClick="ValidateSecurity"
+                              Disabled="string.IsNullOrWhiteSpace(_model.Sql)">
+                        Validate Security
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+
+            <!-- Parameters Section -->
+            <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-3">
+                    <MudText Typo="Typo.h6">Parameters</MudText>
+                    <MudButton Variant="Variant.Outlined"
+                              Size="Size.Small"
+                              StartIcon="@Icons.Material.Filled.Add"
+                              OnClick="AddParameter">
+                        Add Parameter
+                    </MudButton>
+                </MudStack>
+
+                @if (_model.Parameters.Any())
+                {
+                    <MudStack Spacing="3">
+                        @foreach (var param in _model.Parameters.ToList())
+                        {
+                            <MudPaper Class="pa-3" Elevation="1">
+                                <MudGrid>
+                                    <MudItem xs="12" md="3">
+                                        <MudTextField @bind-Value="param.Name"
+                                                    Label="Parameter Name"
+                                                    Variant="Variant.Outlined"
+                                                    Margin="Margin.Dense"
+                                                    HelperText="Use in SQL as :parameter_name"
+                                                    T="string" />
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudSelect @bind-Value="param.Type"
+                                                  Label="Type"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  T="string">
+                                            <MudSelectItem Value="@("string")">String</MudSelectItem>
+                                            <MudSelectItem Value="@("integer")">Integer</MudSelectItem>
+                                            <MudSelectItem Value="@("long")">Long</MudSelectItem>
+                                            <MudSelectItem Value="@("double")">Double</MudSelectItem>
+                                            <MudSelectItem Value="@("decimal")">Decimal</MudSelectItem>
+                                            <MudSelectItem Value="@("boolean")">Boolean</MudSelectItem>
+                                            <MudSelectItem Value="@("date")">Date</MudSelectItem>
+                                            <MudSelectItem Value="@("datetime")">DateTime</MudSelectItem>
+                                        </MudSelect>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudTextField @bind-Value="param.DefaultValue"
+                                                    Label="Default Value"
+                                                    Variant="Variant.Outlined"
+                                                    Margin="Margin.Dense"
+                                                    T="string" />
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudSwitch @bind-Checked="param.Required"
+                                                  Label="Required"
+                                                  Color="Color.Primary" />
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="3">
+                                        <MudStack Row="true" Spacing="1">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                                                          Size="Size.Small"
+                                                          OnClick="() => ToggleValidation(param)"
+                                                          Title="Toggle Validation Rules">
+                                            </MudIconButton>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                          Size="Size.Small"
+                                                          Color="Color.Error"
+                                                          OnClick="() => RemoveParameter(param)"
+                                                          Title="Remove Parameter">
+                                            </MudIconButton>
+                                        </MudStack>
+                                    </MudItem>
+
+                                    <!-- Validation Rules (expandable) -->
+                                    @if (_expandedParamId == param.Name)
+                                    {
+                                        <MudItem xs="12">
+                                            <MudDivider Class="my-2" />
+                                            <MudText Typo="Typo.subtitle2" Class="mb-2">Validation Rules</MudText>
+
+                                            @if (IsNumericType(param.Type))
+                                            {
+                                                <MudStack Row="true" Spacing="2" Class="mb-2">
+                                                    <MudNumericField @bind-Value="param.Validation.Min"
+                                                                   Label="Min Value"
+                                                                   Variant="Variant.Outlined"
+                                                                   Margin="Margin.Dense"
+                                                                   T="double?" />
+                                                    <MudNumericField @bind-Value="param.Validation.Max"
+                                                                   Label="Max Value"
+                                                                   Variant="Variant.Outlined"
+                                                                   Margin="Margin.Dense"
+                                                                   T="double?" />
+                                                </MudStack>
+                                            }
+
+                                            @if (param.Type == "string")
+                                            {
+                                                <MudStack Spacing="2">
+                                                    <MudStack Row="true" Spacing="2">
+                                                        <MudNumericField @bind-Value="param.Validation.MinLength"
+                                                                       Label="Min Length"
+                                                                       Variant="Variant.Outlined"
+                                                                       Margin="Margin.Dense"
+                                                                       T="int?" />
+                                                        <MudNumericField @bind-Value="param.Validation.MaxLength"
+                                                                       Label="Max Length"
+                                                                       Variant="Variant.Outlined"
+                                                                       Margin="Margin.Dense"
+                                                                       T="int?" />
+                                                    </MudStack>
+
+                                                    <MudTextField @bind-Value="param.Validation.Pattern"
+                                                                Label="Regex Pattern"
+                                                                Variant="Variant.Outlined"
+                                                                Margin="Margin.Dense"
+                                                                HelperText="Optional regex validation"
+                                                                T="string" />
+
+                                                    <MudTextField Value="@GetAllowedValuesString(param)"
+                                                                ValueChanged="@((string val) => SetAllowedValues(param, val))"
+                                                                Label="Allowed Values (comma-separated)"
+                                                                Variant="Variant.Outlined"
+                                                                Margin="Margin.Dense"
+                                                                HelperText="e.g., north,south,east,west"
+                                                                T="string" />
+                                                </MudStack>
+                                            }
+
+                                            <MudTextField @bind-Value="param.Validation.ErrorMessage"
+                                                        Label="Custom Error Message"
+                                                        Variant="Variant.Outlined"
+                                                        Margin="Margin.Dense"
+                                                        HelperText="Optional custom error message"
+                                                        T="string"
+                                                        Class="mt-2" />
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No parameters defined. Add parameters to make your SQL view dynamic.</MudAlert>
+                }
+            </MudPaper>
+
+            <!-- Advanced Settings -->
+            <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-3">Advanced Settings</MudText>
+
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudNumericField @bind-Value="_model.TimeoutSeconds"
+                                       Label="Timeout (seconds)"
+                                       Variant="Variant.Outlined"
+                                       Min="1"
+                                       Max="300"
+                                       HelperText="Max execution time"
+                                       T="int?" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSwitch @bind-Checked="_model.ReadOnly"
+                                  Label="Read Only"
+                                  Color="Color.Primary"
+                                  Class="mt-3" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Prevent modifications (recommended)</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudSwitch @bind-Checked="_model.ValidateGeometry"
+                                  Label="Validate Geometry"
+                                  Color="Color.Primary"
+                                  Class="mt-3" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Ensure geometries are valid</MudText>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.SecurityFilter"
+                                    Label="Security Filter (optional)"
+                                    Variant="Variant.Outlined"
+                                    HelperText="Additional WHERE clause always applied"
+                                    T="string" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Hints"
+                                    Label="SQL Hints (optional)"
+                                    Variant="Variant.Outlined"
+                                    HelperText="Database-specific query hints"
+                                    T="string" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Description"
+                                    Label="Description (optional)"
+                                    Variant="Variant.Outlined"
+                                    Lines="2"
+                                    HelperText="Describe what this SQL view does"
+                                    T="string" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <!-- Test Results -->
+            @if (_testResults != null)
+            {
+                <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.h6" Class="mb-3">Test Results</MudText>
+
+                    @if (_testResults.Success)
+                    {
+                        <MudAlert Severity="Severity.Success" Class="mb-3">
+                            Query executed successfully! Returned @_testResults.RowCount row(s) in @_testResults.ExecutionTimeMs ms
+                        </MudAlert>
+
+                        @if (_testResults.Rows.Any())
+                        {
+                            <MudTable Items="_testResults.Rows" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm">
+                                <HeaderContent>
+                                    @foreach (var col in _testResults.Columns)
+                                    {
+                                        <MudTh>@col</MudTh>
+                                    }
+                                </HeaderContent>
+                                <RowTemplate>
+                                    @foreach (var col in _testResults.Columns)
+                                    {
+                                        <MudTd DataLabel="@col">@context.GetValueOrDefault(col)?.ToString()</MudTd>
+                                    }
+                                </RowTemplate>
+                            </MudTable>
+
+                            @if (_testResults.Truncated)
+                            {
+                                <MudAlert Severity="Severity.Info" Class="mt-2">Results limited to @_testResults.RowCount rows</MudAlert>
+                            }
+                        }
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Error">
+                            <MudText Typo="Typo.body2">@_testResults.ErrorMessage</MudText>
+                        </MudAlert>
+                    }
+                </MudPaper>
+            }
+
+            <!-- Schema Detection Results -->
+            @if (_schemaResults != null)
+            {
+                <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.h6" Class="mb-3">Schema Detection Results</MudText>
+
+                    @if (_schemaResults.Success)
+                    {
+                        <MudAlert Severity="Severity.Success" Class="mb-3">
+                            Detected @_schemaResults.Fields.Count field(s)
+                        </MudAlert>
+
+                        @if (_schemaResults.Fields.Any())
+                        {
+                            <MudSimpleTable Dense="true" Hover="true">
+                                <thead>
+                                    <tr>
+                                        <th>Field Name</th>
+                                        <th>Type</th>
+                                        <th>Nullable</th>
+                                        <th>Is Geometry</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var field in _schemaResults.Fields)
+                                    {
+                                        <tr>
+                                            <td>@field.Name</td>
+                                            <td>@field.Type</td>
+                                            <td>@(field.Nullable ? "Yes" : "No")</td>
+                                            <td>@(field.IsGeometry ? "Yes" : "No")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                        }
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Error">
+                            <MudText Typo="Typo.body2">@_schemaResults.ErrorMessage</MudText>
+                        </MudAlert>
+                    }
+                </MudPaper>
+            }
+
+            <!-- Security Warnings -->
+            @if (_securityWarnings.Any())
+            {
+                <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                    <MudText Typo="Typo.h6" Class="mb-3">Security Warnings</MudText>
+
+                    @foreach (var warning in _securityWarnings)
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mb-2">
+                            @warning
+                        </MudAlert>
+                    }
+                </MudPaper>
+            }
+
+            <!-- Action Buttons -->
+            <MudStack Row="true" Class="mt-4" Spacing="2">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="HandleSaveAsync"
+                           Disabled="_saving">
+                    @if (_saving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    Save SQL View
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           OnClick="HandleClearAsync"
+                           Disabled="_saving">
+                    Clear SQL View
+                </MudButton>
+
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Default"
+                           OnClick="HandleCancelAsync"
+                           Disabled="_saving">
+                    Back to Layer
+                </MudButton>
+            </MudStack>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string LayerId { get; set; } = "";
+
+    private SqlViewModel _model = new();
+    private QueryTestResult? _testResults;
+    private SchemaDetectionResult? _schemaResults;
+    private List<string> _securityWarnings = new();
+    private string? _expandedParamId;
+    private bool _loading;
+    private bool _saving;
+    private bool _testing;
+    private bool _detectingSchema;
+    private string? _errorMessage;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/"),
+            new BreadcrumbItem("Layers", href: "/layers"),
+            new BreadcrumbItem(LayerId, href: $"/layers/{LayerId}/edit"),
+            new BreadcrumbItem("SQL View", href: null, disabled: true)
+        };
+
+        await LoadSqlViewAsync();
+    }
+
+    private async Task LoadSqlViewAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var sqlView = await SqlViewApi.GetSqlViewAsync(LayerId);
+            _model = sqlView ?? new SqlViewModel();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading SQL View: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task TestQuery()
+    {
+        _testing = true;
+        _testResults = null;
+
+        try
+        {
+            var request = new TestSqlQueryRequest
+            {
+                Sql = _model.Sql,
+                Parameters = _model.Parameters
+                    .Where(p => !string.IsNullOrWhiteSpace(p.DefaultValue))
+                    .ToDictionary(p => p.Name, p => p.DefaultValue ?? ""),
+                TimeoutSeconds = _model.TimeoutSeconds,
+                MaxRows = 100
+            };
+
+            _testResults = await SqlViewApi.TestQueryAsync(LayerId, request);
+
+            if (_testResults.Success)
+            {
+                Snackbar.Add("Query executed successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Query failed. See error below.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Test failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private async Task DetectSchema()
+    {
+        _detectingSchema = true;
+        _schemaResults = null;
+
+        try
+        {
+            var request = new TestSqlQueryRequest
+            {
+                Sql = _model.Sql,
+                Parameters = _model.Parameters
+                    .Where(p => !string.IsNullOrWhiteSpace(p.DefaultValue))
+                    .ToDictionary(p => p.Name, p => p.DefaultValue ?? ""),
+                TimeoutSeconds = _model.TimeoutSeconds
+            };
+
+            _schemaResults = await SqlViewApi.DetectSchemaAsync(LayerId, request);
+
+            if (_schemaResults.Success)
+            {
+                Snackbar.Add($"Detected {_schemaResults.Fields.Count} fields", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Schema detection failed. See error below.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Schema detection failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _detectingSchema = false;
+        }
+    }
+
+    private void ValidateSecurity()
+    {
+        _securityWarnings.Clear();
+
+        var sql = _model.Sql?.ToLowerInvariant() ?? "";
+
+        // Check for dangerous keywords
+        var dangerous = new[] { "drop", "delete", "insert", "update", "truncate", "exec", "execute", "alter" };
+        foreach (var keyword in dangerous)
+        {
+            if (sql.Contains(keyword))
+            {
+                _securityWarnings.Add($"Query contains potentially dangerous keyword: {keyword.ToUpper()}");
+            }
+        }
+
+        // Check for comments
+        if (sql.Contains("--") || sql.Contains("/*"))
+        {
+            _securityWarnings.Add("SQL comments are not allowed for security reasons");
+        }
+
+        // Check if not a SELECT query
+        if (!sql.TrimStart().StartsWith("select"))
+        {
+            _securityWarnings.Add("Query must be a SELECT statement");
+        }
+
+        // Check parameters are used
+        foreach (var param in _model.Parameters)
+        {
+            if (!sql.Contains($":{param.Name.ToLowerInvariant()}"))
+            {
+                _securityWarnings.Add($"Parameter '{param.Name}' is defined but not used in the SQL");
+            }
+        }
+
+        if (_securityWarnings.Count == 0)
+        {
+            Snackbar.Add("No security issues found", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add($"Found {_securityWarnings.Count} security warning(s)", Severity.Warning);
+        }
+    }
+
+    private void AddParameter()
+    {
+        var newParam = new SqlViewParameterModel
+        {
+            Name = $"param{_model.Parameters.Count + 1}",
+            Type = "string",
+            Required = false,
+            Validation = new SqlViewParameterValidationModel()
+        };
+        _model.Parameters.Add(newParam);
+    }
+
+    private void RemoveParameter(SqlViewParameterModel param)
+    {
+        _model.Parameters.Remove(param);
+        if (_expandedParamId == param.Name)
+        {
+            _expandedParamId = null;
+        }
+    }
+
+    private void ToggleValidation(SqlViewParameterModel param)
+    {
+        _expandedParamId = _expandedParamId == param.Name ? null : param.Name;
+    }
+
+    private bool IsNumericType(string type)
+    {
+        return type is "integer" or "long" or "double" or "decimal";
+    }
+
+    private string GetAllowedValuesString(SqlViewParameterModel param)
+    {
+        return string.Join(", ", param.Validation.AllowedValues);
+    }
+
+    private void SetAllowedValues(SqlViewParameterModel param, string value)
+    {
+        param.Validation.AllowedValues = value
+            .Split(',')
+            .Select(v => v.Trim())
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .ToList();
+    }
+
+    private async Task HandleSaveAsync()
+    {
+        _saving = true;
+        _errorMessage = null;
+
+        try
+        {
+            // Validate before saving
+            if (string.IsNullOrWhiteSpace(_model.Sql))
+            {
+                Snackbar.Add("SQL query is required", Severity.Error);
+                return;
+            }
+
+            await SqlViewApi.UpdateSqlViewAsync(LayerId, _model);
+            Snackbar.Add("SQL View saved successfully!", Severity.Success);
+
+            // Navigate back to layer editor
+            Navigation.NavigateTo($"/layers/{LayerId}/edit");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error saving SQL View: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task HandleClearAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            ["ContentText"] = "Are you sure you want to clear the SQL View configuration? This will remove all parameters and settings.",
+            ["ButtonText"] = "Clear",
+            ["Color"] = Color.Error
+        };
+
+        var dialog = await DialogService.ShowAsync<MudBlazor.Dialogs.ConfirmDialog>("Clear SQL View", parameters);
+        var result = await dialog.Result;
+
+        if (result.Canceled)
+        {
+            return;
+        }
+
+        _saving = true;
+
+        try
+        {
+            await SqlViewApi.UpdateSqlViewAsync(LayerId, null);
+            Snackbar.Add("SQL View cleared successfully", Severity.Success);
+            Navigation.NavigateTo($"/layers/{LayerId}/edit");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error clearing SQL View: {ex.Message}";
+            Snackbar.Add(_errorMessage, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void HandleCancelAsync()
+    {
+        Navigation.NavigateTo($"/layers/{LayerId}/edit");
+    }
+}

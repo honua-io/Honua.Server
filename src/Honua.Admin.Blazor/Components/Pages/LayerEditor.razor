@@ -195,6 +195,23 @@
             </MudGrid>
         </MudForm>
 
+        @if (_isEditMode)
+        {
+            <MudDivider Class="my-6" />
+            <MudText Typo="Typo.h6" Class="mb-3">Advanced Features</MudText>
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Info"
+                           StartIcon="@Icons.Material.Filled.Code"
+                           OnClick="@(() => Navigation.NavigateTo($"/layers/{Id}/sqlview"))">
+                    Configure SQL View
+                </MudButton>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="align-self-center">
+                    Create a virtual layer from a SQL query
+                </MudText>
+            </MudStack>
+        }
+
         <MudStack Row="true" Class="mt-6" Spacing="2">
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"

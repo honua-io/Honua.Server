@@ -1,0 +1,169 @@
+@using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Services
+@inject SqlViewApiClient SqlViewApi
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">Test SQL Query</MudText>
+
+        @if (_model.Parameters.Any())
+        {
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Parameter Values</MudText>
+            <MudStack Spacing="2" Class="mb-4">
+                @foreach (var param in _model.Parameters)
+                {
+                    <MudTextField @bind-Value="_parameterValues[param.Name]"
+                                Label="@param.Name"
+                                Variant="Variant.Outlined"
+                                Margin="Margin.Dense"
+                                HelperText="@($"Type: {param.Type}, Required: {param.Required}")"
+                                T="string" />
+                }
+            </MudStack>
+        }
+
+        <MudNumericField @bind-Value="_timeoutSeconds"
+                        Label="Timeout (seconds)"
+                        Variant="Variant.Outlined"
+                        Min="1"
+                        Max="300"
+                        HelperText="Maximum execution time"
+                        T="int"
+                        Class="mb-3" />
+
+        <MudNumericField @bind-Value="_maxRows"
+                        Label="Max Rows"
+                        Variant="Variant.Outlined"
+                        Min="1"
+                        Max="1000"
+                        HelperText="Maximum rows to return"
+                        T="int"
+                        Class="mb-3" />
+
+        @if (_testResult != null)
+        {
+            <MudDivider Class="my-3" />
+
+            @if (_testResult.Success)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-3">
+                    Query executed successfully! Returned @_testResult.RowCount row(s) in @_testResult.ExecutionTimeMs ms
+                </MudAlert>
+
+                @if (_testResult.Rows.Any())
+                {
+                    <MudTable Items="_testResult.Rows" Dense="true" Hover="true" Height="400px" FixedHeader="true">
+                        <HeaderContent>
+                            @foreach (var col in _testResult.Columns)
+                            {
+                                <MudTh>@col</MudTh>
+                            }
+                        </HeaderContent>
+                        <RowTemplate>
+                            @foreach (var col in _testResult.Columns)
+                            {
+                                <MudTd DataLabel="@col">@context.GetValueOrDefault(col)?.ToString()</MudTd>
+                            }
+                        </RowTemplate>
+                    </MudTable>
+
+                    @if (_testResult.Truncated)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-2">Results limited to @_testResult.RowCount rows</MudAlert>
+                    }
+                }
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Error">
+                    <MudText Typo="Typo.body2">@_testResult.ErrorMessage</MudText>
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="ExecuteTestAsync"
+                   Disabled="_testing">
+            @if (_testing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Run Test
+        </MudButton>
+        <MudButton Variant="Variant.Text" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string LayerId { get; set; } = "";
+
+    [Parameter]
+    public SqlViewModel Model { get; set; } = new();
+
+    private SqlViewModel _model = new();
+    private Dictionary<string, string> _parameterValues = new();
+    private int _timeoutSeconds = 30;
+    private int _maxRows = 100;
+    private QueryTestResult? _testResult;
+    private bool _testing;
+
+    protected override void OnParametersSet()
+    {
+        _model = Model;
+
+        // Initialize parameter values with defaults
+        _parameterValues = _model.Parameters
+            .ToDictionary(p => p.Name, p => p.DefaultValue ?? "");
+    }
+
+    private async Task ExecuteTestAsync()
+    {
+        _testing = true;
+        _testResult = null;
+
+        try
+        {
+            var request = new TestSqlQueryRequest
+            {
+                Sql = _model.Sql,
+                Parameters = _parameterValues,
+                TimeoutSeconds = _timeoutSeconds,
+                MaxRows = _maxRows
+            };
+
+            _testResult = await SqlViewApi.TestQueryAsync(LayerId, request);
+
+            if (_testResult.Success)
+            {
+                Snackbar.Add("Query executed successfully!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Query failed", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Test failed: {ex.Message}", Severity.Error);
+            _testResult = new QueryTestResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message
+            };
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private void Close() => MudDialog.Cancel();
+}
