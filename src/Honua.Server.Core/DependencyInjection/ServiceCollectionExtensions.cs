@@ -178,6 +178,9 @@ public static class ServiceCollectionExtensions
         // Add distributed and memory caching support
         services.AddHonuaCaching(configuration);
 
+        // Register time provider for testable time-dependent code
+        services.AddSingleton<Time.ITimeProvider, Time.SystemTimeProvider>();
+
         // Note: Compression codecs for Zarr and other raster formats are now registered
         // in Honua.Server.Core.Raster project via AddHonuaCompressionCodecs extension method
 

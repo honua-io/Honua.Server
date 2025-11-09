@@ -171,7 +171,7 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
                             SignalSnapshotChanged();
 
                             _logger?.LogInformation("Metadata update completed successfully");
-                            await Task.CompletedTask;
+                            await Task.CompletedTask.ConfigureAwait(false);
                         },
                         LogLevel.Information).ConfigureAwait(false);
                 }
@@ -208,7 +208,7 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
             var existing = Volatile.Read(ref _snapshotTask);
             if (existing is not null)
             {
-                return await existing.WaitAsync(cancellationToken);
+                return await existing.WaitAsync(cancellationToken).ConfigureAwait(false);
             }
 
             var loadTask = LoadAsync(cancellationToken);

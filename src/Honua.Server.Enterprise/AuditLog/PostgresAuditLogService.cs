@@ -321,7 +321,8 @@ public class PostgresAuditLogService : IAuditLogService
         parameters.Add("Offset", offset);
 
         var rows = await connection.QueryAsync<dynamic>(dataSql, parameters);
-        var events = rows.Select(MapToAuditEvent).ToList();
+        // Use deferred execution for projection to avoid unnecessary materialization
+        var events = rows.Select(MapToAuditEvent);
 
         return new AuditLogResult
         {

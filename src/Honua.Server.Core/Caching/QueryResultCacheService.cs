@@ -158,7 +158,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         _metrics.RecordCacheMiss(CacheNameMemory, normalizedKey);
 
         // Try L1 (distributed) cache
-        var cachedValue = await GetFromDistributedCacheAsync<T>(normalizedKey, cancellationToken);
+        var cachedValue = await GetFromDistributedCacheAsync<T>(normalizedKey, cancellationToken).ConfigureAwait(false);
         if (cachedValue != null)
         {
             // Populate L2 cache with shorter TTL
@@ -173,13 +173,13 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
 
         try
         {
-            var value = await factory(cancellationToken);
+            var value = await factory(cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
 
             _logger.LogTrace("Factory executed in {ElapsedMs}ms: {CacheKey}", stopwatch.ElapsedMilliseconds, normalizedKey);
 
             // Store in both caches
-            await SetAsync(normalizedKey, value, effectiveExpiration, cancellationToken);
+            await SetAsync(normalizedKey, value, effectiveExpiration, cancellationToken).ConfigureAwait(false);
 
             return value;
         }
@@ -216,7 +216,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
             // Compress if enabled and above threshold
             if (_options.EnableCompression && originalSize > _options.CompressionThreshold)
             {
-                cacheData = await CompressAsync(serialized, cancellationToken);
+                cacheData = await CompressAsync(serialized, cancellationToken).ConfigureAwait(false);
                 compressed = true;
                 _logger.LogTrace("Compressed cache entry: {OriginalSize} -> {CompressedSize} bytes ({Ratio:P1})",
                     originalSize, cacheData.Length, (double)cacheData.Length / originalSize);
@@ -246,7 +246,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
                         AbsoluteExpirationRelativeToNow = effectiveExpiration
                     };
 
-                    await _distributedCache.SetAsync(normalizedKey, envelopeBytes, cacheOptions, cancellationToken);
+                    await _distributedCache.SetAsync(normalizedKey, envelopeBytes, cacheOptions, cancellationToken).ConfigureAwait(false);
 
                     stopwatch.Stop();
                     _metrics.RecordCacheSet(CacheNameDistributed, stopwatch.Elapsed, envelopeBytes.Length);
@@ -290,7 +290,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         _metrics.RecordCacheMiss(CacheNameMemory, normalizedKey);
 
         // Try L1 (distributed) cache
-        return await GetFromDistributedCacheAsync<T>(normalizedKey, cancellationToken);
+        return await GetFromDistributedCacheAsync<T>(normalizedKey, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -307,7 +307,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         {
             try
             {
-                await _distributedCache.RemoveAsync(normalizedKey, cancellationToken);
+                await _distributedCache.RemoveAsync(normalizedKey, cancellationToken).ConfigureAwait(false);
                 _logger.LogTrace("Removed from cache: {CacheKey}", normalizedKey);
             }
             catch (Exception ex)
@@ -352,7 +352,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
 
         try
         {
-            var envelopeBytes = await _distributedCache.GetAsync(key, cancellationToken);
+            var envelopeBytes = await _distributedCache.GetAsync(key, cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
 
             if (envelopeBytes == null)
@@ -374,7 +374,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
 
             // Decompress if needed
             byte[] data = envelope.Compressed
-                ? await DecompressAsync(envelope.Data, cancellationToken)
+                ? await DecompressAsync(envelope.Data, cancellationToken).ConfigureAwait(false)
                 : envelope.Data;
 
             // Deserialize value
@@ -422,7 +422,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         using var outputStream = new MemoryStream();
         await using (var gzipStream = new GZipStream(outputStream, CompressionLevel.Fastest))
         {
-            await gzipStream.WriteAsync(data, cancellationToken);
+            await gzipStream.WriteAsync(data, cancellationToken).ConfigureAwait(false);
         }
         return outputStream.ToArray();
     }
@@ -433,7 +433,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         using var outputStream = new MemoryStream();
         await using (var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress))
         {
-            await gzipStream.CopyToAsync(outputStream, cancellationToken);
+            await gzipStream.CopyToAsync(outputStream, cancellationToken).ConfigureAwait(false);
         }
         return outputStream.ToArray();
     }

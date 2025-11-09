@@ -266,7 +266,7 @@ public sealed class SqliteDataStoreProvider : DisposableBase, IDataStoreProvider
             var normalized = NormalizeRecord(layer, record.Attributes, includeKey: false);
             if (normalized.Columns.Count == 0)
             {
-                return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
+                return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken).ConfigureAwait(false);
             }
 
             var assignmentBuilder = new StringBuilder();
@@ -302,7 +302,7 @@ public sealed class SqliteDataStoreProvider : DisposableBase, IDataStoreProvider
                 }
             }
 
-            return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
+            return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
