@@ -317,13 +317,17 @@ internal static class WfsGetFeatureHandlers
         var srid = CrsHelper.ParseCrs(requestedCrs);
         var urnCrs = WfsHelpers.ToUrn(requestedCrs);
 
+        // Extract SQL view parameters if layer has SQL view
+        var sqlViewParameters = WfsHelpers.ExtractSqlViewParameters(layer, query);
+
         var resultQuery = new FeatureQuery(
             Limit: count,
             Offset: startIndex,
             Bbox: bbox,
             Filter: filter,
             ResultType: resultType,
-            Crs: requestedCrs);
+            Crs: requestedCrs,
+            SqlViewParameters: sqlViewParameters);
 
         var countQuery = resultQuery with { Limit = null, Offset = null, ResultType = FeatureResultType.Hits };
 

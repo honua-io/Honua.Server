@@ -118,6 +118,15 @@ internal static class OgcSharedHandlers
             allowedKeys.Add("collections");
         }
 
+        // Allow SQL view parameters if layer has SQL view
+        if (layer.SqlView?.Parameters != null)
+        {
+            foreach (var param in layer.SqlView.Parameters)
+            {
+                allowedKeys.Add(param.Name);
+            }
+        }
+
         foreach (var key in queryCollection.Keys)
         {
             if (!allowedKeys.Contains(key))
@@ -296,6 +305,9 @@ internal static class OgcSharedHandlers
             sortOrders = new[] { new FeatureSortOrder(layer.IdField, FeatureSortDirection.Ascending) };
         }
 
+        // Extract SQL view parameters if layer has SQL view
+        var sqlViewParameters = ExtractSqlViewParameters(layer, queryCollection);
+
         var query = new FeatureQuery(
             Limit: effectiveLimit,
             Offset: effectiveOffset,
@@ -305,7 +317,8 @@ internal static class OgcSharedHandlers
             PropertyNames: propertyNames,
             SortOrders: sortOrders,
             Filter: combinedFilter,
-            Crs: servedCrs);
+            Crs: servedCrs,
+            SqlViewParameters: sqlViewParameters);
 
         var (includeCount, countError) = QueryParameterHelper.ParseBoolean(
             queryCollection["count"].ToString(),
@@ -855,6 +868,34 @@ internal static class OgcSharedHandlers
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Extracts SQL view parameters from the query string based on layer configuration.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> ExtractSqlViewParameters(
+        LayerDefinition layer,
+        IQueryCollection query)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // Only extract if layer has SQL view defined
+        if (layer.SqlView?.Parameters == null || layer.SqlView.Parameters.Count == 0)
+        {
+            return parameters;
+        }
+
+        // Extract each defined parameter from query string
+        foreach (var param in layer.SqlView.Parameters)
+        {
+            var value = query[param.Name].ToString();
+            if (value.HasValue())
+            {
+                parameters[param.Name] = value;
+            }
+        }
+
+        return parameters;
     }
 
     private static IResult ApplyPreferenceApplied(IResult result, string value)
