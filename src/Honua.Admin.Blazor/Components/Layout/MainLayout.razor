@@ -6,9 +6,10 @@
 @inject IJSRuntime JSRuntime
 @inject IDialogService DialogService
 @inject NotificationService Notifications
+@inject ThemeService ThemeService
 @implements IAsyncDisposable
 
-<MudThemeProvider />
+<MudThemeProvider @bind-IsDarkMode="_isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
@@ -52,6 +53,15 @@
             }
         }
 
+        @* Theme Toggle *@
+        <MudTooltip Text="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
+            <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit"
+                           OnClick="ToggleTheme"
+                           Edge="Edge.End"
+                           Title="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")" />
+        </MudTooltip>
+
         <LoginDisplay />
     </MudAppBar>
 
@@ -76,14 +86,56 @@
 @code {
     private bool _drawerOpen = true;
     private bool _isMobile = false;
+    private bool _isDarkMode = false;
     private List<BreadcrumbItem> _breadcrumbs = new();
     private FeatureFlagState? _featureFlags;
     private string? _currentPage;
 
     [Inject] private NavigationState NavState { get; set; } = default!;
 
+    private MudTheme _theme = new()
+    {
+        Palette = new PaletteLight()
+        {
+            Primary = "#1976d2",
+            Secondary = "#424242",
+            AppbarBackground = "#1976d2",
+            Background = "#f5f5f5",
+            Surface = "#ffffff",
+            DrawerBackground = "#ffffff",
+            DrawerText = "rgba(0,0,0, 0.87)",
+            Success = "#4caf50",
+            Info = "#2196f3",
+            Warning = "#ff9800",
+            Error = "#f44336",
+            TextPrimary = "rgba(0,0,0, 0.87)",
+            TextSecondary = "rgba(0,0,0, 0.6)"
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#90caf9",
+            Secondary = "#f48fb1",
+            AppbarBackground = "#1e1e1e",
+            Background = "#121212",
+            Surface = "#1e1e1e",
+            DrawerBackground = "#1e1e1e",
+            DrawerText = "rgba(255,255,255, 0.87)",
+            Success = "#66bb6a",
+            Info = "#42a5f5",
+            Warning = "#ffa726",
+            Error = "#ef5350",
+            TextPrimary = "rgba(255,255,255, 0.87)",
+            TextSecondary = "rgba(255,255,255, 0.6)"
+        }
+    };
+
     protected override async Task OnInitializedAsync()
     {
+        // Initialize theme service
+        await ThemeService.InitializeAsync();
+        _isDarkMode = ThemeService.IsDarkMode;
+        ThemeService.OnThemeChanged += OnThemeChanged;
+
         // Subscribe to breadcrumb changes
         NavState.OnChange += UpdateBreadcrumbs;
         UpdateBreadcrumbs();
@@ -245,10 +297,24 @@
         await DialogService.ShowAsync<KeyboardShortcutsHelp>("Keyboard Shortcuts", parameters, options);
     }
 
+    // Theme management
+
+    private async Task ToggleTheme()
+    {
+        await ThemeService.ToggleThemeAsync();
+    }
+
+    private void OnThemeChanged()
+    {
+        _isDarkMode = ThemeService.IsDarkMode;
+        StateHasChanged();
+    }
+
     public async ValueTask DisposeAsync()
     {
         NavState.OnChange -= UpdateBreadcrumbs;
         Navigation.LocationChanged -= OnLocationChanged;
+        ThemeService.OnThemeChanged -= OnThemeChanged;
 
         if (KeyboardShortcuts != null)
         {

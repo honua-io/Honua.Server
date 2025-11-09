@@ -6,12 +6,43 @@ html, body {
 }
 
 /* ========================================
+   Theme Variables (Light/Dark Mode)
+   ======================================== */
+
+/* Light theme (default) */
+:root {
+    --surface-color: #ffffff;
+    --background-color: #f5f5f5;
+    --text-primary: rgba(0, 0, 0, 0.87);
+    --text-secondary: rgba(0, 0, 0, 0.6);
+    --border-color: rgba(0, 0, 0, 0.12);
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --hover-overlay: rgba(0, 0, 0, 0.04);
+    --divider-color: rgba(0, 0, 0, 0.12);
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+    --surface-color: #1e1e1e;
+    --background-color: #121212;
+    --text-primary: rgba(255, 255, 255, 0.87);
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --border-color: rgba(255, 255, 255, 0.12);
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --hover-overlay: rgba(255, 255, 255, 0.08);
+    --divider-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ========================================
    Global Transitions & Animations
    ======================================== */
 
-/* Smooth transitions for all interactive elements */
+/* Smooth transitions for all interactive elements including theme changes */
 * {
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+    transition: background-color 0.3s ease,
+                color 0.3s ease,
+                border-color 0.3s ease,
+                opacity 0.2s ease;
 }
 
 /* Page transition fade-in */
@@ -646,4 +677,145 @@ html {
     .swipe-nav-indicator {
         display: none !important;
     }
+}
+
+/* ========================================
+   Auto-Save Draft Functionality
+   ======================================== */
+
+/* Pulsing dot for unsaved changes indicator */
+@keyframes pulse-dot {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+.unsaved-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: orange;
+    animation: pulse-dot 2s infinite;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+/* Auto-save status badge animations */
+.auto-save-badge {
+    transition: all 0.3s ease;
+}
+
+.auto-save-badge.saving {
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* Draft restore dialog highlight */
+.draft-restore-highlight {
+    animation: highlight-flash 0.5s ease-out;
+}
+
+@keyframes highlight-flash {
+    0% {
+        background-color: rgba(25, 118, 210, 0.1);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+/* Draft status indicator container */
+.draft-status-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+/* Cloud icon animation for saving */
+@keyframes cloud-sync {
+    0% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
+
+.cloud-syncing {
+    animation: cloud-sync 1s ease-in-out infinite;
+}
+
+/* ========================================
+   Dark Mode Theme-Aware Styles
+   ======================================== */
+
+/* Apply CSS variables to key components */
+.map-info-panel,
+.map-layer-panel {
+    background: var(--surface-color);
+    color: var(--text-primary);
+}
+
+/* Dark theme specific overrides */
+[data-theme="dark"] .sticky-header thead th {
+    background: #1e1e1e;
+}
+
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(90deg, #2a2a2a 0px, #3a3a3a 40px, #2a2a2a 80px);
+}
+
+[data-theme="dark"] .mud-table-container::-webkit-scrollbar-track {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] .mud-table-container::-webkit-scrollbar-thumb {
+    background: #555;
+}
+
+[data-theme="dark"] .mud-table-container::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+[data-theme="dark"] .loading-overlay {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+[data-theme="dark"] .layer-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .service-card:hover,
+[data-theme="dark"] .mud-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] *:focus-visible {
+    outline-color: #90caf9;
+}
+
+[data-theme="dark"] .service-link:hover {
+    color: #90caf9 !important;
+}
+
+[data-theme="dark"] .pull-to-refresh-indicator .path {
+    stroke: #90caf9;
+}
+
+[data-theme="dark"] .pull-to-refresh-indicator.active .path {
+    stroke: #64b5f6;
+}
+
+[data-theme="dark"] .pull-text {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] .pull-to-refresh-indicator.active .pull-text {
+    color: rgba(255, 255, 255, 0.87);
 }

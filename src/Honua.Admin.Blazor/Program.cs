@@ -67,6 +67,8 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<SearchStateService>();
 builder.Services.AddScoped<KeyboardShortcutService>();
 builder.Services.AddScoped<TouchGestureService>();
+builder.Services.AddScoped<DraftStorageService>();
+builder.Services.AddScoped<ThemeService>();
 
 // Register MapSDK services (visual map builder)
 builder.Services.AddHonuaMapSDK();
