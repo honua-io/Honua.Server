@@ -4,6 +4,8 @@ Complete reference for all supported data formats and content types across Honua
 
 ## Vector Feature Formats
 
+### Standard Formats
+
 | Format | Content-Type | Query Parameter | Accept Header | Notes |
 |--------|--------------|-----------------|---------------|-------|
 | **GeoJSON** | `application/geo+json` | `?f=geojson` | `Accept: application/geo+json` | Default format for OGC API Features. Standard GeoJSON FeatureCollection. |
@@ -12,10 +14,33 @@ Complete reference for all supported data formats and content types across Honua
 | **KML** | `application/vnd.google-earth.kml+xml` | `?f=kml` | `Accept: application/vnd.google-earth.kml+xml` | Google Earth KML format. Includes `<ExtendedData>` for attributes. |
 | **KMZ** | `application/vnd.google-earth.kmz` | `?f=kmz` | `Accept: application/vnd.google-earth.kmz` | Compressed KML in ZIP archive. Includes icons and styles. |
 | **CSV** | `text/csv` | `?f=csv` | `Accept: text/csv` | Comma-separated values with geometry as WKT or GeoJSON. |
-| **Shapefile** | `application/zip` | `?f=shapefile` | `Accept: application/x-shapefile` | Zipped SHP/SHX/DBF/PRJ bundle. Enforces record limits (configurable, default 10k). |
+| **Shapefile** | `application/zip` | `?f=shapefile` or `?f=shp` | `Accept: application/x-shapefile` | Zipped SHP/SHX/DBF/PRJ bundle. Enforces record limits (configurable, default 10k). |
 | **GeoPackage** | `application/geopackage+sqlite3` | `?f=geopackage` or `?f=gpkg` | `Accept: application/geopackage+sqlite3` | OGC GeoPackage SQLite database. May return 202 Accepted with async job for large datasets. |
-| **GeoServices JSON format** | `application/json` | `?f=json` or `?f=pjson` | `Accept: application/json` | GeoServices FeatureSet format (FeatureServer endpoints only). |
+| **GeoServices JSON** | `application/json` | `?f=json` or `?f=pjson` | `Accept: application/json` | GeoServices FeatureSet format (FeatureServer endpoints only). |
 | **GML 3.2** | `application/gml+xml; version=3.2` | `?outputFormat=application/gml+xml; version=3.2` | `Accept: application/gml+xml` | OGC Geography Markup Language 3.2. Used for WFS locking and transactions. |
+
+### High-Performance & Cloud-Optimized Formats
+
+| Format | Content-Type | Query Parameter | Accept Header | Notes |
+|--------|--------------|-----------------|---------------|-------|
+| **FlatGeobuf** | `application/flatgeobuf` | `?f=fgb` or `?f=flatgeobuf` | `Accept: application/flatgeobuf` | High-performance binary format with spatial indexing. HTTP range request support for cloud-optimized access. |
+| **GeoParquet** | `application/parquet` | `?f=parquet` or `?f=geoparquet` | `Accept: application/parquet` | Columnar format optimized for analytics. GeoParquet v1.1.0 spec compliant. Ideal for big data workflows. |
+| **GeoArrow** | `application/vnd.apache.arrow.file` | `?f=arrow` or `?f=geoarrow` | `Accept: application/vnd.apache.arrow.file` | Apache Arrow columnar format with WKB geometry encoding. Zero-copy reads, efficient for analytics. |
+| **PMTiles** | `application/pmtiles` | `?f=pmtiles` | `Accept: application/pmtiles` | Cloudless tile archive format. Supports Gzip, Brotli, and Zstd compression. Optimized for serverless deployment. |
+
+### Linked Data & Semantic Web Formats
+
+| Format | Content-Type | Query Parameter | Accept Header | Notes |
+|--------|--------------|-----------------|---------------|-------|
+| **JSON-LD** | `application/ld+json` | `?f=jsonld` | `Accept: application/ld+json` | Linked Data JSON format with semantic annotations. |
+| **GeoJSON-T** | `application/geo+json-t` | `?f=geojsont` | `Accept: application/geo+json-t` | Time-indexed GeoJSON variant for temporal data. |
+
+### Geometry-Only Formats
+
+| Format | Content-Type | Query Parameter | Accept Header | Notes |
+|--------|--------------|-----------------|---------------|-------|
+| **WKT** | `text/plain` | `?f=wkt` | `Accept: text/plain` | Well-Known Text geometry format. Returns geometries only, no attributes. |
+| **WKB** | `application/octet-stream` | `?f=wkb` | `Accept: application/octet-stream` | Well-Known Binary geometry format. Compact binary representation. |
 
 ## Raster Tile Formats
 

@@ -74,7 +74,14 @@ HONUA__AUTHENTICATION__ENFORCE=true
 
 ### Local Mode
 
-Built-in user authentication with file-based storage and JWT tokens.
+Built-in user authentication with database storage and JWT tokens.
+
+**Security Features:**
+- **Argon2id password hashing** (64MB memory cost, 4 iterations) - More secure than bcrypt
+- **Database storage** - SQLite (default), PostgreSQL, MySQL, or SQL Server
+- **JWT token authentication** with RSA signing
+- **Account lockout** after failed login attempts
+- **Password expiration policies**
 
 ```json
 {
@@ -84,10 +91,11 @@ Built-in user authentication with file-based storage and JWT tokens.
       "enforce": true,
       "local": {
         "sessionLifetimeMinutes": 480,
-        "storePath": "data/users",
+        "storePath": "data/auth",
         "signingKeyPath": "data/signing-key.pem",
         "maxFailedLoginAttempts": 5,
-        "lockoutDurationMinutes": 15
+        "lockoutDurationMinutes": 15,
+        "provider": "sqlite"
       },
       "bootstrap": {
         "adminUsername": "admin",
@@ -104,10 +112,17 @@ Built-in user authentication with file-based storage and JWT tokens.
 | Option | Description | Default |
 |--------|-------------|---------|
 | `sessionLifetimeMinutes` | JWT token expiration | 480 (8 hours) |
-| `storePath` | User database directory | `data/users` |
+| `storePath` | User database directory | `data/auth` |
 | `signingKeyPath` | RSA signing key path | `data/signing-key.pem` |
 | `maxFailedLoginAttempts` | Lockout threshold | 5 |
 | `lockoutDurationMinutes` | Account lockout duration | 15 |
+| `provider` | Database provider | `sqlite` |
+
+**Supported Database Providers:**
+- `sqlite` - Local SQLite database (default: `data/auth/auth.db`)
+- `postgres` - PostgreSQL (uses main connection string)
+- `mysql` - MySQL (uses main connection string)
+- `sqlserver` - SQL Server (uses main connection string)
 
 **Setup Steps:**
 

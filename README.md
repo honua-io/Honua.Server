@@ -463,26 +463,44 @@ Annual pricing available (20% discount).
 
 ## Documentation
 
+### 📚 Complete Documentation Hub
+**[Main Documentation Index](docs/README.md)** - Start here for all documentation
+
+### 👤 For Users
+
 **Getting Started:**
-- [Quick Start Guide](docs/user/getting-started.md)
-- [Configuration Guide](docs/configuration/)
-- [Deployment Guides](docs/deployment/)
+- 🚀 **[Quick Start Guide](docs/quickstart/README.md)** - Get running in 5 minutes
+- 📖 **[User Documentation](docs/user/README.md)** - Complete user guide
+- 🔐 **[Authentication](docs/user/authentication.md)** - User auth setup
+- ⚙️ **[Configuration](docs/configuration/README.md)** - Configuration reference
+- 🚢 **[Deployment](docs/deployment/README.md)** - Production deployment
+
+**API Documentation:**
+- 📚 **[API Reference](docs/api/README.md)** - Complete API docs
+- ⚡ **[GeoEvent API](docs/GEOEVENT_API_GUIDE.md)** - Real-time geofencing
+- 🔧 **[Admin API](docs/user/admin-api.md)** - Administration endpoints
+- 🌐 **[API Endpoints](docs/user/endpoints.md)** - All endpoints reference
 
 **Platform Components:**
-- [MapSDK Documentation](src/Honua.MapSDK/README.md) - Visual map builder
-- [HonuaField Mobile App](src/HonuaField/README.md) - Field data collection
-- [GeoEvent API Guide](docs/GEOEVENT_API_GUIDE.md) - Real-time geofencing
-- [GeoETL/Intake README](src/Honua.Server.Intake/README.md) - Container distribution
-
-**API References:**
-- [OGC API Reference](docs/api/)
-- [GeoEvent API](docs/GEOEVENT_API_GUIDE.md)
-- [Admin API](docs/api/admin/)
+- 🗺️ **[MapSDK Documentation](docs/mapsdk/README.md)** - Blazor mapping components
+  - [Getting Started](docs/mapsdk/getting-started/quick-start.md)
+  - [Tutorials](docs/mapsdk/tutorials/)
+  - [Component Catalog](docs/mapsdk/ComponentCatalog.md)
+- 🔄 **[GeoETL](docs/geoetl/)** - Data transformation pipelines
+- 📥 **[Data Ingestion](docs/user/data-ingestion.md)** - Loading data into Honua
 
 **Operations:**
-- [Performance Tuning](docs/operations/performance.md)
-- [Security Best Practices](docs/SECURITY.md)
-- [Monitoring & Observability](docs/operations/)
+- 📊 **[Operations Guide](docs/operations/README.md)** - Day-to-day operations
+- 🛡️ **[Security Best Practices](SECURITY.md)** - Security policy
+- 🔍 **[Monitoring & Observability](docs/observability/)** - Metrics and tracing
+
+### 🔧 For Developers
+
+**Development Documentation:**
+- 🏗️ **[Development Docs](docs/development/README.md)** - Architecture, testing, processes
+- 🧪 **[Testing Guide](docs/development/testing/QUICKSTART-TESTING.md)** - Running tests
+- 📝 **[Architecture Decisions](docs/development/architecture/decisions/)** - ADRs
+- 🔄 **[Implementation Docs](docs/development/implementation/)** - Feature implementations
 
 ---
 
@@ -582,14 +600,15 @@ tests/
 
 ## Contributing
 
-Honua is source-available under Elastic License 2.0. We are not currently accepting code contributions, but welcome:
+Honua is source-available under Elastic License 2.0. We welcome:
 
-- Bug reports
-- Feature requests
-- Documentation improvements
-- Use case descriptions
+- **Bug reports** - [Report an issue](https://github.com/honua-io/Honua.Server/issues)
+- **Feature requests** - [Request a feature](https://github.com/honua-io/Honua.Server/issues/new)
+- **Documentation improvements** - [Documentation issues](https://github.com/honua-io/Honua.Server/issues?q=label%3Adocumentation)
+- **Use case descriptions** - Share your use case in [Discussions](https://github.com/honua-io/Honua.Server/discussions)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+**For Developers:**
+See [Development Documentation](docs/development/README.md) for architecture, testing, and development processes.
 
 ---
 
