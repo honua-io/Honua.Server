@@ -1,0 +1,391 @@
+@page "/drone-example"
+@inject IJSRuntime JS
+
+<PageTitle>Drone Data Example</PageTitle>
+
+<div class="drone-example">
+    <h1>Drone Data Visualization Example</h1>
+
+    <div class="example-description">
+        <p>
+            This example demonstrates the complete drone data integration pipeline,
+            including point cloud visualization, orthomosaic overlay, and 3D model rendering.
+        </p>
+    </div>
+
+    <div class="map-container" id="drone-map">
+        @if (!string.IsNullOrEmpty(SelectedSurveyId))
+        {
+            <DroneDataViewer
+                SurveyId="@SelectedSurveyId"
+                SurveyName="@SelectedSurveyName"
+                MapId="drone-map" />
+        }
+    </div>
+
+    <div class="survey-list">
+        <h3>Available Surveys</h3>
+
+        @if (Surveys == null)
+        {
+            <p>Loading surveys...</p>
+        }
+        else if (!Surveys.Any())
+        {
+            <p>No surveys available. Create a survey to get started.</p>
+            <button @onclick="ShowCreateDialog" class="btn-create">Create Survey</button>
+        }
+        else
+        {
+            <ul>
+                @foreach (var survey in Surveys)
+                {
+                    <li @onclick="() => SelectSurvey(survey)"
+                        class="@(survey.Id == SelectedSurveyId ? "selected" : "")">
+                        <div class="survey-item">
+                            <h4>@survey.Name</h4>
+                            <p>@survey.SurveyDate.ToString("yyyy-MM-dd")</p>
+                            <div class="survey-stats">
+                                <span>@survey.PointCount.ToString("N0") points</span>
+                                @if (survey.AreaSqm.HasValue)
+                                {
+                                    <span>@(survey.AreaSqm.Value / 10000).ToString("F2") ha</span>
+                                }
+                            </div>
+                            <div class="survey-badges">
+                                @if (survey.HasPointCloud)
+                                {
+                                    <span class="badge">Point Cloud</span>
+                                }
+                                @if (survey.HasOrthophoto)
+                                {
+                                    <span class="badge">Orthophoto</span>
+                                }
+                                @if (survey.Has3DModel)
+                                {
+                                    <span class="badge">3D Model</span>
+                                }
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+            <button @onclick="ShowCreateDialog" class="btn-create">Add New Survey</button>
+        }
+    </div>
+
+    @if (ShowCreate)
+    {
+        <div class="modal-overlay" @onclick="HideCreateDialog">
+            <div class="modal-content" @onclick:stopPropagation>
+                <h3>Create New Survey</h3>
+                <EditForm Model="@NewSurvey" OnValidSubmit="CreateSurvey">
+                    <div class="form-group">
+                        <label>Survey Name:</label>
+                        <InputText @bind-Value="NewSurvey.Name" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <InputTextArea @bind-Value="NewSurvey.Description" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Survey Date:</label>
+                        <InputDate @bind-Value="NewSurvey.SurveyDate" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Flight Altitude (m):</label>
+                        <InputNumber @bind-Value="NewSurvey.FlightAltitudeM" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ground Resolution (cm):</label>
+                        <InputNumber @bind-Value="NewSurvey.GroundResolutionCm" class="form-control" />
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="btn-primary">Create</button>
+                        <button type="button" @onclick="HideCreateDialog" class="btn-cancel">Cancel</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .drone-example {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        grid-template-rows: auto 1fr;
+        gap: 20px;
+        height: 100vh;
+        padding: 20px;
+    }
+
+    .example-description {
+        grid-column: 1 / -1;
+    }
+
+    .map-container {
+        position: relative;
+        background: #e8e8e8;
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 600px;
+    }
+
+    .survey-list {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow-y: auto;
+    }
+
+    .survey-list h3 {
+        margin: 0 0 15px 0;
+    }
+
+    .survey-list ul {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 15px 0;
+    }
+
+    .survey-list li {
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .survey-list li:hover {
+        background: #f5f5f5;
+    }
+
+    .survey-list li.selected {
+        background: #e3f2fd;
+        border-color: #2196F3;
+    }
+
+    .survey-item h4 {
+        margin: 0 0 5px 0;
+        font-size: 14px;
+    }
+
+    .survey-item p {
+        margin: 0 0 8px 0;
+        font-size: 12px;
+        color: #666;
+    }
+
+    .survey-stats {
+        display: flex;
+        gap: 10px;
+        font-size: 12px;
+        margin-bottom: 8px;
+    }
+
+    .survey-badges {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #4CAF50;
+        color: white;
+        border-radius: 12px;
+        font-size: 11px;
+    }
+
+    .btn-create,
+    .btn-primary,
+    .btn-cancel {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .btn-create,
+    .btn-primary {
+        background: #2196F3;
+        color: white;
+    }
+
+    .btn-create:hover,
+    .btn-primary:hover {
+        background: #1976D2;
+    }
+
+    .btn-cancel {
+        background: #f0f0f0;
+        color: #333;
+        margin-left: 8px;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .modal-actions {
+        margin-top: 20px;
+        display: flex;
+        justify-content: flex-end;
+    }
+</style>
+
+@code {
+    private List<DroneSurveySummary>? Surveys { get; set; }
+    private string? SelectedSurveyId { get; set; }
+    private string? SelectedSurveyName { get; set; }
+    private bool ShowCreate { get; set; } = false;
+    private CreateSurveyModel NewSurvey { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSurveysAsync();
+    }
+
+    private async Task LoadSurveysAsync()
+    {
+        // In a real app, this would call the API
+        // For demo purposes, we'll create sample data
+        Surveys = new List<DroneSurveySummary>
+        {
+            new()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = "Downtown Survey 2025",
+                SurveyDate = new DateTime(2025, 1, 15),
+                PointCount = 25_000_000,
+                AreaSqm = 50000,
+                HasPointCloud = true,
+                HasOrthophoto = true,
+                Has3DModel = false
+            },
+            new()
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = "Construction Site - Phase 1",
+                SurveyDate = new DateTime(2025, 2, 10),
+                PointCount = 10_500_000,
+                AreaSqm = 15000,
+                HasPointCloud = true,
+                HasOrthophoto = true,
+                Has3DModel = true
+            }
+        };
+
+        await Task.CompletedTask;
+    }
+
+    private void SelectSurvey(DroneSurveySummary survey)
+    {
+        SelectedSurveyId = survey.Id;
+        SelectedSurveyName = survey.Name;
+    }
+
+    private void ShowCreateDialog()
+    {
+        NewSurvey = new CreateSurveyModel
+        {
+            SurveyDate = DateTime.Today
+        };
+        ShowCreate = true;
+    }
+
+    private void HideCreateDialog()
+    {
+        ShowCreate = false;
+    }
+
+    private async Task CreateSurvey()
+    {
+        // In a real app, this would call the API
+        // For demo, just add to local list
+        if (Surveys != null)
+        {
+            Surveys.Add(new DroneSurveySummary
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = NewSurvey.Name,
+                SurveyDate = NewSurvey.SurveyDate,
+                PointCount = 0,
+                AreaSqm = null,
+                HasPointCloud = false,
+                HasOrthophoto = false,
+                Has3DModel = false
+            });
+        }
+
+        HideCreateDialog();
+        await Task.CompletedTask;
+    }
+
+    private class DroneSurveySummary
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public DateTime SurveyDate { get; set; }
+        public long PointCount { get; set; }
+        public double? AreaSqm { get; set; }
+        public bool HasPointCloud { get; set; }
+        public bool HasOrthophoto { get; set; }
+        public bool Has3DModel { get; set; }
+    }
+
+    private class CreateSurveyModel
+    {
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public DateTime SurveyDate { get; set; }
+        public double? FlightAltitudeM { get; set; }
+        public double? GroundResolutionCm { get; set; }
+    }
+}

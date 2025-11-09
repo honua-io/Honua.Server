@@ -724,6 +724,12 @@ internal static class OgcSharedHandlers
             AddValue(CrsHelper.DefaultCrsIdentifier);
         }
 
+        // Add CRS84H (3D support) if layer has Z coordinates
+        if (layer.HasZ || (layer.Storage?.HasZ ?? false))
+        {
+            AddValue("CRS84H");
+        }
+
         return supported;
     }
 

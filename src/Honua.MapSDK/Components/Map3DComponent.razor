@@ -1,0 +1,315 @@
+@using Microsoft.JSInterop
+@using Honua.MapSDK.Models
+@using System.Text.Json
+@implements IAsyncDisposable
+
+<div class="map-3d-component">
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>
+    /// Map ID to attach 3D rendering to.
+    /// Must match the ID of an existing MapLibre GL map.
+    /// </summary>
+    [Parameter]
+    public required string MapId { get; set; }
+
+    /// <summary>
+    /// Enable lighting effects for 3D rendering.
+    /// </summary>
+    [Parameter]
+    public bool EnableLighting { get; set; } = true;
+
+    /// <summary>
+    /// Enable feature picking (click/hover interactions).
+    /// </summary>
+    [Parameter]
+    public bool EnablePicking { get; set; } = true;
+
+    /// <summary>
+    /// Default camera configuration for 3D view.
+    /// </summary>
+    [Parameter]
+    public Camera3DConfig? DefaultCamera { get; set; }
+
+    /// <summary>
+    /// Event callback when a 3D feature is clicked.
+    /// </summary>
+    [Parameter]
+    public EventCallback<Feature3DClickEvent> OnFeatureClick { get; set; }
+
+    /// <summary>
+    /// Event callback when a 3D feature is hovered.
+    /// </summary>
+    [Parameter]
+    public EventCallback<Feature3DClickEvent> OnFeatureHover { get; set; }
+
+    /// <summary>
+    /// Child content (can contain layer components, etc.)
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    private IJSObjectReference? _jsModule;
+    private IJSObjectReference? _geometry3DModule;
+    private DotNetObjectReference<Map3DComponent>? _dotNetRef;
+    private bool _initialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Initialize the 3D rendering system.
+    /// </summary>
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            // Load JavaScript modules
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/honua-3d.js");
+            _geometry3DModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/honua-geometry-3d.js");
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Get MapLibre map instance
+            var mapExists = await JS.InvokeAsync<bool>("eval", $"window.HonuaMap && window.HonuaMap._maps && window.HonuaMap._maps.has('{MapId}')");
+
+            if (!mapExists)
+            {
+                throw new InvalidOperationException($"MapLibre map '{MapId}' not found. Ensure HonuaMapLibre component is initialized first.");
+            }
+
+            var map = await JS.InvokeAsync<IJSObjectReference>("eval", $"window.HonuaMap._maps.get('{MapId}')");
+
+            // Initialize Deck.gl
+            var options = new
+            {
+                enableLighting = EnableLighting,
+                enablePicking = EnablePicking,
+                onHover = EnablePicking ? _dotNetRef : null,
+                onClick = EnablePicking ? _dotNetRef : null
+            };
+
+            await JS.InvokeVoidAsync("Honua3D.initialize", MapId, map, options);
+
+            // Set default camera if specified
+            if (DefaultCamera != null)
+            {
+                await SetCamera3DAsync(DefaultCamera);
+            }
+
+            _initialized = true;
+            Console.WriteLine($"Map3DComponent initialized for map '{MapId}'");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to initialize Map3DComponent: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Load a 3D GeoJSON layer.
+    /// </summary>
+    /// <param name="layerId">Unique layer identifier</param>
+    /// <param name="geojson">GeoJSON feature collection or feature</param>
+    /// <param name="options">Layer styling options</param>
+    public async Task LoadGeoJson3DLayerAsync(string layerId, object geojson, Layer3DOptions? options = null)
+    {
+        if (!_initialized)
+        {
+            throw new InvalidOperationException("Map3DComponent not initialized");
+        }
+
+        var opts = options ?? new Layer3DOptions();
+        await JS.InvokeVoidAsync("Honua3D.addGeoJsonLayer", MapId, layerId, geojson, opts);
+    }
+
+    /// <summary>
+    /// Load a point cloud layer (optimized for millions of points).
+    /// </summary>
+    /// <param name="layerId">Layer identifier</param>
+    /// <param name="points">Array of [lon, lat, z] coordinates</param>
+    /// <param name="options">Point styling options</param>
+    public async Task LoadPointCloudLayerAsync(string layerId, double[][] points, PointCloudOptions? options = null)
+    {
+        if (!_initialized)
+        {
+            throw new InvalidOperationException("Map3DComponent not initialized");
+        }
+
+        var opts = options ?? new PointCloudOptions();
+        await JS.InvokeVoidAsync("Honua3D.addPointCloudLayer", MapId, layerId, points, opts);
+    }
+
+    /// <summary>
+    /// Load a 3D path layer (for flight paths, routes, etc.).
+    /// </summary>
+    public async Task LoadPathLayerAsync(string layerId, object[] paths, PathLayerOptions? options = null)
+    {
+        if (!_initialized)
+        {
+            throw new InvalidOperationException("Map3DComponent not initialized");
+        }
+
+        var opts = options ?? new PathLayerOptions();
+        await JS.InvokeVoidAsync("Honua3D.addPathLayer", MapId, layerId, paths, opts);
+    }
+
+    /// <summary>
+    /// Remove a 3D layer.
+    /// </summary>
+    public async Task RemoveLayerAsync(string layerId)
+    {
+        if (!_initialized) return;
+        await JS.InvokeVoidAsync("Honua3D.removeLayer", MapId, layerId);
+    }
+
+    /// <summary>
+    /// Update layer data.
+    /// </summary>
+    public async Task UpdateLayerAsync(string layerId, object newData)
+    {
+        if (!_initialized) return;
+        await JS.InvokeVoidAsync("Honua3D.updateLayer", MapId, layerId, newData);
+    }
+
+    /// <summary>
+    /// Set camera position for 3D viewing.
+    /// </summary>
+    public async Task SetCamera3DAsync(Camera3DConfig camera, AnimationOptions? options = null)
+    {
+        if (!_initialized) return;
+
+        var opts = options ?? new AnimationOptions();
+        await JS.InvokeVoidAsync("Honua3D.setCamera3D", MapId, camera, opts);
+    }
+
+    /// <summary>
+    /// JavaScript callback when a feature is clicked.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureClickedAsync(JsonElement featureData)
+    {
+        if (OnFeatureClick.HasDelegate)
+        {
+            var clickEvent = new Feature3DClickEvent
+            {
+                Feature = featureData,
+                Timestamp = DateTime.UtcNow
+            };
+            await OnFeatureClick.InvokeAsync(clickEvent);
+        }
+    }
+
+    /// <summary>
+    /// JavaScript callback when a feature is hovered.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureHoveredAsync(JsonElement featureData)
+    {
+        if (OnFeatureHover.HasDelegate)
+        {
+            var hoverEvent = new Feature3DClickEvent
+            {
+                Feature = featureData,
+                Timestamp = DateTime.UtcNow
+            };
+            await OnFeatureHover.InvokeAsync(hoverEvent);
+        }
+    }
+
+    /// <summary>
+    /// Dispose of resources.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_initialized)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("Honua3D.dispose", MapId);
+            }
+            catch
+            {
+                // Ignore disposal errors
+            }
+        }
+
+        _dotNetRef?.Dispose();
+
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+
+        if (_geometry3DModule != null)
+        {
+            await _geometry3DModule.DisposeAsync();
+        }
+    }
+}
+
+@code {
+    /// <summary>
+    /// Layer styling options for 3D GeoJSON layers.
+    /// </summary>
+    public class Layer3DOptions
+    {
+        public bool Extruded { get; set; } = true;
+        public bool Wireframe { get; set; } = false;
+        public int[]? FillColor { get; set; } = new[] { 160, 160, 180, 200 };
+        public int[]? LineColor { get; set; } = new[] { 80, 80, 80, 255 };
+        public double LineWidth { get; set; } = 1;
+        public bool Pickable { get; set; } = true;
+        public bool AutoHighlight { get; set; } = true;
+        public int[]? HighlightColor { get; set; } = new[] { 255, 255, 0, 100 };
+        public object? Material { get; set; }
+    }
+
+    /// <summary>
+    /// Point cloud styling options.
+    /// </summary>
+    public class PointCloudOptions
+    {
+        public double Radius { get; set; } = 5;
+        public int[]? Color { get; set; } = new[] { 255, 140, 0 };
+        public bool Pickable { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Path layer styling options.
+    /// </summary>
+    public class PathLayerOptions
+    {
+        public int[]? Color { get; set; } = new[] { 255, 140, 0 };
+        public double Width { get; set; } = 5;
+        public bool Pickable { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Animation options for camera transitions.
+    /// </summary>
+    public class AnimationOptions
+    {
+        public int Duration { get; set; } = 1000;
+        public string Easing { get; set; } = "ease";
+    }
+
+    /// <summary>
+    /// Feature click/hover event.
+    /// </summary>
+    public class Feature3DClickEvent
+    {
+        public JsonElement Feature { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+}

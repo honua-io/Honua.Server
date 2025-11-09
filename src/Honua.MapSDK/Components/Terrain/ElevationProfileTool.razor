@@ -1,0 +1,204 @@
+@using Microsoft.JSInterop
+@using Honua.MapSDK.Services.Terrain
+@using MudBlazor
+@implements IAsyncDisposable
+
+<div class="elevation-profile-tool">
+    <MudPaper Class="pa-4">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Elevation Profile</MudText>
+
+            @if (_profile != null)
+            {
+                <MudGrid>
+                    <MudItem xs="12">
+                        <canvas id="@_chartId" style="height: 300px;"></canvas>
+                    </MudItem>
+
+                    <MudItem xs="12" md="3">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.subtitle2">Total Distance</MudText>
+                                <MudText Typo="Typo.body1">@($"{_profile.TotalDistance / 1000:F2} km")</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="12" md="3">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.subtitle2">Elevation Gain</MudText>
+                                <MudText Typo="Typo.body1">@($"{_elevationGain:F0} m")</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="12" md="3">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.subtitle2">Max Elevation</MudText>
+                                <MudText Typo="Typo.body1">@($"{_profile.MaxElevation:F0} m")</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <MudItem xs="12" md="3">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.subtitle2">Min Elevation</MudText>
+                                <MudText Typo="Typo.body1">@($"{_profile.MinElevation:F0} m")</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ExportCSV">
+                        Export CSV
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ExportGPX">
+                        Export GPX
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="ClearProfile">
+                        Clear
+                    </MudButton>
+                </MudStack>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Draw a path on the map to generate an elevation profile.
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartDrawing">
+                    Draw Path
+                </MudButton>
+            }
+        </MudStack>
+    </MudPaper>
+</div>
+
+@code {
+    [Parameter]
+    public required string MapId { get; set; }
+
+    [Parameter]
+    public int SamplePoints { get; set; } = 100;
+
+    [Parameter]
+    public EventCallback<ElevationProfile> OnProfileGenerated { get; set; }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    [Inject]
+    private IElevationService ElevationService { get; set; } = default!;
+
+    private IJSObjectReference? _jsModule;
+    private ElevationProfile? _profile;
+    private string _chartId = $"elevation-chart-{Guid.NewGuid():N}";
+    private double _elevationGain;
+    private bool _isDrawing;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeAsync();
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/terrain/elevation-utils.js");
+            Console.WriteLine("Elevation profile tool initialized");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to initialize elevation profile tool: {ex.Message}");
+        }
+    }
+
+    private async Task StartDrawing()
+    {
+        if (_jsModule == null) return;
+
+        _isDrawing = true;
+        var dotNetRef = DotNetObjectReference.Create(this);
+        await _jsModule.InvokeVoidAsync("startDrawingPath", MapId, dotNetRef);
+    }
+
+    [JSInvokable]
+    public async Task OnPathDrawn(double[][] coordinates)
+    {
+        try
+        {
+            _isDrawing = false;
+
+            // Generate elevation profile
+            _profile = await ElevationService.QueryPathElevationAsync(coordinates, SamplePoints);
+
+            // Calculate statistics
+            _elevationGain = 0;
+            for (int i = 1; i < _profile.Points.Length; i++)
+            {
+                var diff = _profile.Points[i].Elevation - _profile.Points[i - 1].Elevation;
+                if (diff > 0)
+                    _elevationGain += diff;
+            }
+
+            // Create chart
+            if (_jsModule != null)
+            {
+                await _jsModule.InvokeVoidAsync("createElevationChart", _chartId, _profile);
+            }
+
+            await InvokeAsync(StateHasChanged);
+
+            if (OnProfileGenerated.HasDelegate)
+            {
+                await OnProfileGenerated.InvokeAsync(_profile);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error generating elevation profile: {ex.Message}");
+        }
+    }
+
+    private async Task ExportCSV()
+    {
+        if (_profile == null || _jsModule == null) return;
+        await _jsModule.InvokeVoidAsync("exportProfileCSV", _profile);
+    }
+
+    private async Task ExportGPX()
+    {
+        if (_profile == null || _jsModule == null) return;
+        await _jsModule.InvokeVoidAsync("exportProfileGPX", _profile);
+    }
+
+    private async Task ClearProfile()
+    {
+        _profile = null;
+        _elevationGain = 0;
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("clearProfile", MapId);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+}

@@ -1,0 +1,399 @@
+@inject IJSRuntime JS
+@inject HttpClient Http
+
+<div class="drone-data-viewer">
+    <div class="controls-panel">
+        <h3>Drone Survey: @SurveyName</h3>
+
+        @if (IsLoading)
+        {
+            <div class="loading">
+                <p>Loading point cloud...</p>
+                <progress></progress>
+            </div>
+        }
+
+        <div class="control-group">
+            <label>Color Mode:</label>
+            <select @bind="ColorMode" @bind:after="OnColorModeChanged">
+                <option value="rgb">RGB (True Color)</option>
+                <option value="classification">Classification</option>
+                <option value="intensity">Intensity</option>
+                <option value="elevation">Elevation</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Detail Level (LOD):</label>
+            <select @bind="LodLevel" @bind:after="OnLodChanged">
+                <option value="0">Full Detail (100%)</option>
+                <option value="1">Coarse (10%)</option>
+                <option value="2">Sparse (1%)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Point Size:</label>
+            <input type="range" min="1" max="10" step="0.5"
+                   @bind="PointSize" @bind:after="OnPointSizeChanged" />
+            <span>@PointSize px</span>
+        </div>
+
+        <div class="control-group">
+            <label>Classification Filter:</label>
+            <select @bind="ClassificationFilter" @bind:after="OnFilterChanged">
+                <option value="">All Points</option>
+                <option value="2">Ground Only</option>
+                <option value="3,4,5">Vegetation</option>
+                <option value="6">Buildings</option>
+                <option value="9">Water</option>
+                <option value="10,11">Roads & Rail</option>
+            </select>
+        </div>
+
+        @if (Statistics != null)
+        {
+            <div class="statistics">
+                <h4>Statistics</h4>
+                <p><strong>Total Points:</strong> @Statistics.TotalPoints.ToString("N0")</p>
+                <p><strong>Loaded Points:</strong> @LoadedPoints.ToString("N0")</p>
+                @if (Statistics.BoundingBox != null)
+                {
+                    <p><strong>Elevation Range:</strong> @Statistics.BoundingBox.MinZ.ToString("F1")m - @Statistics.BoundingBox.MaxZ.ToString("F1")m</p>
+                }
+            </div>
+        }
+
+        @if (ColorMode == "classification" && AvailableClassifications.Any())
+        {
+            <div class="legend">
+                <h4>Classification Legend</h4>
+                <ul class="classification-list">
+                    @foreach (var cls in AvailableClassifications)
+                    {
+                        <li>
+                            <span class="color-box" style="background-color: @GetClassificationColorCss(cls)"></span>
+                            <span>@GetClassificationName(cls)</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .drone-data-viewer {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    .controls-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        max-width: 300px;
+        max-height: 90vh;
+        overflow-y: auto;
+        z-index: 1000;
+    }
+
+    .controls-panel h3 {
+        margin: 0 0 15px 0;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .control-group {
+        margin-bottom: 15px;
+    }
+
+    .control-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .control-group select,
+    .control-group input[type="range"] {
+        width: 100%;
+    }
+
+    .loading {
+        padding: 10px;
+        background: #f0f0f0;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+
+    .loading p {
+        margin: 0 0 8px 0;
+    }
+
+    .loading progress {
+        width: 100%;
+    }
+
+    .statistics {
+        margin-top: 20px;
+        padding: 10px;
+        background: #f8f8f8;
+        border-radius: 4px;
+    }
+
+    .statistics h4 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+    }
+
+    .statistics p {
+        margin: 5px 0;
+        font-size: 13px;
+    }
+
+    .legend {
+        margin-top: 20px;
+    }
+
+    .legend h4 {
+        margin: 0 0 10px 0;
+        font-size: 14px;
+    }
+
+    .classification-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .classification-list li {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+        font-size: 12px;
+    }
+
+    .color-box {
+        display: inline-block;
+        width: 20px;
+        height: 12px;
+        margin-right: 8px;
+        border: 1px solid #ccc;
+    }
+</style>
+
+@code {
+    [Parameter] public string SurveyId { get; set; } = "";
+    [Parameter] public string MapId { get; set; } = "map";
+    [Parameter] public string SurveyName { get; set; } = "Drone Survey";
+
+    private IJSObjectReference? _module;
+    private IJSObjectReference? _renderer;
+
+    private string ColorMode { get; set; } = "rgb";
+    private int LodLevel { get; set; } = 0;
+    private double PointSize { get; set; } = 2;
+    private string? ClassificationFilter { get; set; }
+
+    private bool IsLoading { get; set; } = false;
+    private int LoadedPoints { get; set; } = 0;
+
+    private PointCloudStatistics? Statistics { get; set; }
+    private List<int> AvailableClassifications { get; set; } = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !string.IsNullOrEmpty(SurveyId))
+        {
+            await InitializeAsync();
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            // Import JavaScript module
+            _module = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./js/drone/point-cloud-layer.js");
+
+            // Get deck.gl instance (assuming it's available globally)
+            _renderer = await _module.InvokeAsync<IJSObjectReference>(
+                "createPointCloudRenderer",
+                JS.InvokeAsync<IJSObjectReference>("eval", $"window.deckInstance_{MapId}"));
+
+            // Load statistics
+            await LoadStatisticsAsync();
+
+            // Load point cloud
+            await LoadPointCloudAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing drone viewer: {ex.Message}");
+        }
+    }
+
+    private async Task LoadStatisticsAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<PointCloudStatistics>(
+                $"/api/drone/surveys/{SurveyId}/pointcloud/statistics");
+
+            Statistics = response;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading statistics: {ex.Message}");
+        }
+    }
+
+    private async Task LoadPointCloudAsync()
+    {
+        if (_renderer == null) return;
+
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var classifications = ClassificationFilter?
+                .Split(',')
+                .Select(int.Parse)
+                .ToArray();
+
+            await _renderer.InvokeVoidAsync("loadSurvey", SurveyId, new
+            {
+                colorMode = ColorMode,
+                lod = LodLevel,
+                classificationFilter = classifications
+            });
+
+            LoadedPoints = await _renderer.InvokeAsync<int>("getPointCount");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading point cloud: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnColorModeChanged()
+    {
+        if (_renderer != null)
+        {
+            await _renderer.InvokeVoidAsync("setColorMode", ColorMode);
+        }
+    }
+
+    private async Task OnLodChanged()
+    {
+        await LoadPointCloudAsync();
+    }
+
+    private async Task OnPointSizeChanged()
+    {
+        if (_renderer != null)
+        {
+            await _renderer.InvokeVoidAsync("setPointSize", PointSize);
+        }
+    }
+
+    private async Task OnFilterChanged()
+    {
+        await LoadPointCloudAsync();
+    }
+
+    private string GetClassificationColorCss(int classification)
+    {
+        var color = GetClassificationColor(classification);
+        return $"rgb({color.R},{color.G},{color.B})";
+    }
+
+    private (byte R, byte G, byte B) GetClassificationColor(int classification)
+    {
+        var colors = new Dictionary<int, (byte, byte, byte)>
+        {
+            { 0, (128, 128, 128) },
+            { 1, (128, 128, 128) },
+            { 2, (139, 69, 19) },
+            { 3, (34, 139, 34) },
+            { 4, (0, 128, 0) },
+            { 5, (0, 255, 0) },
+            { 6, (255, 0, 0) },
+            { 7, (255, 255, 0) },
+            { 9, (0, 0, 255) },
+            { 10, (128, 0, 128) },
+            { 11, (64, 64, 64) },
+            { 17, (255, 255, 0) },
+            { 18, (255, 0, 255) }
+        };
+
+        return colors.TryGetValue(classification, out var color) ? color : (200, 200, 200);
+    }
+
+    private string GetClassificationName(int classification)
+    {
+        var names = new Dictionary<int, string>
+        {
+            { 0, "Never Classified" },
+            { 1, "Unclassified" },
+            { 2, "Ground" },
+            { 3, "Low Vegetation" },
+            { 4, "Medium Vegetation" },
+            { 5, "High Vegetation" },
+            { 6, "Building" },
+            { 7, "Low Point (Noise)" },
+            { 9, "Water" },
+            { 10, "Rail" },
+            { 11, "Road Surface" },
+            { 17, "Bridge Deck" },
+            { 18, "High Noise" }
+        };
+
+        return names.TryGetValue(classification, out var name) ? name : $"Custom ({classification})";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_renderer != null)
+        {
+            await _renderer.InvokeVoidAsync("clear");
+            await _renderer.DisposeAsync();
+        }
+
+        if (_module != null)
+        {
+            await _module.DisposeAsync();
+        }
+    }
+
+    // Helper class for statistics (matches the API response)
+    private class PointCloudStatistics
+    {
+        public long TotalPoints { get; set; }
+        public BoundingBox3D? BoundingBox { get; set; }
+    }
+
+    private class BoundingBox3D
+    {
+        public double MinX { get; set; }
+        public double MinY { get; set; }
+        public double MinZ { get; set; }
+        public double MaxX { get; set; }
+        public double MaxY { get; set; }
+        public double MaxZ { get; set; }
+    }
+}

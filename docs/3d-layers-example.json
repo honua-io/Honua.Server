@@ -1,0 +1,207 @@
+{
+  "$schema": "../schemas/metadata-schema.json",
+  "catalog": {
+    "id": "3d-demo",
+    "title": "3D Geospatial Data Demonstration",
+    "description": "Example configuration for serving 3D geospatial data with Z coordinates",
+    "version": "1.0.0"
+  },
+  "folders": [
+    {
+      "id": "3d-features",
+      "title": "3D Features",
+      "order": 1
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "postgis-3d",
+      "provider": "PostgreSQL",
+      "connectionString": "Host=localhost;Database=geodata;Username=postgres;Password=yourpassword"
+    }
+  ],
+  "services": [
+    {
+      "id": "buildings-3d-service",
+      "title": "3D Buildings Service",
+      "folderId": "3d-features",
+      "serviceType": "FeatureServer",
+      "dataSourceId": "postgis-3d",
+      "enabled": true,
+      "description": "OGC-compliant 3D building footprints with height data",
+      "ogc": {
+        "collectionsEnabled": true,
+        "itemLimit": 1000,
+        "defaultCrs": "EPSG:4326",
+        "additionalCrs": ["EPSG:3857", "CRS84H"],
+        "conformanceClasses": [
+          "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core",
+          "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson"
+        ]
+      }
+    }
+  ],
+  "layers": [
+    {
+      "id": "building-footprints-3d",
+      "serviceId": "buildings-3d-service",
+      "title": "3D Building Footprints",
+      "description": "Building footprints with elevation data stored in PostGIS geometry Z coordinates",
+      "geometryType": "Polygon",
+      "idField": "building_id",
+      "displayField": "name",
+      "geometryField": "geom",
+      "hasZ": true,
+      "crs": ["EPSG:4326", "CRS84H", "EPSG:3857"],
+      "extent": {
+        "bbox": [
+          [-122.5, 37.7, 0, -122.3, 37.9, 100]
+        ],
+        "crs": "EPSG:4326"
+      },
+      "storage": {
+        "table": "buildings_3d",
+        "geometryColumn": "geom",
+        "primaryKey": "building_id",
+        "srid": 4326,
+        "hasZ": true
+      },
+      "fields": [
+        {
+          "name": "building_id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "maxLength": 100
+        },
+        {
+          "name": "height_m",
+          "alias": "Height (meters)",
+          "type": "double",
+          "nullable": true
+        },
+        {
+          "name": "floors",
+          "type": "int"
+        }
+      ],
+      "keywords": ["buildings", "3d", "elevation", "urban"]
+    },
+    {
+      "id": "flight-paths-3d",
+      "serviceId": "buildings-3d-service",
+      "title": "3D Flight Paths",
+      "description": "Aircraft flight paths with altitude stored as Z coordinates",
+      "geometryType": "LineString",
+      "idField": "flight_id",
+      "displayField": "flight_number",
+      "geometryField": "path",
+      "hasZ": true,
+      "zField": "altitude_ft",
+      "crs": ["EPSG:4326", "CRS84H"],
+      "extent": {
+        "bbox": [
+          [-122.5, 37.7, 0, -122.3, 37.9, 40000]
+        ],
+        "crs": "CRS84H",
+        "temporal": {
+          "interval": [
+            ["2025-01-01T00:00:00Z", "2025-12-31T23:59:59Z"]
+          ],
+          "trs": "http://www.opengis.net/def/uom/ISO-8601/0/Gregorian"
+        }
+      },
+      "storage": {
+        "table": "flight_paths",
+        "geometryColumn": "path",
+        "primaryKey": "flight_id",
+        "temporalColumn": "timestamp",
+        "srid": 4326,
+        "hasZ": true
+      },
+      "fields": [
+        {
+          "name": "flight_id",
+          "type": "string",
+          "maxLength": 20,
+          "nullable": false
+        },
+        {
+          "name": "flight_number",
+          "type": "string",
+          "maxLength": 10
+        },
+        {
+          "name": "altitude_ft",
+          "alias": "Altitude (feet)",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "aircraft_type",
+          "type": "string",
+          "maxLength": 50
+        },
+        {
+          "name": "timestamp",
+          "type": "datetime"
+        }
+      ],
+      "keywords": ["aviation", "3d", "altitude", "tracking"]
+    },
+    {
+      "id": "sensor-locations-3d",
+      "serviceId": "buildings-3d-service",
+      "title": "3D Sensor Locations",
+      "description": "Environmental sensors with precise elevation coordinates",
+      "geometryType": "Point",
+      "idField": "sensor_id",
+      "displayField": "sensor_name",
+      "geometryField": "location",
+      "hasZ": true,
+      "crs": ["EPSG:4326", "CRS84H"],
+      "extent": {
+        "bbox": [
+          [-122.5, 37.7, -10, -122.3, 37.9, 500]
+        ]
+      },
+      "storage": {
+        "table": "sensors_3d",
+        "geometryColumn": "location",
+        "primaryKey": "sensor_id",
+        "srid": 4326,
+        "hasZ": true
+      },
+      "fields": [
+        {
+          "name": "sensor_id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "sensor_name",
+          "type": "string",
+          "maxLength": 50
+        },
+        {
+          "name": "sensor_type",
+          "type": "string",
+          "maxLength": 30
+        },
+        {
+          "name": "elevation_m",
+          "alias": "Elevation (meters above sea level)",
+          "type": "double"
+        },
+        {
+          "name": "last_reading",
+          "type": "datetime"
+        }
+      ],
+      "keywords": ["sensors", "monitoring", "3d", "elevation", "environment"]
+    }
+  ]
+}

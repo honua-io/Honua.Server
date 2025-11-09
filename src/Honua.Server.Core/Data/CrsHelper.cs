@@ -25,7 +25,8 @@ public static class CrsHelper
         var token = GetLastToken(normalized);
         if (token.Equals("CRS84H", StringComparison.OrdinalIgnoreCase))
         {
-            // Treat CRS84h as equivalent to WGS84 for 2D operations.
+            // CRS84h is WGS84 with ellipsoidal height (3D support)
+            // Return WGS84 SRID but preserve 3D coordinates during transformation
             return Wgs84;
         }
 

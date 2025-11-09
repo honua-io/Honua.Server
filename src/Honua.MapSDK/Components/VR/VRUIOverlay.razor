@@ -1,0 +1,257 @@
+@using Honua.MapSDK.Services.VR
+
+<div class="vr-ui-overlay @(IsVisible ? "visible" : "hidden")">
+    <div class="vr-panel">
+        <h3>Map Controls</h3>
+
+        <div class="vr-control-group">
+            <h4>Navigation</h4>
+            <div class="btn-group">
+                <button class="btn btn-sm" @onclick="() => SetLocomotionMode(\"teleport\")">
+                    Teleport
+                </button>
+                <button class="btn btn-sm" @onclick="() => SetLocomotionMode(\"smooth\")">
+                    Smooth
+                </button>
+                <button class="btn btn-sm" @onclick="() => SetLocomotionMode(\"grab-move\")">
+                    Grab
+                </button>
+            </div>
+        </div>
+
+        <div class="vr-control-group">
+            <h4>Scale: 1:@Scale.ToString("F0")</h4>
+            <input type="range" min="1" max="10000" step="10" @bind="Scale" @bind:event="oninput" />
+            <div class="scale-buttons">
+                <button class="btn btn-sm" @onclick="() => AdjustScale(0.5)">-</button>
+                <button class="btn btn-sm" @onclick="ResetScale">Reset</button>
+                <button class="btn btn-sm" @onclick="() => AdjustScale(2.0)">+</button>
+            </div>
+        </div>
+
+        <div class="vr-control-group">
+            <h4>Quality</h4>
+            <select class="form-control" @bind="Quality">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select>
+        </div>
+
+        <div class="vr-control-group">
+            <h4>Options</h4>
+            <label>
+                <input type="checkbox" @bind="ShowGrid" />
+                Show Grid
+            </label>
+            <label>
+                <input type="checkbox" @bind="ShowMinimap" />
+                Show Minimap
+            </label>
+            <label>
+                <input type="checkbox" @bind="EnableShadows" />
+                Shadows
+            </label>
+        </div>
+
+        @if (PerformanceMetrics != null)
+        {
+            <div class="vr-control-group">
+                <h4>Performance</h4>
+                <p>FPS: @PerformanceMetrics.AverageFrameRate.ToString("F1")</p>
+                <p>Memory: @(PerformanceMetrics.AverageMemoryUsage / 1024 / 1024) MB</p>
+                @if (PerformanceMetrics.AverageFrameRate < 72)
+                {
+                    <p class="text-warning">⚠ Low frame rate</p>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public bool IsVisible { get; set; } = true;
+
+    [Parameter]
+    public EventCallback<bool> IsVisibleChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnLocomotionModeChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<double> OnScaleChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnQualityChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnShowGridChanged { get; set; }
+
+    [Parameter]
+    public VRPerformanceMetrics? PerformanceMetrics { get; set; }
+
+    private double _scale = 100.0;
+    public double Scale
+    {
+        get => _scale;
+        set
+        {
+            if (_scale != value)
+            {
+                _scale = value;
+                OnScaleChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    private string _quality = "medium";
+    public string Quality
+    {
+        get => _quality;
+        set
+        {
+            if (_quality != value)
+            {
+                _quality = value;
+                OnQualityChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    private bool _showGrid = false;
+    public bool ShowGrid
+    {
+        get => _showGrid;
+        set
+        {
+            if (_showGrid != value)
+            {
+                _showGrid = value;
+                OnShowGridChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    private bool _showMinimap = true;
+    public bool ShowMinimap { get; set; } = true;
+
+    private bool _enableShadows = false;
+    public bool EnableShadows { get; set; } = false;
+
+    private async Task SetLocomotionMode(string mode)
+    {
+        await OnLocomotionModeChanged.InvokeAsync(mode);
+    }
+
+    private async Task AdjustScale(double factor)
+    {
+        Scale = Math.Clamp(Scale * factor, 1, 10000);
+    }
+
+    private async Task ResetScale()
+    {
+        Scale = 100.0;
+    }
+
+    public async Task Toggle()
+    {
+        IsVisible = !IsVisible;
+        await IsVisibleChanged.InvokeAsync(IsVisible);
+    }
+}
+
+<style>
+    .vr-ui-overlay {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        max-width: 300px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        font-family: Arial, sans-serif;
+        z-index: 1000;
+        transition: opacity 0.3s;
+    }
+
+    .vr-ui-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .vr-ui-overlay.visible {
+        opacity: 1;
+    }
+
+    .vr-panel h3 {
+        margin-top: 0;
+        font-size: 18px;
+        border-bottom: 1px solid #444;
+        padding-bottom: 8px;
+    }
+
+    .vr-control-group {
+        margin: 15px 0;
+    }
+
+    .vr-control-group h4 {
+        font-size: 14px;
+        margin-bottom: 8px;
+        color: #aaa;
+    }
+
+    .vr-control-group input[type="range"] {
+        width: 100%;
+    }
+
+    .vr-control-group label {
+        display: block;
+        margin: 5px 0;
+        font-size: 13px;
+    }
+
+    .btn-group {
+        display: flex;
+        gap: 5px;
+    }
+
+    .btn {
+        padding: 6px 12px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+
+    .btn:hover {
+        background: #0056b3;
+    }
+
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+
+    .scale-buttons {
+        display: flex;
+        gap: 5px;
+        margin-top: 5px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 6px;
+        background: #333;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 4px;
+    }
+
+    .text-warning {
+        color: #ffc107;
+    }
+</style>

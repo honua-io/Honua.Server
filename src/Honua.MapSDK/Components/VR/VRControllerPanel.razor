@@ -1,0 +1,229 @@
+@using Honua.MapSDK.Services.VR
+
+<div class="vr-controller-panel">
+    <h4>Controller Guide</h4>
+
+    <div class="controller-section">
+        <h5>Left Controller</h5>
+        <ul>
+            <li><strong>Thumbstick:</strong> @GetLocomotionDescription()</li>
+            <li><strong>Grip:</strong> @(LocomotionMode == "grab-move" ? "Grab & Move Map" : "Not Used")</li>
+            <li><strong>Trigger:</strong> @(LocomotionMode == "teleport" ? "Show Teleport" : "Select")</li>
+            <li><strong>X Button:</strong> Scale Up</li>
+            <li><strong>Y Button:</strong> Scale Down</li>
+        </ul>
+    </div>
+
+    <div class="controller-section">
+        <h5>Right Controller</h5>
+        <ul>
+            <li><strong>Thumbstick:</strong> @GetLocomotionDescription()</li>
+            <li><strong>Grip:</strong> @(LocomotionMode == "grab-move" ? "Grab & Move Map" : "Not Used")</li>
+            <li><strong>Trigger:</strong> @(LocomotionMode == "teleport" ? "Teleport" : "Select Feature")</li>
+            <li><strong>A Button:</strong> Toggle UI</li>
+            <li><strong>B Button:</strong> Reset View</li>
+        </ul>
+    </div>
+
+    <div class="comfort-section">
+        <h5>Comfort Options</h5>
+        <label>
+            <input type="checkbox" @bind="EnableVignette" />
+            Vignette (reduces motion sickness)
+        </label>
+        <label>
+            <input type="checkbox" @bind="EnableSnapTurning" />
+            Snap Turning (vs smooth)
+        </label>
+        @if (EnableSnapTurning)
+        {
+            <div class="sub-option">
+                <label>Turn Angle: @TurnAngle°</label>
+                <input type="range" min="15" max="90" step="15" @bind="TurnAngle" @bind:event="oninput" />
+            </div>
+        }
+    </div>
+
+    <div class="haptics-section">
+        <h5>Haptic Feedback</h5>
+        <label>
+            <input type="checkbox" @bind="EnableHaptics" />
+            Enable Haptics
+        </label>
+        @if (EnableHaptics)
+        {
+            <div class="sub-option">
+                <label>Intensity: @((HapticIntensity * 100).ToString("F0"))%</label>
+                <input type="range" min="0" max="1" step="0.1" @bind="HapticIntensity" @bind:event="oninput" />
+            </div>
+        }
+    </div>
+
+    @if (ShowControllerStatus)
+    {
+        <div class="controller-status">
+            <h5>Controller Status</h5>
+            <p>Left: @(LeftControllerConnected ? "✓ Connected" : "✗ Disconnected")</p>
+            <p>Right: @(RightControllerConnected ? "✓ Connected" : "✗ Disconnected")</p>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string LocomotionMode { get; set; } = "teleport";
+
+    [Parameter]
+    public EventCallback<bool> OnEnableVignetteChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnEnableSnapTurningChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<float> OnTurnAngleChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnEnableHapticsChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<float> OnHapticIntensityChanged { get; set; }
+
+    [Parameter]
+    public bool ShowControllerStatus { get; set; } = false;
+
+    [Parameter]
+    public bool LeftControllerConnected { get; set; } = false;
+
+    [Parameter]
+    public bool RightControllerConnected { get; set; } = false;
+
+    private bool _enableVignette = false;
+    public bool EnableVignette
+    {
+        get => _enableVignette;
+        set
+        {
+            _enableVignette = value;
+            OnEnableVignetteChanged.InvokeAsync(value);
+        }
+    }
+
+    private bool _enableSnapTurning = true;
+    public bool EnableSnapTurning
+    {
+        get => _enableSnapTurning;
+        set
+        {
+            _enableSnapTurning = value;
+            OnEnableSnapTurningChanged.InvokeAsync(value);
+        }
+    }
+
+    private float _turnAngle = 45f;
+    public float TurnAngle
+    {
+        get => _turnAngle;
+        set
+        {
+            _turnAngle = value;
+            OnTurnAngleChanged.InvokeAsync(value);
+        }
+    }
+
+    private bool _enableHaptics = true;
+    public bool EnableHaptics
+    {
+        get => _enableHaptics;
+        set
+        {
+            _enableHaptics = value;
+            OnEnableHapticsChanged.InvokeAsync(value);
+        }
+    }
+
+    private float _hapticIntensity = 0.5f;
+    public float HapticIntensity
+    {
+        get => _hapticIntensity;
+        set
+        {
+            _hapticIntensity = value;
+            OnHapticIntensityChanged.InvokeAsync(value);
+        }
+    }
+
+    private string GetLocomotionDescription()
+    {
+        return LocomotionMode switch
+        {
+            "teleport" => "Not Used (Teleport Mode)",
+            "smooth" => "Move & Turn",
+            "grab-move" => "Not Used (Grab Mode)",
+            _ => "Unknown"
+        };
+    }
+}
+
+<style>
+    .vr-controller-panel {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 15px;
+        border-radius: 8px;
+        max-width: 350px;
+        font-size: 14px;
+    }
+
+    .vr-controller-panel h4 {
+        margin-top: 0;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 8px;
+    }
+
+    .controller-section,
+    .comfort-section,
+    .haptics-section,
+    .controller-status {
+        margin: 15px 0;
+    }
+
+    .controller-section h5,
+    .comfort-section h5,
+    .haptics-section h5,
+    .controller-status h5 {
+        font-size: 13px;
+        color: #007bff;
+        margin-bottom: 8px;
+    }
+
+    .controller-section ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+
+    .controller-section li {
+        margin: 5px 0;
+    }
+
+    .controller-section strong {
+        color: #333;
+    }
+
+    label {
+        display: block;
+        margin: 8px 0;
+        font-size: 13px;
+    }
+
+    .sub-option {
+        margin-left: 20px;
+        padding: 5px 0;
+    }
+
+    input[type="range"] {
+        width: 100%;
+    }
+
+    .controller-status p {
+        margin: 5px 0;
+    }
+</style>

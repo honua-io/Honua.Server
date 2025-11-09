@@ -67,6 +67,85 @@ public class PerformanceMonitor : IDisposable
     }
 
     /// <summary>
+    /// Measures the execution time and memory usage of an interop operation.
+    /// Optimized for tracking Blazor-JavaScript interop performance.
+    /// </summary>
+    /// <typeparam name="T">Return type of the operation.</typeparam>
+    /// <param name="operationName">Name of the interop operation.</param>
+    /// <param name="operation">Interop operation to measure.</param>
+    /// <returns>Result of the operation.</returns>
+    public async Task<T> MeasureInteropAsync<T>(string operationName, Func<Task<T>> operation)
+    {
+        if (!_enabled)
+            return await operation();
+
+        var sw = Stopwatch.StartNew();
+        var memBefore = GC.GetTotalMemory(false);
+
+        try
+        {
+            var result = await operation();
+            sw.Stop();
+
+            var memAfter = GC.GetTotalMemory(false);
+            var memDelta = (memAfter - memBefore) / 1024.0 / 1024.0; // MB
+
+            RecordMeasurement(operationName, sw.ElapsedMilliseconds);
+
+            _logger.Info(
+                $"Interop {operationName}: {sw.ElapsedMilliseconds}ms, Memory: {memDelta:F2}MB"
+            );
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.Error($"Interop {operationName} failed", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Measures the execution time and memory usage of a void interop operation.
+    /// Optimized for tracking Blazor-JavaScript interop performance.
+    /// </summary>
+    /// <param name="operationName">Name of the interop operation.</param>
+    /// <param name="operation">Interop operation to measure.</param>
+    public async Task MeasureInteropAsync(string operationName, Func<Task> operation)
+    {
+        if (!_enabled)
+        {
+            await operation();
+            return;
+        }
+
+        var sw = Stopwatch.StartNew();
+        var memBefore = GC.GetTotalMemory(false);
+
+        try
+        {
+            await operation();
+            sw.Stop();
+
+            var memAfter = GC.GetTotalMemory(false);
+            var memDelta = (memAfter - memBefore) / 1024.0 / 1024.0; // MB
+
+            RecordMeasurement(operationName, sw.ElapsedMilliseconds);
+
+            _logger.Info(
+                $"Interop {operationName}: {sw.ElapsedMilliseconds}ms, Memory: {memDelta:F2}MB"
+            );
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.Error($"Interop {operationName} failed", ex);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Measures the execution time of a synchronous operation.
     /// </summary>
     /// <typeparam name="T">Return type of the operation.</typeparam>

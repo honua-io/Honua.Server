@@ -1,0 +1,464 @@
+@page "/examples/map-3d"
+@using Honua.MapSDK.Components
+@using Honua.MapSDK.Models
+@using System.Text.Json
+@inject IJSRuntime JS
+
+<PageTitle>3D Map Example - Honua MapSDK</PageTitle>
+
+<div class="example-container">
+    <h1>3D Map Example</h1>
+    <p class="lead">
+        Demonstrates 3D GeoJSON rendering with Deck.gl and MapLibre GL JS.
+        Features include 3D points, lines, and polygons with elevation data.
+    </p>
+
+    <div class="map-wrapper">
+        <HonuaMapLibre @ref="_mapComponent"
+                       MapId="map-3d"
+                       Style="https://demotiles.maplibre.org/style.json"
+                       Center="new[] { -122.4194, 37.7749 }"
+                       Zoom="13"
+                       Pitch="45"
+                       Bearing="0">
+
+            <Map3DComponent MapId="map-3d"
+                           EnableLighting="true"
+                           EnablePicking="true"
+                           DefaultCamera="_defaultCamera"
+                           OnFeatureClick="HandleFeatureClick"
+                           @ref="_map3DComponent" />
+        </HonuaMapLibre>
+
+        <div class="map-controls">
+            <div class="control-panel">
+                <h3>3D Layers</h3>
+
+                <button class="btn btn-primary" @onclick="LoadBuildingsLayer" disabled="@_buildingsLoaded">
+                    @(_buildingsLoaded ? "Buildings Loaded ✓" : "Load 3D Buildings")
+                </button>
+
+                <button class="btn btn-primary" @onclick="LoadFlightPathLayer" disabled="@_flightPathLoaded">
+                    @(_flightPathLoaded ? "Flight Path Loaded ✓" : "Load Flight Path")
+                </button>
+
+                <button class="btn btn-primary" @onclick="LoadPointCloudLayer" disabled="@_pointCloudLoaded">
+                    @(_pointCloudLoaded ? "Point Cloud Loaded ✓" : "Load Point Cloud")
+                </button>
+
+                <button class="btn btn-secondary" @onclick="ClearAllLayers">
+                    Clear All Layers
+                </button>
+            </div>
+
+            <div class="control-panel">
+                <h3>Camera Controls</h3>
+
+                <label>
+                    Pitch: @_pitch°
+                    <input type="range" min="0" max="85" step="1"
+                           @bind="_pitch" @bind:event="oninput" @bind:after="UpdateCamera" />
+                </label>
+
+                <label>
+                    Bearing: @_bearing°
+                    <input type="range" min="0" max="360" step="1"
+                           @bind="_bearing" @bind:event="oninput" @bind:after="UpdateCamera" />
+                </label>
+
+                <label>
+                    Zoom: @_zoom.ToString("F1")
+                    <input type="range" min="10" max="18" step="0.1"
+                           @bind="_zoom" @bind:event="oninput" @bind:after="UpdateCamera" />
+                </label>
+            </div>
+
+            @if (_selectedFeature != null)
+            {
+                <div class="control-panel feature-info">
+                    <h3>Selected Feature</h3>
+                    <pre>@_selectedFeature</pre>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="example-info">
+        <h2>About This Example</h2>
+        <p>
+            This example demonstrates the Phase 1 implementation of 3D geometry support in Honua.Server MapSDK.
+            It showcases:
+        </p>
+        <ul>
+            <li><strong>3D Buildings:</strong> Extruded polygons with base elevation and height</li>
+            <li><strong>Flight Paths:</strong> 3D LineStrings showing altitude variations</li>
+            <li><strong>Point Cloud:</strong> High-performance rendering of thousands of 3D points</li>
+            <li><strong>Camera Controls:</strong> Interactive pitch, bearing, and zoom controls for 3D viewing</li>
+            <li><strong>Feature Picking:</strong> Click on features to see their properties</li>
+        </ul>
+
+        <h3>Architecture</h3>
+        <ul>
+            <li><strong>Deck.gl:</strong> WebGL-based 3D rendering engine for geospatial data</li>
+            <li><strong>MapLibre GL JS:</strong> Base map with synchronized camera controls</li>
+            <li><strong>HonuaGeometry3D:</strong> 3D GeoJSON parsing and Z coordinate extraction</li>
+            <li><strong>Map3DComponent:</strong> Blazor component for 3D layer management</li>
+        </ul>
+
+        <h3>Code Example</h3>
+        <pre><code>// Load 3D GeoJSON layer
+var geojson = new
+{
+    type = "FeatureCollection",
+    features = new[]
+    {
+        new
+        {
+            type = "Feature",
+            geometry = new
+            {
+                type = "Point",
+                coordinates = new[] { -122.4194, 37.7749, 50.0 } // lon, lat, elevation
+            },
+            properties = new { name = "3D Point" }
+        }
+    }
+};
+
+await _map3DComponent.LoadGeoJson3DLayerAsync("my-layer", geojson, new Layer3DOptions
+{
+    Extruded = true,
+    FillColor = new[] { 160, 160, 180, 200 },
+    Pickable = true
+});</code></pre>
+    </div>
+</div>
+
+@code {
+    private HonuaMapLibre? _mapComponent;
+    private Map3DComponent? _map3DComponent;
+    private Camera3DConfig _defaultCamera = new() { Pitch = 45, Bearing = 0, Zoom = 13 };
+
+    private bool _buildingsLoaded = false;
+    private bool _flightPathLoaded = false;
+    private bool _pointCloudLoaded = false;
+
+    private double _pitch = 45;
+    private double _bearing = 0;
+    private double _zoom = 13;
+
+    private string? _selectedFeature;
+
+    /// <summary>
+    /// Load sample 3D buildings layer.
+    /// </summary>
+    private async Task LoadBuildingsLayer()
+    {
+        if (_map3DComponent == null) return;
+
+        // Create sample 3D building data
+        var buildings = new
+        {
+            type = "FeatureCollection",
+            features = new[]
+            {
+                new
+                {
+                    type = "Feature",
+                    geometry = new
+                    {
+                        type = "Polygon",
+                        coordinates = new[]
+                        {
+                            new[]
+                            {
+                                new[] { -122.420, 37.775, 0.0 },
+                                new[] { -122.419, 37.775, 0.0 },
+                                new[] { -122.419, 37.776, 0.0 },
+                                new[] { -122.420, 37.776, 0.0 },
+                                new[] { -122.420, 37.775, 0.0 }
+                            }
+                        }
+                    },
+                    properties = new
+                    {
+                        name = "Building A",
+                        height = 50.0,
+                        base_elevation = 0.0
+                    }
+                },
+                new
+                {
+                    type = "Feature",
+                    geometry = new
+                    {
+                        type = "Polygon",
+                        coordinates = new[]
+                        {
+                            new[]
+                            {
+                                new[] { -122.418, 37.774, 0.0 },
+                                new[] { -122.417, 37.774, 0.0 },
+                                new[] { -122.417, 37.775, 0.0 },
+                                new[] { -122.418, 37.775, 0.0 },
+                                new[] { -122.418, 37.774, 0.0 }
+                            }
+                        }
+                    },
+                    properties = new
+                    {
+                        name = "Building B",
+                        height = 75.0,
+                        base_elevation = 0.0
+                    }
+                }
+            }
+        };
+
+        await _map3DComponent.LoadGeoJson3DLayerAsync("buildings", buildings, new Map3DComponent.Layer3DOptions
+        {
+            Extruded = true,
+            FillColor = new[] { 120, 140, 180, 200 },
+            LineColor = new[] { 60, 70, 90, 255 },
+            Pickable = true
+        });
+
+        _buildingsLoaded = true;
+    }
+
+    /// <summary>
+    /// Load sample flight path layer.
+    /// </summary>
+    private async Task LoadFlightPathLayer()
+    {
+        if (_map3DComponent == null) return;
+
+        var flightPath = new
+        {
+            type = "FeatureCollection",
+            features = new[]
+            {
+                new
+                {
+                    type = "Feature",
+                    geometry = new
+                    {
+                        type = "LineString",
+                        coordinates = new[]
+                        {
+                            new[] { -122.425, 37.770, 100.0 },
+                            new[] { -122.422, 37.772, 150.0 },
+                            new[] { -122.419, 37.774, 200.0 },
+                            new[] { -122.416, 37.776, 150.0 },
+                            new[] { -122.413, 37.778, 100.0 }
+                        }
+                    },
+                    properties = new
+                    {
+                        name = "Flight Path 001",
+                        aircraft = "Boeing 737",
+                        altitude_unit = "meters"
+                    }
+                }
+            }
+        };
+
+        await _map3DComponent.LoadPathLayerAsync("flight-path", new[] { flightPath.features[0].geometry },
+            new Map3DComponent.PathLayerOptions
+            {
+                Color = new[] { 255, 100, 0, 200 },
+                Width = 3,
+                Pickable = true
+            });
+
+        _flightPathLoaded = true;
+    }
+
+    /// <summary>
+    /// Load sample point cloud layer.
+    /// </summary>
+    private async Task LoadPointCloudLayer()
+    {
+        if (_map3DComponent == null) return;
+
+        // Generate random 3D points
+        var random = new Random(42);
+        var points = new List<double[]>();
+
+        for (int i = 0; i < 1000; i++)
+        {
+            var lon = -122.425 + (random.NextDouble() * 0.02);
+            var lat = 37.770 + (random.NextDouble() * 0.02);
+            var elevation = random.NextDouble() * 50;
+            points.Add(new[] { lon, lat, elevation });
+        }
+
+        await _map3DComponent.LoadPointCloudLayerAsync("point-cloud", points.ToArray(),
+            new Map3DComponent.PointCloudOptions
+            {
+                Radius = 3,
+                Color = new[] { 0, 255, 150, 180 },
+                Pickable = true
+            });
+
+        _pointCloudLoaded = true;
+    }
+
+    /// <summary>
+    /// Clear all 3D layers.
+    /// </summary>
+    private async Task ClearAllLayers()
+    {
+        if (_map3DComponent == null) return;
+
+        if (_buildingsLoaded)
+        {
+            await _map3DComponent.RemoveLayerAsync("buildings");
+            _buildingsLoaded = false;
+        }
+
+        if (_flightPathLoaded)
+        {
+            await _map3DComponent.RemoveLayerAsync("flight-path");
+            _flightPathLoaded = false;
+        }
+
+        if (_pointCloudLoaded)
+        {
+            await _map3DComponent.RemoveLayerAsync("point-cloud");
+            _pointCloudLoaded = false;
+        }
+    }
+
+    /// <summary>
+    /// Update camera position.
+    /// </summary>
+    private async Task UpdateCamera()
+    {
+        if (_map3DComponent == null) return;
+
+        var camera = new Camera3DConfig
+        {
+            Pitch = _pitch,
+            Bearing = _bearing,
+            Zoom = _zoom,
+            Center = new[] { -122.4194, 37.7749 }
+        };
+
+        await _map3DComponent.SetCamera3DAsync(camera, new Map3DComponent.AnimationOptions
+        {
+            Duration = 500
+        });
+    }
+
+    /// <summary>
+    /// Handle feature click event.
+    /// </summary>
+    private void HandleFeatureClick(Map3DComponent.Feature3DClickEvent e)
+    {
+        _selectedFeature = JsonSerializer.Serialize(e.Feature, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+        StateHasChanged();
+    }
+}
+
+<style>
+    .example-container {
+        padding: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .lead {
+        font-size: 1.1rem;
+        color: #666;
+        margin-bottom: 2rem;
+    }
+
+    .map-wrapper {
+        display: grid;
+        grid-template-columns: 1fr 350px;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .map-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .control-panel {
+        background: white;
+        padding: 1rem;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .control-panel h3 {
+        margin-top: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .control-panel label {
+        display: block;
+        margin-bottom: 0.75rem;
+        font-size: 0.9rem;
+    }
+
+    .control-panel input[type="range"] {
+        width: 100%;
+        margin-top: 0.25rem;
+    }
+
+    .control-panel button {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    .feature-info pre {
+        font-size: 0.75rem;
+        background: #f5f5f5;
+        padding: 0.5rem;
+        border-radius: 4px;
+        overflow-x: auto;
+        max-height: 200px;
+    }
+
+    .example-info {
+        background: white;
+        padding: 2rem;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .example-info h2 {
+        margin-top: 0;
+    }
+
+    .example-info h3 {
+        margin-top: 1.5rem;
+    }
+
+    .example-info pre {
+        background: #f5f5f5;
+        padding: 1rem;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+
+    .example-info code {
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+    }
+
+    @media (max-width: 1024px) {
+        .map-wrapper {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
