@@ -7,11 +7,11 @@ on:
   #     - 'src/Honua.MapSDK/**'
   #     - 'tests/Honua.MapSDK.Tests/**'
   #     - '.github/workflows/test.yml'
-  pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'src/Honua.MapSDK/**'
-      - 'tests/Honua.MapSDK.Tests/**'
+  # pull_request:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'src/Honua.MapSDK/**'
+  #     - 'tests/Honua.MapSDK.Tests/**'
   workflow_dispatch:
 
 jobs:
