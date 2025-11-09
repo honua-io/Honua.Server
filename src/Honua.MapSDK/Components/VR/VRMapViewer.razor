@@ -1,0 +1,301 @@
+@page "/vr-map"
+@inject IJSRuntime JS
+@using Honua.MapSDK.Services.VR
+
+<div class="vr-container">
+    @if (!vrSupported)
+    {
+        <div class="alert alert-warning">
+            <h4>WebXR Not Supported</h4>
+            <p>Your browser or device does not support WebXR.</p>
+            <ul>
+                <li>Use Meta Quest Browser, Chrome, or Edge with VR headset</li>
+                <li>Ensure you're on HTTPS (required for WebXR)</li>
+                <li>Enable WebXR flags if using experimental browser</li>
+            </ul>
+        </div>
+    }
+    else if (!sessionActive)
+    {
+        <div class="vr-entry">
+            <h2>Enter VR Mode</h2>
+            <p>Experience geospatial data in immersive virtual reality</p>
+
+            <div class="vr-settings">
+                <div class="form-group">
+                    <label>Center Location:</label>
+                    <input type="text" class="form-control" @bind="centerLon" placeholder="Longitude" />
+                    <input type="text" class="form-control" @bind="centerLat" placeholder="Latitude" />
+                </div>
+
+                <div class="form-group">
+                    <label>Scale (1:N):</label>
+                    <input type="number" class="form-control" @bind="scale" min="1" max="10000" />
+                </div>
+
+                <div class="form-group">
+                    <label>Quality:</label>
+                    <select class="form-control" @bind="qualityLevel">
+                        <option value="low">Low (Best Performance)</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High (Best Quality)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Locomotion:</label>
+                    <select class="form-control" @bind="locomotionMode">
+                        <option value="teleport" selected>Teleport (Most Comfortable)</option>
+                        <option value="smooth">Smooth</option>
+                        <option value="grab-move">Grab & Move</option>
+                    </select>
+                </div>
+            </div>
+
+            <button @onclick="EnterVR" class="btn btn-primary btn-lg mt-3" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm mr-2"></span>
+                    <text>Initializing VR...</text>
+                }
+                else
+                {
+                    <text>Enter VR Mode</text>
+                }
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="vr-active">
+            <p class="text-success">VR Session Active</p>
+            <p class="text-muted">Put on your headset to view the 3D map</p>
+            <button @onclick="ExitVR" class="btn btn-danger">Exit VR</button>
+        </div>
+    }
+
+    @if (errorMessage != null)
+    {
+        <div class="alert alert-danger mt-3">
+            @errorMessage
+        </div>
+    }
+
+    @if (performanceStats != null && sessionActive)
+    {
+        <div class="vr-stats">
+            <h5>Performance</h5>
+            <p>FPS: @performanceStats.FrameRate.ToString("F1")</p>
+            <p>Draw Calls: @performanceStats.DrawCalls</p>
+            <p>Features: @performanceStats.FeatureCount</p>
+        </div>
+    }
+</div>
+
+<canvas id="vr-canvas" style="display: @(sessionActive ? "block" : "none"); width: 100%; height: 100vh;"></canvas>
+
+@code {
+    [Parameter]
+    public string? MapId { get; set; }
+
+    [Parameter]
+    public double[]? InitialCenter { get; set; }
+
+    [Inject]
+    private VRSessionService? VRSessionService { get; set; }
+
+    [Inject]
+    private VRTelemetryService? VRTelemetryService { get; set; }
+
+    private IJSObjectReference? vrModule;
+    private bool vrSupported = false;
+    private bool sessionActive = false;
+    private bool isLoading = false;
+    private string? errorMessage = null;
+    private string sessionId = string.Empty;
+
+    // Settings
+    private double centerLon = -122.4194;
+    private double centerLat = 37.7749;
+    private double scale = 100.0;
+    private string qualityLevel = "medium";
+    private string locomotionMode = "teleport";
+
+    // Performance
+    private VRPerformanceStats? performanceStats = null;
+    private System.Timers.Timer? statsTimer;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (InitialCenter != null && InitialCenter.Length >= 2)
+            {
+                centerLon = InitialCenter[0];
+                centerLat = InitialCenter[1];
+            }
+
+            try
+            {
+                vrModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import", "./js/vr/vr-session-manager.js");
+
+                vrSupported = await vrModule.InvokeAsync<bool>("checkVRSupport");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Failed to initialize VR: {ex.Message}";
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task EnterVR()
+    {
+        if (vrModule == null) return;
+
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            sessionId = Guid.NewGuid().ToString();
+
+            // Create VR session on server
+            var config = new VRSessionConfig
+            {
+                SessionMode = "immersive-vr",
+                ReferenceSpace = "local-floor",
+                EnableHandTracking = true,
+                TargetFrameRate = 72
+            };
+
+            var session = VRSessionService?.CreateSession(sessionId, config);
+
+            // Set preferences
+            var preferences = new VRPreferences
+            {
+                LocomotionMode = locomotionMode,
+                Scale = (float)scale,
+                QualityLevel = qualityLevel,
+                EnableSnapTurning = true,
+                ShowMinimap = true
+            };
+
+            VRSessionService?.UpdateSessionPreferences(sessionId, preferences);
+
+            // Start VR session in JavaScript
+            await vrModule.InvokeVoidAsync("enterVRSession", new
+            {
+                mapId = MapId ?? "main",
+                center = new[] { centerLon, centerLat },
+                scale = scale,
+                quality = qualityLevel,
+                locomotion = locomotionMode
+            });
+
+            sessionActive = true;
+
+            // Record telemetry
+            VRTelemetryService?.RecordEvent(sessionId, "session_start", new Dictionary<string, object>
+            {
+                { "deviceType", "quest" },
+                { "quality", qualityLevel },
+                { "locomotion", locomotionMode }
+            });
+
+            // Start performance monitoring
+            StartPerformanceMonitoring();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to enter VR: {ex.Message}";
+            sessionActive = false;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExitVR()
+    {
+        if (vrModule != null)
+        {
+            try
+            {
+                await vrModule.InvokeVoidAsync("exitVRSession");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error exiting VR: {ex.Message}");
+            }
+        }
+
+        VRSessionService?.EndSession(sessionId);
+
+        VRTelemetryService?.RecordEvent(sessionId, "session_end", new Dictionary<string, object>
+        {
+            { "duration", DateTime.UtcNow.Subtract(DateTime.UtcNow).TotalSeconds }
+        });
+
+        StopPerformanceMonitoring();
+
+        sessionActive = false;
+        sessionId = string.Empty;
+        StateHasChanged();
+    }
+
+    private void StartPerformanceMonitoring()
+    {
+        statsTimer = new System.Timers.Timer(1000); // Update every second
+        statsTimer.Elapsed += async (sender, args) =>
+        {
+            // In production, get real stats from JavaScript
+            performanceStats = new VRPerformanceStats
+            {
+                FrameRate = 72.5,
+                DrawCalls = 156,
+                FeatureCount = 2543
+            };
+
+            await InvokeAsync(StateHasChanged);
+        };
+        statsTimer.Start();
+    }
+
+    private void StopPerformanceMonitoring()
+    {
+        statsTimer?.Stop();
+        statsTimer?.Dispose();
+        statsTimer = null;
+        performanceStats = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        StopPerformanceMonitoring();
+
+        if (sessionActive)
+        {
+            await ExitVR();
+        }
+
+        if (vrModule != null)
+        {
+            await vrModule.DisposeAsync();
+        }
+    }
+
+    private class VRPerformanceStats
+    {
+        public double FrameRate { get; set; }
+        public int DrawCalls { get; set; }
+        public int FeatureCount { get; set; }
+    }
+}
