@@ -75,6 +75,17 @@ internal sealed class PostgresFeatureOperations
         Guard.NotNull(layer);
 
         var normalizedQuery = query ?? new FeatureQuery();
+
+        // Check if layer is backed by a SQL view
+        if (SqlViewQueryBuilder.IsSqlView(layer))
+        {
+            await foreach (var record in ExecuteSqlViewQueryAsync(dataSource, layer, normalizedQuery, cancellationToken).ConfigureAwait(false))
+            {
+                yield return record;
+            }
+            yield break;
+        }
+
         var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
         var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
 
@@ -132,6 +143,13 @@ internal sealed class PostgresFeatureOperations
             async () =>
             {
                 var normalizedQuery = query ?? new FeatureQuery();
+
+                // Check if layer is backed by a SQL view
+                if (SqlViewQueryBuilder.IsSqlView(layer))
+                {
+                    return await ExecuteSqlViewCountAsync(dataSource, layer, normalizedQuery, cancellationToken).ConfigureAwait(false);
+                }
+
                 var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
                 var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
 
@@ -175,6 +193,12 @@ internal sealed class PostgresFeatureOperations
         Guard.NotNull(service);
         Guard.NotNull(layer);
         Guard.NotNullOrWhiteSpace(featureId);
+
+        // Check if layer is backed by a SQL view
+        if (SqlViewQueryBuilder.IsSqlView(layer))
+        {
+            return await ExecuteSqlViewByIdAsync(dataSource, layer, featureId, query, cancellationToken).ConfigureAwait(false);
+        }
 
         var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
         var targetSrid = CrsHelper.ParseCrs(query?.Crs ?? service.Ogc.DefaultCrs);
@@ -922,5 +946,138 @@ internal sealed class PostgresFeatureOperations
         await _connectionManager.RetryPipeline.ExecuteAsync(async ct =>
             await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Executes a SQL view query to retrieve features.
+    /// </summary>
+    private async IAsyncEnumerable<FeatureRecord> ExecuteSqlViewQueryAsync(
+        DataSourceDefinition dataSource,
+        LayerDefinition layer,
+        FeatureQuery query,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var requestParameters = query.SqlViewParameters ?? new Dictionary<string, string>();
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var queryDef = sqlViewBuilder.BuildSelect(query);
+
+        await using var connection = await _connectionManager.CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _connectionManager.RetryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = queryDef.Sql;
+
+        // Apply timeout from SQL view definition or query
+        var timeout = sqlViewBuilder.GetCommandTimeout() ?? query.CommandTimeout ?? TimeSpan.FromSeconds(_options.DefaultCommandTimeoutSeconds);
+        command.CommandTimeout = (int)timeout.TotalSeconds;
+
+        // Add parameters
+        foreach (var param in queryDef.Parameters)
+        {
+            var npgsqlParam = command.CreateParameter();
+            npgsqlParam.ParameterName = param.Key;
+            npgsqlParam.Value = param.Value ?? DBNull.Value;
+            command.Parameters.Add(npgsqlParam);
+        }
+
+        await using var reader = await _connectionManager.RetryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return PostgresRecordMapper.CreateFeatureRecord(reader, layer);
+        }
+    }
+
+    /// <summary>
+    /// Executes a SQL view count query.
+    /// </summary>
+    private async Task<long> ExecuteSqlViewCountAsync(
+        DataSourceDefinition dataSource,
+        LayerDefinition layer,
+        FeatureQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var requestParameters = query.SqlViewParameters ?? new Dictionary<string, string>();
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var queryDef = sqlViewBuilder.BuildCount(query);
+
+        await using var connection = await _connectionManager.CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _connectionManager.RetryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = queryDef.Sql;
+
+        // Apply timeout from SQL view definition or query
+        var timeout = sqlViewBuilder.GetCommandTimeout() ?? query.CommandTimeout ?? TimeSpan.FromSeconds(_options.DefaultCommandTimeoutSeconds);
+        command.CommandTimeout = (int)timeout.TotalSeconds;
+
+        // Add parameters
+        foreach (var param in queryDef.Parameters)
+        {
+            var npgsqlParam = command.CreateParameter();
+            npgsqlParam.ParameterName = param.Key;
+            npgsqlParam.Value = param.Value ?? DBNull.Value;
+            command.Parameters.Add(npgsqlParam);
+        }
+
+        var result = await _connectionManager.RetryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        return (result is null || result is DBNull) ? 0 : Convert.ToInt64(result, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Executes a SQL view query to retrieve a single feature by ID.
+    /// </summary>
+    private async Task<FeatureRecord?> ExecuteSqlViewByIdAsync(
+        DataSourceDefinition dataSource,
+        LayerDefinition layer,
+        string featureId,
+        FeatureQuery? query,
+        CancellationToken cancellationToken = default)
+    {
+        var requestParameters = query?.SqlViewParameters ?? new Dictionary<string, string>();
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var queryDef = sqlViewBuilder.BuildById(featureId, query);
+
+        await using var connection = await _connectionManager.CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _connectionManager.RetryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = queryDef.Sql;
+
+        // Apply timeout from SQL view definition or query
+        var timeout = sqlViewBuilder.GetCommandTimeout() ?? query?.CommandTimeout ?? TimeSpan.FromSeconds(_options.DefaultCommandTimeoutSeconds);
+        command.CommandTimeout = (int)timeout.TotalSeconds;
+
+        // Add parameters
+        foreach (var param in queryDef.Parameters)
+        {
+            var npgsqlParam = command.CreateParameter();
+            npgsqlParam.ParameterName = param.Key;
+            npgsqlParam.Value = param.Value ?? DBNull.Value;
+            command.Parameters.Add(npgsqlParam);
+        }
+
+        await using var reader = await _connectionManager.RetryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return PostgresRecordMapper.CreateFeatureRecord(reader, layer);
+        }
+
+        return null;
     }
 }

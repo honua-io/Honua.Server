@@ -90,6 +90,8 @@ public sealed class SqlServerDataStoreProvider : RelationalDataStoreProviderBase
         return connectionString;
     }
 
+    protected override string GetProviderName() => "sqlserver";
+
     protected override QueryDefinition BuildSelectQuery(
         ServiceDefinition service,
         LayerDefinition layer,

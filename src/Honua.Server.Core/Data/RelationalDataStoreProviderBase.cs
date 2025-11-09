@@ -104,6 +104,17 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         Guard.NotNull(layer);
 
         var normalizedQuery = query ?? new FeatureQuery();
+
+        // Check if layer is backed by a SQL view
+        if (SqlViewQueryBuilder.IsSqlView(layer))
+        {
+            await foreach (var record in ExecuteSqlViewQueryAsync(dataSource, layer, normalizedQuery, cancellationToken).ConfigureAwait(false))
+            {
+                yield return record;
+            }
+            yield break;
+        }
+
         var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
         var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
 
@@ -141,6 +152,13 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         Guard.NotNull(layer);
 
         var normalizedQuery = query ?? new FeatureQuery();
+
+        // Check if layer is backed by a SQL view
+        if (SqlViewQueryBuilder.IsSqlView(layer))
+        {
+            return await ExecuteSqlViewCountAsync(dataSource, layer, normalizedQuery, cancellationToken).ConfigureAwait(false);
+        }
+
         var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
         var targetSrid = CrsHelper.ParseCrs(normalizedQuery.Crs ?? service.Ogc.DefaultCrs);
 
@@ -180,6 +198,12 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         Guard.NotNull(service);
         Guard.NotNull(layer);
         Guard.NotNullOrWhiteSpace(featureId);
+
+        // Check if layer is backed by a SQL view
+        if (SqlViewQueryBuilder.IsSqlView(layer))
+        {
+            return await ExecuteSqlViewByIdAsync(dataSource, layer, featureId, query, cancellationToken).ConfigureAwait(false);
+        }
 
         var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
         var targetSrid = CrsHelper.ParseCrs(query?.Crs ?? service.Ogc.DefaultCrs);
@@ -838,6 +862,193 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         LayerDefinition layer,
         FeatureQuery? filter,
         CancellationToken cancellationToken = default);
+
+    // ========================================
+    // SQL VIEW SCHEMA DETECTION
+    // ========================================
+
+    /// <summary>
+    /// Detects schema for a SQL view layer by executing the query and inspecting result metadata.
+    /// This allows automatic field discovery instead of manually defining fields.
+    /// </summary>
+    /// <param name="layer">Layer definition containing the SQL view.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of detected field definitions.</returns>
+    public virtual async Task<IReadOnlyList<FieldDefinition>> DetectSchemaForSqlViewAsync(
+        LayerDefinition layer,
+        CancellationToken ct)
+    {
+        if (layer.SqlView == null)
+        {
+            throw new ArgumentException("Layer does not have a SQL view defined", nameof(layer));
+        }
+
+        var detector = new SqlViewSchemaDetector();
+
+        // We need to create a connection without a DataSourceDefinition
+        // For this, we'll need to add an overload or make the connection creation more flexible
+        // For now, let's add a protected method that takes just a connection string
+        throw new NotImplementedException("DetectSchemaForSqlViewAsync requires connection - use overload with DataSourceDefinition");
+    }
+
+    /// <summary>
+    /// Detects schema for a SQL view layer by executing the query and inspecting result metadata.
+    /// This allows automatic field discovery instead of manually defining fields.
+    /// </summary>
+    /// <param name="dataSource">Data source containing connection information.</param>
+    /// <param name="layer">Layer definition containing the SQL view.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of detected field definitions.</returns>
+    public virtual async Task<IReadOnlyList<FieldDefinition>> DetectSchemaForSqlViewAsync(
+        DataSourceDefinition dataSource,
+        LayerDefinition layer,
+        CancellationToken ct)
+    {
+        if (layer.SqlView == null)
+        {
+            throw new ArgumentException("Layer does not have a SQL view defined", nameof(layer));
+        }
+
+        var detector = new SqlViewSchemaDetector();
+
+        await using var connection = await CreateConnectionAsync(dataSource, ct).ConfigureAwait(false);
+        await _retryPipeline.ExecuteAsync(async cancellationToken =>
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false),
+            ct).ConfigureAwait(false);
+
+        return await detector.DetectSchemaAsync(
+            connection,
+            layer.SqlView,
+            GetProviderName(),
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets the provider name for schema detection.
+    /// Must be one of: "postgres", "sqlserver", "mysql", "sqlite"
+    /// </summary>
+    protected abstract string GetProviderName();
+
+    // ========================================
+    // SQL VIEW SUPPORT (Protected virtual helpers)
+    // ========================================
+
+    /// <summary>
+    /// Executes a SQL view query to retrieve features.
+    /// Derived classes can override to customize SQL view execution behavior.
+    /// </summary>
+    protected virtual async IAsyncEnumerable<FeatureRecord> ExecuteSqlViewQueryAsync(
+        DataSourceDefinition dataSource,
+        LayerDefinition layer,
+        FeatureQuery query,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var requestParameters = query.SqlViewParameters ?? new Dictionary<string, string>();
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var queryDef = sqlViewBuilder.BuildSelect(query);
+
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _retryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        var definition = new QueryDefinition(queryDef.Sql, queryDef.Parameters);
+        await using var command = CreateCommand(connection, definition);
+
+        // Apply timeout from SQL view definition or query
+        var timeout = sqlViewBuilder.GetCommandTimeout() ?? query.CommandTimeout ?? TimeSpan.FromSeconds(DefaultCommandTimeoutSeconds);
+        command.CommandTimeout = (int)timeout.TotalSeconds;
+
+        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        // For SQL views, we use the stored SRID from the layer (or WGS84 as default)
+        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
+        var targetSrid = storageSrid; // SQL views handle their own CRS transformations in the query
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return CreateFeatureRecord((TDataReader)reader, layer, storageSrid, targetSrid);
+        }
+    }
+
+    /// <summary>
+    /// Executes a SQL view count query.
+    /// Derived classes can override to customize SQL view count behavior.
+    /// </summary>
+    protected virtual async Task<long> ExecuteSqlViewCountAsync(
+        DataSourceDefinition dataSource,
+        LayerDefinition layer,
+        FeatureQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var requestParameters = query.SqlViewParameters ?? new Dictionary<string, string>();
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var queryDef = sqlViewBuilder.BuildCount(query);
+
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _retryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        var definition = new QueryDefinition(queryDef.Sql, queryDef.Parameters);
+        await using var command = CreateCommand(connection, definition);
+
+        // Apply timeout from SQL view definition or query
+        var timeout = sqlViewBuilder.GetCommandTimeout() ?? query.CommandTimeout ?? TimeSpan.FromSeconds(DefaultCommandTimeoutSeconds);
+        command.CommandTimeout = (int)timeout.TotalSeconds;
+
+        var result = await _retryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteScalarAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        return (result is null || result is DBNull) ? 0 : Convert.ToInt64(result, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Executes a SQL view query to retrieve a single feature by ID.
+    /// Derived classes can override to customize SQL view get-by-id behavior.
+    /// </summary>
+    protected virtual async Task<FeatureRecord?> ExecuteSqlViewByIdAsync(
+        DataSourceDefinition dataSource,
+        LayerDefinition layer,
+        string featureId,
+        FeatureQuery? query,
+        CancellationToken cancellationToken = default)
+    {
+        var requestParameters = query?.SqlViewParameters ?? new Dictionary<string, string>();
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var queryDef = sqlViewBuilder.BuildById(featureId, query);
+
+        await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
+        await _retryPipeline.ExecuteAsync(async ct =>
+            await connection.OpenAsync(ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        var definition = new QueryDefinition(queryDef.Sql, queryDef.Parameters);
+        await using var command = CreateCommand(connection, definition);
+
+        // Apply timeout from SQL view definition or query
+        var timeout = sqlViewBuilder.GetCommandTimeout() ?? query?.CommandTimeout ?? TimeSpan.FromSeconds(DefaultCommandTimeoutSeconds);
+        command.CommandTimeout = (int)timeout.TotalSeconds;
+
+        await using var reader = await _retryPipeline.ExecuteAsync(async ct =>
+            await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
+
+        // For SQL views, we use the stored SRID from the layer (or WGS84 as default)
+        var storageSrid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
+        var targetSrid = storageSrid; // SQL views handle their own CRS transformations in the query
+
+        if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return CreateFeatureRecord((TDataReader)reader, layer, storageSrid, targetSrid);
+        }
+
+        return null;
+    }
 }
 
 /// <summary>

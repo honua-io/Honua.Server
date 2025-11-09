@@ -240,6 +240,21 @@ public sealed class WmsCapabilitiesBuilder : OgcCapabilitiesBuilder
             layer.Add(BuildDatasetLayer(dataset, styleLookup));
         }
 
+        // Add layer groups
+        foreach (var service in metadata.Services.Where(s => s.Enabled && s.Ogc.WmsEnabled))
+        {
+            var serviceLayerGroups = metadata.LayerGroups
+                .Where(lg => lg.Enabled &&
+                            string.Equals(lg.ServiceId, service.Id, StringComparison.OrdinalIgnoreCase) &&
+                            lg.Wms.AdvertiseInCapabilities)
+                .OrderBy(lg => lg.Title, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var layerGroup in serviceLayerGroups)
+            {
+                layer.Add(BuildLayerGroupElement(layerGroup, metadata, styleLookup));
+            }
+        }
+
         return layer;
     }
 
@@ -382,6 +397,128 @@ public sealed class WmsCapabilitiesBuilder : OgcCapabilitiesBuilder
 
         dimension.SetValue(extentValue);
         return dimension;
+    }
+
+    /// <summary>
+    /// Builds a layer element for a layer group.
+    /// </summary>
+    private XElement BuildLayerGroupElement(
+        LayerGroupDefinition layerGroup,
+        MetadataSnapshot metadata,
+        IReadOnlyDictionary<string, StyleDefinition> styleLookup)
+    {
+        var layerName = $"{layerGroup.ServiceId}:{layerGroup.Id}";
+        var layer = new XElement(Wms + "Layer",
+            new XElement(Wms + "Name", layerName),
+            new XElement(Wms + "Title", layerGroup.Title));
+
+        // Set queryable attribute
+        layer.SetAttributeValue("queryable", layerGroup.Queryable ? "1" : "0");
+
+        if (layerGroup.Description.HasValue())
+        {
+            layer.Add(new XElement(Wms + "Abstract", layerGroup.Description));
+        }
+
+        // Add keywords
+        var keywords = new HashSet<string>(layerGroup.Keywords, StringComparer.OrdinalIgnoreCase);
+        if (layerGroup.Catalog.Keywords.Count > 0)
+        {
+            foreach (var keyword in layerGroup.Catalog.Keywords)
+            {
+                keywords.Add(keyword);
+            }
+        }
+
+        if (keywords.Count > 0)
+        {
+            var keywordList = new XElement(Wms + "KeywordList");
+            foreach (var keyword in keywords)
+            {
+                if (keyword.HasValue())
+                {
+                    keywordList.Add(new XElement(Wms + "Keyword", keyword));
+                }
+            }
+            layer.Add(keywordList);
+        }
+
+        // Add CRS (either explicit or inherited from member layers)
+        var supportedCrs = LayerGroupExpander.GetSupportedCrs(layerGroup, metadata);
+        foreach (var crs in supportedCrs)
+        {
+            layer.Add(new XElement(Wms + "CRS", crs));
+        }
+
+        // Add bounding box
+        var extent = LayerGroupExpander.CalculateGroupExtent(layerGroup, metadata);
+        if (extent?.Bbox != null && extent.Bbox.Count > 0)
+        {
+            var bbox = extent.Bbox[0];
+            if (bbox.Length >= 4)
+            {
+                layer.Add(WmsSharedHelpers.CreateGeographicBoundingBox(bbox));
+
+                // Use the CRS from the extent, or fallback to the first supported CRS
+                var bboxCrs = extent.Crs ?? supportedCrs.FirstOrDefault() ?? "CRS:84";
+                var normalizedCrs = CrsNormalizationHelper.NormalizeForWms(bboxCrs);
+
+                // Swap bbox coordinates if CRS requires lat,lon order (e.g., EPSG:4326)
+                var bboxForCrs = WmsSharedHelpers.RequiresAxisOrderSwap(normalizedCrs)
+                    ? new[] { bbox[1], bbox[0], bbox[3], bbox[2] }  // lon,lat -> lat,lon
+                    : bbox;
+
+                layer.Add(WmsSharedHelpers.CreateBoundingBox(normalizedCrs, bboxForCrs));
+            }
+        }
+
+        // Add styles
+        var styleIds = new List<string>();
+        if (layerGroup.DefaultStyleId.HasValue())
+        {
+            styleIds.Add(layerGroup.DefaultStyleId!);
+        }
+        styleIds.AddRange(layerGroup.StyleIds);
+
+        foreach (var styleId in styleIds.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var title = styleLookup.TryGetValue(styleId, out var style) && style.Title.HasValue()
+                ? style.Title
+                : styleId;
+
+            layer.Add(new XElement(Wms + "Style",
+                new XElement(Wms + "Name", styleId),
+                new XElement(Wms + "Title", title)));
+        }
+
+        // Add default style if no styles are defined
+        if (styleIds.Count == 0)
+        {
+            layer.Add(new XElement(Wms + "Style",
+                new XElement(Wms + "Name", "default"),
+                new XElement(Wms + "Title", "Default")));
+        }
+
+        // Add scale hints if defined
+        if (layerGroup.MinScale.HasValue || layerGroup.MaxScale.HasValue)
+        {
+            // WMS 1.3.0 uses MinScaleDenominator/MaxScaleDenominator
+            if (layerGroup.MinScale.HasValue)
+            {
+                layer.Add(new XElement(Wms + "MinScaleDenominator", layerGroup.MinScale.Value));
+            }
+
+            if (layerGroup.MaxScale.HasValue)
+            {
+                layer.Add(new XElement(Wms + "MaxScaleDenominator", layerGroup.MaxScale.Value));
+            }
+        }
+
+        // Optionally, expand and include member layers as nested layers
+        // (This depends on whether we want a flat or hierarchical structure)
+        // For now, we'll just advertise the group as a named layer
+
+        return layer;
     }
 
     protected override Task AddProtocolSpecificSectionsAsync(XElement root, MetadataSnapshot metadata, HttpRequest request, CancellationToken cancellationToken)

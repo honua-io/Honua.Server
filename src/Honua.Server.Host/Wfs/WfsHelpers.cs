@@ -844,6 +844,34 @@ internal static class WfsHelpers
         return OgcExceptionHelper.CreateWfsException(code, locator, message);
     }
 
+    /// <summary>
+    /// Extracts SQL view parameters from the query string based on layer configuration.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> ExtractSqlViewParameters(
+        LayerDefinition layer,
+        IQueryCollection query)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // Only extract if layer has SQL view defined
+        if (layer.SqlView?.Parameters == null || layer.SqlView.Parameters.Count == 0)
+        {
+            return parameters;
+        }
+
+        // Extract each defined parameter from query string
+        foreach (var param in layer.SqlView.Parameters)
+        {
+            var value = QueryParsingHelpers.GetQueryValue(query, param.Name);
+            if (value.HasValue())
+            {
+                parameters[param.Name] = value;
+            }
+        }
+
+        return parameters;
+    }
+
     #endregion
 
     #region Schema Helpers

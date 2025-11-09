@@ -1,0 +1,202 @@
+{
+  "catalog": {
+    "id": "layer-groups-demo",
+    "title": "Layer Groups Example",
+    "description": "Demonstrates layer group functionality"
+  },
+  "folders": [
+    {
+      "id": "basemaps",
+      "title": "Base Maps"
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "main-db",
+      "provider": "postgis",
+      "connectionString": "Host=localhost;Database=geodata;Username=geouser"
+    }
+  ],
+  "services": [
+    {
+      "id": "mapping-service",
+      "title": "Mapping Service",
+      "folderId": "basemaps",
+      "serviceType": "feature",
+      "dataSourceId": "main-db",
+      "ogc": {
+        "wmsEnabled": true,
+        "wfsEnabled": true,
+        "collectionsEnabled": true
+      }
+    }
+  ],
+  "layers": [
+    {
+      "id": "parcels",
+      "serviceId": "mapping-service",
+      "title": "Property Parcels",
+      "geometryType": "Polygon",
+      "idField": "parcel_id",
+      "geometryField": "geom",
+      "storage": {
+        "table": "parcels"
+      }
+    },
+    {
+      "id": "buildings",
+      "serviceId": "mapping-service",
+      "title": "Buildings",
+      "geometryType": "Polygon",
+      "idField": "building_id",
+      "geometryField": "geom",
+      "storage": {
+        "table": "buildings"
+      }
+    },
+    {
+      "id": "roads",
+      "serviceId": "mapping-service",
+      "title": "Roads",
+      "geometryType": "LineString",
+      "idField": "road_id",
+      "geometryField": "geom",
+      "storage": {
+        "table": "roads"
+      }
+    },
+    {
+      "id": "water-bodies",
+      "serviceId": "mapping-service",
+      "title": "Water Bodies",
+      "geometryType": "Polygon",
+      "idField": "water_id",
+      "geometryField": "geom",
+      "storage": {
+        "table": "water_bodies"
+      }
+    },
+    {
+      "id": "labels",
+      "serviceId": "mapping-service",
+      "title": "Place Labels",
+      "geometryType": "Point",
+      "idField": "label_id",
+      "geometryField": "geom",
+      "storage": {
+        "table": "place_labels"
+      }
+    }
+  ],
+  "layerGroups": [
+    {
+      "id": "base-map",
+      "title": "Base Map 2025",
+      "serviceId": "mapping-service",
+      "description": "Complete base map with parcels, buildings, roads, and water",
+      "enabled": true,
+      "renderMode": "Single",
+      "queryable": true,
+      "keywords": ["basemap", "composite"],
+      "members": [
+        {
+          "type": "Layer",
+          "layerId": "parcels",
+          "order": 0,
+          "opacity": 0.7,
+          "enabled": true
+        },
+        {
+          "type": "Layer",
+          "layerId": "water-bodies",
+          "order": 1,
+          "opacity": 0.8,
+          "enabled": true
+        },
+        {
+          "type": "Layer",
+          "layerId": "roads",
+          "order": 2,
+          "opacity": 1.0,
+          "enabled": true
+        },
+        {
+          "type": "Layer",
+          "layerId": "buildings",
+          "order": 3,
+          "opacity": 0.9,
+          "enabled": true
+        },
+        {
+          "type": "Layer",
+          "layerId": "labels",
+          "order": 4,
+          "opacity": 1.0,
+          "enabled": true
+        }
+      ],
+      "wms": {
+        "advertiseInCapabilities": true,
+        "allowDirectRequest": true,
+        "showAsNamedLayer": true
+      }
+    },
+    {
+      "id": "cadastral-base",
+      "title": "Cadastral Base Layers",
+      "serviceId": "mapping-service",
+      "description": "Parcels and buildings only",
+      "enabled": true,
+      "renderMode": "Single",
+      "queryable": true,
+      "members": [
+        {
+          "type": "Layer",
+          "layerId": "parcels",
+          "order": 0,
+          "opacity": 0.7,
+          "enabled": true
+        },
+        {
+          "type": "Layer",
+          "layerId": "buildings",
+          "order": 1,
+          "opacity": 0.9,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "complete-map",
+      "title": "Complete Map with Nested Groups",
+      "serviceId": "mapping-service",
+      "description": "Example of nested layer groups",
+      "enabled": true,
+      "renderMode": "Single",
+      "queryable": true,
+      "members": [
+        {
+          "type": "Group",
+          "groupId": "cadastral-base",
+          "order": 0,
+          "opacity": 1.0,
+          "enabled": true
+        },
+        {
+          "type": "Layer",
+          "layerId": "roads",
+          "order": 1,
+          "opacity": 1.0,
+          "enabled": true
+        },
+        {
+          "type": "Layer",
+          "layerId": "water-bodies",
+          "order": 2,
+          "opacity": 0.8,
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

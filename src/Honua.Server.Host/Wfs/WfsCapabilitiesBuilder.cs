@@ -250,9 +250,25 @@ public sealed class WfsCapabilitiesBuilder : OgcCapabilitiesBuilder
 
         foreach (var service in metadata.Services.Where(s => s.Enabled && s.Ogc.CollectionsEnabled))
         {
+            // Add regular layers
             foreach (var layer in service.Layers)
             {
                 featureTypeList.Add(BuildFeatureType(service, layer));
+            }
+
+            // Add layer groups if WFS is enabled for the service
+            if (service.Ogc.WfsEnabled)
+            {
+                var serviceLayerGroups = metadata.LayerGroups
+                    .Where(lg => lg.Enabled &&
+                                string.Equals(lg.ServiceId, service.Id, StringComparison.OrdinalIgnoreCase) &&
+                                lg.Queryable)
+                    .OrderBy(lg => lg.Title, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var layerGroup in serviceLayerGroups)
+                {
+                    featureTypeList.Add(BuildLayerGroupFeatureType(service, layerGroup, metadata));
+                }
             }
         }
 
@@ -318,6 +334,88 @@ public sealed class WfsCapabilitiesBuilder : OgcCapabilitiesBuilder
 
         // Add metadata URL if present
         if (layer.Catalog?.Links?.FirstOrDefault() is { } link && link.Href.HasValue())
+        {
+            featureType.Add(new XElement(WfsConstants.Wfs + "MetadataURL",
+                new XAttribute(XLink + "href", link.Href)));
+        }
+
+        return featureType;
+    }
+
+    /// <summary>
+    /// Builds a FeatureType element for a layer group.
+    /// </summary>
+    private XElement BuildLayerGroupFeatureType(ServiceDefinition service, LayerGroupDefinition layerGroup, MetadataSnapshot metadata)
+    {
+        // Get supported CRS from the group or its members
+        var supportedCrs = LayerGroupExpander.GetSupportedCrs(layerGroup, metadata);
+        var baseCrs = supportedCrs.FirstOrDefault() ?? service.Ogc.DefaultCrs ?? "EPSG:4326";
+        var qualifiedName = $"{service.Id}:{layerGroup.Id}";
+
+        var featureType = new XElement(WfsConstants.Wfs + "FeatureType",
+            new XElement(WfsConstants.Wfs + "Name", qualifiedName),
+            new XElement(WfsConstants.Wfs + "Title", layerGroup.Title),
+            new XElement(WfsConstants.Wfs + "DefaultCRS", WfsHelpers.ToUrn(baseCrs)));
+
+        // Add abstract if present
+        if (layerGroup.Description.HasValue())
+        {
+            featureType.Add(new XElement(WfsConstants.Wfs + "Abstract", layerGroup.Description));
+        }
+
+        // Add keywords
+        var keywords = new HashSet<string>(layerGroup.Keywords, StringComparer.OrdinalIgnoreCase);
+        if (layerGroup.Catalog.Keywords.Count > 0)
+        {
+            foreach (var keyword in layerGroup.Catalog.Keywords)
+            {
+                keywords.Add(keyword);
+            }
+        }
+
+        if (keywords.Count > 0)
+        {
+            var keywordsElement = new XElement(WfsConstants.Ows + "Keywords");
+            foreach (var keyword in keywords)
+            {
+                if (keyword.HasValue())
+                {
+                    keywordsElement.Add(new XElement(WfsConstants.Ows + "Keyword", keyword));
+                }
+            }
+            featureType.Add(keywordsElement);
+        }
+
+        // Add other supported CRS
+        foreach (var crs in supportedCrs.Skip(1))
+        {
+            featureType.Add(new XElement(WfsConstants.Wfs + "OtherCRS", WfsHelpers.ToUrn(crs)));
+        }
+
+        // Add output formats
+        featureType.Add(new XElement(WfsConstants.Wfs + "OutputFormats",
+            new XElement(WfsConstants.Wfs + "Format", WfsConstants.GmlFormat),
+            new XElement(WfsConstants.Wfs + "Format", WfsConstants.GeoJsonFormat),
+            new XElement(WfsConstants.Wfs + "Format", WfsConstants.CsvFormat),
+            new XElement(WfsConstants.Wfs + "Format", WfsConstants.ShapefileFormat)));
+
+        // Add WGS84 bounding box from calculated group extent
+        var extent = LayerGroupExpander.CalculateGroupExtent(layerGroup, metadata);
+        if (extent?.Bbox is { Count: > 0 })
+        {
+            var bbox = extent.Bbox[0];
+            if (bbox.Length >= 4)
+            {
+                featureType.Add(new XElement(WfsConstants.Wfs + "WGS84BoundingBox",
+                    new XElement(WfsConstants.Ows + "LowerCorner",
+                        $"{FormatDouble(bbox[0])} {FormatDouble(bbox[1])}"),
+                    new XElement(WfsConstants.Ows + "UpperCorner",
+                        $"{FormatDouble(bbox[2])} {FormatDouble(bbox[3])}")));
+            }
+        }
+
+        // Add metadata URL if present
+        if (layerGroup.Links?.FirstOrDefault() is { } link && link.Href.HasValue())
         {
             featureType.Add(new XElement(WfsConstants.Wfs + "MetadataURL",
                 new XAttribute(XLink + "href", link.Href)));

@@ -63,6 +63,8 @@ public sealed class MySqlDataStoreProvider : RelationalDataStoreProviderBase<MyS
         return builder.ConnectionString;
     }
 
+    protected override string GetProviderName() => "mysql";
+
     protected override QueryDefinition BuildSelectQuery(
         ServiceDefinition service,
         LayerDefinition layer,
