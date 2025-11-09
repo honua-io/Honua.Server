@@ -565,4 +565,306 @@ public sealed class GeometryValidatorTests
     }
 
     #endregion
+
+    #region LineString 3D Tests
+
+    [Fact]
+    public void ValidateLineString_WithZCoordinates_ReturnsValid()
+    {
+        // Arrange
+        var coords = new[]
+        {
+            new CoordinateZ(0, 0, 100),
+            new CoordinateZ(10, 10, 200),
+            new CoordinateZ(20, 20, 150)
+        };
+        var lineString = _factory.CreateLineString(coords);
+
+        // Act
+        var result = GeometryValidator.ValidateLineString(lineString);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateLineString_WithMCoordinates_ReturnsValid()
+    {
+        // Arrange
+        var coords = new[]
+        {
+            new CoordinateM(0, 0, 0),
+            new CoordinateM(10, 10, 100),
+            new CoordinateM(20, 20, 200)
+        };
+        var lineString = _factory.CreateLineString(coords);
+
+        // Act
+        var result = GeometryValidator.ValidateLineString(lineString);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateLineString_WithZMCoordinates_ReturnsValid()
+    {
+        // Arrange
+        var coords = new[]
+        {
+            new CoordinateZM(0, 0, 100, 0),
+            new CoordinateZM(10, 10, 200, 100),
+            new CoordinateZM(20, 20, 150, 200)
+        };
+        var lineString = _factory.CreateLineString(coords);
+
+        // Act
+        var result = GeometryValidator.ValidateLineString(lineString);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+    }
+
+    #endregion
+
+    #region MultiPoint 3D Tests
+
+    [Fact]
+    public void ValidateMultiPoint_WithZCoordinates_ReturnsValid()
+    {
+        // Arrange
+        var points = new[]
+        {
+            _factory.CreatePoint(new CoordinateZ(0, 0, 100)),
+            _factory.CreatePoint(new CoordinateZ(10, 10, 200)),
+            _factory.CreatePoint(new CoordinateZ(20, 20, 150))
+        };
+        var multiPoint = _factory.CreateMultiPoint(points);
+
+        // Act - MultiPoint doesn't have specific validation in GeometryValidator
+        // but we're testing that 3D coordinates are preserved
+
+        // Assert
+        multiPoint.Coordinates.All(c => !double.IsNaN(c.Z)).Should().BeTrue();
+        multiPoint.IsEmpty.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region MultiLineString 3D Tests
+
+    [Fact]
+    public void ValidateMultiLineString_WithZCoordinates_ReturnsValid()
+    {
+        // Arrange
+        var line1 = _factory.CreateLineString(new[]
+        {
+            new CoordinateZ(0, 0, 100),
+            new CoordinateZ(10, 0, 100)
+        });
+
+        var line2 = _factory.CreateLineString(new[]
+        {
+            new CoordinateZ(20, 20, 200),
+            new CoordinateZ(30, 20, 200)
+        });
+
+        var multiLineString = _factory.CreateMultiLineString(new[] { line1, line2 });
+
+        // Assert
+        multiLineString.Coordinates.All(c => !double.IsNaN(c.Z)).Should().BeTrue();
+        multiLineString.IsEmpty.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region MultiPolygon 3D Tests
+
+    [Fact]
+    public void ValidateMultiPolygon_WithZCoordinates_ReturnsValid()
+    {
+        // Arrange
+        var poly1 = _factory.CreatePolygon(new[]
+        {
+            new CoordinateZ(0, 0, 100),
+            new CoordinateZ(5, 0, 100),
+            new CoordinateZ(5, 5, 100),
+            new CoordinateZ(0, 5, 100),
+            new CoordinateZ(0, 0, 100)
+        });
+
+        var poly2 = _factory.CreatePolygon(new[]
+        {
+            new CoordinateZ(10, 10, 200),
+            new CoordinateZ(15, 10, 200),
+            new CoordinateZ(15, 15, 200),
+            new CoordinateZ(10, 15, 200),
+            new CoordinateZ(10, 10, 200)
+        });
+
+        var multiPolygon = _factory.CreateMultiPolygon(new[] { poly1, poly2 });
+
+        // Act
+        var result = GeometryValidator.ValidateMultiPolygon(multiPolygon);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+        multiPolygon.Coordinates.All(c => !double.IsNaN(c.Z)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidateMultiPolygon_WithMixedZValues_PreservesAllZ()
+    {
+        // Arrange - Different Z values for different polygons
+        var poly1 = _factory.CreatePolygon(new[]
+        {
+            new CoordinateZ(0, 0, 50),
+            new CoordinateZ(5, 0, 50),
+            new CoordinateZ(5, 5, 50),
+            new CoordinateZ(0, 5, 50),
+            new CoordinateZ(0, 0, 50)
+        });
+
+        var poly2 = _factory.CreatePolygon(new[]
+        {
+            new CoordinateZ(10, 10, 250),
+            new CoordinateZ(15, 10, 250),
+            new CoordinateZ(15, 15, 250),
+            new CoordinateZ(10, 15, 250),
+            new CoordinateZ(10, 10, 250)
+        });
+
+        var multiPolygon = _factory.CreateMultiPolygon(new[] { poly1, poly2 });
+
+        // Act
+        var result = GeometryValidator.ValidateMultiPolygon(multiPolygon);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+        var poly1Z = ((Polygon)multiPolygon.GetGeometryN(0)).Coordinates.First().Z;
+        var poly2Z = ((Polygon)multiPolygon.GetGeometryN(1)).Coordinates.First().Z;
+        poly1Z.Should().Be(50);
+        poly2Z.Should().Be(250);
+    }
+
+    #endregion
+
+    #region GeometryCollection 3D Tests
+
+    [Fact]
+    public void GeometryCollection_WithMixed3DGeometries_PreservesZ()
+    {
+        // Arrange
+        var point = _factory.CreatePoint(new CoordinateZ(0, 0, 100));
+        var lineString = _factory.CreateLineString(new[]
+        {
+            new CoordinateZ(5, 5, 150),
+            new CoordinateZ(10, 10, 200)
+        });
+        var polygon = _factory.CreatePolygon(new[]
+        {
+            new CoordinateZ(20, 20, 250),
+            new CoordinateZ(25, 20, 250),
+            new CoordinateZ(25, 25, 250),
+            new CoordinateZ(20, 25, 250),
+            new CoordinateZ(20, 20, 250)
+        });
+
+        var collection = _factory.CreateGeometryCollection(new NetTopologySuite.Geometries.Geometry[] { point, lineString, polygon });
+
+        // Assert
+        collection.Coordinates.All(c => !double.IsNaN(c.Z)).Should().BeTrue();
+        collection.IsEmpty.Should().BeFalse();
+        collection.NumGeometries.Should().Be(3);
+    }
+
+    #endregion
+
+    #region Polygon with Holes 3D Tests
+
+    [Fact]
+    public void ValidatePolygon_WithHolesAndZCoordinates_ReturnsValid()
+    {
+        // Arrange - Create a 3D polygon with a hole
+        var shell = _factory.CreateLinearRing(new[]
+        {
+            new CoordinateZ(0, 0, 100),
+            new CoordinateZ(10, 0, 100),
+            new CoordinateZ(10, 10, 100),
+            new CoordinateZ(0, 10, 100),
+            new CoordinateZ(0, 0, 100)
+        });
+
+        var hole = _factory.CreateLinearRing(new[]
+        {
+            new CoordinateZ(2, 2, 100),
+            new CoordinateZ(2, 8, 100),
+            new CoordinateZ(8, 8, 100),
+            new CoordinateZ(8, 2, 100),
+            new CoordinateZ(2, 2, 100)
+        });
+
+        var polygon = _factory.CreatePolygon(shell, new[] { hole });
+
+        // Act
+        var result = GeometryValidator.ValidatePolygon(polygon);
+
+        // Assert
+        result.IsValid.Should().BeTrue();
+        polygon.Coordinates.All(c => !double.IsNaN(c.Z)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ValidatePolygon_WithHolesAtDifferentZ_ReturnsValid()
+    {
+        // Arrange - Shell and hole at different Z levels (like a bridge)
+        var shell = _factory.CreateLinearRing(new[]
+        {
+            new CoordinateZ(0, 0, 100),
+            new CoordinateZ(10, 0, 100),
+            new CoordinateZ(10, 10, 100),
+            new CoordinateZ(0, 10, 100),
+            new CoordinateZ(0, 0, 100)
+        });
+
+        var hole = _factory.CreateLinearRing(new[]
+        {
+            new CoordinateZ(2, 2, 50),
+            new CoordinateZ(2, 8, 50),
+            new CoordinateZ(8, 8, 50),
+            new CoordinateZ(8, 2, 50),
+            new CoordinateZ(2, 2, 50)
+        });
+
+        var polygon = _factory.CreatePolygon(shell, new[] { hole });
+
+        // Act
+        var result = GeometryValidator.ValidatePolygon(polygon);
+
+        // Assert - This should be valid as NTS doesn't enforce same Z for shell and holes
+        result.IsValid.Should().BeTrue();
+    }
+
+    #endregion
+
+    #region SRID Preservation with 3D Tests
+
+    [Fact]
+    public void Geometry3D_ShouldPreserveSRID()
+    {
+        // Arrange
+        var coords = new[]
+        {
+            new CoordinateZ(0, 0, 100),
+            new CoordinateZ(10, 10, 200)
+        };
+        var lineString = _factory.CreateLineString(coords);
+        lineString.SRID = 4979; // EPSG:4979 (WGS84 3D)
+
+        // Assert
+        lineString.SRID.Should().Be(4979);
+        lineString.Coordinates.All(c => !double.IsNaN(c.Z)).Should().BeTrue();
+    }
+
+    #endregion
 }
