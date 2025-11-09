@@ -1,0 +1,40 @@
+{
+  "name": "honua-mapsdk",
+  "version": "1.0.0",
+  "description": "Honua MapSDK - 3D geospatial visualization library",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "build": "echo 'No build step required - using CDN links'"
+  },
+  "dependencies": {
+    "@deck.gl/core": "^8.9.33",
+    "@deck.gl/layers": "^8.9.33",
+    "@deck.gl/geo-layers": "^8.9.33",
+    "earcut": "^2.2.4"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/wwwroot/js/**/*.test.js",
+      "**/__tests__/**/*.js"
+    ],
+    "collectCoverageFrom": [
+      "wwwroot/js/honua-*.js",
+      "!wwwroot/js/**/*.test.js"
+    ]
+  },
+  "keywords": [
+    "gis",
+    "geospatial",
+    "3d",
+    "maplibre",
+    "deckgl"
+  ],
+  "license": "UNLICENSED"
+}
