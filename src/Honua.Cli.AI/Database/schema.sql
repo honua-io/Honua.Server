@@ -124,6 +124,137 @@ CREATE INDEX IF NOT EXISTS idx_pattern_recommendations_analyzed_at ON pattern_re
 CREATE INDEX IF NOT EXISTS idx_pattern_recommendations_cloud_provider ON pattern_recommendations(cloud_provider);
 
 -- ============================================================================
+-- Pattern Interaction Feedback
+-- ============================================================================
+-- Stores detailed user interaction data for each pattern recommendation.
+-- Tracks config modifications, timing, questions, and satisfaction for learning loop.
+
+CREATE TABLE IF NOT EXISTS pattern_interaction_feedback (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pattern_id VARCHAR(200) NOT NULL,
+    deployment_id VARCHAR(100),
+
+    -- Recommendation context
+    recommended_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    recommendation_rank INTEGER NOT NULL,
+    confidence_score DECIMAL(5,4) NOT NULL,
+
+    -- User interaction timing
+    decision_timestamp TIMESTAMP WITH TIME ZONE,
+    time_to_decision_seconds INTEGER, -- How long user took to decide
+
+    -- User decision
+    was_accepted BOOLEAN,
+    was_modified BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Configuration changes (what user changed from recommended config)
+    recommended_config JSONB,
+    actual_config JSONB,
+    config_modifications JSONB, -- Structured diff of changes
+
+    -- Interaction signals
+    follow_up_questions_count INTEGER NOT NULL DEFAULT 0,
+    user_hesitation_indicators JSONB, -- Backtracking, re-reading, etc.
+
+    -- Explicit feedback
+    user_satisfaction_rating INTEGER, -- 1-5 scale (optional)
+    user_feedback_text TEXT,
+
+    -- Metadata
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for learning analysis
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_pattern_id ON pattern_interaction_feedback(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_recommended_at ON pattern_interaction_feedback(recommended_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_accepted ON pattern_interaction_feedback(was_accepted);
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_modified ON pattern_interaction_feedback(was_modified);
+CREATE INDEX IF NOT EXISTS idx_pattern_feedback_satisfaction ON pattern_interaction_feedback(user_satisfaction_rating);
+
+-- ============================================================================
+-- Online Learning Updates
+-- ============================================================================
+-- Tracks real-time confidence updates based on acceptance/rejection signals.
+
+CREATE TABLE IF NOT EXISTS pattern_online_learning_updates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pattern_id VARCHAR(200) NOT NULL,
+    previous_confidence DECIMAL(5,4) NOT NULL,
+    new_confidence DECIMAL(5,4) NOT NULL,
+    signal_type VARCHAR(50) NOT NULL, -- acceptance | rejection | reconciliation
+    learning_rate DECIMAL(5,4) NOT NULL,
+    update_timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    reconciliation_metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_online_learning_pattern_id ON pattern_online_learning_updates(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_online_learning_timestamp ON pattern_online_learning_updates(update_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_online_learning_signal_type ON pattern_online_learning_updates(signal_type);
+
+-- ============================================================================
+-- Transfer Learning Bootstraps
+-- ============================================================================
+-- Records transfer learning bootstraps for new patterns.
+
+CREATE TABLE IF NOT EXISTS transfer_learning_bootstraps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pattern_id VARCHAR(200) NOT NULL,
+    bootstrapped_confidence DECIMAL(5,4) NOT NULL,
+    source_patterns JSONB NOT NULL,
+    bootstrap_timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfer_learning_pattern_id ON transfer_learning_bootstraps(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_learning_timestamp ON transfer_learning_bootstraps(bootstrap_timestamp DESC);
+
+-- ============================================================================
+-- Pattern Tuning History
+-- ============================================================================
+-- Records applied pattern configuration tunings.
+
+CREATE TABLE IF NOT EXISTS pattern_tuning_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pattern_id VARCHAR(200) NOT NULL,
+    field_name VARCHAR(100) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    modification_count INTEGER NOT NULL,
+    modification_rate DECIMAL(5,4) NOT NULL,
+    consensus_rate DECIMAL(5,4) NOT NULL,
+    confidence DECIMAL(5,4) NOT NULL,
+    approved_by VARCHAR(100),
+    applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pattern_tuning_pattern_id ON pattern_tuning_history(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_pattern_tuning_applied_at ON pattern_tuning_history(applied_at DESC);
+
+-- ============================================================================
+-- Active Learning Requests
+-- ============================================================================
+-- Tracks when and why feedback was requested from users.
+
+CREATE TABLE IF NOT EXISTS active_learning_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    interaction_id UUID NOT NULL,
+    pattern_id VARCHAR(200) NOT NULL,
+    request_type VARCHAR(50) NOT NULL, -- low_confidence | uncertainty | cold_start | etc
+    priority VARCHAR(20) NOT NULL, -- low | medium | high
+    questions JSONB NOT NULL,
+    requested_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_active_learning_interaction_id ON active_learning_requests(interaction_id);
+CREATE INDEX IF NOT EXISTS idx_active_learning_pattern_id ON active_learning_requests(pattern_id);
+CREATE INDEX IF NOT EXISTS idx_active_learning_requested_at ON active_learning_requests(requested_at DESC);
+CREATE INDEX IF NOT EXISTS idx_active_learning_request_type ON active_learning_requests(request_type);
+
+-- ============================================================================
 -- Known Issues
 -- ============================================================================
 -- Stores known deployment issues for proactive troubleshooting.
@@ -297,6 +428,59 @@ WHERE started_at >= NOW() - INTERVAL '30 days'
 GROUP BY agent_name, action
 ORDER BY execution_count DESC;
 
+-- Pattern learning metrics view
+CREATE OR REPLACE VIEW pattern_learning_metrics AS
+SELECT
+    pattern_id,
+    COUNT(*) as total_recommendations,
+    COUNT(*) FILTER (WHERE was_accepted = true) as accepted_count,
+    COUNT(*) FILTER (WHERE was_modified = true) as modified_count,
+    AVG(confidence_score) as avg_confidence,
+    AVG(time_to_decision_seconds) as avg_decision_time_seconds,
+    AVG(follow_up_questions_count) as avg_questions,
+    AVG(user_satisfaction_rating) as avg_satisfaction,
+    AVG(CASE WHEN was_accepted = true THEN 1.0 ELSE 0.0 END) as acceptance_rate,
+    AVG(CASE WHEN was_modified = true THEN 1.0 ELSE 0.0 END) as modification_rate
+FROM pattern_interaction_feedback
+WHERE recommended_at >= NOW() - INTERVAL '90 days'
+GROUP BY pattern_id
+ORDER BY total_recommendations DESC;
+
+-- Pattern confidence trends over time (weekly)
+CREATE OR REPLACE VIEW pattern_confidence_trends AS
+SELECT
+    pattern_id,
+    DATE_TRUNC('week', recommended_at) as week,
+    COUNT(*) as recommendation_count,
+    AVG(confidence_score) as avg_confidence,
+    AVG(CASE WHEN was_accepted = true THEN 1.0 ELSE 0.0 END) as acceptance_rate,
+    AVG(time_to_decision_seconds) as avg_decision_time
+FROM pattern_interaction_feedback
+WHERE recommended_at >= NOW() - INTERVAL '180 days'
+GROUP BY pattern_id, DATE_TRUNC('week', recommended_at)
+ORDER BY pattern_id, week DESC;
+
+-- Feature importance analysis
+CREATE OR REPLACE VIEW feature_importance_analysis AS
+WITH config_changes AS (
+    SELECT
+        pattern_id,
+        jsonb_object_keys(config_modifications) as changed_field,
+        COUNT(*) as change_count
+    FROM pattern_interaction_feedback
+    WHERE was_modified = true
+      AND config_modifications IS NOT NULL
+      AND recommended_at >= NOW() - INTERVAL '90 days'
+    GROUP BY pattern_id, jsonb_object_keys(config_modifications)
+)
+SELECT
+    pattern_id,
+    changed_field,
+    change_count,
+    ROUND((change_count::DECIMAL / SUM(change_count) OVER (PARTITION BY pattern_id)) * 100, 2) as change_percentage
+FROM config_changes
+ORDER BY pattern_id, change_count DESC;
+
 -- ============================================================================
 -- Functions
 -- ============================================================================
@@ -321,6 +505,9 @@ CREATE TRIGGER update_known_issues_updated_at BEFORE UPDATE ON known_issues
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_cost_optimization_updated_at BEFORE UPDATE ON cost_optimization_recommendations
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_pattern_interaction_feedback_updated_at BEFORE UPDATE ON pattern_interaction_feedback
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
