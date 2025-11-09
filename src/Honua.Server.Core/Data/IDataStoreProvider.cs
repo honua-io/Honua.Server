@@ -301,7 +301,8 @@ public sealed record FeatureQuery(
     QueryEntityDefinition? EntityDefinition = null,
     string? Crs = null,
     TimeSpan? CommandTimeout = null,  // Optional per-query timeout override (e.g., for slow analytical queries)
-    string? HavingClause = null);  // SQL HAVING clause for filtering aggregated statistics results
+    string? HavingClause = null,  // SQL HAVING clause for filtering aggregated statistics results
+    IReadOnlyDictionary<string, string>? SqlViewParameters = null);  // Parameters for SQL views (e.g., ?region=west&min_population=100000)
 
 public sealed record BoundingBox(
     double MinX,
