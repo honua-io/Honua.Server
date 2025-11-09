@@ -80,7 +80,9 @@
         "primaryKey": { "type": "string" },
         "temporalColumn": { "type": "string" },
         "srid": { "type": "integer" },
-        "crs": { "type": "string" }
+        "crs": { "type": "string" },
+        "hasZ": { "type": "boolean" },
+        "hasM": { "type": "boolean" }
       }
     },
     "layerAttachments": {
@@ -311,7 +313,10 @@
           "attachments": { "$ref": "#/$defs/layerAttachments" },
           "itemType": { "type": "string" },
           "minScale": { "type": "number", "minimum": 0 },
-          "maxScale": { "type": "number", "minimum": 0 }
+          "maxScale": { "type": "number", "minimum": 0 },
+          "hasZ": { "type": "boolean" },
+          "hasM": { "type": "boolean" },
+          "zField": { "type": "string" }
         }
       }
     },

@@ -1226,6 +1226,9 @@ public sealed record LayerDefinition
     public OpenRosa.OpenRosaLayerDefinition? OpenRosa { get; init; }
     public Iso19115Metadata? Iso19115 { get; init; }
     public StacMetadata? Stac { get; init; }
+    public bool HasZ { get; init; }
+    public bool HasM { get; init; }
+    public string? ZField { get; init; }
 }
 
 public sealed record LayerRelationshipDefinition
@@ -1331,6 +1334,8 @@ public sealed record LayerStorageDefinition
     public string? TemporalColumn { get; init; }
     public int? Srid { get; init; }
     public string? Crs { get; init; }
+    public bool HasZ { get; init; }
+    public bool HasM { get; init; }
 }
 
 public sealed record FieldDefinition
