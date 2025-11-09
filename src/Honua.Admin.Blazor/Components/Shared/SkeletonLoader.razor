@@ -1,0 +1,124 @@
+@* Skeleton Loader Component for smooth loading states *@
+
+<div class="skeleton-loader">
+    @if (Type == SkeletonType.Card)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <div class="skeleton skeleton-title mb-3"></div>
+            <div class="skeleton skeleton-text mb-2"></div>
+            <div class="skeleton skeleton-text mb-2" style="width: 80%;"></div>
+            <div class="skeleton skeleton-text" style="width: 60%;"></div>
+        </MudPaper>
+    }
+    else if (Type == SkeletonType.Table)
+    {
+        <MudPaper Class="pa-4">
+            @for (int i = 0; i < Rows; i++)
+            {
+                <div class="skeleton-row mb-3" style="display: flex; gap: 1rem; align-items: center;">
+                    <div class="skeleton skeleton-text" style="flex: 2;"></div>
+                    <div class="skeleton skeleton-text" style="flex: 1;"></div>
+                    <div class="skeleton skeleton-text" style="flex: 1;"></div>
+                    <div class="skeleton skeleton-chip" style="width: 80px;"></div>
+                </div>
+            }
+        </MudPaper>
+    }
+    else if (Type == SkeletonType.List)
+    {
+        @for (int i = 0; i < Rows; i++)
+        {
+            <div class="skeleton-list-item mb-3">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div class="skeleton skeleton-circle"></div>
+                    <div style="flex: 1;">
+                        <div class="skeleton skeleton-text mb-2" style="width: 70%;"></div>
+                        <div class="skeleton skeleton-text" style="width: 40%;"></div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else if (Type == SkeletonType.Text)
+    {
+        <div class="skeleton skeleton-text" style="width: @Width;"></div>
+    }
+    else if (Type == SkeletonType.Circle)
+    {
+        <div class="skeleton skeleton-circle"></div>
+    }
+    else if (Type == SkeletonType.Rectangle)
+    {
+        <div class="skeleton skeleton-rectangle" style="width: @Width; height: @Height;"></div>
+    }
+</div>
+
+<style>
+    .skeleton-loader {
+        width: 100%;
+    }
+
+    .skeleton-title {
+        height: 2rem;
+        width: 50%;
+        margin-bottom: 1rem;
+    }
+
+    .skeleton-text {
+        height: 1rem;
+        width: 100%;
+    }
+
+    .skeleton-chip {
+        height: 2rem;
+        border-radius: 16px;
+    }
+
+    .skeleton-circle {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+    }
+
+    .skeleton-rectangle {
+        width: 100%;
+        height: 200px;
+    }
+
+    .skeleton-row {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .skeleton-list-item {
+        padding: 1rem;
+        background: white;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public SkeletonType Type { get; set; } = SkeletonType.Card;
+
+    [Parameter]
+    public int Rows { get; set; } = 3;
+
+    [Parameter]
+    public string Width { get; set; } = "100%";
+
+    [Parameter]
+    public string Height { get; set; } = "200px";
+
+    public enum SkeletonType
+    {
+        Card,
+        Table,
+        List,
+        Text,
+        Circle,
+        Rectangle
+    }
+}

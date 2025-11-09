@@ -1,50 +1,83 @@
+@using Honua.Admin.Blazor.Shared.Services
 @inherits LayoutComponentBase
 @inject FeatureFlagService FeatureFlags
+@inject KeyboardShortcutService KeyboardShortcuts
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+@inject NotificationService Notifications
+@inject ThemeService ThemeService
+@implements IAsyncDisposable
 
-<MudThemeProvider />
+<MudThemeProvider @bind-IsDarkMode="_isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
-        <MudText Typo="Typo.h5" Class="ml-3">Honua Admin</MudText>
-        <MudSpacer />
-        <GlobalSearch Class="mx-4" Style="max-width: 500px; width: 100%;" />
+    <MudAppBar Elevation="1" Dense="@_isMobile">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                      Color="Color.Inherit"
+                      Edge="Edge.Start"
+                      OnClick="@ToggleDrawer"
+                      Title="Toggle menu" />
+        <MudText Typo="@(_isMobile ? Typo.h6 : Typo.h5)" Class="ml-3">
+            @(_isMobile ? "Honua" : "Honua Admin")
+        </MudText>
         <MudSpacer />
 
-        @* License Tier Badge *@
-        @if (_featureFlags != null)
+        @if (!_isMobile)
         {
-            <MudChip Color="@GetTierColor()" Size="Size.Small" Icon="@Icons.Material.Filled.Badge" Class="mr-2">
-                @_featureFlags.Tier
-            </MudChip>
+            <GlobalSearch Class="mx-4" Style="max-width: 500px; width: 100%;" />
+            <MudSpacer />
 
-            @if (_featureFlags.DaysUntilExpiration <= 30 && _featureFlags.DaysUntilExpiration > 0)
+            @* License Tier Badge *@
+            @if (_featureFlags != null)
             {
-                <MudChip Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Warning" Class="mr-2">
-                    Expires in @_featureFlags.DaysUntilExpiration days
+                <MudChip Color="@GetTierColor()" Size="Size.Small" Icon="@Icons.Material.Filled.Badge" Class="mr-2">
+                    @_featureFlags.Tier
                 </MudChip>
-            }
-            else if (_featureFlags.DaysUntilExpiration <= 0)
-            {
-                <MudChip Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Error" Class="mr-2">
-                    License Expired
-                </MudChip>
+
+                @if (_featureFlags.DaysUntilExpiration <= 30 && _featureFlags.DaysUntilExpiration > 0)
+                {
+                    <MudChip Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Warning" Class="mr-2">
+                        Expires in @_featureFlags.DaysUntilExpiration days
+                    </MudChip>
+                }
+                else if (_featureFlags.DaysUntilExpiration <= 0)
+                {
+                    <MudChip Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Error" Class="mr-2">
+                        License Expired
+                    </MudChip>
+                }
             }
         }
+
+        @* Theme Toggle *@
+        <MudTooltip Text="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")">
+            <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit"
+                           OnClick="ToggleTheme"
+                           Edge="Edge.End"
+                           Title="@(_isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")" />
+        </MudTooltip>
 
         <LoginDisplay />
     </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+    <MudDrawer @bind-Open="_drawerOpen"
+               ClipMode="DrawerClipMode.Always"
+               Elevation="2"
+               Variant="@(_isMobile ? DrawerVariant.Temporary : DrawerVariant.Persistent)">
         <NavMenu />
     </MudDrawer>
 
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-            <MudBreadcrumbs Items="_breadcrumbs"></MudBreadcrumbs>
+    <MudMainContent Class="main-content">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="@(_isMobile ? "mt-2 pa-2" : "mt-4 pa-4")">
+            @if (!_isMobile)
+            {
+                <MudBreadcrumbs Items="_breadcrumbs"></MudBreadcrumbs>
+            }
             @Body
         </MudContainer>
     </MudMainContent>
@@ -52,19 +85,128 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _isMobile = false;
+    private bool _isDarkMode = false;
     private List<BreadcrumbItem> _breadcrumbs = new();
     private FeatureFlagState? _featureFlags;
+    private string? _currentPage;
 
     [Inject] private NavigationState NavState { get; set; } = default!;
 
+    private MudTheme _theme = new()
+    {
+        Palette = new PaletteLight()
+        {
+            Primary = "#1976d2",
+            Secondary = "#424242",
+            AppbarBackground = "#1976d2",
+            Background = "#f5f5f5",
+            Surface = "#ffffff",
+            DrawerBackground = "#ffffff",
+            DrawerText = "rgba(0,0,0, 0.87)",
+            Success = "#4caf50",
+            Info = "#2196f3",
+            Warning = "#ff9800",
+            Error = "#f44336",
+            TextPrimary = "rgba(0,0,0, 0.87)",
+            TextSecondary = "rgba(0,0,0, 0.6)"
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#90caf9",
+            Secondary = "#f48fb1",
+            AppbarBackground = "#1e1e1e",
+            Background = "#121212",
+            Surface = "#1e1e1e",
+            DrawerBackground = "#1e1e1e",
+            DrawerText = "rgba(255,255,255, 0.87)",
+            Success = "#66bb6a",
+            Info = "#42a5f5",
+            Warning = "#ffa726",
+            Error = "#ef5350",
+            TextPrimary = "rgba(255,255,255, 0.87)",
+            TextSecondary = "rgba(255,255,255, 0.6)"
+        }
+    };
+
     protected override async Task OnInitializedAsync()
     {
+        // Initialize theme service
+        await ThemeService.InitializeAsync();
+        _isDarkMode = ThemeService.IsDarkMode;
+        ThemeService.OnThemeChanged += OnThemeChanged;
+
         // Subscribe to breadcrumb changes
         NavState.OnChange += UpdateBreadcrumbs;
         UpdateBreadcrumbs();
 
         // Load feature flags for license tier display
         _featureFlags = await FeatureFlags.GetFeatureFlagsAsync();
+
+        // Check if mobile on initial load
+        CheckIfMobile();
+
+        // Initialize keyboard shortcuts
+        await InitializeKeyboardShortcutsAsync();
+
+        // Track current page for context-dependent shortcuts
+        Navigation.LocationChanged += OnLocationChanged;
+        UpdateCurrentPage();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            CheckIfMobile();
+        }
+    }
+
+    private async Task InitializeKeyboardShortcutsAsync()
+    {
+        await KeyboardShortcuts.InitializeAsync();
+
+        // Navigation shortcuts
+        KeyboardShortcuts.Register(AdminShortcuts.GoToServices, () => NavigateToPage("/services"),
+            "Go to Services", "Navigation");
+        KeyboardShortcuts.Register(AdminShortcuts.GoToLayers, () => NavigateToPage("/layers"),
+            "Go to Layers", "Navigation");
+        KeyboardShortcuts.Register(AdminShortcuts.GoToMaps, () => NavigateToPage("/maps"),
+            "Go to Maps", "Navigation");
+
+        // Search shortcuts
+        KeyboardShortcuts.Register(AdminShortcuts.FocusSearch, FocusGlobalSearch,
+            "Focus global search", "Search");
+
+        // Action shortcuts
+        KeyboardShortcuts.Register(AdminShortcuts.NewItem, HandleNewItem,
+            "Create new item (context-dependent)", "Actions");
+        KeyboardShortcuts.Register(AdminShortcuts.Refresh, HandleRefresh,
+            "Refresh current page", "Actions");
+
+        // General shortcuts
+        KeyboardShortcuts.Register(AdminShortcuts.ShowHelp, ShowKeyboardHelp,
+            "Show keyboard shortcuts help", "General");
+        KeyboardShortcuts.Register("Shift+?", ShowKeyboardHelp,
+            "Show keyboard shortcuts help", "General");
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        UpdateCurrentPage();
+    }
+
+    private void UpdateCurrentPage()
+    {
+        var uri = new Uri(Navigation.Uri);
+        _currentPage = uri.AbsolutePath.ToLower();
+    }
+
+    private void CheckIfMobile()
+    {
+        // Simple heuristic: close drawer on mobile
+        // In a real app, you'd use JS interop to check window.innerWidth
+        _isMobile = false; // Default to desktop, can be enhanced with JS interop
     }
 
     private void UpdateBreadcrumbs()
@@ -85,8 +227,98 @@
         _ => Color.Default
     };
 
-    public void Dispose()
+    // Keyboard shortcut handlers
+
+    private async Task FocusGlobalSearch()
+    {
+        try
+        {
+            // Focus the global search autocomplete input
+            await JSRuntime.InvokeVoidAsync("HonuaAdmin.KeyboardShortcuts.focusElementBySelector",
+                ".mud-autocomplete input");
+            Notifications.Info("Search focused - press Esc to cancel");
+        }
+        catch
+        {
+            // Silently fail if search not available
+        }
+    }
+
+    private void NavigateToPage(string url)
+    {
+        Navigation.NavigateTo(url);
+        Notifications.Info($"Navigated to {url}");
+    }
+
+    private void HandleNewItem()
+    {
+        // Context-dependent "New" action
+        var message = _currentPage switch
+        {
+            var p when p.Contains("/services") => "Create new service",
+            var p when p.Contains("/layers") => "Create new layer",
+            var p when p.Contains("/maps") => "Create new map",
+            var p when p.Contains("/folders") => "Create new folder",
+            var p when p.Contains("/datasources") => "Create new data source",
+            var p when p.Contains("/users") => "Create new user",
+            var p when p.Contains("/roles") => "Create new role",
+            _ => "Create new item (navigate to a specific page first)"
+        };
+
+        // In a real implementation, this would trigger the actual creation dialog
+        // For now, just show feedback
+        Notifications.Info(message);
+    }
+
+    private async Task HandleRefresh()
+    {
+        // Refresh current page
+        Notifications.Info("Refreshing page...");
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        await Task.CompletedTask;
+    }
+
+    private async Task ShowKeyboardHelp()
+    {
+        var shortcuts = KeyboardShortcuts.GetAllShortcuts();
+        var parameters = new DialogParameters
+        {
+            { "Shortcuts", shortcuts }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true
+        };
+
+        await DialogService.ShowAsync<KeyboardShortcutsHelp>("Keyboard Shortcuts", parameters, options);
+    }
+
+    // Theme management
+
+    private async Task ToggleTheme()
+    {
+        await ThemeService.ToggleThemeAsync();
+    }
+
+    private void OnThemeChanged()
+    {
+        _isDarkMode = ThemeService.IsDarkMode;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
     {
         NavState.OnChange -= UpdateBreadcrumbs;
+        Navigation.LocationChanged -= OnLocationChanged;
+        ThemeService.OnThemeChanged -= OnThemeChanged;
+
+        if (KeyboardShortcuts != null)
+        {
+            await KeyboardShortcuts.DisposeAsync();
+        }
     }
 }

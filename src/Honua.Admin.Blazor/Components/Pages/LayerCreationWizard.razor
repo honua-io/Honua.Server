@@ -337,16 +337,45 @@
                     <MudStack Spacing="4" Class="mt-4">
                         <MudText Typo="Typo.h6">Review Layer Configuration</MudText>
 
-                        <MudTextField @bind-Value="_layerId"
+                        @if (_validationErrors.Any())
+                        {
+                            <MudAlert Severity="Severity.Warning">
+                                <MudText Typo="Typo.body1"><b>Please fix @_validationErrors.Count error(s):</b></MudText>
+                                <MudList Dense="true" Class="mt-2">
+                                    @foreach (var error in _validationErrors)
+                                    {
+                                        <MudListItem Icon="@Icons.Material.Filled.Error" IconColor="Color.Warning">
+                                            <MudText Typo="Typo.body2">@error</MudText>
+                                        </MudListItem>
+                                    }
+                                </MudList>
+                            </MudAlert>
+                        }
+
+                        <MudTextField @ref="_layerIdField"
+                                      @bind-Value="_layerId"
                                       Label="Layer ID"
                                       Required="true"
+                                      Immediate="true"
                                       Variant="Variant.Outlined"
-                                      HelperText="Unique identifier (e.g., 'parcels', 'buildings')" />
+                                      HelperText="Unique identifier (e.g., 'parcels', 'buildings')"
+                                      Validation="@(new Func<string, IEnumerable<string>>(ValidateLayerId))"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@GetValidationIcon(nameof(_layerId))"
+                                      AdornmentColor="@GetValidationColor(nameof(_layerId))"
+                                      OnBlur="@(() => OnFieldBlur(nameof(_layerId)))" />
 
-                        <MudTextField @bind-Value="_layerTitle"
+                        <MudTextField @ref="_layerTitleField"
+                                      @bind-Value="_layerTitle"
                                       Label="Layer Title"
                                       Required="true"
-                                      Variant="Variant.Outlined" />
+                                      Immediate="true"
+                                      Variant="Variant.Outlined"
+                                      Validation="@(new Func<string, IEnumerable<string>>(ValidateLayerTitle))"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@GetValidationIcon(nameof(_layerTitle))"
+                                      AdornmentColor="@GetValidationColor(nameof(_layerTitle))"
+                                      OnBlur="@(() => OnFieldBlur(nameof(_layerTitle)))" />
 
                         <MudSelect @bind-Value="_targetServiceId"
                                    Label="Target Service"
@@ -457,6 +486,15 @@
     private string _layerTitle = string.Empty;
     private string _targetServiceId = string.Empty;
     private bool _creating;
+
+    // Field references
+    private MudTextField<string> _layerIdField = default!;
+    private MudTextField<string> _layerTitleField = default!;
+
+    // Validation tracking
+    private Dictionary<string, bool> _fieldValidity = new();
+    private Dictionary<string, bool> _fieldTouched = new();
+    private List<string> _validationErrors = new();
 
     // Database table workflow
     private string _selectedDataSourceId = string.Empty;
@@ -642,6 +680,14 @@
 
     private async Task CreateLayer()
     {
+        // Validate required fields
+        if (!IsFormValid())
+        {
+            await FocusFirstInvalidField();
+            Snackbar.Add("Please fix validation errors before creating the layer.", Severity.Error);
+            return;
+        }
+
         _creating = true;
 
         try
@@ -659,6 +705,117 @@
         finally
         {
             _creating = false;
+        }
+    }
+
+    private bool IsFormValid()
+    {
+        return !string.IsNullOrWhiteSpace(_layerId) &&
+               !string.IsNullOrWhiteSpace(_layerTitle) &&
+               !string.IsNullOrWhiteSpace(_targetServiceId);
+    }
+
+    private IEnumerable<string> ValidateLayerId(string id)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            errors.Add("Layer ID is required");
+            UpdateFieldValidity(nameof(_layerId), false);
+        }
+        else if (!System.Text.RegularExpressions.Regex.IsMatch(id, "^[a-zA-Z0-9_-]+$"))
+        {
+            errors.Add("Layer ID must contain only alphanumeric characters, hyphens, and underscores");
+            UpdateFieldValidity(nameof(_layerId), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_layerId), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private IEnumerable<string> ValidateLayerTitle(string title)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            errors.Add("Layer title is required");
+            UpdateFieldValidity(nameof(_layerTitle), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_layerTitle), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private void UpdateFieldValidity(string fieldName, bool isValid)
+    {
+        _fieldValidity[fieldName] = isValid;
+    }
+
+    private void OnFieldBlur(string fieldName)
+    {
+        _fieldTouched[fieldName] = true;
+        StateHasChanged();
+    }
+
+    private string GetValidationIcon(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return string.Empty;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Icons.Material.Filled.CheckCircle
+            : Icons.Material.Filled.Error;
+    }
+
+    private Color GetValidationColor(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return Color.Default;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Color.Success
+            : Color.Error;
+    }
+
+    private void UpdateValidationSummary()
+    {
+        _validationErrors.Clear();
+
+        if (_fieldTouched.GetValueOrDefault(nameof(_layerId)) && !_fieldValidity.GetValueOrDefault(nameof(_layerId)))
+        {
+            _validationErrors.Add("Layer ID: Invalid format or missing");
+        }
+
+        if (_fieldTouched.GetValueOrDefault(nameof(_layerTitle)) && !_fieldValidity.GetValueOrDefault(nameof(_layerTitle)))
+        {
+            _validationErrors.Add("Layer Title: Required field is missing");
+        }
+
+        if (string.IsNullOrWhiteSpace(_targetServiceId))
+        {
+            _validationErrors.Add("Target Service: Please select a target service");
+        }
+    }
+
+    private async Task FocusFirstInvalidField()
+    {
+        if (!_fieldValidity.GetValueOrDefault(nameof(_layerId)) && _layerIdField != null)
+        {
+            await _layerIdField.FocusAsync();
+        }
+        else if (!_fieldValidity.GetValueOrDefault(nameof(_layerTitle)) && _layerTitleField != null)
+        {
+            await _layerTitleField.FocusAsync();
         }
     }
 

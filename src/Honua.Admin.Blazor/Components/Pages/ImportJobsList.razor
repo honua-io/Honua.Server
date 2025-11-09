@@ -1,6 +1,7 @@
 @page "/import/jobs"
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Shared.Helpers
 @using Microsoft.JSInterop
 @attribute [Authorize(Roles = "administrator,datapublisher")]
 @inject ImportApiClient ImportApi
@@ -45,14 +46,14 @@
             <MudExpansionPanel Text="Filters & Search" IsInitiallyExpanded="true">
                 <MudGrid>
                     <MudItem xs="12" sm="6" md="3">
-                        <MudTextField @bind-Value="_searchText"
+                        <MudTextField Value="@_searchText"
+                                      ValueChanged="@((string value) => OnSearchTextChanged(value))"
                                       Label="Search"
                                       Placeholder="Filename, service, or layer..."
                                       Variant="Variant.Outlined"
                                       Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Search"
+                                      AdornmentIcon="@(_searching ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Search)"
                                       Clearable="true"
-                                      Immediate="true"
                                       OnClearButtonClick="ClearSearch" />
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
@@ -449,11 +450,13 @@
     };
 
     private bool _loading = true;
+    private bool _searching = false;
     private string? _errorMessage;
     private List<ImportJobSnapshot> _jobs = new();
     private string? _paginationToken;
     private System.Threading.Timer? _refreshTimer;
     private HashSet<Guid> _expandedJobs = new();
+    private SearchDebouncer _searchDebouncer = new(300);
 
     // Filter and search fields
     private string _searchText = "";
@@ -784,6 +787,18 @@
         _searchText = "";
     }
 
+    private void OnSearchTextChanged(string value)
+    {
+        _searchText = value;
+        _searching = true;
+
+        _searchDebouncer.Debounce(() =>
+        {
+            _searching = false;
+            StateHasChanged();
+        });
+    }
+
     private void ClearFilters()
     {
         _searchText = "";
@@ -917,5 +932,6 @@
     public void Dispose()
     {
         _refreshTimer?.Dispose();
+        _searchDebouncer?.Dispose();
     }
 }

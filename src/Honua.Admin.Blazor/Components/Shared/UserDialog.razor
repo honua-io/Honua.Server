@@ -4,13 +4,35 @@
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="3">
+            @if (_validationErrors.Any())
+            {
+                <MudAlert Severity="Severity.Warning">
+                    <MudText Typo="Typo.body1"><b>Please fix @_validationErrors.Count error(s):</b></MudText>
+                    <MudList Dense="true" Class="mt-2">
+                        @foreach (var error in _validationErrors)
+                        {
+                            <MudListItem Icon="@Icons.Material.Filled.Error" IconColor="Color.Warning">
+                                <MudText Typo="Typo.body2">@error</MudText>
+                            </MudListItem>
+                        }
+                    </MudList>
+                </MudAlert>
+            }
+
             @if (!IsEditMode)
             {
-                <MudTextField @bind-Value="_username"
+                <MudTextField @ref="_usernameField"
+                              @bind-Value="_username"
                               Label="Username"
                               Variant="Variant.Outlined"
                               Required="true"
-                              HelperText="Unique username for login" />
+                              Immediate="true"
+                              HelperText="Unique username for login"
+                              Validation="@(new Func<string, IEnumerable<string>>(ValidateUsername))"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@GetValidationIcon(nameof(_username))"
+                              AdornmentColor="@GetValidationColor(nameof(_username))"
+                              OnBlur="@(() => OnFieldBlur(nameof(_username)))" />
             }
             else
             {
@@ -26,27 +48,48 @@
                           Variant="Variant.Outlined"
                           HelperText="Full name or display name" />
 
-            <MudTextField @bind-Value="_email"
+            <MudTextField @ref="_emailField"
+                          @bind-Value="_email"
                           Label="Email"
                           Variant="Variant.Outlined"
                           InputType="InputType.Email"
-                          HelperText="Email address for notifications" />
+                          Immediate="true"
+                          HelperText="Email address for notifications"
+                          Validation="@(new Func<string, IEnumerable<string>>(ValidateEmail))"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@GetValidationIcon(nameof(_email))"
+                          AdornmentColor="@GetValidationColor(nameof(_email))"
+                          OnBlur="@(() => OnFieldBlur(nameof(_email)))" />
 
             @if (!IsEditMode)
             {
-                <MudTextField @bind-Value="_password"
+                <MudTextField @ref="_passwordField"
+                              @bind-Value="_password"
                               Label="Password"
                               Variant="Variant.Outlined"
                               InputType="InputType.Password"
                               Required="true"
-                              HelperText="Initial password (must be at least 8 characters)" />
+                              Immediate="true"
+                              HelperText="Initial password (must be at least 8 characters)"
+                              Validation="@(new Func<string, IEnumerable<string>>(ValidatePassword))"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@GetValidationIcon(nameof(_password))"
+                              AdornmentColor="@GetValidationColor(nameof(_password))"
+                              OnBlur="@(() => OnFieldBlur(nameof(_password)))" />
 
-                <MudTextField @bind-Value="_confirmPassword"
+                <MudTextField @ref="_confirmPasswordField"
+                              @bind-Value="_confirmPassword"
                               Label="Confirm Password"
                               Variant="Variant.Outlined"
                               InputType="InputType.Password"
                               Required="true"
-                              HelperText="Re-enter password to confirm" />
+                              Immediate="true"
+                              HelperText="Re-enter password to confirm"
+                              Validation="@(new Func<string, IEnumerable<string>>(ValidateConfirmPassword))"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@GetValidationIcon(nameof(_confirmPassword))"
+                              AdornmentColor="@GetValidationColor(nameof(_confirmPassword))"
+                              OnBlur="@(() => OnFieldBlur(nameof(_confirmPassword)))" />
             }
 
             <MudSelect T="string"
@@ -107,6 +150,17 @@
     private bool _isEnabled = true;
     private string? _errorMessage;
 
+    // Field references
+    private MudTextField<string> _usernameField = default!;
+    private MudTextField<string?> _emailField = default!;
+    private MudTextField<string> _passwordField = default!;
+    private MudTextField<string> _confirmPasswordField = default!;
+
+    // Validation tracking
+    private Dictionary<string, bool> _fieldValidity = new();
+    private Dictionary<string, bool> _fieldTouched = new();
+    private List<string> _validationErrors = new();
+
     protected override void OnInitialized()
     {
         if (IsEditMode && User != null)
@@ -119,34 +173,27 @@
         }
     }
 
-    private void Submit()
+    private async Task Submit()
     {
         _errorMessage = null;
+
+        // Mark all fields as touched for validation display
+        _fieldTouched[nameof(_username)] = true;
+        _fieldTouched[nameof(_email)] = true;
+        _fieldTouched[nameof(_password)] = true;
+        _fieldTouched[nameof(_confirmPassword)] = true;
 
         if (!IsEditMode)
         {
             // Create mode validation
-            if (string.IsNullOrWhiteSpace(_username))
-            {
-                _errorMessage = "Username is required";
-                return;
-            }
+            ValidateUsername(_username);
+            ValidateEmail(_email);
+            ValidatePassword(_password);
+            ValidateConfirmPassword(_confirmPassword);
 
-            if (string.IsNullOrWhiteSpace(_password))
+            if (_validationErrors.Any())
             {
-                _errorMessage = "Password is required";
-                return;
-            }
-
-            if (_password.Length < 8)
-            {
-                _errorMessage = "Password must be at least 8 characters";
-                return;
-            }
-
-            if (_password != _confirmPassword)
-            {
-                _errorMessage = "Passwords do not match";
+                await FocusFirstInvalidField();
                 return;
             }
 
@@ -164,7 +211,18 @@
         }
         else
         {
-            // Edit mode
+            // Edit mode - only validate email if present
+            if (!string.IsNullOrWhiteSpace(_email))
+            {
+                ValidateEmail(_email);
+            }
+
+            if (_validationErrors.Any())
+            {
+                await FocusFirstInvalidField();
+                return;
+            }
+
             var request = new UpdateUserRequest
             {
                 Email = string.IsNullOrWhiteSpace(_email) ? null : _email.Trim(),
@@ -174,6 +232,186 @@
             };
 
             MudDialog.Close(DialogResult.Ok(request));
+        }
+    }
+
+    private IEnumerable<string> ValidateUsername(string username)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            errors.Add("Username is required");
+            UpdateFieldValidity(nameof(_username), false);
+        }
+        else if (username.Length < 3)
+        {
+            errors.Add("Username must be at least 3 characters");
+            UpdateFieldValidity(nameof(_username), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_username), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private IEnumerable<string> ValidateEmail(string? email)
+    {
+        var errors = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+            {
+                errors.Add("Invalid email format");
+                UpdateFieldValidity(nameof(_email), false);
+            }
+            else
+            {
+                UpdateFieldValidity(nameof(_email), true);
+            }
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_email), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private IEnumerable<string> ValidatePassword(string password)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            errors.Add("Password is required");
+            UpdateFieldValidity(nameof(_password), false);
+        }
+        else if (password.Length < 8)
+        {
+            errors.Add("Password must be at least 8 characters");
+            UpdateFieldValidity(nameof(_password), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_password), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private IEnumerable<string> ValidateConfirmPassword(string confirmPassword)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(confirmPassword))
+        {
+            errors.Add("Please confirm your password");
+            UpdateFieldValidity(nameof(_confirmPassword), false);
+        }
+        else if (confirmPassword != _password)
+        {
+            errors.Add("Passwords do not match");
+            UpdateFieldValidity(nameof(_confirmPassword), false);
+        }
+        else
+        {
+            UpdateFieldValidity(nameof(_confirmPassword), true);
+        }
+
+        UpdateValidationSummary();
+        return errors;
+    }
+
+    private void UpdateFieldValidity(string fieldName, bool isValid)
+    {
+        _fieldValidity[fieldName] = isValid;
+    }
+
+    private void OnFieldBlur(string fieldName)
+    {
+        _fieldTouched[fieldName] = true;
+        StateHasChanged();
+    }
+
+    private string GetValidationIcon(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return string.Empty;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Icons.Material.Filled.CheckCircle
+            : Icons.Material.Filled.Error;
+    }
+
+    private Color GetValidationColor(string fieldName)
+    {
+        if (!_fieldTouched.GetValueOrDefault(fieldName))
+            return Color.Default;
+
+        return _fieldValidity.GetValueOrDefault(fieldName)
+            ? Color.Success
+            : Color.Error;
+    }
+
+    private void UpdateValidationSummary()
+    {
+        _validationErrors.Clear();
+
+        if (!IsEditMode)
+        {
+            if (_fieldTouched.GetValueOrDefault(nameof(_username)) && !_fieldValidity.GetValueOrDefault(nameof(_username)))
+            {
+                _validationErrors.Add("Username: Invalid or missing");
+            }
+
+            if (_fieldTouched.GetValueOrDefault(nameof(_password)) && !_fieldValidity.GetValueOrDefault(nameof(_password)))
+            {
+                _validationErrors.Add("Password: Invalid or missing");
+            }
+
+            if (_fieldTouched.GetValueOrDefault(nameof(_confirmPassword)) && !_fieldValidity.GetValueOrDefault(nameof(_confirmPassword)))
+            {
+                _validationErrors.Add("Confirm Password: Passwords do not match");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_email) && _fieldTouched.GetValueOrDefault(nameof(_email)) && !_fieldValidity.GetValueOrDefault(nameof(_email)))
+        {
+            _validationErrors.Add("Email: Invalid format");
+        }
+    }
+
+    private async Task FocusFirstInvalidField()
+    {
+        if (!IsEditMode)
+        {
+            if (!_fieldValidity.GetValueOrDefault(nameof(_username)) && _usernameField != null)
+            {
+                await _usernameField.FocusAsync();
+                return;
+            }
+            if (!_fieldValidity.GetValueOrDefault(nameof(_password)) && _passwordField != null)
+            {
+                await _passwordField.FocusAsync();
+                return;
+            }
+            if (!_fieldValidity.GetValueOrDefault(nameof(_confirmPassword)) && _confirmPasswordField != null)
+            {
+                await _confirmPasswordField.FocusAsync();
+                return;
+            }
+        }
+
+        if (!_fieldValidity.GetValueOrDefault(nameof(_email)) && _emailField != null)
+        {
+            await _emailField.FocusAsync();
         }
     }
 

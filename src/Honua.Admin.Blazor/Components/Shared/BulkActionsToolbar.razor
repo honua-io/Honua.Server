@@ -1,0 +1,113 @@
+@typeparam TItem
+
+@if (SelectedCount > 0)
+{
+    <MudPaper Class="mb-4 pa-3" Elevation="2">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Primary" />
+            <MudText><strong>@SelectedCount</strong> item(s) selected</MudText>
+            <MudSpacer />
+
+            @if (ChildContent != null)
+            {
+                @ChildContent
+            }
+            else
+            {
+                @if (ShowDelete)
+                {
+                    <MudButton StartIcon="@Icons.Material.Filled.Delete"
+                               Color="Color.Error"
+                               Variant="Variant.Filled"
+                               OnClick="OnDeleteClicked"
+                               Disabled="@IsProcessing">
+                        Delete Selected
+                    </MudButton>
+                }
+
+                @if (ShowEnable)
+                {
+                    <MudButton StartIcon="@Icons.Material.Filled.PlayArrow"
+                               Color="Color.Success"
+                               Variant="Variant.Filled"
+                               OnClick="OnEnableClicked"
+                               Disabled="@IsProcessing">
+                        Enable Selected
+                    </MudButton>
+                }
+
+                @if (ShowDisable)
+                {
+                    <MudButton StartIcon="@Icons.Material.Filled.Stop"
+                               Color="Color.Default"
+                               Variant="Variant.Filled"
+                               OnClick="OnDisableClicked"
+                               Disabled="@IsProcessing">
+                        Disable Selected
+                    </MudButton>
+                }
+            }
+
+            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                           OnClick="OnClearClicked"
+                           Title="Clear selection"
+                           Disabled="@IsProcessing" />
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public int SelectedCount { get; set; }
+
+    [Parameter]
+    public bool IsProcessing { get; set; }
+
+    [Parameter]
+    public bool ShowDelete { get; set; } = true;
+
+    [Parameter]
+    public bool ShowEnable { get; set; } = false;
+
+    [Parameter]
+    public bool ShowDisable { get; set; } = false;
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    [Parameter]
+    public EventCallback OnEnable { get; set; }
+
+    [Parameter]
+    public EventCallback OnDisable { get; set; }
+
+    [Parameter]
+    public EventCallback OnClear { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private async Task OnDeleteClicked()
+    {
+        if (OnDelete.HasDelegate)
+            await OnDelete.InvokeAsync();
+    }
+
+    private async Task OnEnableClicked()
+    {
+        if (OnEnable.HasDelegate)
+            await OnEnable.InvokeAsync();
+    }
+
+    private async Task OnDisableClicked()
+    {
+        if (OnDisable.HasDelegate)
+            await OnDisable.InvokeAsync();
+    }
+
+    private async Task OnClearClicked()
+    {
+        if (OnClear.HasDelegate)
+            await OnClear.InvokeAsync();
+    }
+}

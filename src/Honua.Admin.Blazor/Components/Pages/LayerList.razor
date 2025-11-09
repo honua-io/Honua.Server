@@ -2,15 +2,22 @@
 @page "/services/{ServiceId}/layers"
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Components.Shared
+@using Microsoft.JSInterop
 @attribute [Authorize(Roles = "administrator,datapublisher")]
 @inject LayerApiClient LayerApi
 @inject ServiceApiClient ServiceApi
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject TouchGestureService TouchGestures
+@inject ILogger<LayerList> Logger
+@inject DataExportService ExportService
+@implements IAsyncDisposable
 
 <PageTitle>Layers - Honua Admin</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4" id="layers-container">
     <MudBreadcrumbs Items="_breadcrumbs" />
 
     <MudPaper Elevation="2" Class="pa-4 mt-4">
@@ -35,6 +42,43 @@
                     Back to Service
                 </MudButton>
             }
+            <MudTooltip Text="@(_isDense ? "Normal Density" : "Dense View")">
+                <MudIconButton Icon="@(_isDense ? Icons.Material.Filled.ViewCompact : Icons.Material.Filled.ViewComfy)"
+                               Color="Color.Default"
+                               OnClick="@(() => _isDense = !_isDense)"
+                               Title="Toggle Density" />
+            </MudTooltip>
+            <MudMenu Icon="@Icons.Material.Filled.FileDownload"
+                     Label="Export"
+                     Variant="Variant.Outlined"
+                     Size="Size.Small"
+                     Disabled="@(!_filteredLayers.Any())">
+                <MudMenuItem OnClick="@(() => ExportToCsv())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.TableChart" Size="Size.Small" />
+                        <MudText>Export to CSV</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => ExportToExcel())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.GridOn" Size="Size.Small" />
+                        <MudText>Export to Excel</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => ExportToPdf())">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" />
+                        <MudText>Export to PDF</MudText>
+                    </MudStack>
+                </MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="@ShowExportDialog">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Small" />
+                        <MudText>Custom Export...</MudText>
+                    </MudStack>
+                </MudMenuItem>
+            </MudMenu>
             <MudButton Variant="Variant.Filled"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Add"
@@ -51,7 +95,8 @@
                       Class="mb-4"
                       Immediate="true"
                       OnDebounceIntervalElapsed="OnSearchChanged"
-                      DebounceInterval="300" />
+                      DebounceInterval="300"
+                      Clearable="true" />
 
         @if (string.IsNullOrEmpty(ServiceId))
         {
@@ -66,90 +111,152 @@
 
         @if (_loading)
         {
-            <MudProgressLinear Indeterminate="true" Class="mb-4" />
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.Table" Rows="5" />
         }
-
-        @if (!string.IsNullOrEmpty(_errorMessage))
+        else
         {
-            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
-        }
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+            }
 
-        <MudTable Items="@_filteredLayers"
-                  Hover="true"
-                  Breakpoint="Breakpoint.Sm"
-                  Loading="@_loading"
-                  LoadingProgressColor="Color.Primary">
-            <HeaderContent>
-                <MudTh>Layer ID</MudTh>
-                <MudTh>Title</MudTh>
-                @if (string.IsNullOrEmpty(ServiceId))
-                {
-                    <MudTh>Service</MudTh>
-                }
-                <MudTh>Geometry Type</MudTh>
-                <MudTh>Last Updated</MudTh>
-                <MudTh>Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Layer ID">
-                    <MudText Typo="Typo.body2" Class="text-monospace">@context.Id</MudText>
-                </MudTd>
-                <MudTd DataLabel="Title">
-                    <MudText Typo="Typo.body1">@context.Title</MudText>
-                </MudTd>
-                @if (string.IsNullOrEmpty(ServiceId))
-                {
-                    <MudTd DataLabel="Service">
-                        <MudLink Href="@($"/services/{context.ServiceId}")">@context.ServiceId</MudLink>
-                    </MudTd>
-                }
-                <MudTd DataLabel="Geometry Type">
-                    <MudChip T="string" Size="Size.Small" Color="@GetGeometryTypeColor(context.GeometryType)">
-                        @GeometryTypes.GetDisplayName(context.GeometryType)
-                    </MudChip>
-                </MudTd>
-                <MudTd DataLabel="Last Updated">
-                    @if (context.UpdatedAt.HasValue)
-                    {
-                        <MudText Typo="Typo.body2">@context.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
-                    }
-                </MudTd>
-                <MudTd DataLabel="Actions">
-                    <MudStack Row="true" Spacing="1">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
-                                       Size="Size.Small"
-                                       Color="Color.Primary"
-                                       Href="@($"/layers/{context.Id}/edit")"
-                                       Title="Edit" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Visibility"
-                                       Size="Size.Small"
-                                       Color="Color.Info"
-                                       Href="@($"/layers/{context.Id}")"
-                                       Title="View Details" />
+            @if (!_filteredLayers.Any())
+            {
+                <MudPaper Class="pa-8" Elevation="0">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Large" Color="Color.Default" Style="font-size: 4rem; opacity: 0.3;" />
+                        <MudText Typo="Typo.h6" Align="Align.Center">
+                            @if (!string.IsNullOrEmpty(ServiceId))
+                            {
+                                <text>No layers found for this service</text>
+                            }
+                            else
+                            {
+                                <text>No layers found</text>
+                            }
+                        </MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                            Create your first layer to publish geospatial data through services!
+                        </MudText>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Href="@GetNewLayerUrl()">
+                            Create Layer
+                        </MudButton>
                     </MudStack>
-                </MudTd>
-            </RowTemplate>
-            <NoRecordsContent>
-                <MudText Align="Align.Center" Class="py-4">
-                    @if (_searchString.Length > 0)
-                    {
-                        <span>No layers match your search.</span>
-                    }
-                    else if (!string.IsNullOrEmpty(ServiceId))
-                    {
-                        <span>No layers found for this service. Create your first layer to get started!</span>
-                    }
-                    else
-                    {
-                        <span>No layers found. Create your first layer to get started!</span>
-                    }
-                </MudText>
-            </NoRecordsContent>
-        </MudTable>
+                </MudPaper>
+            }
+            else
+            {
+                <BulkActionsToolbar TItem="LayerListItem"
+                                    SelectedCount="@_selectedItems.Count"
+                                    IsProcessing="@_bulkActionInProgress"
+                                    ShowDelete="true"
+                                    ShowEnable="false"
+                                    ShowDisable="false"
+                                    OnDelete="BulkDelete"
+                                    OnClear="ClearSelection" />
+
+                <MudTable Items="@_filteredLayers"
+                          @ref="_table"
+                          MultiSelection="true"
+                          @bind-SelectedItems="_selectedItems"
+                          SelectOnRowClick="false"
+                          Hover="true"
+                          Breakpoint="Breakpoint.Sm"
+                          Dense="@_isDense"
+                          Loading="@_loading"
+                          LoadingProgressColor="Color.Primary"
+                          SortLabel="Sort By"
+                          Class="sticky-header">
+                    <HeaderContent>
+                        <MudTh Style="width: 50px;">
+                            <MudCheckBox T="bool"
+                                         Value="@_selectAll"
+                                         ValueChanged="SelectAllChanged"
+                                         Color="Color.Primary" />
+                        </MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<LayerListItem, object>(x => x.Id)">Layer ID</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<LayerListItem, object>(x => x.Title)">Title</MudTableSortLabel></MudTh>
+                        @if (string.IsNullOrEmpty(ServiceId))
+                        {
+                            <MudTh><MudTableSortLabel SortBy="new Func<LayerListItem, object>(x => x.ServiceId)">Service</MudTableSortLabel></MudTh>
+                        }
+                        <MudTh><MudTableSortLabel SortBy="new Func<LayerListItem, object>(x => x.GeometryType)">Geometry Type</MudTableSortLabel></MudTh>
+                        <MudTh><MudTableSortLabel SortBy="new Func<LayerListItem, object>(x => x.UpdatedAt ?? DateTimeOffset.MinValue)">Last Updated</MudTableSortLabel></MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Select">
+                            <MudCheckBox T="bool"
+                                         Value="@_selectedItems.Contains(context)"
+                                         ValueChanged="@((bool value) => ToggleSelection(context, value))"
+                                         Color="Color.Primary" />
+                        </MudTd>
+                        <MudTd DataLabel="Layer ID">
+                            <MudText Typo="Typo.body2" Class="text-monospace">@context.Id</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Title">
+                            <MudText Typo="Typo.body1">@context.Title</MudText>
+                        </MudTd>
+                        @if (string.IsNullOrEmpty(ServiceId))
+                        {
+                            <MudTd DataLabel="Service">
+                                <MudLink Href="@($"/services/{context.ServiceId}")">@context.ServiceId</MudLink>
+                            </MudTd>
+                        }
+                        <MudTd DataLabel="Geometry Type">
+                            <MudChip T="string" Size="Size.Small" Color="@GetGeometryTypeColor(context.GeometryType)">
+                                @GeometryTypes.GetDisplayName(context.GeometryType)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Last Updated">
+                            @if (context.UpdatedAt.HasValue)
+                            {
+                                <MudText Typo="Typo.body2">@context.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm")</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            <MudStack Row="true" Spacing="1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               Href="@($"/layers/{context.Id}/edit")"
+                                               Title="Edit" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                               Size="Size.Small"
+                                               Color="Color.Info"
+                                               Href="@($"/layers/{context.Id}")"
+                                               Title="View Details" />
+                            </MudStack>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudPaper Class="pa-8" Elevation="0">
+                            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                                <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" Style="font-size: 4rem;" />
+                                <MudText Typo="Typo.h6" Color="Color.Default">
+                                    No layers found matching "@_searchString"
+                                </MudText>
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => _searchString = string.Empty)">
+                                    Clear Search
+                                </MudButton>
+                            </MudStack>
+                        </MudPaper>
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                    </PagerContent>
+                </MudTable>
+            }
+        }
     </MudPaper>
 </MudContainer>
 
@@ -162,14 +269,66 @@
     private string _searchString = string.Empty;
     private SearchFilter _currentFilter = new();
     private bool _loading = true;
+    private bool _isDense = false;
     private string? _errorMessage;
     private string? _serviceName;
     private List<BreadcrumbItem> _breadcrumbs = new();
+    private DotNetObjectReference<LayerList>? _dotNetRef;
+    private string? _pullToRefreshGestureId;
+    private string? _swipeNavGestureId;
+    private HashSet<LayerListItem> _selectedItems = new();
+    private bool _selectAll = false;
+    private bool _bulkActionInProgress = false;
+    private MudTable<LayerListItem>? _table;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadLayersAsync();
         UpdateBreadcrumbs();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Initialize touch gestures for mobile
+                _dotNetRef = DotNetObjectReference.Create(this);
+
+                // Pull-to-refresh
+                _pullToRefreshGestureId = await TouchGestures.InitializePullToRefreshAsync(
+                    "layers-container",
+                    _dotNetRef
+                );
+
+                // Swipe navigation (back to services or home)
+                _swipeNavGestureId = await TouchGestures.InitializeSwipeNavigationAsync(
+                    "layers-container",
+                    _dotNetRef
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error initializing touch gestures");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPullToRefresh()
+    {
+        await LoadLayersAsync();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnSwipeBack()
+    {
+        // Navigate back to service detail if filtering by service, otherwise to services list
+        var backUrl = !string.IsNullOrEmpty(ServiceId) ? $"/services/{ServiceId}" : "/services";
+        Navigation.NavigateTo(backUrl);
+        return Task.CompletedTask;
     }
 
     private async Task LoadLayersAsync()
@@ -277,4 +436,313 @@
         GeometryTypes.MultiPolygon => Color.Warning,
         _ => Color.Default
     };
+
+    private void SelectAllChanged(bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedItems = _filteredLayers.ToHashSet();
+            _selectAll = true;
+        }
+        else
+        {
+            _selectedItems.Clear();
+            _selectAll = false;
+        }
+    }
+
+    private void ToggleSelection(LayerListItem layer, bool isSelected)
+    {
+        if (isSelected)
+        {
+            _selectedItems.Add(layer);
+        }
+        else
+        {
+            _selectedItems.Remove(layer);
+            _selectAll = false;
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedItems.Clear();
+        _selectAll = false;
+    }
+
+    private async Task BulkDelete()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Bulk Delete",
+            $"Delete {_selectedItems.Count} layer(s)? This cannot be undone.",
+            yesText: "Delete All",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", "Deleting Layers" },
+                { "Message", "Deleting layers..." },
+                { "Total", _selectedItems.Count }
+            };
+
+            var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+            var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+            var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+            _bulkActionInProgress = true;
+            int succeeded = 0;
+            int failed = 0;
+            int current = 0;
+            var itemsToDelete = _selectedItems.ToList();
+
+            foreach (var item in itemsToDelete)
+            {
+                current++;
+                try
+                {
+                    await LayerApi.DeleteLayerAsync(item.Id);
+                    _layers.Remove(item);
+                    _filteredLayers.Remove(item);
+                    succeeded++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Logger.LogError(ex, "Error deleting layer {LayerId}", item.Id);
+                }
+
+                progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                    $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+            }
+
+            progressDialog.Close();
+
+            Snackbar.Add($"Deleted {succeeded} layer(s). {failed} failed.",
+                failed > 0 ? Severity.Warning : Severity.Success);
+
+            _selectedItems.Clear();
+            _selectAll = false;
+            _bulkActionInProgress = false;
+            StateHasChanged();
+        }
+    }
+
+    // Export methods
+    private async Task ExportToCsv()
+    {
+        try
+        {
+            var data = _filteredLayers.ToList();
+            var columns = string.IsNullOrEmpty(ServiceId)
+                ? new[] { "Layer ID", "Title", "Service", "Geometry Type", "Last Updated" }
+                : new[] { "Layer ID", "Title", "Geometry Type", "Last Updated" };
+
+            await ExportService.ExportToCsvAsync(
+                data,
+                $"layers_{DateTime.Now:yyyyMMdd_HHmmss}.csv",
+                columns,
+                item => MapLayerToStringArray(item, columns));
+
+            Snackbar.Add("Layers exported to CSV successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting layers to CSV");
+        }
+    }
+
+    private async Task ExportToExcel()
+    {
+        try
+        {
+            var data = _filteredLayers.ToList();
+            var columns = string.IsNullOrEmpty(ServiceId)
+                ? new[] { "Layer ID", "Title", "Service", "Geometry Type", "Last Updated" }
+                : new[] { "Layer ID", "Title", "Geometry Type", "Last Updated" };
+
+            await ExportService.ExportToExcelAsync(
+                data,
+                $"layers_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx",
+                "Layers",
+                columns,
+                item => MapLayerToObjectArray(item, columns),
+                "Honua Layers Export");
+
+            Snackbar.Add("Layers exported to Excel successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting layers to Excel");
+        }
+    }
+
+    private async Task ExportToPdf()
+    {
+        try
+        {
+            var data = _filteredLayers.ToList();
+            var columns = string.IsNullOrEmpty(ServiceId)
+                ? new[] { "Layer ID", "Title", "Service", "Geometry Type", "Last Updated" }
+                : new[] { "Layer ID", "Title", "Geometry Type", "Last Updated" };
+
+            await ExportService.ExportToPdfAsync(
+                data,
+                $"layers_{DateTime.Now:yyyyMMdd_HHmmss}.pdf",
+                "Honua Layers Export",
+                columns,
+                item => MapLayerToStringArray(item, columns));
+
+            Snackbar.Add("Layers exported to PDF successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Logger.LogError(ex, "Error exporting layers to PDF");
+        }
+    }
+
+    private async Task ShowExportDialog()
+    {
+        var columns = new List<ExportDialog.ExportColumnDefinition>
+        {
+            new() { FieldName = "Id", DisplayName = "Layer ID", IsSelected = true },
+            new() { FieldName = "Title", DisplayName = "Title", IsSelected = true },
+            new() { FieldName = "GeometryType", DisplayName = "Geometry Type", IsSelected = true },
+            new() { FieldName = "UpdatedAt", DisplayName = "Last Updated", IsSelected = true }
+        };
+
+        if (string.IsNullOrEmpty(ServiceId))
+        {
+            columns.Insert(2, new() { FieldName = "ServiceId", DisplayName = "Service", IsSelected = true });
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "AvailableColumns", columns },
+            { "TotalCount", _layers.Count },
+            { "FilteredCount", _filteredLayers.Count },
+            { "DefaultFilename", $"layers_{DateTime.Now:yyyyMMdd_HHmmss}" }
+        };
+
+        var dialog = await DialogService.ShowAsync<ExportDialog>("Export Layers", parameters);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is ExportDialog.ExportConfiguration config)
+        {
+            try
+            {
+                var dataToExport = config.ExportFilteredOnly ? _filteredLayers : _layers;
+
+                switch (config.Format)
+                {
+                    case ExportDialog.ExportFormat.Csv:
+                        await ExportService.ExportToCsvAsync(
+                            dataToExport,
+                            $"{config.Filename}.csv",
+                            config.SelectedColumnNames,
+                            item => MapLayerToColumns(item, config.SelectedColumns));
+                        break;
+
+                    case ExportDialog.ExportFormat.Excel:
+                        await ExportService.ExportToExcelAsync(
+                            dataToExport,
+                            $"{config.Filename}.xlsx",
+                            "Layers",
+                            config.SelectedColumnNames,
+                            item => MapLayerToColumns(item, config.SelectedColumns).Select(v => (object)v).ToArray(),
+                            "Honua Layers Export");
+                        break;
+
+                    case ExportDialog.ExportFormat.Pdf:
+                        await ExportService.ExportToPdfAsync(
+                            dataToExport,
+                            $"{config.Filename}.pdf",
+                            "Honua Layers Export",
+                            config.SelectedColumnNames,
+                            item => MapLayerToColumns(item, config.SelectedColumns));
+                        break;
+                }
+
+                Snackbar.Add($"Layers exported successfully to {config.Format}", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+                Logger.LogError(ex, "Error in custom export");
+            }
+        }
+    }
+
+    private string[] MapLayerToStringArray(LayerListItem layer, string[] columns)
+    {
+        var values = new List<string>();
+        foreach (var column in columns)
+        {
+            values.Add(column switch
+            {
+                "Layer ID" => layer.Id,
+                "Title" => layer.Title,
+                "Service" => layer.ServiceId,
+                "Geometry Type" => GeometryTypes.GetDisplayName(layer.GeometryType),
+                "Last Updated" => layer.UpdatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-",
+                _ => string.Empty
+            });
+        }
+        return values.ToArray();
+    }
+
+    private object[] MapLayerToObjectArray(LayerListItem layer, string[] columns)
+    {
+        var values = new List<object>();
+        foreach (var column in columns)
+        {
+            values.Add(column switch
+            {
+                "Layer ID" => layer.Id,
+                "Title" => layer.Title,
+                "Service" => layer.ServiceId,
+                "Geometry Type" => GeometryTypes.GetDisplayName(layer.GeometryType),
+                "Last Updated" => (object)(layer.UpdatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-"),
+                _ => string.Empty
+            });
+        }
+        return values.ToArray();
+    }
+
+    private string[] MapLayerToColumns(LayerListItem layer, string[] selectedColumns)
+    {
+        var values = new List<string>();
+        foreach (var column in selectedColumns)
+        {
+            values.Add(column switch
+            {
+                "Id" => layer.Id,
+                "Title" => layer.Title,
+                "ServiceId" => layer.ServiceId,
+                "GeometryType" => GeometryTypes.GetDisplayName(layer.GeometryType),
+                "UpdatedAt" => layer.UpdatedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-",
+                _ => string.Empty
+            });
+        }
+        return values.ToArray();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_pullToRefreshGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_pullToRefreshGestureId);
+        }
+
+        if (_swipeNavGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_swipeNavGestureId);
+        }
+
+        _dotNetRef?.Dispose();
+    }
 }

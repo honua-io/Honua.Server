@@ -1,0 +1,128 @@
+@using Honua.Admin.Blazor.Shared.Services
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.Keyboard" Class="mr-2" />
+            Keyboard Shortcuts
+        </MudText>
+
+        @if (_shortcuts.Any())
+        {
+            @foreach (var category in _shortcuts.OrderBy(kvp => GetCategoryOrder(kvp.Key)))
+            {
+                <MudText Typo="Typo.subtitle1" Class="mt-4 mb-2" Color="Color.Primary">
+                    <b>@category.Key</b>
+                </MudText>
+
+                <MudSimpleTable Dense="true" Hover="true" Class="mb-3">
+                    <tbody>
+                        @foreach (var shortcut in category.Value.OrderBy(s => s.Shortcut))
+                        {
+                            <tr>
+                                <td style="width: 200px;">
+                                    <MudChip Size="Size.Small" Variant="Variant.Outlined" Class="shortcut-chip">
+                                        @FormatShortcut(shortcut.Shortcut)
+                                    </MudChip>
+                                </td>
+                                <td>
+                                    <MudText Typo="Typo.body2">@shortcut.Description</MudText>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                No keyboard shortcuts are currently registered.
+            </MudAlert>
+        }
+
+        <MudDivider Class="my-4" />
+
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-1" />
+            Press <kbd>?</kbd> or <kbd>Shift+?</kbd> anytime to show this help dialog.
+            <br />
+            On Mac, use <kbd>Cmd</kbd> instead of <kbd>Ctrl</kbd>.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close" Color="Color.Primary" Variant="Variant.Filled">
+            Got it!
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .shortcut-chip {
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+    }
+
+    kbd {
+        background-color: #f4f4f4;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+        color: #333;
+        display: inline-block;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85em;
+        font-weight: 600;
+        line-height: 1;
+        padding: 2px 4px;
+        white-space: nowrap;
+    }
+
+    .mud-table-cell {
+        vertical-align: middle !important;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public Dictionary<string, List<ShortcutInfo>> Shortcuts { get; set; } = new();
+
+    private Dictionary<string, List<ShortcutInfo>> _shortcuts = new();
+
+    protected override void OnParametersSet()
+    {
+        _shortcuts = Shortcuts ?? new();
+    }
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+
+    private string FormatShortcut(string shortcut)
+    {
+        // Replace modifier names with symbols for better readability
+        return shortcut
+            .Replace("Ctrl", "Ctrl")
+            .Replace("Alt", "Alt")
+            .Replace("Shift", "Shift")
+            .Replace("+", " + ")
+            .Replace(" ", " then ");
+    }
+
+    private int GetCategoryOrder(string category)
+    {
+        // Define order for categories
+        return category switch
+        {
+            "Navigation" => 0,
+            "Search" => 1,
+            "Actions" => 2,
+            "General" => 3,
+            _ => 99
+        };
+    }
+}

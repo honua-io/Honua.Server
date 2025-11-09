@@ -2,26 +2,302 @@
 
 html, body {
     font-family: 'Roboto', sans-serif;
+    overflow-x: hidden;
 }
 
-/* Loading indicator */
+/* ========================================
+   Theme Variables (Light/Dark Mode)
+   ======================================== */
+
+/* Light theme (default) */
+:root {
+    --surface-color: #ffffff;
+    --background-color: #f5f5f5;
+    --text-primary: rgba(0, 0, 0, 0.87);
+    --text-secondary: rgba(0, 0, 0, 0.6);
+    --border-color: rgba(0, 0, 0, 0.12);
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --hover-overlay: rgba(0, 0, 0, 0.04);
+    --divider-color: rgba(0, 0, 0, 0.12);
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+    --surface-color: #1e1e1e;
+    --background-color: #121212;
+    --text-primary: rgba(255, 255, 255, 0.87);
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --border-color: rgba(255, 255, 255, 0.12);
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --hover-overlay: rgba(255, 255, 255, 0.08);
+    --divider-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ========================================
+   Global Transitions & Animations
+   ======================================== */
+
+/* Smooth transitions for all interactive elements including theme changes */
+* {
+    transition: background-color 0.3s ease,
+                color 0.3s ease,
+                border-color 0.3s ease,
+                opacity 0.2s ease;
+}
+
+/* Page transition fade-in */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.mud-container {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Skeleton loading animation */
+@keyframes skeleton {
+    0% {
+        background-position: -200px 0;
+    }
+    100% {
+        background-position: calc(200px + 100%) 0;
+    }
+}
+
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 0px, #e0e0e0 40px, #f0f0f0 80px);
+    background-size: 200px 100%;
+    animation: skeleton 1.2s ease-in-out infinite;
+    border-radius: 4px;
+}
+
+/* ========================================
+   Loading States
+   ======================================== */
+
 .mud-progress-circular {
     margin: 2rem auto;
     display: block;
 }
 
-/* Service card hover effects */
-.service-card {
-    transition: transform 0.2s ease-in-out;
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
 }
 
-.service-card:hover {
+/* ========================================
+   Cards & Hover Effects
+   ======================================== */
+
+/* Enhanced card hover effects */
+.service-card,
+.mud-card,
+.mud-paper {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.service-card:hover,
+.mud-card:hover {
     transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
 }
 
-/* Breadcrumbs styling */
+/* Button smooth transitions */
+.mud-button {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mud-button:hover {
+    transform: translateY(-1px);
+}
+
+.mud-button:active {
+    transform: translateY(0);
+}
+
+/* Icon button ripple effect */
+.mud-icon-button {
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.mud-icon-button:hover {
+    transform: scale(1.1);
+}
+
+.mud-icon-button:active {
+    transform: scale(0.95);
+}
+
+/* ========================================
+   Map Viewer Responsive Layout
+   ======================================== */
+
+.map-viewer-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.map-info-panel {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    max-width: 400px;
+    width: calc(100% - 2rem);
+    z-index: 1000;
+    padding: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease;
+}
+
+.map-info-panel.collapsed {
+    transform: translateX(0);
+    max-width: fit-content;
+}
+
+.map-layer-panel {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 300px;
+    max-width: calc(100% - 2rem);
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 1000;
+    padding: 0.75rem;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.map-layer-toggle {
+    position: absolute !important;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    transition: transform 0.2s ease;
+}
+
+.map-layer-toggle:hover {
+    transform: scale(1.1);
+}
+
+.layer-item {
+    transition: all 0.2s ease;
+}
+
+.layer-item:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+    transform: translateX(4px);
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Mobile responsiveness for map viewer */
+@media (max-width: 768px) {
+    .map-info-panel {
+        max-width: calc(100% - 1rem);
+        left: 0.5rem;
+        top: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .map-layer-panel {
+        width: calc(100% - 1rem);
+        right: 0.5rem;
+        top: 0.5rem;
+        max-height: 60vh;
+    }
+
+    .map-layer-toggle {
+        top: 0.5rem;
+        right: 0.5rem;
+    }
+}
+
+/* ========================================
+   Breadcrumbs
+   ======================================== */
+
 .mud-breadcrumbs {
     margin-bottom: 1rem;
+}
+
+.mud-breadcrumb-item {
+    transition: color 0.2s ease;
+}
+
+/* ========================================
+   Tables & Lists
+   ======================================== */
+
+/* Sticky table headers */
+.sticky-header thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: white;
+}
+
+.sticky-header thead th {
+    background: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark theme support for sticky headers */
+.mud-theme-dark .sticky-header thead th {
+    background: #1e1e1e;
+}
+
+/* Smooth row hover */
+.mud-table-row {
+    transition: background-color 0.2s ease;
 }
 
 /* Custom scrollbar for tables */
@@ -37,13 +313,118 @@ html, body {
 .mud-table-container::-webkit-scrollbar-thumb {
     background: #888;
     border-radius: 4px;
+    transition: background 0.2s ease;
 }
 
 .mud-table-container::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
 
-/* Utility classes */
+/* List item transitions */
+.mud-list-item {
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.mud-list-item:hover {
+    transform: translateX(4px);
+}
+
+/* ========================================
+   Forms & Inputs
+   ======================================== */
+
+/* Input focus animations */
+.mud-input-root {
+    transition: all 0.2s ease;
+}
+
+.mud-input-root:focus-within {
+    transform: translateY(-1px);
+}
+
+/* ========================================
+   Chips & Badges
+   ======================================== */
+
+.mud-chip {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mud-chip:hover {
+    transform: scale(1.05);
+}
+
+/* ========================================
+   Alerts & Notifications
+   ======================================== */
+
+.mud-alert {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========================================
+   Dialogs & Modals
+   ======================================== */
+
+.mud-dialog {
+    animation: scaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ========================================
+   Drawer & Navigation
+   ======================================== */
+
+.mud-drawer {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mud-nav-item {
+    transition: all 0.2s ease;
+}
+
+.mud-nav-item:hover {
+    transform: translateX(4px);
+}
+
+/* ========================================
+   Progress & Loading Indicators
+   ======================================== */
+
+.mud-progress-linear {
+    overflow: hidden;
+}
+
+.mud-progress-linear .mud-progress-linear-bar {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+
+/* Margins */
 .mt-2 { margin-top: 0.5rem; }
 .mt-4 { margin-top: 1rem; }
 .mt-6 { margin-top: 1.5rem; }
@@ -53,3 +434,388 @@ html, body {
 .mb-6 { margin-bottom: 1.5rem; }
 .ml-3 { margin-left: 0.75rem; }
 .pa-4 { padding: 1rem; }
+
+/* Responsive utilities */
+.mobile-hidden {
+    display: block;
+}
+
+.mobile-only {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-hidden {
+        display: none;
+    }
+
+    .mobile-only {
+        display: block;
+    }
+}
+
+/* Smooth scroll */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Focus styles for accessibility */
+*:focus-visible {
+    outline: 2px solid #1976d2;
+    outline-offset: 2px;
+}
+
+/* Service link styling */
+.service-link {
+    transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+
+.service-link:hover {
+    text-decoration: underline;
+    color: #1976d2 !important;
+}
+
+/* Responsive table adjustments */
+@media (max-width: 768px) {
+    .mud-table {
+        font-size: 0.875rem;
+    }
+
+    .mud-table-cell {
+        padding: 0.5rem !important;
+    }
+
+    .mud-container {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    .mud-appbar .mud-text {
+        font-size: 1.25rem !important;
+    }
+}
+
+/* Enhanced touch targets for mobile */
+@media (max-width: 768px) {
+    .mud-icon-button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .mud-button {
+        min-height: 44px;
+    }
+}
+
+/* ========================================
+   Performance Optimizations
+   ======================================== */
+
+/* GPU acceleration for animations */
+.map-viewer-container,
+.map-info-panel,
+.map-layer-panel {
+    will-change: transform;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ========================================
+   Touch Gesture Styles (Mobile)
+   ======================================== */
+
+/* Pull-to-Refresh Indicator */
+.pull-to-refresh-indicator {
+    color: #1976d2;
+    font-size: 14px;
+    user-select: none;
+}
+
+.pull-to-refresh-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.pull-to-refresh-indicator .circular-spinner {
+    width: 32px;
+    height: 32px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pull-to-refresh-indicator .path {
+    stroke: #1976d2;
+    stroke-linecap: round;
+}
+
+.pull-to-refresh-indicator.active .path {
+    stroke: #1565c0;
+    animation: spinnerDash 1.5s ease-in-out infinite;
+}
+
+.pull-to-refresh-indicator.loading .circular-spinner {
+    animation: spinnerRotate 2s linear infinite;
+}
+
+.pull-to-refresh-indicator.loading .path {
+    animation: spinnerDash 1.5s ease-in-out infinite;
+}
+
+@keyframes spinnerRotate {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes spinnerDash {
+    0% {
+        stroke-dasharray: 1, 150;
+        stroke-dashoffset: 0;
+    }
+    50% {
+        stroke-dasharray: 90, 150;
+        stroke-dashoffset: -35;
+    }
+    100% {
+        stroke-dasharray: 90, 150;
+        stroke-dashoffset: -124;
+    }
+}
+
+.pull-text {
+    font-weight: 500;
+    color: #666;
+    transition: color 0.2s ease;
+}
+
+.pull-to-refresh-indicator.active .pull-text {
+    color: #1565c0;
+}
+
+/* Swipe-to-Delete Action */
+.swipe-delete-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    user-select: none;
+}
+
+.swipe-delete-action svg {
+    flex-shrink: 0;
+}
+
+.swipe-delete-action:active {
+    background: #c62828 !important;
+}
+
+/* Swipe Navigation Indicator */
+.swipe-nav-indicator {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.swipe-nav-indicator svg {
+    display: block;
+}
+
+/* Touch feedback for mobile */
+@media (max-width: 768px) {
+    /* Prevent text selection during gestures */
+    .mud-table-row,
+    .mud-list-item {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+
+    /* Enhanced touch targets */
+    .mud-table-row {
+        position: relative;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Smooth swipe animations */
+    .mud-table-row {
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Visual feedback for touch start */
+    .mud-table-row:active {
+        background-color: rgba(0, 0, 0, 0.03);
+    }
+
+    /* Container scroll optimization */
+    .mud-container {
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Prevent scroll when gesturing */
+    body.gesture-active {
+        overflow: hidden;
+        touch-action: none;
+    }
+}
+
+/* Disable gestures on desktop */
+@media (min-width: 769px) {
+    .pull-to-refresh-indicator,
+    .swipe-delete-action,
+    .swipe-nav-indicator {
+        display: none !important;
+    }
+}
+
+/* ========================================
+   Auto-Save Draft Functionality
+   ======================================== */
+
+/* Pulsing dot for unsaved changes indicator */
+@keyframes pulse-dot {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.3;
+    }
+}
+
+.unsaved-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: orange;
+    animation: pulse-dot 2s infinite;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+/* Auto-save status badge animations */
+.auto-save-badge {
+    transition: all 0.3s ease;
+}
+
+.auto-save-badge.saving {
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* Draft restore dialog highlight */
+.draft-restore-highlight {
+    animation: highlight-flash 0.5s ease-out;
+}
+
+@keyframes highlight-flash {
+    0% {
+        background-color: rgba(25, 118, 210, 0.1);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+/* Draft status indicator container */
+.draft-status-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+/* Cloud icon animation for saving */
+@keyframes cloud-sync {
+    0% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
+
+.cloud-syncing {
+    animation: cloud-sync 1s ease-in-out infinite;
+}
+
+/* ========================================
+   Dark Mode Theme-Aware Styles
+   ======================================== */
+
+/* Apply CSS variables to key components */
+.map-info-panel,
+.map-layer-panel {
+    background: var(--surface-color);
+    color: var(--text-primary);
+}
+
+/* Dark theme specific overrides */
+[data-theme="dark"] .sticky-header thead th {
+    background: #1e1e1e;
+}
+
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(90deg, #2a2a2a 0px, #3a3a3a 40px, #2a2a2a 80px);
+}
+
+[data-theme="dark"] .mud-table-container::-webkit-scrollbar-track {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] .mud-table-container::-webkit-scrollbar-thumb {
+    background: #555;
+}
+
+[data-theme="dark"] .mud-table-container::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+[data-theme="dark"] .loading-overlay {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+[data-theme="dark"] .layer-item:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .service-card:hover,
+[data-theme="dark"] .mud-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] *:focus-visible {
+    outline-color: #90caf9;
+}
+
+[data-theme="dark"] .service-link:hover {
+    color: #90caf9 !important;
+}
+
+[data-theme="dark"] .pull-to-refresh-indicator .path {
+    stroke: #90caf9;
+}
+
+[data-theme="dark"] .pull-to-refresh-indicator.active .path {
+    stroke: #64b5f6;
+}
+
+[data-theme="dark"] .pull-text {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] .pull-to-refresh-indicator.active .pull-text {
+    color: rgba(255, 255, 255, 0.87);
+}

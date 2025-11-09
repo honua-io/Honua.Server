@@ -27,7 +27,7 @@ else if (_config == null)
 }
 else
 {
-    <div style="position: relative; width: 100vw; height: 100vh;">
+    <div class="map-viewer-container">
         <!-- Map -->
         <HonuaMap Id="@Id"
                  MapStyle="@_config.Settings.Style"
@@ -43,74 +43,83 @@ else
                  Style="width: 100%; height: 100%;" />
 
         <!-- Floating Info Panel -->
-        <MudPaper Class="pa-4"
-                 Style="position: absolute; top: 20px; left: 20px; max-width: 400px; z-index: 1000;">
+        <MudPaper Class="@(_showInfoPanel ? "map-info-panel" : "map-info-panel collapsed")" Elevation="4">
             <MudStack Spacing="2">
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                     <MudText Typo="Typo.h6">@_mapName</MudText>
-                    <MudIconButton Icon="@Icons.Material.Filled.Close"
-                                  Size="Size.Small"
-                                  OnClick="@(() => Navigation.NavigateTo("/maps"))" />
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@(_showInfoPanel ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                      Size="Size.Small"
+                                      OnClick="@(() => _showInfoPanel = !_showInfoPanel)"
+                                      Title="Toggle panel" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                      Size="Size.Small"
+                                      OnClick="@(() => Navigation.NavigateTo("/maps"))"
+                                      Title="Close map" />
+                    </MudStack>
                 </MudStack>
 
-                @if (!string.IsNullOrEmpty(_config.Description))
+                @if (_showInfoPanel)
                 {
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        @_config.Description
-                    </MudText>
+                    @if (!string.IsNullOrEmpty(_config.Description))
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @_config.Description
+                        </MudText>
+                    }
+
+                    <MudDivider />
+
+                    <MudText Typo="Typo.subtitle2">Map Information</MudText>
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.body2">
+                            <strong>Layers:</strong> @_config.Layers.Count
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Controls:</strong> @_config.Controls.Count(c => c.Visible)
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Projection:</strong> @_config.Settings.Projection
+                        </MudText>
+                    </MudStack>
+
+                    <MudDivider />
+
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Outlined"
+                                  Size="Size.Small"
+                                  FullWidth="true"
+                                  StartIcon="@Icons.Material.Filled.Edit"
+                                  OnClick="@(() => Navigation.NavigateTo($"/maps/edit/{Id}"))">
+                            Edit
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                  Size="Size.Small"
+                                  FullWidth="true"
+                                  StartIcon="@Icons.Material.Filled.Share"
+                                  OnClick="ShowShareDialog">
+                            Share
+                        </MudButton>
+                    </MudStack>
                 }
-
-                <MudDivider />
-
-                <MudText Typo="Typo.subtitle2">Map Information</MudText>
-                <MudStack Spacing="1">
-                    <MudText Typo="Typo.body2">
-                        <strong>Layers:</strong> @_config.Layers.Count
-                    </MudText>
-                    <MudText Typo="Typo.body2">
-                        <strong>Controls:</strong> @_config.Controls.Count(c => c.Visible)
-                    </MudText>
-                    <MudText Typo="Typo.body2">
-                        <strong>Projection:</strong> @_config.Settings.Projection
-                    </MudText>
-                </MudStack>
-
-                <MudDivider />
-
-                <MudStack Row="true" Spacing="2">
-                    <MudButton Variant="Variant.Outlined"
-                              Size="Size.Small"
-                              FullWidth="true"
-                              StartIcon="@Icons.Material.Filled.Edit"
-                              OnClick="@(() => Navigation.NavigateTo($"/maps/edit/{Id}"))">
-                        Edit
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined"
-                              Size="Size.Small"
-                              FullWidth="true"
-                              StartIcon="@Icons.Material.Filled.Share"
-                              OnClick="ShowShareDialog">
-                        Share
-                    </MudButton>
-                </MudStack>
             </MudStack>
         </MudPaper>
 
         <!-- Layer List (if there are layers) -->
         @if (_config.Layers.Count > 0 && _showLayerList)
         {
-            <MudPaper Class="pa-3"
-                     Style="position: absolute; top: 20px; right: 20px; width: 300px; max-height: 500px; overflow-y: auto; z-index: 1000;">
+            <MudPaper Class="map-layer-panel" Elevation="4">
                 <MudStack Spacing="2">
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                         <MudText Typo="Typo.subtitle1"><strong>Layers</strong></MudText>
                         <MudIconButton Icon="@Icons.Material.Filled.Close"
                                       Size="Size.Small"
-                                      OnClick="@(() => _showLayerList = false)" />
+                                      OnClick="@(() => _showLayerList = false)"
+                                      Title="Close layer list" />
                     </MudStack>
                     @foreach (var layer in _config.Layers)
                     {
-                        <MudPaper Outlined="true" Class="pa-2">
+                        <MudPaper Outlined="true" Class="pa-2 layer-item">
                             <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                                 <MudStack Spacing="1">
                                     <MudText Typo="Typo.body2"><strong>@layer.Name</strong></MudText>
@@ -131,8 +140,9 @@ else
         {
             <MudFab Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.Layers"
-                   Style="position: absolute; top: 20px; right: 20px; z-index: 1000;"
-                   OnClick="@(() => _showLayerList = true)" />
+                   Class="map-layer-toggle"
+                   OnClick="@(() => _showLayerList = true)"
+                   Title="Show layers" />
         }
     </div>
 }
@@ -145,6 +155,7 @@ else
     private string _mapName = "Map";
     private bool _loading = true;
     private bool _showLayerList = false;
+    private bool _showInfoPanel = true;
 
     protected override async Task OnInitializedAsync()
     {

@@ -1,0 +1,220 @@
+@* Export Dialog for custom export options *@
+@using Honua.Admin.Blazor.Shared.Services
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h6">Export Data</MudText>
+
+            <MudSelect T="ExportFormat"
+                       @bind-Value="_exportFormat"
+                       Label="Export Format"
+                       Variant="Variant.Outlined"
+                       AnchorOrigin="Origin.BottomCenter">
+                <MudSelectItem Value="ExportFormat.Csv">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.TableChart" Size="Size.Small" />
+                        <MudText>CSV (Comma-Separated Values)</MudText>
+                    </MudStack>
+                </MudSelectItem>
+                <MudSelectItem Value="ExportFormat.Excel">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.GridOn" Size="Size.Small" />
+                        <MudText>Excel (.xlsx)</MudText>
+                    </MudStack>
+                </MudSelectItem>
+                <MudSelectItem Value="ExportFormat.Pdf">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudIcon Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" />
+                        <MudText>PDF Document</MudText>
+                    </MudStack>
+                </MudSelectItem>
+            </MudSelect>
+
+            <MudTextField @bind-Value="_filename"
+                          Label="Filename"
+                          Variant="Variant.Outlined"
+                          Placeholder="Enter filename without extension" />
+
+            <MudDivider />
+
+            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Select Columns to Export:</MudText>
+
+            <MudStack Row="true" Spacing="2" Class="mb-2">
+                <MudButton Variant="Variant.Text"
+                           Size="Size.Small"
+                           OnClick="SelectAllColumns"
+                           StartIcon="@Icons.Material.Filled.CheckBox">
+                    Select All
+                </MudButton>
+                <MudButton Variant="Variant.Text"
+                           Size="Size.Small"
+                           OnClick="DeselectAllColumns"
+                           StartIcon="@Icons.Material.Filled.CheckBoxOutlineBlank">
+                    Deselect All
+                </MudButton>
+            </MudStack>
+
+            <MudPaper Elevation="0" Class="pa-3" Style="max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0;">
+                <MudStack Spacing="1">
+                    @foreach (var column in _availableColumns)
+                    {
+                        <MudCheckBox T="bool"
+                                     @bind-Checked="column.IsSelected"
+                                     Label="@column.DisplayName"
+                                     Color="Color.Primary" />
+                    }
+                </MudStack>
+            </MudPaper>
+
+            <MudDivider />
+
+            <MudCheckBox T="bool"
+                         @bind-Checked="_exportFilteredOnly"
+                         Color="Color.Primary">
+                <MudText>
+                    Export only filtered/visible rows
+                    <MudText Typo="Typo.caption" Inline="true">
+                        (@_filteredCount of @_totalCount total)
+                    </MudText>
+                </MudText>
+            </MudCheckBox>
+
+            @if (!string.IsNullOrEmpty(_validationMessage))
+            {
+                <MudAlert Severity="Severity.Warning">@_validationMessage</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton OnClick="Export"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.FileDownload"
+                   Disabled="@(!IsValid())">
+            Export
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public List<ExportColumnDefinition> AvailableColumns { get; set; } = new();
+
+    [Parameter]
+    public int TotalCount { get; set; }
+
+    [Parameter]
+    public int FilteredCount { get; set; }
+
+    [Parameter]
+    public string DefaultFilename { get; set; } = "export";
+
+    private List<ExportColumnDefinition> _availableColumns = new();
+    private ExportFormat _exportFormat = ExportFormat.Csv;
+    private string _filename = string.Empty;
+    private bool _exportFilteredOnly = true;
+    private int _totalCount;
+    private int _filteredCount;
+    private string? _validationMessage;
+
+    protected override void OnInitialized()
+    {
+        _availableColumns = AvailableColumns.Select(c => new ExportColumnDefinition
+        {
+            FieldName = c.FieldName,
+            DisplayName = c.DisplayName,
+            IsSelected = c.IsSelected
+        }).ToList();
+
+        _filename = DefaultFilename;
+        _totalCount = TotalCount;
+        _filteredCount = FilteredCount;
+    }
+
+    private void SelectAllColumns()
+    {
+        foreach (var column in _availableColumns)
+        {
+            column.IsSelected = true;
+        }
+    }
+
+    private void DeselectAllColumns()
+    {
+        foreach (var column in _availableColumns)
+        {
+            column.IsSelected = false;
+        }
+    }
+
+    private bool IsValid()
+    {
+        _validationMessage = null;
+
+        if (string.IsNullOrWhiteSpace(_filename))
+        {
+            _validationMessage = "Please enter a filename.";
+            return false;
+        }
+
+        if (!_availableColumns.Any(c => c.IsSelected))
+        {
+            _validationMessage = "Please select at least one column to export.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Export()
+    {
+        if (!IsValid())
+            return;
+
+        var result = new ExportConfiguration
+        {
+            Format = _exportFormat,
+            Filename = _filename,
+            SelectedColumns = _availableColumns.Where(c => c.IsSelected).Select(c => c.FieldName).ToArray(),
+            SelectedColumnNames = _availableColumns.Where(c => c.IsSelected).Select(c => c.DisplayName).ToArray(),
+            ExportFilteredOnly = _exportFilteredOnly
+        };
+
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+}
+
+@code {
+    public enum ExportFormat
+    {
+        Csv,
+        Excel,
+        Pdf
+    }
+
+    public class ExportColumnDefinition
+    {
+        public string FieldName { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public bool IsSelected { get; set; } = true;
+    }
+
+    public class ExportConfiguration
+    {
+        public ExportFormat Format { get; set; }
+        public string Filename { get; set; } = string.Empty;
+        public string[] SelectedColumns { get; set; } = Array.Empty<string>();
+        public string[] SelectedColumnNames { get; set; } = Array.Empty<string>();
+        public bool ExportFilteredOnly { get; set; }
+    }
+}

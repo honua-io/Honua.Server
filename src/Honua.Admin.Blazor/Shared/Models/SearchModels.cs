@@ -147,6 +147,76 @@ public sealed class GlobalSearchResult
 }
 
 /// <summary>
+/// Filter operator for column-specific filters.
+/// </summary>
+public enum FilterOperator
+{
+    Equals,
+    NotEquals,
+    Contains,
+    NotContains,
+    StartsWith,
+    EndsWith,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+    Between,
+    In,
+    NotIn,
+    IsNull,
+    IsNotNull
+}
+
+/// <summary>
+/// Column-specific filter configuration.
+/// </summary>
+public sealed class ColumnFilter
+{
+    [JsonPropertyName("column")]
+    public string Column { get; set; } = string.Empty;
+
+    [JsonPropertyName("operator")]
+    public FilterOperator Operator { get; set; } = FilterOperator.Equals;
+
+    [JsonPropertyName("value")]
+    public string? Value { get; set; }
+
+    [JsonPropertyName("secondValue")]
+    public string? SecondValue { get; set; } // For range filters (Between)
+
+    [JsonPropertyName("values")]
+    public List<string> Values { get; set; } = new(); // For In/NotIn operators
+}
+
+/// <summary>
+/// Advanced filter preset for column-specific filtering.
+/// </summary>
+public sealed class AdvancedFilterPreset
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    [JsonPropertyName("name")]
+    public required string Name { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("filters")]
+    public List<ColumnFilter> Filters { get; set; } = new();
+
+    [JsonPropertyName("createdAt")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [JsonPropertyName("lastUsedAt")]
+    public DateTime? LastUsedAt { get; set; }
+
+    [JsonPropertyName("tableType")]
+    public string TableType { get; set; } = string.Empty; // "services", "users", "workflows", "layers"
+}
+
+/// <summary>
 /// Predefined filter options.
 /// </summary>
 public static class FilterOptions
@@ -179,5 +249,28 @@ public static class FilterOptions
         "EPSG:32633", // WGS 84 / UTM zone 33N
         "EPSG:32634", // WGS 84 / UTM zone 34N
         "EPSG:2193"   // NZGD2000
+    };
+
+    /// <summary>
+    /// Gets display name for filter operator.
+    /// </summary>
+    public static string GetOperatorDisplayName(FilterOperator op) => op switch
+    {
+        FilterOperator.Equals => "Equals",
+        FilterOperator.NotEquals => "Not Equals",
+        FilterOperator.Contains => "Contains",
+        FilterOperator.NotContains => "Does Not Contain",
+        FilterOperator.StartsWith => "Starts With",
+        FilterOperator.EndsWith => "Ends With",
+        FilterOperator.GreaterThan => "Greater Than",
+        FilterOperator.LessThan => "Less Than",
+        FilterOperator.GreaterThanOrEqual => "Greater Than or Equal",
+        FilterOperator.LessThanOrEqual => "Less Than or Equal",
+        FilterOperator.Between => "Between",
+        FilterOperator.In => "In List",
+        FilterOperator.NotIn => "Not In List",
+        FilterOperator.IsNull => "Is Empty",
+        FilterOperator.IsNotNull => "Is Not Empty",
+        _ => op.ToString()
     };
 }

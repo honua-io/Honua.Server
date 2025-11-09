@@ -1,16 +1,31 @@
 @page "/maps"
 @using Honua.Server.Core.Models
+@using Honua.Admin.Blazor.Components.Shared
+@using Honua.Admin.Blazor.Shared.Helpers
+@using Honua.Admin.Blazor.Shared.Services
+@using Microsoft.JSInterop
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject TouchGestureService TouchGestures
+@inject ILogger<MapList> Logger
+@implements IAsyncDisposable
 
 <PageTitle>Map Configurations</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4" id="maps-container">
     <MudPaper Class="pa-4 mb-4">
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h4">Map Configurations</MudText>
+            <MudSpacer />
+            <MudTextField Value="@_searchText"
+                          ValueChanged="@((string value) => OnSearchTextChanged(value))"
+                          Placeholder="Search maps..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@(_searching ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Search)"
+                          Style="max-width: 400px"
+                          Clearable="true" />
             <MudButton Variant="Variant.Filled"
                       Color="Color.Primary"
                       StartIcon="@Icons.Material.Filled.Add"
@@ -21,12 +36,54 @@
     </MudPaper>
 
     <MudPaper Class="pa-4">
-        <MudTable Items="@_configurations"
-                 Loading="@_loading"
-                 Hover="true"
-                 Breakpoint="Breakpoint.Sm"
-                 LoadingProgressColor="Color.Primary">
-            <HeaderContent>
+        @if (_loading)
+        {
+            <SkeletonLoader Type="SkeletonLoader.SkeletonType.Table" Rows="5" />
+        }
+        else if (!_configurations.Any())
+        {
+            <MudPaper Class="pa-8" Elevation="0">
+                <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                    <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Large" Color="Color.Default" Style="font-size: 4rem; opacity: 0.3;" />
+                    <MudText Typo="Typo.h6" Align="Align.Center">No map configurations found</MudText>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                        Create your first map configuration to start building interactive geospatial applications!
+                    </MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="CreateNew">
+                        Create New Map
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <BulkActionsToolbar TItem="MapConfigurationListItem"
+                                SelectedCount="@_selectedItems.Count"
+                                IsProcessing="@_bulkActionInProgress"
+                                ShowDelete="true"
+                                ShowEnable="false"
+                                ShowDisable="false"
+                                OnDelete="BulkDelete"
+                                OnClear="ClearSelection" />
+
+            <MudTable Items="@_filteredConfigurations"
+                     @ref="_table"
+                     MultiSelection="true"
+                     @bind-SelectedItems="_selectedItems"
+                     SelectOnRowClick="false"
+                     Hover="true"
+                     Breakpoint="Breakpoint.Sm"
+                     LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                <MudTh Style="width: 50px;">
+                    <MudCheckBox T="bool"
+                                 Value="@_selectAll"
+                                 ValueChanged="SelectAllChanged"
+                                 Color="Color.Primary" />
+                </MudTh>
                 <MudTh>Name</MudTh>
                 <MudTh>Description</MudTh>
                 <MudTh>Created By</MudTh>
@@ -36,6 +93,12 @@
                 <MudTh>Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
+                <MudTd DataLabel="Select">
+                    <MudCheckBox T="bool"
+                                 Value="@_selectedItems.Contains(context)"
+                                 ValueChanged="@((bool value) => ToggleSelection(context, value))"
+                                 Color="Color.Primary" />
+                </MudTd>
                 <MudTd DataLabel="Name">
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                         @if (!string.IsNullOrEmpty(context.ThumbnailUrl))
@@ -109,22 +172,102 @@
                     </MudMenu>
                 </MudTd>
             </RowTemplate>
-            <NoRecordsContent>
-                <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
-                    No map configurations found. Create your first map!
-                </MudText>
-            </NoRecordsContent>
-        </MudTable>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="pa-4">
+                        No map configurations found.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+        }
     </MudPaper>
 </MudContainer>
 
 @code {
     private List<MapConfigurationListItem> _configurations = new();
     private bool _loading = true;
+    private bool _searching = false;
+    private string _searchText = string.Empty;
+    private SearchDebouncer _searchDebouncer = new(300);
+    private DotNetObjectReference<MapList>? _dotNetRef;
+    private string? _pullToRefreshGestureId;
+    private string? _swipeNavGestureId;
+    private HashSet<MapConfigurationListItem> _selectedItems = new();
+    private bool _selectAll = false;
+    private bool _bulkActionInProgress = false;
+    private MudTable<MapConfigurationListItem>? _table;
+
+    private IEnumerable<MapConfigurationListItem> _filteredConfigurations =>
+        string.IsNullOrWhiteSpace(_searchText)
+            ? _configurations
+            : _configurations.Where(m =>
+                m.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                (m.Description?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (m.Tags?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                m.CreatedBy.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
         await LoadConfigurations();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Initialize touch gestures for mobile
+                _dotNetRef = DotNetObjectReference.Create(this);
+
+                // Pull-to-refresh
+                _pullToRefreshGestureId = await TouchGestures.InitializePullToRefreshAsync(
+                    "maps-container",
+                    _dotNetRef
+                );
+
+                // Swipe navigation (back to home)
+                _swipeNavGestureId = await TouchGestures.InitializeSwipeNavigationAsync(
+                    "maps-container",
+                    _dotNetRef
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error initializing touch gestures");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPullToRefresh()
+    {
+        await LoadConfigurations();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnSwipeBack()
+    {
+        Navigation.NavigateTo("/");
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task OnSwipeDelete(string mapId)
+    {
+        await DeleteMap(mapId);
+    }
+
+    private void OnSearchTextChanged(string value)
+    {
+        _searchText = value;
+        _searching = true;
+
+        _searchDebouncer.Debounce(() =>
+        {
+            _searching = false;
+            StateHasChanged();
+        });
     }
 
     private async Task LoadConfigurations()
@@ -211,6 +354,104 @@
         Navigation.NavigateTo(url, forceLoad: true);
     }
 
+    private void SelectAllChanged(bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedItems = _filteredConfigurations.ToHashSet();
+            _selectAll = true;
+        }
+        else
+        {
+            _selectedItems.Clear();
+            _selectAll = false;
+        }
+    }
+
+    private void ToggleSelection(MapConfigurationListItem map, bool isSelected)
+    {
+        if (isSelected)
+        {
+            _selectedItems.Add(map);
+        }
+        else
+        {
+            _selectedItems.Remove(map);
+            _selectAll = false;
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedItems.Clear();
+        _selectAll = false;
+    }
+
+    private async Task BulkDelete()
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Confirm Bulk Delete",
+            $"Delete {_selectedItems.Count} map configuration(s)? This cannot be undone.",
+            yesText: "Delete All",
+            cancelText: "Cancel");
+
+        if (confirm == true)
+        {
+            var parameters = new DialogParameters
+            {
+                { "Title", "Deleting Map Configurations" },
+                { "Message", "Deleting map configurations..." },
+                { "Total", _selectedItems.Count }
+            };
+
+            var options = new DialogOptions { CloseButton = false, DisableBackdropClick = true };
+            var progressDialog = await DialogService.ShowAsync<BulkOperationProgress>("Progress", parameters, options);
+            var progressInstance = progressDialog.Dialog as BulkOperationProgress;
+
+            _bulkActionInProgress = true;
+            int succeeded = 0;
+            int failed = 0;
+            int current = 0;
+            var itemsToDelete = _selectedItems.ToList();
+
+            foreach (var item in itemsToDelete)
+            {
+                current++;
+                try
+                {
+                    var response = await Http.DeleteAsync($"/admin/api/map-configurations/{item.Id}");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _configurations.Remove(item);
+                        succeeded++;
+                    }
+                    else
+                    {
+                        failed++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Logger.LogError(ex, "Error deleting map configuration {MapId}", item.Id);
+                }
+
+                progressInstance?.UpdateProgress(current, _selectedItems.Count,
+                    $"Processed {current} of {_selectedItems.Count}", succeeded, failed);
+            }
+
+            progressDialog.Close();
+
+            Snackbar.Add($"Deleted {succeeded} map configuration(s). {failed} failed.",
+                failed > 0 ? Severity.Warning : Severity.Success);
+
+            _selectedItems.Clear();
+            _selectAll = false;
+            _bulkActionInProgress = false;
+            StateHasChanged();
+        }
+    }
+
     // DTO for list view
     private class MapConfigurationListItem
     {
@@ -225,5 +466,21 @@
         public string? Tags { get; set; }
         public string? ThumbnailUrl { get; set; }
         public int ViewCount { get; set; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_pullToRefreshGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_pullToRefreshGestureId);
+        }
+
+        if (_swipeNavGestureId != null)
+        {
+            await TouchGestures.DisposeGestureAsync(_swipeNavGestureId);
+        }
+
+        _dotNetRef?.Dispose();
+        _searchDebouncer?.Dispose();
     }
 }
