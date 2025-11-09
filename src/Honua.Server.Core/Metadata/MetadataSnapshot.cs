@@ -17,6 +17,7 @@ public sealed class MetadataSnapshot
 {
     private readonly IReadOnlyDictionary<string, ServiceDefinition> _serviceIndex;
     private readonly IReadOnlyDictionary<string, StyleDefinition> _styleIndex;
+    private readonly IReadOnlyDictionary<string, LayerGroupDefinition> _layerGroupIndex;
 
     public MetadataSnapshot(
         CatalogDefinition catalog,
@@ -26,6 +27,7 @@ public sealed class MetadataSnapshot
         IReadOnlyList<LayerDefinition> layers,
         IReadOnlyList<RasterDatasetDefinition>? rasterDatasets = null,
         IReadOnlyList<StyleDefinition>? styles = null,
+        IReadOnlyList<LayerGroupDefinition>? layerGroups = null,
         ServerDefinition? server = null)
     {
         Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
@@ -34,6 +36,7 @@ public sealed class MetadataSnapshot
         Layers = layers ?? throw new ArgumentNullException(nameof(layers));
         RasterDatasets = rasterDatasets ?? Array.Empty<RasterDatasetDefinition>();
         Styles = styles ?? Array.Empty<StyleDefinition>();
+        LayerGroups = layerGroups ?? Array.Empty<LayerGroupDefinition>();
         Server = server ?? ServerDefinition.Default;
 
         if (services is null)
@@ -41,7 +44,7 @@ public sealed class MetadataSnapshot
             throw new ArgumentNullException(nameof(services));
         }
 
-        ValidateMetadata(Catalog, Server, Folders, DataSources, services, Layers, RasterDatasets, Styles);
+        ValidateMetadata(Catalog, Server, Folders, DataSources, services, Layers, RasterDatasets, Styles, LayerGroups);
 
         var serviceMap = new Dictionary<string, ServiceDefinition>(StringComparer.OrdinalIgnoreCase);
         foreach (var service in services)
@@ -78,6 +81,19 @@ public sealed class MetadataSnapshot
         }
 
         _styleIndex = styleMap;
+
+        var layerGroupMap = new Dictionary<string, LayerGroupDefinition>(StringComparer.OrdinalIgnoreCase);
+        foreach (var layerGroup in LayerGroups)
+        {
+            if (layerGroup is null)
+            {
+                continue;
+            }
+
+            layerGroupMap[layerGroup.Id] = layerGroup;
+        }
+
+        _layerGroupIndex = layerGroupMap;
     }
 
     public CatalogDefinition Catalog { get; }
@@ -87,6 +103,7 @@ public sealed class MetadataSnapshot
     public IReadOnlyList<LayerDefinition> Layers { get; }
     public IReadOnlyList<RasterDatasetDefinition> RasterDatasets { get; }
     public IReadOnlyList<StyleDefinition> Styles { get; }
+    public IReadOnlyList<LayerGroupDefinition> LayerGroups { get; }
     public ServerDefinition Server { get; }
 
     private static void ValidateMetadata(
@@ -97,7 +114,8 @@ public sealed class MetadataSnapshot
         IReadOnlyList<ServiceDefinition> services,
         IReadOnlyList<LayerDefinition> layers,
         IReadOnlyList<RasterDatasetDefinition> rasterDatasets,
-        IReadOnlyList<StyleDefinition> styles)
+        IReadOnlyList<StyleDefinition> styles,
+        IReadOnlyList<LayerGroupDefinition> layerGroups)
     {
         if (catalog.Id.IsNullOrWhiteSpace())
         {
@@ -240,6 +258,26 @@ public sealed class MetadataSnapshot
                 throw new InvalidDataException($"Layer '{layer.Id}' is missing a geometryField.");
             }
 
+            // Validate that layer has either Storage or SqlView, but not both
+            var hasStorage = layer.Storage?.Table.HasValue() == true;
+            var hasSqlView = layer.SqlView?.Sql.HasValue() == true;
+
+            if (!hasStorage && !hasSqlView)
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' must have either Storage.Table or SqlView defined.");
+            }
+
+            if (hasStorage && hasSqlView)
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' cannot have both Storage.Table and SqlView. Choose one or the other.");
+            }
+
+            // Validate SQL view if present
+            if (hasSqlView)
+            {
+                ValidateSqlView(layer);
+            }
+
             if (layer.DefaultStyleId.HasValue() && !styleIds.Contains(layer.DefaultStyleId))
             {
                 throw new InvalidDataException($"Layer '{layer.Id}' references unknown default style '{layer.DefaultStyleId}'.");
@@ -323,6 +361,190 @@ public sealed class MetadataSnapshot
                 if (!styleIds.Contains(styleId))
                 {
                     throw new InvalidDataException($"Raster dataset '{raster.Id}' references unknown style '{styleId}'.");
+                }
+            }
+        }
+
+        // Validate layer groups
+        var layerGroupIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var layerGroup in layerGroups)
+        {
+            if (layerGroup is null)
+            {
+                continue;
+            }
+
+            if (layerGroup.Id.IsNullOrWhiteSpace())
+            {
+                throw new InvalidDataException("Layer groups must include an id.");
+            }
+
+            if (!layerGroupIds.Add(layerGroup.Id))
+            {
+                throw new InvalidDataException($"Duplicate layer group id '{layerGroup.Id}'.");
+            }
+
+            if (layerGroup.Title.IsNullOrWhiteSpace())
+            {
+                throw new InvalidDataException($"Layer group '{layerGroup.Id}' must have a title.");
+            }
+
+            if (layerGroup.ServiceId.IsNullOrWhiteSpace() || !serviceIds.Contains(layerGroup.ServiceId))
+            {
+                throw new InvalidDataException($"Layer group '{layerGroup.Id}' references unknown service '{layerGroup.ServiceId}'.");
+            }
+
+            if (layerGroup.DefaultStyleId.HasValue() && !styleIds.Contains(layerGroup.DefaultStyleId))
+            {
+                throw new InvalidDataException($"Layer group '{layerGroup.Id}' references unknown default style '{layerGroup.DefaultStyleId}'.");
+            }
+
+            foreach (var styleId in layerGroup.StyleIds)
+            {
+                if (!styleIds.Contains(styleId))
+                {
+                    throw new InvalidDataException($"Layer group '{layerGroup.Id}' references unknown style '{styleId}'.");
+                }
+            }
+
+            if (layerGroup.MinScale is < 0)
+            {
+                throw new InvalidDataException($"Layer group '{layerGroup.Id}' minScale cannot be negative.");
+            }
+
+            if (layerGroup.MaxScale is < 0)
+            {
+                throw new InvalidDataException($"Layer group '{layerGroup.Id}' maxScale cannot be negative.");
+            }
+
+            if (layerGroup.MinScale is double minScale && minScale > 0 &&
+                layerGroup.MaxScale is double maxScale && maxScale > 0 && maxScale > minScale)
+            {
+                throw new InvalidDataException($"Layer group '{layerGroup.Id}' maxScale ({maxScale}) cannot be greater than minScale ({minScale}).");
+            }
+
+            // Validate members
+            if (layerGroup.Members.Count == 0)
+            {
+                throw new InvalidDataException($"Layer group '{layerGroup.Id}' must have at least one member.");
+            }
+
+            for (int i = 0; i < layerGroup.Members.Count; i++)
+            {
+                var member = layerGroup.Members[i];
+                if (member is null)
+                {
+                    throw new InvalidDataException($"Layer group '{layerGroup.Id}' contains a null member at index {i}.");
+                }
+
+                // Validate that member has exactly one reference (LayerId or GroupId)
+                var hasLayerId = member.LayerId.HasValue();
+                var hasGroupId = member.GroupId.HasValue();
+
+                if (!hasLayerId && !hasGroupId)
+                {
+                    throw new InvalidDataException($"Layer group '{layerGroup.Id}' member at index {i} must specify either layerId or groupId.");
+                }
+
+                if (hasLayerId && hasGroupId)
+                {
+                    throw new InvalidDataException($"Layer group '{layerGroup.Id}' member at index {i} cannot specify both layerId and groupId.");
+                }
+
+                // Validate type matches the ID provided
+                if (member.Type == LayerGroupMemberType.Layer && !hasLayerId)
+                {
+                    throw new InvalidDataException($"Layer group '{layerGroup.Id}' member at index {i} has type 'Layer' but no layerId specified.");
+                }
+
+                if (member.Type == LayerGroupMemberType.Group && !hasGroupId)
+                {
+                    throw new InvalidDataException($"Layer group '{layerGroup.Id}' member at index {i} has type 'Group' but no groupId specified.");
+                }
+
+                // Validate referenced layer exists (only for layers in same service)
+                if (hasLayerId)
+                {
+                    var referencedLayerExists = layers.Any(l =>
+                        string.Equals(l.Id, member.LayerId, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(l.ServiceId, layerGroup.ServiceId, StringComparison.OrdinalIgnoreCase));
+
+                    if (!referencedLayerExists)
+                    {
+                        throw new InvalidDataException($"Layer group '{layerGroup.Id}' member at index {i} references unknown layer '{member.LayerId}' in service '{layerGroup.ServiceId}'.");
+                    }
+                }
+
+                // For group references, we'll validate after all groups are collected
+                // to allow forward references
+
+                // Validate opacity range
+                if (member.Opacity is < 0 or > 1)
+                {
+                    throw new InvalidDataException($"Layer group '{layerGroup.Id}' member at index {i} opacity must be between 0 and 1.");
+                }
+
+                // Validate style reference if specified
+                if (member.StyleId.HasValue() && !styleIds.Contains(member.StyleId))
+                {
+                    throw new InvalidDataException($"Layer group '{layerGroup.Id}' member at index {i} references unknown style '{member.StyleId}'.");
+                }
+            }
+        }
+
+        // Second pass: validate group references and circular dependencies
+        foreach (var layerGroup in layerGroups)
+        {
+            if (layerGroup is null)
+            {
+                continue;
+            }
+
+            foreach (var member in layerGroup.Members)
+            {
+                if (member.Type == LayerGroupMemberType.Group)
+                {
+                    if (!layerGroupIds.Contains(member.GroupId!))
+                    {
+                        throw new InvalidDataException($"Layer group '{layerGroup.Id}' references unknown nested group '{member.GroupId}'.");
+                    }
+
+                    // Check that nested group is in the same service
+                    var nestedGroup = layerGroups.FirstOrDefault(g =>
+                        string.Equals(g.Id, member.GroupId, StringComparison.OrdinalIgnoreCase));
+
+                    if (nestedGroup != null && !string.Equals(nestedGroup.ServiceId, layerGroup.ServiceId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidDataException($"Layer group '{layerGroup.Id}' cannot reference group '{member.GroupId}' from a different service.");
+                    }
+                }
+            }
+
+            // Detect circular references
+            DetectCircularGroupReferences(layerGroup, layerGroups, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
+    private static void DetectCircularGroupReferences(
+        LayerGroupDefinition group,
+        IReadOnlyList<LayerGroupDefinition> allGroups,
+        HashSet<string> visitedGroups)
+    {
+        if (!visitedGroups.Add(group.Id))
+        {
+            throw new InvalidDataException($"Circular reference detected in layer group '{group.Id}'.");
+        }
+
+        foreach (var member in group.Members)
+        {
+            if (member.Type == LayerGroupMemberType.Group)
+            {
+                var nestedGroup = allGroups.FirstOrDefault(g =>
+                    string.Equals(g.Id, member.GroupId, StringComparison.OrdinalIgnoreCase));
+
+                if (nestedGroup != null)
+                {
+                    DetectCircularGroupReferences(nestedGroup, allGroups, new HashSet<string>(visitedGroups, StringComparer.OrdinalIgnoreCase));
                 }
             }
         }
@@ -412,6 +634,183 @@ public sealed class MetadataSnapshot
                 break;
             default:
                 throw new InvalidDataException($"Style '{style.Id}' specifies unsupported renderer '{style.Renderer}'.");
+        }
+    }
+
+    private static void ValidateSqlView(LayerDefinition layer)
+    {
+        var sqlView = layer.SqlView;
+        if (sqlView is null)
+        {
+            return;
+        }
+
+        if (sqlView.Sql.IsNullOrWhiteSpace())
+        {
+            throw new InvalidDataException($"Layer '{layer.Id}' SQL view must have a non-empty SQL query.");
+        }
+
+        // Basic SQL injection prevention - check for dangerous patterns
+        var sql = sqlView.Sql.Trim();
+        var sqlLower = sql.ToLowerInvariant();
+
+        // Must be a SELECT statement
+        if (!sqlLower.StartsWith("select"))
+        {
+            throw new InvalidDataException($"Layer '{layer.Id}' SQL view must start with SELECT. Only SELECT queries are allowed.");
+        }
+
+        // Check for dangerous SQL keywords that could modify data or structure
+        var dangerousKeywords = new[]
+        {
+            "drop ", "truncate ", "alter ", "create ", "insert ", "update ", "delete ",
+            "exec ", "execute ", "xp_", "sp_", "grant ", "revoke ", "commit ", "rollback ",
+            "begin ", "end;", "declare ", "set ", "use ", "shutdown ", "backup ", "restore "
+        };
+
+        foreach (var keyword in dangerousKeywords)
+        {
+            if (sqlLower.Contains(keyword))
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' SQL view contains potentially dangerous keyword '{keyword.Trim()}'. Only SELECT queries are allowed.");
+            }
+        }
+
+        // Check for SQL comment patterns that could be used for SQL injection
+        if (sqlLower.Contains("--") || sqlLower.Contains("/*"))
+        {
+            throw new InvalidDataException($"Layer '{layer.Id}' SQL view contains SQL comments which are not allowed for security reasons.");
+        }
+
+        // Validate parameters
+        var parameterNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var parameter in sqlView.Parameters)
+        {
+            if (parameter.Name.IsNullOrWhiteSpace())
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' SQL view contains a parameter without a name.");
+            }
+
+            if (!parameterNames.Add(parameter.Name))
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' SQL view has duplicate parameter '{parameter.Name}'.");
+            }
+
+            if (parameter.Type.IsNullOrWhiteSpace())
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' SQL view parameter '{parameter.Name}' must have a type.");
+            }
+
+            // Validate type is a known type
+            var validTypes = new[] { "string", "integer", "long", "double", "decimal", "boolean", "date", "datetime" };
+            if (!validTypes.Contains(parameter.Type.ToLowerInvariant()))
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' SQL view parameter '{parameter.Name}' has invalid type '{parameter.Type}'. Valid types: {string.Join(", ", validTypes)}");
+            }
+
+            // Check that parameter is actually used in the SQL
+            var paramRef = $":{parameter.Name}";
+            if (!sql.Contains(paramRef, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' SQL view defines parameter '{parameter.Name}' but it is not used in the SQL query.");
+            }
+
+            // Validate parameter validation rules
+            if (parameter.Validation is not null)
+            {
+                ValidateParameterValidation(layer.Id, parameter);
+            }
+        }
+
+        // Warn if timeout is very high
+        if (sqlView.TimeoutSeconds is > 300)
+        {
+            System.Diagnostics.Debug.WriteLine($"Warning: Layer '{layer.Id}' SQL view has a very high timeout of {sqlView.TimeoutSeconds} seconds.");
+        }
+
+        // Check that required fields are included in the query
+        // This is a simple check - we look for the field names in the SQL
+        var requiredFields = new[] { layer.IdField, layer.GeometryField };
+        foreach (var field in requiredFields)
+        {
+            if (!sql.Contains(field, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"Layer '{layer.Id}' SQL view must include the '{field}' field in the SELECT clause.");
+            }
+        }
+    }
+
+    private static void ValidateParameterValidation(string layerId, SqlViewParameterDefinition parameter)
+    {
+        var validation = parameter.Validation!;
+
+        // Numeric validations
+        if (validation.Min.HasValue || validation.Max.HasValue)
+        {
+            var numericTypes = new[] { "integer", "long", "double", "decimal" };
+            if (!numericTypes.Contains(parameter.Type.ToLowerInvariant()))
+            {
+                throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' has Min/Max validation but is not a numeric type.");
+            }
+
+            if (validation.Min.HasValue && validation.Max.HasValue && validation.Min.Value > validation.Max.Value)
+            {
+                throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' has Min greater than Max.");
+            }
+        }
+
+        // String validations
+        if (validation.MinLength.HasValue || validation.MaxLength.HasValue || validation.Pattern.HasValue())
+        {
+            if (!parameter.Type.Equals("string", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' has string validation but is not a string type.");
+            }
+
+            if (validation.MinLength.HasValue && validation.MinLength.Value < 0)
+            {
+                throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' MinLength cannot be negative.");
+            }
+
+            if (validation.MaxLength.HasValue && validation.MaxLength.Value < 1)
+            {
+                throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' MaxLength must be at least 1.");
+            }
+
+            if (validation.MinLength.HasValue && validation.MaxLength.HasValue && validation.MinLength.Value > validation.MaxLength.Value)
+            {
+                throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' MinLength is greater than MaxLength.");
+            }
+
+            // Validate regex pattern if present
+            if (validation.Pattern.HasValue())
+            {
+                try
+                {
+                    _ = new System.Text.RegularExpressions.Regex(validation.Pattern!);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' has invalid regex pattern: {ex.Message}");
+                }
+            }
+        }
+
+        // Allowed values validation
+        if (validation.AllowedValues is { Count: > 0 })
+        {
+            if (validation.AllowedValues.Count > 1000)
+            {
+                throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' has too many allowed values (max 1000).");
+            }
+
+            foreach (var value in validation.AllowedValues)
+            {
+                if (value.IsNullOrWhiteSpace())
+                {
+                    throw new InvalidDataException($"Layer '{layerId}' SQL view parameter '{parameter.Name}' has an empty allowed value.");
+                }
+            }
         }
     }
 
@@ -545,6 +944,34 @@ public sealed class MetadataSnapshot
         }
 
         throw new StyleNotFoundException(styleId);
+    }
+
+    public bool TryGetLayerGroup(string serviceId, string layerGroupId, out LayerGroupDefinition layerGroup)
+    {
+        layerGroup = null!;
+        if (!_layerGroupIndex.TryGetValue(layerGroupId, out var group))
+        {
+            return false;
+        }
+
+        // Verify the layer group belongs to the specified service
+        if (!string.Equals(group.ServiceId, serviceId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        layerGroup = group;
+        return true;
+    }
+
+    public LayerGroupDefinition GetLayerGroup(string serviceId, string layerGroupId)
+    {
+        if (TryGetLayerGroup(serviceId, layerGroupId, out var layerGroup))
+        {
+            return layerGroup;
+        }
+
+        throw new InvalidDataException($"Layer group '{layerGroupId}' not found in service '{serviceId}'.");
     }
 
     private static void ValidateProtocolRequirements(
@@ -787,6 +1214,7 @@ public sealed record LayerDefinition
     public LayerEditingDefinition Editing { get; init; } = LayerEditingDefinition.Disabled;
     public LayerAttachmentDefinition Attachments { get; init; } = LayerAttachmentDefinition.Disabled;
     public LayerStorageDefinition? Storage { get; init; }
+    public SqlViewDefinition? SqlView { get; init; }
     public IReadOnlyList<FieldDefinition> Fields { get; init; } = Array.Empty<FieldDefinition>();
     public string ItemType { get; init; } = "feature";
     public string? DefaultStyleId { get; init; }
