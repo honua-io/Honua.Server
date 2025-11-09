@@ -1,0 +1,210 @@
+@using Microsoft.JSInterop
+@using Honua.MapSDK.Services.Terrain
+@implements IAsyncDisposable
+
+@code {
+    /// <summary>
+    /// Map ID to attach terrain layer to.
+    /// </summary>
+    [Parameter]
+    public required string MapId { get; set; }
+
+    /// <summary>
+    /// Unique layer ID.
+    /// </summary>
+    [Parameter]
+    public required string LayerId { get; set; }
+
+    /// <summary>
+    /// Terrain data source (URL to terrain tiles or elevation service).
+    /// </summary>
+    [Parameter]
+    public string? TerrainSource { get; set; }
+
+    /// <summary>
+    /// Terrain encoding type (terrain-rgb, mapbox, quantized-mesh).
+    /// </summary>
+    [Parameter]
+    public string Encoding { get; set; } = "terrain-rgb";
+
+    /// <summary>
+    /// Vertical exaggeration factor for terrain height.
+    /// </summary>
+    [Parameter]
+    public double Exaggeration { get; set; } = 1.0;
+
+    /// <summary>
+    /// Enable wireframe rendering for debugging.
+    /// </summary>
+    [Parameter]
+    public bool Wireframe { get; set; } = false;
+
+    /// <summary>
+    /// Terrain material properties.
+    /// </summary>
+    [Parameter]
+    public TerrainMaterial? Material { get; set; }
+
+    /// <summary>
+    /// Enable dynamic Level of Detail.
+    /// </summary>
+    [Parameter]
+    public bool EnableLOD { get; set; } = true;
+
+    /// <summary>
+    /// Maximum terrain LOD level.
+    /// </summary>
+    [Parameter]
+    public int MaxLOD { get; set; } = 16;
+
+    /// <summary>
+    /// Color map for terrain elevation (optional).
+    /// </summary>
+    [Parameter]
+    public double[][]? ColorMap { get; set; }
+
+    /// <summary>
+    /// Event callback when terrain is loaded.
+    /// </summary>
+    [Parameter]
+    public EventCallback<TerrainLoadedEvent> OnTerrainLoaded { get; set; }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    private IJSObjectReference? _jsModule;
+    private bool _initialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeAsync();
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            // Load terrain JavaScript module
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/terrain/terrain-layer.js");
+
+            var options = new
+            {
+                layerId = LayerId,
+                terrainSource = TerrainSource,
+                encoding = Encoding,
+                exaggeration = Exaggeration,
+                wireframe = Wireframe,
+                material = Material ?? new TerrainMaterial(),
+                enableLOD = EnableLOD,
+                maxLOD = MaxLOD,
+                colorMap = ColorMap
+            };
+
+            await _jsModule.InvokeVoidAsync("addTerrainLayer", MapId, options);
+
+            _initialized = true;
+            Console.WriteLine($"Terrain layer '{LayerId}' initialized");
+
+            if (OnTerrainLoaded.HasDelegate)
+            {
+                await OnTerrainLoaded.InvokeAsync(new TerrainLoadedEvent
+                {
+                    LayerId = LayerId,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to initialize terrain layer: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Update terrain exaggeration in real-time.
+    /// </summary>
+    public async Task UpdateExaggerationAsync(double exaggeration)
+    {
+        if (!_initialized || _jsModule == null) return;
+
+        Exaggeration = exaggeration;
+        await _jsModule.InvokeVoidAsync("updateTerrainExaggeration", MapId, LayerId, exaggeration);
+    }
+
+    /// <summary>
+    /// Update terrain material properties.
+    /// </summary>
+    public async Task UpdateMaterialAsync(TerrainMaterial material)
+    {
+        if (!_initialized || _jsModule == null) return;
+
+        Material = material;
+        await _jsModule.InvokeVoidAsync("updateTerrainMaterial", MapId, LayerId, material);
+    }
+
+    /// <summary>
+    /// Toggle wireframe rendering.
+    /// </summary>
+    public async Task ToggleWireframeAsync()
+    {
+        if (!_initialized || _jsModule == null) return;
+
+        Wireframe = !Wireframe;
+        await _jsModule.InvokeVoidAsync("toggleWireframe", MapId, LayerId, Wireframe);
+    }
+
+    /// <summary>
+    /// Get elevation at a specific point.
+    /// </summary>
+    public async Task<float?> GetElevationAsync(double longitude, double latitude)
+    {
+        if (!_initialized || _jsModule == null) return null;
+
+        return await _jsModule.InvokeAsync<float?>("getElevationAtPoint", MapId, LayerId, longitude, latitude);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_initialized && _jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("removeTerrainLayer", MapId, LayerId);
+            }
+            catch
+            {
+                // Ignore disposal errors
+            }
+        }
+
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+}
+
+@code {
+    /// <summary>
+    /// Terrain material properties for rendering.
+    /// </summary>
+    public class TerrainMaterial
+    {
+        public double Ambient { get; set; } = 0.3;
+        public double Diffuse { get; set; } = 0.6;
+        public double Shininess { get; set; } = 32.0;
+        public double SpecularColor { get; set; } = 0.1;
+    }
+
+    /// <summary>
+    /// Event data for terrain loaded event.
+    /// </summary>
+    public class TerrainLoadedEvent
+    {
+        public required string LayerId { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+}

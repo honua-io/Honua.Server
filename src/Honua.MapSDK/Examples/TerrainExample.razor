@@ -1,0 +1,415 @@
+@page "/examples/terrain"
+@using Honua.MapSDK.Components
+@using Honua.MapSDK.Components.Terrain
+@using Honua.MapSDK.Services.Terrain
+@using MudBlazor
+
+<PageTitle>Terrain Visualization Example - Honua MapSDK</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
+    <MudText Typo="Typo.h3" Class="mb-4">Terrain Visualization</MudText>
+    <MudText Typo="Typo.body1" Class="mb-6">
+        Comprehensive example of 3D terrain visualization, elevation profiles, and terrain analysis.
+    </MudText>
+
+    <MudGrid>
+        <!-- Map Container -->
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4" Style="height: 600px;">
+                <HonuaMapLibre MapId="terrain-demo-map" @ref="_map"
+                               Center="@_mapCenter"
+                               Zoom="@_mapZoom"
+                               Pitch="60"
+                               Bearing="0"
+                               Style="mapbox://styles/mapbox/outdoors-v12"
+                               OnMapLoaded="@OnMapLoaded">
+
+                    <Map3DComponent MapId="terrain-demo-map" EnableLighting="true">
+                        @if (_showTerrain)
+                        {
+                            <TerrainLayerComponent @ref="_terrainLayer"
+                                                   MapId="terrain-demo-map"
+                                                   LayerId="terrain-layer"
+                                                   TerrainSource="@_terrainSource"
+                                                   Encoding="terrain-rgb"
+                                                   Exaggeration="@_exaggeration"
+                                                   Wireframe="@_wireframe"
+                                                   Material="@_terrainMaterial"
+                                                   EnableLOD="true"
+                                                   MaxLOD="15"
+                                                   OnTerrainLoaded="@OnTerrainLoaded" />
+                        }
+                    </Map3DComponent>
+
+                </HonuaMapLibre>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Controls Panel -->
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudStack Spacing="3">
+                    <!-- Terrain Controls -->
+                    <MudText Typo="Typo.h6">Terrain Controls</MudText>
+
+                    <MudSwitch @bind-Checked="_showTerrain" Color="Color.Primary"
+                               Label="Show Terrain" />
+
+                    @if (_showTerrain)
+                    {
+                        <MudDivider />
+
+                        <MudText Typo="Typo.subtitle2">Exaggeration</MudText>
+                        <MudSlider @bind-Value="_exaggeration"
+                                   Min="0.5" Max="5.0" Step="0.1"
+                                   ValueLabel="true"
+                                   Color="Color.Primary"
+                                   ValueChanged="@OnExaggerationChanged">
+                            <MudText>@_exaggeration.ToString("F1")</MudText>
+                        </MudSlider>
+
+                        <MudSwitch @bind-Checked="_wireframe"
+                                   Color="Color.Secondary"
+                                   Label="Wireframe Mode"
+                                   CheckedChanged="@OnWireframeChanged" />
+
+                        <MudDivider />
+
+                        <!-- Terrain Source Selection -->
+                        <MudText Typo="Typo.subtitle2">Data Source</MudText>
+                        <MudRadioGroup @bind-SelectedOption="_terrainSource">
+                            <MudRadio Option="@_mapboxTerrainUrl" Color="Color.Primary">
+                                Mapbox Terrain-RGB
+                            </MudRadio>
+                            <MudRadio Option="@_customTerrainUrl" Color="Color.Primary">
+                                Custom Server Tiles
+                            </MudRadio>
+                        </MudRadioGroup>
+
+                        <MudDivider />
+
+                        <!-- Material Properties -->
+                        <MudText Typo="Typo.subtitle2">Material</MudText>
+
+                        <MudText Typo="Typo.caption">Ambient</MudText>
+                        <MudSlider @bind-Value="_materialAmbient"
+                                   Min="0.0" Max="1.0" Step="0.05"
+                                   ValueLabel="true"
+                                   ValueChanged="@OnMaterialChanged" />
+
+                        <MudText Typo="Typo.caption">Diffuse</MudText>
+                        <MudSlider @bind-Value="_materialDiffuse"
+                                   Min="0.0" Max="1.0" Step="0.05"
+                                   ValueLabel="true"
+                                   ValueChanged="@OnMaterialChanged" />
+
+                        <MudText Typo="Typo.caption">Shininess</MudText>
+                        <MudSlider @bind-Value="_materialShininess"
+                                   Min="1" Max="128" Step="1"
+                                   ValueLabel="true"
+                                   ValueChanged="@OnMaterialChanged" />
+                    }
+
+                    <MudDivider />
+
+                    <!-- Camera Presets -->
+                    <MudText Typo="Typo.subtitle2">Camera Presets</MudText>
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   OnClick="@(() => FlyToLocation(-122.4194, 37.7749, 12))">
+                            San Francisco
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   OnClick="@(() => FlyToLocation(-119.5383, 37.8651, 11))">
+                            Yosemite
+                        </MudButton>
+                    </MudStack>
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   OnClick="@(() => FlyToLocation(-105.2705, 40.0150, 12))">
+                            Rocky Mountains
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Small"
+                                   OnClick="@(() => FlyToLocation(86.9250, 27.9881, 13))">
+                            Mt. Everest
+                        </MudButton>
+                    </MudStack>
+
+                    @if (_terrainLoaded)
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true">
+                            Terrain loaded successfully
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
+
+            <!-- Statistics Panel -->
+            @if (_currentElevation.HasValue)
+            {
+                <MudPaper Elevation="2" Class="pa-4 mt-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Current Location</MudText>
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.body2">
+                            <strong>Elevation:</strong> @_currentElevation.Value.ToString("F1") m
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Coordinates:</strong> @_currentCoords
+                        </MudText>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudItem>
+
+        <!-- Elevation Profile Tool -->
+        <MudItem xs="12">
+            <MudExpansionPanels>
+                <MudExpansionPanel Text="Elevation Profile Tool" IsInitiallyExpanded="false">
+                    <ElevationProfileTool MapId="terrain-demo-map"
+                                          SamplePoints="200"
+                                          OnProfileGenerated="@OnProfileGenerated" />
+                </MudExpansionPanel>
+
+                <!-- Analysis Tools -->
+                <MudExpansionPanel Text="Terrain Analysis" IsInitiallyExpanded="false">
+                    <MudPaper Class="pa-4">
+                        <MudStack Spacing="3">
+                            <MudText Typo="Typo.subtitle1">Analysis Tools</MudText>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Terrain"
+                                       OnClick="@GenerateHillshade">
+                                Generate Hillshade
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Secondary"
+                                       StartIcon="@Icons.Material.Filled.Gradient"
+                                       OnClick="@GenerateSlopeMap">
+                                Generate Slope Map
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Tertiary"
+                                       StartIcon="@Icons.Material.Filled.ShowChart"
+                                       OnClick="@GenerateContours">
+                                Generate Contours
+                            </MudButton>
+
+                            @if (_analysisResult != null)
+                            {
+                                <MudAlert Severity="Severity.Info">
+                                    @_analysisResult
+                                </MudAlert>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudExpansionPanel>
+
+                <!-- Usage Examples -->
+                <MudExpansionPanel Text="Code Examples" IsInitiallyExpanded="false">
+                    <MudPaper Class="pa-4">
+                        <MudTabs Elevation="0">
+                            <MudTabPanel Text="Basic Setup">
+                                <pre><code class="language-razor">
+&lt;TerrainLayerComponent
+    MapId="my-map"
+    LayerId="terrain"
+    TerrainSource="/api/terrain/tiles/terrain-rgb/{z}/{x}/{y}.png"
+    Encoding="terrain-rgb"
+    Exaggeration="1.5"
+    EnableLOD="true" /&gt;
+                                </code></pre>
+                            </MudTabPanel>
+
+                            <MudTabPanel Text="Elevation Query">
+                                <pre><code class="language-csharp">
+var elevation = await _elevationService.QueryElevationAsync(
+    longitude: -122.4194,
+    latitude: 37.7749);
+
+Console.WriteLine($"Elevation: {elevation} meters");
+                                </code></pre>
+                            </MudTabPanel>
+
+                            <MudTabPanel Text="Profile Generation">
+                                <pre><code class="language-csharp">
+var coordinates = new[]
+{
+    new[] { -122.5, 37.8 },
+    new[] { -122.6, 37.9 }
+};
+
+var profile = await _elevationService.QueryPathElevationAsync(
+    coordinates,
+    samplePoints: 100);
+                                </code></pre>
+                            </MudTabPanel>
+                        </MudTabs>
+                    </MudPaper>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private HonuaMapLibre? _map;
+    private TerrainLayerComponent? _terrainLayer;
+
+    // Map settings
+    private double[] _mapCenter = new[] { -122.4194, 37.7749 };
+    private int _mapZoom = 12;
+
+    // Terrain settings
+    private bool _showTerrain = true;
+    private double _exaggeration = 1.5;
+    private bool _wireframe = false;
+    private bool _terrainLoaded = false;
+
+    // Data sources
+    private string _mapboxTerrainUrl = "https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.png?access_token={YOUR_TOKEN}";
+    private string _customTerrainUrl = "/api/terrain/tiles/terrain-rgb/{z}/{x}/{y}.png";
+    private string _terrainSource = "/api/terrain/tiles/terrain-rgb/{z}/{x}/{y}.png";
+
+    // Material properties
+    private double _materialAmbient = 0.3;
+    private double _materialDiffuse = 0.6;
+    private double _materialShininess = 32;
+    private TerrainLayerComponent.TerrainMaterial _terrainMaterial = new()
+    {
+        Ambient = 0.3,
+        Diffuse = 0.6,
+        Shininess = 32.0,
+        SpecularColor = 0.1
+    };
+
+    // State
+    private float? _currentElevation;
+    private string? _currentCoords;
+    private string? _analysisResult;
+
+    [Inject]
+    private IElevationService ElevationService { get; set; } = default!;
+
+    private async Task OnMapLoaded()
+    {
+        Console.WriteLine("Map loaded");
+    }
+
+    private async Task OnTerrainLoaded(TerrainLayerComponent.TerrainLoadedEvent e)
+    {
+        _terrainLoaded = true;
+        StateHasChanged();
+    }
+
+    private async Task OnExaggerationChanged(double value)
+    {
+        if (_terrainLayer != null)
+        {
+            await _terrainLayer.UpdateExaggerationAsync(value);
+        }
+    }
+
+    private async Task OnWireframeChanged(bool value)
+    {
+        if (_terrainLayer != null)
+        {
+            await _terrainLayer.ToggleWireframeAsync();
+        }
+    }
+
+    private async Task OnMaterialChanged()
+    {
+        _terrainMaterial = new TerrainLayerComponent.TerrainMaterial
+        {
+            Ambient = _materialAmbient,
+            Diffuse = _materialDiffuse,
+            Shininess = _materialShininess,
+            SpecularColor = 0.1
+        };
+
+        if (_terrainLayer != null)
+        {
+            await _terrainLayer.UpdateMaterialAsync(_terrainMaterial);
+        }
+    }
+
+    private async Task FlyToLocation(double lon, double lat, int zoom)
+    {
+        _mapCenter = new[] { lon, lat };
+        _mapZoom = zoom;
+
+        // Query elevation at new location
+        _currentElevation = await ElevationService.QueryElevationAsync(lon, lat);
+        _currentCoords = $"{lat:F4}, {lon:F4}";
+
+        StateHasChanged();
+    }
+
+    private async Task OnProfileGenerated(ElevationProfile profile)
+    {
+        Console.WriteLine($"Profile generated:");
+        Console.WriteLine($"  Distance: {profile.TotalDistance / 1000:F2} km");
+        Console.WriteLine($"  Elevation gain: {CalculateElevationGain(profile):F0} m");
+        Console.WriteLine($"  Max elevation: {profile.MaxElevation:F0} m");
+        Console.WriteLine($"  Min elevation: {profile.MinElevation:F0} m");
+    }
+
+    private float CalculateElevationGain(ElevationProfile profile)
+    {
+        float gain = 0;
+        for (int i = 1; i < profile.Points.Length; i++)
+        {
+            var diff = profile.Points[i].Elevation - profile.Points[i - 1].Elevation;
+            if (diff > 0) gain += diff;
+        }
+        return gain;
+    }
+
+    private async Task GenerateHillshade()
+    {
+        _analysisResult = "Generating hillshade layer...";
+        StateHasChanged();
+
+        await Task.Delay(1000); // Simulate processing
+        _analysisResult = "Hillshade layer generated successfully";
+    }
+
+    private async Task GenerateSlopeMap()
+    {
+        _analysisResult = "Generating slope analysis...";
+        StateHasChanged();
+
+        await Task.Delay(1000);
+        _analysisResult = "Slope map generated successfully";
+    }
+
+    private async Task GenerateContours()
+    {
+        _analysisResult = "Generating contour lines...";
+        StateHasChanged();
+
+        await Task.Delay(1000);
+        _analysisResult = "Contour lines generated successfully";
+    }
+}
+
+<style>
+    pre {
+        background-color: #f5f5f5;
+        padding: 1rem;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+
+    code {
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+    }
+</style>
