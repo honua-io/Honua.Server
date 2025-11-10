@@ -1,0 +1,223 @@
+# OpenAPI 3D Extension Example for OGC API - Features
+# This shows how the include3D parameter is documented in the OpenAPI spec
+
+paths:
+  /collections/{collectionId}/items:
+    get:
+      summary: Get collection items (features)
+      description: |
+        Retrieves features from a collection.
+        Supports 3D coordinates when `include3D=true` is specified.
+      parameters:
+        - name: collectionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Collection identifier
+
+        - name: include3D
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            Include elevation (Z) coordinates in geometry output.
+            When enabled, returns coordinates as [lon, lat, z] instead of [lon, lat].
+            Requires layer to have elevation configuration.
+          examples:
+            enabled:
+              value: true
+              summary: Enable 3D coordinates
+            disabled:
+              value: false
+              summary: Standard 2D coordinates (default)
+
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 10000
+          description: Maximum number of features to return
+
+        - name: bbox
+          in: query
+          schema:
+            type: array
+            items:
+              type: number
+            minItems: 4
+            maxItems: 6
+          description: Bounding box (minX, minY, maxX, maxY, optional minZ, maxZ)
+          style: form
+          explode: false
+
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/geo+json:
+              schema:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: [FeatureCollection]
+                  features:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Feature3D'
+              examples:
+                2D-features:
+                  summary: 2D Feature Collection (default)
+                  value:
+                    type: FeatureCollection
+                    features:
+                      - type: Feature
+                        id: 1
+                        geometry:
+                          type: Point
+                          coordinates: [-122.4194, 37.7749]
+                        properties:
+                          name: Ferry Building
+
+                3D-features:
+                  summary: 3D Feature Collection (include3D=true)
+                  value:
+                    type: FeatureCollection
+                    features:
+                      - type: Feature
+                        id: 1
+                        geometry:
+                          type: Point
+                          coordinates: [-122.4194, 37.7749, 5.0]
+                        properties:
+                          name: Ferry Building
+                          height: 75.0
+
+                3D-buildings:
+                  summary: 3D Buildings with Extrusion
+                  value:
+                    type: FeatureCollection
+                    features:
+                      - type: Feature
+                        id: 101
+                        geometry:
+                          type: Polygon
+                          coordinates: [[
+                            [-122.4020, 37.7918, 260.0],
+                            [-122.4010, 37.7918, 260.0],
+                            [-122.4010, 37.7928, 260.0],
+                            [-122.4020, 37.7928, 260.0],
+                            [-122.4020, 37.7918, 260.0]
+                          ]]
+                        properties:
+                          name: Transamerica Pyramid
+                          height: 85.0
+                          building_type: commercial
+
+components:
+  schemas:
+    Feature3D:
+      type: object
+      required:
+        - type
+        - geometry
+        - properties
+      properties:
+        type:
+          type: string
+          enum: [Feature]
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+        geometry:
+          $ref: '#/components/schemas/Geometry3D'
+        properties:
+          type: object
+          description: |
+            Feature properties. May include 'height' property when
+            include3D=true and layer is configured with building heights.
+          additionalProperties: true
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+
+    Geometry3D:
+      type: object
+      required:
+        - type
+        - coordinates
+      properties:
+        type:
+          type: string
+          enum: [Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon]
+        coordinates:
+          description: |
+            Coordinates array. For 3D output:
+            - Point: [lon, lat, z]
+            - LineString: [[lon, lat, z], ...]
+            - Polygon: [[[lon, lat, z], ...], ...]
+
+            For 2D output (default):
+            - Point: [lon, lat]
+            - LineString: [[lon, lat], ...]
+            - Polygon: [[[lon, lat], ...], ...]
+          oneOf:
+            - $ref: '#/components/schemas/Point3D'
+            - $ref: '#/components/schemas/LineString3D'
+            - $ref: '#/components/schemas/Polygon3D'
+
+    Point3D:
+      type: array
+      description: Point coordinates [lon, lat] or [lon, lat, z]
+      minItems: 2
+      maxItems: 3
+      items:
+        type: number
+      example: [-122.4194, 37.7749, 260.0]
+
+    LineString3D:
+      type: array
+      description: LineString coordinates array
+      items:
+        $ref: '#/components/schemas/Point3D'
+      example: [
+        [-122.4194, 37.7749, 10.0],
+        [-122.4184, 37.7759, 15.0],
+        [-122.4174, 37.7769, 20.0]
+      ]
+
+    Polygon3D:
+      type: array
+      description: Polygon rings array
+      items:
+        $ref: '#/components/schemas/LineString3D'
+      example: [[
+        [-122.4020, 37.7918, 260.0],
+        [-122.4010, 37.7918, 260.0],
+        [-122.4010, 37.7928, 260.0],
+        [-122.4020, 37.7928, 260.0],
+        [-122.4020, 37.7918, 260.0]
+      ]]
+
+    Link:
+      type: object
+      required:
+        - href
+        - rel
+      properties:
+        href:
+          type: string
+          format: uri
+        rel:
+          type: string
+        type:
+          type: string
+        title:
+          type: string

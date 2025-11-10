@@ -108,7 +108,8 @@ internal static class OgcSharedHandlers
             "filter-lang",
             "filter-crs",
             "ids",
-            "sortby"
+            "sortby",
+            "include3D"
         };
 
         var queryCollection = overrideQuery ?? request.Query;
@@ -308,6 +309,11 @@ internal static class OgcSharedHandlers
         // Extract SQL view parameters if layer has SQL view
         var sqlViewParameters = ExtractSqlViewParameters(layer, queryCollection);
 
+        // Parse include3D parameter for 3D visualization support
+        var (include3D, _) = QueryParameterHelper.ParseBoolean(
+            queryCollection["include3D"].ToString(),
+            defaultValue: false);
+
         var query = new FeatureQuery(
             Limit: effectiveLimit,
             Offset: effectiveOffset,
@@ -318,7 +324,8 @@ internal static class OgcSharedHandlers
             SortOrders: sortOrders,
             Filter: combinedFilter,
             Crs: servedCrs,
-            SqlViewParameters: sqlViewParameters);
+            SqlViewParameters: sqlViewParameters,
+            Include3D: include3D);
 
         var (includeCount, countError) = QueryParameterHelper.ParseBoolean(
             queryCollection["count"].ToString(),

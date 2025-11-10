@@ -37,12 +37,37 @@ public static class SensorThingsServiceExtensions
             services.AddScoped<ISensorThingsRepository, PostgresSensorThingsRepository>();
         }
 
+        // Register WebSocket streaming if enabled
+        if (config.WebSocketStreamingEnabled)
+        {
+            AddSensorThingsStreaming(services, configuration);
+        }
+
         // Register services (when implemented)
         // services.AddSingleton<SensorThingsCacheService>();
         // services.AddSingleton<SensorThingsMetrics>();
         // services.AddHealthChecks().AddCheck<SensorThingsHealthCheck>("sensorthings");
 
         return services;
+    }
+
+    /// <summary>
+    /// Adds SensorThings real-time streaming services (SignalR).
+    /// </summary>
+    private static void AddSensorThingsStreaming(
+        IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Note: The actual SignalR hub and broadcaster types are in Honua.Server.Host
+        // We register the streaming options here so they can be injected
+
+        // Bind streaming options from configuration
+        var streamingOptions = configuration
+            .GetSection("SensorThings:Streaming")
+            .Get<SensorObservationStreamingOptions>()
+            ?? new SensorObservationStreamingOptions { Enabled = true };
+
+        services.AddSingleton(streamingOptions);
     }
 
     /// <summary>

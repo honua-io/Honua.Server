@@ -218,6 +218,13 @@ internal static class EndpointExtensions
         // Map GeoETL Progress SignalR hub for real-time workflow execution tracking
         app.MapHub<Honua.Server.Host.GeoEvent.GeoEtlProgressHub>("/hubs/geoetl-progress");
 
+        // Map SensorThings SignalR hub for real-time sensor observation streaming
+        var sensorThingsConfig = app.Services.GetService<Honua.Server.Enterprise.Sensors.Models.SensorThingsServiceDefinition>();
+        if (sensorThingsConfig?.WebSocketStreamingEnabled == true)
+        {
+            app.MapHub<Honua.Server.Host.SensorThings.SensorObservationHub>("/hubs/sensor-observations");
+        }
+
         return app;
     }
 }

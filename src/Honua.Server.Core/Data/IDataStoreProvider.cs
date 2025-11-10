@@ -302,7 +302,8 @@ public sealed record FeatureQuery(
     string? Crs = null,
     TimeSpan? CommandTimeout = null,  // Optional per-query timeout override (e.g., for slow analytical queries)
     string? HavingClause = null,  // SQL HAVING clause for filtering aggregated statistics results
-    IReadOnlyDictionary<string, string>? SqlViewParameters = null);  // Parameters for SQL views (e.g., ?region=west&min_population=100000)
+    IReadOnlyDictionary<string, string>? SqlViewParameters = null,  // Parameters for SQL views (e.g., ?region=west&min_population=100000)
+    bool Include3D = false);  // Include elevation (Z) coordinates in geometry output for 3D visualization
 
 public sealed record BoundingBox(
     double MinX,

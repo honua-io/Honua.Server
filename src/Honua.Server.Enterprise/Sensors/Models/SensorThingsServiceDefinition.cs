@@ -31,6 +31,13 @@ public sealed record SensorThingsServiceDefinition
     public bool MqttEnabled { get; init; } = false;
 
     /// <summary>
+    /// Whether WebSocket (SignalR) streaming is enabled for real-time observation delivery.
+    /// When enabled, observations are pushed to subscribed clients via WebSockets.
+    /// Recommended: true for smart city dashboards and real-time monitoring.
+    /// </summary>
+    public bool WebSocketStreamingEnabled { get; init; } = false;
+
+    /// <summary>
     /// Whether batch operations ($batch endpoint) are enabled.
     /// Recommended: true for mobile applications.
     /// </summary>

@@ -74,6 +74,7 @@ Add SensorThings configuration section:
     "Enabled": true,
     "Version": "v1.1",
     "BasePath": "/sta/v1.1",
+    "WebSocketStreamingEnabled": true,
     "BatchOperationsEnabled": true,
     "DataArrayEnabled": true,
     "OfflineSyncEnabled": true,
@@ -85,6 +86,13 @@ Add SensorThings configuration section:
       "EnablePartitioning": true,
       "PartitionStrategy": "Monthly",
       "RetentionPeriodMonths": 24
+    },
+    "Streaming": {
+      "Enabled": true,
+      "RateLimitingEnabled": true,
+      "RateLimitPerSecond": 100,
+      "BatchingEnabled": true,
+      "BatchingThreshold": 100
     }
   }
 }
@@ -465,6 +473,56 @@ For issues or questions:
 
 ---
 
-**Status**: Ready for integration (Phase 2A and 2B complete)
-**Last Updated**: 2025-11-05
+## Real-Time WebSocket Streaming (New)
+
+Honua Server now supports real-time WebSocket streaming of sensor observations using SignalR. This enables smart city dashboards and IoT applications to receive live sensor data as it arrives without polling.
+
+### Features
+
+- **Real-time push**: Observations are pushed to clients as they're created
+- **Flexible subscriptions**: Subscribe to datastreams, things, sensors, or all observations
+- **Automatic batching**: High-volume sensors are automatically batched
+- **Rate limiting**: Configurable limits to prevent overwhelming clients
+- **Multi-tenancy**: Clients only receive authorized data
+
+### Configuration
+
+WebSocket streaming is enabled via the `WebSocketStreamingEnabled` flag in the SensorThings configuration (see Section 3 above).
+
+### Client Usage
+
+See the comprehensive [SensorThings Streaming Guide](./SENSORTHINGS_STREAMING.md) for:
+- JavaScript/TypeScript client examples
+- React hooks
+- Python client examples
+- API reference
+- Performance considerations
+
+### Example
+
+```javascript
+const connection = new signalR.HubConnectionBuilder()
+    .withUrl('/hubs/sensor-observations')
+    .withAutomaticReconnect()
+    .build();
+
+connection.on('ObservationCreated', (obs) => {
+    console.log(`New reading: ${obs.result}${obs.unitOfMeasurement.symbol}`);
+});
+
+await connection.start();
+await connection.invoke('SubscribeToDatastream', 'temperature-sensor-1');
+```
+
+For a complete working example, see `examples/sensorthings-streaming-client.html`.
+
+---
+
+**Status**: Ready for integration (Phase 2A, 2B, and WebSocket Streaming complete)
+**Last Updated**: 2025-11-10
 **Implementation**: Honua.Server.Enterprise.Sensors namespace
+
+## Additional Resources
+
+- **[SensorThings Streaming Guide](./SENSORTHINGS_STREAMING.md)** - Real-time WebSocket streaming documentation
+- `examples/sensorthings-streaming-client.html` - Interactive demo client

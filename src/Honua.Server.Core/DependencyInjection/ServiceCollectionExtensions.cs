@@ -24,6 +24,7 @@ using Honua.Server.Core.Data.Sqlite;
 using Honua.Server.Core.Data.SqlServer;
 using Honua.Server.Core.Data.Validation;
 using Honua.Server.Core.Editing;
+using Honua.Server.Core.Elevation;
 using Honua.Server.Core.Export;
 using Honua.Server.Core.Geoservices.GeometryService;
 using Honua.Server.Core.Import;
@@ -231,6 +232,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPmTilesExporter, PmTilesExporter>();
         services.AddSingleton<ICsvExporter, CsvExporter>();
         services.AddSingleton<IShapefileExporter, ShapefileExporter>();
+
+        // Register elevation services for 3D visualization support
+        services.AddElevationServices();
+
         services.AddSingleton<ICatalogProjectionService, CatalogProjectionService>();
         services.AddSingleton<RasterStacCatalogBuilder>();
         services.AddSingleton<VectorStacCatalogBuilder>();
