@@ -34,22 +34,34 @@ public sealed class ODataContainerFixture : IAsyncLifetime
         // Find solution directory by searching upward for Dockerfile
         var solutionDir = FindSolutionDirectory();
 
-        // Build Honua server image from test Dockerfile (no BuildKit features)
-        var image = new ImageFromDockerfileBuilder()
-            .WithDockerfileDirectory(solutionDir)
-            .WithDockerfile("Dockerfile.odata-test")
-            .WithName($"honua-server:odata-test-{Guid.NewGuid():N}")
-            .WithCleanUp(true)
-            .Build();
+        // Use a fixed image name for reuse across all tests
+        const string imageName = "honua-server:odata-test-shared";
 
-        await image.CreateAsync();
+        // Check if we should force rebuild (set HONUA_TEST_REBUILD_IMAGE=1 to force)
+        var forceRebuild = Environment.GetEnvironmentVariable("HONUA_TEST_REBUILD_IMAGE") == "1";
 
-        // Create test metadata JSON (will be implemented in next step)
+        // Check if image already exists (unless force rebuild is requested)
+        var shouldBuild = forceRebuild || !await ImageExistsAsync(imageName);
+
+        if (shouldBuild)
+        {
+            // Build Honua server image from test Dockerfile with layer caching
+            var image = new ImageFromDockerfileBuilder()
+                .WithDockerfileDirectory(solutionDir)
+                .WithDockerfile("Dockerfile.odata-test")
+                .WithName(imageName)
+                .WithCleanUp(false) // Keep image for reuse across tests
+                .Build();
+
+            await image.CreateAsync();
+        }
+
+        // Create test metadata JSON
         var metadataPath = CreateTestMetadata();
 
-        // Start container with test configuration
+        // Start container with test configuration using the shared image
         _container = new ContainerBuilder()
-            .WithImage(image)
+            .WithImage(imageName)
             .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
             .WithEnvironment("HONUA__METADATA__PROVIDER", "json")
             .WithEnvironment("HONUA__METADATA__PATH", "/app/testdata/metadata.json")
@@ -191,6 +203,35 @@ public sealed class ODataContainerFixture : IAsyncLifetime
         File.WriteAllText(metadataPath, metadata);
 
         return metadataPath;
+    }
+
+    private static async Task<bool> ImageExistsAsync(string imageName)
+    {
+        try
+        {
+            var processStartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "docker",
+                Arguments = $"inspect --type=image {imageName}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(processStartInfo);
+            if (process == null)
+            {
+                return false;
+            }
+
+            await process.WaitForExitAsync();
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string FindSolutionDirectory()

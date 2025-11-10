@@ -1,19 +1,31 @@
-# Simple Dockerfile for OData container tests
-# No BuildKit features for compatibility with Testcontainers
+# Optimized Dockerfile for OData container tests
+# Uses layer caching to dramatically speed up builds
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /source
 
-# Copy NuGet config and build props
+# Copy NuGet config and build props FIRST (rarely changes)
 COPY NuGet.Config Directory.Build.props ./
 
-# Copy project files
+# Copy ONLY project files for restore (this layer will be cached unless projects change)
+COPY src/*/*.csproj ./
+# Reconstruct directory structure for csproj files
+RUN for file in $(ls *.csproj); do \
+    mkdir -p src/${file%.*}/ && \
+    mv $file src/${file%.*}/; \
+    done
+
+# Restore packages (CACHED LAYER - only re-runs if .csproj or NuGet.Config changes)
+RUN dotnet restore src/Honua.Server.Host/Honua.Server.Host.csproj
+
+# Now copy all source code (this invalidates cache, but restore is already done)
 COPY src/ ./src/
 
-# Build and publish - use Debug to avoid Release optimization issues
+# Build and publish
 RUN dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
     --configuration Debug \
     --output /app/publish \
+    --no-restore \
     /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
