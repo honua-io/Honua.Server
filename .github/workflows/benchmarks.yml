@@ -1,21 +1,22 @@
 name: Performance Benchmarks
 
+# DISABLED: Uncomment 'on' section below to re-enable
 on:
-  workflow_dispatch: # Allow manual triggering
-  schedule:
-    - cron: '0 2 * * 0' # Run weekly on Sunday at 2 AM UTC
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'benchmarks/**'
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'benchmarks/**'
+  # workflow_dispatch: # Allow manual triggering
+  # schedule:
+  #   - cron: '0 2 * * 0' # Run weekly on Sunday at 2 AM UTC
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'src/**'
+  #     - 'benchmarks/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'src/**'
+  #     - 'benchmarks/**'
 
 permissions:
   contents: write
@@ -23,6 +24,7 @@ permissions:
 
 jobs:
   benchmark:
+    if: false # DISABLED
     name: Run Performance Benchmarks
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -103,7 +105,7 @@ jobs:
     name: Quick Benchmark Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: github.event_name == 'pull_request'
+    if: false # DISABLED
 
     steps:
       - name: Checkout repository
