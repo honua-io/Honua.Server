@@ -1,406 +1,451 @@
 # Contributing to Honua.MapSDK
 
-Thank you for your interest in contributing to Honua.MapSDK! This guide will help you get started.
+Thank you for your interest in contributing to Honua.MapSDK! This document provides guidelines and instructions for contributing to the project.
+
+---
 
 ## Table of Contents
 
 1. [Code of Conduct](#code-of-conduct)
 2. [Getting Started](#getting-started)
 3. [Development Setup](#development-setup)
-4. [Code Style Guidelines](#code-style-guidelines)
-5. [Component Development](#component-development)
-6. [Testing Requirements](#testing-requirements)
-7. [Documentation Standards](#documentation-standards)
-8. [Pull Request Process](#pull-request-process)
-9. [Release Process](#release-process)
+4. [Making Changes](#making-changes)
+5. [Pull Request Process](#pull-request-process)
+6. [Coding Standards](#coding-standards)
+7. [Testing](#testing)
+8. [Documentation](#documentation)
+
+---
 
 ## Code of Conduct
 
-We are committed to providing a welcoming and inclusive environment. Please be respectful and professional in all interactions.
+### Our Pledge
+
+We are committed to providing a welcoming and inclusive experience for everyone. We expect all contributors to:
+
+- Use welcoming and inclusive language
+- Be respectful of differing viewpoints and experiences
+- Gracefully accept constructive criticism
+- Focus on what is best for the community
+- Show empathy towards other community members
+
+### Unacceptable Behavior
+
+- Harassment, trolling, or discriminatory comments
+- Personal or political attacks
+- Publishing others' private information without permission
+- Other conduct which could reasonably be considered inappropriate
+
+---
 
 ## Getting Started
 
 ### Ways to Contribute
 
-- **Bug Reports** - Found a bug? [Open an issue](https://github.com/honua/Honua.Server/issues)
-- **Feature Requests** - Have an idea? [Start a discussion](https://github.com/honua/Honua.Server/discussions)
-- **Code Contributions** - Fix bugs or add features via pull requests
-- **Documentation** - Improve docs, add examples, or write tutorials
-- **Testing** - Write tests, improve coverage, or report issues
-- **Community Support** - Help others in discussions
+- **Report Bugs**: Submit detailed bug reports
+- **Suggest Features**: Propose new features or improvements
+- **Fix Issues**: Pick up issues labeled `good-first-issue` or `help-wanted`
+- **Improve Documentation**: Fix typos, add examples, clarify explanations
+- **Write Tests**: Increase code coverage
+- **Review Pull Requests**: Help review and test PRs from others
 
 ### Before You Start
 
-1. **Check existing issues** - Someone may already be working on it
-2. **Start a discussion** - For large changes, discuss first
-3. **Read the docs** - Understand the architecture and patterns
-4. **Review the codebase** - Get familiar with the code style
+1. **Search existing issues** to avoid duplicates
+2. **Discuss major changes** by opening an issue first
+3. **Check the roadmap** to align with project direction
+4. **Read the documentation** to understand the architecture
+
+---
 
 ## Development Setup
 
 ### Prerequisites
 
-- .NET 9 SDK or later
-- Visual Studio 2022, VS Code, or Rider
+- .NET 8.0 SDK or higher
+- Node.js 18+ (for JavaScript development)
 - Git
-- Node.js (for JavaScript development)
+- Visual Studio 2022, VS Code, or Rider
 
-### Clone and Build
+### Clone the Repository
 
 ```bash
-# Clone the repository
-git clone https://github.com/honua/Honua.Server.git
-cd Honua.Server
+git clone https://github.com/honua-io/Honua.Server.git
+cd Honua.Server/src/Honua.MapSDK
+```
 
-# Restore dependencies
+### Install Dependencies
+
+```bash
+# Restore NuGet packages
 dotnet restore
 
-# Build MapSDK
-dotnet build src/Honua.MapSDK/
-
-# Run tests
-dotnet test tests/Honua.MapSDK.Tests/
-
-# Run demo app
-dotnet run --project examples/Honua.MapSDK.DemoApp/
+# Install JavaScript dependencies (if contributing to JS code)
+npm install
 ```
 
-### Project Structure
+### Build the Project
 
-```
-Honua.Server/
-├── src/
-│   └── Honua.MapSDK/
-│       ├── Components/          # UI components
-│       ├── Core/                # Core infrastructure
-│       ├── Services/            # Services
-│       ├── Utilities/           # Utility classes
-│       ├── Models/              # Data models
-│       └── wwwroot/             # Static assets
-├── tests/
-│   └── Honua.MapSDK.Tests/     # Unit tests
-├── examples/
-│   └── Honua.MapSDK.DemoApp/   # Demo application
-└── docs/
-    └── mapsdk/                  # Documentation
+```bash
+dotnet build
 ```
 
-### Development Workflow
+### Run Tests
 
-1. **Create a branch** from main
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+```bash
+dotnet test
+```
 
-2. **Make your changes**
-   - Write code
-   - Add tests
-   - Update documentation
+### Run the Demo Application
 
-3. **Test locally**
-   ```bash
-   dotnet test
-   dotnet run --project examples/Honua.MapSDK.DemoApp/
-   ```
+```bash
+cd ../Honua.Admin.Blazor
+dotnet run
+```
 
-4. **Commit your changes**
-   ```bash
-   git add .
-   git commit -m "Add feature: description"
-   ```
+Navigate to `https://localhost:5001` to see the demo.
 
-5. **Push and create PR**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
+---
 
-## Code Style Guidelines
+## Making Changes
 
-### C# Style
+### 1. Create a Branch
 
-We follow standard .NET coding conventions with these specifics:
+Create a feature branch from `main`:
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b feature/your-feature-name
+```
+
+**Branch Naming:**
+- `feature/` - New features
+- `fix/` - Bug fixes
+- `docs/` - Documentation updates
+- `refactor/` - Code refactoring
+- `test/` - Test additions or modifications
+
+### 2. Make Your Changes
+
+- Write clean, readable code
+- Follow the coding standards (see below)
+- Add tests for new functionality
+- Update documentation as needed
+- Commit regularly with clear messages
+
+### 3. Commit Your Changes
+
+Use clear, descriptive commit messages:
+
+```bash
+git add .
+git commit -m "Add histogram chart type to HonuaChart component"
+```
+
+**Commit Message Format:**
+```
+<type>: <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation only
+- `style:` - Code style (formatting, missing semicolons, etc.)
+- `refactor:` - Code refactoring
+- `test:` - Adding or modifying tests
+- `chore:` - Maintenance tasks
+
+**Example:**
+```
+feat: Add histogram chart type to HonuaChart
+
+- Implement histogram binning algorithm
+- Add Bins parameter to control bin count
+- Update chart.js integration for histogram rendering
+- Add unit tests for histogram calculations
+
+Closes #123
+```
+
+### 4. Push Your Branch
+
+```bash
+git push origin feature/your-feature-name
+```
+
+---
+
+## Pull Request Process
+
+### Before Submitting
+
+- [ ] Code builds without errors
+- [ ] All tests pass
+- [ ] New tests added for new functionality
+- [ ] Documentation updated
+- [ ] No merge conflicts with `main`
+- [ ] Code follows project style guidelines
+
+### Submit Pull Request
+
+1. Go to GitHub repository
+2. Click "New Pull Request"
+3. Select your branch
+4. Fill out the PR template:
+
+```markdown
+## Description
+Brief description of changes
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Testing
+How has this been tested?
+
+## Checklist
+- [ ] Code follows style guidelines
+- [ ] Self-reviewed the code
+- [ ] Commented complex code
+- [ ] Updated documentation
+- [ ] Added tests
+- [ ] All tests pass
+```
+
+5. Link related issues
+6. Request review from maintainers
+
+### Review Process
+
+- Maintainers will review your PR
+- Address any requested changes
+- Once approved, your PR will be merged
+- Your contribution will be credited in release notes
+
+---
+
+## Coding Standards
+
+### C# Style Guide
+
+Follow Microsoft's C# coding conventions with these additions:
 
 #### Naming Conventions
 
 ```csharp
-// PascalCase for types, methods, properties, events
-public class MapComponent { }
-public void LoadData() { }
-public string MapStyle { get; set; }
-public event EventHandler MapReady;
+// Classes, Methods, Properties: PascalCase
+public class HonuaMap { }
+public void FlyToAsync() { }
+public string MapId { get; set; }
 
-// camelCase for local variables and parameters
-public void ProcessData(string dataUrl)
-{
-    var resultData = LoadData(dataUrl);
-}
+// Private fields: _camelCase with underscore
+private string _mapStyle;
+private int _zoomLevel;
 
-// _camelCase for private fields
-private string _mapId;
-private IJSObjectReference? _mapInstance;
+// Parameters, local variables: camelCase
+public void UpdateExtent(double[] bounds, int zoom) { }
 
-// UPPER_CASE for constants
-private const int DEFAULT_ZOOM = 10;
+// Constants: PascalCase
+public const int DefaultZoom = 10;
 ```
 
-#### File Organization
+#### Code Organization
 
 ```csharp
-// 1. Using statements (sorted)
+// 1. Using statements
 using System;
-using System.Collections.Generic;
-using Microsoft.JSInterop;
+using Honua.MapSDK.Core;
 
 // 2. Namespace
 namespace Honua.MapSDK.Components;
 
-// 3. Type definition
+// 3. Class with XML documentation
 /// <summary>
-/// Component description
+/// Interactive map component powered by MapLibre GL JS
 /// </summary>
-public class MyComponent : DisposableComponentBase
+public class HonuaMap : ComponentBase, IAsyncDisposable
 {
-    // 4. Constants
-    private const int MAX_ZOOM = 22;
+    // 4. Parameters (public properties)
+    [Parameter]
+    public string Id { get; set; } = $"map-{Guid.NewGuid():N}";
 
-    // 5. Fields
-    private string _id = "";
-    private IJSObjectReference? _module;
+    // 5. Injected services
+    [Inject]
+    private ComponentBus Bus { get; set; } = default!;
 
-    // 6. Properties (public first, then private)
-    [Parameter] public string Id { get; set; } = "";
-    [Inject] private ComponentBus Bus { get; set; } = default!;
+    // 6. Private fields
+    private IJSObjectReference? _mapInstance;
 
-    // 7. Events
-    [Parameter] public EventCallback<ReadyMessage> OnReady { get; set; }
-
-    // 8. Lifecycle methods
-    protected override void OnInitialized() { }
+    // 7. Lifecycle methods
     protected override async Task OnAfterRenderAsync(bool firstRender) { }
 
-    // 9. Public methods
-    public async Task LoadDataAsync() { }
+    // 8. Public methods
+    public async Task FlyToAsync(double[] center, double? zoom) { }
 
-    // 10. Private methods
-    private void ProcessData() { }
+    // 9. Private methods
+    private void SetupSubscriptions() { }
 
-    // 11. Disposal
-    protected override void OnDispose() { }
+    // 10. Dispose
+    public async ValueTask DisposeAsync() { }
 }
 ```
 
-#### Documentation
+#### XML Documentation
 
-All public APIs must have XML documentation:
+All public members must have XML documentation:
 
 ```csharp
 /// <summary>
-/// Loads geographic data from the specified URL.
+/// Animates the map to a specific location
 /// </summary>
-/// <param name="url">The URL to load data from.</param>
-/// <param name="useCache">Whether to use cached data if available.</param>
-/// <returns>A task that represents the asynchronous operation.</returns>
-/// <exception cref="ArgumentNullException">Thrown when url is null.</exception>
-/// <exception cref="HttpRequestException">Thrown when the request fails.</exception>
-public async Task<GeoJsonData> LoadDataAsync(string url, bool useCache = true)
+/// <param name="center">Center coordinates [longitude, latitude]</param>
+/// <param name="zoom">Target zoom level (optional)</param>
+/// <returns>Task representing the async operation</returns>
+public async Task FlyToAsync(double[] center, double? zoom = null)
 {
     // Implementation
 }
 ```
 
-### Razor Style
+### Razor Component Style
 
 ```razor
-@* 1. Page directive *@
-@page "/map"
-
-@* 2. Using statements *@
-@using Honua.MapSDK.Components
+@* 1. Using directives *@
+@using Honua.MapSDK.Core
 @using Honua.MapSDK.Core.Messages
+
+@* 2. Implements/Inherits *@
+@implements IAsyncDisposable
 
 @* 3. Dependency injection *@
 @inject ComponentBus Bus
 @inject IJSRuntime JS
 
-@* 4. Markup *@
-<div class="map-container">
-    <HonuaMap
-        Id="@_mapId"
-        Center="@_center"
-        Zoom="@_zoom"
-        OnMapReady="HandleReady" />
+@* 4. HTML markup *@
+<div class="honua-map @CssClass" @ref="_mapContainer">
+    @ChildContent
 </div>
 
 @* 5. Code block *@
 @code {
-    private string _mapId = "map1";
-    private double[] _center = new[] { -122, 37 };
-    private double _zoom = 10;
+    // Parameters
+    [Parameter]
+    public string Id { get; set; } = $"map-{Guid.NewGuid():N}";
 
-    private void HandleReady(MapReadyMessage message)
-    {
-        // Handle event
-    }
+    // Fields and methods
 }
 ```
 
 ### JavaScript Style
 
+For JavaScript code in `wwwroot/js`:
+
 ```javascript
 // Use ES6+ features
 export function createMap(container, options, dotNetRef) {
+    // Use const/let, not var
     const map = new maplibregl.Map({
-        container,
-        style: options.style,
-        center: options.center,
-        zoom: options.zoom
+        container: container,
+        ...options
     });
 
-    // Set up event handlers
-    map.on('moveend', () => {
-        dotNetRef.invokeMethodAsync('OnExtentChangedInternal',
-            map.getBounds().toArray(),
-            map.getZoom()
-        );
+    // Arrow functions
+    map.on('load', () => {
+        dotNetRef.invokeMethodAsync('OnMapReady');
     });
 
-    // Return API object
-    return {
-        flyTo: (center, zoom) => {
-            map.flyTo({ center, zoom });
-        },
-        dispose: () => {
-            map.remove();
-        }
-    };
+    return map;
 }
+
+// Document all exported functions
+/**
+ * Creates a MapLibre GL JS map instance
+ * @param {HTMLElement} container - Map container element
+ * @param {Object} options - Map initialization options
+ * @param {Object} dotNetRef - .NET object reference for callbacks
+ * @returns {maplibregl.Map} Map instance
+ */
 ```
 
-## Component Development
+---
 
-### Creating a New Component
+## Testing
 
-1. **Create component files**
-   ```
-   Components/
-   └── MyComponent/
-       ├── HonuaMyComponent.razor
-       ├── HonuaMyComponent.razor.cs (if needed)
-       ├── README.md
-       └── Examples.razor (optional)
-   ```
+### Unit Tests
 
-2. **Implement the component**
-
-```razor
-@* HonuaMyComponent.razor *@
-@inherits DisposableComponentBase
-
-<div class="honua-mycomponent">
-    <!-- Component markup -->
-</div>
-
-@code {
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    [Parameter] public string? SyncWith { get; set; }
-
-    [Inject] private ComponentBus Bus { get; set; } = default!;
-
-    protected override void OnInitialized()
-    {
-        SubscribeToMessage<MapExtentChangedMessage>(HandleExtentChange);
-    }
-
-    private void HandleExtentChange(MessageArgs<MapExtentChangedMessage> args)
-    {
-        if (args.Message.MapId == SyncWith)
-        {
-            // React to change
-        }
-    }
-
-    protected override void OnDispose()
-    {
-        // Custom cleanup if needed
-    }
-}
-```
-
-3. **Add documentation**
-
-Create `Components/MyComponent/README.md`:
-
-```markdown
-# HonuaMyComponent
-
-Brief description of what the component does.
-
-## Usage
-
-\`\`\`razor
-<HonuaMyComponent
-    Id="myComponent"
-    SyncWith="map1"
-    ... />
-\`\`\`
-
-## Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| Id | string | (guid) | Component identifier |
-| SyncWith | string? | null | Map ID to sync with |
-
-## Events
-
-| Event | Type | Description |
-|-------|------|-------------|
-| OnReady | EventCallback<ReadyMessage> | Fired when initialized |
-
-## Examples
-
-See [Examples.razor](Examples.razor) for complete examples.
-```
-
-4. **Add tests**
+Write unit tests for all new functionality:
 
 ```csharp
-public class MyComponentTests : TestContext
+using Xunit;
+using Honua.MapSDK.Components;
+
+public class HonuaMapTests
 {
     [Fact]
-    public void Component_Renders_Successfully()
+    public void MapId_DefaultValue_IsNotEmpty()
     {
-        var cut = RenderComponent<HonuaMyComponent>(parameters => parameters
-            .Add(p => p.Id, "test")
-        );
+        // Arrange
+        var map = new HonuaMap();
 
-        Assert.NotNull(cut.Find(".honua-mycomponent"));
+        // Act
+        var id = map.Id;
+
+        // Assert
+        Assert.NotEmpty(id);
+        Assert.StartsWith("map-", id);
     }
 
-    [Fact]
-    public void Component_Subscribes_To_Messages()
+    [Theory]
+    [InlineData(-180, -90)]
+    [InlineData(0, 0)]
+    [InlineData(180, 90)]
+    public void Center_ValidCoordinates_Accepted(double lon, double lat)
     {
-        var mockBus = new Mock<ComponentBus>();
-        Services.AddSingleton(mockBus.Object);
+        // Arrange & Act
+        var map = new HonuaMap
+        {
+            Center = new[] { lon, lat }
+        };
 
-        var cut = RenderComponent<HonuaMyComponent>();
-
-        mockBus.Verify(b => b.Subscribe<MapExtentChangedMessage>(
-            It.IsAny<Func<MessageArgs<MapExtentChangedMessage>, Task>>()),
-            Times.Once
-        );
+        // Assert
+        Assert.Equal(lon, map.Center[0]);
+        Assert.Equal(lat, map.Center[1]);
     }
 }
 ```
 
-## Testing Requirements
+### Integration Tests
 
-### Test Coverage
+Test component interactions:
 
-- Aim for 80%+ code coverage
-- All public APIs must have tests
-- Test both success and error cases
-- Test ComponentBus integration
+```csharp
+[Fact]
+public async Task Map_And_DataGrid_Sync_WhenExtentChanges()
+{
+    // Arrange
+    using var ctx = new TestContext();
+    ctx.Services.AddHonuaMapSDK();
+
+    var cut = ctx.RenderComponent<MapWithGrid>();
+    var map = cut.FindComponent<HonuaMap>();
+
+    // Act
+    await map.Instance.FlyToAsync(new[] { -122.4, 37.7 }, 12);
+
+    // Assert
+    var grid = cut.FindComponent<HonuaDataGrid>();
+    Assert.NotEmpty(grid.Instance.VisibleItems);
+}
+```
 
 ### Running Tests
 
@@ -409,150 +454,108 @@ public class MyComponentTests : TestContext
 dotnet test
 
 # Run with coverage
-dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+dotnet test /p:CollectCoverage=true /p:CoverageReportFormat=lcov
 
 # Run specific test
-dotnet test --filter FullyQualifiedName~MapComponentTests.Map_Publishes_ReadyMessage
+dotnet test --filter "FullyQualifiedName~HonuaMapTests"
 ```
-
-### Test Organization
-
-```csharp
-public class MyComponentTests
-{
-    // Use descriptive test names
-    [Fact]
-    public void Component_Publishes_Message_When_Initialized()
-    {
-        // Arrange
-        var mockBus = new Mock<ComponentBus>();
-
-        // Act
-        var component = new MyComponent { Bus = mockBus.Object };
-        component.OnInitialized();
-
-        // Assert
-        mockBus.Verify(b => b.PublishAsync(
-            It.IsAny<ReadyMessage>(),
-            It.IsAny<string>()),
-            Times.Once
-        );
-    }
-}
-```
-
-## Documentation Standards
-
-### Component Documentation
-
-Every component needs:
-
-1. **README.md** in component directory
-2. **XML documentation** on public APIs
-3. **Usage examples**
-4. **Parameter documentation**
-
-### Code Comments
-
-```csharp
-// Use comments to explain WHY, not WHAT
-// Good:
-// Debounce updates to prevent excessive re-renders
-await Task.Delay(300);
-
-// Bad:
-// Wait 300ms
-await Task.Delay(300);
-
-// Use XML docs for public APIs
-/// <summary>
-/// Loads data from the specified URL with automatic caching.
-/// </summary>
-public async Task LoadDataAsync(string url) { }
-```
-
-## Pull Request Process
-
-### Before Submitting
-
-- [ ] Code follows style guidelines
-- [ ] All tests pass
-- [ ] New tests added for new features
-- [ ] Documentation updated
-- [ ] No compiler warnings
-- [ ] Changes work in demo app
-
-### PR Title Format
-
-```
-[Type] Brief description
-
-Types:
-- feat: New feature
-- fix: Bug fix
-- docs: Documentation only
-- style: Code style changes
-- refactor: Code refactoring
-- test: Adding tests
-- chore: Maintenance tasks
-```
-
-Examples:
-- `feat: Add HonuaHeatmap component`
-- `fix: Resolve memory leak in ComponentBus`
-- `docs: Update getting started guide`
-
-### PR Description Template
-
-```markdown
-## Description
-Brief description of changes.
-
-## Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
-
-## Related Issues
-Closes #123
-
-## Testing
-Describe how you tested the changes.
-
-## Screenshots
-If applicable, add screenshots.
-
-## Checklist
-- [ ] Tests pass
-- [ ] Documentation updated
-- [ ] Code follows style guidelines
-- [ ] No new warnings
-```
-
-### Review Process
-
-1. **Automated checks** run (tests, linting)
-2. **Code review** by maintainer
-3. **Address feedback** if requested
-4. **Approval and merge**
-
-## Release Process
-
-Releases are managed by maintainers. If you're interested in the process:
-
-1. Update version in `.csproj`
-2. Update CHANGELOG.md
-3. Create release notes
-4. Tag release
-5. Build and publish NuGet package
-6. Update documentation
-
-## Questions?
-
-- **GitHub Discussions**: https://github.com/honua/Honua.Server/discussions
-- **Email**: support@honua.io
 
 ---
 
-**Thank you for contributing to Honua.MapSDK!**
+## Documentation
+
+### Update Documentation
+
+When adding new features:
+
+1. **Update API docs** in `/docs/mapsdk/api/`
+2. **Add examples** to component documentation
+3. **Update README** if adding major features
+4. **Update CHANGELOG** for release notes
+
+### Documentation Style
+
+- Use active voice
+- Be concise and clear
+- Include code examples
+- Add screenshots where helpful
+- Cross-reference related docs
+
+**Example:**
+
+```markdown
+## FlyToAsync Method
+
+Smoothly animates the map to a specified location.
+
+### Parameters
+
+- `center` (double[]): Target center coordinates [longitude, latitude]
+- `zoom` (double?): Optional target zoom level
+
+### Returns
+
+Task representing the asynchronous operation.
+
+### Example
+
+\`\`\`csharp
+await map.FlyToAsync(new[] { -122.4194, 37.7749 }, zoom: 13);
+\`\`\`
+
+### See Also
+
+- [FitBoundsAsync](fitboundsasync.md)
+- [Map Navigation Guide](../guides/map-navigation.md)
+```
+
+---
+
+## Release Process
+
+(For maintainers)
+
+### Version Numbering
+
+We follow [Semantic Versioning](https://semver.org/):
+
+- **MAJOR**: Breaking changes
+- **MINOR**: New features (backward compatible)
+- **PATCH**: Bug fixes (backward compatible)
+
+### Creating a Release
+
+1. Update version in `.csproj`
+2. Update `CHANGELOG.md`
+3. Create release branch: `release/v1.2.0`
+4. Run all tests
+5. Create GitHub release
+6. Publish to NuGet
+7. Merge to main
+8. Tag release
+
+---
+
+## Getting Help
+
+- **Questions**: [GitHub Discussions](https://github.com/honua-io/Honua.Server/discussions)
+- **Bugs**: [GitHub Issues](https://github.com/honua-io/Honua.Server/issues)
+- **Chat**: Join our Discord server (link in README)
+
+---
+
+## Recognition
+
+All contributors will be recognized in:
+
+- Release notes
+- Contributors list
+- Project README
+
+Thank you for contributing to Honua.MapSDK!
+
+---
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.
