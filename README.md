@@ -637,13 +637,27 @@ See [Development Documentation](docs/development/README.md) for architecture, te
 
 ### Enterprise Features
 
-Features marked as **Enterprise** in the documentation require a commercial license. This includes:
-- Advanced geoprocessing operations
-- Cloud data warehouse integrations (Snowflake, BigQuery, Redshift)
-- NoSQL database support (MongoDB, Cosmos DB)
-- SAML/SSO authentication
-- Multi-tenancy support
-- Priority support
+The following features require an **Enterprise** commercial license:
+
+**Experimental Features (Preview):**
+- **GeoEvent Server** - Real-time geofencing, alerts, and event processing
+- **GeoETL** - Data transformation pipelines and container distribution
+- **Geoprocessing** - 40+ distributed spatial analysis operations
+- **AI DevSecOps** - AI-powered deployment assistance and automation
+- **3D Visualization** - 3D rendering and visualization capabilities
+
+**Data & Integration:**
+- Cloud data warehouse connectors (Snowflake, BigQuery, Redshift, Databricks)
+- NoSQL database support (MongoDB, Azure Cosmos DB)
+- Advanced BI connectors (Power BI, Tableau)
+
+**Security & Authentication:**
+- SAML 2.0 / Enterprise SSO integration
+- Advanced RBAC and fine-grained permissions
+
+**Support:**
+- Priority support with 4-hour SLA
+- Dedicated technical account management
 
 Contact **support@honua.io** for Enterprise licensing information.
 
