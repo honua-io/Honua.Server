@@ -58,17 +58,56 @@ internal static class WfsHelpers
             return Result<FeatureContext>.Failure(Error.Invalid("Parameter 'typeNames' is required."));
         }
 
+        // Strip XML namespace prefix if present (e.g., "tns:roads-primary" -> "roads-primary")
+        // WFS Transaction XML uses namespace prefixes like xmlns:tns="..." and typeName="tns:roads-primary"
+        // We need to strip the namespace prefix to get the actual layer/service identifier
+        var parts = typeName.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        // If we have a namespace prefix, check if it's an XML namespace or a serviceId
+        // XML namespace prefixes are typically short (e.g., "tns", "gml", "wfs")
+        // Service IDs are actual service identifiers from metadata
+        if (parts.Length > 2)
+        {
+            // Multiple colons - invalid format
+            return Result<FeatureContext>.Failure(Error.Invalid($"Invalid typeName format: '{typeName}'"));
+        }
+
         string? serviceId = null;
         string layerId;
 
-        var parts = typeName.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length == 2)
         {
-            serviceId = parts[0];
-            layerId = parts[1];
+            // Could be either "namespace:layerId" or "serviceId:layerId"
+            // First, try to find a service with the first part as serviceId
+            var projection = catalog.GetSnapshot();
+            var potentialServiceId = parts[0];
+            var potentialLayerId = parts[1];
+
+            if (projection.ServiceIndex.ContainsKey(potentialServiceId))
+            {
+                // First part is a valid serviceId
+                serviceId = potentialServiceId;
+                layerId = potentialLayerId;
+            }
+            else
+            {
+                // First part is likely an XML namespace prefix, treat the second part as the full identifier
+                // The second part might still be "serviceId:layerId" format, but that would have been caught above
+                // So we treat it as just a layerId and search for it
+                layerId = potentialLayerId;
+                foreach (var service in projection.ServiceIndex.Values)
+                {
+                    if (service.Layers.Any(l => l.Layer.Id.EqualsIgnoreCase(layerId)))
+                    {
+                        serviceId = service.Service.Id;
+                        break;
+                    }
+                }
+            }
         }
         else
         {
+            // Single part - just a layerId
             layerId = parts[0];
             var projection = catalog.GetSnapshot();
             foreach (var service in projection.ServiceIndex.Values)
@@ -842,34 +881,6 @@ internal static class WfsHelpers
     public static IResult CreateException(string code, string locator, string message)
     {
         return OgcExceptionHelper.CreateWfsException(code, locator, message);
-    }
-
-    /// <summary>
-    /// Extracts SQL view parameters from the query string based on layer configuration.
-    /// </summary>
-    public static IReadOnlyDictionary<string, string> ExtractSqlViewParameters(
-        LayerDefinition layer,
-        IQueryCollection query)
-    {
-        var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        // Only extract if layer has SQL view defined
-        if (layer.SqlView?.Parameters == null || layer.SqlView.Parameters.Count == 0)
-        {
-            return parameters;
-        }
-
-        // Extract each defined parameter from query string
-        foreach (var param in layer.SqlView.Parameters)
-        {
-            var value = QueryParsingHelpers.GetQueryValue(query, param.Name);
-            if (value.HasValue())
-            {
-                parameters[param.Name] = value;
-            }
-        }
-
-        return parameters;
     }
 
     #endregion

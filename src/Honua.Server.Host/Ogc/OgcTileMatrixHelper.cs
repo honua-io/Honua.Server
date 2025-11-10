@@ -91,13 +91,18 @@ public static class OgcTileMatrixHelper
             return GetWebMercatorBoundingBox(zoom, row, column);
         }
 
-        var tilesPerAxis = 1 << zoom;
-        var tileWidth = (MaxLongitude - MinLongitude) / tilesPerAxis;
-        var tileHeight = (MaxLatitude - MinLatitude) / tilesPerAxis;
+        // WorldCRS84Quad uses a 2:1 aspect ratio tile matrix to match Earth's geographic extent
+        // Columns: 2^(zoom+1), Rows: 2^zoom
+        // Zoom 0: 2 cols × 1 row, Zoom 1: 4 cols × 2 rows, Zoom 2: 8 cols × 4 rows
+        var columnsPerAxis = 1 << (zoom + 1);
+        var rowsPerAxis = 1 << zoom;
+        var tileWidth = (MaxLongitude - MinLongitude) / columnsPerAxis;
+        var tileHeight = (MaxLatitude - MinLatitude) / rowsPerAxis;
 
         var minX = MinLongitude + column * tileWidth;
         var maxX = minX + tileWidth;
 
+        // WorldCRS84Quad rows are numbered from north to south (top to bottom)
         var maxY = MaxLatitude - row * tileHeight;
         var minY = maxY - tileHeight;
 
@@ -137,19 +142,33 @@ public static class OgcTileMatrixHelper
 
     /// <summary>
     /// Normalizes a longitude value to the [-180, 180] range.
+    /// Values at exactly 180 remain at 180 (not wrapped to -180).
+    /// Values beyond 180 wrap around (e.g., 540 -> -180).
     /// </summary>
     public static double NormalizeLongitude(double longitude)
     {
-        // Wrap to [-180, 180]
-        while (longitude > MaxLongitude)
+        // Handle exact 180 and -180 edge cases
+        if (longitude == MaxLongitude || longitude == MinLongitude)
         {
-            longitude -= 360.0;
+            return longitude;
         }
-        while (longitude < MinLongitude)
+
+        // Normalize using modulo arithmetic to [-180, 180)
+        var normalized = ((longitude + 180.0) % 360.0) - 180.0;
+
+        // Handle negative modulo result
+        if (normalized < -180.0)
         {
-            longitude += 360.0;
+            normalized += 360.0;
         }
-        return longitude;
+
+        // If we wrapped to exactly 180 (from values like 540), use -180 instead
+        if (normalized >= 180.0)
+        {
+            normalized = -180.0;
+        }
+
+        return normalized;
     }
 
     private static double[] GetWebMercatorBoundingBox(int zoom, int row, int column)
@@ -181,10 +200,23 @@ public static class OgcTileMatrixHelper
         var matrices = new List<object>(Math.Max(1, maxZoom - minZoom + 1));
         for (var zoom = minZoom; zoom <= maxZoom; zoom++)
         {
-            var matrixSize = 1 << zoom;
-            var resolution = IsWorldWebMercatorQuad(tileMatrixSetId)
-                ? (WebMercatorMax - WebMercatorMin) / (TileSize * matrixSize)
-                : (MaxLongitude - MinLongitude) / (TileSize * matrixSize);
+            int matrixWidth, matrixHeight;
+            double resolution;
+
+            if (IsWorldWebMercatorQuad(tileMatrixSetId))
+            {
+                // Web Mercator uses equal dimensions (square tiles)
+                matrixWidth = matrixHeight = 1 << zoom;
+                resolution = (WebMercatorMax - WebMercatorMin) / (TileSize * matrixWidth);
+            }
+            else
+            {
+                // WorldCRS84Quad uses 2:1 aspect ratio
+                matrixWidth = 1 << (zoom + 1);
+                matrixHeight = 1 << zoom;
+                resolution = (MaxLongitude - MinLongitude) / (TileSize * matrixWidth);
+            }
+
             var scaleDenominator = resolution / 0.00028d;
 
             matrices.Add(new
@@ -196,8 +228,8 @@ public static class OgcTileMatrixHelper
                     : new[] { MinLongitude, MaxLatitude },
                 tileWidth = TileSize,
                 tileHeight = TileSize,
-                matrixWidth = matrixSize,
-                matrixHeight = matrixSize
+                matrixWidth,
+                matrixHeight
             });
         }
 
@@ -211,9 +243,9 @@ public static class OgcTileMatrixHelper
             return (0, -1, 0, -1);
         }
 
-        var maxIndex = (1 << zoom) - 1;
         if (IsWorldWebMercatorQuad(tileMatrixSetId))
         {
+            var maxIndex = (1 << zoom) - 1;
             var span = WebMercatorMax - WebMercatorMin;
             var minColumn = ClampIndex((int)Math.Floor((minX - WebMercatorMin) / span * (1 << zoom)), maxIndex);
             var maxColumn = ClampIndex((int)Math.Floor((maxX - WebMercatorMin) / span * (1 << zoom)), maxIndex);
@@ -232,12 +264,20 @@ public static class OgcTileMatrixHelper
             return (minRow, maxRow, minColumn, maxColumn);
         }
 
+        // WorldCRS84Quad: uses 2:1 aspect ratio tile matrix
+        var columnsPerAxisCrs84 = 1 << (zoom + 1);
+        var rowsPerAxisCrs84 = 1 << zoom;
+        var maxColIndex = columnsPerAxisCrs84 - 1;
+        var maxRowIndex = rowsPerAxisCrs84 - 1;
+
         var width = MaxLongitude - MinLongitude;
         var height = MaxLatitude - MinLatitude;
-        var minCol = ClampIndex((int)Math.Floor((minX - MinLongitude) / width * (1 << zoom)), maxIndex);
-        var maxCol = ClampIndex((int)Math.Floor((maxX - MinLongitude) / width * (1 << zoom)), maxIndex);
-        var minRowCrs84 = ClampIndex((int)Math.Floor((MaxLatitude - maxY) / height * (1 << zoom)), maxIndex);
-        var maxRowCrs84 = ClampIndex((int)Math.Floor((MaxLatitude - minY) / height * (1 << zoom)), maxIndex);
+        var minCol = ClampIndex((int)Math.Floor((minX - MinLongitude) / width * columnsPerAxisCrs84), maxColIndex);
+        var maxCol = ClampIndex((int)Math.Floor((maxX - MinLongitude) / width * columnsPerAxisCrs84), maxColIndex);
+
+        // WorldCRS84Quad rows are numbered from north to south (top to bottom)
+        var minRowCrs84 = ClampIndex((int)Math.Floor((MaxLatitude - maxY) / height * rowsPerAxisCrs84), maxRowIndex);
+        var maxRowCrs84 = ClampIndex((int)Math.Floor((MaxLatitude - minY) / height * rowsPerAxisCrs84), maxRowIndex);
         NormalizeRange(ref minRowCrs84, ref maxRowCrs84);
 
         // BUG FIX #3: Don't normalize column range if it crosses the antimeridian

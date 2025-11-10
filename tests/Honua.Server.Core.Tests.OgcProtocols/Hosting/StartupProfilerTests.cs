@@ -323,6 +323,7 @@ public class StartupMetricsServiceTests
     public void RecordStartupComplete_LogsStartupTime()
     {
         // Arrange
+        StartupMetricsService.Reset();
         var loggerMock = new Mock<ILogger>();
 
         // Act
@@ -343,6 +344,7 @@ public class StartupMetricsServiceTests
     public void RecordStartupComplete_LogsMemoryUsage()
     {
         // Arrange
+        StartupMetricsService.Reset();
         var loggerMock = new Mock<ILogger>();
 
         // Act
@@ -363,6 +365,7 @@ public class StartupMetricsServiceTests
     public void RecordStartupComplete_LogsGCCollections()
     {
         // Arrange
+        StartupMetricsService.Reset();
         var loggerMock = new Mock<ILogger>();
 
         // Act
@@ -383,6 +386,7 @@ public class StartupMetricsServiceTests
     public void RecordStartupComplete_OnlyLogsOnce()
     {
         // Arrange
+        StartupMetricsService.Reset();
         var loggerMock = new Mock<ILogger>();
 
         // Act
@@ -401,8 +405,14 @@ public class StartupMetricsServiceTests
     }
 
     [Fact]
-    public void ElapsedMilliseconds_ReturnsPositiveValue()
+    public async Task ElapsedMilliseconds_ReturnsPositiveValue()
     {
+        // Arrange - Reset to ensure timer is running
+        StartupMetricsService.Reset();
+
+        // Wait a small amount of time for the timer to tick
+        await Task.Delay(10);
+
         // Act
         var elapsed = StartupMetricsService.ElapsedMilliseconds;
 

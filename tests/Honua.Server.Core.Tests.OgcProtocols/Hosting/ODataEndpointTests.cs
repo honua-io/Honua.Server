@@ -20,12 +20,14 @@ using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Performance;
 using Honua.Server.Host;
+using Honua.Server.Host.Hosting;
 using Testcontainers.PostgreSql;
 using Honua.Server.Host.OData;
 using Honua.Server.Host.Middleware;
 using Honua.Server.Host.OpenApi.Filters;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,10 +51,6 @@ public sealed class ODataEndpointSqliteTests : IClassFixture<ODataSqliteFixture>
     [Fact]
     public async Task ServiceDocument_ShouldExposeEntitySet()
     {
-        if (_fixture.ShouldSkip)
-        {
-            return;
-        }
         var client = _fixture.CreateAuthenticatedClient();
         var (setName, typeName) = await ODataTestHelpers.DiscoverEntitySetAsync(client);
 
@@ -63,10 +61,6 @@ public sealed class ODataEndpointSqliteTests : IClassFixture<ODataSqliteFixture>
     [Fact]
     public async Task ODataEndpoints_ShouldSupportCrud()
     {
-        if (_fixture.ShouldSkip)
-        {
-            return;
-        }
         var client = _fixture.CreateAuthenticatedClient();
         var (entitySet, _) = await ODataTestHelpers.DiscoverEntitySetAsync(client);
 
@@ -113,10 +107,6 @@ public sealed class ODataEndpointSqliteTests : IClassFixture<ODataSqliteFixture>
     [Fact]
     public async Task ODataEndpoints_ShouldHonorQueryOptions()
     {
-        if (_fixture.ShouldSkip)
-        {
-            return;
-        }
         var client = _fixture.CreateAuthenticatedClient();
         var (entitySet, _) = await ODataTestHelpers.DiscoverEntitySetAsync(client);
 
@@ -143,11 +133,6 @@ public sealed class ODataEndpointSqliteTests : IClassFixture<ODataSqliteFixture>
     [Fact]
     public async Task ODataEndpoints_ShouldRejectGeometryFilters_OnSqlite()
     {
-        if (_fixture.ShouldSkip)
-        {
-            return;
-        }
-
         var client = _fixture.CreateAuthenticatedClient();
         var (entitySet, _) = await ODataTestHelpers.DiscoverEntitySetAsync(client);
         var filter = Uri.EscapeDataString("geo.intersects(geom, geometry'SRID=4326;LINESTRING(-122.5 45.5,-122.4 45.6)')");
@@ -170,14 +155,10 @@ public sealed class ODataEndpointPostgresTests : IClassFixture<ODataPostgresFixt
     [Fact]
     public async Task ODataEndpoints_ShouldSupportCrud()
     {
-        if (_fixture.ShouldSkip)
-        {
-            return;
-        }
         var client = _fixture.CreateAuthenticatedClient();
         var (entitySet, _) = await ODataTestHelpers.DiscoverEntitySetAsync(client);
 
-        var list = await ODataTestHelpers.GetValueAsync(client, $"/odata/{entitySet}");
+        var list = await ODataTestHelpers.GetValueAsync(client, $"/v1/odata/{entitySet}");
         list.GetProperty("value").EnumerateArray().Count().Should().BeGreaterThanOrEqualTo(2);
 
         var existingIds = list.GetProperty("value").EnumerateArray().Select(v => v.GetProperty("road_id").GetInt32()).ToHashSet();
@@ -195,7 +176,7 @@ public sealed class ODataEndpointPostgresTests : IClassFixture<ODataPostgresFixt
         create.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var updatedPayload = new { status = "planned" };
-        var patch = await ODataTestHelpers.SendPatchAsync(client, $"/odata/{entitySet}({newId})", updatedPayload);
+        var patch = await ODataTestHelpers.SendPatchAsync(client, $"/v1/odata/{entitySet}({newId})", updatedPayload);
         patch.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var updated = await ODataTestHelpers.GetSingleAsync(client, entitySet, newId);
@@ -209,11 +190,6 @@ public sealed class ODataEndpointPostgresTests : IClassFixture<ODataPostgresFixt
     [Fact]
     public async Task ODataEndpoints_ShouldFilterByGeometry()
     {
-        if (_fixture.ShouldSkip)
-        {
-            return;
-        }
-
         var client = _fixture.CreateAuthenticatedClient();
         var (entitySet, _) = await ODataTestHelpers.DiscoverEntitySetAsync(client);
         var filter = Uri.EscapeDataString("geo.intersects(geom, geometry'SRID=4326;LINESTRING(-122.51 45.49,-122.39 45.61)')");
@@ -230,6 +206,8 @@ public static class ODataTestHelpers
 {
     public static async Task<(string EntitySetName, string EntityTypeName)> DiscoverEntitySetAsync(HttpClient client)
     {
+        // Note: OData endpoints are at /odata (unversioned) due to ASP.NET Core OData v8 routing limitations
+        // with route prefixes containing forward slashes (e.g., "v1/odata")
         var response = await client.GetAsync("/odata/$metadata");
         var metadataXml = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
@@ -327,6 +305,7 @@ public sealed class ODataSqliteFixture : WebApplicationFactory<Program>, IDispos
             {
                 ["honua:metadata:provider"] = "json",
                 ["honua:metadata:path"] = _metadataPath,
+                ["honua:services:odata:enabled"] = "true",
                 ["honua:services:odata:allowWrites"] = "true",
                 ["honua:authentication:mode"] = "Local",
                 ["honua:authentication:enforce"] = "true",
@@ -341,42 +320,11 @@ public sealed class ODataSqliteFixture : WebApplicationFactory<Program>, IDispos
 
         builder.ConfigureServices(services =>
         {
-            var connectionString = $"Data Source={_databasePath}";
-            var snapshot = CreateMetadataSnapshot(connectionString);
+            // Don't replace OData-specific services (IMetadataProvider, IMetadataRegistry, ODataModelCache)
+            // Let them use the real implementations with test configuration from ConfigureAppConfiguration
 
-            services.RemoveAll<IHonuaConfigurationService>();
-            services.RemoveAll<IMetadataProvider>();
-            services.RemoveAll<IMetadataRegistry>();
-            services.RemoveAll<ODataModelCache>();
             services.RemoveAll<IOutputCacheInvalidationService>();
             services.RemoveAll<IOutputCacheStore>();
-
-            services.AddSingleton<IHonuaConfigurationService>(_ => new HonuaConfigurationService(new HonuaConfiguration
-            {
-                Metadata = new MetadataConfiguration
-                {
-                    Provider = "in-memory",
-                    Path = _metadataPath
-                },
-                Services = new ServicesConfiguration
-                {
-                    OData = new ODataConfiguration
-                    {
-                        AllowWrites = true,
-                        DefaultPageSize = 100,
-                        MaxPageSize = 1000,
-                        EmitWktShadowProperties = true
-                    }
-                }
-            }));
-
-            services.AddSingleton<IMetadataProvider>(_ => new InMemoryMetadataProvider(snapshot));
-            services.AddSingleton<IMetadataRegistry, MetadataRegistry>();
-
-            services.AddSingleton<ODataModelCache>(sp => new ODataModelCache(
-                sp.GetRequiredService<DynamicEdmModelBuilder>(),
-                sp.GetRequiredService<IMetadataRegistry>(),
-                sp.GetRequiredService<IHonuaConfigurationService>()));
 
             services.AddSingleton<IOutputCacheStore, NoOpOutputCacheStore>();
             services.AddSingleton<IOutputCacheInvalidationService, NoOpOutputCacheInvalidationService>();
@@ -681,7 +629,7 @@ VALUES (@id, @name, @status, @observed, @geom);
             return;
         }
 
-        var response = await client.PostAsJsonAsync("/api/auth/local/login", new { username = AdminUsername, password = AdminPassword }).ConfigureAwait(false);
+        var response = await client.PostAsJsonAsync("/v1/api/auth/local/login", new { username = AdminUsername, password = AdminPassword }).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
         var token = payload.GetProperty("token").GetString();
@@ -772,6 +720,7 @@ public sealed class ODataPostgresFixture : WebApplicationFactory<Program>
             {
                 ["honua:metadata:provider"] = "json",
                 ["honua:metadata:path"] = _metadataPath,
+                ["honua:services:odata:enabled"] = "true",
                 ["honua:services:odata:allowWrites"] = "true",
                 ["honua:authentication:mode"] = "Local",
                 ["honua:authentication:enforce"] = "true",
@@ -786,34 +735,11 @@ public sealed class ODataPostgresFixture : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            var metadataPath = _metadataPath ?? throw new InvalidOperationException("Metadata path was not initialized.");
-            services.RemoveAll<IHonuaConfigurationService>();
+            // Don't replace OData-specific services (IMetadataProvider, IMetadataRegistry, ODataModelCache)
+            // Let them use the real implementations with test configuration from ConfigureAppConfiguration
+
             services.RemoveAll<IOutputCacheInvalidationService>();
             services.RemoveAll<IOutputCacheStore>();
-            services.AddSingleton<IHonuaConfigurationService>(_ => new HonuaConfigurationService(new HonuaConfiguration
-            {
-                Metadata = new MetadataConfiguration
-                {
-                    Provider = "json",
-                    Path = metadataPath
-                },
-                Services = new ServicesConfiguration
-                {
-                    OData = new ODataConfiguration
-                    {
-                        AllowWrites = true,
-                        DefaultPageSize = 100,
-                        MaxPageSize = 1000,
-                        EmitWktShadowProperties = true
-                    }
-                }
-            }));
-
-            var metadataJson = _metadataJson ?? throw new InvalidOperationException("Metadata JSON was not initialized.");
-            services.RemoveAll<IMetadataProvider>();
-            services.RemoveAll<IMetadataRegistry>();
-            services.AddSingleton<IMetadataProvider>(_ => new StaticMetadataProvider(metadataJson));
-            services.AddSingleton<IMetadataRegistry>(sp => new MetadataRegistry(sp.GetRequiredService<IMetadataProvider>()));
 
             services.AddSingleton<IOutputCacheStore, PostgresNoOpOutputCacheStore>();
             services.AddSingleton<IOutputCacheInvalidationService, PostgresNoOpOutputCacheInvalidationService>();
@@ -1023,7 +949,7 @@ VALUES
             return;
         }
 
-        var response = await client.PostAsJsonAsync("/api/auth/local/login", new { username = AdminUsername, password = AdminPassword }).ConfigureAwait(false);
+        var response = await client.PostAsJsonAsync("/v1/api/auth/local/login", new { username = AdminUsername, password = AdminPassword }).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
         var token = payload.GetProperty("token").GetString();

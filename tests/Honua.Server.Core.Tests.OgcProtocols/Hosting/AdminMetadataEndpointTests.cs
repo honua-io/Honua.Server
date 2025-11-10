@@ -44,11 +44,11 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
     public async Task Diff_ShouldReportAddedService()
     {
         var client = await CreateAuthenticatedClientAsync();
-        var baselineResponse = await client.PostAsync("/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
+        var baselineResponse = await client.PostAsync("/v1/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
         baselineResponse.EnsureSuccessStatusCode();
 
         var diffJson = MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"), ("new-roads", "new-layer"));
-        var response = await client.PostAsync("/admin/metadata/diff", JsonContent(diffJson));
+        var response = await client.PostAsync("/v1/admin/metadata/diff", JsonContent(diffJson));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -65,7 +65,7 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         var client = await CreateAuthenticatedClientAsync();
         var invalidJson = MetadataTestFile.CreateWithoutRequiredLayerField();
 
-        var response = await client.PostAsync("/admin/metadata/diff", JsonContent(invalidJson));
+        var response = await client.PostAsync("/v1/admin/metadata/diff", JsonContent(invalidJson));
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -77,11 +77,11 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
     {
         var client = await CreateAuthenticatedClientAsync();
 
-        var baselineResponse = await client.PostAsync("/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
+        var baselineResponse = await client.PostAsync("/v1/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
         baselineResponse.EnsureSuccessStatusCode();
 
         var applyJson = MetadataTestFile.Create("catalog-v2", ("roads", "roads-primary"));
-        var response = await client.PostAsync("/admin/metadata/apply", JsonContent(applyJson));
+        var response = await client.PostAsync("/v1/admin/metadata/apply", JsonContent(applyJson));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -104,9 +104,9 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         var client = await CreateAuthenticatedClientAsync();
         var original = File.ReadAllText(_factory.MetadataPath);
 
-        var response = await client.PostAsync("/admin/metadata/apply", JsonContent("{ invalid json }"));
+        var response = await client.PostAsync("/v1/admin/metadata/apply", JsonContent("{ invalid json }"));
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
         payload.GetProperty("error").GetString().Should().NotBeNullOrWhiteSpace();
 
@@ -119,7 +119,7 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         var client = await CreateAuthenticatedClientAsync();
 
         MetadataTestFile.Write(_factory.MetadataPath, "catalog-v1", ("roads", "roads-primary"));
-        await client.PostAsync("/admin/metadata/reload", content: null);
+        await client.PostAsync("/v1/admin/metadata/reload", content: null);
 
         using (var scope = _factory.Services.CreateScope())
         {
@@ -130,7 +130,7 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         }
 
         MetadataTestFile.Write(_factory.MetadataPath, "catalog-v2", ("roads", "roads-primary"));
-        var response = await client.PostAsync("/admin/metadata/reload", content: null);
+        var response = await client.PostAsync("/v1/admin/metadata/reload", content: null);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -149,11 +149,11 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         var client = await CreateAuthenticatedClientAsync();
 
         MetadataTestFile.Write(_factory.MetadataPath, "catalog-v1", ("roads", "roads-primary"));
-        await client.PostAsync("/admin/metadata/reload", content: null);
+        await client.PostAsync("/v1/admin/metadata/reload", content: null);
 
         await File.WriteAllTextAsync(_factory.MetadataPath, "{ invalid json }");
 
-        var failure = await client.PostAsync("/admin/metadata/reload", content: null);
+        var failure = await client.PostAsync("/v1/admin/metadata/reload", content: null);
         if (failure.StatusCode != HttpStatusCode.UnprocessableEntity)
         {
             var content = await failure.Content.ReadAsStringAsync();
@@ -176,9 +176,9 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
     {
         var client = await CreateAuthenticatedClientAsync();
 
-        await client.PostAsync("/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
+        await client.PostAsync("/v1/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
 
-        var createResponse = await client.PostAsJsonAsync("/admin/metadata/snapshots", new { label = "release-v1", notes = "baseline" });
+        var createResponse = await client.PostAsJsonAsync("/v1/admin/metadata/snapshots", new { label = "release-v1", notes = "baseline" });
         if (createResponse.StatusCode != HttpStatusCode.Created)
         {
             var content = await createResponse.Content.ReadAsStringAsync();
@@ -189,7 +189,7 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         var label = created.GetProperty("snapshot").GetProperty("label").GetString();
         label.Should().NotBeNullOrWhiteSpace();
 
-        var listResponse = await client.GetAsync("/admin/metadata/snapshots");
+        var listResponse = await client.GetAsync("/v1/admin/metadata/snapshots");
         listResponse.EnsureSuccessStatusCode();
         var listPayload = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
         listPayload.GetProperty("snapshots")
@@ -203,8 +203,8 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
     {
         var client = await CreateAuthenticatedClientAsync();
 
-        await client.PostAsync("/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
-        var snapshotResponse = await client.PostAsJsonAsync("/admin/metadata/snapshots", new { label = "baseline" });
+        await client.PostAsync("/v1/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
+        var snapshotResponse = await client.PostAsJsonAsync("/v1/admin/metadata/snapshots", new { label = "baseline" });
         if (snapshotResponse.StatusCode != HttpStatusCode.Created)
         {
             var content = await snapshotResponse.Content.ReadAsStringAsync();
@@ -214,8 +214,8 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         var snapshotPayload = await snapshotResponse.Content.ReadFromJsonAsync<JsonElement>();
         var label = snapshotPayload.GetProperty("snapshot").GetProperty("label").GetString();
 
-        await client.PostAsync("/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v2", ("roads", "roads-primary"))));
-        var restoreResponse = await client.PostAsync($"/admin/metadata/snapshots/{label}/restore", content: null);
+        await client.PostAsync("/v1/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v2", ("roads", "roads-primary"))));
+        var restoreResponse = await client.PostAsync($"/v1/admin/metadata/snapshots/{label}/restore", content: null);
         restoreResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using var scope = _factory.Services.CreateScope();
@@ -230,8 +230,8 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
     {
         var client = await CreateAuthenticatedClientAsync();
 
-        await client.PostAsync("/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
-        var snapshotResponse = await client.PostAsJsonAsync("/admin/metadata/snapshots", new { label = "content" });
+        await client.PostAsync("/v1/admin/metadata/apply", JsonContent(MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"))));
+        var snapshotResponse = await client.PostAsJsonAsync("/v1/admin/metadata/snapshots", new { label = "content" });
         if (snapshotResponse.StatusCode != HttpStatusCode.Created)
         {
             var content = await snapshotResponse.Content.ReadAsStringAsync();
@@ -241,7 +241,7 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         var snapshotPayload = await snapshotResponse.Content.ReadFromJsonAsync<JsonElement>();
         var label = snapshotPayload.GetProperty("snapshot").GetProperty("label").GetString();
 
-        var getResponse = await client.GetAsync($"/admin/metadata/snapshots/{label}");
+        var getResponse = await client.GetAsync($"/v1/admin/metadata/snapshots/{label}");
         getResponse.EnsureSuccessStatusCode();
         var payload = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
         payload.GetProperty("metadata").GetString().Should().Contain("catalog-v1");
@@ -253,7 +253,7 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
         var client = await CreateAuthenticatedClientAsync();
         var payload = MetadataTestFile.Create("catalog-v1", ("roads", "roads-primary"));
 
-        var response = await client.PostAsync("/admin/metadata/validate", JsonContent(payload));
+        var response = await client.PostAsync("/v1/admin/metadata/validate", JsonContent(payload));
         if (response.StatusCode != HttpStatusCode.OK)
         {
             var body = await response.Content.ReadAsStringAsync();
@@ -271,9 +271,9 @@ public class AdminMetadataEndpointTests : IClassFixture<ReloadableMetadataFactor
     {
         var client = await CreateAuthenticatedClientAsync();
 
-        var response = await client.PostAsync("/admin/metadata/validate", JsonContent("{ invalid json }"));
+        var response = await client.PostAsync("/v1/admin/metadata/validate", JsonContent("{ invalid json }"));
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
     private Task<HttpClient> CreateAuthenticatedClientAsync() => _factory.CreateAuthenticatedClientAsync();
 
