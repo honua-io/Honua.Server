@@ -3,6 +3,7 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject FeatureFlagService FeatureFlags
+@inject UserContextService UserContext
 
 <PageTitle>Workflow Designer</PageTitle>
 
@@ -383,8 +384,8 @@ else
         _saving = true;
         try
         {
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract tenant and user context from authentication claims
+            var (tenantId, userId) = await UserContext.GetContextAsync();
 
             var request = new
             {
@@ -438,8 +439,8 @@ else
 
         try
         {
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract tenant and user context from authentication claims
+            var (tenantId, userId) = await UserContext.GetContextAsync();
 
             var request = new
             {

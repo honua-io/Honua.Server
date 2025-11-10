@@ -4,6 +4,7 @@
 @inject ISnackbar Snackbar
 @inject FeatureFlagService FeatureFlags
 @inject IDialogService DialogService
+@inject UserContextService UserContext
 
 <PageTitle>GeoETL Template Gallery</PageTitle>
 
@@ -234,9 +235,8 @@ else
     {
         try
         {
-            // TODO: Replace with actual tenant ID and user ID from authentication
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract tenant and user context from authentication claims
+            var (tenantId, userId) = await UserContext.GetContextAsync();
 
             var request = new
             {
