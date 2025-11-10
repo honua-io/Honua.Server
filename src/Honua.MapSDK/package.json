@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@deck.gl/core": "^8.9.33",
-    "@deck.gl/layers": "^8.9.33",
+    "@deck.gl/layers": "^9.2.2",
     "@deck.gl/geo-layers": "^8.9.33",
     "@deck.gl/mesh-layers": "^8.9.33",
     "@loaders.gl/gltf": "^4.0.4",
