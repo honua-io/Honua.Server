@@ -13,7 +13,21 @@ A cloud-native geospatial server built on .NET 9, implementing OGC standards and
 [![codecov](https://codecov.io/gh/honua-io/Honua.Server/branch/main/graph/badge.svg)](https://codecov.io/gh/honua-io/Honua.Server)
 [![License](https://img.shields.io/badge/license-Elastic_2.0-blue.svg)](LICENSE)
 
-[Documentation](docs/) • [Quick Start](#quick-start) • [Architecture](#architecture) • [Pricing](#pricing)
+[Documentation](docs/) • [Quick Start](#quick-start) • [Architecture](#architecture) • [License](#license)
+
+---
+
+> **⚠️ PREVIEW STATUS**
+>
+> Honua Server is currently in **preview**. While the core OGC standards implementation is stable, the following features are **experimental** and subject to change:
+> - **MapSDK** - Visual map builder and Blazor components
+> - **GeoETL** - Data transformation and container distribution
+> - **GeoEvent** - Real-time geofencing and alerts
+> - **Geoprocessing** - Distributed spatial analysis
+> - **3D Visualization** - 3D rendering capabilities
+> - **AI Features** - AI-powered deployment and DevSecOps agents
+>
+> We welcome feedback and bug reports as we work toward a stable 1.0 release.
 
 ---
 
@@ -42,11 +56,11 @@ Honua provides a complete OGC-compliant geospatial server with:
 
 | Component | Description |
 |-----------|-------------|
-| **🗺️ MapSDK** | Visual map builder with no-code editor, live preview, and export to JSON/YAML/HTML/Blazor. [Docs](src/Honua.MapSDK/README.md) |
+| **🗺️ MapSDK** 🧪 | Visual map builder with no-code editor, live preview, and export to JSON/YAML/HTML/Blazor. **[Experimental]** [Docs](src/Honua.MapSDK/README.md) |
 | **📱 HonuaField Mobile** | Cross-platform field data collection app for iOS/Android/Windows/macOS with offline support. [Docs](src/HonuaField/README.md) |
-| **⚡ GeoEvent Server** | Real-time geofencing with <100ms latency, batch processing, and webhook notifications. [API Guide](docs/GEOEVENT_API_GUIDE.md) |
-| **🔄 GeoETL** | Container registry provisioning and build delivery for multi-tenant deployments. [Docs](src/Honua.Server.Intake/README.md) |
-| **⚙️ Geoprocessing** | Distributed spatial analysis with 40+ operations (buffer, union, dissolve, heatmaps). Enterprise tier. |
+| **⚡ GeoEvent Server** 🧪 | Real-time geofencing with <100ms latency, batch processing, and webhook notifications. **[Experimental]** [API Guide](docs/GEOEVENT_API_GUIDE.md) |
+| **🔄 GeoETL** 🧪 | Container registry provisioning and build delivery for multi-tenant deployments. **[Experimental]** [Docs](src/Honua.Server.Intake/README.md) |
+| **⚙️ Geoprocessing** 🧪 | Distributed spatial analysis with 40+ operations (buffer, union, dissolve, heatmaps). **[Experimental]** Enterprise tier. |
 | **🔔 Alert Receiver** | Cloud event webhook receiver for AWS SNS and Azure Event Grid notifications. |
 | **🎛️ Admin Portal** | Web-based UI for managing maps, layers, geofences, users, and analytics. Built with Blazor. |
 
@@ -417,50 +431,6 @@ Full configuration reference: [docs/configuration/](docs/configuration/)
 
 ---
 
-## Pricing
-
-Honua uses the **Elastic License 2.0** (source-available, not open source).
-
-### Licensing Summary
-
-**You can:**
-- Use for internal projects
-- Self-host in your organization
-- Modify the source code
-- Build applications on top of Honua
-
-**You cannot:**
-- Offer Honua as a hosted service to third parties
-- Remove or bypass license validation
-- Circumvent feature restrictions
-
-### Tiers
-
-| Feature | Free | Professional | Enterprise |
-|---------|------|--------------|------------|
-| **Monthly Cost** | $0 | $299 | $1,499 |
-| **Users** | 1 | 10 | Unlimited |
-| **Layers** | 10 | 100 | Unlimited |
-| **API Requests/Day** | 10,000 | 100,000 | Unlimited |
-| **PostgreSQL/MySQL/SQLite** | ✓ | ✓ | ✓ |
-| **SQL Server** | - | ✓ | ✓ |
-| **Cloud DW (Snowflake, BigQuery, Redshift)** | - | - | ✓ |
-| **NoSQL (MongoDB, Cosmos)** | - | - | ✓ |
-| **Local Auth** | ✓ | ✓ | ✓ |
-| **OIDC/OAuth** | - | ✓ | ✓ |
-| **SAML/SSO** | - | - | ✓ |
-| **STAC Catalog** | - | ✓ | ✓ |
-| **BI Connectors (Power BI, Tableau)** | - | ✓ | ✓ |
-| **Geoprocessing** | - | ✓ | ✓ |
-| **Cloud Batch Processing** | - | - | ✓ |
-| **Versioning & Branching** | - | - | ✓ |
-| **Multi-tenancy** | - | - | ✓ |
-| **Support** | Community | Email (2-day) | Priority (4-hour) |
-
-Annual pricing available (20% discount).
-
----
-
 ## Documentation
 
 ### 📚 Complete Documentation Hub
@@ -613,7 +583,7 @@ src/
 ├── Honua.Server.Gateway/           # API gateway
 ├── Honua.Server.Observability/     # Metrics & monitoring
 ├── Honua.Cli/                      # Command-line tools
-└── Honua.Cli.AI/                   # AI-powered deployment agents
+└── Honua.Cli.AI/                   # AI-powered deployment agents 🧪 [Experimental]
 
 tests/
 ├── Honua.Server.Core.Tests/
@@ -655,14 +625,50 @@ See [Development Documentation](docs/development/README.md) for architecture, te
 
 **Elastic License 2.0** - Source-available, not open source.
 
-Key restrictions:
-- Cannot offer as a hosted service to third parties
-- Cannot remove license validation
-- Must include license notices
+**You can:**
+- Use for internal projects and self-hosting
+- Modify the source code
+- Build applications on top of Honua
 
-Full terms: [LICENSE](LICENSE)
+**You cannot:**
+- Offer Honua as a hosted service to third parties
+- Remove license validation
+- Circumvent feature restrictions
 
-Commercial licensing available for specific use cases.
+### Enterprise Features
+
+The following features require an **Enterprise** commercial license:
+
+**Experimental Features (Preview):**
+- **GeoEvent Server** - Real-time geofencing, alerts, and event processing
+- **GeoETL** - Data transformation pipelines and container distribution
+- **Geoprocessing** - 40+ distributed spatial analysis operations
+- **AI DevSecOps** - AI-powered deployment assistance and automation
+- **3D Visualization** - 3D rendering and visualization capabilities
+
+**Data & Integration:**
+- Cloud data warehouse connectors (Snowflake, BigQuery, Redshift, Databricks)
+- NoSQL database support (MongoDB, Azure Cosmos DB)
+- Advanced BI connectors (Power BI, Tableau)
+- Data audit logging and compliance tracking
+- Data versioning and branching
+
+**Deployment & Operations:**
+- GitOps integration and declarative configuration
+- Blue/green deployment support
+- Advanced health checks and readiness probes
+
+**Security & Authentication:**
+- SAML 2.0 / Enterprise SSO integration
+- Advanced RBAC and fine-grained permissions
+
+**Support:**
+- Priority support with 4-hour SLA
+- Dedicated technical account management
+
+Contact **support@honua.io** for Enterprise licensing information.
+
+Full license terms: [LICENSE](LICENSE)
 
 ---
 
