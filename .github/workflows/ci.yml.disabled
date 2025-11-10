@@ -12,15 +12,27 @@ name: Continuous Integration
 # - Slow: Performance/benchmark tests (30s+)
 
 on:
-  # push:
-  #   branches: [ master, main, develop ]
-  # pull_request:
-  #   branches: [ master, main ]
+  push:
+    branches: [ master, main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+  pull_request:
+    branches: [ master, main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
   workflow_dispatch:
 
 env:
   DOTNET_VERSION: '9.0.x'
   SOLUTION_FILE: 'Honua.sln'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # Build and basic validation
@@ -39,9 +51,13 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        path: |
+          ~/.nuget/packages
+          ~/.local/share/NuGet
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
         restore-keys: |
+          ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
           ${{ runner.os }}-nuget-
 
     - name: Restore dependencies
@@ -55,9 +71,12 @@ jobs:
       with:
         name: build-artifacts
         path: |
-          **/bin/Release/**
-          **/obj/Release/**
+          **/bin/Release/**/Honua*.dll
+          **/bin/Release/**/Honua*.exe
+          **/bin/Release/**/*.deps.json
+          **/bin/Release/**/*.runtimeconfig.json
         retention-days: 1
+        compression-level: 9
 
   # Fast unit tests (excluding infrastructure-dependent tests)
   unit-tests:
@@ -81,16 +100,20 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-artifacts
+        path: |
+          ~/.nuget/packages
+          ~/.local/share/NuGet
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          ${{ runner.os }}-nuget-
 
     - name: Restore dependencies
       run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution (cached)
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
     - name: Run fast unit tests
       run: |
@@ -233,16 +256,20 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-artifacts
+        path: |
+          ~/.nuget/packages
+          ~/.local/share/NuGet
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          ${{ runner.os }}-nuget-
 
     - name: Restore dependencies
       run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution (cached)
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
     - name: Run infrastructure integration tests
       run: |
@@ -286,16 +313,20 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-artifacts
+        path: |
+          ~/.nuget/packages
+          ~/.local/share/NuGet
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          ${{ runner.os }}-nuget-
 
     - name: Restore dependencies
       run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution (cached)
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
 
     - name: Run integration tests (including slow tests)
       run: |
@@ -338,8 +369,14 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        path: |
+          ~/.nuget/packages
+          ~/.local/share/NuGet
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          ${{ runner.os }}-nuget-
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4
@@ -571,8 +608,14 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        path: |
+          ~/.nuget/packages
+          ~/.local/share/NuGet
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          ${{ runner.os }}-nuget-
 
     - name: Download build artifacts
       uses: actions/download-artifact@v4
@@ -681,8 +724,14 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        path: |
+          ~/.nuget/packages
+          ~/.local/share/NuGet
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          ${{ runner.os }}-nuget-
 
     - name: Restore dependencies
       run: dotnet restore ${{ env.SOLUTION_FILE }}
@@ -837,8 +886,14 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        path: |
+          ~/.nuget/packages
+          ~/.local/share/NuGet
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          ${{ runner.os }}-nuget-
 
     - name: Restore dependencies
       run: dotnet restore ${{ env.SOLUTION_FILE }}
