@@ -225,12 +225,13 @@ internal static partial class OgcSharedHandlers
 
         return attributes;
     }
-    private static object? ConvertJsonElement(JsonElement element)
+
+    internal static object? ConvertJsonElement(JsonElement element)
     {
         return JsonElementConverter.ToObjectWithJsonNode(element);
     }
 
-    private static string? ConvertJsonElementToString(JsonElement element)
+    internal static string? ConvertJsonElementToString(JsonElement element)
     {
         return JsonElementConverter.ToString(element);
     }

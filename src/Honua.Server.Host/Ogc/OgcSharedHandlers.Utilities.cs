@@ -51,83 +51,6 @@ namespace Honua.Server.Host.Ogc;
 
 internal static partial class OgcSharedHandlers
 {
-    private static QueryFilter? CombineFilters(QueryFilter? first, QueryFilter? second)
-    {
-        if (first?.Expression is null)
-        {
-            return second;
-        }
-
-        if (second?.Expression is null)
-        {
-            return first;
-        }
-
-        var combined = new QueryBinaryExpression(first.Expression, QueryBinaryOperator.And, second.Expression);
-        return new QueryFilter(combined);
-    }
-
-    private static (QueryFilter? Filter, IResult? Error) BuildIdsFilter(LayerDefinition layer, IReadOnlyList<string> ids)
-    {
-        if (ids.Count == 0)
-        {
-            return (null, null);
-        }
-
-        // Limit IDs to prevent unbounded OR expressions that hammer the database
-        const int MaxIds = 1000;
-        if (ids.Count > MaxIds)
-        {
-            return (null, CreateValidationProblem($"ids parameter exceeds maximum limit of {MaxIds} identifiers.", "ids"));
-        }
-
-        QueryExpression? expression = null;
-        (string FieldName, string? FieldType) resolved;
-
-        try
-        {
-            resolved = CqlFilterParserUtils.ResolveField(layer, layer.IdField);
-        }
-        catch (Exception ex)
-        {
-            return (null, CreateValidationProblem(ex.Message, "ids"));
-        }
-
-        foreach (var rawId in ids)
-        {
-            if (rawId.IsNullOrWhiteSpace())
-            {
-                continue;
-            }
-
-            var typedValue = CqlFilterParserUtils.ConvertToFieldValue(resolved.FieldType, rawId);
-            var comparison = new QueryBinaryExpression(
-                new QueryFieldReference(resolved.FieldName),
-                QueryBinaryOperator.Equal,
-                new QueryConstant(typedValue));
-
-            expression = expression is null
-                ? comparison
-                : new QueryBinaryExpression(expression, QueryBinaryOperator.Or, comparison);
-        }
-
-        if (expression is null)
-        {
-            return (null, CreateValidationProblem("ids parameter must include at least one non-empty value.", "ids"));
-        }
-
-        return (new QueryFilter(expression), null);
-    }
-    internal static bool LooksLikeJson(string? value)
-    {
-        if (value.IsNullOrWhiteSpace())
-        {
-            return false;
-        }
-
-        var trimmed = value.TrimStart();
-        return trimmed.StartsWith("{", StringComparison.Ordinal) || trimmed.StartsWith("[", StringComparison.Ordinal);
-    }
     internal static object BuildQueryablesSchema(LayerDefinition layer)
     {
         var properties = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -250,35 +173,6 @@ internal static partial class OgcSharedHandlers
         return schema;
     }
 
-    internal static List<OgcLink> BuildCollectionLinks(HttpRequest request, ServiceDefinition service, LayerDefinition layer, string collectionId)
-    {
-        var links = new List<OgcLink>(layer.Links.Select(ToLink));
-        links.AddRange(new[]
-        {
-            BuildLink(request, $"/ogc/collections/{collectionId}", "self", "application/json", layer.Title),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "items", "application/geo+json", $"Items for {layer.Title}"),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/vnd.google-earth.kml+xml", $"Items for {layer.Title} (KML)", null, new Dictionary<string, string?> { ["f"] = "kml" }),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/vnd.google-earth.kmz", $"Items for {layer.Title} (KMZ)", null, new Dictionary<string, string?> { ["f"] = "kmz" }),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/geopackage+sqlite3", $"Items for {layer.Title} (GeoPackage)", null, new Dictionary<string, string?> { ["f"] = "geopackage" }),
-            BuildLink(request, $"/ogc/collections/{collectionId}/queryables", "queryables", "application/json", $"Queryables for {layer.Title}")
-        });
-
-        if (layer.DefaultStyleId.HasValue())
-        {
-            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles/{layer.DefaultStyleId}", "stylesheet", "application/vnd.ogc.sld+xml", $"Default style for {layer.Title}"));
-        }
-
-        foreach (var styleId in layer.StyleIds)
-        {
-            if (!string.Equals(styleId, layer.DefaultStyleId, StringComparison.OrdinalIgnoreCase))
-            {
-                links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles/{styleId}", "stylesheet", "application/vnd.ogc.sld+xml", $"Style '{styleId}'"));
-            }
-        }
-
-        return links;
-    }
-
     private static void AppendStyleMetadata(IDictionary<string, object?> target, LayerDefinition layer)
     {
         if (target is null)
@@ -308,6 +202,9 @@ internal static partial class OgcSharedHandlers
         }
     }
 
+    internal static IResult WithResponseHeader(IResult result, string headerName, string headerValue)
+        => new HeaderResult(result, headerName, headerValue);
+
     internal static IReadOnlyList<string> BuildOrderedStyleIds(LayerDefinition layer)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -328,18 +225,7 @@ internal static partial class OgcSharedHandlers
 
         return results.Count == 0 ? Array.Empty<string>() : results;
     }
-    internal static IResult WithResponseHeader(IResult result, string headerName, string headerValue)
-        => new HeaderResult(result, headerName, headerValue);
 
-    internal static string FormatContentCrs(string? value)
-        => value.IsNullOrWhiteSpace() ? string.Empty : $"<{value}>";
-
-    /// <summary>
-    /// Adds a Content-Crs header to the result with proper formatting.
-    /// This consolidates the common pattern of calling WithResponseHeader + FormatContentCrs.
-    /// </summary>
-    internal static IResult WithContentCrsHeader(IResult result, string? contentCrs)
-        => WithResponseHeader(result, "Content-Crs", FormatContentCrs(contentCrs));
     internal static IReadOnlyList<string> BuildOrderedStyleIds(LayerGroupDefinition layerGroup)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -360,6 +246,91 @@ internal static partial class OgcSharedHandlers
 
         return results;
     }
+
+    internal static List<OgcLink> BuildCollectionLinks(HttpRequest request, ServiceDefinition service, LayerDefinition layer, string collectionId)
+    {
+        var links = new List<OgcLink>(layer.Links.Select(ToLink));
+        links.AddRange(new[]
+        {
+            BuildLink(request, $"/ogc/collections/{collectionId}", "self", "application/json", layer.Title),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "items", "application/geo+json", $"Items for {layer.Title}"),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/vnd.google-earth.kml+xml", $"Items for {layer.Title} (KML)", null, new Dictionary<string, string?> { ["f"] = "kml" }),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/vnd.google-earth.kmz", $"Items for {layer.Title} (KMZ)", null, new Dictionary<string, string?> { ["f"] = "kmz" }),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/geopackage+sqlite3", $"Items for {layer.Title} (GeoPackage)", null, new Dictionary<string, string?> { ["f"] = "geopackage" }),
+            BuildLink(request, $"/ogc/collections/{collectionId}/queryables", "queryables", "application/json", $"Queryables for {layer.Title}")
+        });
+
+        if (layer.DefaultStyleId.HasValue())
+        {
+            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles/{layer.DefaultStyleId}", "stylesheet", "application/vnd.ogc.sld+xml", $"Default style for {layer.Title}"));
+        }
+
+        foreach (var styleId in layer.StyleIds)
+        {
+            if (!string.Equals(styleId, layer.DefaultStyleId, StringComparison.OrdinalIgnoreCase))
+            {
+                links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles/{styleId}", "stylesheet", "application/vnd.ogc.sld+xml", $"Style '{styleId}'"));
+            }
+        }
+
+        return links;
+    }
+
+    internal static List<OgcLink> BuildLayerGroupCollectionLinks(HttpRequest request, ServiceDefinition service, LayerGroupDefinition layerGroup, string collectionId)
+    {
+        var links = new List<OgcLink>(layerGroup.Links.Select(ToLink));
+        links.AddRange(new[]
+        {
+            BuildLink(request, $"/ogc/collections/{collectionId}", "self", "application/json", "This collection"),
+            BuildLink(request, $"/ogc/collections/{collectionId}", "alternate", "text/html", "This collection as HTML"),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "items", "application/geo+json", "Features in this layer group"),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "http://www.opengis.net/def/rel/ogc/1.0/items", "application/geo+json", "Features")
+        });
+
+        if (layerGroup.StyleIds.Count > 0)
+        {
+            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles", "styles", "application/json", "Styles for this layer group"));
+        }
+
+        return links;
+    }
+
+    internal static IReadOnlyList<object> BuildTileMatrixSetLinks(HttpRequest request, string collectionId, string tilesetId)
+    {
+        return new object[]
+        {
+            new
+            {
+                tileMatrixSet = OgcTileMatrixHelper.WorldCrs84QuadId,
+                tileMatrixSetUri = OgcTileMatrixHelper.WorldCrs84QuadUri,
+                crs = OgcTileMatrixHelper.WorldCrs84QuadCrs,
+                href = BuildHref(request, $"/ogc/collections/{collectionId}/tiles/{tilesetId}/{OgcTileMatrixHelper.WorldCrs84QuadId}", null, null)
+            },
+            new
+            {
+                tileMatrixSet = OgcTileMatrixHelper.WorldWebMercatorQuadId,
+                tileMatrixSetUri = OgcTileMatrixHelper.WorldWebMercatorQuadUri,
+                crs = OgcTileMatrixHelper.WorldWebMercatorQuadCrs,
+                href = BuildHref(request, $"/ogc/collections/{collectionId}/tiles/{tilesetId}/{OgcTileMatrixHelper.WorldWebMercatorQuadId}", null, null)
+            }
+        };
+    }
+
+    internal static object BuildTileMatrixSetSummary(HttpRequest request, string id, string uri, string crs)
+    {
+        return new
+        {
+            id,
+            title = id,
+            tileMatrixSetUri = uri,
+            crs,
+            links = new[]
+            {
+                BuildLink(request, $"/ogc/tileMatrixSets/{id}", "self", "application/json", $"{id} definition")
+            }
+        };
+    }
+
     internal static IResult CreateValidationProblem(string detail, string parameter)
     {
         var problemDetails = new ProblemDetails
@@ -377,4 +348,14 @@ internal static partial class OgcSharedHandlers
     {
         return Results.Problem(detail, statusCode: StatusCodes.Status404NotFound, title: "Not Found");
     }
+
+    internal static string FormatContentCrs(string? value)
+        => value.IsNullOrWhiteSpace() ? string.Empty : $"<{value}>";
+
+    /// <summary>
+    /// Adds a Content-Crs header to the result with proper formatting.
+    /// This consolidates the common pattern of calling WithResponseHeader + FormatContentCrs.
+    /// </summary>
+    internal static IResult WithContentCrsHeader(IResult result, string? contentCrs)
+        => WithResponseHeader(result, "Content-Crs", FormatContentCrs(contentCrs));
 }
