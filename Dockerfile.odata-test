@@ -10,19 +10,11 @@ COPY NuGet.Config Directory.Build.props ./
 # Copy project files
 COPY src/ ./src/
 
-# Build and publish - handle duplicate content files
-RUN dotnet build src/Honua.Server.Host/Honua.Server.Host.csproj \
-    --configuration Release && \
-    dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
-    --configuration Release \
-    --no-build \
+# Build and publish - use Debug to avoid Release optimization issues
+RUN dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
+    --configuration Debug \
     --output /app/publish \
-    /p:UseAppHost=false || \
-    (dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
-    --configuration Release \
-    --output /app/publish \
-    /p:UseAppHost=false \
-    /p:ErrorOnDuplicatePublishOutputFiles=false)
+    /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
