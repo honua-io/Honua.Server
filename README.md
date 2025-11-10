@@ -650,6 +650,13 @@ The following features require an **Enterprise** commercial license:
 - Cloud data warehouse connectors (Snowflake, BigQuery, Redshift, Databricks)
 - NoSQL database support (MongoDB, Azure Cosmos DB)
 - Advanced BI connectors (Power BI, Tableau)
+- Data audit logging and compliance tracking
+- Data versioning and branching
+
+**Deployment & Operations:**
+- GitOps integration and declarative configuration
+- Blue/green deployment support
+- Advanced health checks and readiness probes
 
 **Security & Authentication:**
 - SAML 2.0 / Enterprise SSO integration
