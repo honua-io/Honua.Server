@@ -2,9 +2,13 @@
 name: "Dependency Review"
 
 on:
-  # pull_request:
-  #   branches: [ "master", "dev" ]
+  pull_request:
+    branches: [ "master", "main", "develop" ]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

@@ -2,22 +2,26 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System.Security.Cryptography;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Host.Configuration;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Honua.Server.Host.Middleware;
 
 /// <summary>
 /// Middleware that adds security headers to protect against common web vulnerabilities.
 /// Implements OWASP security header recommendations with nonce-based CSP.
+/// Configurable via appsettings.json SecurityHeaders section.
 /// </summary>
 public class SecurityHeadersMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<SecurityHeadersMiddleware> _logger;
+    private readonly SecurityHeadersOptions _options;
 
     /// <summary>
     /// HttpContext item key for CSP nonce value.
@@ -28,16 +32,25 @@ public class SecurityHeadersMiddleware
     public SecurityHeadersMiddleware(
         RequestDelegate next,
         IWebHostEnvironment environment,
-        ILogger<SecurityHeadersMiddleware> logger)
+        ILogger<SecurityHeadersMiddleware> logger,
+        IOptions<SecurityHeadersOptions> options)
     {
         _next = Guard.NotNull(next);
         _environment = Guard.NotNull(environment);
         _logger = Guard.NotNull(logger);
+        _options = Guard.NotNull(options).Value;
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
         Guard.NotNull(context);
+
+        // Skip if middleware is disabled
+        if (!_options.Enabled)
+        {
+            await _next(context).ConfigureAwait(false);
+            return;
+        }
 
         try
         {
@@ -46,7 +59,7 @@ public class SecurityHeadersMiddleware
             context.Items[CspNonceKey] = nonce;
 
             // Add security headers before processing the request
-            AddSecurityHeaders(context, _environment, nonce);
+            AddSecurityHeaders(context, _environment, nonce, _options);
 
             await _next(context).ConfigureAwait(false);
         }
@@ -72,27 +85,49 @@ public class SecurityHeadersMiddleware
         return Convert.ToBase64String(nonceBytes);
     }
 
-    private static void AddSecurityHeaders(HttpContext context, IWebHostEnvironment environment, string cspNonce)
+    private static void AddSecurityHeaders(HttpContext context, IWebHostEnvironment environment, string cspNonce, SecurityHeadersOptions options)
     {
         var headers = context.Response.Headers;
         var isProduction = environment.IsProduction();
 
         // Strict-Transport-Security (HSTS)
         // Forces HTTPS - use preload only in production
-        if (context.Request.IsHttps)
+        if (options.EnableHsts && context.Request.IsHttps)
         {
-            headers["Strict-Transport-Security"] = isProduction
-                ? "max-age=31536000; includeSubDomains; preload"
-                : "max-age=86400; includeSubDomains";
+            // Skip HSTS if configured for production-only and not in production
+            if (!options.HstsProductionOnly || isProduction)
+            {
+                var hstsValue = options.StrictTransportSecurity;
+                if (string.IsNullOrWhiteSpace(hstsValue))
+                {
+                    // Default HSTS values
+                    hstsValue = isProduction
+                        ? "max-age=31536000; includeSubDomains; preload"
+                        : "max-age=86400; includeSubDomains";
+                }
+
+                if (!headers.ContainsKey("Strict-Transport-Security"))
+                {
+                    headers["Strict-Transport-Security"] = hstsValue;
+                }
+            }
         }
 
         // X-Content-Type-Options
         // Prevents MIME type sniffing
-        headers["X-Content-Type-Options"] = "nosniff";
+        var xContentTypeOptions = options.XContentTypeOptions ?? "nosniff";
+        if (!string.IsNullOrWhiteSpace(xContentTypeOptions) && !headers.ContainsKey("X-Content-Type-Options"))
+        {
+            headers["X-Content-Type-Options"] = xContentTypeOptions;
+        }
 
         // X-Frame-Options
         // Prevents clickjacking attacks
-        headers["X-Frame-Options"] = "DENY";
+        var xFrameOptions = options.XFrameOptions ?? "DENY";
+        if (!string.IsNullOrWhiteSpace(xFrameOptions) && !headers.ContainsKey("X-Frame-Options"))
+        {
+            headers["X-Frame-Options"] = xFrameOptions;
+        }
 
         // X-XSS-Protection header removed (deprecated by modern browsers)
         // Use Content-Security-Policy instead for XSS protection
@@ -100,7 +135,11 @@ public class SecurityHeadersMiddleware
 
         // Referrer-Policy
         // Controls referrer information
-        headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        var referrerPolicy = options.ReferrerPolicy ?? "strict-origin-when-cross-origin";
+        if (!string.IsNullOrWhiteSpace(referrerPolicy) && !headers.ContainsKey("Referrer-Policy"))
+        {
+            headers["Referrer-Policy"] = referrerPolicy;
+        }
 
         // Content-Security-Policy with nonce-based script protection
         // Prevents XSS, clickjacking, and other code injection attacks
@@ -111,50 +150,82 @@ public class SecurityHeadersMiddleware
         //
         // Production: Strict nonce-based policy with no unsafe directives
         // Development: Relaxed for Swagger/debugging tools (still uses nonce for additional security)
-        headers["Content-Security-Policy"] = isProduction
-            ? $"default-src 'self'; " +
-              $"script-src 'nonce-{cspNonce}' 'self' 'strict-dynamic'; " +
-              $"style-src 'self' 'unsafe-inline'; " +  // CSS can safely use unsafe-inline
-              $"img-src 'self' data: https:; " +
-              $"font-src 'self'; " +
-              $"connect-src 'self'; " +
-              $"object-src 'none'; " +
-              $"base-uri 'self'; " +
-              $"form-action 'self'; " +
-              $"frame-ancestors 'none'; " +
-              $"upgrade-insecure-requests"
-            : $"default-src 'self'; " +
-              $"script-src 'nonce-{cspNonce}' 'self' 'unsafe-inline' 'unsafe-eval'; " +  // Relaxed for Swagger
-              $"style-src 'self' 'unsafe-inline'; " +
-              $"img-src 'self' data: https:; " +
-              $"font-src 'self' data:; " +
-              $"connect-src 'self'; " +
-              $"object-src 'none'; " +
-              $"base-uri 'self'; " +
-              $"form-action 'self'; " +
-              $"frame-ancestors 'none'";
+        var cspValue = options.ContentSecurityPolicy;
+        if (string.IsNullOrWhiteSpace(cspValue))
+        {
+            // Build default CSP based on environment
+            var scriptSrc = isProduction
+                ? $"'nonce-{cspNonce}' 'self' 'strict-dynamic'"
+                : $"'nonce-{cspNonce}' 'self'" +
+                  (options.AllowUnsafeInlineInDevelopment ? " 'unsafe-inline'" : "") +
+                  (options.AllowUnsafeEvalInDevelopment ? " 'unsafe-eval'" : "");
+
+            var fontSrc = isProduction ? "'self'" : "'self' data:";
+
+            cspValue = $"default-src 'self'; " +
+                      $"script-src {scriptSrc}; " +
+                      $"style-src 'self' 'unsafe-inline'; " +  // CSS can safely use unsafe-inline
+                      $"img-src 'self' data: https:; " +
+                      $"font-src {fontSrc}; " +
+                      $"connect-src 'self'; " +
+                      $"object-src 'none'; " +
+                      $"base-uri 'self'; " +
+                      $"form-action 'self'; " +
+                      $"frame-ancestors 'none'";
+
+            if (isProduction)
+            {
+                cspValue += "; upgrade-insecure-requests";
+            }
+        }
+        else
+        {
+            // Replace {nonce} placeholder with actual nonce
+            cspValue = cspValue.Replace("{nonce}", cspNonce);
+        }
+
+        if (!headers.ContainsKey("Content-Security-Policy"))
+        {
+            headers["Content-Security-Policy"] = cspValue;
+        }
 
         // Permissions-Policy (formerly Feature-Policy)
         // Restricts browser features
-        headers["Permissions-Policy"] =
-            "accelerometer=(), " +
-            "camera=(), " +
-            "geolocation=(), " +
-            "gyroscope=(), " +
-            "magnetometer=(), " +
-            "microphone=(), " +
-            "payment=(), " +
-            "usb=()";
+        var permissionsPolicy = options.PermissionsPolicy;
+        if (string.IsNullOrWhiteSpace(permissionsPolicy))
+        {
+            permissionsPolicy =
+                "accelerometer=(), " +
+                "camera=(), " +
+                "geolocation=(), " +
+                "gyroscope=(), " +
+                "magnetometer=(), " +
+                "microphone=(), " +
+                "payment=(), " +
+                "usb=()";
+        }
+
+        if (!headers.ContainsKey("Permissions-Policy"))
+        {
+            headers["Permissions-Policy"] = permissionsPolicy;
+        }
 
         // X-Permitted-Cross-Domain-Policies
         // Restricts Adobe Flash and PDF cross-domain requests
-        headers["X-Permitted-Cross-Domain-Policies"] = "none";
+        var xPermittedCrossDomainPolicies = options.XPermittedCrossDomainPolicies ?? "none";
+        if (!string.IsNullOrWhiteSpace(xPermittedCrossDomainPolicies) && !headers.ContainsKey("X-Permitted-Cross-Domain-Policies"))
+        {
+            headers["X-Permitted-Cross-Domain-Policies"] = xPermittedCrossDomainPolicies;
+        }
 
         // Remove server header to avoid information disclosure
-        headers.Remove("Server");
-        headers.Remove("X-Powered-By");
-        headers.Remove("X-AspNet-Version");
-        headers.Remove("X-AspNetMvc-Version");
+        if (options.RemoveServerHeaders)
+        {
+            headers.Remove("Server");
+            headers.Remove("X-Powered-By");
+            headers.Remove("X-AspNet-Version");
+            headers.Remove("X-AspNetMvc-Version");
+        }
     }
 }
 

@@ -100,12 +100,24 @@ internal sealed class PostgresFeatureOperations
         {
             definition = builder.BuildSelect(normalizedQuery);
         }
+        catch (QueryException)
+        {
+            _queryBuilderPool.Return(builder, service, layer, storageSrid, targetSrid);
+            throw;
+        }
+        catch (ArgumentException argEx)
+        {
+            _logger?.LogError(argEx, "Invalid argument building query for layer {LayerId} in service {ServiceId}",
+                layer.Id, service.Id);
+            _queryBuilderPool.Return(builder, service, layer, storageSrid, targetSrid);
+            throw new QueryException($"Invalid query parameters for layer '{layer.Id}'", argEx);
+        }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to build select query for layer {LayerId} in service {ServiceId}. Storage SRID: {StorageSrid}, Target SRID: {TargetSrid}",
                 layer.Id, service.Id, storageSrid, targetSrid);
             _queryBuilderPool.Return(builder, service, layer, storageSrid, targetSrid);
-            throw;
+            throw new QueryException($"Failed to build query for layer '{layer.Id}'", ex);
         }
 
         await using var command = PostgresRecordMapper.CreateCommand(connection, definition, normalizedQuery.CommandTimeout, _options.DefaultCommandTimeoutSeconds);

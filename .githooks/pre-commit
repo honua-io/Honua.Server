@@ -1,0 +1,35 @@
+#!/bin/bash
+# Pre-commit hook for Honua.Server
+# Runs code formatting check, build, and unit tests
+
+set -e
+
+echo "Running pre-commit checks..."
+
+# 1. Check for dotnet format
+echo "Checking code formatting..."
+if ! dotnet format --verify-no-changes --verbosity quiet; then
+    echo "❌ Code formatting check failed!"
+    echo "Run 'dotnet format' to fix formatting issues."
+    exit 1
+fi
+echo "✅ Code formatting check passed"
+
+# 2. Build the project
+echo "Building project..."
+if ! dotnet build --no-incremental --verbosity quiet; then
+    echo "❌ Build failed!"
+    exit 1
+fi
+echo "✅ Build passed"
+
+# 3. Run unit tests (fast tests only)
+echo "Running unit tests..."
+if ! dotnet test --no-build --filter "Category=Unit" --verbosity quiet; then
+    echo "❌ Unit tests failed!"
+    exit 1
+fi
+echo "✅ Unit tests passed"
+
+echo "✅ All pre-commit checks passed!"
+exit 0

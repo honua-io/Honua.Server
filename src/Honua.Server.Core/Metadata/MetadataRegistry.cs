@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Honua.Server.Core.Exceptions;
 using Honua.Server.Core.Observability;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
@@ -110,11 +111,23 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
                                     snapshot.Folders.Count,
                                     layerCount);
                             }
+                            catch (MetadataException)
+                            {
+                                // Re-throw domain exceptions as-is
+                                Volatile.Write(ref _snapshotTask, previous);
+                                throw;
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // Re-throw cancellation as-is
+                                Volatile.Write(ref _snapshotTask, previous);
+                                throw;
+                            }
                             catch (Exception ex)
                             {
                                 Volatile.Write(ref _snapshotTask, previous);
                                 _logger?.LogError(ex, "Metadata reload failed: {Error}", ex.Message);
-                                throw;
+                                throw new MetadataException("Failed to reload metadata", "METADATA_RELOAD_FAILED", ex);
                             }
                         },
                         LogLevel.Information).ConfigureAwait(false);
@@ -171,14 +184,24 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
                             SignalSnapshotChanged();
 
                             _logger?.LogInformation("Metadata update completed successfully");
-                            await Task.CompletedTask;
+                            await Task.CompletedTask.ConfigureAwait(false);
                         },
                         LogLevel.Information).ConfigureAwait(false);
+                }
+                catch (MetadataException)
+                {
+                    // Re-throw domain exceptions as-is
+                    throw;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Re-throw cancellation as-is
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "Metadata update failed: {Error}", ex.Message);
-                    throw;
+                    throw new MetadataException("Failed to update metadata", "METADATA_UPDATE_FAILED", ex);
                 }
                 finally
                 {
@@ -208,7 +231,7 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
             var existing = Volatile.Read(ref _snapshotTask);
             if (existing is not null)
             {
-                return await existing.WaitAsync(cancellationToken);
+                return await existing.WaitAsync(cancellationToken).ConfigureAwait(false);
             }
 
             var loadTask = LoadAsync(cancellationToken);
@@ -233,11 +256,23 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
 
                 return snapshot;
             }
+            catch (MetadataException)
+            {
+                // Re-throw domain exceptions as-is
+                Volatile.Write(ref _snapshotTask, null);
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                // Re-throw cancellation as-is
+                Volatile.Write(ref _snapshotTask, null);
+                throw;
+            }
             catch (Exception ex)
             {
                 Volatile.Write(ref _snapshotTask, null);
                 _logger?.LogError(ex, "Metadata initialization failed: {Error}", ex.Message);
-                throw;
+                throw new MetadataException("Failed to initialize metadata", "METADATA_INIT_FAILED", ex);
             }
         }
         finally

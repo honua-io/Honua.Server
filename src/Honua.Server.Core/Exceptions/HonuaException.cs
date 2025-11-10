@@ -9,11 +9,31 @@ namespace Honua.Server.Core.Exceptions;
 /// </summary>
 public abstract class HonuaException : Exception
 {
+    /// <summary>
+    /// Gets the error code for this exception.
+    /// </summary>
+    public string? ErrorCode { get; protected set; }
+
+    /// <summary>
+    /// Gets a value indicating whether this exception represents a transient failure that can be retried.
+    /// </summary>
+    public virtual bool IsTransient => this is ITransientException transient && transient.IsTransient;
+
     protected HonuaException(string message) : base(message)
     {
     }
 
     protected HonuaException(string message, Exception innerException) : base(message, innerException)
     {
+    }
+
+    protected HonuaException(string message, string? errorCode) : base(message)
+    {
+        ErrorCode = errorCode;
+    }
+
+    protected HonuaException(string message, string? errorCode, Exception innerException) : base(message, innerException)
+    {
+        ErrorCode = errorCode;
     }
 }

@@ -178,6 +178,9 @@ public static class ServiceCollectionExtensions
         // Add distributed and memory caching support
         services.AddHonuaCaching(configuration);
 
+        // Register time provider for testable time-dependent code
+        services.AddSingleton<Time.ITimeProvider, Time.SystemTimeProvider>();
+
         // Note: Compression codecs for Zarr and other raster formats are now registered
         // in Honua.Server.Core.Raster project via AddHonuaCompressionCodecs extension method
 
@@ -331,6 +334,12 @@ public static class ServiceCollectionExtensions
         // Configure circuit breaker options and service
         services.Configure<Resilience.CircuitBreakerOptions>(configuration.GetSection(Resilience.CircuitBreakerOptions.SectionName));
         services.AddSingleton<Resilience.ICircuitBreakerService, Resilience.CircuitBreakerService>();
+
+        // Configure bulkhead resilience options and services
+        services.Configure<Resilience.BulkheadOptions>(configuration.GetSection(Resilience.BulkheadOptions.SectionName));
+        services.AddSingleton<Resilience.BulkheadPolicyProvider>();
+        services.AddSingleton<Resilience.TenantResourceLimiter>();
+        services.AddSingleton<Resilience.MemoryCircuitBreaker>();
 
         services.AddHostedService<SecurityValidationHostedService>();
         services.AddHostedService<MetadataInitializationHostedService>();
