@@ -104,6 +104,66 @@ public sealed class OgcConformanceTests
     }
 
     [Fact]
+    public async Task WcsService_PassesConformance()
+    {
+        if (!OgcConformanceFixture.IsEnabled)
+        {
+            _output.WriteLine($"OGC conformance tests disabled. Set {OgcConformanceFixture.ComplianceEnvVar}=true to enable.");
+            return;
+        }
+
+        await _fixture.EnsureInitializedAsync();
+
+        var capabilitiesUrl = $"{_fixture.HonuaBaseUrl}/wcs?service=WCS&request=GetCapabilities&version=2.0.1";
+        var result = await _fixture.RunWcsTests(capabilitiesUrl);
+
+        _output.WriteLine($"Test results saved to: {result.ReportPath}");
+        _output.WriteLine($"Test completed with status: {result.Success}");
+
+        result.Success.Should().BeTrue("WCS 2.0 conformance tests should pass");
+    }
+
+    [Fact]
+    public async Task WmtsService_PassesConformance()
+    {
+        if (!OgcConformanceFixture.IsEnabled)
+        {
+            _output.WriteLine($"OGC conformance tests disabled. Set {OgcConformanceFixture.ComplianceEnvVar}=true to enable.");
+            return;
+        }
+
+        await _fixture.EnsureInitializedAsync();
+
+        var capabilitiesUrl = $"{_fixture.HonuaBaseUrl}/wmts?service=WMTS&request=GetCapabilities&version=1.0.0";
+        var result = await _fixture.RunWmtsTests(capabilitiesUrl);
+
+        _output.WriteLine($"Test results saved to: {result.ReportPath}");
+        _output.WriteLine($"Test completed with status: {result.Success}");
+
+        result.Success.Should().BeTrue("WMTS 1.0 conformance tests should pass");
+    }
+
+    [Fact]
+    public async Task CswService_PassesConformance()
+    {
+        if (!OgcConformanceFixture.IsEnabled)
+        {
+            _output.WriteLine($"OGC conformance tests disabled. Set {OgcConformanceFixture.ComplianceEnvVar}=true to enable.");
+            return;
+        }
+
+        await _fixture.EnsureInitializedAsync();
+
+        var capabilitiesUrl = $"{_fixture.HonuaBaseUrl}/csw?service=CSW&request=GetCapabilities&version=2.0.2";
+        var result = await _fixture.RunCswTests(capabilitiesUrl);
+
+        _output.WriteLine($"Test results saved to: {result.ReportPath}");
+        _output.WriteLine($"Test completed with status: {result.Success}");
+
+        result.Success.Should().BeTrue("CSW 2.0.2 conformance tests should pass");
+    }
+
+    [Fact]
     public async Task KmlExport_PassesConformance()
     {
         if (!OgcConformanceFixture.IsEnabled)
@@ -207,6 +267,9 @@ public sealed class OgcConformanceFixture : IAsyncLifetime
                          "ogccite/ets-ogcapi-features10:latest",
                          "ogccite/ets-wfs20:latest",
                          "ogccite/ets-wms13:latest",
+                         "ogccite/ets-wcs20:latest",
+                         "ogccite/ets-wmts10:latest",
+                         "ogccite/ets-csw202:latest",
                          "ogccite/ets-kml22:latest"
                      })
             {
@@ -358,6 +421,114 @@ public sealed class OgcConformanceFixture : IAsyncLifetime
         var success = response.IsSuccessStatusCode && !content.Contains("FAIL", StringComparison.OrdinalIgnoreCase);
 
         return new WmsTestResult(reportPath, success);
+    }
+
+    public async Task<WcsTestResult> RunWcsTests(string capabilitiesUrl)
+    {
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        var reportDir = Path.Combine(ReportRootDir, $"wcs-{timestamp}");
+        Directory.CreateDirectory(reportDir);
+
+        var reportPath = Path.Combine(reportDir, "wcs-conformance-response.xml");
+
+        // Start ephemeral TEAM Engine container
+        await using var wcsEngine = new ContainerBuilder()
+            .WithImage("ogccite/ets-wcs20:latest")
+            .WithPortBinding(8080, true)
+            .WithExtraHost("host.docker.internal", "host-gateway")
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(8080))
+            .Build();
+
+        await wcsEngine.StartAsync().ConfigureAwait(false);
+        var port = wcsEngine.GetMappedPublicPort(8080);
+        await Task.Delay(5000); // Additional stabilization time
+
+        // Invoke WCS test suite via REST API
+        var encodedCapabilities = Uri.EscapeDataString(capabilitiesUrl);
+        var runUrl = $"http://localhost:{port}/teamengine/rest/suites/wcs20/run?wcs={encodedCapabilities}&format=xml";
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Authorization", "Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes("ogctest:ogctest")));
+
+        var response = await httpClient.GetAsync(runUrl);
+        var content = await response.Content.ReadAsStringAsync();
+        await File.WriteAllTextAsync(reportPath, content);
+
+        var success = response.IsSuccessStatusCode && !content.Contains("FAIL", StringComparison.OrdinalIgnoreCase);
+
+        return new WcsTestResult(reportPath, success);
+    }
+
+    public async Task<WmtsTestResult> RunWmtsTests(string capabilitiesUrl)
+    {
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        var reportDir = Path.Combine(ReportRootDir, $"wmts-{timestamp}");
+        Directory.CreateDirectory(reportDir);
+
+        var reportPath = Path.Combine(reportDir, "wmts-conformance-response.xml");
+
+        // Start ephemeral TEAM Engine container
+        await using var wmtsEngine = new ContainerBuilder()
+            .WithImage("ogccite/ets-wmts10:latest")
+            .WithPortBinding(8080, true)
+            .WithExtraHost("host.docker.internal", "host-gateway")
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(8080))
+            .Build();
+
+        await wmtsEngine.StartAsync().ConfigureAwait(false);
+        var port = wmtsEngine.GetMappedPublicPort(8080);
+        await Task.Delay(5000); // Additional stabilization time
+
+        // Invoke WMTS test suite via REST API
+        var encodedCapabilities = Uri.EscapeDataString(capabilitiesUrl);
+        var runUrl = $"http://localhost:{port}/teamengine/rest/suites/wmts10/run?wmts={encodedCapabilities}&format=xml";
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Authorization", "Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes("ogctest:ogctest")));
+
+        var response = await httpClient.GetAsync(runUrl);
+        var content = await response.Content.ReadAsStringAsync();
+        await File.WriteAllTextAsync(reportPath, content);
+
+        var success = response.IsSuccessStatusCode && !content.Contains("FAIL", StringComparison.OrdinalIgnoreCase);
+
+        return new WmtsTestResult(reportPath, success);
+    }
+
+    public async Task<CswTestResult> RunCswTests(string capabilitiesUrl)
+    {
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        var reportDir = Path.Combine(ReportRootDir, $"csw-{timestamp}");
+        Directory.CreateDirectory(reportDir);
+
+        var reportPath = Path.Combine(reportDir, "csw-conformance-response.xml");
+
+        // Start ephemeral TEAM Engine container
+        await using var cswEngine = new ContainerBuilder()
+            .WithImage("ogccite/ets-csw202:latest")
+            .WithPortBinding(8080, true)
+            .WithExtraHost("host.docker.internal", "host-gateway")
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(8080))
+            .Build();
+
+        await cswEngine.StartAsync().ConfigureAwait(false);
+        var port = cswEngine.GetMappedPublicPort(8080);
+        await Task.Delay(5000); // Additional stabilization time
+
+        // Invoke CSW test suite via REST API
+        var encodedCapabilities = Uri.EscapeDataString(capabilitiesUrl);
+        var runUrl = $"http://localhost:{port}/teamengine/rest/suites/csw202/run?csw={encodedCapabilities}&format=xml";
+
+        using var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Add("Authorization", "Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes("ogctest:ogctest")));
+
+        var response = await httpClient.GetAsync(runUrl);
+        var content = await response.Content.ReadAsStringAsync();
+        await File.WriteAllTextAsync(reportPath, content);
+
+        var success = response.IsSuccessStatusCode && !content.Contains("FAIL", StringComparison.OrdinalIgnoreCase);
+
+        return new CswTestResult(reportPath, success);
     }
 
     public async Task<KmlTestResult> RunKmlTests(string kmlFilePath)
@@ -589,4 +760,7 @@ public sealed class OgcConformanceFixture : IAsyncLifetime
 public sealed record OgcApiFeaturesTestResult(string ReportPath, int Passed, int Failed, int Skipped, bool Success);
 public sealed record WfsTestResult(string ReportPath, bool Success);
 public sealed record WmsTestResult(string ReportPath, bool Success);
+public sealed record WcsTestResult(string ReportPath, bool Success);
+public sealed record WmtsTestResult(string ReportPath, bool Success);
+public sealed record CswTestResult(string ReportPath, bool Success);
 public sealed record KmlTestResult(string ReportPath, bool Success);

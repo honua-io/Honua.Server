@@ -118,25 +118,55 @@ Honua Server implements comprehensive conformance testing for multiple OGC (Open
 
 **Documentation**: `tools/ets/ets-kml22-README.md`
 
-### ⚠️ WCS 2.0 (Web Coverage Service)
+### ✅ WCS 2.0 (Web Coverage Service)
 
-**Status**: Python/QGIS integration tests only (no official CITE)
-**Test Location**: Python test suite with QGIS
-**Note**: Official CITE integration should be added for certification
+**Status**: Official CITE tests integrated
+**Test Location**: `tests/Honua.Server.Core.Tests.OgcProtocols/Ogc/OgcConformanceTests.cs`
+**Container**: `ogccite/ets-wcs20:latest`
+
+**Capabilities**:
+- GetCapabilities operation
+- DescribeCoverage operation
+- GetCoverage operation
+- Format negotiation (GeoTIFF, PNG, etc.)
+- CRS support and transformations
+- Range subsetting
+- Interpolation methods
+
+### ✅ WMTS 1.0 (Web Map Tile Service)
+
+**Status**: Official CITE tests integrated
+**Test Location**: `tests/Honua.Server.Core.Tests.OgcProtocols/Ogc/OgcConformanceTests.cs`
+**Container**: `ogccite/ets-wmts10:latest`
+
+**Capabilities**:
+- GetCapabilities operation
+- GetTile operation
+- GetFeatureInfo operation
+- Multiple tile matrix sets
+- Multiple output formats
+- RESTful and KVP (Key-Value-Pair) interfaces
+
+### ✅ CSW 2.0.2 (Catalogue Service for the Web)
+
+**Status**: Official CITE tests integrated
+**Test Location**: `tests/Honua.Server.Core.Tests.OgcProtocols/Ogc/OgcConformanceTests.cs`
+**Container**: `ogccite/ets-csw202:latest`
+
+**Capabilities**:
+- GetCapabilities operation
+- DescribeRecord operation
+- GetRecords operation
+- GetRecordById operation
+- GetDomain operation
+- Metadata discovery and query
+- ISO 19139 metadata support
 
 ### ✅ Additional Standards
-
-**WMTS (Web Map Tile Service)**
-- Python/QGIS integration tests
-- Tile matrix set validation
 
 **STAC (SpatioTemporal Asset Catalog)**
 - Python integration tests
 - Catalog and collection validation
-
-**CSW (Catalog Service for the Web)**
-- Python integration tests
-- Metadata discovery validation
 
 ## Test Architecture
 
@@ -234,13 +264,22 @@ dotnet test --filter "Category=OGC&Category=Conformance"
 dotnet test --filter "FullyQualifiedName~OgcApiFeatures"
 
 # WFS 2.0
-dotnet test --filter "FullyQualifiedName~Wfs20"
+dotnet test --filter "FullyQualifiedName~Wfs"
 
 # WMS 1.3
-dotnet test --filter "FullyQualifiedName~Wms13"
+dotnet test --filter "FullyQualifiedName~Wms"
+
+# WCS 2.0
+dotnet test --filter "FullyQualifiedName~Wcs"
+
+# WMTS 1.0
+dotnet test --filter "FullyQualifiedName~Wmts"
+
+# CSW 2.0.2
+dotnet test --filter "FullyQualifiedName~Csw"
 
 # KML 2.2
-dotnet test --filter "FullyQualifiedName~Kml22"
+dotnet test --filter "FullyQualifiedName~Kml"
 
 # SensorThings
 dotnet test --filter "FullyQualifiedName~OgcSensorThingsConformanceTests"
@@ -278,16 +317,21 @@ The following standards have comprehensive testing and are ready for official OG
    - Official CITE tests integrated
    - Multiple format support validated
 
-5. **KML 2.2** ✅
+5. **WCS 2.0** ✅
+   - Official CITE tests integrated
+   - Coverage format support validated
+
+6. **WMTS 1.0** ✅
+   - Official CITE tests integrated
+   - Tile matrix set support validated
+
+7. **CSW 2.0.2** ✅
+   - Official CITE tests integrated
+   - Metadata discovery validated
+
+8. **KML 2.2** ✅
    - Official CITE tests integrated
    - All conformance levels tested
-
-### Needs Additional Work
-
-1. **WCS 2.0** ⚠️
-   - Only Python integration tests currently
-   - Should integrate official CITE tests for certification
-   - Consider adding to `OgcConformanceTests.cs` with `ogccite/ets-wcs20` container
 
 ## Conformance Declarations
 
@@ -406,10 +450,10 @@ For questions about OGC compliance:
 
 Honua Server has **comprehensive OGC standards compliance testing** in place:
 
-- ✅ **5 standards** with official CITE integration
-- ✅ **SensorThings API v1.1** with complete conformance suite (7 classes)
+- ✅ **8 standards** with official CITE integration (OGC API Features, WFS 2.0, WMS 1.3, WCS 2.0, WMTS 1.0, CSW 2.0.2, KML 2.2, plus SensorThings API v1.1)
+- ✅ **SensorThings API v1.1** with complete conformance suite (7 classes, 8 entity types)
 - ✅ **Automated CI/CD** integration for regression prevention
-- ✅ **Ready for certification** for 5 OGC standards
-- ⚠️ **WCS 2.0** needs official CITE integration (currently Python-only tests)
+- ✅ **Ready for certification** for 8 OGC standards
+- ✅ **Full coverage** of core OGC web services (Features, WFS, WMS, WCS, WMTS, CSW)
 
-The testing infrastructure is production-ready and suitable for pursuing official OGC certification.
+The testing infrastructure is production-ready and suitable for pursuing official OGC certification across all implemented standards.
