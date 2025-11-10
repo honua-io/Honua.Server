@@ -12,6 +12,7 @@ public static class MapConfigurationEndpoints
     public static IEndpointRouteBuilder MapMapConfigurationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/admin/api/map-configurations")
+            .RequireAuthorization("RequireAdministrator")
             .WithTags("Map Configurations")
             .WithOpenApi();
 
