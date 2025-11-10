@@ -588,6 +588,10 @@ public static class SensorThingsHandlers
             return Results.BadRequest(new { error = "Result is required" });
 
         var created = await repository.CreateObservationAsync(observation, ct);
+
+        // Broadcast to SignalR subscribers (if enabled)
+        await BroadcastObservationAsync(context, repository, created, ct);
+
         return Results.Created(created.SelfLink, created);
     }
 
@@ -772,6 +776,9 @@ public static class SensorThingsHandlers
 
         var created = await repository.CreateObservationsDataArrayAsync(request, ct);
 
+        // Broadcast batch to SignalR subscribers (if enabled)
+        await BroadcastObservationBatchAsync(context, repository, created, ct);
+
         return Results.Created($"{GetBaseUrl(context)}/Datastreams({request.Datastream.Id})/Observations", new
         {
             context = $"{GetBaseUrl(context)}/$metadata#Observations",
@@ -822,5 +829,114 @@ public static class SensorThingsHandlers
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
             WriteIndented = false
         };
+    }
+
+    // ========================================
+    // SignalR Broadcasting Helpers
+    // ========================================
+
+    /// <summary>
+    /// Broadcasts a single observation to SignalR subscribers (if broadcaster is available).
+    /// </summary>
+    private static async Task BroadcastObservationAsync(
+        HttpContext context,
+        ISensorThingsRepository repository,
+        Observation observation,
+        CancellationToken ct)
+    {
+        try
+        {
+            // Get broadcaster from DI (if registered)
+            var broadcaster = context.RequestServices
+                .GetService(Type.GetType("Honua.Server.Host.SensorThings.ISensorObservationBroadcaster, Honua.Server.Host"));
+
+            if (broadcaster == null)
+                return; // Broadcaster not registered, skip
+
+            // Check if broadcaster is enabled
+            var isEnabledProperty = broadcaster.GetType().GetProperty("IsEnabled");
+            if (isEnabledProperty?.GetValue(broadcaster) is bool enabled && !enabled)
+                return;
+
+            // Get the datastream for context
+            var datastream = await repository.GetDatastreamAsync(observation.DatastreamId, ct: ct);
+            if (datastream == null)
+                return;
+
+            // Call BroadcastObservationAsync method
+            var broadcastMethod = broadcaster.GetType().GetMethod("BroadcastObservationAsync");
+            if (broadcastMethod != null)
+            {
+                var task = (Task?)broadcastMethod.Invoke(broadcaster, new object[] { observation, datastream, ct });
+                if (task != null)
+                    await task;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the request if broadcasting fails
+            var logger = context.RequestServices.GetService<ILogger<ISensorThingsRepository>>();
+            logger?.LogError(ex, "Error broadcasting observation {ObservationId}", observation.Id);
+        }
+    }
+
+    /// <summary>
+    /// Broadcasts a batch of observations to SignalR subscribers (if broadcaster is available).
+    /// </summary>
+    private static async Task BroadcastObservationBatchAsync(
+        HttpContext context,
+        ISensorThingsRepository repository,
+        IReadOnlyList<Observation> observations,
+        CancellationToken ct)
+    {
+        try
+        {
+            if (observations.Count == 0)
+                return;
+
+            // Get broadcaster from DI (if registered)
+            var broadcaster = context.RequestServices
+                .GetService(Type.GetType("Honua.Server.Host.SensorThings.ISensorObservationBroadcaster, Honua.Server.Host"));
+
+            if (broadcaster == null)
+                return;
+
+            // Check if broadcaster is enabled
+            var isEnabledProperty = broadcaster.GetType().GetProperty("IsEnabled");
+            if (isEnabledProperty?.GetValue(broadcaster) is bool enabled && !enabled)
+                return;
+
+            // Group observations by datastream and fetch datastream info
+            var datastreamIds = observations.Select(o => o.DatastreamId).Distinct().ToList();
+            var datastreams = new Dictionary<string, Datastream>();
+
+            foreach (var datastreamId in datastreamIds)
+            {
+                var datastream = await repository.GetDatastreamAsync(datastreamId, ct: ct);
+                if (datastream != null)
+                    datastreams[datastreamId] = datastream;
+            }
+
+            // Create list of observations with their datastreams
+            var observationsWithDatastreams = observations
+                .Where(o => datastreams.ContainsKey(o.DatastreamId))
+                .Select(o => (o, datastreams[o.DatastreamId]))
+                .ToList();
+
+            // Call BroadcastObservationsAsync method
+            var broadcastMethod = broadcaster.GetType().GetMethod("BroadcastObservationsAsync");
+            if (broadcastMethod != null)
+            {
+                var task = (Task?)broadcastMethod.Invoke(broadcaster, new object[] { observationsWithDatastreams, ct });
+                if (task != null)
+                    await task;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the request if broadcasting fails
+            var logger = context.RequestServices.GetService<ILogger<ISensorThingsRepository>>();
+            logger?.LogError(ex, "Error broadcasting observation batch of {Count} observations", observations.Count);
+        }
     }
 }

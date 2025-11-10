@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SensorThings Streaming Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .observations {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        .observation {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #007bff;
+            border-radius: 4px;
+        }
+        .observation .time {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        .observation .value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .subscriptions {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .subscription-tag {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 12px;
+            margin: 3px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SensorThings Real-Time Streaming Demo</h1>
+
+        <div id="status" class="status disconnected">
+            Status: <span id="statusText">Disconnected</span>
+        </div>
+
+        <div class="controls">
+            <h3>Connection</h3>
+            <input type="text" id="serverUrl" placeholder="Server URL" value="http://localhost:5000" style="width: 300px;">
+            <input type="text" id="authToken" placeholder="Auth Token (optional)" style="width: 300px;">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
+
+        <div class="controls">
+            <h3>Subscribe</h3>
+            <select id="subscriptionType">
+                <option value="datastream">Datastream</option>
+                <option value="thing">Thing</option>
+                <option value="sensor">Sensor</option>
+            </select>
+            <input type="text" id="subscriptionId" placeholder="ID to subscribe to" style="width: 300px;">
+            <button id="subscribeBtn" onclick="subscribe()" disabled>Subscribe</button>
+        </div>
+
+        <div class="subscriptions">
+            <h3>Active Subscriptions</h3>
+            <div id="subscriptionList">None</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Live Observations <span id="observationCount">(0)</span></h2>
+        <button onclick="clearObservations()">Clear</button>
+        <div id="observations" class="observations">
+            <p style="color: #6c757d;">Waiting for observations...</p>
+        </div>
+    </div>
+
+    <script>
+        let connection = null;
+        let observationCount = 0;
+        const subscriptions = new Set();
+
+        async function connect() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const authToken = document.getElementById('authToken').value;
+
+            const options = {};
+            if (authToken) {
+                options.accessTokenFactory = () => authToken;
+            }
+
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl(serverUrl + '/hubs/sensor-observations', options)
+                .withAutomaticReconnect()
+                .configureLogging(signalR.LogLevel.Information)
+                .build();
+
+            // Handle observations
+            connection.on('ObservationCreated', (obs) => {
+                addObservation(obs, false);
+            });
+
+            // Handle batched observations
+            connection.on('ObservationsBatch', (batch) => {
+                console.log(`Received batch of ${batch.count} observations`);
+                batch.observations.forEach(obs => addObservation(obs, true));
+            });
+
+            // Handle subscription confirmations
+            connection.on('Subscribed', (info) => {
+                console.log('Subscribed:', info);
+                subscriptions.add(`${info.type}:${info.id}`);
+                updateSubscriptionList();
+            });
+
+            // Handle unsubscription confirmations
+            connection.on('Unsubscribed', (info) => {
+                console.log('Unsubscribed:', info);
+                subscriptions.delete(`${info.type}:${info.id}`);
+                updateSubscriptionList();
+            });
+
+            // Handle errors
+            connection.on('Error', (error) => {
+                console.error('SignalR error:', error);
+                alert('Error: ' + error.message);
+            });
+
+            // Handle connection state changes
+            connection.onreconnecting(() => {
+                updateStatus(false, 'Reconnecting...');
+            });
+
+            connection.onreconnected(() => {
+                updateStatus(true, 'Reconnected');
+                // Re-subscribe to all subscriptions
+                subscriptions.forEach(async (sub) => {
+                    const [type, id] = sub.split(':');
+                    await resubscribe(type, id);
+                });
+            });
+
+            connection.onclose(() => {
+                updateStatus(false, 'Disconnected');
+            });
+
+            try {
+                await connection.start();
+                updateStatus(true, 'Connected');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('subscribeBtn').disabled = false;
+            } catch (err) {
+                console.error('Connection error:', err);
+                alert('Failed to connect: ' + err.message);
+            }
+        }
+
+        async function disconnect() {
+            if (connection) {
+                await connection.stop();
+                connection = null;
+                updateStatus(false, 'Disconnected');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                document.getElementById('subscribeBtn').disabled = true;
+                subscriptions.clear();
+                updateSubscriptionList();
+            }
+        }
+
+        async function subscribe() {
+            if (!connection) return;
+
+            const type = document.getElementById('subscriptionType').value;
+            const id = document.getElementById('subscriptionId').value;
+
+            if (!id) {
+                alert('Please enter an ID to subscribe to');
+                return;
+            }
+
+            try {
+                let method;
+                switch (type) {
+                    case 'datastream':
+                        method = 'SubscribeToDatastream';
+                        break;
+                    case 'thing':
+                        method = 'SubscribeToThing';
+                        break;
+                    case 'sensor':
+                        method = 'SubscribeToSensor';
+                        break;
+                }
+
+                await connection.invoke(method, id);
+                console.log(`Subscribed to ${type}: ${id}`);
+            } catch (err) {
+                console.error('Subscription error:', err);
+                alert('Failed to subscribe: ' + err.message);
+            }
+        }
+
+        async function resubscribe(type, id) {
+            let method;
+            switch (type) {
+                case 'datastream':
+                    method = 'SubscribeToDatastream';
+                    break;
+                case 'thing':
+                    method = 'SubscribeToThing';
+                    break;
+                case 'sensor':
+                    method = 'SubscribeToSensor';
+                    break;
+            }
+            await connection.invoke(method, id);
+        }
+
+        function addObservation(obs, isBatch) {
+            observationCount++;
+            document.getElementById('observationCount').textContent = `(${observationCount})`;
+
+            const observationsDiv = document.getElementById('observations');
+
+            // Remove placeholder text if present
+            if (observationCount === 1) {
+                observationsDiv.innerHTML = '';
+            }
+
+            const obsDiv = document.createElement('div');
+            obsDiv.className = 'observation';
+
+            const time = new Date(obs.phenomenonTime).toLocaleString();
+            const unit = obs.unitOfMeasurement?.symbol || '';
+
+            obsDiv.innerHTML = `
+                <div class="value">${obs.result}${unit}</div>
+                <div>${obs.datastreamName || obs.datastreamId}</div>
+                <div class="time">${time} ${isBatch ? '(batched)' : ''}</div>
+                <div class="time">Thing: ${obs.thingId} | Sensor: ${obs.sensorId}</div>
+            `;
+
+            observationsDiv.insertBefore(obsDiv, observationsDiv.firstChild);
+
+            // Keep only last 50 observations
+            while (observationsDiv.children.length > 50) {
+                observationsDiv.removeChild(observationsDiv.lastChild);
+            }
+        }
+
+        function clearObservations() {
+            observationCount = 0;
+            document.getElementById('observationCount').textContent = '(0)';
+            document.getElementById('observations').innerHTML = '<p style="color: #6c757d;">Waiting for observations...</p>';
+        }
+
+        function updateStatus(isConnected, text) {
+            const statusDiv = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+
+            statusDiv.className = 'status ' + (isConnected ? 'connected' : 'disconnected');
+            statusText.textContent = text;
+        }
+
+        function updateSubscriptionList() {
+            const listDiv = document.getElementById('subscriptionList');
+
+            if (subscriptions.size === 0) {
+                listDiv.innerHTML = 'None';
+                return;
+            }
+
+            listDiv.innerHTML = '';
+            subscriptions.forEach(sub => {
+                const tag = document.createElement('span');
+                tag.className = 'subscription-tag';
+                tag.textContent = sub;
+                listDiv.appendChild(tag);
+            });
+        }
+    </script>
+</body>
+</html>

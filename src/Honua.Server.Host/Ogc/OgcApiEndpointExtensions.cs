@@ -137,6 +137,7 @@ internal static class OgcApiEndpointExtensions
         [FromServices] IApiMetrics apiMetrics,
         [FromServices] OgcCacheHeaderService cacheHeaderService,
         [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+        [FromServices] Honua.Server.Core.Elevation.IElevationService elevationService,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(catalog);
@@ -169,6 +170,7 @@ internal static class OgcApiEndpointExtensions
             apiMetrics,
             cacheHeaderService,
             attachmentHandler,
+            elevationService,
             cancellationToken);
     }
 

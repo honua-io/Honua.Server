@@ -69,7 +69,8 @@ internal static partial class OgcSharedHandlers
             "filter-lang",
             "filter-crs",
             "ids",
-            "sortby"
+            "sortby",
+            "include3D"
         };
 
         var queryCollection = overrideQuery ?? request.Query;
@@ -257,6 +258,12 @@ internal static partial class OgcSharedHandlers
             sortOrders = new[] { new FeatureSortOrder(layer.IdField, FeatureSortDirection.Ascending) };
         }
 
+        // Parse include3D parameter for 3D coordinate support
+        var (include3D, include3DError) = QueryParameterHelper.ParseBoolean(
+            queryCollection["include3D"].ToString(),
+            defaultValue: false);
+        // Note: Boolean parsing errors are not critical, just use default
+
         var query = new FeatureQuery(
             Limit: effectiveLimit,
             Offset: effectiveOffset,
@@ -266,7 +273,8 @@ internal static partial class OgcSharedHandlers
             PropertyNames: propertyNames,
             SortOrders: sortOrders,
             Filter: combinedFilter,
-            Crs: servedCrs);
+            Crs: servedCrs,
+            Include3D: include3D);
 
         var (includeCount, countError) = QueryParameterHelper.ParseBoolean(
             queryCollection["count"].ToString(),
