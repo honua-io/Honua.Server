@@ -24,7 +24,7 @@ public static class AuditLogEndpoints
     public static IEndpointRouteBuilder MapAuditLogEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/audit")
-            .RequireAuthorization("AdminOnly"); // Requires admin role
+            .RequireAuthorization("RequireAdministrator"); // Requires admin role
 
         // Query audit events
         group.MapPost("/query", QueryAuditEventsAsync)

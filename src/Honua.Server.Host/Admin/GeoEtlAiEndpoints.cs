@@ -17,7 +17,8 @@ public static class GeoEtlAiEndpoints
     {
         var group = endpoints.MapGroup("/admin/api/geoetl/ai")
             .WithTags("GeoETL AI")
-            .WithOpenApi();
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // Check if AI service is available
         group.MapGet("/status", async (

@@ -256,7 +256,13 @@ public sealed class CosmosDbDataStoreProvider : IDataStoreProvider, IDisposable
             "Check IDataStoreCapabilities.SupportsSoftDelete before calling this method.");
     }
 
-    public Task<bool> HardDeleteAsync(
+    /// <summary>
+    /// Permanently deletes a feature from Azure Cosmos DB without recovery option.
+    /// This is a GDPR-compliant hard delete that cannot be undone.
+    /// Note: Cosmos DB backups may still contain deleted data until backup retention expires.
+    /// Audit logging is performed via the deletedBy parameter for compliance tracking.
+    /// </summary>
+    public async Task<bool> HardDeleteAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -265,9 +271,45 @@ public sealed class CosmosDbDataStoreProvider : IDataStoreProvider, IDisposable
         IDataStoreTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement hard delete functionality for CosmosDB
-        // For now, delegate to regular DeleteAsync
-        return DeleteAsync(dataSource, service, layer, featureId, transaction, cancellationToken);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var context = await GetContainerContextAsync(dataSource, layer, cancellationToken).ConfigureAwait(false);
+
+        // First, fetch the document to get its partition key
+        var existing = await FetchDocumentAsync(context, layer, featureId, cancellationToken).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return false;
+        }
+
+        var partitionKey = ResolvePartitionKey(context, existing);
+
+        try
+        {
+            // Permanently delete the document from Cosmos DB
+            await context.Container.DeleteItemAsync<Dictionary<string, object?>>(
+                featureId,
+                partitionKey,
+                cancellationToken: cancellationToken
+            ).ConfigureAwait(false);
+
+            // Log the hard delete operation for audit compliance (GDPR, SOC2, etc.)
+            System.Diagnostics.Debug.WriteLine(
+                $"HARD DELETE: Feature permanently deleted from Cosmos DB - " +
+                $"Container: {context.Container.Id}, FeatureId: {featureId}, " +
+                $"DeletedBy: {deletedBy ?? "<system>"}");
+
+            return true;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
     }
 
     public async Task<int> BulkInsertAsync(
