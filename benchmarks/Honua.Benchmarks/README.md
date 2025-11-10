@@ -146,6 +146,88 @@ AMD EPYC 9654 96-Core Processor, 2 CPU, 192 logical and 96 physical cores
 - **Memory**: Lower Allocated values reduce GC pressure and improve throughput
 - **GC**: Fewer Gen0/Gen1/Gen2 collections improve responsiveness
 
+## Performance Quick Reference
+
+### Expected Performance Ranges
+
+| Operation | Size | Expected Time | Status |
+|-----------|------|---|---|
+| **Geometry Intersection** | 10 vertices | < 2 μs | ✅ |
+| **Geometry Intersection** | 100 vertices | < 20 μs | ✅ |
+| **Geometry Intersection** | 1000 vertices | < 150 μs | ✅ |
+| **Geometry Union** | 10 vertices | < 2 μs | ✅ |
+| **Geometry Union** | 100 vertices | < 20 μs | ✅ |
+| **Geometry Union** | 1000 vertices | < 150 μs | ✅ |
+| **Geometry Buffer** | Point | < 1 μs | ✅ |
+| **Geometry Buffer** | LineString | < 250 μs | ✅ |
+| **Geometry Buffer** | Polygon (1000 v) | < 250 μs | ✅ |
+| **Spatial Index Creation** | 100 features | < 0.5 ms | ✅ |
+| **Spatial Index Creation** | 1000 features | < 5 ms | ✅ |
+| **Spatial Index Creation** | 10000 features | < 40 ms | ✅ |
+| **Spatial Index Query** | Any size | < 2 μs | ✅ 36x vs linear |
+| **Cache Get (80% hit)** | N/A | < 20 μs | ✅ |
+| **Cache Get (50% hit)** | N/A | < 20 μs | ✅ |
+| **Cache Set** | 1000 items | < 4 ms | ✅ |
+| **GeoJSON Serialize** | Point | < 2 μs | ✅ |
+| **GeoJSON Serialize** | Polygon | < 15 μs | ✅ |
+| **GeoJSON Serialize** | 100 features | < 25 ms | ✅ |
+| **GeoJSON Serialize** | 1000 features | < 250 ms | ✅ |
+
+### Key Performance Insights
+
+#### 1. Geometry Operations
+- **Topological tests scale well**: Contains/Intersects < 2 μs regardless of complexity
+- **Overlay operations scale with complexity**: 10x slower for 10x vertices
+- **Buffer operations are expensive**: 100-250 μs for complex geometries
+- **Recommendation**: Use spatial indexes to filter before expensive operations
+
+#### 2. Spatial Indexing
+- **STRtree 30% faster than Quadtree**
+- **Query speedup: 36x vs linear search** (10K features)
+- **Index breakeven: ~20 queries**
+- **Recommendation**: Always use index for > 1000 features
+
+#### 3. Caching
+- **ConcurrentDictionary fastest** (~12 μs)
+- **Hit ratio directly impacts performance** (4-5 μs difference)
+- **Recommendation**: Target > 70% hit rate
+
+#### 4. Serialization
+- **StringBuilder 2x faster than concatenation**
+- **Throughput: ~2,900 features/sec**
+- **Recommendation**: Pre-allocate StringBuilder with size estimate
+
+### Representative Benchmark Runs
+
+```bash
+# Quick validation (2-3 minutes)
+dotnet run -c Release --filter *Intersection_Small*
+
+# Geometry operations (5-10 minutes)
+dotnet run -c Release --filter "*GeometryOperationsBenchmarks*" --filter "*_Small*|*_Medium*"
+
+# Spatial indexing (10-15 minutes)
+dotnet run -c Release --filter "*SpatialIndexBenchmarks*" --filter "*_Small*|*_Medium*"
+
+# Caching at 50% hit rate (5-10 minutes)
+dotnet run -c Release --filter "*CachingBenchmarks*" --filter "*VariableHitRatio*"
+
+# GeoJSON with 100 features (5-10 minutes)
+dotnet run -c Release --filter "*GeoJsonSerializationBenchmarks*" --filter "*100*"
+
+# Full benchmark suite (30-45 minutes)
+dotnet run -c Release
+```
+
+### Baseline Results
+
+See **[BASELINE-RESULTS.md](BASELINE-RESULTS.md)** for:
+- Complete baseline measurements
+- Detailed performance analysis
+- Optimization recommendations
+- SLA targets and thresholds
+- How to detect performance regressions
+
 ## Best Practices
 
 ### Running Reliable Benchmarks
