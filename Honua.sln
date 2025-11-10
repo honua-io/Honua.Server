@@ -30,10 +30,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Honua.Benchmarks", "benchma
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Honua.Cli.AI", "src\Honua.Cli.AI\Honua.Cli.AI.csproj", "{99628698-B3EF-4966-AC0A-CA3033C702FB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Honua.Cli.AI.Secrets", "src\Honua.Cli.AI.Secrets\Honua.Cli.AI.Secrets.csproj", "{F0103F52-E703-4763-87CC-D2D959D6F5BF}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Honua.Cli.AI.Tests", "tests\Honua.Cli.AI.Tests\Honua.Cli.AI.Tests.csproj", "{55D78E0C-44D5-452C-9819-A7776A92A5FA}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Honua.Server.Enterprise", "src\Honua.Server.Enterprise\Honua.Server.Enterprise.csproj", "{73A02D67-DC92-454D-849C-A5F6F8B14B0C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Honua.Server.Enterprise.Tests", "tests\Honua.Server.Enterprise.Tests\Honua.Server.Enterprise.Tests.csproj", "{8BA1BB73-96BE-44CC-9564-ACEC05D60232}"
