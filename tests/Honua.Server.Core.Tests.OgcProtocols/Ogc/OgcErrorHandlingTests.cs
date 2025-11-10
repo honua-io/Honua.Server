@@ -51,6 +51,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             attachmentHandler,
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -94,6 +95,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             attachmentHandler,
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -137,6 +139,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             attachmentHandler,
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -180,6 +183,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             attachmentHandler,
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -224,6 +228,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             attachmentHandler,
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -273,6 +278,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             attachmentHandler,
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -399,6 +405,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             attachmentHandler,
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -442,6 +449,7 @@ public class OgcErrorHandlingTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             attachmentHandler,
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

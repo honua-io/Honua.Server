@@ -51,6 +51,7 @@ public class OgcHandlersKmzTests
             OgcTestUtilities.CreateApiMetrics(),
             OgcTestUtilities.CreateCacheHeaderService(),
             OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

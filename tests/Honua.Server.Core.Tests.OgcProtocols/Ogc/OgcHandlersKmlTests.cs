@@ -45,6 +45,7 @@ public class OgcHandlersKmlTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);

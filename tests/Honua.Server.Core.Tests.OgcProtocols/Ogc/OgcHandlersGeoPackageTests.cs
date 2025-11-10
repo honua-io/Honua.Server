@@ -46,6 +46,7 @@ public class OgcHandlersGeoPackageTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
@@ -120,6 +121,7 @@ public class OgcHandlersGeoPackageTests : IClassFixture<OgcHandlerTestFixture>
             _fixture.ApiMetrics,
             _fixture.CacheHeaderService,
             OgcTestUtilities.CreateOgcFeaturesAttachmentHandlerStub(),
+            new Core.Elevation.DefaultElevationService(),
             CancellationToken.None);
 
         await result.ExecuteAsync(context);
