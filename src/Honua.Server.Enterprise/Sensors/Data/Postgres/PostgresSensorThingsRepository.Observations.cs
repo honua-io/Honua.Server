@@ -4,6 +4,7 @@ using System.Text.Json;
 using Dapper;
 using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Enterprise.Sensors.Query;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -117,7 +118,7 @@ public sealed partial class PostgresSensorThingsRepository
 
         return new PagedResult<Observation>
         {
-            Items = observationsWithLinks,
+            Items = observationsWithLinks.ToList(),
             TotalCount = totalCount,
             NextLink = nextLink
         };

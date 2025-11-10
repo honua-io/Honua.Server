@@ -4,6 +4,7 @@ using System.Text.Json;
 using Dapper;
 using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Enterprise.Sensors.Query;
+using Microsoft.Extensions.Logging;
 using Geometry = NetTopologySuite.Geometries.Geometry;
 using StaLocation = Honua.Server.Enterprise.Sensors.Models.Location;
 
@@ -69,7 +70,7 @@ public sealed partial class PostgresSensorThingsRepository
                 new CommandDefinition(thingsSql, new { LocationId = id }, cancellationToken: ct));
 
             // Use deferred execution to avoid materializing collection until accessed
-            location = location with { Things = things.Select(t => t with { SelfLink = $"{_config.BasePath}/Things({t.Id})" }) };
+            location = location with { Things = things.Select(t => t with { SelfLink = $"{_config.BasePath}/Things({t.Id})" }).ToList() };
         }
 
         return location;
@@ -149,7 +150,7 @@ public sealed partial class PostgresSensorThingsRepository
 
         return new PagedResult<StaLocation>
         {
-            Items = locations,
+            Items = locations.ToList(),
             TotalCount = totalCount,
             NextLink = nextLink
         };

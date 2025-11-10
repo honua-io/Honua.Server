@@ -2,6 +2,8 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Honua.Server.Enterprise.Sensors.Data;
 using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Enterprise.Sensors.Query;
@@ -875,7 +877,7 @@ public static class SensorThingsHandlers
         catch (Exception ex)
         {
             // Log but don't fail the request if broadcasting fails
-            var logger = context.RequestServices.GetService<ILogger<ISensorThingsRepository>>();
+            var logger = context.RequestServices.GetService(typeof(ILogger<ISensorThingsRepository>)) as ILogger<ISensorThingsRepository>;
             logger?.LogError(ex, "Error broadcasting observation {ObservationId}", observation.Id);
         }
     }
@@ -935,7 +937,7 @@ public static class SensorThingsHandlers
         catch (Exception ex)
         {
             // Log but don't fail the request if broadcasting fails
-            var logger = context.RequestServices.GetService<ILogger<ISensorThingsRepository>>();
+            var logger = context.RequestServices.GetService(typeof(ILogger<ISensorThingsRepository>)) as ILogger<ISensorThingsRepository>;
             logger?.LogError(ex, "Error broadcasting observation batch of {Count} observations", observations.Count);
         }
     }
