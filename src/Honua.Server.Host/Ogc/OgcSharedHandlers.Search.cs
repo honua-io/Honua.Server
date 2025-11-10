@@ -132,6 +132,7 @@ internal static partial class OgcSharedHandlers
                 apiMetrics,
                 cacheHeaderService,
                 attachmentHandler,
+                new Core.Elevation.DefaultElevationService(),
                 sanitized,
                 cancellationToken).ConfigureAwait(false);
         }

@@ -132,6 +132,7 @@ public static partial class MetadataAdministrationEndpoints
                 snapshot.Layers.Append(newLayer).ToList(),
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -246,6 +247,7 @@ public static partial class MetadataAdministrationEndpoints
                 updatedLayers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -464,7 +466,7 @@ public static partial class MetadataAdministrationEndpoints
             }
 
             // Get data provider
-            var provider = providerFactory.CreateProvider(dataSource);
+            var provider = providerFactory.Create(dataSource.Provider);
 
             // Execute the SQL with timeout
             var stopwatch = Stopwatch.StartNew();
@@ -621,14 +623,13 @@ public static partial class MetadataAdministrationEndpoints
             }
 
             // Convert to DetectedFieldInfo
-            // Use deferred execution - collection will be serialized without extra allocation
             var detectedFields = fields.Select(f => new DetectedFieldInfo
             {
                 Name = f.Name,
                 Type = f.DataType ?? "esriFieldTypeString",
                 Nullable = f.Nullable,
                 IsGeometry = f.Name.Equals(layer.GeometryField, StringComparison.OrdinalIgnoreCase)
-            });
+            }).ToList();
 
             var result = new SchemaDetectionResult
             {

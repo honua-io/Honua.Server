@@ -77,6 +77,7 @@ public static partial class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -143,6 +144,7 @@ public static partial class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -204,6 +206,7 @@ public static partial class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 

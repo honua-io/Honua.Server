@@ -370,6 +370,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
                 apiMetrics,
                 cacheHeaderService,
                 attachmentHandler,
+                new Core.Elevation.DefaultElevationService(),
                 sanitized,
                 cancellationToken).ConfigureAwait(false);
         }

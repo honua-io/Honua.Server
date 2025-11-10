@@ -173,7 +173,7 @@ internal static partial class OgcSharedHandlers
         return schema;
     }
 
-    private static void AppendStyleMetadata(IDictionary<string, object?> target, LayerDefinition layer)
+    internal static void AppendStyleMetadata(IDictionary<string, object?> target, LayerDefinition layer)
     {
         if (target is null)
         {
