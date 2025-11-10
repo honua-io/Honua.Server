@@ -151,7 +151,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
             await using var reader = await _client.ExecuteQueryAsync(sql).ConfigureAwait(false);
             if (await reader.ReadAsync().ConfigureAwait(false))
             {
-                var count = reader.GetInt64(0);
+                var count = reader.GetValue<long>(0);
                 return count > 0;
             }
             return false;
@@ -665,7 +665,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
     {
         var node = new GraphNode
         {
-            Id = vertex.Id,
+            Id = string.IsNullOrEmpty(vertex.Id.ToString()) ? null : long.Parse(vertex.Id.ToString()),
             Label = vertex.Label,
             Properties = new Dictionary<string, object>()
         };
@@ -685,10 +685,10 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
     {
         var graphEdge = new GraphEdge
         {
-            Id = edge.Id,
+            Id = string.IsNullOrEmpty(edge.Id.ToString()) ? null : long.Parse(edge.Id.ToString()),
             Type = edge.Label,
-            StartNodeId = edge.StartId,
-            EndNodeId = edge.EndId,
+            StartNodeId = long.Parse(edge.StartId.ToString()),
+            EndNodeId = long.Parse(edge.EndId.ToString()),
             Properties = new Dictionary<string, object>()
         };
 

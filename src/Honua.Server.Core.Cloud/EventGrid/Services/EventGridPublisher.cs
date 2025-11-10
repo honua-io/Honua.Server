@@ -80,7 +80,7 @@ public class EventGridPublisher : IEventGridPublisher, IDisposable
         // Apply filters
         if (!PassesFilters(cloudEvent))
         {
-            Interlocked.Increment(ref _metrics.EventsFiltered);
+            _metrics.EventsFiltered++;
             _logger.LogDebug("Event filtered: Type={Type}, Collection={Collection}, Tenant={Tenant}",
                 cloudEvent.Type, cloudEvent.Collection, cloudEvent.TenantId);
             return;
@@ -95,7 +95,7 @@ public class EventGridPublisher : IEventGridPublisher, IDisposable
         }
         else
         {
-            Interlocked.Increment(ref _metrics.EventsDropped);
+            _metrics.EventsDropped++;
             _logger.LogWarning("Event dropped (queue full): Id={Id}, Type={Type}", cloudEvent.Id, cloudEvent.Type);
         }
     }
@@ -208,7 +208,7 @@ public class EventGridPublisher : IEventGridPublisher, IDisposable
                     await _client.SendEventsAsync(eventGridEvents, ct).ConfigureAwait(false);
                 }, cancellationToken).ConfigureAwait(false);
 
-                Interlocked.Add(ref _metrics.EventsPublished, chunk.Length);
+                _metrics.EventsPublished += chunk.Length;
                 _metrics.LastPublishTime = DateTimeOffset.UtcNow;
 
                 _logger.LogInformation("Published {Count} events to Event Grid", chunk.Length);
@@ -217,14 +217,14 @@ public class EventGridPublisher : IEventGridPublisher, IDisposable
             {
                 _metrics.CircuitBreakerState = "Open";
                 _metrics.LastError = "Circuit breaker is open";
-                Interlocked.Add(ref _metrics.EventsFailed, chunk.Length);
+                _metrics.EventsFailed += chunk.Length;
 
                 _logger.LogError(ex, "Circuit breaker is open - events dropped: {Count}", chunk.Length);
             }
             catch (Exception ex)
             {
                 _metrics.LastError = ex.Message;
-                Interlocked.Add(ref _metrics.EventsFailed, chunk.Length);
+                _metrics.EventsFailed += chunk.Length;
 
                 _logger.LogError(ex, "Failed to publish events to Event Grid after retries: {Count}", chunk.Length);
             }

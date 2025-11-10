@@ -198,14 +198,14 @@ public class Geometry3DService : IGeometry3DService
         // Determine export format
         var exportFormatId = GetExportFormatId(options.Format);
 
-        // Export to memory stream
-        var outputStream = new MemoryStream();
+        // Export to temporary file first (AssimpNet requires a file path)
+        var tempFilePath = Path.Combine(Path.GetTempPath(), $"geometry_{geometryId}.{exportFormatId}");
 
         try
         {
             var exportSuccess = _assimpContext.ExportFile(
                 scene,
-                outputStream,
+                tempFilePath,
                 exportFormatId,
                 options.BinaryFormat ? PostProcessSteps.None : PostProcessSteps.None);
 
@@ -214,14 +214,29 @@ public class Geometry3DService : IGeometry3DService
                 throw new InvalidOperationException($"Failed to export geometry to {options.Format}");
             }
 
-            outputStream.Position = 0;
+            // Read the exported file into a memory stream
+            var outputStream = new MemoryStream(await System.IO.File.ReadAllBytesAsync(tempFilePath, CancellationToken.None));
             return outputStream;
         }
         catch (Exception ex)
         {
-            outputStream.Dispose();
             _logger.LogError(ex, "Failed to export geometry {GeometryId} to {Format}", geometryId, options.Format);
             throw;
+        }
+        finally
+        {
+            // Clean up temporary file
+            try
+            {
+                if (System.IO.File.Exists(tempFilePath))
+                {
+                    System.IO.File.Delete(tempFilePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete temporary export file: {FilePath}", tempFilePath);
+            }
         }
     }
 

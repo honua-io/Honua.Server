@@ -214,8 +214,9 @@ public sealed class FeatureRepository : IFeatureRepository
         {
             var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
             var result = await context.Provider.CreateAsync(context.DataSource, context.Service, context.Layer, record, transaction, cancellationToken);
+            var featureId = result.Attributes.TryGetValue(context.Layer.IdField, out var pk) ? pk : "unknown";
             _logger.LogInformation("Successfully created feature {FeatureId} in {ServiceId}/{LayerId}",
-                result.Id, serviceId, layerId);
+                featureId, serviceId, layerId);
             return result;
         }
         catch (Exception ex)
