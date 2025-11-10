@@ -4,15 +4,25 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /source
 
+# Copy NuGet config and build props
+COPY NuGet.Config Directory.Build.props ./
+
 # Copy project files
 COPY src/ ./src/
 
-# Restore and build
-RUN dotnet restore src/Honua.Server.Host/Honua.Server.Host.csproj
-RUN dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
+# Build and publish - handle duplicate content files
+RUN dotnet build src/Honua.Server.Host/Honua.Server.Host.csproj \
+    --configuration Release && \
+    dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
+    --configuration Release \
+    --no-build \
+    --output /app/publish \
+    /p:UseAppHost=false || \
+    (dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
     --configuration Release \
     --output /app/publish \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:ErrorOnDuplicatePublishOutputFiles=false)
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
