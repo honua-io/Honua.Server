@@ -33,6 +33,8 @@
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
     <!-- Assertion libraries -->
     <PackageReference Include="FluentAssertions" Version="8.6.0" />
+    <!-- Docker container testing -->
+    <PackageReference Include="Testcontainers" Version="3.10.0" />
   </ItemGroup>
 
   <ItemGroup>
