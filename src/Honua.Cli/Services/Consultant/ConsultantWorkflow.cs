@@ -94,7 +94,7 @@ public sealed class ConsultantWorkflow : IConsultantWorkflow
         var workspacePath = _environment.ResolveWorkspacePath(request.WorkspacePath);
         var normalizedRequest = request with { WorkspacePath = workspacePath };
 
-        _console.WriteLine("Honua Consultant (preview build)");
+        _console.WriteLine("Honua Devsecops (preview build)");
         _console.WriteLine($"Planning workspace: {workspacePath}");
 
         var prompt = normalizedRequest.Prompt;

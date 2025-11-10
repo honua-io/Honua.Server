@@ -116,7 +116,7 @@ cat ~/.honua/telemetry/telemetry-2025-10-02.jsonl
 # Natural language query
 honua assistant "My queries on the cities table are slow"
 
-# The AI will:
+# The AI Devsecops will:
 # 1. Analyze your database schema
 # 2. Review query logs
 # 3. Generate an optimization plan
