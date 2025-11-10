@@ -32,7 +32,7 @@
 
 	<ItemGroup>
 		<!-- Reference to main project -->
-		<ProjectReference Include="..\HonuaField\HonuaField.csproj" />
+		<ProjectReference Include="..\Honua.Field\Honua.Field.csproj" />
 	</ItemGroup>
 
 </Project>
