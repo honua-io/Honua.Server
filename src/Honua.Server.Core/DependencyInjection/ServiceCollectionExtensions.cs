@@ -445,6 +445,12 @@ public static class ServiceCollectionExtensions
             return new OpenRosa.SqliteSubmissionRepository($"Data Source={connectionString}");
         });
 
+        // Register AEC services for graph database, 3D geometry, and IFC import
+        services.AddScoped<Services.IGraphDatabaseService, Services.GraphDatabaseService>();
+        services.AddScoped<Services.Geometry3D.IGeometry3DService, Services.Geometry3D.Geometry3DService>();
+        services.AddScoped<Services.Geometry3D.IMeshConverter, Services.Geometry3D.MeshConverter>();
+        services.AddScoped<Services.IIfcImportService, Services.IfcImportService>();
+
         return services;
     }
 
