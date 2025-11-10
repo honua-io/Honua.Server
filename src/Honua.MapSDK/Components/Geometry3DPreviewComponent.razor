@@ -1,0 +1,306 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject ILogger<Geometry3DPreviewComponent> Logger
+
+<div class="geometry-3d-preview-container" @ref="_containerElement">
+    @if (_isLoading)
+    {
+        <div class="preview-loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading mesh preview...</span>
+            </div>
+            <p class="mt-2">Loading 3D mesh preview...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="preview-error alert alert-danger" role="alert">
+            <h5 class="alert-heading">Error Loading Preview</h5>
+            <p>@_errorMessage</p>
+            @if (_retryCount < MaxRetries)
+            {
+                <button class="btn btn-sm btn-outline-danger" @onclick="LoadPreviewAsync">
+                    Retry (@(_retryCount + 1)/@MaxRetries)
+                </button>
+            }
+        </div>
+    }
+    else if (_previewData != null)
+    {
+        <div class="preview-canvas-container">
+            <canvas @ref="_canvasElement" class="preview-canvas"></canvas>
+            <div class="preview-controls">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="RotateLeft" title="Rotate Left">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="RotateRight" title="Rotate Right">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="ZoomIn" title="Zoom In">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="ZoomOut" title="Zoom Out">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ResetCamera" title="Reset Camera">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="preview-info">
+                <small class="text-muted">
+                    Vertices: @_previewData.VertexCount.ToString("N0") |
+                    Faces: @_previewData.FaceCount.ToString("N0") |
+                    Format: @_previewData.SourceFormat?.ToUpper()
+                    @if (_previewData.LevelOfDetail > 0)
+                    {
+                        <span> | LOD: @_previewData.LevelOfDetail</span>
+                    }
+                </small>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Geometry ID to preview
+    /// </summary>
+    [Parameter]
+    public Guid GeometryId { get; set; }
+
+    /// <summary>
+    /// Map ID for context (optional)
+    /// </summary>
+    [Parameter]
+    public string? MapId { get; set; }
+
+    /// <summary>
+    /// Preview format: 'simple' or 'gltf'
+    /// </summary>
+    [Parameter]
+    public string Format { get; set; } = "simple";
+
+    /// <summary>
+    /// Level of detail (0-100)
+    /// </summary>
+    [Parameter]
+    public int LevelOfDetail { get; set; } = 0;
+
+    /// <summary>
+    /// Container width (default: 100%)
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "100%";
+
+    /// <summary>
+    /// Container height (default: 500px)
+    /// </summary>
+    [Parameter]
+    public string Height { get; set; } = "500px";
+
+    /// <summary>
+    /// API base URL (defaults to current origin)
+    /// </summary>
+    [Parameter]
+    public string? ApiBaseUrl { get; set; }
+
+    private const int MaxRetries = 3;
+    private ElementReference _containerElement;
+    private ElementReference _canvasElement;
+    private IJSObjectReference? _jsModule;
+    private object? _previewData;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private int _retryCount = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                // Load the JavaScript module
+                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./js/geometry-3d-preview.js");
+
+                await LoadPreviewAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to initialize 3D preview component");
+                _errorMessage = $"Failed to initialize preview: {ex.Message}";
+                _isLoading = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload preview when geometry ID or LOD changes
+        if (!_isLoading && _jsModule != null)
+        {
+            await LoadPreviewAsync();
+        }
+    }
+
+    private async Task LoadPreviewAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            if (_jsModule == null)
+            {
+                throw new InvalidOperationException("JavaScript module not loaded");
+            }
+
+            // Construct API URL
+            var baseUrl = ApiBaseUrl ?? string.Empty;
+            var apiUrl = $"{baseUrl}/api/v1.0/geometry/3d/{GeometryId}/preview?format={Format}&lod={LevelOfDetail}";
+
+            // Call JavaScript to render the preview
+            _previewData = await _jsModule.InvokeAsync<object>(
+                "renderMeshPreview",
+                _canvasElement,
+                apiUrl,
+                new
+                {
+                    width = Width,
+                    height = Height,
+                    mapId = MapId
+                });
+
+            _retryCount = 0;
+            _isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load 3D mesh preview for geometry {GeometryId}", GeometryId);
+            _errorMessage = $"Failed to load preview: {ex.Message}";
+            _retryCount++;
+            _isLoading = false;
+        }
+        finally
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RotateLeft()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("rotateModel", _canvasElement, -15);
+        }
+    }
+
+    private async Task RotateRight()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("rotateModel", _canvasElement, 15);
+        }
+    }
+
+    private async Task ZoomIn()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("zoomModel", _canvasElement, 1.2);
+        }
+    }
+
+    private async Task ZoomOut()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("zoomModel", _canvasElement, 0.8);
+        }
+    }
+
+    private async Task ResetCamera()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("resetCamera", _canvasElement);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("dispose", _canvasElement);
+                await _jsModule.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error disposing 3D preview component");
+            }
+        }
+    }
+}
+
+<style>
+    .geometry-3d-preview-container {
+        width: 100%;
+        height: 500px;
+        position: relative;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        overflow: hidden;
+    }
+
+    .preview-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+    }
+
+    .preview-error {
+        margin: 1rem;
+    }
+
+    .preview-canvas-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+    }
+
+    .preview-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    .preview-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 0.25rem;
+        padding: 0.25rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .preview-info {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 0.25rem;
+        padding: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+</style>

@@ -516,6 +516,36 @@ dotnet build
 dotnet test
 ```
 
+### Development Setup
+
+#### Code Formatting
+
+This project uses EditorConfig for consistent code style. Most modern editors (Visual Studio, VS Code, Rider) support EditorConfig automatically.
+
+#### Pre-commit Hooks
+
+Install pre-commit hooks to enforce code quality before every commit:
+
+**Linux/macOS:**
+```bash
+./scripts/install-hooks.sh
+```
+
+**Windows:**
+```powershell
+.\scripts\install-hooks.ps1
+```
+
+The pre-commit hook will automatically:
+- Check code formatting (`dotnet format`)
+- Build the project
+- Run unit tests
+
+To skip hooks (not recommended):
+```bash
+git commit --no-verify
+```
+
 ### Running Tests
 
 ```bash

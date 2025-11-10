@@ -65,8 +65,8 @@ public sealed class ConsultantCommand : AsyncCommand<ConsultantCommand.Settings>
     {
         // For now, just direct users to use consultant-chat command
         // Interactive mode integration can be completed later
-        Console.WriteLine("Interactive chat mode is available via the consultant-chat command.");
-        Console.WriteLine("Please run: honua consultant-chat");
+        Console.WriteLine("Interactive chat mode is available via the devsecops-chat command.");
+        Console.WriteLine("Please run: honua devsecops-chat");
 
         return await Task.FromResult(0);
     }

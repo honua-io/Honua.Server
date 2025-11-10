@@ -17,6 +17,9 @@
     <PackageReference Include="Npgsql" Version="9.0.4" />
     <PackageReference Include="Npgsql.NetTopologySuite" Version="9.0.4" />
 
+    <!-- Graph Database (Apache AGE) -->
+    <PackageReference Include="ApacheAGE" Version="1.0.0" />
+
     <!-- Vector Geometry (Essential) -->
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
     <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="4.0.0" />
@@ -78,6 +81,11 @@
     <!-- Rendering (Vector-to-Raster) - Used by both Full and Lite -->
     <PackageReference Include="SkiaSharp" Version="3.119.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 3D Geometry Support (AEC Technical Enablers) -->
+    <PackageReference Include="AssimpNet" Version="5.0.0-beta1" />
   </ItemGroup>
 
   <ItemGroup>

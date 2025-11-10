@@ -54,6 +54,7 @@ internal static partial class OgcFeaturesHandlers
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
         Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+        [FromServices] Core.Elevation.IElevationService elevationService,
         CancellationToken cancellationToken)
         => ExecuteCollectionItemsAsync(
             collectionId,
@@ -70,6 +71,7 @@ internal static partial class OgcFeaturesHandlers
             apiMetrics,
             cacheHeaderService,
             attachmentHandler,
+            elevationService,
             queryOverrides: null,
             cancellationToken);
 
@@ -91,6 +93,7 @@ internal static partial class OgcFeaturesHandlers
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
         Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+        Core.Elevation.IElevationService elevationService,
         IQueryCollection? queryOverrides,
         CancellationToken cancellationToken)
     {
@@ -448,7 +451,11 @@ internal static partial class OgcFeaturesHandlers
                         }
                     }
 
-                    features!.Add(OgcSharedHandlers.ToFeature(request, collectionId, layer, record, query, componentsOverride, attachmentLinks));
+                    var feature = query.Include3D
+                        ? await ToFeature3DAsync(request, collectionId, service, layer, record, query, elevationService, componentsOverride, attachmentLinks, cancellationToken).ConfigureAwait(false)
+                        : OgcSharedHandlers.ToFeature(request, collectionId, layer, record, query, componentsOverride, attachmentLinks);
+
+                    features!.Add(feature);
                 }
             }
         }
@@ -483,7 +490,11 @@ internal static partial class OgcFeaturesHandlers
                         htmlComponents!.Add(componentsOverride);
                     }
 
-                    features!.Add(OgcSharedHandlers.ToFeature(request, collectionId, layer, record, query, componentsOverride, null));
+                    var feature = query.Include3D
+                        ? await ToFeature3DAsync(request, collectionId, service, layer, record, query, elevationService, componentsOverride, null, cancellationToken).ConfigureAwait(false)
+                        : OgcSharedHandlers.ToFeature(request, collectionId, layer, record, query, componentsOverride, null);
+
+                    features!.Add(feature);
                 }
             }
         }

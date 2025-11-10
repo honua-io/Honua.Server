@@ -40,7 +40,7 @@ The `honua` CLI provides commands for managing Honua Server deployments, configu
 | Data | Data ingestion | `honua data ingest` |
 | Raster | Raster processing | `honua raster cache preseed` |
 | Status | System status | `honua status` |
-| Consultant | AI assistance | `honua consultant` |
+| Devsecops | AI assistance | `honua devsecops` |
 
 ## Installation
 
@@ -595,14 +595,14 @@ Output:
   Last reported: 2025-10-15 10:30:00 UTC
 ```
 
-## AI Consultant
+## AI Devsecops
 
-### consultant
+### devsecops
 
 AI-powered deployment assistance.
 
 ```bash
-honua consultant [options]
+honua devsecops [options]
 
 Options:
   --prompt <TEXT>          Natural language prompt
@@ -612,21 +612,21 @@ Options:
 
 Examples:
   # Interactive mode
-  honua consultant
+  honua devsecops
 
   # Single prompt
-  honua consultant --prompt "Deploy Honua to AWS with PostgreSQL"
+  honua devsecops --prompt "Deploy Honua to AWS with PostgreSQL"
 
   # Bootstrap mode
-  honua consultant --mode bootstrap
+  honua devsecops --mode bootstrap
 ```
 
-### consultant-chat
+### devsecops-chat
 
 Interactive AI chat.
 
 ```bash
-honua consultant-chat
+honua devsecops-chat
 
 Features:
   - Multi-turn conversations
@@ -635,8 +635,8 @@ Features:
   - Deployment guidance
 
 Example session:
-  > honua consultant-chat
-  Welcome to Honua AI Consultant!
+  > honua devsecops-chat
+  Welcome to Honua AI Devsecops!
 
   You: How do I deploy to Kubernetes?
   AI: I'll help you deploy to Kubernetes...

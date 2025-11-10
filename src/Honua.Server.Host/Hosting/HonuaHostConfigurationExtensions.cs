@@ -53,6 +53,15 @@ internal static class HonuaHostConfigurationExtensions
         builder.Services.AddHonuaCartoServices();
         builder.Services.AddSensorThings(builder.Configuration); // OGC SensorThings API v1.1
 
+        // Register SensorThings SignalR broadcaster (if WebSocket streaming enabled)
+        var sensorThingsConfig = builder.Configuration.GetSection("SensorThings")
+            .Get<Honua.Server.Enterprise.Sensors.Models.SensorThingsServiceDefinition>();
+        if (sensorThingsConfig?.WebSocketStreamingEnabled == true)
+        {
+            builder.Services.AddSingleton<Honua.Server.Host.SensorThings.ISensorObservationBroadcaster,
+                Honua.Server.Host.SensorThings.SignalRSensorObservationBroadcaster>();
+        }
+
         // GeoEvent services (conditional - requires Postgres connection)
         var connectionString = builder.Configuration.GetConnectionString("Postgres")
             ?? builder.Configuration.GetConnectionString("DefaultConnection");

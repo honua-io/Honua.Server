@@ -128,7 +128,7 @@ public sealed class ConsultantChatCommand : AsyncCommand<ConsultantChatCommand.S
         }
 
         _console.WriteLine();
-        _console.MarkupLine("[dim]Thanks for using Honua AI Consultant! 👋[/]");
+        _console.MarkupLine("[dim]Thanks for using Honua AI Devsecops! 👋[/]");
     }
 
     private async Task ProcessUserInputAsync(

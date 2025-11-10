@@ -23,6 +23,7 @@ using Polly;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using Honua.Server.Core.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Data.Sqlite;
 
@@ -39,13 +40,17 @@ public sealed class SqliteDataStoreProvider : DisposableBase, IDataStoreProvider
     private readonly ConcurrentDictionary<string, Task<string>> _decryptionCache = new(StringComparer.Ordinal);
     private readonly ResiliencePipeline _retryPipeline;
     private readonly IConnectionStringEncryptionService? _encryptionService;
+    private readonly ILogger<SqliteDataStoreProvider> _logger;
 
     public const string ProviderKey = "sqlite";
 
-    public SqliteDataStoreProvider(IConnectionStringEncryptionService? encryptionService = null)
+    public SqliteDataStoreProvider(
+        IConnectionStringEncryptionService? encryptionService = null,
+        ILogger<SqliteDataStoreProvider>? logger = null)
     {
         _retryPipeline = DatabaseRetryPolicy.CreateSqliteRetryPipeline();
         _encryptionService = encryptionService;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<SqliteDataStoreProvider>.Instance;
     }
 
     public string Provider => ProviderKey;
@@ -102,6 +107,9 @@ public sealed class SqliteDataStoreProvider : DisposableBase, IDataStoreProvider
         Guard.NotNull(service);
         Guard.NotNull(layer);
 
+        _logger.LogDebug("Counting features for {ServiceId}/{LayerId}", service.Id, layer.Id);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         var normalizedQuery = query ?? new FeatureQuery();
         await using var connection = CreateConnection(dataSource);
         await _retryPipeline.ExecuteAsync(async ct =>
@@ -120,7 +128,21 @@ public sealed class SqliteDataStoreProvider : DisposableBase, IDataStoreProvider
             return 0;
         }
 
-        return Convert.ToInt64(result);
+        var count = Convert.ToInt64(result);
+        stopwatch.Stop();
+
+        if (stopwatch.ElapsedMilliseconds > 1000)
+        {
+            _logger.LogWarning("Slow count query for {ServiceId}/{LayerId} took {ElapsedMs}ms, returned {Count} records",
+                service.Id, layer.Id, stopwatch.ElapsedMilliseconds, count);
+        }
+        else
+        {
+            _logger.LogDebug("Counted {Count} features for {ServiceId}/{LayerId} in {ElapsedMs}ms",
+                count, service.Id, layer.Id, stopwatch.ElapsedMilliseconds);
+        }
+
+        return count;
     }
 
     public async Task<FeatureRecord?> GetAsync(
@@ -266,7 +288,7 @@ public sealed class SqliteDataStoreProvider : DisposableBase, IDataStoreProvider
             var normalized = NormalizeRecord(layer, record.Attributes, includeKey: false);
             if (normalized.Columns.Count == 0)
             {
-                return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
+                return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken).ConfigureAwait(false);
             }
 
             var assignmentBuilder = new StringBuilder();
@@ -302,7 +324,7 @@ public sealed class SqliteDataStoreProvider : DisposableBase, IDataStoreProvider
                 }
             }
 
-            return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken);
+            return await GetAsync(dataSource, service, layer, featureId, null, cancellationToken).ConfigureAwait(false);
         }
         finally
         {

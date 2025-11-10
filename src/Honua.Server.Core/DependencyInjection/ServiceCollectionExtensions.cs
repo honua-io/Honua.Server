@@ -24,6 +24,7 @@ using Honua.Server.Core.Data.Sqlite;
 using Honua.Server.Core.Data.SqlServer;
 using Honua.Server.Core.Data.Validation;
 using Honua.Server.Core.Editing;
+using Honua.Server.Core.Elevation;
 using Honua.Server.Core.Export;
 using Honua.Server.Core.Geoservices.GeometryService;
 using Honua.Server.Core.Import;
@@ -178,6 +179,9 @@ public static class ServiceCollectionExtensions
         // Add distributed and memory caching support
         services.AddHonuaCaching(configuration);
 
+        // Register time provider for testable time-dependent code
+        services.AddSingleton<Time.ITimeProvider, Time.SystemTimeProvider>();
+
         // Note: Compression codecs for Zarr and other raster formats are now registered
         // in Honua.Server.Core.Raster project via AddHonuaCompressionCodecs extension method
 
@@ -231,6 +235,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPmTilesExporter, PmTilesExporter>();
         services.AddSingleton<ICsvExporter, CsvExporter>();
         services.AddSingleton<IShapefileExporter, ShapefileExporter>();
+
+        // Register elevation services for 3D visualization support
+        services.AddElevationServices();
+
         services.AddSingleton<ICatalogProjectionService, CatalogProjectionService>();
         services.AddSingleton<RasterStacCatalogBuilder>();
         services.AddSingleton<VectorStacCatalogBuilder>();
@@ -332,6 +340,12 @@ public static class ServiceCollectionExtensions
         services.Configure<Resilience.CircuitBreakerOptions>(configuration.GetSection(Resilience.CircuitBreakerOptions.SectionName));
         services.AddSingleton<Resilience.ICircuitBreakerService, Resilience.CircuitBreakerService>();
 
+        // Configure bulkhead resilience options and services
+        services.Configure<Resilience.BulkheadOptions>(configuration.GetSection(Resilience.BulkheadOptions.SectionName));
+        services.AddSingleton<Resilience.BulkheadPolicyProvider>();
+        services.AddSingleton<Resilience.TenantResourceLimiter>();
+        services.AddSingleton<Resilience.MemoryCircuitBreaker>();
+
         services.AddHostedService<SecurityValidationHostedService>();
         services.AddHostedService<MetadataInitializationHostedService>();
         services.AddHostedService<ServiceApiValidationHostedService>();
@@ -430,6 +444,12 @@ public static class ServiceCollectionExtensions
             var connectionString = Path.Combine(basePath, "data", "openrosa-submissions.db");
             return new OpenRosa.SqliteSubmissionRepository($"Data Source={connectionString}");
         });
+
+        // Register AEC services for graph database, 3D geometry, and IFC import
+        services.AddScoped<Services.IGraphDatabaseService, Services.GraphDatabaseService>();
+        services.AddScoped<Services.Geometry3D.IGeometry3DService, Services.Geometry3D.Geometry3DService>();
+        services.AddScoped<Services.Geometry3D.IMeshConverter, Services.Geometry3D.MeshConverter>();
+        services.AddScoped<Services.IIfcImportService, Services.IfcImportService>();
 
         return services;
     }

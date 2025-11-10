@@ -1,4 +1,4 @@
-# Honua AI Consultant - REAL Integration Tests
+# Honua AI Devsecops - REAL Integration Tests
 
 **NO MOCKS. NO HARDCODED RESPONSES. REAL AI. REAL INFRASTRUCTURE.**
 

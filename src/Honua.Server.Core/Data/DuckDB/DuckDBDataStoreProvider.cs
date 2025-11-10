@@ -23,6 +23,7 @@ using Polly;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using Honua.Server.Core.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Data.DuckDB;
 
@@ -39,13 +40,17 @@ public sealed class DuckDBDataStoreProvider : DisposableBase, IDataStoreProvider
     private readonly ConcurrentDictionary<string, Task<string>> _decryptionCache = new(StringComparer.Ordinal);
     private readonly ResiliencePipeline _retryPipeline;
     private readonly IConnectionStringEncryptionService? _encryptionService;
+    private readonly ILogger<DuckDBDataStoreProvider> _logger;
 
     public const string ProviderKey = "duckdb";
 
-    public DuckDBDataStoreProvider(IConnectionStringEncryptionService? encryptionService = null)
+    public DuckDBDataStoreProvider(
+        IConnectionStringEncryptionService? encryptionService = null,
+        ILogger<DuckDBDataStoreProvider>? logger = null)
     {
         _retryPipeline = DatabaseRetryPolicy.CreatePostgresRetryPipeline();
         _encryptionService = encryptionService;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DuckDBDataStoreProvider>.Instance;
     }
 
     public string Provider => ProviderKey;

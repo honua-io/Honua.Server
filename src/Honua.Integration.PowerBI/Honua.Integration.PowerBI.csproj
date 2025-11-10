@@ -1,0 +1,36 @@
+<!-- Copyright (c) 2025 HonuaIO -->
+<!-- Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. -->
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Honua.Server.Core\Honua.Server.Core.csproj" />
+    <ProjectReference Include="..\Honua.Server.Core.OData\Honua.Server.Core.OData.csproj" />
+    <ProjectReference Include="..\Honua.Server.Enterprise\Honua.Server.Enterprise.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Power BI .NET SDK -->
+    <PackageReference Include="Microsoft.PowerBI.Api" Version="4.20.0" />
+
+    <!-- Azure Identity for authentication -->
+    <PackageReference Include="Azure.Identity" Version="1.14.1" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.70.0" />
+
+    <!-- OData Protocol -->
+    <PackageReference Include="Microsoft.AspNetCore.OData" Version="9.4.0" />
+
+    <!-- HTTP client for streaming -->
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="9.0.10" />
+
+    <!-- JSON handling -->
+    <PackageReference Include="System.Text.Json" Version="9.0.2" />
+  </ItemGroup>
+</Project>

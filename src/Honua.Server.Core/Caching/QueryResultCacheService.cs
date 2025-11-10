@@ -8,6 +8,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Honua.Server.Core.Exceptions;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Performance;
 using Microsoft.Extensions.Caching.Distributed;
@@ -158,7 +159,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         _metrics.RecordCacheMiss(CacheNameMemory, normalizedKey);
 
         // Try L1 (distributed) cache
-        var cachedValue = await GetFromDistributedCacheAsync<T>(normalizedKey, cancellationToken);
+        var cachedValue = await GetFromDistributedCacheAsync<T>(normalizedKey, cancellationToken).ConfigureAwait(false);
         if (cachedValue != null)
         {
             // Populate L2 cache with shorter TTL
@@ -173,13 +174,13 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
 
         try
         {
-            var value = await factory(cancellationToken);
+            var value = await factory(cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
 
             _logger.LogTrace("Factory executed in {ElapsedMs}ms: {CacheKey}", stopwatch.ElapsedMilliseconds, normalizedKey);
 
             // Store in both caches
-            await SetAsync(normalizedKey, value, effectiveExpiration, cancellationToken);
+            await SetAsync(normalizedKey, value, effectiveExpiration, cancellationToken).ConfigureAwait(false);
 
             return value;
         }
@@ -216,7 +217,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
             // Compress if enabled and above threshold
             if (_options.EnableCompression && originalSize > _options.CompressionThreshold)
             {
-                cacheData = await CompressAsync(serialized, cancellationToken);
+                cacheData = await CompressAsync(serialized, cancellationToken).ConfigureAwait(false);
                 compressed = true;
                 _logger.LogTrace("Compressed cache entry: {OriginalSize} -> {CompressedSize} bytes ({Ratio:P1})",
                     originalSize, cacheData.Length, (double)cacheData.Length / originalSize);
@@ -246,18 +247,24 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
                         AbsoluteExpirationRelativeToNow = effectiveExpiration
                     };
 
-                    await _distributedCache.SetAsync(normalizedKey, envelopeBytes, cacheOptions, cancellationToken);
+                    await _distributedCache.SetAsync(normalizedKey, envelopeBytes, cacheOptions, cancellationToken).ConfigureAwait(false);
 
                     stopwatch.Stop();
                     _metrics.RecordCacheSet(CacheNameDistributed, stopwatch.Elapsed, envelopeBytes.Length);
                     _logger.LogTrace("Set distributed cache: {CacheKey}, size={Size} bytes, ttl={TTL}",
                         normalizedKey, envelopeBytes.Length, effectiveExpiration);
                 }
-                catch (Exception ex)
+                catch (TimeoutException timeoutEx)
+                {
+                    _logger.LogWarning(timeoutEx, "Timeout setting distributed cache: {CacheKey}", normalizedKey);
+                    _metrics.RecordCacheError(CacheNameDistributed, "set", "timeout");
+                    // Continue to set in-memory cache
+                }
+                catch (Exception ex) when (ex is not CacheException)
                 {
                     _logger.LogWarning(ex, "Failed to set distributed cache: {CacheKey}", normalizedKey);
                     _metrics.RecordCacheError(CacheNameDistributed, "set", ex.GetType().Name);
-                    // Continue to set in-memory cache
+                    // Continue to set in-memory cache - don't throw, gracefully degrade
                 }
             }
 
@@ -265,11 +272,17 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
             var memoryExpiration = TimeSpan.FromSeconds(Math.Min(effectiveExpiration.TotalSeconds, 300));
             SetInMemoryCache(normalizedKey, value, memoryExpiration);
         }
-        catch (Exception ex)
+        catch (JsonException jsonEx)
+        {
+            _logger.LogError(jsonEx, "Failed to serialize cache value: {CacheKey}", normalizedKey);
+            _metrics.RecordCacheError(CacheNameMemory, "serialize", "json");
+            throw new CacheException($"Failed to serialize cache value for key '{normalizedKey}'", jsonEx);
+        }
+        catch (Exception ex) when (ex is not CacheException)
         {
             _logger.LogError(ex, "Failed to set cache: {CacheKey}", normalizedKey);
             _metrics.RecordCacheError(CacheNameMemory, "set", ex.GetType().Name);
-            throw;
+            throw new CacheException($"Unexpected error setting cache for key '{normalizedKey}'", ex);
         }
     }
 
@@ -290,7 +303,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         _metrics.RecordCacheMiss(CacheNameMemory, normalizedKey);
 
         // Try L1 (distributed) cache
-        return await GetFromDistributedCacheAsync<T>(normalizedKey, cancellationToken);
+        return await GetFromDistributedCacheAsync<T>(normalizedKey, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -307,13 +320,20 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         {
             try
             {
-                await _distributedCache.RemoveAsync(normalizedKey, cancellationToken);
+                await _distributedCache.RemoveAsync(normalizedKey, cancellationToken).ConfigureAwait(false);
                 _logger.LogTrace("Removed from cache: {CacheKey}", normalizedKey);
             }
-            catch (Exception ex)
+            catch (TimeoutException timeoutEx)
+            {
+                _logger.LogWarning(timeoutEx, "Timeout removing from distributed cache: {CacheKey}", normalizedKey);
+                _metrics.RecordCacheError(CacheNameDistributed, "remove", "timeout");
+                // Graceful degradation - don't throw
+            }
+            catch (Exception ex) when (ex is not CacheException)
             {
                 _logger.LogWarning(ex, "Failed to remove from distributed cache: {CacheKey}", normalizedKey);
                 _metrics.RecordCacheError(CacheNameDistributed, "remove", ex.GetType().Name);
+                // Graceful degradation - don't throw
             }
         }
     }
@@ -352,7 +372,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
 
         try
         {
-            var envelopeBytes = await _distributedCache.GetAsync(key, cancellationToken);
+            var envelopeBytes = await _distributedCache.GetAsync(key, cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
 
             if (envelopeBytes == null)
@@ -374,7 +394,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
 
             // Decompress if needed
             byte[] data = envelope.Compressed
-                ? await DecompressAsync(envelope.Data, cancellationToken)
+                ? await DecompressAsync(envelope.Data, cancellationToken).ConfigureAwait(false)
                 : envelope.Data;
 
             // Deserialize value
@@ -422,7 +442,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         using var outputStream = new MemoryStream();
         await using (var gzipStream = new GZipStream(outputStream, CompressionLevel.Fastest))
         {
-            await gzipStream.WriteAsync(data, cancellationToken);
+            await gzipStream.WriteAsync(data, cancellationToken).ConfigureAwait(false);
         }
         return outputStream.ToArray();
     }
@@ -433,7 +453,7 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
         using var outputStream = new MemoryStream();
         await using (var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress))
         {
-            await gzipStream.CopyToAsync(outputStream, cancellationToken);
+            await gzipStream.CopyToAsync(outputStream, cancellationToken).ConfigureAwait(false);
         }
         return outputStream.ToArray();
     }
