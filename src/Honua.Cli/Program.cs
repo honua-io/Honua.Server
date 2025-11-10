@@ -129,7 +129,7 @@ public static class Program
                 .WithExample("honua", "setup", "--deployment-target", "development", "--database-type", "postgis");
 
             config.AddCommand<ConsultantCommand>("consultant")
-                .WithDescription("Launch the Honua AI consultant (plan-only preview).")
+                .WithDescription("Launch the Honua AI Devsecops (plan-only preview).")
                 .WithExample("honua", "consultant", "--dry-run", "--prompt", "connect my PostGIS database");
 
             config.AddCommand<ConsultantRefineCommand>("consultant-refine")

@@ -636,7 +636,7 @@ Features:
 
 Example session:
   > honua consultant-chat
-  Welcome to Honua AI Consultant!
+  Welcome to Honua AI Devsecops!
 
   You: How do I deploy to Kubernetes?
   AI: I'll help you deploy to Kubernetes...
