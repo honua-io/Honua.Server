@@ -183,6 +183,11 @@ public class GeofenceEdgeCaseTests
         _mockGeofenceRepo.Setup(r => r.GetByIdAsync(geofenceId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(geofence);
 
+        _mockGeofenceRepo.Setup(r => r.GetByIdsAsync(
+                It.IsAny<IEnumerable<Guid>>(), null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IEnumerable<Guid> ids, string _, CancellationToken __) =>
+                ids.Contains(geofenceId) ? new List<Geofence> { geofence } : new List<Geofence>());
+
         _mockStateRepo.Setup(r => r.GetEntityStatesAsync(entityId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<EntityGeofenceState> { exitState });
 
@@ -369,6 +374,11 @@ public class GeofenceEdgeCaseTests
 
         _mockGeofenceRepo.Setup(r => r.GetByIdAsync(geofenceId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(geofence);
+
+        _mockGeofenceRepo.Setup(r => r.GetByIdsAsync(
+                It.IsAny<IEnumerable<Guid>>(), null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IEnumerable<Guid> ids, string _, CancellationToken __) =>
+                ids.Contains(geofenceId) ? new List<Geofence> { geofence } : new List<Geofence>());
 
         _mockStateRepo.Setup(r => r.GetEntityStatesAsync(entityId, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<EntityGeofenceState> { existingState });

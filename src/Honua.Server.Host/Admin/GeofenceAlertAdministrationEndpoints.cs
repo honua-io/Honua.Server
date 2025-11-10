@@ -326,23 +326,23 @@ public static class GeofenceAlertAdministrationEndpoints
         return correlation != null ? Results.Ok(correlation) : Results.NotFound();
     }
 
-    private static async Task<IResult> GetAlertsByGeofence(
+    private static Task<IResult> GetAlertsByGeofence(
         Guid geofenceId,
         [FromServices] IGeofenceAlertRepository repository,
         [FromQuery] int limit = 100,
         CancellationToken cancellationToken = default)
     {
         // This would require additional repository method - for now return placeholder
-        return Results.Ok(new List<ActiveGeofenceAlert>());
+        return Task.FromResult<IResult>(Results.Ok(new List<ActiveGeofenceAlert>()));
     }
 
-    private static async Task<IResult> GetAlertsByEntity(
+    private static Task<IResult> GetAlertsByEntity(
         string entityId,
         [FromServices] IGeofenceAlertRepository repository,
         [FromQuery] int limit = 100,
         CancellationToken cancellationToken = default)
     {
         // This would require additional repository method - for now return placeholder
-        return Results.Ok(new List<ActiveGeofenceAlert>());
+        return Task.FromResult<IResult>(Results.Ok(new List<ActiveGeofenceAlert>()));
     }
 }

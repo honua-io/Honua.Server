@@ -119,6 +119,99 @@ public class ODataContainerTests
         count.Should().BeGreaterThanOrEqualTo(0);
     }
 
+    [Fact]
+    public async Task ODataEndpoints_ShouldSupportPagination()
+    {
+        // Arrange
+        var skipUrl = "/odata/Roads?$top=5&$skip=2";
+
+        // Act
+        var response = await _fixture.Client.GetAsync(skipUrl);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ODataResponse<RoadEntity>>();
+        json.Should().NotBeNull();
+        json!.Value.Should().NotBeNull();
+        json.Value.Should().HaveCountLessThanOrEqualTo(5);
+    }
+
+    [Fact]
+    public async Task ODataEndpoints_ShouldSupportComplexFiltering()
+    {
+        // Arrange - Test AND operation in filter
+        var complexFilterUrl = "/odata/Roads?$filter=status eq 'active' and length_km gt 10";
+
+        // Act
+        var response = await _fixture.Client.GetAsync(complexFilterUrl);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ODataResponse<RoadEntity>>();
+        json.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task ODataEndpoints_ShouldSupportCombinedQueryOptions()
+    {
+        // Arrange - Test multiple query options together
+        var combinedUrl = "/odata/Roads?$filter=status eq 'active'&$orderby=name&$top=10&$select=name,status";
+
+        // Act
+        var response = await _fixture.Client.GetAsync(combinedUrl);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ODataResponse<RoadEntity>>();
+        json.Should().NotBeNull();
+        json!.Value.Should().HaveCountLessThanOrEqualTo(10);
+    }
+
+    [Fact]
+    public async Task ODataEndpoints_ShouldReturnCountInResponse()
+    {
+        // Arrange - Test $count=true query option
+        var countInlineUrl = "/odata/Roads?$count=true&$top=5";
+
+        // Act
+        var response = await _fixture.Client.GetAsync(countInlineUrl);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("@odata.count");
+    }
+
+    [Fact]
+    public async Task ODataEndpoints_ShouldHandleInvalidFilter()
+    {
+        // Arrange - Test error handling with invalid filter
+        var invalidFilterUrl = "/odata/Roads?$filter=invalid_field eq 'test'";
+
+        // Act
+        var response = await _fixture.Client.GetAsync(invalidFilterUrl);
+
+        // Assert
+        // Should return 400 Bad Request or 500 Internal Server Error
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.InternalServerError);
+    }
+
+    [Fact]
+    public async Task ODataEndpoints_ShouldSupportSelectWithMultipleFields()
+    {
+        // Arrange - Test selecting multiple specific fields
+        var selectUrl = "/odata/Roads?$select=name,status,length_km&$top=5";
+
+        // Act
+        var response = await _fixture.Client.GetAsync(selectUrl);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadFromJsonAsync<ODataResponse<RoadEntity>>();
+        json.Should().NotBeNull();
+        json!.Value.Should().NotBeNull();
+    }
+
     // Helper classes for JSON deserialization
     private class ODataResponse<T>
     {

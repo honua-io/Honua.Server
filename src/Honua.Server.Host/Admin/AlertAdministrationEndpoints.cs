@@ -725,7 +725,7 @@ public static class AlertAdministrationEndpoints
         }
     }
 
-    private static async Task<IResult> GetAlertHistoryById(
+    private static Task<IResult> GetAlertHistoryById(
         long id,
         [FromServices] IAlertHistoryStore historyStore,
         CancellationToken ct)
@@ -734,17 +734,17 @@ public static class AlertAdministrationEndpoints
         {
             // TODO: Add method to get alert by ID
             // For now, return not implemented
-            return Results.Problem(
+            return Task.FromResult<IResult>(Results.Problem(
                 title: "Not implemented",
                 statusCode: StatusCodes.Status501NotImplemented,
-                detail: "Alert history by ID not yet implemented. Use fingerprint-based lookup instead.");
+                detail: "Alert history by ID not yet implemented. Use fingerprint-based lookup instead."));
         }
         catch (Exception ex)
         {
-            return Results.Problem(
+            return Task.FromResult<IResult>(Results.Problem(
                 title: "Internal server error",
                 statusCode: StatusCodes.Status500InternalServerError,
-                detail: $"Failed to retrieve alert: {ex.Message}");
+                detail: $"Failed to retrieve alert: {ex.Message}"));
         }
     }
 

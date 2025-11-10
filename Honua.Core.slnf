@@ -1,0 +1,20 @@
+{
+  "solution": {
+    "path": "Honua.sln",
+    "projects": [
+      "src/Honua.Server.Core.Cloud/Honua.Server.Core.Cloud.csproj",
+      "src/Honua.Server.Core.OData/Honua.Server.Core.OData.csproj",
+      "src/Honua.Server.Core.Raster/Honua.Server.Core.Raster.csproj",
+      "src/Honua.Server.Core/Honua.Server.Core.csproj",
+      "tests/Honua.Server.Core.Tests.Apis/Honua.Server.Core.Tests.Apis.csproj",
+      "tests/Honua.Server.Core.Tests.Data/Honua.Server.Core.Tests.Data.csproj",
+      "tests/Honua.Server.Core.Tests.DataOperations/Honua.Server.Core.Tests.DataOperations.csproj",
+      "tests/Honua.Server.Core.Tests.Infrastructure/Honua.Server.Core.Tests.Infrastructure.csproj",
+      "tests/Honua.Server.Core.Tests.Integration/Honua.Server.Core.Tests.Integration.csproj",
+      "tests/Honua.Server.Core.Tests.OgcProtocols/Honua.Server.Core.Tests.OgcProtocols.csproj",
+      "tests/Honua.Server.Core.Tests.Raster/Honua.Server.Core.Tests.Raster.csproj",
+      "tests/Honua.Server.Core.Tests.Security/Honua.Server.Core.Tests.Security.csproj",
+      "tests/Honua.Server.Core.Tests.Shared/Honua.Server.Core.Tests.Shared.csproj"
+    ]
+  }
+}

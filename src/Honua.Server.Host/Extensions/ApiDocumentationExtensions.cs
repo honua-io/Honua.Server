@@ -33,9 +33,6 @@ internal static class ApiDocumentationExtensions
     {
         services.AddEndpointsApiExplorer();
 
-        // Temporarily disable Swagger to bypass filter issues
-        return services;
-
         services.AddSwaggerGen(options =>
         {
             options.SwaggerDoc("v1", new OpenApiInfo
@@ -128,9 +125,6 @@ internal static class ApiDocumentationExtensions
     /// <returns>The web application for method chaining.</returns>
     public static WebApplication UseHonuaApiDocumentation(this WebApplication app)
     {
-        // Temporarily disabled to bypass Swagger filter issues
-        return app;
-
         // Only enable Swagger in Development to prevent information disclosure in production
         if (app.Environment.IsDevelopment())
         {
