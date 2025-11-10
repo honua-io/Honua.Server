@@ -53,6 +53,12 @@ public static class ServiceCollectionExtensions
         services.AddExceptionHandler<ExceptionHandlers.GlobalExceptionHandler>();
         services.AddProblemDetails();
 
+        // Register security headers options with validation
+        services.AddOptions<SecurityHeadersOptions>()
+            .Bind(configuration.GetSection(SecurityHeadersOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         // Register OGC cache header service with validation
         services.AddOptions<CacheHeaderOptions>()
             .Bind(configuration.GetSection("CacheHeaders"))

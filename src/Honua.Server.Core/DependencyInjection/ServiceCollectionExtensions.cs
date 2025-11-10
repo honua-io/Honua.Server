@@ -335,6 +335,12 @@ public static class ServiceCollectionExtensions
         services.Configure<Resilience.CircuitBreakerOptions>(configuration.GetSection(Resilience.CircuitBreakerOptions.SectionName));
         services.AddSingleton<Resilience.ICircuitBreakerService, Resilience.CircuitBreakerService>();
 
+        // Configure bulkhead resilience options and services
+        services.Configure<Resilience.BulkheadOptions>(configuration.GetSection(Resilience.BulkheadOptions.SectionName));
+        services.AddSingleton<Resilience.BulkheadPolicyProvider>();
+        services.AddSingleton<Resilience.TenantResourceLimiter>();
+        services.AddSingleton<Resilience.MemoryCircuitBreaker>();
+
         services.AddHostedService<SecurityValidationHostedService>();
         services.AddHostedService<MetadataInitializationHostedService>();
         services.AddHostedService<ServiceApiValidationHostedService>();
