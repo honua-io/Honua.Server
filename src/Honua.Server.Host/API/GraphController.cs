@@ -1,6 +1,8 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Honua.Server.Core.Services;
 using Honua.Server.Core.Models.Graph;
@@ -13,7 +15,9 @@ namespace Honua.Server.Host.API;
 /// Provides endpoints for managing nodes, edges, and executing Cypher queries.
 /// </summary>
 [ApiController]
-[Route("api/graph")]
+[ApiVersion("1.0")]
+[Authorize(Policy = "RequireEditor")]
+[Route("api/v{version:apiVersion}/graph")]
 [Produces("application/json")]
 public class GraphController : ControllerBase
 {

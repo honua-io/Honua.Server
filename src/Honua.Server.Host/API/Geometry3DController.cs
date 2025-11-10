@@ -1,8 +1,10 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using Asp.Versioning;
 using Honua.Server.Core.Models.Geometry3D;
 using Honua.Server.Core.Services.Geometry3D;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Honua.Server.Host.API;
@@ -13,18 +15,23 @@ namespace Honua.Server.Host.API;
 /// Part of Phase 1.2: Complex 3D Geometry Support (AEC Technical Enablers)
 /// </summary>
 [ApiController]
-[Route("api/geometry/3d")]
+[ApiVersion("1.0")]
+[Authorize(Policy = "RequireEditor")]
+[Route("api/v{version:apiVersion}/geometry/3d")]
 [Produces("application/json")]
 public class Geometry3DController : ControllerBase
 {
     private readonly IGeometry3DService _geometryService;
+    private readonly IMeshConverter _meshConverter;
     private readonly ILogger<Geometry3DController> _logger;
 
     public Geometry3DController(
         IGeometry3DService geometryService,
+        IMeshConverter meshConverter,
         ILogger<Geometry3DController> logger)
     {
         _geometryService = geometryService;
+        _meshConverter = meshConverter;
         _logger = logger;
     }
 
@@ -250,5 +257,78 @@ public class Geometry3DController : ControllerBase
         var bbox = new BoundingBox3D(minX, minY, minZ, maxX, maxY, maxZ);
         var geometries = await _geometryService.FindGeometriesByBoundingBoxAsync(bbox, cancellationToken);
         return Ok(geometries);
+    }
+
+    /// <summary>
+    /// Get mesh preview data for web rendering
+    /// Returns optimized mesh data suitable for Deck.gl visualization
+    /// </summary>
+    /// <param name="id">Geometry ID</param>
+    /// <param name="format">Preview format: 'simple' (SimpleMeshLayer) or 'gltf' (ScenegraphLayer)</param>
+    /// <param name="lod">Level of detail (0-100, where 0 is highest quality)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    [HttpGet("{id}/preview")]
+    [ProducesResponseType(typeof(MeshPreviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetMeshPreview(
+        Guid id,
+        [FromQuery] string format = "simple",
+        [FromQuery] int lod = 0,
+        CancellationToken cancellationToken = default)
+    {
+        // Validate format
+        if (format != "simple" && format != "gltf")
+        {
+            return BadRequest("Format must be 'simple' or 'gltf'");
+        }
+
+        // Validate LOD
+        if (lod < 0 || lod > 100)
+        {
+            return BadRequest("Level of detail must be between 0 and 100");
+        }
+
+        // Get geometry with mesh data
+        var geometry = await _geometryService.GetGeometryAsync(id, includeMeshData: true, cancellationToken);
+
+        if (geometry == null)
+        {
+            return NotFound($"Geometry {id} not found");
+        }
+
+        if (geometry.Mesh == null)
+        {
+            return BadRequest("Geometry has no mesh data available");
+        }
+
+        try
+        {
+            MeshPreviewResponse response;
+
+            if (format == "simple")
+            {
+                response = await _meshConverter.ToSimpleMeshAsync(
+                    geometry.Mesh,
+                    lod,
+                    geometry.Id,
+                    geometry.SourceFormat);
+            }
+            else
+            {
+                response = await _meshConverter.ToGltfJsonAsync(
+                    geometry.Mesh,
+                    lod,
+                    geometry.Id,
+                    geometry.SourceFormat);
+            }
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate mesh preview for geometry {GeometryId} with format {Format}", id, format);
+            return BadRequest($"Failed to generate preview: {ex.Message}");
+        }
     }
 }
