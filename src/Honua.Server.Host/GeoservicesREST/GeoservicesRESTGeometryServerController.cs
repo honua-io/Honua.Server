@@ -27,7 +27,7 @@ namespace Honua.Server.Host.GeoservicesREST;
 
 [ApiController]
 [Authorize(Policy = "RequireViewer")]
-[Route("rest/services/Geometry/GeometryServer")]
+[Route("v1/rest/services/Geometry/GeometryServer")]
 public sealed class GeoservicesRESTGeometryServerController : ControllerBase
 {
     private const int OperationTimeoutSeconds = 30;
@@ -146,7 +146,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
         catch (GeometrySerializationException ex)
         {
             _logger.LogOperationFailure(ex, "Geometry serialization", "project operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            return BadRequest(new { error = ex.Message });
         }
         catch (GeometryServiceException ex)
         {

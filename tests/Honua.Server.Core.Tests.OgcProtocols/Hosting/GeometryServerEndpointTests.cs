@@ -11,6 +11,7 @@ using FluentAssertions;
 using Honua.Server.Core.Authentication;
 using Honua.Server.Core.Geoservices.GeometryService;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Xunit;
@@ -57,7 +58,7 @@ public sealed class GeometryServerEndpointTests : IClassFixture<HonuaWebApplicat
             }
         };
 
-        var response = await client.PostAsJsonAsync("/rest/services/Geometry/GeometryServer/project?f=json", payload);
+        var response = await client.PostAsJsonAsync("/v1/rest/services/Geometry/GeometryServer/project?f=json", payload);
 
         var responseBody = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(HttpStatusCode.OK, responseBody);
@@ -90,7 +91,7 @@ public sealed class GeometryServerEndpointTests : IClassFixture<HonuaWebApplicat
             geometries = new { geometries = new[] { new { x = 0, y = 0 } } }
         };
 
-        var response = await client.PostAsJsonAsync("/rest/services/Geometry/GeometryServer/project?f=geojson", payload);
+        var response = await client.PostAsJsonAsync("/v1/rest/services/Geometry/GeometryServer/project?f=geojson", payload);
 
         var responseBody = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest, responseBody);
@@ -110,7 +111,7 @@ public sealed class GeometryServerEndpointTests : IClassFixture<HonuaWebApplicat
             outSR = 3857
         };
 
-        var response = await client.PostAsJsonAsync("/rest/services/Geometry/GeometryServer/project", payload);
+        var response = await client.PostAsJsonAsync("/v1/rest/services/Geometry/GeometryServer/project", payload);
 
         var responseBody = await response.Content.ReadAsStringAsync();
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest, responseBody);
@@ -122,6 +123,15 @@ public sealed class GeometryServerEndpointTests : IClassFixture<HonuaWebApplicat
     {
         return _factory.WithHonuaWebHostBuilder(builder =>
         {
+            builder.ConfigureAppConfiguration((context, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["honua:authentication:mode"] = "Local",
+                    ["honua:services:geometry:enabled"] = "true"
+                });
+            });
+
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IGeometryOperationExecutor>();
@@ -143,7 +153,7 @@ public sealed class GeometryServerEndpointTests : IClassFixture<HonuaWebApplicat
         // Get CSRF token BEFORE login
         await EnsureCsrfTokenAsync(client);
 
-        var response = await client.PostAsJsonAsync("/api/auth/local/login", new
+        var response = await client.PostAsJsonAsync("/v1/api/auth/local/login", new
         {
             username = HonuaWebApplicationFactory.DefaultAdminUsername,
             password = HonuaWebApplicationFactory.DefaultAdminPassword

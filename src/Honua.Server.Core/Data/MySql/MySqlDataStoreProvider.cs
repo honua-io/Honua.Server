@@ -19,6 +19,7 @@ using Honua.Server.Core.Security;
 using Honua.Server.Core.Utilities;
 using MySqlConnector;
 using Honua.Server.Core.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Data.MySql;
 
@@ -27,12 +28,16 @@ public sealed class MySqlDataStoreProvider : RelationalDataStoreProviderBase<MyS
     private const int BulkBatchSize = 1000;
 
     private readonly ConcurrentDictionary<string, Lazy<MySqlDataSource>> _dataSources = new(StringComparer.Ordinal);
+    private readonly ILogger<MySqlDataStoreProvider> _logger;
 
     public const string ProviderKey = "mysql";
 
-    public MySqlDataStoreProvider(IConnectionStringEncryptionService? encryptionService = null)
+    public MySqlDataStoreProvider(
+        IConnectionStringEncryptionService? encryptionService = null,
+        ILogger<MySqlDataStoreProvider>? logger = null)
         : base(ProviderKey, DatabaseRetryPolicy.CreateMySqlRetryPipeline(), encryptionService)
     {
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MySqlDataStoreProvider>.Instance;
     }
 
     public override string Provider => ProviderKey;
@@ -45,8 +50,19 @@ public sealed class MySqlDataStoreProvider : RelationalDataStoreProviderBase<MyS
 
     protected override MySqlConnection CreateConnectionCore(string connectionString)
     {
-        var dataSource = new MySqlDataSource(connectionString);
-        return dataSource.CreateConnection();
+        _logger.LogDebug("Creating MySQL connection");
+        try
+        {
+            var dataSource = new MySqlDataSource(connectionString);
+            var connection = dataSource.CreateConnection();
+            _logger.LogTrace("MySQL connection created successfully");
+            return connection;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create MySQL connection");
+            throw;
+        }
     }
 
     protected override string NormalizeConnectionString(string connectionString)
@@ -304,6 +320,9 @@ public sealed class MySqlDataStoreProvider : RelationalDataStoreProviderBase<MyS
         Guard.NotNull(layer);
         Guard.NotNull(records);
 
+        _logger.LogInformation("Starting bulk insert for {ServiceId}/{LayerId}", service.Id, layer.Id);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         var table = LayerMetadataHelper.GetTableExpression(layer, QuoteIdentifier);
         var srid = layer.Storage?.Srid ?? CrsHelper.Wgs84;
 
@@ -322,6 +341,7 @@ public sealed class MySqlDataStoreProvider : RelationalDataStoreProviderBase<MyS
             if (batch.Count >= BulkBatchSize)
             {
                 count += await ExecuteInsertBatchAsync(connection, table, layer, batch, srid, cancellationToken).ConfigureAwait(false);
+                _logger.LogDebug("Processed batch of {BatchSize} records for {ServiceId}/{LayerId}, total: {TotalCount}", batch.Count, service.Id, layer.Id, count);
                 batch.Clear();
             }
         }
@@ -331,6 +351,10 @@ public sealed class MySqlDataStoreProvider : RelationalDataStoreProviderBase<MyS
         {
             count += await ExecuteInsertBatchAsync(connection, table, layer, batch, srid, cancellationToken).ConfigureAwait(false);
         }
+
+        stopwatch.Stop();
+        _logger.LogInformation("Completed bulk insert of {RecordCount} records for {ServiceId}/{LayerId} in {ElapsedMs}ms",
+            count, service.Id, layer.Id, stopwatch.ElapsedMilliseconds);
 
         return count;
     }

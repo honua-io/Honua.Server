@@ -187,7 +187,7 @@ public class LazyRedisInitializerTests
 
         // Act
         await initializer.StartAsync(CancellationToken.None);
-        await Task.Delay(2000); // Wait for background initialization to fail
+        await Task.Delay(18000); // Wait for background initialization to fail (1500ms delay + 15000ms retries (5s × 3) + buffer)
 
         // Assert - Should have logged a warning about the failure
         loggerMock.Verify(

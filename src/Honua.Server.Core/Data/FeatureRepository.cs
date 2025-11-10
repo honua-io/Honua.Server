@@ -12,6 +12,7 @@ using Honua.Server.Core.Query.Expressions;
 using Honua.Server.Core.Query.Filter;
 
 using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
 namespace Honua.Server.Core.Data;
 
 /// <summary>
@@ -137,10 +138,14 @@ public interface IFeatureRepository
 public sealed class FeatureRepository : IFeatureRepository
 {
     private readonly IFeatureContextResolver _contextResolver;
+    private readonly ILogger<FeatureRepository> _logger;
 
-    public FeatureRepository(IFeatureContextResolver contextResolver)
+    public FeatureRepository(
+        IFeatureContextResolver contextResolver,
+        ILogger<FeatureRepository> logger)
     {
         _contextResolver = contextResolver ?? throw new ArgumentNullException(nameof(contextResolver));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public IAsyncEnumerable<FeatureRecord> QueryAsync(string serviceId, string layerId, FeatureQuery? query, CancellationToken cancellationToken = default)
@@ -154,9 +159,37 @@ public sealed class FeatureRepository : IFeatureRepository
     {
         Guard.NotNullOrWhiteSpace(serviceId);
         Guard.NotNullOrWhiteSpace(layerId);
-        var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
-        var effectiveQuery = NormalizeQuery(context, query);
-        return await context.Provider.CountAsync(context.DataSource, context.Service, context.Layer, effectiveQuery, cancellationToken);
+
+        _logger.LogDebug("Counting features for {ServiceId}/{LayerId}", serviceId, layerId);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
+            var effectiveQuery = NormalizeQuery(context, query);
+            var count = await context.Provider.CountAsync(context.DataSource, context.Service, context.Layer, effectiveQuery, cancellationToken);
+
+            stopwatch.Stop();
+            if (stopwatch.ElapsedMilliseconds > 1000)
+            {
+                _logger.LogWarning("Slow count query for {ServiceId}/{LayerId} took {ElapsedMs}ms, returned {Count}",
+                    serviceId, layerId, stopwatch.ElapsedMilliseconds, count);
+            }
+            else
+            {
+                _logger.LogDebug("Counted {Count} features for {ServiceId}/{LayerId} in {ElapsedMs}ms",
+                    count, serviceId, layerId, stopwatch.ElapsedMilliseconds);
+            }
+
+            return count;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "Failed to count features for {ServiceId}/{LayerId} after {ElapsedMs}ms",
+                serviceId, layerId, stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
 
     public async Task<FeatureRecord?> GetAsync(string serviceId, string layerId, string featureId, FeatureQuery? query = null, CancellationToken cancellationToken = default)
@@ -174,8 +207,22 @@ public sealed class FeatureRepository : IFeatureRepository
         Guard.NotNullOrWhiteSpace(serviceId);
         Guard.NotNullOrWhiteSpace(layerId);
         Guard.NotNull(record);
-        var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
-        return await context.Provider.CreateAsync(context.DataSource, context.Service, context.Layer, record, transaction, cancellationToken);
+
+        _logger.LogInformation("Creating feature in {ServiceId}/{LayerId}", serviceId, layerId);
+
+        try
+        {
+            var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
+            var result = await context.Provider.CreateAsync(context.DataSource, context.Service, context.Layer, record, transaction, cancellationToken);
+            _logger.LogInformation("Successfully created feature {FeatureId} in {ServiceId}/{LayerId}",
+                result.Id, serviceId, layerId);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create feature in {ServiceId}/{LayerId}", serviceId, layerId);
+            throw;
+        }
     }
 
     public async Task<FeatureRecord?> UpdateAsync(string serviceId, string layerId, string featureId, FeatureRecord record, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
@@ -184,8 +231,30 @@ public sealed class FeatureRepository : IFeatureRepository
         Guard.NotNullOrWhiteSpace(layerId);
         Guard.NotNullOrWhiteSpace(featureId);
         Guard.NotNull(record);
-        var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
-        return await context.Provider.UpdateAsync(context.DataSource, context.Service, context.Layer, featureId, record, transaction, cancellationToken);
+
+        _logger.LogInformation("Updating feature {FeatureId} in {ServiceId}/{LayerId}", featureId, serviceId, layerId);
+
+        try
+        {
+            var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
+            var result = await context.Provider.UpdateAsync(context.DataSource, context.Service, context.Layer, featureId, record, transaction, cancellationToken);
+
+            if (result != null)
+            {
+                _logger.LogInformation("Successfully updated feature {FeatureId} in {ServiceId}/{LayerId}", featureId, serviceId, layerId);
+            }
+            else
+            {
+                _logger.LogWarning("Feature {FeatureId} not found for update in {ServiceId}/{LayerId}", featureId, serviceId, layerId);
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update feature {FeatureId} in {ServiceId}/{LayerId}", featureId, serviceId, layerId);
+            throw;
+        }
     }
 
     public async Task<bool> DeleteAsync(string serviceId, string layerId, string featureId, IDataStoreTransaction? transaction = null, CancellationToken cancellationToken = default)
@@ -193,8 +262,30 @@ public sealed class FeatureRepository : IFeatureRepository
         Guard.NotNullOrWhiteSpace(serviceId);
         Guard.NotNullOrWhiteSpace(layerId);
         Guard.NotNullOrWhiteSpace(featureId);
-        var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
-        return await context.Provider.DeleteAsync(context.DataSource, context.Service, context.Layer, featureId, transaction, cancellationToken);
+
+        _logger.LogInformation("Deleting feature {FeatureId} from {ServiceId}/{LayerId}", featureId, serviceId, layerId);
+
+        try
+        {
+            var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
+            var deleted = await context.Provider.DeleteAsync(context.DataSource, context.Service, context.Layer, featureId, transaction, cancellationToken);
+
+            if (deleted)
+            {
+                _logger.LogInformation("Successfully deleted feature {FeatureId} from {ServiceId}/{LayerId}", featureId, serviceId, layerId);
+            }
+            else
+            {
+                _logger.LogWarning("Feature {FeatureId} not found for deletion in {ServiceId}/{LayerId}", featureId, serviceId, layerId);
+            }
+
+            return deleted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete feature {FeatureId} from {ServiceId}/{LayerId}", featureId, serviceId, layerId);
+            throw;
+        }
     }
 
     public async Task<byte[]> GenerateMvtTileAsync(string serviceId, string layerId, int zoom, int x, int y, string? datetime = null, CancellationToken cancellationToken = default)

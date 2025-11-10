@@ -5,9 +5,31 @@
 namespace Honua.Server.Core.Exceptions;
 
 /// <summary>
+/// Base exception for metadata operation errors.
+/// </summary>
+public class MetadataException : HonuaException
+{
+    public MetadataException(string message) : base(message, "METADATA_ERROR")
+    {
+    }
+
+    public MetadataException(string message, Exception innerException) : base(message, "METADATA_ERROR", innerException)
+    {
+    }
+
+    public MetadataException(string message, string? errorCode) : base(message, errorCode)
+    {
+    }
+
+    public MetadataException(string message, string? errorCode, Exception innerException) : base(message, errorCode, innerException)
+    {
+    }
+}
+
+/// <summary>
 /// Exception thrown when metadata is not found.
 /// </summary>
-public class MetadataNotFoundException : HonuaException
+public class MetadataNotFoundException : MetadataException
 {
     public MetadataNotFoundException(string message) : base(message)
     {
@@ -99,13 +121,13 @@ public sealed class FolderNotFoundException : MetadataNotFoundException
 /// <summary>
 /// Exception thrown when metadata validation fails.
 /// </summary>
-public sealed class MetadataValidationException : HonuaException
+public sealed class MetadataValidationException : MetadataException
 {
-    public MetadataValidationException(string message) : base(message)
+    public MetadataValidationException(string message) : base(message, "METADATA_VALIDATION_FAILED")
     {
     }
 
-    public MetadataValidationException(string message, Exception innerException) : base(message, innerException)
+    public MetadataValidationException(string message, Exception innerException) : base(message, "METADATA_VALIDATION_FAILED", innerException)
     {
     }
 }
@@ -113,13 +135,13 @@ public sealed class MetadataValidationException : HonuaException
 /// <summary>
 /// Exception thrown when metadata configuration is invalid or missing.
 /// </summary>
-public sealed class MetadataConfigurationException : HonuaException
+public sealed class MetadataConfigurationException : MetadataException
 {
-    public MetadataConfigurationException(string message) : base(message)
+    public MetadataConfigurationException(string message) : base(message, "METADATA_CONFIGURATION_ERROR")
     {
     }
 
-    public MetadataConfigurationException(string message, Exception innerException) : base(message, innerException)
+    public MetadataConfigurationException(string message, Exception innerException) : base(message, "METADATA_CONFIGURATION_ERROR", innerException)
     {
     }
 }
