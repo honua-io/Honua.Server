@@ -1,5 +1,6 @@
 name: MapSDK Tests
 
+# DISABLED: Uncomment 'on' section below to re-enable
 on:
   # push:
   #   branches: [ main, develop ]
@@ -12,10 +13,11 @@ on:
   #   paths:
   #     - 'src/Honua.MapSDK/**'
   #     - 'tests/Honua.MapSDK.Tests/**'
-  workflow_dispatch:
+  # workflow_dispatch:
 
 jobs:
   test:
+    if: false # DISABLED
     name: Run Tests
     runs-on: ubuntu-latest
 

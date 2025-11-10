@@ -71,6 +71,9 @@ builder.Services.AddScoped<DraftStorageService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<DataExportService>();
 
+// SECURITY: Register user context service for tenant isolation and user identity extraction
+builder.Services.AddScoped<UserContextService>();
+
 // Register MapSDK services (visual map builder)
 builder.Services.AddHonuaMapSDK();
 

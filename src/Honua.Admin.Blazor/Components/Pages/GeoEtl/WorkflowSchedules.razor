@@ -3,6 +3,7 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject UserContextService UserContext
 
 <PageTitle>Workflow Schedules</PageTitle>
 
@@ -199,8 +200,8 @@
         _loading = true;
         try
         {
-            // TODO: Get actual tenant ID from auth context
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract tenant ID from authentication claims
+            var tenantId = await UserContext.GetTenantIdAsync();
             _schedules = await Http.GetFromJsonAsync<List<WorkflowScheduleDto>>(
                 $"/admin/api/geoetl/schedules?tenantId={tenantId}");
         }
@@ -218,7 +219,8 @@
     {
         try
         {
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract tenant ID from authentication claims
+            var tenantId = await UserContext.GetTenantIdAsync();
             _workflows = await Http.GetFromJsonAsync<List<WorkflowDto>>(
                 $"/admin/api/geoetl/workflows?tenantId={tenantId}");
         }
@@ -330,8 +332,8 @@
     {
         try
         {
-            // TODO: Get actual user ID from auth context
-            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract user ID from authentication claims
+            var userId = await UserContext.GetUserIdAsync();
             var response = await Http.PostAsync($"/admin/api/geoetl/schedules/{scheduleId}/run-now?userId={userId}", null);
             if (response.IsSuccessStatusCode)
             {

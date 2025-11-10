@@ -5,6 +5,7 @@
 @inject ISnackbar Snackbar
 @inject FeatureFlagService FeatureFlags
 @inject GeoEtlProgressService ProgressService
+@inject UserContextService UserContext
 @implements IAsyncDisposable
 
 <PageTitle>Workflow Execution History</PageTitle>
@@ -272,7 +273,8 @@ else
         _loading = true;
         try
         {
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract tenant ID from authentication claims
+            var tenantId = await UserContext.GetTenantIdAsync();
 
             // Check if filtering by specific workflow
             var uri = new Uri(Navigation.Uri);

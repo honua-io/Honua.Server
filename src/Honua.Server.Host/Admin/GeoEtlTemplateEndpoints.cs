@@ -16,7 +16,8 @@ public static class GeoEtlTemplateEndpoints
     {
         var group = endpoints.MapGroup("/admin/api/geoetl/templates")
             .WithTags("GeoETL Templates")
-            .WithOpenApi();
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // Get all templates
         group.MapGet("/", async (

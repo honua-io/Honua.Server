@@ -1,5 +1,6 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject UserContextService UserContext
 
 <MudDialog>
     <DialogContent>
@@ -166,12 +167,15 @@
 
         try
         {
+            // SECURITY: Extract tenant and user context from authentication claims
+            var (tenantId, userId) = await UserContext.GetContextAsync();
+
             var request = new
             {
-                tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001"), // TODO: Get from auth
+                tenantId = tenantId,
                 workflowId = _model.WorkflowId,
-                createdBy = Guid.Parse("00000000-0000-0000-0000-000000000001"), // TODO: Get from auth
-                updatedBy = Guid.Parse("00000000-0000-0000-0000-000000000001"), // TODO: Get from auth
+                createdBy = userId,
+                updatedBy = userId,
                 name = _model.Name,
                 description = _model.Description,
                 cronExpression = _model.CronExpression,

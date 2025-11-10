@@ -4,6 +4,7 @@ global:
   external_labels:
     cluster: 'honua-production'
     environment: 'production'
+    monitor: 'prometheus-main'
 
 # Alertmanager configuration
 alerting:
@@ -11,6 +12,10 @@ alerting:
     - static_configs:
         - targets:
             - 'alertmanager:9093'
+      # Alertmanager request timeout
+      timeout: 30s
+      # Send resolved alerts
+      send_resolved: true
 
 # Load rules once and periodically evaluate them
 rule_files:
@@ -18,45 +23,82 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # Honua Server metrics
+  # Honua Server metrics - with authentication support
   - job_name: 'honua-server'
     metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    honor_timestamps: true
+    # Basic authentication for metrics endpoint (if enabled in app)
+    # basic_auth:
+    #   username: 'prometheus'
+    #   password: 'password'
+    # Bearer token for metrics endpoint (if enabled in app)
+    # bearer_token: 'your-bearer-token'
     static_configs:
       - targets:
           - 'honua-server:5000'
         labels:
           service: 'honua-server'
           tier: 'backend'
+          version: 'v1'
+    # Relabel configs to add custom labels
+    relabel_configs:
+      - source_labels: [__scheme__]
+        target_label: __scheme__
+      # Skip problematic metrics with too many labels
+      - source_labels: [__name__]
+        regex: '(process_runtime_.*|http_client_request_duration_ms_bucket)'
+        action: drop
 
   # Prometheus self-monitoring
   - job_name: 'prometheus'
+    scrape_interval: 15s
+    scrape_timeout: 10s
     static_configs:
       - targets:
           - 'localhost:9090'
         labels:
           service: 'prometheus'
+          tier: 'monitoring'
 
   # PostgreSQL exporter (optional)
   - job_name: 'postgres'
+    scrape_interval: 30s
+    scrape_timeout: 10s
     static_configs:
       - targets:
           - 'postgres-exporter:9187'
         labels:
           service: 'postgres'
           tier: 'database'
+          version: '14'
+    # Optional: Database credentials
+    # basic_auth:
+    #   username: 'postgres'
+    #   password: 'password'
 
   # Node exporter for system metrics (optional)
   - job_name: 'node'
+    scrape_interval: 30s
+    scrape_timeout: 10s
     static_configs:
       - targets:
           - 'node-exporter:9100'
         labels:
           service: 'node-exporter'
           tier: 'infrastructure'
+          region: 'us-east-1'
 
 # Remote write for long-term storage (optional)
+# Uncomment and configure for production with long-term metric storage
 # remote_write:
 #   - url: 'http://your-prometheus-remote-storage/api/v1/write'
+#     write_relabel_configs:
+#       # Skip internal metrics
+#       - source_labels: [__name__]
+#         regex: 'prometheus_.*'
+#         action: drop
 #     queue_config:
 #       capacity: 10000
 #       max_shards: 5
@@ -65,9 +107,17 @@ scrape_configs:
 #       batch_send_deadline: 5s
 #       min_backoff: 30ms
 #       max_backoff: 100ms
+#     basic_auth:
+#       username: 'prometheus'
+#       password: 'password'
 
 # Storage configuration
 storage:
   tsdb:
+    # Retention time (default: 15 days for development)
+    # For production, consider 30d or higher
     retention.time: 15d
+    # Maximum storage size before dropping old data
     retention.size: 50GB
+    # WAL (Write Ahead Log) directory
+    wal_compression: true

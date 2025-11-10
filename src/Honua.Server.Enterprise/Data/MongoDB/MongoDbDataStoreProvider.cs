@@ -237,7 +237,12 @@ public sealed class MongoDbDataStoreProvider : IDataStoreProvider, IDisposable
             "Check IDataStoreCapabilities.SupportsSoftDelete before calling this method.");
     }
 
-    public Task<bool> HardDeleteAsync(
+    /// <summary>
+    /// Permanently deletes a feature from MongoDB without recovery option.
+    /// This is a GDPR-compliant hard delete that cannot be undone.
+    /// Audit logging is performed via the deletedBy parameter for compliance tracking.
+    /// </summary>
+    public async Task<bool> HardDeleteAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -246,9 +251,31 @@ public sealed class MongoDbDataStoreProvider : IDataStoreProvider, IDisposable
         IDataStoreTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement hard delete functionality for MongoDB
-        // For now, delegate to regular DeleteAsync
-        return DeleteAsync(dataSource, service, layer, featureId, transaction, cancellationToken);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var collection = GetCollection(dataSource, layer);
+        var builder = new MongoDbFeatureQueryBuilder(layer);
+        var filter = builder.BuildByIdFilter(featureId);
+
+        // Permanently delete the document - this is irreversible
+        var result = await collection.DeleteOneAsync(filter, cancellationToken).ConfigureAwait(false);
+
+        var deleted = result.DeletedCount > 0;
+
+        // Log the hard delete operation for audit compliance (GDPR, SOC2, etc.)
+        if (deleted)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"HARD DELETE: Feature permanently deleted from MongoDB - " +
+                $"Layer: {layer.Id}, FeatureId: {featureId}, DeletedBy: {deletedBy ?? "<system>"}");
+        }
+
+        return deleted;
     }
 
     public async Task<int> BulkInsertAsync(

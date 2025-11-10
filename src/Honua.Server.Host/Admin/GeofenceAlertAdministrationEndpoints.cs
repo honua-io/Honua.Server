@@ -24,7 +24,7 @@ public static class GeofenceAlertAdministrationEndpoints
     {
         var group = endpoints.MapGroup("/admin/geofence-alerts")
             .WithTags("Geofence Alerts Admin")
-            .RequireAuthorization();
+            .RequireAuthorization("RequireAdministrator");
 
         // === Alert Rules ===
 

@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject FeatureFlagService FeatureFlags
+@inject UserContextService UserContext
 @implements IDisposable
 
 <PageTitle>GeoETL Workflows</PageTitle>
@@ -171,8 +172,8 @@ else
         _loading = true;
         try
         {
-            // TODO: Replace with actual tenant ID from authentication
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract tenant ID from authentication claims
+            var tenantId = await UserContext.GetTenantIdAsync();
             var response = await Http.GetFromJsonAsync<List<WorkflowDto>>($"/admin/api/geoetl/workflows?tenantId={tenantId}");
             _workflows = response ?? new List<WorkflowDto>();
         }
@@ -208,8 +209,8 @@ else
         // TODO: Add confirmation dialog
         try
         {
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            // SECURITY: Extract tenant and user context from authentication claims
+            var (tenantId, userId) = await UserContext.GetContextAsync();
             await Http.DeleteAsync($"/admin/api/geoetl/workflows/{workflowId}?tenantId={tenantId}&deletedBy={userId}");
             Snackbar.Add("Workflow deleted successfully", Severity.Success);
             await LoadWorkflows();
