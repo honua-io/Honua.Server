@@ -6,6 +6,12 @@ Honua Server supports distributed tracing using OpenTelemetry, allowing you to o
 
 Tracing is configured via the `observability:tracing` section in `appsettings.json`. Honua provides Activity Sources for all major subsystems, making it easy to trace requests through different layers of the application.
 
+**Default Configuration:**
+- **Base/Development:** Tracing exporter is set to `none` (disabled)
+- **Production:** Tracing exporter is set to `none` by default (configure OTLP endpoint to enable)
+- **Overhead:** Minimal (~0.5%) when disabled, ~2-5% when enabled with OTLP
+- **Environment Variables:** Override via `observability__tracing__exporter` and `observability__tracing__otlpEndpoint`
+
 ## Configuration
 
 ### Enable Console Tracing (Development)
