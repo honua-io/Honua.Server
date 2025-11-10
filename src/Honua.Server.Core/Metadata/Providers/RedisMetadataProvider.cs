@@ -220,6 +220,7 @@ public sealed class RedisMetadataProvider : DisposableBase, IMutableMetadataProv
             layers,
             snapshot.RasterDatasets,
             snapshot.Styles,
+            snapshot.LayerGroups,
             snapshot.Server);
 
         await SaveAsync(updatedSnapshot, cancellationToken);

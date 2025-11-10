@@ -314,6 +314,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -420,6 +421,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -475,6 +477,7 @@ public static class MetadataAdministrationEndpoints
                 updatedLayers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -551,6 +554,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -815,6 +819,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers.Append(newLayer).ToList(),
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -929,6 +934,7 @@ public static class MetadataAdministrationEndpoints
                 updatedLayers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -1147,7 +1153,7 @@ public static class MetadataAdministrationEndpoints
             }
 
             // Get data provider
-            var provider = providerFactory.CreateProvider(dataSource);
+            var provider = providerFactory.Create(dataSource.Provider);
 
             // Execute the SQL with timeout
             var stopwatch = Stopwatch.StartNew();
@@ -1396,6 +1402,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -1462,6 +1469,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -1523,6 +1531,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -1623,6 +1632,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -1688,6 +1698,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 
@@ -1749,6 +1760,7 @@ public static class MetadataAdministrationEndpoints
                 snapshot.Layers,
                 snapshot.RasterDatasets,
                 snapshot.Styles,
+                snapshot.LayerGroups,
                 snapshot.Server
             );
 

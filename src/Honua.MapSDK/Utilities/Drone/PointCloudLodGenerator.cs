@@ -1,4 +1,4 @@
-using Honua.MapSDK.Models.Drone;
+using Honua.Server.Core.Models.Drone;
 using Microsoft.Extensions.Logging;
 
 namespace Honua.MapSDK.Utilities.Drone;
@@ -236,6 +236,6 @@ public static class PointCloudClassificationColors
     {
         return StandardColors.TryGetValue(classification, out var color)
             ? color
-            : (200, 200, 200); // Default gray
+            : ((byte)200, (byte)200, (byte)200); // Default gray
     }
 }

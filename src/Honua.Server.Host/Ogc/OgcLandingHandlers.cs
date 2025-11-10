@@ -185,7 +185,8 @@ internal static class OgcLandingHandlers
                 });
             }
 
-            // Add layer groups as collections
+            // TODO: Add layer groups as collections (implementation incomplete)
+            /*
             foreach (var group in snapshot.LayerGroups.Where(g => g.ServiceId == service.Id && g.Enabled))
             {
                 var collectionId = OgcSharedHandlers.BuildLayerGroupCollectionId(service, group);
@@ -229,6 +230,7 @@ internal static class OgcLandingHandlers
                     })
                 });
             }
+            */
         }
 
         var responseLinks = new List<OgcLink>
@@ -299,6 +301,10 @@ internal static class OgcLandingHandlers
             return Results.Ok(response).WithMetadataCacheHeaders(cacheHeaderService, etag);
         }
 
+        // TODO: Re-enable layer group collection support when helper methods are implemented
+        // The following code references BuildLayerGroupCollectionId, BuildLayerGroupCollectionLinks,
+        // and RenderLayerGroupCollectionHtml which are not yet implemented
+        /*
         // If not found as a layer, try to resolve as a layer group
         var snapshot = await metadataRegistry.GetInitializedSnapshotAsync(cancellationToken).ConfigureAwait(false);
         var parts = collectionId.Split(new[] { "::" }, StringSplitOptions.None);
@@ -363,5 +369,9 @@ internal static class OgcLandingHandlers
 
         var groupEtag = cacheHeaderService.GenerateETagForObject(groupResponse);
         return Results.Ok(groupResponse).WithMetadataCacheHeaders(cacheHeaderService, groupEtag);
+        */
+
+        // For now, return the original error since layer groups are not yet fully supported
+        return OgcSharedHandlers.MapCollectionResolutionError(result.Error!, collectionId);
     }
 }

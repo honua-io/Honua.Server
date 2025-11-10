@@ -369,6 +369,7 @@ public sealed class CswTests
             Array.Empty<LayerDefinition>(),
             Array.Empty<RasterDatasetDefinition>(),
             Array.Empty<StyleDefinition>(),
+            Array.Empty<LayerGroupDefinition>(),
             new ServerDefinition()
         );
 
@@ -405,6 +406,7 @@ public sealed class CswTests
             Array.Empty<LayerDefinition>(),
             Array.Empty<RasterDatasetDefinition>(),
             Array.Empty<StyleDefinition>(),
+            Array.Empty<LayerGroupDefinition>(),
             new ServerDefinition()
         );
 

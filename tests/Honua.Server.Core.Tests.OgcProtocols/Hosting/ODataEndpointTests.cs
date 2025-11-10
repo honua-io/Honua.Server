@@ -544,14 +544,6 @@ VALUES (@id, @name, @status, @observed, @geom);
                     displayField = "name",
                     geometryField = "geom",
                     itemType = "feature",
-                    fields = new object[]
-                    {
-                        new { name = "road_id", type = "int", dataType = "int", storageType = "int", nullable = false },
-                        new { name = "name", type = "string", dataType = "string" },
-                        new { name = "status", type = "string", dataType = "string" },
-                        new { name = "observed_at", type = "datetimeoffset", dataType = "datetime" },
-                        new { name = "geom", type = "geometry", dataType = "geometry" }
-                    },
                     storage = new
                     {
                         table = "roads_primary",
@@ -867,14 +859,6 @@ VALUES
                     displayField = "name",
                     geometryField = "geom",
                     itemType = "feature",
-                    fields = new object[]
-                    {
-                        new { name = "road_id", type = "int", dataType = "int", storageType = "int", nullable = false },
-                        new { name = "name", type = "string", dataType = "string" },
-                        new { name = "status", type = "string", dataType = "string" },
-                        new { name = "observed_at", type = "datetimeoffset", dataType = "datetime" },
-                        new { name = "geom", type = "geometry", dataType = "geometry" }
-                    },
                     storage = new
                     {
                         table = "roads_primary",

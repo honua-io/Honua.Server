@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Honua.MapSDK.Models.Drone;
+namespace Honua.Server.Core.Models.Drone;
 
 /// <summary>
 /// Represents a drone survey mission with metadata

@@ -1,4 +1,4 @@
-using Honua.MapSDK.Models.Drone;
+using Honua.Server.Core.Models.Drone;
 using Microsoft.Extensions.Logging;
 
 namespace Honua.MapSDK.Utilities.Drone;

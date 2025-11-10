@@ -374,6 +374,7 @@ public sealed class WmtsTests
             Array.Empty<LayerDefinition>(),
             Array.Empty<RasterDatasetDefinition>(),
             Array.Empty<StyleDefinition>(),
+            Array.Empty<LayerGroupDefinition>(),
             new ServerDefinition()
         );
 

@@ -267,6 +267,7 @@ public sealed class SqlServerMetadataProvider : IMutableMetadataProvider, IReloa
             layers,
             snapshot.RasterDatasets,
             snapshot.Styles,
+            snapshot.LayerGroups,
             snapshot.Server);
 
         await SaveAsync(updatedSnapshot, cancellationToken);

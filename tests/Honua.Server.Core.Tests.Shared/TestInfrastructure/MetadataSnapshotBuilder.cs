@@ -18,6 +18,7 @@ public sealed class MetadataSnapshotBuilder
     private readonly List<LayerDefinition> _layers = new();
     private readonly List<RasterDatasetDefinition> _rasterDatasets = new();
     private readonly List<StyleDefinition> _styles = new();
+    private readonly List<LayerGroupDefinition> _layerGroups = new();
     private ServerDefinition _server;
 
     public MetadataSnapshotBuilder()
@@ -157,6 +158,7 @@ public sealed class MetadataSnapshotBuilder
             _layers,
             _rasterDatasets,
             _styles,
+            _layerGroups,
             _server);
     }
 

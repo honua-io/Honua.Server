@@ -1,4 +1,4 @@
-namespace Honua.MapSDK.Models.Drone;
+namespace Honua.Server.Core.Models.Drone;
 
 /// <summary>
 /// Represents an orthomosaic (orthophoto) from a drone survey

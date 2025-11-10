@@ -1,3 +1,4 @@
+@using System.Net.Http.Json
 @inject IJSRuntime JS
 @inject HttpClient Http
 
@@ -341,7 +342,7 @@
             { 18, (255, 0, 255) }
         };
 
-        return colors.TryGetValue(classification, out var color) ? color : (200, 200, 200);
+        return colors.TryGetValue(classification, out var color) ? color : ((byte)200, (byte)200, (byte)200);
     }
 
     private string GetClassificationName(int classification)

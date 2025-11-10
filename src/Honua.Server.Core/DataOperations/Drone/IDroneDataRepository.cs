@@ -1,4 +1,4 @@
-using Honua.MapSDK.Models.Drone;
+using Honua.Server.Core.Models.Drone;
 
 namespace Honua.Server.Core.DataOperations.Drone;
 

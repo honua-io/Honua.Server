@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using System.Buffers;
+using Microsoft.Extensions.Logging;
 using Honua.MapSDK.Utilities.Terrain;
 
 namespace Honua.MapSDK.Services.Terrain;

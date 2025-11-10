@@ -82,27 +82,27 @@
                 <EditForm Model="@NewSurvey" OnValidSubmit="CreateSurvey">
                     <div class="form-group">
                         <label>Survey Name:</label>
-                        <InputText @bind-Value="NewSurvey.Name" class="form-control" />
+                        <InputText Value="@NewSurvey.Name" ValueChanged="v => NewSurvey.Name = v" ValueExpression="() => NewSurvey.Name" class="form-control" />
                     </div>
 
                     <div class="form-group">
                         <label>Description:</label>
-                        <InputTextArea @bind-Value="NewSurvey.Description" class="form-control" />
+                        <InputTextArea Value="@NewSurvey.Description" ValueChanged="v => NewSurvey.Description = v" ValueExpression="() => NewSurvey.Description" class="form-control" />
                     </div>
 
                     <div class="form-group">
                         <label>Survey Date:</label>
-                        <InputDate @bind-Value="NewSurvey.SurveyDate" class="form-control" />
+                        <InputDate TValue="DateTime" Value="@NewSurvey.SurveyDate" ValueChanged="v => NewSurvey.SurveyDate = v" ValueExpression="() => NewSurvey.SurveyDate" class="form-control" />
                     </div>
 
                     <div class="form-group">
                         <label>Flight Altitude (m):</label>
-                        <InputNumber @bind-Value="NewSurvey.FlightAltitudeM" class="form-control" />
+                        <InputNumber TValue="double?" Value="@NewSurvey.FlightAltitudeM" ValueChanged="v => NewSurvey.FlightAltitudeM = v" ValueExpression="() => NewSurvey.FlightAltitudeM" class="form-control" />
                     </div>
 
                     <div class="form-group">
                         <label>Ground Resolution (cm):</label>
-                        <InputNumber @bind-Value="NewSurvey.GroundResolutionCm" class="form-control" />
+                        <InputNumber TValue="double?" Value="@NewSurvey.GroundResolutionCm" ValueChanged="v => NewSurvey.GroundResolutionCm = v" ValueExpression="() => NewSurvey.GroundResolutionCm" class="form-control" />
                     </div>
 
                     <div class="modal-actions">

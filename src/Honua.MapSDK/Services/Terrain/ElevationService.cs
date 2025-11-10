@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 
 namespace Honua.MapSDK.Services.Terrain;

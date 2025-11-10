@@ -1,4 +1,4 @@
-using Honua.MapSDK.Models.Drone;
+using Honua.Server.Core.Models.Drone;
 using Honua.MapSDK.Services.Drone;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
