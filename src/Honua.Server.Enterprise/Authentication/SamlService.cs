@@ -457,20 +457,245 @@ public class SamlService : ISamlService
         return Task.FromResult(config);
     }
 
-    public Task<SamlLogoutRequest> CreateLogoutRequestAsync(
+    /// <summary>
+    /// Creates a SAML logout request for Single Logout (SLO)
+    /// </summary>
+    /// <param name="tenantId">Tenant ID</param>
+    /// <param name="nameId">User NameID from the authentication assertion</param>
+    /// <param name="sessionIndex">Session index from authentication (if available)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Logout request result with redirect URL</returns>
+    /// <exception cref="InvalidOperationException">Thrown when IdP configuration is not found or logout not supported</exception>
+    public async Task<SamlLogoutRequest> CreateLogoutRequestAsync(
         Guid tenantId,
         string nameId,
         string? sessionIndex = null,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("SAML logout not yet implemented");
+        _logger.LogInformation("Creating SAML logout request for tenant {TenantId}", tenantId);
+
+        if (nameId.IsNullOrEmpty())
+        {
+            throw new ArgumentException("NameID cannot be null or empty", nameof(nameId));
+        }
+
+        // Get IdP configuration for tenant
+        var idpConfig = await _idpStore.GetEnabledByTenantIdAsync(tenantId, cancellationToken);
+        if (idpConfig == null)
+        {
+            throw new InvalidOperationException($"No enabled SAML IdP configuration found for tenant {tenantId}");
+        }
+
+        // Check if IdP supports Single Logout
+        if (idpConfig.SingleLogoutServiceUrl.IsNullOrEmpty())
+        {
+            throw new InvalidOperationException($"IdP {idpConfig.Name} does not have Single Logout configured");
+        }
+
+        // Generate request ID
+        var requestId = $"_{Guid.NewGuid():N}";
+        var issueInstant = DateTimeOffset.UtcNow;
+
+        // Build LogoutRequest XML
+        var logoutRequest = new XElement(
+            XName.Get("LogoutRequest", SamlpNamespace),
+            new XAttribute("ID", requestId),
+            new XAttribute("Version", "2.0"),
+            new XAttribute("IssueInstant", issueInstant.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")),
+            new XAttribute("Destination", idpConfig.SingleLogoutServiceUrl),
+            new XElement(
+                XName.Get("Issuer", SamlNamespace),
+                _options.ServiceProvider.EntityId
+            ),
+            new XElement(
+                XName.Get("NameID", SamlNamespace),
+                new XAttribute("Format", idpConfig.NameIdFormat),
+                nameId
+            )
+        );
+
+        // Add SessionIndex if provided (required for proper session termination)
+        if (!sessionIndex.IsNullOrEmpty())
+        {
+            logoutRequest.Add(
+                new XElement(
+                    XName.Get("SessionIndex", SamlpNamespace),
+                    sessionIndex
+                )
+            );
+        }
+
+        // Sign request if required
+        if (idpConfig.SignAuthenticationRequests && !_options.ServiceProvider.SigningCertificate.IsNullOrEmpty())
+        {
+            logoutRequest = SignXmlDocument(logoutRequest);
+        }
+
+        // Convert to string
+        var logoutRequestXml = logoutRequest.ToString(SaveOptions.DisableFormatting);
+
+        if (_options.EnableDebugLogging)
+        {
+            _logger.LogDebug("SAML LogoutRequest: {LogoutRequestXml}", logoutRequestXml);
+        }
+
+        // Encode for transmission
+        var samlRequestEncoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(logoutRequestXml));
+
+        // Create session for tracking the logout response
+        var validityPeriod = TimeSpan.FromMinutes(_options.ServiceProvider.AuthnRequestValidityMinutes);
+        await _sessionStore.CreateSessionAsync(
+            tenantId,
+            idpConfig.Id,
+            requestId,
+            null, // No relay state for logout
+            validityPeriod,
+            cancellationToken);
+
+        // Build redirect URL based on binding type
+        string redirectUrl;
+        if (idpConfig.BindingType == SamlBindingType.HttpPost)
+        {
+            // For POST binding, we'll need to render an HTML form
+            redirectUrl = idpConfig.SingleLogoutServiceUrl;
+        }
+        else
+        {
+            // HTTP-Redirect binding
+            var queryString = $"SAMLRequest={Uri.EscapeDataString(samlRequestEncoded)}";
+            redirectUrl = $"{idpConfig.SingleLogoutServiceUrl}?{queryString}";
+        }
+
+        _logger.LogInformation(
+            "Created SAML logout request {RequestId} for tenant {TenantId} to IdP {IdpName}",
+            requestId, tenantId, idpConfig.Name);
+
+        return new SamlLogoutRequest
+        {
+            RequestId = requestId,
+            RedirectUrl = redirectUrl,
+            SamlRequest = samlRequestEncoded,
+            BindingType = idpConfig.BindingType
+        };
     }
 
-    public Task<bool> ValidateLogoutResponseAsync(
+    /// <summary>
+    /// Validates a SAML logout response from the identity provider
+    /// </summary>
+    /// <param name="samlResponse">Base64-encoded SAML logout response</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if logout was successful, false otherwise</returns>
+    public async Task<bool> ValidateLogoutResponseAsync(
         string samlResponse,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("SAML logout not yet implemented");
+        _logger.LogInformation("Validating SAML logout response");
+
+        try
+        {
+            // Decode SAML response
+            var responseXml = Encoding.UTF8.GetString(Convert.FromBase64String(samlResponse));
+
+            if (_options.EnableDebugLogging)
+            {
+                _logger.LogDebug("SAML LogoutResponse: {ResponseXml}", responseXml);
+            }
+
+            // Parse XML
+            var doc = XDocument.Parse(responseXml);
+            var response = doc.Root;
+
+            if (response == null || response.Name != XName.Get("LogoutResponse", SamlpNamespace))
+            {
+                _logger.LogWarning("Invalid SAML logout response format");
+                return false;
+            }
+
+            // Extract InResponseTo to find session
+            var inResponseTo = response.Attribute("InResponseTo")?.Value;
+            if (inResponseTo.IsNullOrEmpty())
+            {
+                _logger.LogWarning("SAML logout response missing InResponseTo attribute");
+                return false;
+            }
+
+            // Get session and atomically consume it to prevent replay attacks
+            var session = await _sessionStore.GetSessionByRequestIdAsync(inResponseTo, cancellationToken);
+            if (session == null)
+            {
+                _logger.LogWarning(
+                    "SAML logout session not found or expired for request {RequestId}",
+                    inResponseTo);
+                return false;
+            }
+
+            // Atomically consume the session to prevent replay attacks
+            var consumed = await _sessionStore.TryConsumeSessionAsync(inResponseTo, cancellationToken);
+            if (!consumed)
+            {
+                _logger.LogWarning(
+                    "SAML logout replay attack detected for request {RequestId} - session already consumed",
+                    inResponseTo);
+                return false;
+            }
+
+            // Get IdP configuration
+            var idpConfig = await _idpStore.GetByIdAsync(session.IdpConfigurationId, cancellationToken);
+            if (idpConfig == null)
+            {
+                _logger.LogWarning(
+                    "IdP configuration {IdpConfigId} not found for logout session",
+                    session.IdpConfigurationId);
+                return false;
+            }
+
+            // Validate status
+            var status = response.Element(XName.Get("Status", SamlpNamespace));
+            var statusCode = status?.Element(XName.Get("StatusCode", SamlpNamespace))?.Attribute("Value")?.Value;
+
+            if (statusCode != "urn:oasis:names:tc:SAML:2.0:status:Success")
+            {
+                var statusMessage = status?.Element(XName.Get("StatusMessage", SamlpNamespace))?.Value;
+                _logger.LogWarning(
+                    "SAML logout failed with status {StatusCode}: {StatusMessage}",
+                    statusCode, statusMessage);
+                return false;
+            }
+
+            // Verify signature if required
+            if (idpConfig.WantAssertionsSigned)
+            {
+                var isSignatureValid = VerifyXmlSignature(response, idpConfig.SigningCertificate);
+                if (!isSignatureValid)
+                {
+                    _logger.LogWarning(
+                        "SAML logout response signature validation failed for IdP {IdpName}",
+                        idpConfig.Name);
+                    return false;
+                }
+            }
+
+            _logger.LogInformation(
+                "Successfully validated SAML logout response for request {RequestId}",
+                inResponseTo);
+
+            return true;
+        }
+        catch (FormatException ex)
+        {
+            _logger.LogError(ex, "Invalid SAML logout response format - cannot decode Base64");
+            return false;
+        }
+        catch (XmlException ex)
+        {
+            _logger.LogError(ex, "Invalid SAML logout response - malformed XML");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating SAML logout response");
+            return false;
+        }
     }
 
     // Helper methods

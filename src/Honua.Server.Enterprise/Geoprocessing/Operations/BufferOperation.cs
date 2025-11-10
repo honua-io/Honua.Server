@@ -152,29 +152,7 @@ public class BufferOperation : GeoprocessingOperationBase
 
     private async Task<List<Geometry>> LoadGeometriesAsync(GeoprocessingInput input, CancellationToken cancellationToken)
     {
-        // This is simplified - in production, would load from collection, URL, or inline GeoJSON
-        // For now, return placeholder
-        await Task.CompletedTask;
-
-        var factory = GeometryFactory.Default;
-        var reader = new WKTReader();
-
-        // Sample: load from WKT
-        if (input.Type == "wkt")
-        {
-            return new List<Geometry> { reader.Read(input.Source) };
-        }
-
-        // Sample: load from GeoJSON
-        if (input.Type == "geojson")
-        {
-            var geoJsonReader = new GeoJsonReader();
-            var geometry = geoJsonReader.Read<Geometry>(input.Source);
-            return new List<Geometry> { geometry };
-        }
-
-        // TODO: Implement loading from collections, URLs, etc.
-        throw new NotImplementedException($"Input type '{input.Type}' not yet implemented");
+        return await GeometryLoader.LoadGeometriesAsync(input, cancellationToken);
     }
 
     private double ConvertToMeters(double distance, string units)
