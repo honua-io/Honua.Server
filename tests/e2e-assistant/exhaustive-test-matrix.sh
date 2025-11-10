@@ -391,7 +391,7 @@ cat > "$RESULTS_DIR/report.html" <<'EOF'
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Honua AI Consultant - Exhaustive Test Report</title>
+    <title>Honua AI Devsecops - Exhaustive Test Report</title>
     <style>
         body { font-family: monospace; margin: 20px; background: #1a1a1a; color: #00ff00; }
         h1 { color: #00ff00; }
@@ -407,7 +407,7 @@ cat > "$RESULTS_DIR/report.html" <<'EOF'
     </style>
 </head>
 <body>
-    <h1>Honua AI Consultant - Exhaustive Test Matrix Results</h1>
+    <h1>Honua AI Devsecops - Exhaustive Test Matrix Results</h1>
     <p><strong>Test Run:</strong> $(date)</p>
     <p><strong>Total Tests:</strong> $((PASS_COUNT + FAIL_COUNT))</p>
     <p><strong>Passed:</strong> <span class="pass">$PASS_COUNT</span></p>

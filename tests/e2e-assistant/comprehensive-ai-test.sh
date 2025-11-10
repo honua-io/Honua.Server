@@ -15,7 +15,7 @@ RESULTS_DIR="/tmp/honua-ai-tests-$TIMESTAMP"
 mkdir -p "$RESULTS_DIR"
 
 echo "╔══════════════════════════════════════════════════════════╗"
-echo "║  Honua AI Consultant - Comprehensive Test Suite         ║"
+echo "║  Honua AI Devsecops - Comprehensive Test Suite          ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
 echo "Results: $RESULTS_DIR"

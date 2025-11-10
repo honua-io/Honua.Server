@@ -129,7 +129,7 @@ public sealed class SetupWizardCommand : AsyncCommand<SetupWizardCommand.Setting
 
             _console.WriteLine();
             _console.MarkupLine("[bold]Helpful commands:[/]");
-            _console.MarkupLine("  [cyan]honua assistant[/]          - Interactive AI assistant for custom tasks");
+            _console.MarkupLine("  [cyan]honua devsecops[/]          - Interactive AI Devsecops for custom tasks");
             _console.MarkupLine("  [cyan]honua metadata validate[/]   - Validate metadata configuration");
             _console.MarkupLine("  [cyan]honua status[/]              - Check server and data source status");
             _console.MarkupLine("  [cyan]honua --help[/]              - View all available commands");

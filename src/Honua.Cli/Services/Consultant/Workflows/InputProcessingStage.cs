@@ -37,7 +37,7 @@ public sealed class InputProcessingStage : IWorkflowStage<WorkflowContext, Workf
         var workspacePath = _environment.ResolveWorkspacePath(context.Request.WorkspacePath);
         var normalizedRequest = context.Request with { WorkspacePath = workspacePath };
 
-        _console.WriteLine("Honua Consultant (preview build)");
+        _console.WriteLine("Honua Devsecops (preview build)");
         _console.WriteLine($"Planning workspace: {workspacePath}");
 
         var prompt = normalizedRequest.Prompt;

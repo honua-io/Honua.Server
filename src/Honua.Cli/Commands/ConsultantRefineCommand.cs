@@ -54,7 +54,7 @@ public sealed class ConsultantRefineCommand : AsyncCommand<ConsultantRefineComma
         if (session == null)
         {
             AnsiConsole.MarkupLine($"[red]✗ Session '{settings.SessionId}' not found[/]");
-            AnsiConsole.MarkupLine("[dim]Use 'honua consultant refine' to see recent sessions[/]");
+            AnsiConsole.MarkupLine("[dim]Use 'honua devsecops-refine' to see recent sessions[/]");
             return 1;
         }
 
@@ -104,7 +104,7 @@ public sealed class ConsultantRefineCommand : AsyncCommand<ConsultantRefineComma
         if (!sessions.Any())
         {
             AnsiConsole.MarkupLine("[yellow]No recent consultant sessions found[/]");
-            AnsiConsole.MarkupLine("[dim]Run 'honua consultant' to create a new session[/]");
+            AnsiConsole.MarkupLine("[dim]Run 'honua devsecops' to create a new session[/]");
             return 0;
         }
 
@@ -123,7 +123,7 @@ public sealed class ConsultantRefineCommand : AsyncCommand<ConsultantRefineComma
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[dim]To refine a session:[/]");
-        AnsiConsole.MarkupLine("[dim]  honua consultant refine --session <id> --adjustment \"your refinement\"[/]");
+        AnsiConsole.MarkupLine("[dim]  honua devsecops-refine --session <id> --adjustment \"your refinement\"[/]");
 
         return 0;
     }
