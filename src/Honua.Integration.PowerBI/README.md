@@ -4,12 +4,13 @@ Power BI connector for Honua.Server that enables municipalities to create real-t
 
 ## Features
 
-- **OData v4 Feed**: Exposes OGC Features API and SensorThings API as OData endpoints for Power BI
-- **Push Datasets**: Real-time streaming of sensor observations and alerts to Power BI
+- **Server-Side Push Datasets**: Real-time streaming of sensor observations and alerts to Power BI
+- **Programmatic Management**: Full Power BI REST API integration for dataset/report management
 - **Pre-built Templates**: Ready-to-use Power Query M code for common smart city dashboards
 - **Incremental Refresh**: Support for large datasets with datetime-based incremental refresh
-- **Programmatic Management**: Full Power BI REST API integration for dataset/report management
 - **Embed Tokens**: Support for embedding Power BI reports in web applications
+
+**Note**: Honua.Server already provides OData v4 feeds at `/odata/{collection}` for all feature collections. This package adds **server-side push** capabilities to programmatically manage Power BI datasets and stream real-time data.
 
 ## Quick Start
 
@@ -25,9 +26,7 @@ Add Power BI settings to `appsettings.json`:
     "ClientSecret": "your-service-principal-secret",
     "WorkspaceId": "your-powerbi-workspace-id",
     "ApiUrl": "https://api.powerbi.com",
-    "EnableODataFeeds": true,
     "EnablePushDatasets": true,
-    "MaxODataPageSize": 5000,
     "HonuaServerBaseUrl": "https://your-honua-server.com",
     "Datasets": [
       {
@@ -60,29 +59,29 @@ using Honua.Integration.PowerBI.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Power BI integration
+// Add Power BI integration (Push Datasets and REST API)
 builder.Services.AddPowerBIIntegration(builder.Configuration);
 
 var app = builder.Build();
-
-// Map OData endpoints
-app.MapControllers();
-
 app.Run();
 ```
 
-### 3. Access OData Feeds
+### 3. Connect to OData Feeds
 
-OData endpoints are available at:
+Honua.Server provides built-in OData v4 endpoints for all feature collections:
 
 ```
-https://your-honua-server.com/odata/features/{collectionId}
+https://your-honua-server.com/odata/{collectionName}
 ```
 
 Example:
 ```
-https://your-honua-server.com/odata/features/traffic::sensors
+https://your-honua-server.com/odata/parcels
+https://your-honua-server.com/odata/buildings
+https://your-honua-server.com/odata/traffic_sensors
 ```
+
+These endpoints are **already available** without this package. Use them to connect Power BI to historical data.
 
 ### 4. Create Datasets Programmatically
 
@@ -131,10 +130,12 @@ public class DashboardSetupService
 
 1. Open Power BI Desktop
 2. **Get Data** > **OData Feed**
-3. Enter URL: `https://your-honua-server.com/odata/features/traffic::sensors`
+3. Enter URL: `https://your-honua-server.com/odata/traffic_sensors`
 4. Click **OK**
 5. Choose **Basic** or **Organizational account** authentication
 6. Select the table and click **Load**
+
+**Note**: OData endpoints use the collection name directly (e.g., `parcels`, `buildings`, `traffic_sensors`), not the service::layer format.
 
 ### Method 2: Power Query M Code (Recommended)
 
@@ -240,24 +241,28 @@ HTML/JavaScript:
 │   Power BI      │
 │   Desktop       │
 └────────┬────────┘
-         │ OData v4
-         ├─────────────────────┐
-         │                     │
-         ↓                     ↓
-┌─────────────────┐   ┌──────────────────┐
-│ OData Endpoint  │   │ Power BI Service │
-│ (Features API)  │   │  (Streaming)     │
-└────────┬────────┘   └────────┬─────────┘
-         │                     │
-         │                     │ REST API
-         ↓                     ↓
-┌──────────────────────────────────────┐
-│       Honua.Integration.PowerBI       │
-│  ┌─────────────┐  ┌─────────────────┐│
-│  │   OData     │  │   Streaming     ││
-│  │ Controller  │  │    Service      ││
-│  └─────────────┘  └─────────────────┘│
-└──────────────┬───────────────────────┘
+         │ OData v4 (Pull)
+         ├─────────────────────────────┐
+         │                             │
+         ↓                             ↓
+┌─────────────────┐          ┌──────────────────┐
+│ OData Endpoint  │          │ Power BI Service │
+│ (Built-in Host) │◄─────────│  (Push Datasets) │
+└────────┬────────┘  REST API└────────┬─────────┘
+         │                            │
+         │                            │ Server Push
+         ↓                            ↓
+┌──────────────────────────────────────────────────┐
+│            Honua.Server.Host                      │
+│  ┌─────────────────┐  ┌─────────────────────────┐│
+│  │ DynamicOData    │  │ Honua.Integration.      ││
+│  │   Controller    │  │      PowerBI            ││
+│  │ /odata/{coll}   │  │  ┌────────────────────┐ ││
+│  │                 │  │  │ Dataset Service    │ ││
+│  │                 │  │  │ Streaming Service  │ ││
+│  │                 │  │  └────────────────────┘ ││
+│  └─────────────────┘  └─────────────────────────┘│
+└──────────────┬───────────────────────────────────┘
                │
                ↓
 ┌──────────────────────────────────────┐
@@ -269,13 +274,17 @@ HTML/JavaScript:
 └──────────────────────────────────────┘
 ```
 
+**Key Points:**
+- **OData feeds** (left path): Built into Honua.Server.Host, no configuration needed
+- **Push datasets** (right path): Provided by this package for real-time server-side updates
+
 ## Performance Considerations
 
-- **OData Page Size**: Default 1000, max 5000 rows per page
-- **Streaming Rate Limit**: 10,000 rows per hour per dataset
-- **Batch Size**: 100 rows per push request
+- **OData Feeds**: Configured in Honua.Server.Host (see OData configuration documentation)
+- **Streaming Rate Limit**: 10,000 rows per hour per dataset (Power BI limit)
+- **Push Batch Size**: 100 rows per push request recommended
 - **Incremental Refresh**: Recommended for datasets > 100,000 rows
-- **Caching**: Power BI caches OData responses for ~1 hour
+- **Dataset Refresh**: Power BI caches imported data; configure refresh schedules appropriately
 
 ## Troubleshooting
 

@@ -5,11 +5,12 @@ let
     // ===== PARAMETERS - UPDATE THESE =====
     HonuaServerUrl = "https://your-honua-server.com",
     TenantId = "your-tenant-id",
-    CollectionId = "environment::air_quality",
+    CollectionName = "air_quality",  // Collection name from Honua.Server
 
     // ===== ODATA CONNECTION =====
+    // OData endpoint is built into Honua.Server at /odata/{collection}
     Source = OData.Feed(
-        HonuaServerUrl & "/odata/features/" & CollectionId,
+        HonuaServerUrl & "/odata/" & CollectionName,
         null,
         [
             Implementation = "2.0",

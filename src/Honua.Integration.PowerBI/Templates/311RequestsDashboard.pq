@@ -5,13 +5,14 @@ let
     // ===== PARAMETERS - UPDATE THESE =====
     HonuaServerUrl = "https://your-honua-server.com",
     TenantId = "your-tenant-id",
-    CollectionId = "civic::service_requests",
+    CollectionName = "service_requests",  // Collection name from Honua.Server
 
     // ===== ODATA CONNECTION WITH INCREMENTAL REFRESH =====
     // Note: For incremental refresh, add RangeStart and RangeEnd parameters
     // in Power BI Desktop: Manage Parameters > New Parameter
+    // OData endpoint is built into Honua.Server at /odata/{collection}
     Source = OData.Feed(
-        HonuaServerUrl & "/odata/features/" & CollectionId,
+        HonuaServerUrl & "/odata/" & CollectionName,
         null,
         [
             Implementation = "2.0",

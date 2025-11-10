@@ -41,6 +41,7 @@ public class PowerBIOptions
     /// <summary>
     /// Enable OData feed endpoints for Power BI connectivity
     /// </summary>
+    [Obsolete("OData feeds are now built into Honua.Server.Host at /odata/{collection}. This setting is ignored.")]
     public bool EnableODataFeeds { get; set; } = true;
 
     /// <summary>
@@ -56,6 +57,7 @@ public class PowerBIOptions
     /// <summary>
     /// Maximum rows per OData query (for performance)
     /// </summary>
+    [Obsolete("OData configuration is now handled in Honua.Server.Host OData settings. This setting is ignored.")]
     public int MaxODataPageSize { get; set; } = 5000;
 
     /// <summary>

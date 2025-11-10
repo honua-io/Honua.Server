@@ -36,7 +36,6 @@ Add to your Honua.Server `appsettings.json`:
     "ClientId": "your-client-id-from-step-5",
     "ClientSecret": "your-secret-from-step-7",
     "WorkspaceId": "your-powerbi-workspace-id",
-    "EnableODataFeeds": true,
     "EnablePushDatasets": true,
     "HonuaServerBaseUrl": "https://your-honua-server.com"
   }
@@ -66,9 +65,9 @@ app.Run();
 dotnet run
 ```
 
-Verify OData endpoint is accessible:
+Verify OData endpoint is accessible (built-in, no configuration needed):
 ```bash
-curl https://your-honua-server.com/odata/features/$metadata
+curl https://your-honua-server.com/odata
 ```
 
 ## Step 2: Create Your First Dashboard in Power BI Desktop
@@ -79,9 +78,9 @@ curl https://your-honua-server.com/odata/features/$metadata
 2. Click **Get Data** > **OData Feed**
 3. Enter URL:
    ```
-   https://your-honua-server.com/odata/features/traffic::sensors
+   https://your-honua-server.com/odata/traffic_sensors
    ```
-   (Replace `traffic::sensors` with your collection ID)
+   (Replace `traffic_sensors` with your collection name)
 4. Click **OK**
 5. Choose authentication:
    - **Anonymous** (if Honua.Server allows)
@@ -90,6 +89,8 @@ curl https://your-honua-server.com/odata/features/$metadata
 6. Click **Load**
 
 You should see the data appear in the Fields pane!
+
+**Note**: Use the collection name directly (e.g., `parcels`, `buildings`, `traffic_sensors`). OData endpoints are built into Honua.Server at `/odata/{collection}`.
 
 ### Option B: Using Power Query M Code (Recommended)
 
@@ -257,17 +258,22 @@ Data now flows automatically from Honua.Server to Power BI!
 - [Troubleshooting](./power-bi-troubleshooting.md) common issues
 - [Advanced Scenarios](./power-bi-advanced.md) for custom visualizations
 
-## Common Collection IDs
+## Common Collection Names
 
-Assuming standard Honua.Server setup:
+List all available collections and their OData endpoints:
+```bash
+curl https://your-honua-server.com/odata
+```
 
-- Traffic sensors: `traffic::sensors`
-- Air quality: `environment::air_quality`
-- 311 requests: `civic::service_requests`
-- Asset management: `assets::field_equipment`
-- Building occupancy: `facilities::occupancy`
+Example collections (depends on your Honua.Server configuration):
 
-List all collections:
+- Parcels: `https://your-honua-server.com/odata/parcels`
+- Buildings: `https://your-honua-server.com/odata/buildings`
+- Traffic sensors: `https://your-honua-server.com/odata/traffic_sensors`
+- Air quality: `https://your-honua-server.com/odata/air_quality`
+- 311 requests: `https://your-honua-server.com/odata/service_requests`
+
+You can also list collections via OGC API:
 ```bash
 curl https://your-honua-server.com/ogc/collections
 ```
