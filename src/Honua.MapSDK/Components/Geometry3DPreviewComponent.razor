@@ -1,5 +1,6 @@
 @using Microsoft.JSInterop
 @using Microsoft.Extensions.Logging
+@using Honua.Server.Core.Models.Geometry3D
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 @inject ILogger<Geometry3DPreviewComponent> Logger
@@ -112,7 +113,7 @@
     private ElementReference _containerElement;
     private ElementReference _canvasElement;
     private IJSObjectReference? _jsModule;
-    private object? _previewData;
+    private MeshPreviewResponse? _previewData;
     private bool _isLoading = true;
     private string? _errorMessage;
     private int _retryCount = 0;
@@ -166,7 +167,7 @@
             var apiUrl = $"{baseUrl}/api/v1.0/geometry/3d/{GeometryId}/preview?format={Format}&lod={LevelOfDetail}";
 
             // Call JavaScript to render the preview
-            _previewData = await _jsModule.InvokeAsync<object>(
+            _previewData = await _jsModule.InvokeAsync<MeshPreviewResponse>(
                 "renderMeshPreview",
                 _canvasElement,
                 apiUrl,
