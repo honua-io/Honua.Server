@@ -31,13 +31,13 @@ public sealed class ODataContainerFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // Get solution directory (assumes tests are in tests/Honua.Server.Core.Tests.OgcProtocols)
-        var solutionDir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".."));
+        // Find solution directory by searching upward for Dockerfile
+        var solutionDir = FindSolutionDirectory();
 
-        // Build Honua server image from Dockerfile
+        // Build Honua server image from test Dockerfile (no BuildKit features)
         var image = new ImageFromDockerfileBuilder()
             .WithDockerfileDirectory(solutionDir)
-            .WithDockerfile("Dockerfile")
+            .WithDockerfile("Dockerfile.odata-test")
             .WithName($"honua-server:odata-test-{Guid.NewGuid():N}")
             .WithCleanUp(true)
             .Build();
@@ -191,6 +191,24 @@ public sealed class ODataContainerFixture : IAsyncLifetime
         File.WriteAllText(metadataPath, metadata);
 
         return metadataPath;
+    }
+
+    private static string FindSolutionDirectory()
+    {
+        // Start from current directory and search upward for test Dockerfile
+        var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
+
+        while (currentDir != null)
+        {
+            if (File.Exists(Path.Combine(currentDir.FullName, "Dockerfile.odata-test")))
+            {
+                return currentDir.FullName;
+            }
+
+            currentDir = currentDir.Parent;
+        }
+
+        throw new InvalidOperationException("Could not find solution directory containing Dockerfile.odata-test. Make sure tests are run from within the solution.");
     }
 }
 
