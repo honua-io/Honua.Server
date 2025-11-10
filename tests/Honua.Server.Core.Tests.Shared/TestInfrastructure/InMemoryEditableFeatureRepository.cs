@@ -407,7 +407,7 @@ public sealed class InMemoryEditableFeatureRepository : IFeatureRepository
             }
         }
 
-        return string.Equals(Convert.ToString(left, CultureInfo.InvariantCulture), Convert.ToString(right, CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        return string.Equals(Convert.ToString(left, CultureInfo.InvariantCulture), Convert.ToString(right, CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase);
     }
 
     private static int CompareValues(object? left, object? right)

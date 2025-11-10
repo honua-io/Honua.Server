@@ -118,15 +118,6 @@ internal static class OgcSharedHandlers
             allowedKeys.Add("collections");
         }
 
-        // Allow SQL view parameters if layer has SQL view
-        if (layer.SqlView?.Parameters != null)
-        {
-            foreach (var param in layer.SqlView.Parameters)
-            {
-                allowedKeys.Add(param.Name);
-            }
-        }
-
         foreach (var key in queryCollection.Keys)
         {
             if (!allowedKeys.Contains(key))
@@ -305,9 +296,6 @@ internal static class OgcSharedHandlers
             sortOrders = new[] { new FeatureSortOrder(layer.IdField, FeatureSortDirection.Ascending) };
         }
 
-        // Extract SQL view parameters if layer has SQL view
-        var sqlViewParameters = ExtractSqlViewParameters(layer, queryCollection);
-
         var query = new FeatureQuery(
             Limit: effectiveLimit,
             Offset: effectiveOffset,
@@ -317,8 +305,7 @@ internal static class OgcSharedHandlers
             PropertyNames: propertyNames,
             SortOrders: sortOrders,
             Filter: combinedFilter,
-            Crs: servedCrs,
-            SqlViewParameters: sqlViewParameters);
+            Crs: servedCrs);
 
         var (includeCount, countError) = QueryParameterHelper.ParseBoolean(
             queryCollection["count"].ToString(),
@@ -724,12 +711,6 @@ internal static class OgcSharedHandlers
             AddValue(CrsHelper.DefaultCrsIdentifier);
         }
 
-        // Add CRS84H (3D support) if layer has Z coordinates
-        if (layer.HasZ || (layer.Storage?.HasZ ?? false))
-        {
-            AddValue("CRS84H");
-        }
-
         return supported;
     }
 
@@ -874,34 +855,6 @@ internal static class OgcSharedHandlers
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// Extracts SQL view parameters from the query string based on layer configuration.
-    /// </summary>
-    private static IReadOnlyDictionary<string, string> ExtractSqlViewParameters(
-        LayerDefinition layer,
-        IQueryCollection query)
-    {
-        var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        // Only extract if layer has SQL view defined
-        if (layer.SqlView?.Parameters == null || layer.SqlView.Parameters.Count == 0)
-        {
-            return parameters;
-        }
-
-        // Extract each defined parameter from query string
-        foreach (var param in layer.SqlView.Parameters)
-        {
-            var value = query[param.Name].ToString();
-            if (value.HasValue())
-            {
-                parameters[param.Name] = value;
-            }
-        }
-
-        return parameters;
     }
 
     private static IResult ApplyPreferenceApplied(IResult result, string value)
@@ -1487,66 +1440,6 @@ internal static class OgcSharedHandlers
             AppendMetadataRow(body, "Default Style", layer.DefaultStyleId);
             AppendMetadataRow(body, "Styles", string.Join(", ", BuildOrderedStyleIds(layer)));
             body.AppendLine("</tbody></table>");
-
-            AppendLinksHtml(body, links);
-
-            body.Append("<p><a href=\"")
-                .Append(HtmlEncode(BuildHref(request, "/ogc/collections", null, null)))
-                .AppendLine("\">Back to collections</a></p>");
-        });
-    }
-
-    internal static string RenderLayerGroupCollectionHtml(
-        HttpRequest request,
-        ServiceDefinition service,
-        LayerGroupDefinition layerGroup,
-        string collectionId,
-        IReadOnlyList<string> crs,
-        IReadOnlyList<OgcLink> links)
-    {
-        return RenderHtmlDocument(layerGroup.Title ?? collectionId, body =>
-        {
-            body.Append("<h1>")
-                .Append(HtmlEncode(layerGroup.Title ?? collectionId))
-                .AppendLine("</h1>");
-
-            if (layerGroup.Description.HasValue())
-            {
-                body.Append("<p>")
-                    .Append(HtmlEncode(layerGroup.Description))
-                    .AppendLine("</p>");
-            }
-
-            body.AppendLine("<table><tbody>");
-            AppendMetadataRow(body, "Collection ID", collectionId);
-            AppendMetadataRow(body, "Service", service.Title ?? service.Id);
-            AppendMetadataRow(body, "Type", "Layer Group");
-            AppendMetadataRow(body, "Item Type", "feature");
-            AppendMetadataRow(body, "Supported CRS", string.Join(", ", crs));
-            AppendMetadataRow(body, "Default Style", layerGroup.DefaultStyleId);
-            AppendMetadataRow(body, "Styles", string.Join(", ", BuildOrderedStyleIds(layerGroup)));
-            AppendMetadataRow(body, "Members", layerGroup.Members.Count.ToString());
-            body.AppendLine("</tbody></table>");
-
-            // Show members
-            if (layerGroup.Members.Count > 0)
-            {
-                body.AppendLine("<h2>Members</h2>");
-                body.AppendLine("<table><thead><tr><th>Order</th><th>Type</th><th>ID</th><th>Opacity</th></tr></thead><tbody>");
-                foreach (var member in layerGroup.Members.OrderBy(m => m.Order))
-                {
-                    body.Append("<tr><td>")
-                        .Append(HtmlEncode(member.Order.ToString()))
-                        .Append("</td><td>")
-                        .Append(HtmlEncode(member.Type.ToString()))
-                        .Append("</td><td>")
-                        .Append(HtmlEncode(member.LayerId ?? member.GroupId ?? ""))
-                        .Append("</td><td>")
-                        .Append(HtmlEncode(member.Opacity.ToString("0.00")))
-                        .AppendLine("</td></tr>");
-                }
-                body.AppendLine("</tbody></table>");
-            }
 
             AppendLinksHtml(body, links);
 
@@ -2423,9 +2316,32 @@ internal static async Task<IReadOnlyList<Geometry>> CollectVectorGeometriesAsync
     /// <summary>
     /// Builds an HREF with query parameters using RequestLinkHelper for consistent URL generation.
     /// Respects proxy headers (X-Forwarded-Proto, X-Forwarded-Host) and handles query parameter merging.
+    /// Automatically detects and preserves the API version prefix (/v1, /v2, etc.) from the incoming request path.
     /// </summary>
     internal static string BuildHref(HttpRequest request, string relativePath, FeatureQuery? query, IDictionary<string, string?>? overrides)
     {
+        // BUG FIX: Preserve API version prefix in OGC links
+        // OGC endpoints are available at both /ogc and /v1/ogc
+        // We need to detect which one was used and preserve it in generated links
+        var requestPath = request.Path.Value ?? string.Empty;
+        var versionedPath = relativePath;
+
+        // Check if the request came through a versioned endpoint (e.g., /v1/ogc)
+        if (requestPath.StartsWith("/v", StringComparison.OrdinalIgnoreCase))
+        {
+            var firstSegmentEnd = requestPath.IndexOf('/', 1);
+            if (firstSegmentEnd > 0)
+            {
+                var versionPrefix = requestPath.Substring(0, firstSegmentEnd); // e.g., "/v1"
+
+                // Only add version prefix if relativePath doesn't already have it
+                if (!relativePath.StartsWith(versionPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    versionedPath = versionPrefix + relativePath;
+                }
+            }
+        }
+
         var queryParameters = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
         if (query is not null)
@@ -2512,7 +2428,8 @@ internal static async Task<IReadOnlyList<Geometry>> CollectVectorGeometriesAsync
         }
 
         // Use RequestLinkHelper for consistent URL generation with proxy header support
-        return request.BuildAbsoluteUrl(relativePath, queryParameters);
+        // Use versionedPath to preserve the version prefix from the incoming request
+        return request.BuildAbsoluteUrl(versionedPath, queryParameters);
     }
 
     private static string? BuildAttachmentHref(
@@ -3322,49 +3239,6 @@ internal static async Task<IReadOnlyList<Geometry>> CollectVectorGeometriesAsync
 
     internal static string BuildCollectionId(ServiceDefinition service, LayerDefinition layer)
         => $"{service.Id}{CollectionIdSeparator}{layer.Id}";
-
-    internal static string BuildLayerGroupCollectionId(ServiceDefinition service, LayerGroupDefinition layerGroup)
-        => $"{service.Id}{CollectionIdSeparator}{layerGroup.Id}";
-
-    internal static List<OgcLink> BuildLayerGroupCollectionLinks(HttpRequest request, ServiceDefinition service, LayerGroupDefinition layerGroup, string collectionId)
-    {
-        var links = new List<OgcLink>(layerGroup.Links.Select(ToLink));
-        links.AddRange(new[]
-        {
-            BuildLink(request, $"/ogc/collections/{collectionId}", "self", "application/json", "This collection"),
-            BuildLink(request, $"/ogc/collections/{collectionId}", "alternate", "text/html", "This collection as HTML"),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "items", "application/geo+json", "Features in this layer group"),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "http://www.opengis.net/def/rel/ogc/1.0/items", "application/geo+json", "Features")
-        });
-
-        if (layerGroup.StyleIds.Count > 0)
-        {
-            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles", "styles", "application/json", "Styles for this layer group"));
-        }
-
-        return links;
-    }
-
-    internal static IReadOnlyList<string> BuildOrderedStyleIds(LayerGroupDefinition layerGroup)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var results = new List<string>();
-
-        if (layerGroup.DefaultStyleId.HasValue() && seen.Add(layerGroup.DefaultStyleId))
-        {
-            results.Add(layerGroup.DefaultStyleId);
-        }
-
-        foreach (var styleId in layerGroup.StyleIds)
-        {
-            if (styleId.HasValue() && seen.Add(styleId))
-            {
-                results.Add(styleId);
-            }
-        }
-
-        return results;
-    }
 
     internal static IResult CreateValidationProblem(string detail, string parameter)
     {

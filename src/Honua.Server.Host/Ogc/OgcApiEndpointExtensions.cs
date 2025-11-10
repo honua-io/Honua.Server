@@ -174,6 +174,7 @@ internal static class OgcApiEndpointExtensions
 
     // BUG FIX #5: Legacy OGC collections links emit relative URLs
     // Accept HttpRequest parameter and use RequestLinkHelper to generate absolute URLs
+    // BUG FIX: Preserve API version prefix in legacy collection links
     private static IResult BuildLegacyCollectionsResponse(string serviceId, HttpRequest request, ICatalogProjectionService catalog)
     {
         Guard.NotNull(request);
@@ -191,6 +192,19 @@ internal static class OgcApiEndpointExtensions
             return Results.NotFound();
         }
 
+        // Detect API version prefix from request path (e.g., /v1/ogc/... -> /v1)
+        var requestPath = request.Path.Value ?? string.Empty;
+        var ogcBasePath = "/ogc";
+        if (requestPath.StartsWith("/v", StringComparison.OrdinalIgnoreCase))
+        {
+            var firstSegmentEnd = requestPath.IndexOf('/', 1);
+            if (firstSegmentEnd > 0)
+            {
+                var versionPrefix = requestPath.Substring(0, firstSegmentEnd);
+                ogcBasePath = versionPrefix + ogcBasePath;
+            }
+        }
+
         var collections = serviceView.Layers
             .Select(layer => new
             {
@@ -201,8 +215,8 @@ internal static class OgcApiEndpointExtensions
                 crs = layer.Layer.Crs,
                 links = new[]
                 {
-                    new { href = request.BuildAbsoluteUrl($"/ogc/{service.Id}/collections/{layer.Layer.Id}"), rel = "self", type = "application/json" },
-                    new { href = request.BuildAbsoluteUrl($"/ogc/{service.Id}/collections/{layer.Layer.Id}/items"), rel = "items", type = "application/geo+json" }
+                    new { href = request.BuildAbsoluteUrl($"{ogcBasePath}/{service.Id}/collections/{layer.Layer.Id}"), rel = "self", type = "application/json" },
+                    new { href = request.BuildAbsoluteUrl($"{ogcBasePath}/{service.Id}/collections/{layer.Layer.Id}/items"), rel = "items", type = "application/geo+json" }
                 }
             })
             .ToArray();
@@ -212,6 +226,7 @@ internal static class OgcApiEndpointExtensions
 
     // BUG FIX #6: Legacy collection detail response also uses relative links
     // Pass HttpRequest and use RequestLinkHelper for fully-qualified URLs
+    // BUG FIX: Preserve API version prefix in legacy collection links
     private static IResult BuildLegacyCollectionResponse(string serviceId, string layerId, HttpRequest request, ICatalogProjectionService catalog)
     {
         Guard.NotNull(request);
@@ -224,6 +239,19 @@ internal static class OgcApiEndpointExtensions
             return Results.NotFound();
         }
 
+        // Detect API version prefix from request path (e.g., /v1/ogc/... -> /v1)
+        var requestPath = request.Path.Value ?? string.Empty;
+        var ogcBasePath = "/ogc";
+        if (requestPath.StartsWith("/v", StringComparison.OrdinalIgnoreCase))
+        {
+            var firstSegmentEnd = requestPath.IndexOf('/', 1);
+            if (firstSegmentEnd > 0)
+            {
+                var versionPrefix = requestPath.Substring(0, firstSegmentEnd);
+                ogcBasePath = versionPrefix + ogcBasePath;
+            }
+        }
+
         var layer = layerView.Layer;
         var collection = new
         {
@@ -234,8 +262,8 @@ internal static class OgcApiEndpointExtensions
             crs = layer.Crs,
             links = new[]
             {
-                new { href = request.BuildAbsoluteUrl($"/ogc/{serviceId}/collections/{layer.Id}"), rel = "self", type = "application/json" },
-                new { href = request.BuildAbsoluteUrl($"/ogc/{serviceId}/collections/{layer.Id}/items"), rel = "items", type = "application/geo+json" }
+                new { href = request.BuildAbsoluteUrl($"{ogcBasePath}/{serviceId}/collections/{layer.Id}"), rel = "self", type = "application/json" },
+                new { href = request.BuildAbsoluteUrl($"{ogcBasePath}/{serviceId}/collections/{layer.Id}/items"), rel = "items", type = "application/geo+json" }
             }
         };
 
