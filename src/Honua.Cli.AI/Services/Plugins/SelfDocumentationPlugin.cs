@@ -504,7 +504,7 @@ public sealed class SelfDocumentationPlugin
                 relatedCommands = new[]
                 {
                     "honua --help - See all available commands",
-                    "honua assistant - Interactive AI Devsecops",
+                    "honua devsecops - Interactive AI Devsecops",
                     "honua setup - Guided setup wizard"
                 }
             }

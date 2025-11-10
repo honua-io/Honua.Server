@@ -15,7 +15,7 @@ WORKSPACE="$TEST_DIR/workspaces/postgis"
 rm -rf "$WORKSPACE"
 mkdir -p "$WORKSPACE"
 
-CONSULTANT_CMD=(honua consultant --workspace "$WORKSPACE" --auto-approve --mode multi --prompt "Deploy Honua on Docker with PostGIS database, Redis cache, and Nginx reverse proxy. Include metadata for a sample roads layer for testing.")
+CONSULTANT_CMD=(honua devsecops --workspace "$WORKSPACE" --auto-approve --mode multi --prompt "Deploy Honua on Docker with PostGIS database, Redis cache, and Nginx reverse proxy. Include metadata for a sample roads layer for testing.")
 
 if ! "${CONSULTANT_CMD[@]}"; then
     echo "✗ Consultant command failed"

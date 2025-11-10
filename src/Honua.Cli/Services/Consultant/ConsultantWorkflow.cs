@@ -1051,7 +1051,7 @@ public sealed class ConsultantWorkflow : IConsultantWorkflow
             var sessionId = $"{timestamp}-{requestHash}";
 
             await _sessionStore.SaveSessionAsync(sessionId, plan, context, cancellationToken);
-            _console.MarkupLine($"[dim]Session ID: {sessionId} (use 'honua consultant refine --session {sessionId}' to refine)[/]");
+            _console.MarkupLine($"[dim]Session ID: {sessionId} (use 'honua devsecops-refine --session {sessionId}' to refine)[/]");
         }
         catch (Exception)
         {
@@ -1193,7 +1193,7 @@ public sealed class ConsultantWorkflow : IConsultantWorkflow
                     _console.WriteLine();
                 }
 
-                _console.MarkupLine("[dim]💡 Tip: Use 'honua consultant' with data ingestion prompts to generate complete metadata configurations[/]");
+                _console.MarkupLine("[dim]💡 Tip: Use 'honua devsecops' with data ingestion prompts to generate complete metadata configurations[/]");
             }
             else
             {
@@ -1205,7 +1205,7 @@ public sealed class ConsultantWorkflow : IConsultantWorkflow
                 _console.WriteLine("  • services: Feature/Map servers with OGC protocol configuration");
                 _console.WriteLine("  • layers: Individual datasets with geometry and field definitions");
                 _console.WriteLine();
-                _console.MarkupLine("[dim]💡 Tip: Use 'honua consultant' with \"help me ingest data\" to generate complete configurations[/]");
+                _console.MarkupLine("[dim]💡 Tip: Use 'honua devsecops' with \"help me ingest data\" to generate complete configurations[/]");
             }
 
             _console.WriteLine();

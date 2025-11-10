@@ -128,18 +128,18 @@ public static class Program
                 .WithExample("honua", "setup")
                 .WithExample("honua", "setup", "--deployment-target", "development", "--database-type", "postgis");
 
-            config.AddCommand<ConsultantCommand>("consultant")
+            config.AddCommand<ConsultantCommand>("devsecops")
                 .WithDescription("Launch the Honua AI Devsecops (plan-only preview).")
-                .WithExample("honua", "consultant", "--dry-run", "--prompt", "connect my PostGIS database");
+                .WithExample("honua", "devsecops", "--dry-run", "--prompt", "connect my PostGIS database");
 
-            config.AddCommand<ConsultantRefineCommand>("consultant-refine")
-                .WithDescription("Refine a previous consultant plan based on feedback.")
-                .WithExample("honua", "consultant-refine", "--session", "20250110-123456-ABCD1234", "--adjustment", "make it more secure")
-                .WithExample("honua", "consultant-refine");
+            config.AddCommand<ConsultantRefineCommand>("devsecops-refine")
+                .WithDescription("Refine a previous devsecops plan based on feedback.")
+                .WithExample("honua", "devsecops-refine", "--session", "20250110-123456-ABCD1234", "--adjustment", "make it more secure")
+                .WithExample("honua", "devsecops-refine");
 
-            config.AddCommand<ConsultantPatternsIngestCommand>("consultant-patterns")
-                .WithDescription("Ingest deployment patterns into the consultant knowledge base.")
-                .WithExample("honua", "consultant-patterns", "--file", "patterns.json");
+            config.AddCommand<ConsultantPatternsIngestCommand>("devsecops-patterns")
+                .WithDescription("Ingest deployment patterns into the devsecops knowledge base.")
+                .WithExample("honua", "devsecops-patterns", "--file", "patterns.json");
 
             config.AddCommand<StatusCommand>("status")
                 .WithDescription("Check Honua host health and authentication status using the configured defaults.")

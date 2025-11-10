@@ -218,7 +218,7 @@ public sealed class WorkspacePlugin
             {
                 priority = "High",
                 action = $"Found {dataFileCount} data files but no service configuration",
-                command = "Use 'honua assistant setup' to configure services for your data"
+                command = "Use 'honua devsecops setup' to configure services for your data"
             });
         }
 
