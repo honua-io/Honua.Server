@@ -70,11 +70,13 @@ public sealed class ODataInitializationHostedService : IHostedService
             var descriptor = await _modelCache.GetOrCreateAsync(token).ConfigureAwait(false);
             var options = _odataOptions.Value;
 
-            if (!options.RouteComponents.ContainsKey("odata"))
+            const string routePrefix = "odata";
+
+            if (!options.RouteComponents.ContainsKey(routePrefix))
             {
-                options.AddRouteComponents("odata", descriptor.Model);
+                options.AddRouteComponents(routePrefix, descriptor.Model);
                 var entityTypeCount = descriptor.Model.SchemaElements.Count();
-                _logger.LogInformation("OData route 'odata' registered with {EntityTypeCount} entity types", entityTypeCount);
+                _logger.LogInformation("OData route registered at '/{RoutePrefix}' with {EntityTypeCount} entity types (unversioned due to ASP.NET Core OData v8 routing limitations)", routePrefix, entityTypeCount);
             }
 
             var odataConfig = _configurationService.Current.Services.OData;

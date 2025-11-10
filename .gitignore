@@ -113,3 +113,4 @@ package-lock.json.backup
 *.backup
 *.bak.cs
 *.cs.backup
+tests/TestData/raster-cache/elevation/

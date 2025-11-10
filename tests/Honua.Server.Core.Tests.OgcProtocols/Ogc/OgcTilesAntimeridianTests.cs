@@ -104,7 +104,8 @@ public class OgcTilesAntimeridianTests
     [Fact]
     public void GetBoundingBox_WorldCrs84Quad_Zoom0_Tile0_0_ShouldCoverWesternHemisphere()
     {
-        // Arrange
+        // Arrange: At zoom 0, WorldCRS84Quad has 2 columns × 1 row
+        // Tile 0,0 covers western hemisphere, Tile 0,1 covers eastern hemisphere
         var zoom = 0;
         var row = 0;
         var col = 0;
@@ -116,24 +117,24 @@ public class OgcTilesAntimeridianTests
         bbox.Should().HaveCount(4);
         bbox[0].Should().BeApproximately(-180.0, 0.001); // minX
         bbox[1].Should().BeApproximately(-90.0, 0.001);  // minY
-        bbox[2].Should().BeApproximately(180.0, 0.001);  // maxX
+        bbox[2].Should().BeApproximately(0.0, 0.001);    // maxX - western hemisphere only
         bbox[3].Should().BeApproximately(90.0, 0.001);   // maxY
     }
 
     [Fact]
     public void GetBoundingBox_WorldCrs84Quad_Zoom1_RightmostTile_ShouldApproachAntimeridian()
     {
-        // Arrange: At zoom 1, there are 2x2 tiles
+        // Arrange: At zoom 1, WorldCRS84Quad has 4 columns × 2 rows (OGC standard quad-tree doubling)
         var zoom = 1;
         var row = 0;
-        var col = 1; // Rightmost tile in top row
+        var col = 3; // Rightmost tile in top row (columns 0-3)
 
         // Act
         var bbox = OgcTileMatrixHelper.GetBoundingBox("WorldCRS84Quad", zoom, row, col);
 
         // Assert
         bbox.Should().HaveCount(4);
-        bbox[0].Should().BeApproximately(0.0, 0.001);    // minX
+        bbox[0].Should().BeApproximately(90.0, 0.001);   // minX
         bbox[1].Should().BeApproximately(0.0, 0.001);    // minY
         bbox[2].Should().BeApproximately(180.0, 0.001);  // maxX - reaches antimeridian
         bbox[3].Should().BeApproximately(90.0, 0.001);   // maxY
@@ -142,19 +143,19 @@ public class OgcTilesAntimeridianTests
     [Fact]
     public void GetBoundingBox_WorldCrs84Quad_Zoom2_TileNearAntimeridian_ShouldBeValid()
     {
-        // Arrange: At zoom 2, there are 4x4 tiles
+        // Arrange: At zoom 2, WorldCRS84Quad has 8 columns × 4 rows (OGC standard quad-tree doubling)
         var zoom = 2;
         var row = 1;
-        var col = 3; // Rightmost tile in second row
+        var col = 7; // Rightmost tile in second row (columns 0-7)
 
         // Act
         var bbox = OgcTileMatrixHelper.GetBoundingBox("WorldCRS84Quad", zoom, row, col);
 
         // Assert
         bbox.Should().HaveCount(4);
-        bbox[0].Should().BeApproximately(90.0, 0.001);   // minX
-        bbox[1].Should().BeApproximately(-45.0, 0.001);  // minY
-        bbox[2].Should().BeApproximately(180.0, 0.001);  // maxX
+        bbox[0].Should().BeApproximately(135.0, 0.001);  // minX
+        bbox[1].Should().BeApproximately(0.0, 0.001);    // minY
+        bbox[2].Should().BeApproximately(180.0, 0.001);  // maxX - reaches antimeridian
         bbox[3].Should().BeApproximately(45.0, 0.001);   // maxY
 
         // Should not cross antimeridian

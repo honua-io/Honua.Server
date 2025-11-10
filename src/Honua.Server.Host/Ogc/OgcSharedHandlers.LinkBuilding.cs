@@ -240,9 +240,32 @@ internal static List<OgcLink> BuildSearchLinks(HttpRequest request, IReadOnlyLis
     /// <summary>
     /// Builds an HREF with query parameters using RequestLinkHelper for consistent URL generation.
     /// Respects proxy headers (X-Forwarded-Proto, X-Forwarded-Host) and handles query parameter merging.
+    /// Automatically detects and preserves the API version prefix (/v1, /v2, etc.) from the incoming request path.
     /// </summary>
     internal static string BuildHref(HttpRequest request, string relativePath, FeatureQuery? query, IDictionary<string, string?>? overrides)
     {
+        // BUG FIX: Preserve API version prefix in OGC links
+        // OGC endpoints are available at both /ogc and /v1/ogc
+        // We need to detect which one was used and preserve it in generated links
+        var requestPath = request.Path.Value ?? string.Empty;
+        var versionedPath = relativePath;
+
+        // Check if the request came through a versioned endpoint (e.g., /v1/ogc)
+        if (requestPath.StartsWith("/v", StringComparison.OrdinalIgnoreCase))
+        {
+            var firstSegmentEnd = requestPath.IndexOf('/', 1);
+            if (firstSegmentEnd > 0)
+            {
+                var versionPrefix = requestPath.Substring(0, firstSegmentEnd); // e.g., "/v1"
+
+                // Only add version prefix if relativePath doesn't already have it
+                if (!relativePath.StartsWith(versionPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    versionedPath = versionPrefix + relativePath;
+                }
+            }
+        }
+
         var queryParameters = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
         if (query is not null)
@@ -329,7 +352,8 @@ internal static List<OgcLink> BuildSearchLinks(HttpRequest request, IReadOnlyLis
         }
 
         // Use RequestLinkHelper for consistent URL generation with proxy header support
-        return request.BuildAbsoluteUrl(relativePath, queryParameters);
+        // Use versionedPath to preserve the version prefix from the incoming request
+        return request.BuildAbsoluteUrl(versionedPath, queryParameters);
     }
     internal static IReadOnlyList<OgcLink> BuildFeatureLinks(
         HttpRequest request,

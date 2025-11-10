@@ -78,19 +78,21 @@ internal static class WfsStreamingTransactionParser
             var settings = SecureXmlSettings.CreateSecureSettings();
             settings.Async = true;
 
-            using var reader = XmlReader.Create(stream, settings);
+            // Create XmlReader (ownership transferred to TransactionOperationEnumerable)
+            var reader = XmlReader.Create(stream, settings);
 
             // Parse transaction root element and extract metadata
             var metadataResult = await ParseTransactionRootAsync(reader, cancellationToken).ConfigureAwait(false);
             if (metadataResult.IsFailure)
             {
+                reader.Dispose();
                 return Result<(TransactionMetadata, IAsyncEnumerable<TransactionOperation>)>.Failure(metadataResult.Error!);
             }
 
             var metadata = metadataResult.Value;
 
-            // Create async enumerable for operations
-            var operations = ParseOperationsAsync(reader, maxOperations, cancellationToken);
+            // Create async enumerable for operations that owns the XmlReader
+            var operations = new TransactionOperationEnumerable(reader, maxOperations, cancellationToken);
 
             return Result<(TransactionMetadata, IAsyncEnumerable<TransactionOperation>)>.Success((metadata, operations));
         }
@@ -262,5 +264,131 @@ internal static class WfsStreamingTransactionParser
         }
 
         return count;
+    }
+
+    /// <summary>
+    /// Async enumerable wrapper that owns the XmlReader lifetime.
+    /// Ensures the XmlReader is disposed after enumeration completes.
+    /// </summary>
+    private sealed class TransactionOperationEnumerable : IAsyncEnumerable<TransactionOperation>
+    {
+        private readonly XmlReader _reader;
+        private readonly int _maxOperations;
+        private readonly CancellationToken _cancellationToken;
+
+        public TransactionOperationEnumerable(XmlReader reader, int maxOperations, CancellationToken cancellationToken)
+        {
+            _reader = reader;
+            _maxOperations = maxOperations;
+            _cancellationToken = cancellationToken;
+        }
+
+        public IAsyncEnumerator<TransactionOperation> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        {
+            // Combine the cancellation tokens
+            var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken);
+            return new TransactionOperationEnumerator(_reader, _maxOperations, combinedCts.Token, combinedCts);
+        }
+    }
+
+    /// <summary>
+    /// Async enumerator that reads operations from XmlReader and disposes it when done.
+    /// </summary>
+    private sealed class TransactionOperationEnumerator : IAsyncEnumerator<TransactionOperation>
+    {
+        private readonly XmlReader _reader;
+        private readonly int _maxOperations;
+        private readonly CancellationToken _cancellationToken;
+        private readonly CancellationTokenSource _cts;
+        private readonly int _initialDepth;
+        private int _operationCount;
+        private TransactionOperation? _current;
+        private bool _disposed;
+
+        public TransactionOperationEnumerator(XmlReader reader, int maxOperations, CancellationToken cancellationToken, CancellationTokenSource cts)
+        {
+            _reader = reader;
+            _maxOperations = maxOperations;
+            _cancellationToken = cancellationToken;
+            _cts = cts;
+            _initialDepth = reader.Depth;
+        }
+
+        public TransactionOperation Current => _current ?? throw new InvalidOperationException("Enumeration has not started or has already finished.");
+
+        public async ValueTask<bool> MoveNextAsync()
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            while (await _reader.ReadAsync().ConfigureAwait(false))
+            {
+                _cancellationToken.ThrowIfCancellationRequested();
+
+                // Stop if we've exited the Transaction element
+                if (_reader.NodeType == XmlNodeType.EndElement && _reader.Depth <= _initialDepth)
+                {
+                    return false;
+                }
+
+                if (_reader.NodeType == XmlNodeType.Element &&
+                    _reader.NamespaceURI == WfsConstants.Wfs.NamespaceName)
+                {
+                    var localName = _reader.LocalName;
+
+                    if (localName == "Insert" || localName == "Update" || localName == "Delete" || localName == "Replace")
+                    {
+                        _operationCount++;
+
+                        if (_operationCount > _maxOperations)
+                        {
+                            throw new XmlException(
+                                $"Transaction exceeds maximum allowed operations ({_maxOperations}). " +
+                                $"Configure honua:wfs:MaxTransactionFeatures to increase this limit.");
+                        }
+
+                        // Read the operation element as XElement (still memory efficient for single operation)
+                        var element = (XElement)XNode.ReadFrom(_reader);
+
+                        var operationType = localName switch
+                        {
+                            "Insert" => WfsTransactionOperationType.Insert,
+                            "Update" => WfsTransactionOperationType.Update,
+                            "Delete" => WfsTransactionOperationType.Delete,
+                            "Replace" => WfsTransactionOperationType.Replace,
+                            _ => throw new InvalidOperationException($"Unknown operation type: {localName}")
+                        };
+
+                        // For Update, Delete, and Replace, extract typeName directly
+                        string? typeName = null;
+                        if (operationType == WfsTransactionOperationType.Update ||
+                            operationType == WfsTransactionOperationType.Delete ||
+                            operationType == WfsTransactionOperationType.Replace)
+                        {
+                            typeName = element.Attribute("typeName")?.Value ??
+                                       element.Attribute(XName.Get("typeName"))?.Value;
+                        }
+
+                        _current = new TransactionOperation(operationType, typeName, null, element);
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                _reader.Dispose();
+                _cts.Dispose();
+            }
+            return ValueTask.CompletedTask;
+        }
     }
 }

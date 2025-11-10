@@ -208,66 +208,6 @@ internal static partial class OgcSharedHandlers
         });
     }
 
-    internal static string RenderLayerGroupCollectionHtml(
-        HttpRequest request,
-        ServiceDefinition service,
-        LayerGroupDefinition layerGroup,
-        string collectionId,
-        IReadOnlyList<string> crs,
-        IReadOnlyList<OgcLink> links)
-    {
-        return RenderHtmlDocument(layerGroup.Title ?? collectionId, body =>
-        {
-            body.Append("<h1>")
-                .Append(HtmlEncode(layerGroup.Title ?? collectionId))
-                .AppendLine("</h1>");
-
-            if (layerGroup.Description.HasValue())
-            {
-                body.Append("<p>")
-                    .Append(HtmlEncode(layerGroup.Description))
-                    .AppendLine("</p>");
-            }
-
-            body.AppendLine("<table><tbody>");
-            AppendMetadataRow(body, "Collection ID", collectionId);
-            AppendMetadataRow(body, "Service", service.Title ?? service.Id);
-            AppendMetadataRow(body, "Type", "Layer Group");
-            AppendMetadataRow(body, "Item Type", "feature");
-            AppendMetadataRow(body, "Supported CRS", string.Join(", ", crs));
-            AppendMetadataRow(body, "Default Style", layerGroup.DefaultStyleId);
-            AppendMetadataRow(body, "Styles", string.Join(", ", BuildOrderedStyleIds(layerGroup)));
-            AppendMetadataRow(body, "Members", layerGroup.Members.Count.ToString());
-            body.AppendLine("</tbody></table>");
-
-            // Show members
-            if (layerGroup.Members.Count > 0)
-            {
-                body.AppendLine("<h2>Members</h2>");
-                body.AppendLine("<table><thead><tr><th>Order</th><th>Type</th><th>ID</th><th>Opacity</th></tr></thead><tbody>");
-                foreach (var member in layerGroup.Members.OrderBy(m => m.Order))
-                {
-                    body.Append("<tr><td>")
-                        .Append(HtmlEncode(member.Order.ToString()))
-                        .Append("</td><td>")
-                        .Append(HtmlEncode(member.Type.ToString()))
-                        .Append("</td><td>")
-                        .Append(HtmlEncode(member.LayerId ?? member.GroupId ?? ""))
-                        .Append("</td><td>")
-                        .Append(HtmlEncode(member.Opacity.ToString("0.00")))
-                        .AppendLine("</td></tr>");
-                }
-                body.AppendLine("</tbody></table>");
-            }
-
-            AppendLinksHtml(body, links);
-
-            body.Append("<p><a href=\"")
-                .Append(HtmlEncode(BuildHref(request, "/ogc/collections", null, null)))
-                .AppendLine("\">Back to collections</a></p>");
-        });
-    }
-
     internal static string RenderFeatureCollectionHtml(
         string title,
         string? subtitle,

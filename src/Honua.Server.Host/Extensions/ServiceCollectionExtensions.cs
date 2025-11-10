@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using Honua.Server.Core.Configuration;
 using Honua.Server.Core.DependencyInjection;
+using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Security;
 using Honua.Server.Host.Carto;
 using Honua.Server.Host.Configuration;
@@ -377,17 +378,70 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration,
         IMvcBuilder mvcBuilder)
     {
+        // Register OData services first (model cache, builders, etc.)
         services.AddHonuaOData();
 
+        // Build a temporary service provider to resolve dependencies during configuration
+        using var tempProvider = services.BuildServiceProvider();
+
+        var logger = tempProvider.GetRequiredService<ILogger<Program>>();
+        var metadataRegistry = tempProvider.GetRequiredService<IMetadataRegistry>();
+        var modelCache = tempProvider.GetRequiredService<ODataModelCache>();
+        var configService = tempProvider.GetRequiredService<IHonuaConfigurationService>();
+
+        // Ensure metadata is initialized synchronously
+        // This is acceptable because: (1) tests initialize metadata synchronously anyway,
+        // (2) production metadata loading is fast (JSON/DB config), and (3) this only runs once at startup
+        try
+        {
+            metadataRegistry.EnsureInitializedAsync(CancellationToken.None).GetAwaiter().GetResult();
+            logger.LogInformation("Metadata registry initialized for OData service configuration");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to initialize metadata registry during OData configuration. OData endpoints may not be functional until metadata is loaded.");
+        }
+
+        // Build the EDM model synchronously
+        ODataModelDescriptor? modelDescriptor = null;
+        try
+        {
+            modelDescriptor = modelCache.GetOrCreateAsync(CancellationToken.None).GetAwaiter().GetResult();
+            logger.LogInformation("OData EDM model built with {EntityCount} entity types", modelDescriptor.EntitySets.Count);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to build OData EDM model during service configuration. OData endpoints will not be functional.");
+        }
+
+        // Configure OData with the built model
         mvcBuilder.AddOData(options =>
         {
             options.Count().Filter().Expand().Select().OrderBy();
             options.Conventions.Add(new DynamicODataRoutingConvention());
+
+            // Register routes BEFORE MapControllers() is called
+            // This is critical: routes must be registered during service configuration,
+            // not in a hosted service which runs AFTER the middleware pipeline is configured
+            if (modelDescriptor != null)
+            {
+                const string routePrefix = "odata";
+                options.AddRouteComponents(routePrefix, modelDescriptor.Model);
+                logger.LogInformation("OData route registered at '/{RoutePrefix}' with {EntityTypeCount} entity types", routePrefix, modelDescriptor.EntitySets.Count);
+
+                // Apply configuration options
+                var odataConfig = configService.Current.Services.OData;
+                if (odataConfig.MaxPageSize > 0)
+                {
+                    options.SetMaxTop(odataConfig.MaxPageSize);
+                    logger.LogInformation("OData max page size set to {MaxPageSize}", odataConfig.MaxPageSize);
+                }
+            }
         });
 
-        // Register hosted services for catalog and OData warm-up
+        // Register hosted service for catalog warm-up only
+        // OData initialization is now handled synchronously above
         services.AddHostedService<CatalogProjectionWarmupHostedService>();
-        services.AddHostedService<ODataInitializationHostedService>();
 
         return services;
     }

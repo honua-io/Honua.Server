@@ -45,11 +45,19 @@ internal static class EndpointExtensions
         // Map versioned API endpoints (all endpoints under /v1/)
         app.MapVersionedEndpoints();
 
+        // Map OGC endpoints at root level for OGC API spec compliance
+        // The OGC API specification expects the landing page at /ogc, not /v1/ogc
+        var configService = app.Services.GetService<IHonuaConfigurationService>();
+        if (configService?.Current.Services.OgcApi.Enabled ?? true)
+        {
+            app.MapOgcEndpoints();
+        }
+
         // Map health check endpoints (NOT versioned - infrastructure endpoints)
         app.MapHonuaHealthCheckEndpoints();
 
-        // Map home redirect to versioned OGC endpoint
-        app.MapGet("/", () => Results.Redirect("/v1/ogc"));
+        // Map home redirect to OGC landing page endpoint
+        app.MapGet("/", () => Results.Redirect("/ogc"));
 
         return app;
     }

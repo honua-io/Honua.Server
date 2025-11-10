@@ -35,7 +35,8 @@ namespace Honua.Server.Core.Hosting;
 public sealed class StartupProfiler
 {
     private readonly Stopwatch _stopwatch;
-    private readonly ConcurrentBag<CheckpointTiming> _timings;
+    private readonly List<CheckpointTiming> _timings;
+    private readonly object _timingsLock = new object();
     private readonly Stopwatch _processStopwatch;
 
     /// <summary>
@@ -44,7 +45,7 @@ public sealed class StartupProfiler
     public StartupProfiler()
     {
         _stopwatch = Stopwatch.StartNew();
-        _timings = new ConcurrentBag<CheckpointTiming>();
+        _timings = new List<CheckpointTiming>();
         _processStopwatch = Stopwatch.StartNew();
     }
 
@@ -55,7 +56,10 @@ public sealed class StartupProfiler
     public void Checkpoint(string name)
     {
         var elapsed = _stopwatch.ElapsedMilliseconds;
-        _timings.Add(new CheckpointTiming(name, elapsed));
+        lock (_timingsLock)
+        {
+            _timings.Add(new CheckpointTiming(name, elapsed));
+        }
     }
 
     /// <summary>
@@ -67,7 +71,11 @@ public sealed class StartupProfiler
         _stopwatch.Stop();
         _processStopwatch.Stop();
 
-        var orderedTimings = _timings.OrderBy(t => t.ElapsedMs).ToList();
+        List<CheckpointTiming> orderedTimings;
+        lock (_timingsLock)
+        {
+            orderedTimings = _timings.OrderBy(t => t.ElapsedMs).ToList();
+        }
 
         logger.LogInformation("=== Startup Performance Profile ===");
         logger.LogInformation("Total startup time: {TotalMs}ms", _stopwatch.ElapsedMilliseconds);
@@ -117,9 +125,18 @@ public sealed class StartupProfiler
     public long ElapsedMilliseconds => _stopwatch.ElapsedMilliseconds;
 
     /// <summary>
-    /// Gets all recorded checkpoints.
+    /// Gets all recorded checkpoints in the order they were added.
     /// </summary>
-    public IReadOnlyList<CheckpointTiming> Checkpoints => _timings.OrderBy(t => t.ElapsedMs).ToList();
+    public IReadOnlyList<CheckpointTiming> Checkpoints
+    {
+        get
+        {
+            lock (_timingsLock)
+            {
+                return _timings.ToList();
+            }
+        }
+    }
 
     /// <summary>
     /// Represents a single checkpoint timing measurement.
@@ -180,4 +197,17 @@ public sealed class StartupMetricsService
     /// Gets the elapsed startup time in milliseconds.
     /// </summary>
     public static long ElapsedMilliseconds => _startupTimer.ElapsedMilliseconds;
+
+    /// <summary>
+    /// Resets the startup metrics service state.
+    /// For testing purposes only.
+    /// </summary>
+    internal static void Reset()
+    {
+        _startupLogged = false;
+        if (!_startupTimer.IsRunning)
+        {
+            _startupTimer.Restart();
+        }
+    }
 }
