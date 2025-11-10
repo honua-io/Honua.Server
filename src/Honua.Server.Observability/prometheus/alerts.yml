@@ -216,3 +216,107 @@ groups:
         annotations:
           summary: "High CPU usage detected"
           description: "Process CPU usage is {{ $value | humanizePercentage }}."
+
+      - alert: CriticalMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 6
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical memory usage detected"
+          description: "Process is using {{ $value }}GB of memory (threshold: 6GB). May cause OOM."
+
+  - name: honua_database
+    interval: 30s
+    rules:
+      - alert: DatabaseConnectionPoolExhausted
+        expr: db_connection_pool_available < 5
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Only {{ $value }} connections available in pool. Risk of connection timeout."
+
+      - alert: DatabaseSlowQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_query_duration_seconds_bucket[5m])) by (le, database)
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query duration for {{ $labels.database }} is {{ $value }}s (threshold: 2s)."
+
+      - alert: HighDatabaseErrorRate
+        expr: |
+          rate(db_errors_total[5m]) /
+          (rate(db_queries_total[5m]) + rate(db_errors_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database error rate"
+          description: "Database error rate is {{ $value | humanizePercentage }}."
+
+  - name: honua_performance
+    interval: 30s
+    rules:
+      - alert: P95ResponseTimeHigh
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path, method)
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: http
+        annotations:
+          summary: "High p95 response time"
+          description: "P95 response time for {{ $labels.method }} {{ $labels.path }} is {{ $value }}s (threshold: 5s)."
+
+      - alert: P99ResponseTimeHigh
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path, method)
+          ) > 10
+        for: 5m
+        labels:
+          severity: critical
+          component: http
+        annotations:
+          summary: "Critical p99 response time"
+          description: "P99 response time for {{ $labels.method }} {{ $labels.path }} is {{ $value }}s (threshold: 10s)."
+
+  - name: honua_availability
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="honua-server"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: availability
+        annotations:
+          summary: "Service is down"
+          description: "Honua Server at {{ $labels.instance }} has been unreachable for 2 minutes."
+
+      - alert: HighErrorBudgetBurn
+        expr: |
+          (
+            rate(http_requests_total{status_class=~"5xx"}[5m]) /
+            rate(http_requests_total[5m])
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: critical
+          component: availability
+        annotations:
+          summary: "High error budget burn rate"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 10%). SLO at risk."

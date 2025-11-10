@@ -521,9 +521,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<StreamingGeoJsonWriter>();
         services.AddScoped<StreamingKmlWriter>();
 
-        // TODO: Register remaining services as they are implemented
-        // services.AddScoped<IGeoservicesAttachmentService, GeoservicesAttachmentService>();
-        // services.AddScoped<IGeoservicesExportService, GeoservicesExportService>();
+        // Register export and attachment services (refactored from controller)
+        services.AddScoped<IGeoservicesExportService, GeoservicesExportService>();
+        services.AddScoped<IGeoservicesAttachmentService, GeoservicesAttachmentService>();
 
         return services;
     }
