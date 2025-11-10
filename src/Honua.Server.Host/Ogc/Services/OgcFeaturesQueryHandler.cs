@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Primitives;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Host.Ogc.Services;
 
@@ -36,13 +37,16 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
 {
     private readonly IOgcCollectionResolver _collectionResolver;
     private readonly IOgcFeaturesGeoJsonHandler _geoJsonHandler;
+    private readonly ILogger<OgcFeaturesQueryHandler> _logger;
 
     public OgcFeaturesQueryHandler(
         IOgcCollectionResolver collectionResolver,
-        IOgcFeaturesGeoJsonHandler geoJsonHandler)
+        IOgcFeaturesGeoJsonHandler geoJsonHandler,
+        ILogger<OgcFeaturesQueryHandler> logger)
     {
-        _collectionResolver = collectionResolver;
-        _geoJsonHandler = geoJsonHandler;
+        _collectionResolver = collectionResolver ?? throw new ArgumentNullException(nameof(collectionResolver));
+        _geoJsonHandler = geoJsonHandler ?? throw new ArgumentNullException(nameof(geoJsonHandler));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <inheritdoc />
@@ -298,6 +302,12 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
         IOgcFeaturesAttachmentHandler attachmentHandler,
         CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Executing OGC search across {CollectionCount} collections: {Collections}",
+            collections.Count, string.Join(", ", collections));
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
         static QueryCollection RemoveCollectionsParameter(IQueryCollection source)
         {
             var dictionary = new Dictionary<string, StringValues>(StringComparer.OrdinalIgnoreCase);
@@ -476,7 +486,19 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
                 cancellationToken).ConfigureAwait(false);
         }, contentType);
 
+        stopwatch.Stop();
+        _logger.LogInformation("OGC search completed for {Collections} in {ElapsedMs}ms",
+            string.Join(", ", collections), stopwatch.ElapsedMilliseconds);
+
         return OgcSharedHandlers.WithContentCrsHeader(geoJsonResult, globalContentCrs);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "OGC search failed for collections {Collections} after {ElapsedMs}ms",
+                string.Join(", ", collections), stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
 
     /// <inheritdoc />

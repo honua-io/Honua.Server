@@ -23,6 +23,7 @@ using Microsoft.Extensions.Options;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
 using Honua.Server.Core.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Data.SqlServer;
 
@@ -37,15 +38,18 @@ public sealed class SqlServerDataStoreProvider : RelationalDataStoreProviderBase
     private readonly ConcurrentDictionary<string, GeometryColumnInfo> _geometryCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, SqlConnectionStringBuilder> _connectionBuilders = new(StringComparer.Ordinal);
     private readonly DataAccessOptions _options;
+    private readonly ILogger<SqlServerDataStoreProvider> _logger;
 
     public const string ProviderKey = "sqlserver";
 
     public SqlServerDataStoreProvider(
         IOptions<DataAccessOptions>? options = null,
-        IConnectionStringEncryptionService? encryptionService = null)
+        IConnectionStringEncryptionService? encryptionService = null,
+        ILogger<SqlServerDataStoreProvider>? logger = null)
         : base(ProviderKey, DatabaseRetryPolicy.CreateSqlServerRetryPipeline(), encryptionService)
     {
         _options = options?.Value ?? new DataAccessOptions();
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<SqlServerDataStoreProvider>.Instance;
     }
 
     public override string Provider => ProviderKey;

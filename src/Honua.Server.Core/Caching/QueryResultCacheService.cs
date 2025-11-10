@@ -8,6 +8,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Honua.Server.Core.Exceptions;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Performance;
 using Microsoft.Extensions.Caching.Distributed;
@@ -253,11 +254,17 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
                     _logger.LogTrace("Set distributed cache: {CacheKey}, size={Size} bytes, ttl={TTL}",
                         normalizedKey, envelopeBytes.Length, effectiveExpiration);
                 }
-                catch (Exception ex)
+                catch (TimeoutException timeoutEx)
+                {
+                    _logger.LogWarning(timeoutEx, "Timeout setting distributed cache: {CacheKey}", normalizedKey);
+                    _metrics.RecordCacheError(CacheNameDistributed, "set", "timeout");
+                    // Continue to set in-memory cache
+                }
+                catch (Exception ex) when (ex is not CacheException)
                 {
                     _logger.LogWarning(ex, "Failed to set distributed cache: {CacheKey}", normalizedKey);
                     _metrics.RecordCacheError(CacheNameDistributed, "set", ex.GetType().Name);
-                    // Continue to set in-memory cache
+                    // Continue to set in-memory cache - don't throw, gracefully degrade
                 }
             }
 
@@ -265,11 +272,17 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
             var memoryExpiration = TimeSpan.FromSeconds(Math.Min(effectiveExpiration.TotalSeconds, 300));
             SetInMemoryCache(normalizedKey, value, memoryExpiration);
         }
-        catch (Exception ex)
+        catch (JsonException jsonEx)
+        {
+            _logger.LogError(jsonEx, "Failed to serialize cache value: {CacheKey}", normalizedKey);
+            _metrics.RecordCacheError(CacheNameMemory, "serialize", "json");
+            throw new CacheException($"Failed to serialize cache value for key '{normalizedKey}'", jsonEx);
+        }
+        catch (Exception ex) when (ex is not CacheException)
         {
             _logger.LogError(ex, "Failed to set cache: {CacheKey}", normalizedKey);
             _metrics.RecordCacheError(CacheNameMemory, "set", ex.GetType().Name);
-            throw;
+            throw new CacheException($"Unexpected error setting cache for key '{normalizedKey}'", ex);
         }
     }
 
@@ -310,10 +323,17 @@ public sealed class QueryResultCacheService : IQueryResultCacheService
                 await _distributedCache.RemoveAsync(normalizedKey, cancellationToken).ConfigureAwait(false);
                 _logger.LogTrace("Removed from cache: {CacheKey}", normalizedKey);
             }
-            catch (Exception ex)
+            catch (TimeoutException timeoutEx)
+            {
+                _logger.LogWarning(timeoutEx, "Timeout removing from distributed cache: {CacheKey}", normalizedKey);
+                _metrics.RecordCacheError(CacheNameDistributed, "remove", "timeout");
+                // Graceful degradation - don't throw
+            }
+            catch (Exception ex) when (ex is not CacheException)
             {
                 _logger.LogWarning(ex, "Failed to remove from distributed cache: {CacheKey}", normalizedKey);
                 _metrics.RecordCacheError(CacheNameDistributed, "remove", ex.GetType().Name);
+                // Graceful degradation - don't throw
             }
         }
     }

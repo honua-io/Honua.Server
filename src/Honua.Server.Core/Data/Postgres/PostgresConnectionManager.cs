@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Caching;
+using Honua.Server.Core.Exceptions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Security;
 using Microsoft.Extensions.Caching.Memory;
@@ -63,10 +64,27 @@ internal sealed class PostgresConnectionManager : DisposableBase
             connection = dataSourceInstance.CreateConnection();
             _metrics.RecordPoolWaitTime(dataSource.ConnectionString, stopwatch.Elapsed);
         }
-        catch (Exception ex)
+        catch (NpgsqlException npgsqlEx)
+        {
+            _metrics.RecordConnectionFailure(dataSource.ConnectionString, npgsqlEx);
+
+            // Wrap Npgsql exceptions in domain-specific exceptions for better error handling
+            if (npgsqlEx.IsTransient)
+            {
+                throw new DataStoreConnectionException(dataSource.Id, "Database connection failed transiently", npgsqlEx);
+            }
+
+            throw new DataStoreConnectionException(dataSource.Id, "Database connection failed", npgsqlEx);
+        }
+        catch (TimeoutException timeoutEx)
+        {
+            _metrics.RecordConnectionFailure(dataSource.ConnectionString, timeoutEx);
+            throw new DataStoreTimeoutException("CreateConnection", "Connection attempt timed out", timeoutEx);
+        }
+        catch (Exception ex) when (ex is not DataStoreException)
         {
             _metrics.RecordConnectionFailure(dataSource.ConnectionString, ex);
-            throw;
+            throw new DataStoreException($"Unexpected error creating connection to data source '{dataSource.Id}'", "CONNECTION_ERROR", ex);
         }
 
         return connection;
