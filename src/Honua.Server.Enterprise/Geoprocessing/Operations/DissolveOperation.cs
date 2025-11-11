@@ -126,35 +126,6 @@ public class DissolveOperation : GeoprocessingOperationBase
 
     private async Task<List<Geometry>> LoadGeometriesAsync(GeoprocessingInput input, CancellationToken cancellationToken)
     {
-        await Task.CompletedTask;
-
-        var factory = GeometryFactory.Default;
-        var reader = new WKTReader();
-
-        if (input.Type == "wkt")
-        {
-            return new List<Geometry> { reader.Read(input.Source) };
-        }
-
-        if (input.Type == "geojson")
-        {
-            var geoJsonReader = new GeoJsonReader();
-            var geometry = geoJsonReader.Read<Geometry>(input.Source);
-
-            // If it's a collection, extract individual geometries
-            if (geometry is GeometryCollection gc)
-            {
-                var geometries = new List<Geometry>();
-                for (int i = 0; i < gc.NumGeometries; i++)
-                {
-                    geometries.Add(gc.GetGeometryN(i));
-                }
-                return geometries;
-            }
-
-            return new List<Geometry> { geometry };
-        }
-
-        throw new NotImplementedException($"Input type '{input.Type}' not yet implemented");
+        return await GeometryLoader.LoadGeometriesAsync(input, cancellationToken);
     }
 }

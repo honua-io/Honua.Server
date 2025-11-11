@@ -4,6 +4,8 @@
     <!-- Temporarily disabled TreatWarningsAsErrors to allow critical fixes to be committed -->
     <!-- TODO: Re-enable after addressing pre-existing analyzer warnings in separate PR -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- SECURITY: Treat security and reliability warnings as errors -->
+    <WarningsAsErrors>$(WarningsAsErrors);CA5404;CA2213;CA2234;CA2012;CA2016;CA2249</WarningsAsErrors>
     <AnalysisLevel>latest-all</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
@@ -14,7 +16,7 @@
     <!-- CA1812: Internal test classes instantiated via reflection/DI -->
     <!-- CA2000: Disposal false positives in test code and DI containers -->
     <!-- CA1304: ToLower/ToUpper in tests doesn't need culture info -->
-    <!-- CA5394: Random in tests doesn't need cryptographic security -->
+    <!-- CA5394: Random in tests doesn't need cryptographic security (TEST CODE ONLY) -->
     <!-- CA2022, CA1835, CA2208: Test code quality suggestions -->
     <!-- S*: SonarAnalyzer style rules (subjective code smells) -->
     <!-- SA*: ALL StyleCop rules temporarily suppressed - pre-existing style issues to fix in separate PR -->
@@ -27,7 +29,8 @@
     <!-- CS0618: Obsolete API usage (Azure SDK) -->
     <!-- CS4014, CS0169: Async and unused field warnings -->
     <!-- VSTHRD003: Task context warnings -->
-    <NoWarn>$(NoWarn);CA1707;CA1812;CA2000;CA1716;CA1054;CA1000;CA1310;CA1513;CA1854;CA1826;CA1869;CA1860;CA1866;CA1867;CA1846;CA1805;CA2234;CA2012;CA1024;CA1508;CA2213;CA5404;CA1304;CA5394;CA2022;CA1835;CA2208;CA2016;CA2249;CA3003;S127;S4487;S1144;S3398;S2094;S3218;S101;S4144;S3881;S2933;S927;S2486;S6667;S1125;S2139;S3923;S1871;S1135;S3928;S6610;VSTHRD200;CA1850;CS0168;CA1724;CA1303;CA1711;CA1847;CA1823;CA1028;CA1008;CA1844;CA1845;CA1814;CA1515;CA1851;CA1055;CA1806;CA1852;CA1019;CA1725;CA1051;CA1052;CA1063;CA1311;CS0618;CA1862;CA1825;CA1816;CS4014;CS0169;VSTHRD003</NoWarn>
+    <!-- SECURITY: Removed CA5404, CA2213, CA2234, CA2012, CA2016, CA2249 to enable security warnings -->
+    <NoWarn>$(NoWarn);CA1707;CA1812;CA2000;CA1716;CA1054;CA1000;CA1310;CA1513;CA1854;CA1826;CA1869;CA1860;CA1866;CA1867;CA1846;CA1805;CA1024;CA1508;CA1304;CA5394;CA2022;CA1835;CA2208;CA3003;S127;S4487;S1144;S3398;S2094;S3218;S101;S4144;S3881;S2933;S927;S2486;S6667;S1125;S2139;S3923;S1871;S1135;S3928;S6610;VSTHRD200;CA1850;CS0168;CA1724;CA1303;CA1711;CA1847;CA1823;CA1028;CA1008;CA1844;CA1845;CA1814;CA1515;CA1851;CA1055;CA1806;CA1852;CA1019;CA1725;CA1051;CA1052;CA1063;CA1311;CS0618;CA1862;CA1825;CA1816;CS4014;CS0169;VSTHRD003</NoWarn>
   </PropertyGroup>
 
   <!-- Suppress all StyleCop analyzers temporarily for MVP release -->
