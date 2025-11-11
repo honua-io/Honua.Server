@@ -1,0 +1,96 @@
+# Basic deployment example with embedded PostgreSQL and Redis
+# Suitable for development and testing environments
+
+# Create namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: honua-dev
+
+---
+# Install Honua Server with embedded dependencies
+# Usage: helm install honua-server ./deploy/kubernetes/helm/honua-server --namespace honua-dev -f deploy/kubernetes/examples/basic-deployment.yaml
+
+replicaCount: 1
+
+image:
+  variant: lite
+  pullPolicy: Always
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+# Enable embedded PostgreSQL
+postgresql:
+  enabled: true
+  auth:
+    username: honua
+    password: honua123
+    database: honua_dev
+  primary:
+    persistence:
+      enabled: false
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+# Enable embedded Redis
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: honua-dev.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+config:
+  aspnetcoreEnvironment: Development
+  logging:
+    level: Debug
+    structuredLogging: false
+
+serviceMonitor:
+  enabled: false
+
+networkPolicy:
+  enabled: false
+
+# Relaxed security for development
+podSecurityContext:
+  runAsNonRoot: false
+
+securityContext:
+  allowPrivilegeEscalation: true
+  readOnlyRootFilesystem: false

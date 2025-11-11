@@ -1,0 +1,483 @@
+# Default values for honua-server Helm chart
+# This is a YAML-formatted file with sensible defaults for production deployment
+
+# Image configuration
+image:
+  # Registry where the image is stored
+  registry: ghcr.io
+  repository: honua-io/honua-server
+
+  # Image variant: "full" or "lite"
+  # full: Complete image with GDAL, raster processing, cloud SDKs (~500MB)
+  # lite: Lightweight image for vector-only workloads (~60MB)
+  variant: full
+
+  # Image tag (defaults to Chart appVersion if not specified)
+  tag: ""
+
+  # Image pull policy
+  pullPolicy: IfNotPresent
+
+  # Image pull secrets for private registries
+  pullSecrets: []
+  # - name: regcred
+
+# Deployment configuration
+replicaCount: 2
+
+# Update strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Pod annotations
+podAnnotations: {}
+  # prometheus.io/scrape: "true"
+  # prometheus.io/port: "8080"
+  # prometheus.io/path: "/metrics"
+
+# Pod labels
+podLabels: {}
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations: {}
+  # AWS Load Balancer Controller annotations
+  # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+  # Azure annotations
+  # service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - host: honua.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: honua-tls
+  #   hosts:
+  #     - honua.example.com
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Horizontal Pod Autoscaler
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  # Custom metrics (requires metrics-server and custom metrics API)
+  customMetrics: []
+  # - type: Pods
+  #   pods:
+  #     metric:
+  #       name: http_requests_per_second
+  #     target:
+  #       type: AverageValue
+  #       averageValue: "1000"
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Health checks
+healthChecks:
+  liveness:
+    enabled: true
+    path: /healthz/live
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  readiness:
+    enabled: true
+    path: /healthz/ready
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
+
+  startup:
+    enabled: true
+    path: /healthz/live
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30
+    successThreshold: 1
+
+# Application configuration
+config:
+  # Service name for tracing and logging
+  serviceName: honua-server
+  serviceVersion: "1.0.0"
+
+  # ASP.NET Core environment
+  aspnetcoreEnvironment: Production
+
+  # Logging configuration
+  logging:
+    level: Information
+    structuredLogging: true
+    console:
+      enabled: true
+      format: json
+
+  # OpenTelemetry configuration
+  openTelemetry:
+    enabled: false
+    otlpEndpoint: ""
+    serviceName: honua-server
+    # Supported exporters: otlp, jaeger, zipkin, console
+    exporters:
+      - otlp
+
+  # CORS configuration
+  cors:
+    enabled: true
+    allowedOrigins: []
+    allowCredentials: true
+    allowedMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+    allowedHeaders:
+      - "*"
+
+  # Rate limiting
+  rateLimiting:
+    enabled: true
+    globalPermitLimit: 10000
+    globalWindowSeconds: 60
+    perIpPermitLimit: 100
+    perIpWindowSeconds: 60
+
+# Database configuration
+database:
+  # Use external PostgreSQL
+  external: false
+
+  # External database connection (when external: true)
+  host: ""
+  port: 5432
+  name: honua
+  username: honua
+
+  # Secret containing database password
+  # Must have key: password
+  existingSecret: ""
+  existingSecretKey: password
+
+  # Connection pool settings
+  pooling:
+    minPoolSize: 5
+    maxPoolSize: 100
+
+  # SSL mode: disable, allow, prefer, require, verify-ca, verify-full
+  sslMode: require
+
+  # Azure PostgreSQL Flexible Server settings
+  azure:
+    enabled: false
+    # Use Azure AD authentication
+    useAzureAD: false
+    # Managed Identity Client ID (optional)
+    managedIdentityClientId: ""
+
+# Redis configuration
+redis:
+  # Use external Redis
+  external: false
+
+  # External Redis connection (when external: true)
+  host: ""
+  port: 6379
+
+  # Secret containing Redis password (optional)
+  existingSecret: ""
+  existingSecretKey: password
+
+  # SSL/TLS settings
+  ssl:
+    enabled: false
+
+  # Azure Redis Cache settings
+  azure:
+    enabled: false
+    # Use Azure AD authentication
+    useAzureAD: false
+
+# Secrets management
+secrets:
+  # Provider: "kubernetes", "azure-keyvault", "aws-secrets-manager", "gcp-secret-manager"
+  provider: kubernetes
+
+  # Azure Key Vault configuration
+  azureKeyVault:
+    enabled: false
+    name: ""
+    tenantId: ""
+    # Use Pod Identity or Workload Identity
+    useManagedIdentity: true
+    clientId: ""
+
+  # AWS Secrets Manager configuration
+  awsSecretsManager:
+    enabled: false
+    region: us-east-1
+    # Use IAM Role for Service Account (IRSA)
+    useIRSA: true
+
+  # GCP Secret Manager configuration
+  gcpSecretManager:
+    enabled: false
+    projectId: ""
+    # Use Workload Identity
+    useWorkloadIdentity: true
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Ingress rules
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app: honua-gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  # Egress rules (allow DNS, PostgreSQL, Redis by default)
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow PostgreSQL
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow Redis
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow HTTPS for external APIs
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+# Service Monitor for Prometheus Operator
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+  # Additional labels for ServiceMonitor
+  # release: prometheus-operator
+  relabelings: []
+  metricRelabelings: []
+
+# Service Account
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # AWS IAM Role for Service Account (IRSA)
+  # eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/honua-server
+  # Azure Workload Identity
+  # azure.workload.identity/client-id: "client-id"
+  # azure.workload.identity/tenant-id: "tenant-id"
+  # GCP Workload Identity
+  # iam.gke.io/gcp-service-account: honua-server@project-id.iam.gserviceaccount.com
+
+  # The name of the service account to use
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Node selector
+nodeSelector: {}
+  # disktype: ssd
+  # workload: compute
+
+# Tolerations
+tolerations: []
+  # - key: "workload"
+  #   operator: "Equal"
+  #   value: "compute"
+  #   effect: "NoSchedule"
+
+# Affinity rules
+affinity: {}
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #     - weight: 100
+  #       podAffinityTerm:
+  #         labelSelector:
+  #           matchExpressions:
+  #             - key: app.kubernetes.io/name
+  #               operator: In
+  #               values:
+  #                 - honua-server
+  #         topologyKey: kubernetes.io/hostname
+
+# Priority class for pod scheduling
+priorityClassName: ""
+
+# Pod topology spread constraints
+topologySpreadConstraints: []
+  # - maxSkew: 1
+  #   topologyKey: topology.kubernetes.io/zone
+  #   whenUnsatisfiable: ScheduleAnyway
+  #   labelSelector:
+  #     matchLabels:
+  #       app.kubernetes.io/name: honua-server
+
+# Persistent volumes
+persistence:
+  enabled: false
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  mountPath: /data
+  annotations: {}
+
+# Extra environment variables
+extraEnv: []
+  # - name: CUSTOM_VAR
+  #   value: "custom-value"
+
+# Extra environment variables from ConfigMaps or Secrets
+extraEnvFrom: []
+  # - configMapRef:
+  #     name: extra-config
+  # - secretRef:
+  #     name: extra-secrets
+
+# Extra volumes
+extraVolumes: []
+  # - name: custom-volume
+  #   emptyDir: {}
+
+# Extra volume mounts
+extraVolumeMounts: []
+  # - name: custom-volume
+  #   mountPath: /custom
+
+# Init containers
+initContainers: []
+  # - name: init-db
+  #   image: busybox:1.35
+  #   command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for db; sleep 2; done;']
+
+# Sidecar containers
+sidecars: []
+  # - name: log-shipper
+  #   image: fluent/fluent-bit:2.0
+  #   volumeMounts:
+  #     - name: logs
+  #       mountPath: /var/log
+
+# PostgreSQL subchart configuration (when postgresql.enabled: true)
+postgresql:
+  enabled: false
+  auth:
+    username: honua
+    password: honua123
+    database: honua
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+# Redis subchart configuration (when redis.enabled: true)
+redis:
+  enabled: false
+  architecture: standalone
+  auth:
+    enabled: true
+    password: redis123
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 256Mi

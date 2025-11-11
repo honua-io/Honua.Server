@@ -46,6 +46,14 @@ public static class AuthenticationExtensions
             LocalBasicAuthenticationDefaults.Scheme,
             _ => { });
 
+        // Register HttpContextAccessor if not already registered (required by UserContext)
+        services.AddHttpContextAccessor();
+
+        // Register User Context service for extracting user identity and session information
+        // This service provides access to authenticated user details, session IDs, and request metadata
+        // for audit logging and tracking throughout the application
+        services.AddScoped<IUserContext, UserContext>();
+
         return services;
     }
 
@@ -73,6 +81,11 @@ public static class AuthenticationExtensions
                 {
                     policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, LocalBasicAuthenticationDefaults.Scheme);
                     policy.RequireRole("administrator");
+                });
+                options.AddPolicy("RequireEditor", policy =>
+                {
+                    policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, LocalBasicAuthenticationDefaults.Scheme);
+                    policy.RequireRole("administrator", "editor");
                 });
                 options.AddPolicy("RequireDataPublisher", policy =>
                 {
@@ -104,6 +117,15 @@ public static class AuthenticationExtensions
                     policy.RequireAssertion(context =>
                         context.User.Identity?.IsAuthenticated != true ||
                         context.User.IsInRole("administrator"));
+                });
+
+                options.AddPolicy("RequireEditor", policy =>
+                {
+                    policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, LocalBasicAuthenticationDefaults.Scheme);
+                    policy.RequireAssertion(context =>
+                        context.User.Identity?.IsAuthenticated != true ||
+                        context.User.IsInRole("administrator") ||
+                        context.User.IsInRole("editor"));
                 });
 
                 options.AddPolicy("RequireDataPublisher", policy =>

@@ -1,0 +1,124 @@
+# Staging environment values
+# Production-like configuration with verbose logging
+
+replicaCount: 2
+
+image:
+  variant: full
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+config:
+  aspnetcoreEnvironment: Staging
+  logging:
+    level: Debug
+    structuredLogging: true
+    console:
+      format: json
+
+  openTelemetry:
+    enabled: true
+    otlpEndpoint: "http://opentelemetry-collector.observability.svc.cluster.local:4317"
+    exporters:
+      - otlp
+
+  rateLimiting:
+    enabled: true
+    globalPermitLimit: 5000
+    perIpPermitLimit: 50
+
+# Use external database
+database:
+  external: true
+  host: postgres-staging.example.com
+  port: 5432
+  name: honua_staging
+  username: honua_staging
+  existingSecret: honua-db-staging
+  existingSecretKey: password
+  sslMode: require
+
+# Use external Redis
+redis:
+  external: true
+  host: redis-staging.example.com
+  port: 6379
+  existingSecret: honua-redis-staging
+  existingSecretKey: password
+  ssl:
+    enabled: true
+
+# Disable subcharts
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: honua-staging.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: honua-staging-tls
+      hosts:
+        - honua-staging.example.com
+
+serviceMonitor:
+  enabled: true
+  namespace: observability
+  labels:
+    release: prometheus-operator
+
+networkPolicy:
+  enabled: true
+
+secrets:
+  provider: kubernetes
+
+# Pod anti-affinity for high availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - honua-server
+          topologyKey: kubernetes.io/hostname
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: honua-server

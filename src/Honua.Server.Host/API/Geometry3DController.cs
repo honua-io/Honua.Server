@@ -146,28 +146,20 @@ public class Geometry3DController : ControllerBase
             BinaryFormat = binary
         };
 
-        try
-        {
-            var stream = await _geometryService.ExportGeometryAsync(id, options, cancellationToken);
+        var stream = await _geometryService.ExportGeometryAsync(id, options, cancellationToken);
 
-            var contentType = format.ToLowerInvariant() switch
-            {
-                "obj" => "model/obj",
-                "stl" => "model/stl",
-                "gltf" => "model/gltf+json",
-                "glb" => "model/gltf-binary",
-                "ply" => "application/ply",
-                _ => "application/octet-stream"
-            };
-
-            var fileName = $"geometry_{id}.{format}";
-            return File(stream, contentType, fileName);
-        }
-        catch (Exception ex)
+        var contentType = format.ToLowerInvariant() switch
         {
-            _logger.LogError(ex, "Failed to export geometry {GeometryId} to format {Format}", id, format);
-            return BadRequest($"Export failed: {ex.Message}");
-        }
+            "obj" => "model/obj",
+            "stl" => "model/stl",
+            "gltf" => "model/gltf+json",
+            "glb" => "model/gltf-binary",
+            "ply" => "application/ply",
+            _ => "application/octet-stream"
+        };
+
+        var fileName = $"geometry_{id}.{format}";
+        return File(stream, contentType, fileName);
     }
 
     /// <summary>
@@ -222,15 +214,10 @@ public class Geometry3DController : ControllerBase
         [FromBody] Dictionary<string, object> metadata,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            await _geometryService.UpdateGeometryMetadataAsync(id, metadata, cancellationToken);
-            return NoContent();
-        }
-        catch (InvalidOperationException)
-        {
-            return NotFound($"Geometry {id} not found");
-        }
+        // NOTE: Service should throw appropriate domain exception instead of InvalidOperationException
+        // InvalidOperationException is mapped to 400 BadRequest by middleware
+        await _geometryService.UpdateGeometryMetadataAsync(id, metadata, cancellationToken);
+        return NoContent();
     }
 
     /// <summary>
@@ -302,33 +289,25 @@ public class Geometry3DController : ControllerBase
             return BadRequest("Geometry has no mesh data available");
         }
 
-        try
-        {
-            MeshPreviewResponse response;
+        MeshPreviewResponse response;
 
-            if (format == "simple")
-            {
-                response = await _meshConverter.ToSimpleMeshAsync(
-                    geometry.Mesh,
-                    lod,
-                    geometry.Id,
-                    geometry.SourceFormat);
-            }
-            else
-            {
-                response = await _meshConverter.ToGltfJsonAsync(
-                    geometry.Mesh,
-                    lod,
-                    geometry.Id,
-                    geometry.SourceFormat);
-            }
-
-            return Ok(response);
-        }
-        catch (Exception ex)
+        if (format == "simple")
         {
-            _logger.LogError(ex, "Failed to generate mesh preview for geometry {GeometryId} with format {Format}", id, format);
-            return BadRequest($"Failed to generate preview: {ex.Message}");
+            response = await _meshConverter.ToSimpleMeshAsync(
+                geometry.Mesh,
+                lod,
+                geometry.Id,
+                geometry.SourceFormat);
         }
+        else
+        {
+            response = await _meshConverter.ToGltfJsonAsync(
+                geometry.Mesh,
+                lod,
+                geometry.Id,
+                geometry.SourceFormat);
+        }
+
+        return Ok(response);
     }
 }

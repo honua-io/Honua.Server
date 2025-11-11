@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/appsettings.json",
+  "Secrets": {
+    "Provider": "HashiCorpVault",
+    "EnableCaching": true,
+    "CacheDurationSeconds": 300,
+    "Vault": {
+      "Address": "https://vault.example.com:8200",
+      "MountPoint": "secret",
+      "KvVersion": 2,
+      "RoleId": "your-role-id",
+      "SecretId": "your-secret-id",
+      "TimeoutSeconds": 30,
+      "MaxRetries": 3,
+      "SkipTlsVerify": false
+    }
+  }
+}

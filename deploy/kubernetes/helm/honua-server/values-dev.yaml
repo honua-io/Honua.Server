@@ -1,0 +1,116 @@
+# Development environment values
+# Minimal resources, debug logging, embedded PostgreSQL and Redis
+
+replicaCount: 1
+
+image:
+  variant: lite
+  pullPolicy: Always
+
+strategy:
+  type: Recreate
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+config:
+  aspnetcoreEnvironment: Development
+  logging:
+    level: Debug
+    structuredLogging: false
+    console:
+      format: simple
+
+  openTelemetry:
+    enabled: true
+    exporters:
+      - console
+
+  rateLimiting:
+    enabled: false
+
+# Use PostgreSQL subchart for development
+database:
+  external: false
+
+postgresql:
+  enabled: true
+  auth:
+    username: honua
+    password: dev123
+    database: honua_dev
+  primary:
+    persistence:
+      enabled: false
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+# Use Redis subchart for development
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: honua-dev.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+serviceMonitor:
+  enabled: false
+
+networkPolicy:
+  enabled: false
+
+secrets:
+  provider: kubernetes
+
+# Relax security for development
+podSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  fsGroup: 0
+
+securityContext:
+  allowPrivilegeEscalation: true
+  readOnlyRootFilesystem: false
+  runAsNonRoot: false
+  runAsUser: 0
+
+# Extra environment for debugging
+extraEnv:
+  - name: ASPNETCORE_DETAILEDERRORS
+    value: "true"
+  - name: DOTNET_USE_POLLING_FILE_WATCHER
+    value: "true"

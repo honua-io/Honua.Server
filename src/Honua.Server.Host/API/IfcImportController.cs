@@ -131,56 +131,43 @@ public sealed class IfcImportController : ControllerBase
             });
         }
 
-        try
+        _logger.LogInformation(
+            "Starting IFC import: File={FileName}, Size={Size} bytes, Service={ServiceId}, Layer={LayerId}",
+            file.FileName, file.Length, targetServiceId, targetLayerId);
+
+        // Create import options
+        var options = new IfcImportOptions
+        {
+            TargetServiceId = targetServiceId,
+            TargetLayerId = targetLayerId,
+            ImportGeometry = importGeometry,
+            ImportProperties = importProperties,
+            ImportRelationships = importRelationships,
+            CreateGraphRelationships = createGraphRelationships,
+            MaxEntities = maxEntities
+        };
+
+        // Import the file
+        IfcImportResult result;
+        await using (var stream = file.OpenReadStream())
+        {
+            result = await _ifcImportService.ImportIfcFileAsync(stream, options, cancellationToken);
+        }
+
+        if (result.Success)
         {
             _logger.LogInformation(
-                "Starting IFC import: File={FileName}, Size={Size} bytes, Service={ServiceId}, Layer={LayerId}",
-                file.FileName, file.Length, targetServiceId, targetLayerId);
-
-            // Create import options
-            var options = new IfcImportOptions
-            {
-                TargetServiceId = targetServiceId,
-                TargetLayerId = targetLayerId,
-                ImportGeometry = importGeometry,
-                ImportProperties = importProperties,
-                ImportRelationships = importRelationships,
-                CreateGraphRelationships = createGraphRelationships,
-                MaxEntities = maxEntities
-            };
-
-            // Import the file
-            IfcImportResult result;
-            await using (var stream = file.OpenReadStream())
-            {
-                result = await _ifcImportService.ImportIfcFileAsync(stream, options, cancellationToken);
-            }
-
-            if (result.Success)
-            {
-                _logger.LogInformation(
-                    "IFC import completed: JobId={JobId}, FeaturesCreated={FeaturesCreated}, Duration={Duration}ms",
-                    result.ImportJobId, result.FeaturesCreated, result.Duration.TotalMilliseconds);
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "IFC import completed with errors: JobId={JobId}, Errors={ErrorCount}",
-                    result.ImportJobId, result.Errors.Count);
-            }
-
-            return Ok(result);
+                "IFC import completed: JobId={JobId}, FeaturesCreated={FeaturesCreated}, Duration={Duration}ms",
+                result.ImportJobId, result.FeaturesCreated, result.Duration.TotalMilliseconds);
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogError(ex, "Error importing IFC file: {FileName}", file.FileName);
-            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
-            {
-                Title = "Import failed",
-                Detail = ex.Message,
-                Status = StatusCodes.Status500InternalServerError
-            });
+            _logger.LogWarning(
+                "IFC import completed with errors: JobId={JobId}, Errors={ErrorCount}",
+                result.ImportJobId, result.Errors.Count);
         }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -209,32 +196,19 @@ public sealed class IfcImportController : ControllerBase
             });
         }
 
-        try
+        _logger.LogInformation("Validating IFC file: {FileName}, Size={Size} bytes",
+            file.FileName, file.Length);
+
+        IfcValidationResult result;
+        await using (var stream = file.OpenReadStream())
         {
-            _logger.LogInformation("Validating IFC file: {FileName}, Size={Size} bytes",
-                file.FileName, file.Length);
-
-            IfcValidationResult result;
-            await using (var stream = file.OpenReadStream())
-            {
-                result = await _ifcImportService.ValidateIfcAsync(stream, cancellationToken);
-            }
-
-            _logger.LogInformation("IFC validation completed: Valid={IsValid}, Schema={Schema}, Format={Format}",
-                result.IsValid, result.SchemaVersion, result.FileFormat);
-
-            return Ok(result);
+            result = await _ifcImportService.ValidateIfcAsync(stream, cancellationToken);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error validating IFC file: {FileName}", file.FileName);
-            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
-            {
-                Title = "Validation failed",
-                Detail = ex.Message,
-                Status = StatusCodes.Status500InternalServerError
-            });
-        }
+
+        _logger.LogInformation("IFC validation completed: Valid={IsValid}, Schema={Schema}, Format={Format}",
+            result.IsValid, result.SchemaVersion, result.FileFormat);
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -263,31 +237,18 @@ public sealed class IfcImportController : ControllerBase
             });
         }
 
-        try
+        _logger.LogInformation("Extracting metadata from IFC file: {FileName}", file.FileName);
+
+        IfcProjectMetadata metadata;
+        await using (var stream = file.OpenReadStream())
         {
-            _logger.LogInformation("Extracting metadata from IFC file: {FileName}", file.FileName);
-
-            IfcProjectMetadata metadata;
-            await using (var stream = file.OpenReadStream())
-            {
-                metadata = await _ifcImportService.ExtractMetadataAsync(stream, cancellationToken);
-            }
-
-            _logger.LogInformation("IFC metadata extracted: Project={ProjectName}, Schema={Schema}",
-                metadata.ProjectName, metadata.SchemaVersion);
-
-            return Ok(metadata);
+            metadata = await _ifcImportService.ExtractMetadataAsync(stream, cancellationToken);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error extracting metadata from IFC file: {FileName}", file.FileName);
-            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
-            {
-                Title = "Metadata extraction failed",
-                Detail = ex.Message,
-                Status = StatusCodes.Status500InternalServerError
-            });
-        }
+
+        _logger.LogInformation("IFC metadata extracted: Project={ProjectName}, Schema={Schema}",
+            metadata.ProjectName, metadata.SchemaVersion);
+
+        return Ok(metadata);
     }
 
     /// <summary>

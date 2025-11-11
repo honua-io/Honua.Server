@@ -4,6 +4,7 @@ using System;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Honua.Server.Core.Authentication;
 using Honua.Server.Enterprise.Authentication;
 using Honua.Server.Enterprise.Multitenancy;
 using Microsoft.AspNetCore.Authentication;
@@ -124,6 +125,7 @@ public static class SamlEndpoints
         [FromServices] ISamlService samlService,
         [FromServices] ISamlUserProvisioningService provisioningService,
         [FromServices] ITenantProvider tenantProvider,
+        [FromServices] IUserContext userContext,
         [FromServices] ILogger<SamlService> logger,
         CancellationToken cancellationToken = default)
     {
@@ -179,11 +181,10 @@ public static class SamlEndpoints
             }
 
             // Provision user (JIT or existing)
-            // For now, we'll use a placeholder IdP configuration ID
-            // In production, get this from the SAML session
+            // Use session ID from user context for tracking the SAML session
             var provisionedUser = await provisioningService.ProvisionUserAsync(
                 tenantGuid,
-                Guid.Empty, // TODO: Get from session
+                userContext.SessionId,
                 assertionResult,
                 cancellationToken);
 
