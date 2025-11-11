@@ -1,0 +1,434 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.MapSDK.Models.RouteOptimization
+@using Honua.MapSDK.Services.RouteOptimization
+@inject RouteOptimizationService OptimizationService
+@inject IJSRuntime JSRuntime
+@inject ILogger<HonuaRouteOptimizer> Logger
+
+<div class="honua-route-optimizer">
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">
+            <strong>Error:</strong> @ErrorMessage
+        </div>
+    }
+
+    @if (IsOptimizing)
+    {
+        <div class="optimization-progress">
+            <div class="progress-header">
+                <h4>Optimizing Route...</h4>
+                <span class="progress-stage">@_currentStage</span>
+            </div>
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                     role="progressbar"
+                     style="width: @(_currentProgress)%"
+                     aria-valuenow="@_currentProgress"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                    @(_currentProgress)%
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (Result != null && !IsOptimizing)
+    {
+        <div class="optimization-result">
+            <div class="result-header">
+                <h3>Optimization Complete</h3>
+                <button class="btn btn-sm btn-secondary" @onclick="ClearResult">
+                    Clear
+                </button>
+            </div>
+
+            <div class="result-summary">
+                <div class="metric-card">
+                    <div class="metric-label">Distance Saved</div>
+                    <div class="metric-value">
+                        @FormatDistance(Result.Metrics.DistanceSavedMeters)
+                    </div>
+                    <div class="metric-percent savings">
+                        @Result.Metrics.DistanceSavingsPercent.ToString("F1")% improvement
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Time Saved</div>
+                    <div class="metric-value">
+                        @FormatDuration(Result.Metrics.DurationSavedSeconds)
+                    </div>
+                    <div class="metric-percent savings">
+                        @Result.Metrics.DurationSavingsPercent.ToString("F1")% improvement
+                    </div>
+                </div>
+
+                @if (Result.Metrics.CostSaved > 0)
+                {
+                    <div class="metric-card">
+                        <div class="metric-label">Cost Saved</div>
+                        <div class="metric-value">
+                            $@Result.Metrics.CostSaved.ToString("F2")
+                        </div>
+                        <div class="metric-percent savings">
+                            @Result.Metrics.CostSavingsPercent.ToString("F1")% improvement
+                        </div>
+                    </div>
+                }
+
+                <div class="metric-card">
+                    <div class="metric-label">Algorithm</div>
+                    <div class="metric-value small">
+                        @Result.Algorithm
+                    </div>
+                    <div class="metric-percent">
+                        Quality: @Result.QualityScore.ToString("F0")%
+                    </div>
+                </div>
+            </div>
+
+            @if (ShowComparison)
+            {
+                <div class="route-comparison">
+                    <div class="comparison-column">
+                        <h4>Original Route</h4>
+                        <div class="route-metrics">
+                            <div class="metric">
+                                <span class="label">Distance:</span>
+                                <span class="value">@FormatDistance(Result.Metrics.OriginalDistanceMeters)</span>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Duration:</span>
+                                <span class="value">@FormatDuration(Result.Metrics.OriginalDurationSeconds)</span>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Cost:</span>
+                                <span class="value">$@Result.Metrics.OriginalCost.ToString("F2")</span>
+                            </div>
+                        </div>
+                        <div class="waypoint-list">
+                            @foreach (var (waypoint, index) in Result.OriginalSequence.Select((w, i) => (w, i)))
+                            {
+                                <div class="waypoint-item">
+                                    <span class="waypoint-number">@(index + 1)</span>
+                                    <span class="waypoint-name">@(waypoint.Name ?? $"Waypoint {waypoint.OriginalIndex + 1}")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="comparison-arrow">→</div>
+
+                    <div class="comparison-column optimized">
+                        <h4>Optimized Route</h4>
+                        <div class="route-metrics">
+                            <div class="metric">
+                                <span class="label">Distance:</span>
+                                <span class="value">@FormatDistance(Result.Metrics.OptimizedDistanceMeters)</span>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Duration:</span>
+                                <span class="value">@FormatDuration(Result.Metrics.OptimizedDurationSeconds)</span>
+                            </div>
+                            <div class="metric">
+                                <span class="label">Cost:</span>
+                                <span class="value">$@Result.Metrics.OptimizedCost.ToString("F2")</span>
+                            </div>
+                        </div>
+                        <div class="waypoint-list">
+                            @foreach (var (waypoint, index) in Result.OptimizedSequence.Select((w, i) => (w, i)))
+                            {
+                                <div class="waypoint-item">
+                                    <span class="waypoint-number">@(index + 1)</span>
+                                    <span class="waypoint-name">@(waypoint.Name ?? $"Waypoint {waypoint.OriginalIndex + 1}")</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (Result.TimeWindowViolations.Any())
+            {
+                <div class="alert alert-warning">
+                    <strong>Time Window Violations:</strong>
+                    <ul>
+                        @foreach (var violation in Result.TimeWindowViolations)
+                        {
+                            <li>
+                                @violation.Waypoint.Name: @violation.Type
+                                (@FormatDuration(Math.Abs(violation.ViolationSeconds)))
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (Result.Warnings.Any())
+            {
+                <div class="alert alert-info">
+                    <strong>Warnings:</strong>
+                    <ul>
+                        @foreach (var warning in Result.Warnings)
+                        {
+                            <li>@warning</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <div class="result-actions">
+                <button class="btn btn-primary" @onclick="ApplyOptimization">
+                    Apply Optimized Route
+                </button>
+                <button class="btn btn-secondary" @onclick="ToggleComparison">
+                    @(ShowComparison ? "Hide" : "Show") Comparison
+                </button>
+                @if (EnableExport)
+                {
+                    <button class="btn btn-outline-primary" @onclick="ExportResult">
+                        Export
+                    </button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Waypoints to optimize
+    /// </summary>
+    [Parameter]
+    public List<OptimizationWaypoint> Waypoints { get; set; } = new();
+
+    /// <summary>
+    /// Start location (depot/origin)
+    /// </summary>
+    [Parameter]
+    public Coordinate? StartLocation { get; set; }
+
+    /// <summary>
+    /// End location (optional return to depot)
+    /// </summary>
+    [Parameter]
+    public Coordinate? EndLocation { get; set; }
+
+    /// <summary>
+    /// Optimization goal
+    /// </summary>
+    [Parameter]
+    public OptimizationGoal Goal { get; set; } = OptimizationGoal.MinimizeDistance;
+
+    /// <summary>
+    /// Optimization provider
+    /// </summary>
+    [Parameter]
+    public OptimizationProvider Provider { get; set; } = OptimizationProvider.ClientSide;
+
+    /// <summary>
+    /// Enable time window constraints
+    /// </summary>
+    [Parameter]
+    public bool EnableTimeWindows { get; set; }
+
+    /// <summary>
+    /// Vehicle capacity (for VRP)
+    /// </summary>
+    [Parameter]
+    public double? VehicleCapacity { get; set; }
+
+    /// <summary>
+    /// Maximum route duration
+    /// </summary>
+    [Parameter]
+    public TimeSpan? MaxRouteDuration { get; set; }
+
+    /// <summary>
+    /// Auto-start optimization
+    /// </summary>
+    [Parameter]
+    public bool AutoStart { get; set; }
+
+    /// <summary>
+    /// Show route comparison
+    /// </summary>
+    [Parameter]
+    public bool ShowComparison { get; set; } = true;
+
+    /// <summary>
+    /// Enable export functionality
+    /// </summary>
+    [Parameter]
+    public bool EnableExport { get; set; } = true;
+
+    /// <summary>
+    /// Event fired when optimization completes
+    /// </summary>
+    [Parameter]
+    public EventCallback<OptimizationResult> OnOptimizationComplete { get; set; }
+
+    /// <summary>
+    /// Event fired when optimized route is applied
+    /// </summary>
+    [Parameter]
+    public EventCallback<OptimizationResult> OnApplyOptimization { get; set; }
+
+    /// <summary>
+    /// Event fired on progress update
+    /// </summary>
+    [Parameter]
+    public EventCallback<OptimizationProgress> OnOptimizationProgress { get; set; }
+
+    private OptimizationResult? Result { get; set; }
+    private bool IsOptimizing { get; set; }
+    private string ErrorMessage { get; set; } = string.Empty;
+    private int _currentProgress = 0;
+    private string _currentStage = "";
+    private CancellationTokenSource? _cancellationTokenSource;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AutoStart && Waypoints.Any() && Result == null && !IsOptimizing)
+        {
+            await OptimizeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Start optimization
+    /// </summary>
+    public async Task OptimizeAsync()
+    {
+        try
+        {
+            ErrorMessage = string.Empty;
+            IsOptimizing = true;
+            _currentProgress = 0;
+            _currentStage = "Initializing...";
+            _cancellationTokenSource = new CancellationTokenSource();
+
+            var request = new OptimizationRequest
+            {
+                Waypoints = Waypoints,
+                StartLocation = StartLocation,
+                EndLocation = EndLocation,
+                Goal = Goal,
+                EnableTimeWindows = EnableTimeWindows,
+                Vehicle = VehicleCapacity.HasValue ? new VehicleConstraints
+                {
+                    MaxCapacity = VehicleCapacity.Value,
+                    MaxDurationSeconds = MaxRouteDuration.HasValue ? (int)MaxRouteDuration.Value.TotalSeconds : null
+                } : null
+            };
+
+            var progress = new Progress<OptimizationProgress>(p =>
+            {
+                _currentProgress = p.Percent;
+                _currentStage = p.Stage;
+                StateHasChanged();
+
+                _ = OnOptimizationProgress.InvokeAsync(p);
+            });
+
+            Result = await OptimizationService.OptimizeAsync(
+                request,
+                Provider,
+                progress,
+                _cancellationTokenSource.Token);
+
+            await OnOptimizationComplete.InvokeAsync(Result);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Optimization failed: {ex.Message}";
+            Logger.LogError(ex, "Route optimization error");
+        }
+        finally
+        {
+            IsOptimizing = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Clear the optimization result
+    /// </summary>
+    public void ClearResult()
+    {
+        Result = null;
+        ErrorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Apply the optimized route
+    /// </summary>
+    private async Task ApplyOptimization()
+    {
+        if (Result != null)
+        {
+            await OnApplyOptimization.InvokeAsync(Result);
+        }
+    }
+
+    /// <summary>
+    /// Toggle comparison view
+    /// </summary>
+    private void ToggleComparison()
+    {
+        ShowComparison = !ShowComparison;
+    }
+
+    /// <summary>
+    /// Export optimization result
+    /// </summary>
+    private async Task ExportResult()
+    {
+        if (Result == null) return;
+
+        try
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(Result, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", "optimization-result.json", json, "application/json");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to export optimization result");
+        }
+    }
+
+    /// <summary>
+    /// Format distance for display
+    /// </summary>
+    private string FormatDistance(double meters)
+    {
+        if (meters < 1000)
+            return $"{meters:F0} m";
+        return $"{meters / 1000:F2} km";
+    }
+
+    /// <summary>
+    /// Format duration for display
+    /// </summary>
+    private string FormatDuration(int seconds)
+    {
+        var ts = TimeSpan.FromSeconds(seconds);
+        if (ts.TotalHours >= 1)
+            return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        return $"{ts.Minutes}m {ts.Seconds}s";
+    }
+
+    public void Dispose()
+    {
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Dispose();
+    }
+}

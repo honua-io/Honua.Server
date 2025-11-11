@@ -1,0 +1,448 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Sky
+@using Honua.MapSDK.Services.Sky
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject SunPositionService SunPositionService
+
+@code {
+    /// <summary>
+    /// Unique identifier for the sky layer
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"sky-layer-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Enable sky layer
+    /// </summary>
+    [Parameter]
+    public bool EnableSky { get; set; } = true;
+
+    /// <summary>
+    /// Sky type (Gradient, Atmosphere, Solid, Custom)
+    /// </summary>
+    [Parameter]
+    public SkyType SkyType { get; set; } = SkyType.Atmosphere;
+
+    /// <summary>
+    /// Base sky color (CSS color string)
+    /// </summary>
+    [Parameter]
+    public string SkyColor { get; set; } = "#87CEEB";
+
+    /// <summary>
+    /// Horizon color (CSS color string)
+    /// </summary>
+    [Parameter]
+    public string HorizonColor { get; set; } = "#B0E0E6";
+
+    /// <summary>
+    /// Horizon blend factor (0.0 = sharp, 1.0 = smooth)
+    /// </summary>
+    [Parameter]
+    public double HorizonBlend { get; set; } = 0.1;
+
+    /// <summary>
+    /// Enable atmospheric scattering effects
+    /// </summary>
+    [Parameter]
+    public bool EnableAtmosphere { get; set; } = true;
+
+    /// <summary>
+    /// Atmosphere intensity (0.0 = none, 1.0 = maximum)
+    /// </summary>
+    [Parameter]
+    public double AtmosphereIntensity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Atmosphere color (CSS color string)
+    /// </summary>
+    [Parameter]
+    public string AtmosphereColor { get; set; } = "#87CEEB";
+
+    /// <summary>
+    /// Enable stars/space background
+    /// </summary>
+    [Parameter]
+    public bool EnableStars { get; set; } = false;
+
+    /// <summary>
+    /// Sun position (azimuth and altitude in degrees)
+    /// </summary>
+    [Parameter]
+    public Vector2 SunPosition { get; set; } = new Vector2(180, 45);
+
+    /// <summary>
+    /// Enable automatic sun position calculation based on time and location
+    /// </summary>
+    [Parameter]
+    public bool EnableAutoSunPosition { get; set; } = false;
+
+    /// <summary>
+    /// Location for sun position calculation (if EnableAutoSunPosition is true)
+    /// </summary>
+    [Parameter]
+    public Coordinate? Location { get; set; }
+
+    /// <summary>
+    /// DateTime for sun position calculation (if EnableAutoSunPosition is true)
+    /// </summary>
+    [Parameter]
+    public DateTime DateTime { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    [Parameter]
+    public int TransitionDuration { get; set; } = 1000;
+
+    /// <summary>
+    /// Event callback when sky configuration changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<SkyConfiguration> OnSkyConfigurationChanged { get; set; }
+
+    /// <summary>
+    /// Event callback when sun position changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<SunPosition> OnSunPositionChanged { get; set; }
+
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaSkyLayer>? _dotNetRef;
+    private bool _mapReady = false;
+    private bool _isSupported = true;
+    private SkyConfiguration? _currentConfig;
+    private System.Threading.Timer? _updateTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/sky-layer-manager.js"
+                );
+
+                _dotNetRef = DotNetObjectReference.Create(this);
+
+                // Check if sky layer is supported
+                _isSupported = await _jsModule.InvokeAsync<bool>("isSkyLayerSupported");
+
+                if (!_isSupported)
+                {
+                    Console.WriteLine("Sky layer is not supported. MapLibre GL JS v3.0+ required.");
+                }
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading sky layer JS module: {ex.Message}");
+                _isSupported = false;
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Update sky layer when parameters change
+        if (_mapReady && _jsModule != null)
+        {
+            await UpdateSkyLayerAsync();
+        }
+
+        // Setup auto-update timer if enabled
+        if (EnableAutoSunPosition && Location != null)
+        {
+            if (_updateTimer == null)
+            {
+                // Update every minute
+                _updateTimer = new System.Threading.Timer(async _ =>
+                {
+                    await UpdateAutoSunPosition();
+                }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+            }
+        }
+        else
+        {
+            _updateTimer?.Dispose();
+            _updateTimer = null;
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                InvokeAsync(async () =>
+                {
+                    await InitializeSkyLayer();
+                    StateHasChanged();
+                });
+            }
+        });
+
+        // Listen for sky update requests
+        Bus.Subscribe<UpdateSkyRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == SyncWith)
+            {
+                await ApplySkyUpdateRequest(args.Message);
+            }
+        });
+
+        // Listen for sun position update requests
+        Bus.Subscribe<UpdateSunPositionRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == SyncWith)
+            {
+                SunPosition = new Vector2(args.Message.Azimuth, args.Message.Altitude);
+                await UpdateSkyLayerAsync();
+            }
+        });
+
+        // Listen for sky preset requests
+        Bus.Subscribe<ApplySkyPresetRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == SyncWith)
+            {
+                await ApplyPreset(args.Message.PresetName, args.Message.TransitionDuration);
+            }
+        });
+    }
+
+    private async Task InitializeSkyLayer()
+    {
+        if (_jsModule == null || !_isSupported) return;
+
+        try {
+            // Get map instance (assuming it's available globally or through a service)
+            // For now, we'll let the map component handle initialization
+            Console.WriteLine("Sky layer component ready");
+
+            // Apply initial configuration
+            await UpdateSkyLayerAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing sky layer: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateSkyLayerAsync()
+    {
+        if (_jsModule == null || !_isSupported || !_mapReady) return;
+
+        try
+        {
+            // Calculate sun position if auto mode is enabled
+            if (EnableAutoSunPosition && Location != null)
+            {
+                await UpdateAutoSunPosition();
+            }
+
+            // Build sky configuration
+            var config = new SkyConfiguration
+            {
+                SkyType = SkyType,
+                SkyColor = SkyColor,
+                HorizonColor = HorizonColor,
+                HorizonBlend = HorizonBlend,
+                EnableAtmosphere = EnableAtmosphere,
+                AtmosphereIntensity = AtmosphereIntensity,
+                AtmosphereColor = AtmosphereColor,
+                EnableStars = EnableStars,
+                SunPosition = SunPosition
+            };
+
+            // Convert to JavaScript object
+            var jsConfig = new
+            {
+                skyType = SkyType.ToString(),
+                skyColor = SkyColor,
+                horizonColor = HorizonColor,
+                horizonBlend = HorizonBlend,
+                enableAtmosphere = EnableAtmosphere,
+                atmosphereIntensity = AtmosphereIntensity,
+                atmosphereColor = AtmosphereColor,
+                enableStars = EnableStars,
+                sunPosition = new { x = SunPosition.X, y = SunPosition.Y }
+            };
+
+            // Update sky layer via JavaScript
+            if (EnableSky)
+            {
+                await _jsModule.InvokeVoidAsync("updateSkyLayer", jsConfig, TransitionDuration);
+            }
+            else
+            {
+                await _jsModule.InvokeVoidAsync("setSkyEnabled", false);
+            }
+
+            _currentConfig = config;
+
+            // Publish configuration changed message
+            await Bus.PublishAsync(new SkyConfigurationChangedMessage
+            {
+                MapId = SyncWith ?? "",
+                ComponentId = Id,
+                SkyType = SkyType.ToString(),
+                SkyColor = SkyColor,
+                EnableAtmosphere = EnableAtmosphere,
+                AtmosphereIntensity = AtmosphereIntensity
+            }, Id);
+
+            // Invoke callback
+            await OnSkyConfigurationChanged.InvokeAsync(config);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating sky layer: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateAutoSunPosition()
+    {
+        if (Location == null) return;
+
+        try
+        {
+            // Calculate sun position
+            var sunPos = SunPositionService.Calculate(
+                DateTime,
+                Location.Latitude,
+                Location.Longitude,
+                Location.Elevation ?? 0
+            );
+
+            // Update sun position
+            SunPosition = new Vector2(sunPos.Azimuth, sunPos.Altitude);
+
+            // Auto-update sky color based on sun altitude if in atmosphere mode
+            if (SkyType == SkyType.Atmosphere)
+            {
+                SkyColor = SunPositionService.InterpolateSkyColor(sunPos.Altitude);
+            }
+
+            // Publish sun position changed message
+            await Bus.PublishAsync(new SunPositionChangedMessage
+            {
+                MapId = SyncWith ?? "",
+                ComponentId = Id,
+                Azimuth = sunPos.Azimuth,
+                Altitude = sunPos.Altitude,
+                DateTime = DateTime,
+                TimeOfDay = sunPos.TimeOfDay.ToString()
+            }, Id);
+
+            // Invoke callback
+            await OnSunPositionChanged.InvokeAsync(sunPos);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating auto sun position: {ex.Message}");
+        }
+    }
+
+    private async Task ApplySkyUpdateRequest(UpdateSkyRequestMessage message)
+    {
+        SkyType = Enum.Parse<SkyType>(message.SkyType);
+        SkyColor = message.SkyColor ?? SkyColor;
+        HorizonColor = message.HorizonColor ?? HorizonColor;
+        HorizonBlend = message.HorizonBlend;
+        EnableAtmosphere = message.EnableAtmosphere;
+        AtmosphereIntensity = message.AtmosphereIntensity;
+        AtmosphereColor = message.AtmosphereColor ?? AtmosphereColor;
+        EnableStars = message.EnableStars;
+
+        await UpdateSkyLayerAsync();
+    }
+
+    /// <summary>
+    /// Apply a sky preset by name
+    /// </summary>
+    public async Task ApplyPreset(string presetName, int transitionDuration = 1000)
+    {
+        var preset = SkyPresets.GetPreset(presetName);
+        if (preset == null)
+        {
+            Console.Error.WriteLine($"Sky preset not found: {presetName}");
+            return;
+        }
+
+        // Apply preset values
+        SkyType = preset.SkyType;
+        SkyColor = preset.SkyColor;
+        HorizonColor = preset.HorizonColor;
+        HorizonBlend = preset.HorizonBlend;
+        EnableAtmosphere = preset.EnableAtmosphere;
+        AtmosphereIntensity = preset.AtmosphereIntensity;
+        AtmosphereColor = preset.AtmosphereColor;
+        EnableStars = preset.EnableStars;
+        SunPosition = preset.SunPosition;
+        TransitionDuration = transitionDuration;
+
+        await UpdateSkyLayerAsync();
+    }
+
+    /// <summary>
+    /// Update sun position manually
+    /// </summary>
+    public async Task UpdateSunPosition(double azimuth, double altitude)
+    {
+        SunPosition = new Vector2(azimuth, altitude);
+        await UpdateSkyLayerAsync();
+    }
+
+    /// <summary>
+    /// JavaScript callback when sun position is updated
+    /// </summary>
+    [JSInvokable]
+    public async Task OnSunPositionUpdated(double azimuth, double altitude)
+    {
+        SunPosition = new Vector2(azimuth, altitude);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _updateTimer?.Dispose();
+
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("cleanup");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error cleaning up sky layer module: {ex.Message}");
+            }
+
+            await _jsModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

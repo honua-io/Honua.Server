@@ -1393,3 +1393,250 @@ public class ChangeProjectionRequestMessage
     /// </summary>
     public int TransitionDuration { get; init; } = 1000;
 }
+
+/// <summary>
+/// Published when sky layer configuration changes
+/// </summary>
+public class SkyConfigurationChangedMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component that triggered the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Sky type (Gradient, Atmosphere, Solid, Custom)
+    /// </summary>
+    public required string SkyType { get; init; }
+
+    /// <summary>
+    /// Sky color (CSS color string)
+    /// </summary>
+    public string? SkyColor { get; init; }
+
+    /// <summary>
+    /// Whether atmosphere is enabled
+    /// </summary>
+    public bool EnableAtmosphere { get; init; }
+
+    /// <summary>
+    /// Atmosphere intensity (0.0 to 1.0)
+    /// </summary>
+    public double AtmosphereIntensity { get; init; } = 1.0;
+}
+
+/// <summary>
+/// Request to update sky layer configuration
+/// </summary>
+public class UpdateSkyRequestMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component requesting the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Sky type
+    /// </summary>
+    public required string SkyType { get; init; }
+
+    /// <summary>
+    /// Sky color
+    /// </summary>
+    public string? SkyColor { get; init; }
+
+    /// <summary>
+    /// Horizon color
+    /// </summary>
+    public string? HorizonColor { get; init; }
+
+    /// <summary>
+    /// Horizon blend factor
+    /// </summary>
+    public double HorizonBlend { get; init; } = 0.1;
+
+    /// <summary>
+    /// Enable atmosphere
+    /// </summary>
+    public bool EnableAtmosphere { get; init; } = true;
+
+    /// <summary>
+    /// Atmosphere intensity
+    /// </summary>
+    public double AtmosphereIntensity { get; init; } = 1.0;
+
+    /// <summary>
+    /// Atmosphere color
+    /// </summary>
+    public string? AtmosphereColor { get; init; }
+
+    /// <summary>
+    /// Enable stars
+    /// </summary>
+    public bool EnableStars { get; init; } = true;
+}
+
+/// <summary>
+/// Published when sun position is updated
+/// </summary>
+public class SunPositionChangedMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component that triggered the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Solar azimuth in degrees (0 = North, 90 = East, 180 = South, 270 = West)
+    /// </summary>
+    public required double Azimuth { get; init; }
+
+    /// <summary>
+    /// Solar altitude in degrees (0 = horizon, 90 = zenith, negative = below horizon)
+    /// </summary>
+    public required double Altitude { get; init; }
+
+    /// <summary>
+    /// Current date/time for the sun position
+    /// </summary>
+    public DateTime DateTime { get; init; }
+
+    /// <summary>
+    /// Time of day category
+    /// </summary>
+    public string? TimeOfDay { get; init; }
+}
+
+/// <summary>
+/// Request to update sun position
+/// </summary>
+public class UpdateSunPositionRequestMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component requesting the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Solar azimuth in degrees
+    /// </summary>
+    public required double Azimuth { get; init; }
+
+    /// <summary>
+    /// Solar altitude in degrees
+    /// </summary>
+    public required double Altitude { get; init; }
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    public int TransitionDuration { get; init; } = 1000;
+}
+
+/// <summary>
+/// Published when day/night cycle state changes
+/// </summary>
+public class DayNightCycleStateChangedMessage
+{
+    /// <summary>
+    /// Component ID
+    /// </summary>
+    public required string ComponentId { get; init; }
+
+    /// <summary>
+    /// Whether cycle is playing
+    /// </summary>
+    public required bool IsPlaying { get; init; }
+
+    /// <summary>
+    /// Current date/time in the cycle
+    /// </summary>
+    public required DateTime CurrentDateTime { get; init; }
+
+    /// <summary>
+    /// Speed multiplier (1.0 = real-time, 60.0 = 1 hour per minute, etc.)
+    /// </summary>
+    public required double Speed { get; init; }
+
+    /// <summary>
+    /// Current sun azimuth
+    /// </summary>
+    public double SunAzimuth { get; init; }
+
+    /// <summary>
+    /// Current sun altitude
+    /// </summary>
+    public double SunAltitude { get; init; }
+}
+
+/// <summary>
+/// Request to start/stop day/night cycle
+/// </summary>
+public class DayNightCycleControlRequestMessage
+{
+    /// <summary>
+    /// Component ID
+    /// </summary>
+    public required string ComponentId { get; init; }
+
+    /// <summary>
+    /// Action: "play", "pause", "stop"
+    /// </summary>
+    public required string Action { get; init; }
+
+    /// <summary>
+    /// Speed multiplier
+    /// </summary>
+    public double? Speed { get; init; }
+
+    /// <summary>
+    /// Start date/time for the cycle
+    /// </summary>
+    public DateTime? StartDateTime { get; init; }
+}
+
+/// <summary>
+/// Request to apply a sky preset
+/// </summary>
+public class ApplySkyPresetRequestMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component requesting the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Preset name (e.g., "Clear Day", "Sunset", "Night")
+    /// </summary>
+    public required string PresetName { get; init; }
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    public int TransitionDuration { get; init; } = 1000;
+}

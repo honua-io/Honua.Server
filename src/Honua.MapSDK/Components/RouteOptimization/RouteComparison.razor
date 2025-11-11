@@ -1,0 +1,391 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.MapSDK.Models.RouteOptimization
+
+<div class="route-comparison-component">
+    @if (Result != null)
+    {
+        <div class="comparison-header">
+            <h3>Route Comparison</h3>
+            <div class="header-controls">
+                <button class="btn btn-sm @(ViewMode == "split" ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="@(() => ViewMode = "split")">
+                    <i class="fas fa-columns"></i> Split View
+                </button>
+                <button class="btn btn-sm @(ViewMode == "overlay" ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="@(() => ViewMode = "overlay")">
+                    <i class="fas fa-layer-group"></i> Overlay
+                </button>
+                <button class="btn btn-sm @(ViewMode == "table" ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="@(() => ViewMode = "table")">
+                    <i class="fas fa-table"></i> Table
+                </button>
+            </div>
+        </div>
+
+        @if (ViewMode == "split")
+        {
+            <div class="split-view">
+                <div class="route-panel original">
+                    <div class="panel-header">
+                        <h4><i class="fas fa-route"></i> Original Route</h4>
+                        <span class="route-badge">Before Optimization</span>
+                    </div>
+                    <div class="panel-content">
+                        @RenderRouteMetrics(Result.Metrics.OriginalDistanceMeters,
+                                          Result.Metrics.OriginalDurationSeconds,
+                                          Result.Metrics.OriginalCost,
+                                          Result.OriginalSequence.Count)
+                        @RenderWaypointSequence(Result.OriginalSequence, "original")
+                    </div>
+                </div>
+
+                <div class="comparison-divider">
+                    <div class="divider-content">
+                        <i class="fas fa-arrow-right fa-2x"></i>
+                        <div class="savings-badge">
+                            <div class="savings-value">-@Result.Metrics.DistanceSavingsPercent.ToString("F1")%</div>
+                            <div class="savings-label">Distance</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="route-panel optimized">
+                    <div class="panel-header">
+                        <h4><i class="fas fa-route"></i> Optimized Route</h4>
+                        <span class="route-badge success">After Optimization</span>
+                    </div>
+                    <div class="panel-content">
+                        @RenderRouteMetrics(Result.Metrics.OptimizedDistanceMeters,
+                                          Result.Metrics.OptimizedDurationSeconds,
+                                          Result.Metrics.OptimizedCost,
+                                          Result.OptimizedSequence.Count)
+                        @RenderWaypointSequence(Result.OptimizedSequence, "optimized")
+                    </div>
+                </div>
+            </div>
+        }
+        else if (ViewMode == "overlay")
+        {
+            <div class="overlay-view">
+                <div class="overlay-legend">
+                    <div class="legend-item original">
+                        <span class="legend-color"></span>
+                        <span>Original Route</span>
+                    </div>
+                    <div class="legend-item optimized">
+                        <span class="legend-color"></span>
+                        <span>Optimized Route</span>
+                    </div>
+                </div>
+
+                <div class="overlay-content">
+                    <div class="route-sequence-overlay">
+                        @for (int i = 0; i < Math.Max(Result.OriginalSequence.Count, Result.OptimizedSequence.Count); i++)
+                        {
+                            <div class="sequence-row">
+                                <div class="sequence-position">@(i + 1)</div>
+
+                                @if (i < Result.OriginalSequence.Count)
+                                {
+                                    <div class="sequence-item original">
+                                        <div class="item-name">
+                                            @(Result.OriginalSequence[i].Name ?? $"Waypoint {Result.OriginalSequence[i].OriginalIndex + 1}")
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="sequence-item empty"></div>
+                                }
+
+                                @if (i < Result.OptimizedSequence.Count)
+                                {
+                                    var optimizedWaypoint = Result.OptimizedSequence[i];
+                                    var originalPosition = Result.OriginalSequence.IndexOf(optimizedWaypoint);
+                                    var moved = originalPosition != i;
+
+                                    <div class="sequence-item optimized @(moved ? "moved" : "same")">
+                                        <div class="item-name">
+                                            @(optimizedWaypoint.Name ?? $"Waypoint {optimizedWaypoint.OriginalIndex + 1}")
+                                            @if (moved)
+                                            {
+                                                <span class="move-indicator" title="Moved from position @(originalPosition + 1)">
+                                                    <i class="fas fa-exchange-alt"></i>
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="sequence-item empty"></div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else if (ViewMode == "table")
+        {
+            <div class="table-view">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Original</th>
+                            <th>Optimized</th>
+                            <th>Savings</th>
+                            <th>Improvement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Distance</strong></td>
+                            <td>@FormatDistance(Result.Metrics.OriginalDistanceMeters)</td>
+                            <td class="optimized">@FormatDistance(Result.Metrics.OptimizedDistanceMeters)</td>
+                            <td class="savings">@FormatDistance(Result.Metrics.DistanceSavedMeters)</td>
+                            <td class="improvement">
+                                <span class="badge bg-success">
+                                    @Result.Metrics.DistanceSavingsPercent.ToString("F1")%
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Duration</strong></td>
+                            <td>@FormatDuration(Result.Metrics.OriginalDurationSeconds)</td>
+                            <td class="optimized">@FormatDuration(Result.Metrics.OptimizedDurationSeconds)</td>
+                            <td class="savings">@FormatDuration(Result.Metrics.DurationSavedSeconds)</td>
+                            <td class="improvement">
+                                <span class="badge bg-success">
+                                    @Result.Metrics.DurationSavingsPercent.ToString("F1")%
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cost</strong></td>
+                            <td>$@Result.Metrics.OriginalCost.ToString("F2")</td>
+                            <td class="optimized">$@Result.Metrics.OptimizedCost.ToString("F2")</td>
+                            <td class="savings">$@Result.Metrics.CostSaved.ToString("F2")</td>
+                            <td class="improvement">
+                                <span class="badge bg-success">
+                                    @Result.Metrics.CostSavingsPercent.ToString("F1")%
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Stops</strong></td>
+                            <td>@Result.Metrics.OriginalStopCount</td>
+                            <td class="optimized">@Result.Metrics.OptimizedStopCount</td>
+                            <td>@(Result.Metrics.OriginalStopCount - Result.Metrics.OptimizedStopCount)</td>
+                            <td>-</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Vehicles</strong></td>
+                            <td colspan="3">@Result.Metrics.VehiclesUsed</td>
+                            <td>-</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="algorithm-info">
+                    <div class="info-row">
+                        <span class="label">Algorithm:</span>
+                        <span class="value">@Result.Algorithm</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Provider:</span>
+                        <span class="value">@Result.Provider</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Computation Time:</span>
+                        <span class="value">@Result.ComputationTimeMs ms</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Quality Score:</span>
+                        <span class="value">@Result.QualityScore.ToString("F0")%</span>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (ShowActions)
+        {
+            <div class="comparison-actions">
+                <button class="btn btn-success" @onclick="OnAccept">
+                    <i class="fas fa-check"></i> Accept Optimized Route
+                </button>
+                <button class="btn btn-secondary" @onclick="OnReject">
+                    <i class="fas fa-times"></i> Keep Original Route
+                </button>
+                @if (EnableExport)
+                {
+                    <button class="btn btn-outline-primary" @onclick="OnExport">
+                        <i class="fas fa-download"></i> Export Comparison
+                    </button>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="empty-comparison">
+            <i class="fas fa-route fa-3x"></i>
+            <p>No optimization result to compare</p>
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Optimization result to compare
+    /// </summary>
+    [Parameter]
+    public OptimizationResult? Result { get; set; }
+
+    /// <summary>
+    /// Show action buttons
+    /// </summary>
+    [Parameter]
+    public bool ShowActions { get; set; } = true;
+
+    /// <summary>
+    /// Enable export functionality
+    /// </summary>
+    [Parameter]
+    public bool EnableExport { get; set; } = true;
+
+    /// <summary>
+    /// Event fired when optimized route is accepted
+    /// </summary>
+    [Parameter]
+    public EventCallback<OptimizationResult> OnAcceptRoute { get; set; }
+
+    /// <summary>
+    /// Event fired when original route is kept
+    /// </summary>
+    [Parameter]
+    public EventCallback OnRejectRoute { get; set; }
+
+    /// <summary>
+    /// Event fired when export is requested
+    /// </summary>
+    [Parameter]
+    public EventCallback<OptimizationResult> OnExportComparison { get; set; }
+
+    private string ViewMode { get; set; } = "split";
+
+    private RenderFragment RenderRouteMetrics(double distance, int duration, double cost, int stops) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "route-metrics");
+
+        builder.OpenElement(2, "div");
+        builder.AddAttribute(3, "class", "metric");
+        builder.OpenElement(4, "i");
+        builder.AddAttribute(5, "class", "fas fa-road");
+        builder.CloseElement();
+        builder.OpenElement(6, "div");
+        builder.AddContent(7, FormatDistance(distance));
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.OpenElement(8, "div");
+        builder.AddAttribute(9, "class", "metric");
+        builder.OpenElement(10, "i");
+        builder.AddAttribute(11, "class", "fas fa-clock");
+        builder.CloseElement();
+        builder.OpenElement(12, "div");
+        builder.AddContent(13, FormatDuration(duration));
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.OpenElement(14, "div");
+        builder.AddAttribute(15, "class", "metric");
+        builder.OpenElement(16, "i");
+        builder.AddAttribute(17, "class", "fas fa-dollar-sign");
+        builder.CloseElement();
+        builder.OpenElement(18, "div");
+        builder.AddContent(19, $"${cost:F2}");
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.OpenElement(20, "div");
+        builder.AddAttribute(21, "class", "metric");
+        builder.OpenElement(22, "i");
+        builder.AddAttribute(23, "class", "fas fa-map-marker-alt");
+        builder.CloseElement();
+        builder.OpenElement(24, "div");
+        builder.AddContent(25, $"{stops} stops");
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderWaypointSequence(List<OptimizationWaypoint> waypoints, string type) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", $"waypoint-sequence {type}");
+
+        for (int i = 0; i < waypoints.Count; i++)
+        {
+            var waypoint = waypoints[i];
+
+            builder.OpenElement(2 + i * 10, "div");
+            builder.AddAttribute(3 + i * 10, "class", "waypoint-sequence-item");
+
+            builder.OpenElement(4 + i * 10, "span");
+            builder.AddAttribute(5 + i * 10, "class", "sequence-number");
+            builder.AddContent(6 + i * 10, i + 1);
+            builder.CloseElement();
+
+            builder.OpenElement(7 + i * 10, "span");
+            builder.AddAttribute(8 + i * 10, "class", "sequence-name");
+            builder.AddContent(9 + i * 10, waypoint.Name ?? $"Waypoint {waypoint.OriginalIndex + 1}");
+            builder.CloseElement();
+
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private async Task OnAccept()
+    {
+        if (Result != null)
+        {
+            await OnAcceptRoute.InvokeAsync(Result);
+        }
+    }
+
+    private async Task OnReject()
+    {
+        await OnRejectRoute.InvokeAsync();
+    }
+
+    private async Task OnExport()
+    {
+        if (Result != null)
+        {
+            await OnExportComparison.InvokeAsync(Result);
+        }
+    }
+
+    private string FormatDistance(double meters)
+    {
+        if (meters < 1000)
+            return $"{meters:F0} m";
+        return $"{meters / 1000:F2} km";
+    }
+
+    private string FormatDuration(int seconds)
+    {
+        var ts = TimeSpan.FromSeconds(seconds);
+        if (ts.TotalHours >= 1)
+            return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        return $"{ts.Minutes}m {ts.Seconds}s";
+    }
+}

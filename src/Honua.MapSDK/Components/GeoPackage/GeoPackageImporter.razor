@@ -1,0 +1,535 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.GeoPackage
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ComponentBus Bus
+
+@*
+    GeoPackageImporter - UI for uploading and importing GeoPackage files
+
+    Usage:
+    <GeoPackageImporter SyncWith="map1"
+                        ShowAsDialog="true"
+                        TriggerText="Import GeoPackage"
+                        OnImportComplete="HandleImport" />
+*@
+
+<div class="honua-gpkg-importer @CssClass" style="@Style">
+    @if (ShowAsDialog)
+    {
+        <MudButton Variant="@TriggerVariant"
+                   Color="@TriggerColor"
+                   StartIcon="@Icons.Material.Filled.FileUpload"
+                   OnClick="@(() => _isDialogOpen = true)">
+            @TriggerText
+        </MudButton>
+
+        <MudDialog @bind-IsVisible="_isDialogOpen" Options="_dialogOptions">
+            <TitleContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.FileUpload" Class="mr-2" />
+                    Import GeoPackage
+                </MudText>
+            </TitleContent>
+            <DialogContent>
+                @RenderContent()
+            </DialogContent>
+            <DialogActions>
+                @if (_gpkgInfo != null && _selectedLayers.Count > 0)
+                {
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               OnClick="@AddLayersToMap"
+                               Disabled="@_isProcessing"
+                               StartIcon="@Icons.Material.Filled.Map">
+                        Add to Map
+                    </MudButton>
+                }
+                <MudButton OnClick="@(() => _isDialogOpen = false)">
+                    Close
+                </MudButton>
+            </DialogActions>
+        </MudDialog>
+    }
+    else
+    {
+        <MudPaper Elevation="@Elevation" Class="pa-4">
+            @RenderContent()
+        </MudPaper>
+    }
+</div>
+
+@code {
+    private RenderFragment RenderContent() => __builder =>
+    {
+        <div class="gpkg-importer-content">
+            @if (_gpkgInfo == null)
+            {
+                <MudFileUpload T="IBrowserFile"
+                               Accept=".gpkg"
+                               MaximumFileCount="1"
+                               OnFilesChanged="@OnFileSelected">
+                    <ActivatorContent>
+                        <MudPaper Outlined="true"
+                                  Class="pa-8 d-flex flex-column align-center justify-center"
+                                  Style="min-height: 200px; border: 2px dashed var(--mud-palette-primary); cursor: pointer;">
+                            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6" Class="mt-4">
+                                Drop GeoPackage file here or click to browse
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                                Maximum file size: @FormatFileSize(MaxFileSize)
+                            </MudText>
+                            @if (_isProcessing)
+                            {
+                                <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="mt-4" />
+                                <MudText Typo="Typo.body2" Class="mt-2">Loading GeoPackage...</MudText>
+                            }
+                        </MudPaper>
+                    </ActivatorContent>
+                </MudFileUpload>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4" ShowCloseIcon="true" CloseIconClicked="@(() => _errorMessage = null)">
+                        @_errorMessage
+                    </MudAlert>
+                }
+            }
+            else
+            {
+                <div class="gpkg-info">
+                    <MudAlert Severity="Severity.Success" Class="mb-4">
+                        <strong>@_gpkgInfo.FileName</strong> loaded successfully!
+                        <br />
+                        Version: @_gpkgInfo.Version | Layers: @_gpkgInfo.Layers.Count | Features: @_gpkgInfo.TotalFeatures
+                    </MudAlert>
+
+                    <MudText Typo="Typo.h6" Class="mb-2">Select Layers to Import</MudText>
+
+                    <MudPaper Outlined="true" Class="pa-2" Style="max-height: 400px; overflow-y: auto;">
+                        @foreach (var layer in _gpkgInfo.Layers.Where(l => l.DataType == "features"))
+                        {
+                            <MudCard Class="mb-2">
+                                <MudCardContent>
+                                    <div class="d-flex align-center">
+                                        <MudCheckBox T="bool"
+                                                     Checked="@_selectedLayers.Contains(layer)"
+                                                     CheckedChanged="@((bool selected) => ToggleLayerSelection(layer, selected))"
+                                                     Color="Color.Primary" />
+                                        <div class="flex-grow-1 ml-2">
+                                            <MudText Typo="Typo.subtitle1">
+                                                <strong>@layer.Identifier</strong>
+                                            </MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                @layer.GeometryType | @layer.FeatureCount features | SRID: @layer.SrsId
+                                            </MudText>
+                                            @if (!string.IsNullOrEmpty(layer.Description))
+                                            {
+                                                <MudText Typo="Typo.caption" Class="mt-1">
+                                                    @layer.Description
+                                                </MudText>
+                                            }
+                                        </div>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Info"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => ShowLayerDetails(layer))" />
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </MudPaper>
+
+                    <div class="mt-4 d-flex gap-2">
+                        <MudButton Variant="Variant.Outlined"
+                                   StartIcon="@Icons.Material.Filled.SelectAll"
+                                   OnClick="@SelectAllLayers">
+                            Select All
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   StartIcon="@Icons.Material.Filled.Clear"
+                                   OnClick="@ClearSelection">
+                            Clear Selection
+                        </MudButton>
+                        <MudSpacer />
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Secondary"
+                                   OnClick="@Reset">
+                            Load Different File
+                        </MudButton>
+                    </div>
+                </div>
+            }
+        </div>
+    };
+}
+
+@code {
+    /// <summary>
+    /// Unique identifier for this component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"gpkg-importer-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Show importer in a dialog
+    /// </summary>
+    [Parameter]
+    public bool ShowAsDialog { get; set; } = false;
+
+    /// <summary>
+    /// Text for trigger button (when ShowAsDialog is true)
+    /// </summary>
+    [Parameter]
+    public string TriggerText { get; set; } = "Import GeoPackage";
+
+    /// <summary>
+    /// Trigger button variant
+    /// </summary>
+    [Parameter]
+    public Variant TriggerVariant { get; set; } = Variant.Filled;
+
+    /// <summary>
+    /// Trigger button color
+    /// </summary>
+    [Parameter]
+    public Color TriggerColor { get; set; } = Color.Primary;
+
+    /// <summary>
+    /// Maximum file size in bytes
+    /// </summary>
+    [Parameter]
+    public long MaxFileSize { get; set; } = 100 * 1024 * 1024; // 100 MB
+
+    /// <summary>
+    /// Automatically zoom to imported layers
+    /// </summary>
+    [Parameter]
+    public bool AutoZoom { get; set; } = true;
+
+    /// <summary>
+    /// Paper elevation (when not in dialog mode)
+    /// </summary>
+    [Parameter]
+    public int Elevation { get; set; } = 1;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Callback when import completes
+    /// </summary>
+    [Parameter]
+    public EventCallback<GeoPackageInfo> OnImportComplete { get; set; }
+
+    /// <summary>
+    /// Callback when error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    private bool _isDialogOpen = false;
+    private bool _isProcessing = false;
+    private int? _readerId;
+    private byte[]? _fileData;
+    private string? _fileName;
+    private GeoPackageInfo? _gpkgInfo;
+    private List<GpkgLayer> _selectedLayers = new();
+    private string? _errorMessage;
+
+    private readonly DialogOptions _dialogOptions = new()
+    {
+        MaxWidth = MaxWidth.Large,
+        FullWidth = true,
+        CloseButton = true,
+        BackdropClick = false
+    };
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _errorMessage = null;
+        _isProcessing = true;
+
+        try
+        {
+            var file = e.File;
+
+            if (file.Size > MaxFileSize)
+            {
+                _errorMessage = $"File is too large. Maximum size: {FormatFileSize(MaxFileSize)}";
+                return;
+            }
+
+            if (!file.Name.EndsWith(".gpkg", StringComparison.OrdinalIgnoreCase))
+            {
+                _errorMessage = "Invalid file type. Please select a .gpkg file.";
+                return;
+            }
+
+            _fileName = file.Name;
+
+            // Read file data
+            using var stream = file.OpenReadStream(MaxFileSize);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            _fileData = memoryStream.ToArray();
+
+            // Load GeoPackage
+            await LoadGeoPackageAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading file: {ex.Message}";
+            await OnError.InvokeAsync(_errorMessage);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadGeoPackageAsync()
+    {
+        try
+        {
+            // Create reader
+            _readerId = await JS.InvokeAsync<int>("HonuaGeoPackage.DotNetHelper.createReader");
+
+            // Load GPKG
+            var result = await JS.InvokeAsync<JsonElement>(
+                "HonuaGeoPackage.DotNetHelper.loadFromBytes",
+                _readerId,
+                _fileData,
+                _fileName
+            );
+
+            if (result.TryGetProperty("success", out var success) && !success.GetBoolean())
+            {
+                var error = result.GetProperty("error").GetString();
+                _errorMessage = $"Failed to load GeoPackage: {error}";
+                return;
+            }
+
+            // Get GPKG info
+            var infoJson = await JS.InvokeAsync<JsonElement>("HonuaGeoPackage.DotNetHelper.getInfo", _readerId);
+            _gpkgInfo = JsonSerializer.Deserialize<GeoPackageInfo>(infoJson.GetRawText());
+
+            if (_gpkgInfo == null)
+            {
+                _errorMessage = "Failed to parse GeoPackage info";
+                return;
+            }
+
+            // Auto-select all feature layers
+            _selectedLayers = _gpkgInfo.Layers
+                .Where(l => l.DataType == "features")
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading GeoPackage: {ex.Message}";
+            await OnError.InvokeAsync(_errorMessage);
+        }
+    }
+
+    private void ToggleLayerSelection(GpkgLayer layer, bool selected)
+    {
+        if (selected)
+        {
+            if (!_selectedLayers.Contains(layer))
+            {
+                _selectedLayers.Add(layer);
+            }
+        }
+        else
+        {
+            _selectedLayers.Remove(layer);
+        }
+    }
+
+    private void SelectAllLayers()
+    {
+        if (_gpkgInfo != null)
+        {
+            _selectedLayers = _gpkgInfo.Layers
+                .Where(l => l.DataType == "features")
+                .ToList();
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedLayers.Clear();
+    }
+
+    private void ShowLayerDetails(GpkgLayer layer)
+    {
+        // TODO: Show detailed layer information in a dialog
+    }
+
+    private async Task AddLayersToMap()
+    {
+        if (_gpkgInfo == null || _readerId == null || _selectedLayers.Count == 0)
+        {
+            return;
+        }
+
+        _isProcessing = true;
+
+        try
+        {
+            double[]? overallBounds = null;
+
+            foreach (var layer in _selectedLayers)
+            {
+                // Query features
+                var request = new GpkgFeatureRequest
+                {
+                    LayerName = layer.TableName,
+                    MaxFeatures = 10000
+                };
+
+                var response = await JS.InvokeAsync<GpkgFeatureResponse>(
+                    "HonuaGeoPackage.DotNetHelper.queryFeatures",
+                    _readerId,
+                    request
+                );
+
+                if (!string.IsNullOrEmpty(response.Error))
+                {
+                    await OnError.InvokeAsync($"Failed to query layer '{layer.Identifier}': {response.Error}");
+                    continue;
+                }
+
+                // Add to map
+                var layerId = $"gpkg-{Id}-{layer.TableName}";
+                await Bus.PublishAsync(new AddGeoJsonLayerMessage
+                {
+                    MapId = SyncWith ?? "*",
+                    LayerId = layerId,
+                    LayerName = layer.Identifier,
+                    GeoJson = response.GeoJson,
+                    Visible = true,
+                    Opacity = 1.0
+                }, Id);
+
+                // Update overall bounds
+                if (response.BoundingBox != null && response.BoundingBox.Length == 4)
+                {
+                    if (overallBounds == null)
+                    {
+                        overallBounds = response.BoundingBox;
+                    }
+                    else
+                    {
+                        overallBounds[0] = Math.Min(overallBounds[0], response.BoundingBox[0]);
+                        overallBounds[1] = Math.Min(overallBounds[1], response.BoundingBox[1]);
+                        overallBounds[2] = Math.Max(overallBounds[2], response.BoundingBox[2]);
+                        overallBounds[3] = Math.Max(overallBounds[3], response.BoundingBox[3]);
+                    }
+                }
+            }
+
+            // Zoom to all imported layers
+            if (AutoZoom && overallBounds != null)
+            {
+                await Bus.PublishAsync(new FitBoundsRequestMessage
+                {
+                    MapId = SyncWith ?? "*",
+                    Bounds = overallBounds,
+                    Padding = 50
+                }, Id);
+            }
+
+            await OnImportComplete.InvokeAsync(_gpkgInfo);
+
+            // Close dialog if in dialog mode
+            if (ShowAsDialog)
+            {
+                _isDialogOpen = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error adding layers to map: {ex.Message}";
+            await OnError.InvokeAsync(_errorMessage);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Reset()
+    {
+        _fileData = null;
+        _fileName = null;
+        _gpkgInfo = null;
+        _selectedLayers.Clear();
+        _errorMessage = null;
+
+        if (_readerId.HasValue)
+        {
+            _ = JS.InvokeVoidAsync("HonuaGeoPackage.DotNetHelper.closeReader", _readerId.Value);
+            _readerId = null;
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_readerId.HasValue)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("HonuaGeoPackage.DotNetHelper.closeReader", _readerId.Value);
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
+    }
+
+    private class AddGeoJsonLayerMessage
+    {
+        public string MapId { get; set; } = string.Empty;
+        public string LayerId { get; set; } = string.Empty;
+        public string LayerName { get; set; } = string.Empty;
+        public string GeoJson { get; set; } = string.Empty;
+        public bool Visible { get; set; } = true;
+        public double Opacity { get; set; } = 1.0;
+    }
+}

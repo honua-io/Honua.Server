@@ -1,0 +1,403 @@
+@using Honua.MapSDK.Models.Navigation
+@using Honua.MapSDK.Models.Routing
+
+<MudPaper Elevation="3" Class="navigation-panel">
+    <div class="navigation-header">
+        <div class="navigation-status">
+            @if (Session?.State == NavigationState.Navigating)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Navigation" Color="Color.Primary" />
+                <MudText Typo="Typo.subtitle1" Color="Color.Primary">Navigating</MudText>
+            }
+            else if (Session?.State == NavigationState.Paused)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Pause" Color="Color.Warning" />
+                <MudText Typo="Typo.subtitle1" Color="Color.Warning">Paused</MudText>
+            }
+            else if (Session?.State == NavigationState.OffRoute)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+                <MudText Typo="Typo.subtitle1" Color="Color.Error">Off Route</MudText>
+            }
+        </div>
+        <div class="navigation-actions">
+            @if (Session?.State == NavigationState.Navigating)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Pause" Size="Size.Small" OnClick="OnPauseNavigation" aria-label="Pause" />
+            }
+            else if (Session?.State == NavigationState.Paused)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" OnClick="OnResumeNavigation" aria-label="Resume" />
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.Stop" Size="Size.Small" Color="Color.Error" OnClick="OnStopNavigation" aria-label="Stop" />
+        </div>
+    </div>
+
+    @if (Progress != null)
+    {
+        <div class="navigation-content">
+            @* Current instruction *@
+            <div class="current-instruction">
+                <div class="instruction-icon">
+                    @if (GetCurrentInstruction() != null)
+                    {
+                        <MudIcon Icon="@GetManeuverIcon(GetCurrentInstruction()!.Maneuver)" Size="Size.Large" Color="Color.Primary" />
+                    }
+                </div>
+                <div class="instruction-details">
+                    <MudText Typo="Typo.h6" Class="instruction-text">
+                        @(Progress.CurrentInstruction ?? "Continue on route")
+                    </MudText>
+                    @if (Progress.DistanceToNextManeuver > 0)
+                    {
+                        <MudText Typo="Typo.body1" Color="Color.Secondary">
+                            @FormatDistance(Progress.DistanceToNextManeuver)
+                        </MudText>
+                    }
+                </div>
+            </div>
+
+            @* Lane guidance *@
+            @if (ShowLaneGuidance && GetCurrentStep()?.LaneGuidance != null)
+            {
+                <div class="lane-guidance">
+                    <MudText Typo="Typo.caption" Class="mb-1">Lane Guidance:</MudText>
+                    <div class="lane-indicators">
+                        @foreach (var (lane, index) in GetCurrentStep()!.LaneGuidance.Lanes.Select((l, i) => (l, i)))
+                        {
+                            <div class="lane-indicator @(lane.IsActive ? "active" : "")">
+                                @foreach (var direction in lane.Directions)
+                                {
+                                    <MudIcon Icon="@GetLaneDirectionIcon(direction)" Size="Size.Small" />
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ETA and distance *@
+            <div class="navigation-stats">
+                <div class="stat-item">
+                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                    <div class="stat-details">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">ETA</MudText>
+                        <MudText Typo="Typo.body2">
+                            @(Progress.EstimatedArrival?.ToLocalTime().ToString("h:mm tt") ?? "--:--")
+                        </MudText>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" />
+                    <div class="stat-details">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Remaining</MudText>
+                        <MudText Typo="Typo.body2">
+                            @FormatDistance(Progress.DistanceRemaining)
+                        </MudText>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" />
+                    <div class="stat-details">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Time Left</MudText>
+                        <MudText Typo="Typo.body2">
+                            @FormatDuration(Progress.TimeRemaining)
+                        </MudText>
+                    </div>
+                </div>
+            </div>
+
+            @* Progress bar *@
+            <div class="progress-section">
+                <MudProgressLinear Value="@Progress.ProgressPercentage" Color="Color.Primary" Size="Size.Small" Class="my-2" />
+                <MudText Typo="Typo.caption" Align="Align.Center">
+                    @($"{Progress.ProgressPercentage:F0}% complete")
+                </MudText>
+            </div>
+
+            @* Current street info *@
+            @if (GetCurrentStep() != null)
+            {
+                var step = GetCurrentStep()!;
+                <div class="street-info">
+                    @if (!string.IsNullOrEmpty(step.CurrentStreet))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Current: @step.CurrentStreet</MudText>
+                    }
+                    @if (!string.IsNullOrEmpty(step.NextStreet))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Next: @step.NextStreet</MudText>
+                    }
+                    @if (step.SpeedLimit.HasValue && Progress.CurrentSpeed.HasValue)
+                    {
+                        var currentSpeedKmh = Progress.CurrentSpeed.Value * 3.6;
+                        var isOverSpeed = currentSpeedKmh > step.SpeedLimit.Value;
+                        <div class="speed-info @(isOverSpeed ? "over-speed" : "")">
+                            <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" />
+                            <MudText Typo="Typo.caption">
+                                @($"{currentSpeedKmh:F0} / {step.SpeedLimit.Value} km/h")
+                            </MudText>
+                        </div>
+                    }
+                </div>
+            }
+
+            @* Next instruction preview *@
+            @if (!string.IsNullOrEmpty(Progress.NextInstruction))
+            {
+                <MudExpansionPanels Dense="true" Class="mt-2">
+                    <MudExpansionPanel Text="Next Steps">
+                        <div class="next-instructions">
+                            <MudText Typo="Typo.body2" Class="mb-1">@Progress.NextInstruction</MudText>
+                            @* Could show more upcoming instructions here *@
+                        </div>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+
+            @* Compass/Heading indicator *@
+            @if (Progress.CurrentHeading.HasValue)
+            {
+                <div class="compass-indicator">
+                    <MudIcon Icon="@Icons.Material.Filled.Explore" Size="Size.Medium"
+                             Style="@($"transform: rotate({Progress.CurrentHeading.Value}deg)")" />
+                    <MudText Typo="Typo.caption">@GetCardinalDirection(Progress.CurrentHeading.Value)</MudText>
+                </div>
+            }
+        </div>
+    }
+</MudPaper>
+
+<style>
+    .navigation-panel {
+        padding: 16px;
+        max-width: 400px;
+    }
+
+    .navigation-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(0,0,0,0.12);
+    }
+
+    .navigation-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .navigation-actions {
+        display: flex;
+        gap: 4px;
+    }
+
+    .current-instruction {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 16px;
+        padding: 16px;
+        background: rgba(66, 133, 244, 0.05);
+        border-radius: 8px;
+        border-left: 4px solid #4285F4;
+    }
+
+    .instruction-icon {
+        flex-shrink: 0;
+    }
+
+    .instruction-details {
+        flex: 1;
+    }
+
+    .instruction-text {
+        margin-bottom: 4px;
+    }
+
+    .lane-guidance {
+        margin-bottom: 16px;
+        padding: 12px;
+        background: rgba(0,0,0,0.02);
+        border-radius: 4px;
+    }
+
+    .lane-indicators {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+    }
+
+    .lane-indicator {
+        padding: 8px;
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .lane-indicator.active {
+        border-color: #4285F4;
+        background: rgba(66, 133, 244, 0.1);
+    }
+
+    .navigation-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .stat-details {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .progress-section {
+        margin-bottom: 16px;
+    }
+
+    .street-info {
+        margin-bottom: 12px;
+        padding: 8px;
+        background: rgba(0,0,0,0.02);
+        border-radius: 4px;
+    }
+
+    .speed-info {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+    }
+
+    .speed-info.over-speed {
+        color: #f44336;
+    }
+
+    .next-instructions {
+        padding: 8px;
+    }
+
+    .compass-indicator {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        margin-top: 12px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public NavigationSession? Session { get; set; }
+
+    [Parameter]
+    public NavigationProgress? Progress { get; set; }
+
+    [Parameter]
+    public bool ShowLaneGuidance { get; set; } = true;
+
+    [Parameter]
+    public EventCallback OnStopNavigation { get; set; }
+
+    [Parameter]
+    public EventCallback OnPauseNavigation { get; set; }
+
+    [Parameter]
+    public EventCallback OnResumeNavigation { get; set; }
+
+    private RouteInstruction? GetCurrentInstruction()
+    {
+        if (Session?.Route == null || Progress == null) return null;
+        if (Progress.CurrentStepIndex >= Session.Route.Instructions.Count) return null;
+        return Session.Route.Instructions[Progress.CurrentStepIndex];
+    }
+
+    private NavigationStep? GetCurrentStep()
+    {
+        var instruction = GetCurrentInstruction();
+        if (instruction == null) return null;
+
+        // In a full implementation, you'd have NavigationStep objects
+        // For now, we'll create a simple one from the instruction
+        return new NavigationStep
+        {
+            Instruction = instruction,
+            CurrentStreet = instruction.StreetName
+        };
+    }
+
+    private string GetManeuverIcon(ManeuverType maneuver)
+    {
+        return maneuver switch
+        {
+            ManeuverType.TurnLeft => Icons.Material.Filled.TurnLeft,
+            ManeuverType.TurnRight => Icons.Material.Filled.TurnRight,
+            ManeuverType.TurnSlightLeft => Icons.Material.Filled.TurnSlightLeft,
+            ManeuverType.TurnSlightRight => Icons.Material.Filled.TurnSlightRight,
+            ManeuverType.TurnSharpLeft => Icons.Material.Filled.TurnSharpLeft,
+            ManeuverType.TurnSharpRight => Icons.Material.Filled.TurnSharpRight,
+            ManeuverType.UTurn => Icons.Material.Filled.UTurnLeft,
+            ManeuverType.Straight or ManeuverType.Continue => Icons.Material.Filled.Straight,
+            ManeuverType.Merge => Icons.Material.Filled.Merge,
+            ManeuverType.Fork => Icons.Material.Filled.CallSplit,
+            ManeuverType.Roundabout => Icons.Material.Filled.RotateRight,
+            ManeuverType.Arrive => Icons.Material.Filled.Place,
+            ManeuverType.Depart => Icons.Material.Filled.NearMe,
+            _ => Icons.Material.Filled.ArrowForward
+        };
+    }
+
+    private string GetLaneDirectionIcon(LaneDirection direction)
+    {
+        return direction switch
+        {
+            LaneDirection.Straight => Icons.Material.Filled.ArrowUpward,
+            LaneDirection.Left => Icons.Material.Filled.ArrowBack,
+            LaneDirection.Right => Icons.Material.Filled.ArrowForward,
+            LaneDirection.SlightLeft => Icons.Material.Filled.NorthWest,
+            LaneDirection.SlightRight => Icons.Material.Filled.NorthEast,
+            LaneDirection.UTurn => Icons.Material.Filled.UTurnLeft,
+            _ => Icons.Material.Filled.ArrowUpward
+        };
+    }
+
+    private string FormatDistance(double meters)
+    {
+        if (meters < 1000)
+        {
+            return $"{(int)meters} m";
+        }
+        return $"{meters / 1000:F1} km";
+    }
+
+    private string FormatDuration(int seconds)
+    {
+        var minutes = seconds / 60;
+        if (minutes < 60)
+        {
+            return $"{minutes} min";
+        }
+        var hours = minutes / 60;
+        var remainingMinutes = minutes % 60;
+        return remainingMinutes > 0 ? $"{hours}h {remainingMinutes}m" : $"{hours}h";
+    }
+
+    private string GetCardinalDirection(double heading)
+    {
+        var directions = new[] { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+        var index = (int)((heading + 22.5) / 45) % 8;
+        return directions[index];
+    }
+}
