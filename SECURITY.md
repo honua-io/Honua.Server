@@ -55,6 +55,7 @@ Honua implements security controls including:
 - Security headers (HSTS, CSP, X-Frame-Options, X-Content-Type-Options)
 
 **Data Protection**
+- Comprehensive secrets management with multiple provider support
 - Secure credential storage
 - PII redaction in logs
 - Attachment security controls
@@ -118,6 +119,69 @@ HONUA__ATTACHMENTS__AZURE__CONNECTIONSTRING="..."
 ```
 
 Never commit credentials to version control. Use `.gitignore` for local configuration files.
+
+### Secrets Management
+
+Honua Server implements comprehensive secrets management with support for multiple cloud providers and local development workflows.
+
+**Supported Providers:**
+- **Azure Key Vault** - For Azure cloud deployments with Managed Identity support
+- **AWS Secrets Manager** - For AWS deployments with IAM role integration
+- **HashiCorp Vault** - For on-premises, Kubernetes, and multi-cloud deployments
+- **Local Development** - File-based with encryption for development environments
+
+**Configuration Example:**
+
+```json
+{
+  "Secrets": {
+    "Provider": "AzureKeyVault",
+    "EnableCaching": true,
+    "CacheDurationSeconds": 300,
+    "AzureKeyVault": {
+      "VaultUri": "https://your-vault.vault.azure.net/",
+      "UseManagedIdentity": true
+    }
+  }
+}
+```
+
+**Usage in Code:**
+
+```csharp
+// In Program.cs
+builder.Services.AddSecretsManagement(builder.Configuration);
+
+// In your services
+public class MyService
+{
+    private readonly ISecretsProvider _secrets;
+
+    public MyService(ISecretsProvider secrets)
+    {
+        _secrets = secrets;
+    }
+
+    public async Task DoWorkAsync()
+    {
+        var apiKey = await _secrets.GetSecretAsync("ApiKeys:OpenAI");
+        var cert = await _secrets.GetCertificateAsync("Certificates:Signing");
+    }
+}
+```
+
+**Security Best Practices:**
+- Use Managed Identity or IAM roles in production (avoid static credentials)
+- Enable secret caching to reduce provider load
+- Implement secret rotation strategies
+- Never commit secrets to source control
+- Use user secrets for local development
+- Monitor secret access through provider audit logs
+- Set appropriate permissions (least privilege)
+- Enable secret versioning where supported
+
+**Documentation:**
+See [docs/security/secrets-management.md](docs/security/secrets-management.md) for comprehensive setup guides, examples, and best practices for each provider.
 
 ## Known Security Considerations
 

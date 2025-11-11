@@ -157,7 +157,7 @@ public sealed class DataIngestionPlugin
                         crsFlexibility = "Unknown",
                         performance = "Unknown"
                     },
-                    recommendedFor = new string[0],
+                    recommendedFor = Array.Empty<string>(),
                     limitations = "Format not recognized by Honua"
                 }
             };

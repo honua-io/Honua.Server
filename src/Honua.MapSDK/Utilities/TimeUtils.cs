@@ -161,9 +161,11 @@ public static class TimeUtils
         foreach (var timestamp in timestamps)
         {
             var binStart = RoundDown(timestamp, interval);
-            if (!bins.ContainsKey(binStart))
-                bins[binStart] = 0;
-            bins[binStart]++;
+            if (!bins.TryGetValue(binStart, out var count))
+            {
+                count = 0;
+            }
+            bins[binStart] = count + 1;
         }
 
         return bins;

@@ -1,0 +1,180 @@
+# GCP-specific deployment with Secret Manager integration
+# Uses GCP Workload Identity for secure access to Secret Manager
+
+# Prerequisites:
+# 1. Create GCP Secret Manager secrets
+# 2. Set up Workload Identity:
+#    https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity
+# 3. Create Cloud SQL PostgreSQL instance
+# 4. Create Memorystore Redis instance
+# 5. Grant Secret Manager access to service account
+
+replicaCount: 3
+
+image:
+  variant: full
+  pullPolicy: IfNotPresent
+  registry: gcr.io
+  repository: your-project-id/honua-server
+  pullSecrets:
+    - name: gcr-pull-secret
+
+resources:
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# GCP Cloud SQL PostgreSQL
+database:
+  external: true
+  # Use Cloud SQL Proxy sidecar pattern
+  host: 127.0.0.1
+  port: 5432
+  name: honua_prod
+  username: honua_admin
+  sslMode: disable # SSL handled by Cloud SQL Proxy
+
+# GCP Memorystore Redis
+redis:
+  external: true
+  host: 10.0.0.3 # Internal IP of Memorystore instance
+  port: 6379
+  ssl:
+    enabled: false # Memorystore uses VPC-native security
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+# GCP Secret Manager integration
+secrets:
+  provider: gcp-secret-manager
+  gcpSecretManager:
+    enabled: true
+    projectId: "your-project-id"
+    useWorkloadIdentity: true
+
+serviceAccount:
+  create: true
+  annotations:
+    iam.gke.io/gcp-service-account: honua-server@your-project-id.iam.gserviceaccount.com
+
+# Cloud SQL Proxy sidecar
+sidecars:
+  - name: cloud-sql-proxy
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0
+    args:
+      - "--structured-logs"
+      - "--port=5432"
+      - "your-project-id:us-central1:honua-postgres"
+    securityContext:
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+ingress:
+  enabled: true
+  className: gce
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "honua-ip"
+    networking.gke.io/managed-certificates: "honua-cert"
+    kubernetes.io/ingress.allow-http: "false"
+  hosts:
+    - host: honua.example.com
+      paths:
+        - path: /*
+          pathType: ImplementationSpecific
+
+config:
+  aspnetcoreEnvironment: Production
+  logging:
+    level: Information
+    structuredLogging: true
+
+  openTelemetry:
+    enabled: true
+    otlpEndpoint: "http://opentelemetry-collector.observability.svc.cluster.local:4317"
+
+  rateLimiting:
+    enabled: true
+
+serviceMonitor:
+  enabled: true
+  namespace: observability
+
+networkPolicy:
+  enabled: true
+  # Allow Cloud SQL Proxy to connect to Cloud SQL
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - podSelector:
+            matchLabels:
+              app: cloud-sql-proxy
+      ports:
+        - protocol: TCP
+          port: 5432
+
+# GCP-specific node selector
+nodeSelector:
+  cloud.google.com/gke-nodepool: production
+  kubernetes.io/os: linux
+
+# High availability across zones
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - honua-server
+        topologyKey: kubernetes.io/hostname
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: honua-server
+
+priorityClassName: high-priority
+
+# Pod annotations for monitoring
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+# Pod labels for Workload Identity
+podLabels:
+  cloud.google.com/gke-workload-identity: honua-server@your-project-id.iam.gserviceaccount.com

@@ -87,43 +87,35 @@ public sealed class AlertController : ControllerBase
 
     private async Task<IActionResult> ProcessAlert(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken)
     {
-        try
+        // BUG FIX #9: SECURITY - Downgraded alert detail logging from Information to Debug level
+        // Previous implementation logged full alert details at Information level, which could expose:
+        // - Secrets embedded in alert descriptions or labels
+        // - Customer identifiers and PII from Alertmanager annotations
+        // - Internal system details that violate compliance requirements
+        // Production environments should set minimum log level to Information or Warning to prevent exposure.
+
+        _logger.LogInformation(
+            "Received {Severity} alert: {AlertName}, Status: {Status}, Alerts: {Count}",
+            severity,
+            webhook.GroupLabels.GetValueOrDefault("alertname", "Unknown"),
+            webhook.Status,
+            webhook.Alerts.Count);
+
+        // BUG FIX #9: Moved detailed alert logging to Debug level (only visible when debugging)
+        // This prevents sensitive data in descriptions/labels from appearing in production logs
+        foreach (var alert in webhook.Alerts)
         {
-            // BUG FIX #9: SECURITY - Downgraded alert detail logging from Information to Debug level
-            // Previous implementation logged full alert details at Information level, which could expose:
-            // - Secrets embedded in alert descriptions or labels
-            // - Customer identifiers and PII from Alertmanager annotations
-            // - Internal system details that violate compliance requirements
-            // Production environments should set minimum log level to Information or Warning to prevent exposure.
-
-            _logger.LogInformation(
-                "Received {Severity} alert: {AlertName}, Status: {Status}, Alerts: {Count}",
-                severity,
-                webhook.GroupLabels.GetValueOrDefault("alertname", "Unknown"),
-                webhook.Status,
-                webhook.Alerts.Count);
-
-            // BUG FIX #9: Moved detailed alert logging to Debug level (only visible when debugging)
-            // This prevents sensitive data in descriptions/labels from appearing in production logs
-            foreach (var alert in webhook.Alerts)
-            {
-                _logger.LogDebug(
-                    "Alert detail - Name: {AlertName}, Status: {Status}, Severity: {Severity}, Description: {Description}",
-                    alert.Labels.GetValueOrDefault("alertname", "Unknown"),
-                    alert.Status,
-                    alert.Labels.GetValueOrDefault("severity", "unknown"),
-                    alert.Annotations.GetValueOrDefault("description", "No description"));
-            }
-
-            // Publish to SNS
-            await _alertPublisher.PublishAsync(webhook, severity, cancellationToken);
-
-            return Ok(new { status = "received", alertCount = webhook.Alerts.Count });
+            _logger.LogDebug(
+                "Alert detail - Name: {AlertName}, Status: {Status}, Severity: {Severity}, Description: {Description}",
+                alert.Labels.GetValueOrDefault("alertname", "Unknown"),
+                alert.Status,
+                alert.Labels.GetValueOrDefault("severity", "unknown"),
+                alert.Annotations.GetValueOrDefault("description", "No description"));
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to process {Severity} alert", severity);
-            return StatusCode(500, new { error = "Failed to process alert" });
-        }
+
+        // Publish to SNS
+        await _alertPublisher.PublishAsync(webhook, severity, cancellationToken);
+
+        return Ok(new { status = "received", alertCount = webhook.Alerts.Count });
     }
 }

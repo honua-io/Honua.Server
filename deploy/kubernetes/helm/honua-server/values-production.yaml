@@ -1,0 +1,190 @@
+# Production environment values
+# Optimized resources, structured logging, high availability
+
+replicaCount: 3
+
+image:
+  variant: full
+  pullPolicy: IfNotPresent
+  pullSecrets:
+    - name: ghcr-pull-secret
+
+resources:
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+config:
+  aspnetcoreEnvironment: Production
+  logging:
+    level: Information
+    structuredLogging: true
+    console:
+      format: json
+
+  openTelemetry:
+    enabled: true
+    otlpEndpoint: "http://opentelemetry-collector.observability.svc.cluster.local:4317"
+    serviceName: honua-server
+    exporters:
+      - otlp
+
+  cors:
+    enabled: true
+    allowedOrigins:
+      - "https://honua.io"
+      - "https://app.honua.io"
+      - "https://*.honua.io"
+
+  rateLimiting:
+    enabled: true
+    globalPermitLimit: 10000
+    globalWindowSeconds: 60
+    perIpPermitLimit: 100
+    perIpWindowSeconds: 60
+
+# Use external managed database
+database:
+  external: true
+  host: postgres-prod.cluster-xyz.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: honua_prod
+  username: honua_prod
+  existingSecret: honua-db-prod
+  existingSecretKey: password
+  sslMode: verify-full
+  pooling:
+    minPoolSize: 10
+    maxPoolSize: 200
+
+# Use external managed Redis
+redis:
+  external: true
+  host: redis-prod.cache.amazonaws.com
+  port: 6379
+  existingSecret: honua-redis-prod
+  existingSecretKey: password
+  ssl:
+    enabled: true
+
+# Disable subcharts in production
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: honua.io
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: api.honua.io
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: honua-prod-tls
+      hosts:
+        - honua.io
+        - api.honua.io
+        - "*.honua.io"
+
+serviceMonitor:
+  enabled: true
+  namespace: observability
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: prometheus-operator
+
+networkPolicy:
+  enabled: true
+
+secrets:
+  # Use cloud provider secret management
+  provider: aws-secrets-manager
+  awsSecretsManager:
+    enabled: true
+    region: us-east-1
+    useIRSA: true
+
+serviceAccount:
+  create: true
+  annotations:
+    # AWS IRSA
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/honua-server-prod
+
+# High availability configuration
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - honua-server
+        topologyKey: kubernetes.io/hostname
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - honua-server
+          topologyKey: topology.kubernetes.io/zone
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: honua-server
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: honua-server
+
+# Node selector for production workloads
+nodeSelector:
+  workload: production
+
+# Priority class for critical workloads
+priorityClassName: high-priority
+
+# Pod annotations for monitoring
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"

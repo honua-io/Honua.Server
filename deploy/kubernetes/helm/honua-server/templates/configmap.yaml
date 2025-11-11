@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "honua-server.fullname" . }}-config
+  labels:
+    {{- include "honua-server.labels" . | nindent 4 }}
+data:
+  appsettings.json: |
+    {
+      "ServiceName": "{{ .Values.config.serviceName }}",
+      "ServiceVersion": "{{ .Values.config.serviceVersion }}",
+      "Logging": {
+        "LogLevel": {
+          "Default": "{{ .Values.config.logging.level }}",
+          "Microsoft.AspNetCore": "Warning"
+        }
+      },
+      "Serilog": {
+        "Using": ["Serilog.Sinks.Console"],
+        "MinimumLevel": {
+          "Default": "{{ .Values.config.logging.level }}",
+          "Override": {
+            "Microsoft": "Warning",
+            "System": "Warning"
+          }
+        },
+        "WriteTo": [
+          {
+            "Name": "Console",
+            "Args": {
+              {{- if .Values.config.logging.structuredLogging }}
+              "formatter": "Serilog.Formatting.Compact.CompactJsonFormatter, Serilog.Formatting.Compact"
+              {{- else }}
+              "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
+              {{- end }}
+            }
+          }
+        ],
+        "Enrich": ["FromLogContext", "WithMachineName", "WithThreadId"]
+      },
+      "AllowedHosts": "*",
+      {{- if .Values.config.openTelemetry.enabled }}
+      "OpenTelemetry": {
+        "OtlpEndpoint": "{{ .Values.config.openTelemetry.otlpEndpoint }}",
+        "ServiceName": "{{ .Values.config.openTelemetry.serviceName | default .Values.config.serviceName }}"
+      },
+      {{- end }}
+      {{- if .Values.config.cors.enabled }}
+      "Cors": {
+        "AllowedOrigins": {{ .Values.config.cors.allowedOrigins | toJson }},
+        "AllowCredentials": {{ .Values.config.cors.allowCredentials }},
+        "AllowedMethods": {{ .Values.config.cors.allowedMethods | toJson }},
+        "AllowedHeaders": {{ .Values.config.cors.allowedHeaders | toJson }}
+      },
+      {{- end }}
+      {{- if .Values.config.rateLimiting.enabled }}
+      "RateLimiting": {
+        "GlobalPermitLimit": {{ .Values.config.rateLimiting.globalPermitLimit }},
+        "GlobalWindowSeconds": {{ .Values.config.rateLimiting.globalWindowSeconds }},
+        "PerIpPermitLimit": {{ .Values.config.rateLimiting.perIpPermitLimit }},
+        "PerIpWindowSeconds": {{ .Values.config.rateLimiting.perIpWindowSeconds }}
+      }
+      {{- end }}
+    }

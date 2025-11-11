@@ -1,0 +1,47 @@
+apiVersion: v2
+name: honua-server
+description: Production-ready Helm chart for Honua Server - Geospatial data platform
+type: application
+
+# Chart version follows SemVer
+version: 1.0.0
+
+# Application version (Docker image tag)
+appVersion: "1.0.0"
+
+keywords:
+  - geospatial
+  - gis
+  - stac
+  - ogc
+  - odata
+  - postgres
+  - redis
+
+maintainers:
+  - name: Honua Team
+    email: support@honua.io
+    url: https://honua.io
+
+home: https://github.com/honua-io/Honua.Server
+sources:
+  - https://github.com/honua-io/Honua.Server
+
+# Optional dependencies - can be enabled in values.yaml
+dependencies:
+  - name: postgresql
+    version: "~12.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    tags:
+      - database
+  - name: redis
+    version: "~18.0.0"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    tags:
+      - cache
+
+annotations:
+  category: Geospatial
+  licenses: Elastic-2.0

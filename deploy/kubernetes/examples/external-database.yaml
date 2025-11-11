@@ -1,0 +1,134 @@
+# Deployment with external managed database and Redis
+# Suitable for staging and production environments
+
+# Prerequisites:
+# 1. Create database secret:
+#    kubectl create secret generic honua-db-secret \
+#      --from-literal=password='your-db-password' \
+#      --namespace honua
+#
+# 2. Create Redis secret:
+#    kubectl create secret generic honua-redis-secret \
+#      --from-literal=password='your-redis-password' \
+#      --namespace honua
+
+replicaCount: 2
+
+image:
+  variant: full
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# External PostgreSQL configuration
+database:
+  external: true
+  host: postgres.example.com
+  port: 5432
+  name: honua_prod
+  username: honua_prod
+  existingSecret: honua-db-secret
+  existingSecretKey: password
+  sslMode: require
+  pooling:
+    minPoolSize: 10
+    maxPoolSize: 100
+
+# External Redis configuration
+redis:
+  external: true
+  host: redis.example.com
+  port: 6379
+  existingSecret: honua-redis-secret
+  existingSecretKey: password
+  ssl:
+    enabled: true
+
+# Disable embedded databases
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: honua.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: honua-tls
+      hosts:
+        - honua.example.com
+
+config:
+  aspnetcoreEnvironment: Production
+  logging:
+    level: Information
+    structuredLogging: true
+    console:
+      format: json
+
+  openTelemetry:
+    enabled: true
+    otlpEndpoint: "http://opentelemetry-collector.observability.svc.cluster.local:4317"
+
+  rateLimiting:
+    enabled: true
+    globalPermitLimit: 10000
+    perIpPermitLimit: 100
+
+serviceMonitor:
+  enabled: true
+  namespace: observability
+  labels:
+    release: prometheus-operator
+
+networkPolicy:
+  enabled: true
+
+# High availability configuration
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - honua-server
+          topologyKey: kubernetes.io/hostname
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: honua-server

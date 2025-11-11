@@ -23,6 +23,13 @@ public static class ConfigurationValidationExtensions
         services.AddSingleton<IValidateOptions<OpenRosaOptions>, OpenRosaOptionsValidator>();
         services.AddSingleton<IValidateOptions<ConnectionStringOptions>, ConnectionStringOptionsValidator>();
 
+        // Register validators for data and caching options
+        services.AddSingleton<IValidateOptions<GraphDatabaseOptions>, GraphDatabaseOptionsValidator>();
+        services.AddSingleton<IValidateOptions<CacheInvalidationOptions>, CacheInvalidationOptionsValidator>();
+        services.AddSingleton<IValidateOptions<CacheSizeLimitOptions>, CacheSizeLimitOptionsValidator>();
+        services.AddSingleton<IValidateOptions<DataIngestionOptions>, DataIngestionOptionsValidator>();
+        services.AddSingleton<IValidateOptions<DataAccessOptions>, DataAccessOptionsValidator>();
+
         // Register the hosted service that validates on startup
         services.AddHostedService<ConfigurationValidationHostedService>();
 
