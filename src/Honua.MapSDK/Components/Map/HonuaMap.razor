@@ -1,5 +1,7 @@
 @using Honua.MapSDK.Core
 @using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
 @inject ComponentBus Bus
@@ -32,7 +34,25 @@
     public string Projection { get; set; } = "mercator";
 
     [Parameter]
+    public MapProjection ProjectionType { get; set; } = MapProjection.Mercator;
+
+    [Parameter]
+    public bool EnableAtmosphere { get; set; } = true;
+
+    [Parameter]
+    public string AtmosphereColor { get; set; } = "#87CEEB";
+
+    [Parameter]
+    public bool EnableSpace { get; set; } = true;
+
+    [Parameter]
     public bool EnableGPU { get; set; } = true;
+
+    [Parameter]
+    public RenderingEngine RenderingEngine { get; set; } = RenderingEngine.Auto;
+
+    [Parameter]
+    public bool ShowRendererInfo { get; set; } = false;
 
     [Parameter]
     public double[]? MaxBounds { get; set; }
@@ -61,11 +81,15 @@
     [Parameter]
     public EventCallback<FeatureClickedMessage> OnFeatureClicked { get; set; }
 
+    [Parameter]
+    public EventCallback<ProjectionChangedMessage> OnProjectionChanged { get; set; }
+
     private ElementReference _mapContainer;
     private IJSObjectReference? _mapModule;
     private IJSObjectReference? _mapInstance;
     private DotNetObjectReference<HonuaMap>? _dotNetRef;
     private bool _isInitialized = false;
+    private RendererInfo? _rendererInfo;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -88,7 +112,18 @@
                 "./_content/Honua.MapSDK/js/honua-map.js"
             );
 
-            // Create map instance
+            // Create map instance with rendering engine preference
+            var renderingEngineStr = RenderingEngine switch
+            {
+                RenderingEngine.WebGPU => "WebGPU",
+                RenderingEngine.WebGL => "WebGL",
+                _ => "Auto"
+            };
+
+            // Determine projection string
+            var projectionStr = ProjectionType == MapProjection.Globe ? "globe" :
+                                !string.IsNullOrEmpty(Projection) ? Projection : "mercator";
+
             _mapInstance = await _mapModule.InvokeAsync<IJSObjectReference>(
                 "createMap",
                 _mapContainer,
@@ -100,14 +135,32 @@
                     zoom = Zoom,
                     bearing = Bearing,
                     pitch = Pitch,
-                    projection = Projection,
+                    projection = projectionStr,
                     enableGPU = EnableGPU,
+                    renderingEngine = renderingEngineStr,
                     maxBounds = MaxBounds,
                     minZoom = MinZoom,
                     maxZoom = MaxZoom
                 },
                 _dotNetRef
             );
+
+            // Get renderer info
+            try
+            {
+                _rendererInfo = await _mapInstance.InvokeAsync<RendererInfo>("getRendererInfo");
+
+                if (_rendererInfo != null && ShowRendererInfo)
+                {
+                    Console.WriteLine($"[Honua Map] Renderer: {_rendererInfo.Engine}");
+                    Console.WriteLine($"[Honua Map] GPU: {_rendererInfo.GpuVendor} - {_rendererInfo.GpuRenderer}");
+                    Console.WriteLine($"[Honua Map] Fallback: {_rendererInfo.IsFallback}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to get renderer info: {ex.Message}");
+            }
 
             _isInitialized = true;
 
@@ -245,6 +298,15 @@
                 await _mapInstance.InvokeVoidAsync("clearHighlights");
             }
         });
+
+        // Listen for projection change requests
+        Bus.Subscribe<ChangeProjectionRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == Id && _mapInstance != null)
+            {
+                await ChangeProjectionAsync(args.Message);
+            }
+        });
     }
 
     /// <summary>
@@ -376,6 +438,133 @@
     {
         if (_mapInstance == null) return null;
         return await _mapInstance.InvokeAsync<double>("getZoom");
+    }
+
+    /// <summary>
+    /// Public API: Get current renderer information
+    /// </summary>
+    public async Task<RendererInfo?> GetRendererInfoAsync()
+    {
+        if (_mapInstance == null) return null;
+        try
+        {
+            return await _mapInstance.InvokeAsync<RendererInfo>("getRendererInfo");
+        }
+        catch (Exception)
+        {
+            return _rendererInfo;
+        }
+    }
+
+    /// <summary>
+    /// Public API: Get cached renderer information
+    /// </summary>
+    public RendererInfo? GetCachedRendererInfo()
+    {
+        return _rendererInfo;
+    }
+
+    /// <summary>
+    /// Public API: Change map projection
+    /// </summary>
+    public async Task<bool> SetProjectionAsync(MapProjection projection, GlobeProjectionOptions? options = null)
+    {
+        if (_mapInstance == null) return false;
+
+        var projectionStr = projection == MapProjection.Globe ? "globe" : "mercator";
+        var opts = options ?? new GlobeProjectionOptions();
+
+        var success = await _mapInstance.InvokeAsync<bool>("setProjection", projectionStr, new
+        {
+            enableAtmosphere = opts.EnableAtmosphere,
+            atmosphereColor = opts.AtmosphereColor,
+            enableSpace = opts.EnableSpace,
+            autoAdjustCamera = opts.AutoAdjustCamera,
+            globeDefaultZoom = opts.GlobeDefaultZoom,
+            transitionDuration = opts.TransitionDuration
+        });
+
+        if (success)
+        {
+            // Publish projection changed message
+            await Bus.PublishAsync(new ProjectionChangedMessage
+            {
+                MapId = Id,
+                ComponentId = "HonuaMap",
+                Projection = projectionStr,
+                AtmosphereEnabled = opts.EnableAtmosphere,
+                TransitionDuration = opts.TransitionDuration
+            }, Id);
+
+            // Invoke callback
+            await OnProjectionChanged.InvokeAsync(new ProjectionChangedMessage
+            {
+                MapId = Id,
+                ComponentId = "HonuaMap",
+                Projection = projectionStr,
+                AtmosphereEnabled = opts.EnableAtmosphere,
+                TransitionDuration = opts.TransitionDuration
+            });
+        }
+
+        return success;
+    }
+
+    /// <summary>
+    /// Public API: Get current projection
+    /// </summary>
+    public async Task<string?> GetProjectionAsync()
+    {
+        if (_mapInstance == null) return null;
+        return await _mapInstance.InvokeAsync<string>("getProjection");
+    }
+
+    /// <summary>
+    /// Handle projection change request from ComponentBus
+    /// </summary>
+    private async Task ChangeProjectionAsync(ChangeProjectionRequestMessage request)
+    {
+        if (_mapInstance == null) return;
+
+        try
+        {
+            var success = await _mapInstance.InvokeAsync<bool>("setProjection", request.Projection, new
+            {
+                enableAtmosphere = request.EnableAtmosphere,
+                atmosphereColor = AtmosphereColor,
+                enableSpace = EnableSpace,
+                autoAdjustCamera = true,
+                globeDefaultZoom = 1.5,
+                transitionDuration = request.TransitionDuration
+            });
+
+            if (success)
+            {
+                // Publish projection changed message
+                await Bus.PublishAsync(new ProjectionChangedMessage
+                {
+                    MapId = Id,
+                    ComponentId = request.ComponentId,
+                    Projection = request.Projection,
+                    AtmosphereEnabled = request.EnableAtmosphere,
+                    TransitionDuration = request.TransitionDuration
+                }, Id);
+
+                // Invoke callback
+                await OnProjectionChanged.InvokeAsync(new ProjectionChangedMessage
+                {
+                    MapId = Id,
+                    ComponentId = request.ComponentId,
+                    Projection = request.Projection,
+                    AtmosphereEnabled = request.EnableAtmosphere,
+                    TransitionDuration = request.TransitionDuration
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error changing projection: {ex.Message}");
+        }
     }
 
     public async ValueTask DisposeAsync()

@@ -1326,3 +1326,70 @@ public class FullscreenChangedMessage
     public required bool IsFullscreen { get; init; }
     public required string TargetElementId { get; init; }
 }
+
+/// <summary>
+/// Published when map projection changes (e.g., from Mercator to Globe)
+/// </summary>
+public class ProjectionChangedMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component that triggered the projection change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// New projection type (mercator, globe, etc.)
+    /// </summary>
+    public required string Projection { get; init; }
+
+    /// <summary>
+    /// Whether atmosphere is enabled (for globe projection)
+    /// </summary>
+    public bool AtmosphereEnabled { get; init; }
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    public int TransitionDuration { get; init; } = 1000;
+}
+
+/// <summary>
+/// Request to change map projection
+/// </summary>
+public class ChangeProjectionRequestMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Target projection type (mercator, globe, etc.)
+    /// </summary>
+    public required string Projection { get; init; }
+
+    /// <summary>
+    /// Component requesting the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Whether to enable atmosphere (for globe projection)
+    /// </summary>
+    public bool EnableAtmosphere { get; init; } = true;
+
+    /// <summary>
+    /// Whether to enable smooth transition
+    /// </summary>
+    public bool EnableTransition { get; init; } = true;
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    public int TransitionDuration { get; init; } = 1000;
+}

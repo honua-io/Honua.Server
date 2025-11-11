@@ -1,0 +1,356 @@
+@page "/webgpu-example"
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Services
+
+<PageTitle>WebGPU Rendering Example - Honua MapSDK</PageTitle>
+
+<div class="webgpu-example-container">
+    <div class="example-header">
+        <h1>WebGPU Rendering with Automatic Fallback</h1>
+        <p>This example demonstrates WebGPU rendering support with automatic WebGL fallback for older browsers.</p>
+    </div>
+
+    <div class="controls-panel">
+        <div class="control-group">
+            <label>Rendering Engine:</label>
+            <select @bind="selectedEngine" @bind:after="RecreateMap">
+                <option value="Auto">Auto (WebGPU with WebGL fallback)</option>
+                <option value="WebGPU">Force WebGPU</option>
+                <option value="WebGL">Force WebGL</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>
+                <input type="checkbox" @bind="showRendererInfo" />
+                Show Renderer Info
+            </label>
+        </div>
+
+        <div class="control-group">
+            <button @onclick="DetectCapabilities" class="btn-detect">Detect WebGPU Support</button>
+        </div>
+
+        @if (_capability != null)
+        {
+            <div class="capability-info @(_capability.IsSupported ? "supported" : "not-supported")">
+                <h3>WebGPU Capability</h3>
+                <div class="capability-row">
+                    <strong>Supported:</strong>
+                    <span>@(_capability.IsSupported ? "Yes ✓" : "No ✗")</span>
+                </div>
+                <div class="capability-row">
+                    <strong>Browser:</strong>
+                    <span>@_capability.Browser @_capability.BrowserVersion</span>
+                </div>
+                <div class="capability-row">
+                    <strong>navigator.gpu:</strong>
+                    <span>@(_capability.HasNavigatorGpu ? "Available" : "Not Available")</span>
+                </div>
+                @if (!string.IsNullOrEmpty(_capability.Reason))
+                {
+                    <div class="capability-row">
+                        <strong>Reason:</strong>
+                        <span>@_capability.Reason</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_gpuInfo != null)
+        {
+            <div class="gpu-info">
+                <h3>GPU Adapter Info</h3>
+                <div class="capability-row">
+                    <strong>Vendor:</strong>
+                    <span>@_gpuInfo.Vendor</span>
+                </div>
+                <div class="capability-row">
+                    <strong>Device:</strong>
+                    <span>@_gpuInfo.Device</span>
+                </div>
+                <div class="capability-row">
+                    <strong>Architecture:</strong>
+                    <span>@_gpuInfo.Architecture</span>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="map-container-wrapper">
+        @if (mapKey > 0)
+        {
+            <HonuaMap @ref="map"
+                      Id="webgpu-demo-map"
+                      MapStyle="https://demotiles.maplibre.org/style.json"
+                      Center="@(new[] { -98.5795, 39.8283 })"
+                      Zoom="4"
+                      Pitch="45"
+                      RenderingEngine="currentEngine"
+                      ShowRendererInfo="showRendererInfo">
+
+                @if (showRendererInfo && map != null)
+                {
+                    <HonuaRenderingInfo Map="map" IsVisible="true" StartExpanded="true" />
+                }
+            </HonuaMap>
+        }
+    </div>
+
+    <div class="info-section">
+        <h2>Browser Compatibility</h2>
+        <div class="compatibility-grid">
+            <div class="browser-item supported">
+                <strong>Chrome 113+</strong>
+                <span>Full WebGPU Support</span>
+            </div>
+            <div class="browser-item supported">
+                <strong>Edge 113+</strong>
+                <span>Full WebGPU Support</span>
+            </div>
+            <div class="browser-item fallback">
+                <strong>Firefox</strong>
+                <span>WebGL Fallback</span>
+            </div>
+            <div class="browser-item fallback">
+                <strong>Safari</strong>
+                <span>WebGL Fallback</span>
+            </div>
+        </div>
+
+        <h2>Features</h2>
+        <ul class="features-list">
+            <li><strong>Automatic Detection:</strong> Detects WebGPU support and falls back to WebGL automatically</li>
+            <li><strong>Performance Monitoring:</strong> Real-time FPS tracking and performance metrics</li>
+            <li><strong>GPU Information:</strong> Displays GPU vendor and renderer details</li>
+            <li><strong>Graceful Degradation:</strong> Seamless fallback without user intervention</li>
+            <li><strong>Force Mode:</strong> Ability to force specific renderer for testing</li>
+        </ul>
+
+        <h2>Performance Benefits</h2>
+        <ul class="features-list">
+            <li>Up to 2x faster rendering for complex scenes</li>
+            <li>Better handling of large datasets</li>
+            <li>Improved 3D terrain rendering</li>
+            <li>Lower CPU overhead</li>
+            <li>Better battery life on laptops</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .webgpu-example-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .example-header {
+        margin-bottom: 20px;
+    }
+
+    .example-header h1 {
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .example-header p {
+        color: #666;
+        font-size: 16px;
+    }
+
+    .controls-panel {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .control-group {
+        margin-bottom: 15px;
+    }
+
+    .control-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #374151;
+    }
+
+    .control-group select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .btn-detect {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: background 0.2s;
+    }
+
+    .btn-detect:hover {
+        background: #2563eb;
+    }
+
+    .capability-info, .gpu-info {
+        margin-top: 15px;
+        padding: 15px;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .capability-info.supported {
+        background: #f0fdf4;
+        border-color: #86efac;
+    }
+
+    .capability-info.not-supported {
+        background: #fef2f2;
+        border-color: #fca5a5;
+    }
+
+    .capability-info h3, .gpu-info h3 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+        color: #1f2937;
+    }
+
+    .capability-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+        font-size: 14px;
+    }
+
+    .capability-row strong {
+        color: #6b7280;
+    }
+
+    .map-container-wrapper {
+        position: relative;
+        height: 600px;
+        margin-bottom: 30px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .info-section {
+        margin-top: 30px;
+    }
+
+    .info-section h2 {
+        color: #1f2937;
+        margin-bottom: 15px;
+        font-size: 24px;
+    }
+
+    .compatibility-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+
+    .browser-item {
+        padding: 15px;
+        border-radius: 6px;
+        text-align: center;
+    }
+
+    .browser-item.supported {
+        background: #f0fdf4;
+        border: 2px solid #86efac;
+    }
+
+    .browser-item.fallback {
+        background: #fef3c7;
+        border: 2px solid #fde68a;
+    }
+
+    .browser-item strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #1f2937;
+        font-size: 16px;
+    }
+
+    .browser-item span {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .features-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .features-list li {
+        padding: 10px 0;
+        border-bottom: 1px solid #e5e7eb;
+        color: #4b5563;
+    }
+
+    .features-list li strong {
+        color: #1f2937;
+    }
+
+    .features-list li:last-child {
+        border-bottom: none;
+    }
+</style>
+
+@code {
+    [Inject]
+    private WebGpuDetectionService? DetectionService { get; set; }
+
+    private HonuaMap? map;
+    private string selectedEngine = "Auto";
+    private RenderingEngine currentEngine = RenderingEngine.Auto;
+    private bool showRendererInfo = true;
+    private int mapKey = 1;
+
+    private WebGpuCapability? _capability;
+    private GpuAdapterInfo? _gpuInfo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await DetectCapabilities();
+    }
+
+    private async Task DetectCapabilities()
+    {
+        if (DetectionService != null)
+        {
+            _capability = await DetectionService.DetectWebGpuSupportAsync();
+
+            if (_capability.IsSupported)
+            {
+                _gpuInfo = await DetectionService.GetGpuAdapterInfoAsync();
+            }
+        }
+    }
+
+    private void RecreateMap()
+    {
+        currentEngine = selectedEngine switch
+        {
+            "WebGPU" => RenderingEngine.WebGPU,
+            "WebGL" => RenderingEngine.WebGL,
+            _ => RenderingEngine.Auto
+        };
+
+        // Force re-render by changing key
+        mapKey++;
+    }
+}
