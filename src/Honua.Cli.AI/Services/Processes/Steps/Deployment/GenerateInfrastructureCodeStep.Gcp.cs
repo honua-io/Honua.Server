@@ -11,7 +11,7 @@ namespace Honua.Cli.AI.Services.Processes.Steps.Deployment;
 /// </summary>
 public partial class GenerateInfrastructureCodeStep
 {
-    private string GenerateGcpTerraform(ResourceEnvelope envelope)
+    private string GenerateGcpTerraform(ResourceEnvelope envelope, string? securityFeedback = null)
     {
         var sanitizedName = SanitizeName(_state.DeploymentName);
         var minInstances = Math.Max(envelope.MinInstances, 1);
@@ -19,7 +19,20 @@ public partial class GenerateInfrastructureCodeStep
         var cpuLimit = envelope.MinVCpu >= 4 ? "4" : envelope.MinVCpu >= 2 ? "2" : "1";
         var memoryLimit = envelope.MinMemoryGb >= 16 ? "16Gi" : envelope.MinMemoryGb >= 4 ? "4Gi" : "2Gi";
 
-        return $@"
+        // If security feedback provided, log it for debugging
+        if (!string.IsNullOrEmpty(securityFeedback))
+        {
+            _logger.LogInformation("Regenerating GCP Terraform with security feedback:\n{Feedback}", securityFeedback);
+        }
+
+        var feedbackComment = string.IsNullOrEmpty(securityFeedback)
+            ? ""
+            : $@"
+# SECURITY FEEDBACK FROM PREVIOUS ATTEMPT:
+# {securityFeedback.Replace("\n", "\n# ")}
+";
+
+        return $@"{feedbackComment}
 terraform {{
   required_providers {{
     google = {{

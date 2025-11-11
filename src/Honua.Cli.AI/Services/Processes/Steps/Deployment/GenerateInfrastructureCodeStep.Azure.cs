@@ -11,14 +11,27 @@ namespace Honua.Cli.AI.Services.Processes.Steps.Deployment;
 /// </summary>
 public partial class GenerateInfrastructureCodeStep
 {
-    private string GenerateAzureTerraform(ResourceEnvelope envelope)
+    private string GenerateAzureTerraform(ResourceEnvelope envelope, string? securityFeedback = null)
     {
         var planSku = envelope.MinVCpu >= 4 ? "EP3" : "EP1";
         var preWarmed = envelope.MinProvisionedConcurrency ?? Math.Max(1, envelope.MinInstances);
         var sanitizedName = SanitizeName(_state.DeploymentName);
         var storageAccountName = SanitizeStorageAccountName(_state.DeploymentName);
 
-        return $@"
+        // If security feedback provided, log it for debugging
+        if (!string.IsNullOrEmpty(securityFeedback))
+        {
+            _logger.LogInformation("Regenerating Azure Terraform with security feedback:\n{Feedback}", securityFeedback);
+        }
+
+        var feedbackComment = string.IsNullOrEmpty(securityFeedback)
+            ? ""
+            : $@"
+# SECURITY FEEDBACK FROM PREVIOUS ATTEMPT:
+# {securityFeedback.Replace("\n", "\n# ")}
+";
+
+        return $@"{feedbackComment}
 terraform {{
   required_providers {{
     azurerm = {{

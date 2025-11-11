@@ -11,7 +11,7 @@ namespace Honua.Cli.AI.Services.Processes.Steps.Deployment;
 /// </summary>
 public partial class GenerateInfrastructureCodeStep
 {
-    private string GenerateAwsTerraform(ResourceEnvelope envelope)
+    private string GenerateAwsTerraform(ResourceEnvelope envelope, string? securityFeedback = null)
     {
         var (taskCpu, taskMemory) = GetFargateTaskShape(envelope);
         var minTasks = Math.Max(envelope.MinInstances, 1);
@@ -19,7 +19,20 @@ public partial class GenerateInfrastructureCodeStep
         var ephemeralGb = Math.Max((int)Math.Ceiling(envelope.MinEphemeralGb), 20);
         var sanitizedName = SanitizeName(_state.DeploymentName);
 
-        return $@"
+        // If security feedback provided, log it for debugging
+        if (!string.IsNullOrEmpty(securityFeedback))
+        {
+            _logger.LogInformation("Regenerating AWS Terraform with security feedback:\n{Feedback}", securityFeedback);
+        }
+
+        var feedbackComment = string.IsNullOrEmpty(securityFeedback)
+            ? ""
+            : $@"
+# SECURITY FEEDBACK FROM PREVIOUS ATTEMPT:
+# {securityFeedback.Replace("\n", "\n# ")}
+";
+
+        return $@"{feedbackComment}
 terraform {{
   required_providers {{
     aws = {{

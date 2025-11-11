@@ -8,17 +8,40 @@ Honua's AI devsecops agent automatically validates all AI-generated Terraform co
 
 ### Workflow Integration
 
-The Checkov security scan is integrated into the `GenerateInfrastructureCodeStep` of the deployment process:
+The Checkov security scan is integrated into the `GenerateInfrastructureCodeStep` of the deployment process with **automatic iterative fixing**:
 
 ```
 1. ValidateDeploymentRequirements
 2. GenerateInfrastructureCode
-   ├── Generate Terraform files (main.tf, variables.tf, terraform.tfvars)
-   ├── ✅ Run Checkov security scan ← NEW!
-   └── Emit "InfrastructureGenerated" event (only if scan passes)
+   ├── Attempt 1: Generate Terraform files
+   │   ├── Write main.tf, variables.tf, terraform.tfvars
+   │   └── ✅ Run Checkov security scan
+   ├── If issues found → Attempt 2: Regenerate with security feedback
+   │   ├── Apply Checkov recommendations
+   │   └── ✅ Run Checkov security scan
+   ├── If issues found → Attempt 3: Final regeneration attempt
+   │   ├── Apply cumulative security feedback
+   │   └── ✅ Run Checkov security scan
+   └── If still blocked → ❌ Fail deployment with detailed error
+   └── If passed → Emit "InfrastructureGenerated" event
 3. ReviewInfrastructure
 4. DeployInfrastructure (terraform init/plan/apply)
 ```
+
+### Iterative Fixing (Self-Healing)
+
+The AI agent automatically learns from Checkov's feedback:
+
+- **Attempt 1**: Initial generation based on guardrail envelope
+- **Attempt 2**: Regenerate with specific fix guidance from Checkov
+- **Attempt 3**: Final attempt with cumulative security improvements
+- **Max Attempts**: 3 (configurable in code)
+
+Each attempt includes:
+- Detailed error descriptions
+- Specific remediation steps (e.g., "Enable S3 encryption with AES256")
+- Resource-level guidance
+- Security best practices reinforcement
 
 ### Gating Policy
 
@@ -79,33 +102,59 @@ await deploymentProcess.StartAsync("StartDeployment", deploymentState);
 // If Checkov finds issues, an exception is thrown with details
 ```
 
-### Example Output (Success)
+### Example Output (Success - First Attempt)
 
 ```
-[INFO] Running Checkov security scan on generated Terraform code at /tmp/honua-terraform/abc123
+[INFO] Infrastructure generation attempt 1/3
+[INFO] Running Checkov security scan on generated Terraform code at /tmp/honua-terraform/abc123-attempt1
 [INFO] Checkov scan completed: 47 passed, 0 failed (0 critical, 0 high, 0 medium, 0 low), 3 skipped
 [INFO] Checkov security scan passed with no issues found.
+[INFO] Checkov validation passed on attempt 1/3
 [INFO] Generated infrastructure code for deployment abc123. Estimated cost: $45.00/month
 ```
 
-### Example Output (Blocked)
+### Example Output (Self-Healing - Fixed on Attempt 2)
 
 ```
-[INFO] Running Checkov security scan on generated Terraform code at /tmp/honua-terraform/abc123
+[INFO] Infrastructure generation attempt 1/3
+[INFO] Running Checkov security scan on generated Terraform code at /tmp/honua-terraform/abc123-attempt1
 [INFO] Checkov scan completed: 42 passed, 5 failed (2 critical, 3 high, 0 medium, 0 low), 3 skipped
-[ERROR] Found 2 CRITICAL severity issues. Deployment blocked.
-[WARN] [CRITICAL] CKV_AWS_20: S3 Bucket has an ACL defined which allows public READ access in aws_s3_bucket.data_bucket (main.tf)
 [WARN] [CRITICAL] CKV_AWS_19: Ensure all data stored in S3 is securely encrypted at rest in aws_s3_bucket.data_bucket (main.tf)
-[WARN] [HIGH] CKV_AWS_23: Ensure every security group has an explicit description in aws_security_group.app_sg (main.tf)
-[ERROR] Checkov found critical security issues. Blocking deployment.
+[WARN] [HIGH] CKV_AWS_46: Ensure EBS volumes are encrypted in aws_instance.app_server (main.tf)
+[ERROR] Found 1 CRITICAL severity issues.
+[WARN] Attempt 1/3: Found 1 CRITICAL and 1 HIGH issues. Regenerating with security fixes...
 
-InvalidOperationException: Checkov security scan found 2 CRITICAL and 3 HIGH severity issues.
+[INFO] Infrastructure generation attempt 2/3 (with security feedback)
+[INFO] Regenerating AWS Terraform with security feedback
+[INFO] Running Checkov security scan on generated Terraform code at /tmp/honua-terraform/abc123-attempt2
+[INFO] Checkov scan completed: 47 passed, 0 failed (0 critical, 0 high, 0 medium, 0 low), 3 skipped
+[INFO] Checkov security scan passed with no issues found.
+[INFO] Checkov validation passed on attempt 2/3
+[INFO] Generated infrastructure code for deployment abc123. Estimated cost: $45.00/month
+```
+
+### Example Output (Blocked After Max Attempts)
+
+```
+[INFO] Infrastructure generation attempt 1/3
+[INFO] Running Checkov security scan...
+[WARN] Attempt 1/3: Found 2 CRITICAL and 3 HIGH issues. Regenerating with security fixes...
+
+[INFO] Infrastructure generation attempt 2/3 (with security feedback)
+[INFO] Regenerating AWS Terraform with security feedback
+[INFO] Running Checkov security scan...
+[WARN] Attempt 2/3: Found 1 CRITICAL and 2 HIGH issues. Regenerating with security fixes...
+
+[INFO] Infrastructure generation attempt 3/3 (with security feedback)
+[INFO] Regenerating AWS Terraform with security feedback
+[INFO] Running Checkov security scan...
+[ERROR] Checkov validation failed after 3 attempts. Blocking deployment.
+
+InvalidOperationException: Failed to generate secure Terraform after 3 attempts.
+
+Checkov security scan found 1 CRITICAL and 1 HIGH severity issues.
 
 Critical/High severity issues:
-  [CRITICAL] CKV_AWS_20: S3 Bucket has an ACL defined which allows public READ access
-    Resource: aws_s3_bucket.data_bucket
-    File: main.tf
-
   [CRITICAL] CKV_AWS_19: Ensure all data stored in S3 is securely encrypted at rest
     Resource: aws_s3_bucket.data_bucket
     File: main.tf
