@@ -100,6 +100,10 @@ public partial class GenerateInfrastructureCodeStep : KernelProcessStep<Deployme
                             SetRestrictiveFilePermissions(tfvarsPath);
                             _logger.LogInformation("Wrote terraform.tfvars to {Path} with secure permissions", tfvarsPath);
                         }
+
+                        // SECURITY: Run Checkov security scan on generated Terraform code
+                        // This gates deployment by blocking if critical/high severity issues are found
+                        await ValidateWithCheckovAsync(workspacePath);
                     }
                     catch
                     {
