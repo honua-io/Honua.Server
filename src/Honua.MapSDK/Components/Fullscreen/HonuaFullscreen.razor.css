@@ -1,0 +1,112 @@
+/* HonuaFullscreen Component Styles */
+
+.honua-fullscreen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+/* Floating positioning */
+.fullscreen-floating {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    padding: 4px;
+}
+
+.fullscreen-top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.fullscreen-top-left {
+    top: 10px;
+    left: 10px;
+}
+
+.fullscreen-bottom-right {
+    bottom: 10px;
+    right: 10px;
+}
+
+.fullscreen-bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+/* Embedded positioning (in a toolbar or panel) */
+.fullscreen-embedded {
+    display: inline-flex;
+}
+
+/* Button styling */
+.fullscreen-button {
+    transition: all 0.2s ease-in-out;
+}
+
+.fullscreen-button:hover {
+    transform: scale(1.05);
+}
+
+.fullscreen-button:active {
+    transform: scale(0.95);
+}
+
+/* Disabled state */
+.fullscreen-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .fullscreen-floating {
+        background: rgba(30, 30, 30, 0.95);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .fullscreen-floating {
+        padding: 2px;
+    }
+
+    .fullscreen-top-right,
+    .fullscreen-bottom-right {
+        right: 5px;
+    }
+
+    .fullscreen-top-left,
+    .fullscreen-bottom-left {
+        left: 5px;
+    }
+
+    .fullscreen-top-right,
+    .fullscreen-top-left {
+        top: 5px;
+    }
+
+    .fullscreen-bottom-right,
+    .fullscreen-bottom-left {
+        bottom: 5px;
+    }
+}
+
+/* Fullscreen active state indicator */
+.honua-fullscreen[data-fullscreen="true"] .fullscreen-button {
+    background-color: var(--mud-palette-primary);
+    color: white;
+}
+
+/* Animation for icon change */
+.fullscreen-button ::deep .mud-icon-root {
+    transition: transform 0.2s ease-in-out;
+}
+
+.fullscreen-button:hover ::deep .mud-icon-root {
+    transform: rotate(90deg);
+}

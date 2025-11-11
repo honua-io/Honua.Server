@@ -1,0 +1,438 @@
+@*
+    Copyright (c) 2025 HonuaIO
+    Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services
+@using Microsoft.JSInterop
+@using System.Text.Json
+@namespace Honua.MapSDK.Components
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject ComponentBus ComponentBus
+
+@code {
+    /// <summary>
+    /// Map instance reference (from HonuaMapLibre or HonuaMap)
+    /// </summary>
+    [Parameter]
+    public required object MapInstance { get; set; }
+
+    /// <summary>
+    /// Map element reference
+    /// </summary>
+    [Parameter]
+    public required ElementReference MapElement { get; set; }
+
+    /// <summary>
+    /// Map ID (for multi-map scenarios)
+    /// </summary>
+    [Parameter]
+    public string? MapId { get; set; }
+
+    /// <summary>
+    /// Initial layers to add
+    /// </summary>
+    [Parameter]
+    public List<DeckLayerDefinition>? Layers { get; set; }
+
+    /// <summary>
+    /// Event fired when a layer is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<DeckLayerClickEventArgs> OnLayerClick { get; set; }
+
+    /// <summary>
+    /// Event fired when a layer is hovered
+    /// </summary>
+    [Parameter]
+    public EventCallback<DeckLayerHoverEventArgs> OnLayerHover { get; set; }
+
+    /// <summary>
+    /// Enable debug logging
+    /// </summary>
+    [Parameter]
+    public bool Debug { get; set; } = false;
+
+    private DotNetObjectReference<HonuaDeckLayer>? _dotNetRef;
+    private IJSObjectReference? _module;
+    private IJSObjectReference? _deckManager;
+    private bool _isInitialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeAsync();
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            // Create .NET reference for callbacks
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Import JavaScript module
+            _module = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./js/deck-gl-integration.js");
+
+            // Initialize Deck.gl overlay
+            _deckManager = await _module.InvokeAsync<IJSObjectReference>(
+                "initializeDeckOverlay", MapInstance, MapElement, _dotNetRef);
+
+            _isInitialized = true;
+
+            if (Debug)
+            {
+                Console.WriteLine("Deck.gl overlay initialized");
+            }
+
+            // Add initial layers
+            if (Layers != null)
+            {
+                foreach (var layer in Layers)
+                {
+                    await AddLayerAsync(layer);
+                }
+            }
+
+            // Subscribe to ComponentBus messages
+            SubscribeToMessages();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing Deck.gl overlay: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Subscribe to ComponentBus messages for layer management
+    /// </summary>
+    private void SubscribeToMessages()
+    {
+        ComponentBus.Subscribe<AddDeckLayerMessage>(async args =>
+        {
+            if (args.Message.MapId == null || args.Message.MapId == MapId)
+            {
+                await AddLayerAsync(args.Message.Layer);
+            }
+        });
+
+        ComponentBus.Subscribe<RemoveDeckLayerMessage>(async args =>
+        {
+            if (args.Message.MapId == null || args.Message.MapId == MapId)
+            {
+                await RemoveLayerAsync(args.Message.LayerId);
+            }
+        });
+
+        ComponentBus.Subscribe<UpdateDeckLayerDataMessage>(async args =>
+        {
+            if (args.Message.MapId == null || args.Message.MapId == MapId)
+            {
+                await UpdateLayerDataAsync(args.Message.LayerId, args.Message.Data);
+            }
+        });
+
+        ComponentBus.Subscribe<SetDeckLayerVisibilityMessage>(async args =>
+        {
+            if (args.Message.MapId == null || args.Message.MapId == MapId)
+            {
+                await SetLayerVisibilityAsync(args.Message.LayerId, args.Message.Visible);
+            }
+        });
+
+        ComponentBus.Subscribe<SetDeckLayerOpacityMessage>(async args =>
+        {
+            if (args.Message.MapId == null || args.Message.MapId == MapId)
+            {
+                await SetLayerOpacityAsync(args.Message.LayerId, args.Message.Opacity);
+            }
+        });
+
+        ComponentBus.Subscribe<ClearDeckLayersMessage>(async args =>
+        {
+            if (args.Message.MapId == null || args.Message.MapId == MapId)
+            {
+                await ClearAllLayersAsync();
+            }
+        });
+    }
+
+    /// <summary>
+    /// Add or update a Deck.gl layer
+    /// </summary>
+    public async Task AddLayerAsync(DeckLayerDefinition layer)
+    {
+        if (!_isInitialized || _deckManager == null) return;
+
+        try
+        {
+            // Serialize layer to JSON
+            var layerConfig = SerializeLayer(layer);
+
+            // Call JavaScript
+            await _deckManager.InvokeVoidAsync("addLayer", layerConfig);
+
+            if (Debug)
+            {
+                Console.WriteLine($"Added Deck.gl layer: {layer.Id} ({layer.Type})");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error adding Deck.gl layer: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Remove a layer
+    /// </summary>
+    public async Task RemoveLayerAsync(string layerId)
+    {
+        if (!_isInitialized || _deckManager == null) return;
+
+        try
+        {
+            await _deckManager.InvokeVoidAsync("removeLayer", layerId);
+
+            if (Debug)
+            {
+                Console.WriteLine($"Removed Deck.gl layer: {layerId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error removing Deck.gl layer: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Update layer data
+    /// </summary>
+    public async Task UpdateLayerDataAsync(string layerId, List<object> data)
+    {
+        if (!_isInitialized || _deckManager == null) return;
+
+        try
+        {
+            await _deckManager.InvokeVoidAsync("updateLayerData", layerId, data);
+
+            if (Debug)
+            {
+                Console.WriteLine($"Updated data for layer: {layerId} ({data.Count} items)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating layer data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Set layer visibility
+    /// </summary>
+    public async Task SetLayerVisibilityAsync(string layerId, bool visible)
+    {
+        if (!_isInitialized || _deckManager == null) return;
+
+        try
+        {
+            await _deckManager.InvokeVoidAsync("setLayerVisibility", layerId, visible);
+
+            if (Debug)
+            {
+                Console.WriteLine($"Set layer {layerId} visibility: {visible}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error setting layer visibility: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Set layer opacity
+    /// </summary>
+    public async Task SetLayerOpacityAsync(string layerId, double opacity)
+    {
+        if (!_isInitialized || _deckManager == null) return;
+
+        try
+        {
+            await _deckManager.InvokeVoidAsync("setLayerOpacity", layerId, opacity);
+
+            if (Debug)
+            {
+                Console.WriteLine($"Set layer {layerId} opacity: {opacity}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error setting layer opacity: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Clear all layers
+    /// </summary>
+    public async Task ClearAllLayersAsync()
+    {
+        if (!_isInitialized || _deckManager == null) return;
+
+        try
+        {
+            await _deckManager.InvokeVoidAsync("clearAllLayers");
+
+            if (Debug)
+            {
+                Console.WriteLine("Cleared all Deck.gl layers");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error clearing layers: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Load layer data from URL
+    /// </summary>
+    public async Task<List<object>?> LoadDataFromUrlAsync(string url)
+    {
+        if (!_isInitialized || _module == null) return null;
+
+        try
+        {
+            var data = await _module.InvokeAsync<List<object>>("loadDeckLayerData", url);
+
+            if (Debug)
+            {
+                Console.WriteLine($"Loaded data from {url}: {data.Count} items");
+            }
+
+            return data;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading data from URL: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Serialize layer definition to JavaScript object
+    /// </summary>
+    private object SerializeLayer(DeckLayerDefinition layer)
+    {
+        // Use System.Text.Json to serialize to object for JS interop
+        var json = JsonSerializer.Serialize(layer, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        });
+
+        return JsonSerializer.Deserialize<object>(json) ?? new object();
+    }
+
+    /// <summary>
+    /// JavaScript callback when layer is clicked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnDeckLayerClickedInternal(
+        string layerId,
+        object clickedObject,
+        int x,
+        int y,
+        double[] coordinate)
+    {
+        var args = new DeckLayerClickEventArgs
+        {
+            LayerId = layerId,
+            ClickedObject = clickedObject,
+            X = x,
+            Y = y,
+            Coordinate = coordinate
+        };
+
+        // Raise event
+        if (OnLayerClick.HasDelegate)
+        {
+            await OnLayerClick.InvokeAsync(args);
+        }
+
+        // Publish to ComponentBus
+        await ComponentBus.PublishAsync(new DeckLayerClickedMessage
+        {
+            LayerId = layerId,
+            ClickedObject = clickedObject,
+            X = x,
+            Y = y,
+            Coordinate = coordinate,
+            MapId = MapId
+        }, "HonuaDeckLayer");
+    }
+
+    /// <summary>
+    /// JavaScript callback when layer is hovered
+    /// </summary>
+    [JSInvokable]
+    public async Task OnDeckLayerHoveredInternal(
+        string layerId,
+        object? hoveredObject,
+        int x,
+        int y)
+    {
+        var args = new DeckLayerHoverEventArgs
+        {
+            LayerId = layerId,
+            HoveredObject = hoveredObject,
+            X = x,
+            Y = y
+        };
+
+        // Raise event
+        if (OnLayerHover.HasDelegate)
+        {
+            await OnLayerHover.InvokeAsync(args);
+        }
+
+        // Publish to ComponentBus
+        await ComponentBus.PublishAsync(new DeckLayerHoveredMessage
+        {
+            LayerId = layerId,
+            HoveredObject = hoveredObject,
+            X = x,
+            Y = y,
+            MapId = MapId
+        }, "HonuaDeckLayer");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_deckManager != null)
+        {
+            try
+            {
+                await _deckManager.InvokeVoidAsync("dispose");
+                await _deckManager.DisposeAsync();
+            }
+            catch { }
+        }
+
+        if (_module != null)
+        {
+            try
+            {
+                await _module.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

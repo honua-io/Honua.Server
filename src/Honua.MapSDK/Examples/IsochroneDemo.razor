@@ -1,0 +1,276 @@
+@page "/isochrone-demo"
+@using Honua.MapSDK.Components
+@using Honua.MapSDK.Models.Routing
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@inject ComponentBus Bus
+
+<PageTitle>Isochrone Demo - Honua.MapSDK</PageTitle>
+
+<div class="isochrone-demo-container">
+    <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="py-4">
+        <MudText Typo="Typo.h4" Class="mb-4">Isochrone Analysis Demo</MudText>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            Generate travel time polygons (isochrones) to visualize areas reachable within specific time intervals.
+            Click "Set Origin" and click anywhere on the map to begin.
+        </MudText>
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Elevation="2" Style="height: 600px; position: relative;">
+                    <HonuaMap
+                        @ref="_map"
+                        Id="isochrone-demo-map"
+                        Center="@_mapCenter"
+                        Zoom="@_zoom"
+                        Style="width: 100%; height: 100%;">
+                    </HonuaMap>
+                </MudPaper>
+
+                @if (_currentResult != null)
+                {
+                    <MudPaper Elevation="2" Class="mt-4 pa-4">
+                        <MudText Typo="Typo.h6" Class="mb-2">Statistics</MudText>
+                        <MudSimpleTable Dense="true">
+                            <thead>
+                                <tr>
+                                    <th>Interval</th>
+                                    <th>Area (km²)</th>
+                                    <th>Color</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var polygon in _currentResult.Polygons.OrderBy(p => p.Interval))
+                                {
+                                    <tr>
+                                        <td>@polygon.Interval min</td>
+                                        <td>@((polygon.Area / 1_000_000).ToString("F2"))</td>
+                                        <td>
+                                            <div style="width: 40px; height: 20px; background-color: @polygon.Color; border: 1px solid #ccc;"></div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.body2">
+                            <strong>Total Coverage:</strong> @((TotalArea / 1_000_000).ToString("F2")) km²
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Travel Mode:</strong> @_currentResult.TravelMode
+                        </MudText>
+                    </MudPaper>
+                }
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <HonuaIsochrone
+                    @ref="_isochroneComponent"
+                    MapId="isochrone-demo-map"
+                    DefaultProvider="@_selectedProvider"
+                    TravelMode="@_travelMode"
+                    DefaultIntervals="@_intervals"
+                    OnIsochroneGenerated="@OnIsochroneGenerated"
+                    OnError="@OnError"
+                    Elevation="2" />
+
+                <MudPaper Elevation="2" Class="mt-4 pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Quick Settings</MudText>
+
+                    <MudSelect
+                        T="string"
+                        Label="Scenario"
+                        Value="@_scenario"
+                        ValueChanged="@OnScenarioChanged"
+                        Variant="Variant.Outlined"
+                        Dense="true"
+                        Class="mb-2">
+                        <MudSelectItem Value="@("custom")">Custom</MudSelectItem>
+                        <MudSelectItem Value="@("service-area")">Service Area (15, 30, 45 min)</MudSelectItem>
+                        <MudSelectItem Value="@("emergency")">Emergency Response (5, 10, 15 min)</MudSelectItem>
+                        <MudSelectItem Value="@("walkability")">Walkability (5, 10, 20 min)</MudSelectItem>
+                        <MudSelectItem Value="@("commute")">Commute Analysis (20, 40, 60 min)</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSwitch
+                        T="bool"
+                        Checked="@_showStats"
+                        CheckedChanged="@((bool val) => _showStats = val)"
+                        Color="Color.Primary"
+                        Label="Show Statistics" />
+                </MudPaper>
+
+                <MudPaper Elevation="2" Class="mt-4 pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Sample Locations</MudText>
+                    <MudList Dense="true">
+                        <MudListItem
+                            Icon="@Icons.Material.Filled.LocationCity"
+                            OnClick="@(() => SetLocation(-122.4194, 37.7749))">
+                            San Francisco
+                        </MudListItem>
+                        <MudListItem
+                            Icon="@Icons.Material.Filled.LocationCity"
+                            OnClick="@(() => SetLocation(-74.0060, 40.7128))">
+                            New York City
+                        </MudListItem>
+                        <MudListItem
+                            Icon="@Icons.Material.Filled.LocationCity"
+                            OnClick="@(() => SetLocation(-0.1276, 51.5074))">
+                            London
+                        </MudListItem>
+                        <MudListItem
+                            Icon="@Icons.Material.Filled.LocationCity"
+                            OnClick="@(() => SetLocation(2.3522, 48.8566))">
+                            Paris
+                        </MudListItem>
+                        <MudListItem
+                            Icon="@Icons.Material.Filled.LocationCity"
+                            OnClick="@(() => SetLocation(139.6503, 35.6762))">
+                            Tokyo
+                        </MudListItem>
+                    </MudList>
+                </MudPaper>
+
+                @if (_messages.Any())
+                {
+                    <MudPaper Elevation="2" Class="mt-4 pa-4">
+                        <MudText Typo="Typo.h6" Class="mb-2">Activity Log</MudText>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            @foreach (var message in _messages.TakeLast(10).Reverse())
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @message.Timestamp.ToString("HH:mm:ss"): @message.Text
+                                </MudText>
+                            }
+                        </div>
+                    </MudPaper>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+</div>
+
+<style>
+    .isochrone-demo-container {
+        min-height: 100vh;
+        background-color: #f5f5f5;
+    }
+</style>
+
+@code {
+    private HonuaMap? _map;
+    private HonuaIsochrone? _isochroneComponent;
+
+    private double[] _mapCenter = new[] { -122.4194, 37.7749 }; // San Francisco
+    private double _zoom = 11;
+
+    private string _selectedProvider = "mapbox";
+    private TravelMode _travelMode = TravelMode.Driving;
+    private List<int> _intervals = new() { 5, 10, 15, 30 };
+    private string _scenario = "custom";
+    private bool _showStats = true;
+
+    private IsochroneResult? _currentResult;
+    private List<(DateTime Timestamp, string Text)> _messages = new();
+
+    private double TotalArea => _currentResult?.Polygons.Sum(p => p.Area) ?? 0;
+
+    protected override void OnInitialized()
+    {
+        SetupMessageSubscriptions();
+    }
+
+    private void SetupMessageSubscriptions()
+    {
+        Bus.Subscribe<IsochroneCalculatedMessage>(args =>
+        {
+            var msg = args.Message;
+            AddMessage($"Isochrone calculated: {msg.PolygonCount} polygons for {msg.TravelMode}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        Bus.Subscribe<IsochroneOriginSelectedMessage>(args =>
+        {
+            var msg = args.Message;
+            AddMessage($"Origin selected at {msg.Latitude:F4}, {msg.Longitude:F4}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        Bus.Subscribe<IsochroneClearedMessage>(args =>
+        {
+            AddMessage("Isochrone cleared");
+            _currentResult = null;
+            InvokeAsync(StateHasChanged);
+        });
+
+        Bus.Subscribe<IsochroneExportedMessage>(args =>
+        {
+            var msg = args.Message;
+            AddMessage($"Exported {msg.PolygonCount} polygons as {msg.Format}");
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void OnIsochroneGenerated(IsochroneResult result)
+    {
+        _currentResult = result;
+        AddMessage($"Generated isochrone with total area: {(TotalArea / 1_000_000):F2} km²");
+    }
+
+    private void OnError(string errorMessage)
+    {
+        AddMessage($"Error: {errorMessage}");
+    }
+
+    private async Task OnScenarioChanged(string scenario)
+    {
+        _scenario = scenario;
+
+        switch (scenario)
+        {
+            case "service-area":
+                _intervals = new List<int> { 15, 30, 45 };
+                _travelMode = TravelMode.Driving;
+                break;
+            case "emergency":
+                _intervals = new List<int> { 5, 10, 15 };
+                _travelMode = TravelMode.Driving;
+                break;
+            case "walkability":
+                _intervals = new List<int> { 5, 10, 20 };
+                _travelMode = TravelMode.Walking;
+                break;
+            case "commute":
+                _intervals = new List<int> { 20, 40, 60 };
+                _travelMode = TravelMode.Driving;
+                break;
+        }
+
+        AddMessage($"Scenario changed to: {scenario}");
+        StateHasChanged();
+    }
+
+    private async Task SetLocation(double longitude, double latitude)
+    {
+        _mapCenter = new[] { longitude, latitude };
+
+        // Publish message to set origin
+        await Bus.PublishAsync(new IsochroneOriginSelectedMessage
+        {
+            ComponentId = _isochroneComponent?.Id ?? "",
+            Longitude = longitude,
+            Latitude = latitude
+        });
+
+        AddMessage($"Location set to {latitude:F4}, {longitude:F4}");
+    }
+
+    private void AddMessage(string text)
+    {
+        _messages.Add((DateTime.Now, text));
+        if (_messages.Count > 50)
+        {
+            _messages.RemoveAt(0);
+        }
+    }
+}

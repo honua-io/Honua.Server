@@ -1,0 +1,502 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.OGC
+@using Honua.MapSDK.Services.OGC
+@using Microsoft.JSInterop
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject HttpClient Http
+
+<div class="honua-ogc-browser @CssClass" id="@Id">
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-4">OGC Service Browser</MudText>
+
+        @* Connection Section *@
+        <div class="browser-connect-section mb-4">
+            <MudTextField T="string"
+                         @bind-Value="@_serviceUrl"
+                         Label="Service URL"
+                         Variant="Variant.Outlined"
+                         Placeholder="https://example.com/wms or https://example.com/wfs"
+                         HelperText="Enter the base URL for WMS or WFS service"
+                         Immediate="true" />
+
+            <div class="mt-2">
+                <MudButton OnClick="@ConnectToService"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary"
+                          Disabled="@_isConnecting"
+                          StartIcon="@Icons.Material.Filled.Cloud">
+                    @if (_isConnecting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Connecting...</span>
+                    }
+                    else
+                    {
+                        <span>Connect</span>
+                    }
+                </MudButton>
+
+                @if (_serviceInfo != null && _serviceInfo.IsValid)
+                {
+                    <MudChip Color="Color.Success" Size="Size.Small" Class="ml-2">
+                        Connected: @_serviceInfo.ServiceType
+                    </MudChip>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2" CloseIconClicked="@(() => _errorMessage = null)">
+                    @_errorMessage
+                </MudAlert>
+            }
+        </div>
+
+        @* Service Information *@
+        @if (_serviceInfo != null && _serviceInfo.IsValid)
+        {
+            <MudDivider Class="my-4" />
+
+            <div class="browser-service-info mb-4">
+                <MudText Typo="Typo.h6" Class="mb-2">@_serviceInfo.Title</MudText>
+                @if (!string.IsNullOrEmpty(_serviceInfo.Abstract))
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                        @_serviceInfo.Abstract
+                    </MudText>
+                }
+                @if (_serviceInfo.Keywords.Count > 0)
+                {
+                    <div class="mt-2">
+                        @foreach (var keyword in _serviceInfo.Keywords)
+                        {
+                            <MudChip Size="Size.Small" Variant="Variant.Text">@keyword</MudChip>
+                        }
+                    </div>
+                }
+            </div>
+
+            <MudDivider Class="my-4" />
+
+            @* WMS Layers *@
+            @if (_serviceInfo.ServiceType == OgcServiceType.WMS && _wmsLayers.Count > 0)
+            {
+                <div class="browser-layers-section">
+                    <MudText Typo="Typo.h6" Class="mb-3">Available Layers (@_wmsLayers.Count)</MudText>
+
+                    <MudTextField T="string"
+                                 @bind-Value="@_searchTerm"
+                                 Label="Search Layers"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Adornment="Adornment.Start"
+                                 AdornmentIcon="@Icons.Material.Filled.Search"
+                                 Class="mb-3" />
+
+                    <MudList T="WmsLayer" Clickable="true" Dense="true" Class="browser-layer-list">
+                        @foreach (var layer in GetFilteredWmsLayers())
+                        {
+                            <MudListItem>
+                                <div class="layer-item-content">
+                                    <div class="layer-item-info">
+                                        <MudText Typo="Typo.body1">@layer.Title</MudText>
+                                        @if (!string.IsNullOrEmpty(layer.Abstract))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @layer.Abstract
+                                            </MudText>
+                                        }
+                                        @if (layer.Queryable)
+                                        {
+                                            <MudChip Size="Size.Small" Variant="Variant.Text" Color="Color.Info">Queryable</MudChip>
+                                        }
+                                    </div>
+                                    <div class="layer-item-actions">
+                                        <MudButton OnClick="@(() => PreviewWmsLayer(layer))"
+                                                  Variant="Variant.Text"
+                                                  Color="Color.Primary"
+                                                  Size="Size.Small"
+                                                  StartIcon="@Icons.Material.Filled.Visibility">
+                                            Preview
+                                        </MudButton>
+                                        <MudButton OnClick="@(() => AddWmsLayerToMap(layer))"
+                                                  Variant="Variant.Filled"
+                                                  Color="Color.Primary"
+                                                  Size="Size.Small"
+                                                  StartIcon="@Icons.Material.Filled.Add">
+                                            Add to Map
+                                        </MudButton>
+                                    </div>
+                                </div>
+                            </MudListItem>
+                            <MudDivider />
+                        }
+                    </MudList>
+
+                    @if (GetFilteredWmsLayers().Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4 text-center">
+                            No layers found matching "@_searchTerm"
+                        </MudText>
+                    }
+                </div>
+            }
+
+            @* WFS Feature Types *@
+            @if (_serviceInfo.ServiceType == OgcServiceType.WFS && _wfsFeatureTypes.Count > 0)
+            {
+                <div class="browser-feature-types-section">
+                    <MudText Typo="Typo.h6" Class="mb-3">Available Feature Types (@_wfsFeatureTypes.Count)</MudText>
+
+                    <MudTextField T="string"
+                                 @bind-Value="@_searchTerm"
+                                 Label="Search Feature Types"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Adornment="Adornment.Start"
+                                 AdornmentIcon="@Icons.Material.Filled.Search"
+                                 Class="mb-3" />
+
+                    <MudList T="WfsFeatureType" Clickable="true" Dense="true" Class="browser-layer-list">
+                        @foreach (var featureType in GetFilteredWfsFeatureTypes())
+                        {
+                            <MudListItem>
+                                <div class="layer-item-content">
+                                    <div class="layer-item-info">
+                                        <MudText Typo="Typo.body1">@featureType.Title</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @featureType.Name
+                                        </MudText>
+                                        @if (!string.IsNullOrEmpty(featureType.Abstract))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @featureType.Abstract
+                                            </MudText>
+                                        }
+                                    </div>
+                                    <div class="layer-item-actions">
+                                        <MudButton OnClick="@(() => PreviewWfsFeatureType(featureType))"
+                                                  Variant="Variant.Text"
+                                                  Color="Color.Primary"
+                                                  Size="Size.Small"
+                                                  StartIcon="@Icons.Material.Filled.Visibility">
+                                            Preview
+                                        </MudButton>
+                                        <MudButton OnClick="@(() => AddWfsLayerToMap(featureType))"
+                                                  Variant="Variant.Filled"
+                                                  Color="Color.Primary"
+                                                  Size="Size.Small"
+                                                  StartIcon="@Icons.Material.Filled.Add">
+                                            Add to Map
+                                        </MudButton>
+                                    </div>
+                                </div>
+                            </MudListItem>
+                            <MudDivider />
+                        }
+                    </MudList>
+
+                    @if (GetFilteredWfsFeatureTypes().Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4 text-center">
+                            No feature types found matching "@_searchTerm"
+                        </MudText>
+                    }
+                </div>
+            }
+        }
+
+        @* Layer Preview Dialog *@
+        @if (_previewLayer != null)
+        {
+            <MudDialog @bind-IsVisible="_showPreviewDialog" Options="new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true }">
+                <TitleContent>
+                    <MudText Typo="Typo.h6">@_previewLayer.Title</MudText>
+                </TitleContent>
+                <DialogContent>
+                    @if (!string.IsNullOrEmpty(_previewLayer.Abstract))
+                    {
+                        <MudText Typo="Typo.body2" Class="mb-4">@_previewLayer.Abstract</MudText>
+                    }
+
+                    <MudSimpleTable Dense="true" Hover="true" Class="mb-4">
+                        <tbody>
+                            <tr>
+                                <td><strong>Name:</strong></td>
+                                <td>@_previewLayer.Name</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Queryable:</strong></td>
+                                <td>@(_previewLayer.Queryable ? "Yes" : "No")</td>
+                            </tr>
+                            @if (_previewLayer.MinScaleDenominator.HasValue)
+                            {
+                                <tr>
+                                    <td><strong>Min Scale:</strong></td>
+                                    <td>@_previewLayer.MinScaleDenominator.Value.ToString("N0")</td>
+                                </tr>
+                            }
+                            @if (_previewLayer.MaxScaleDenominator.HasValue)
+                            {
+                                <tr>
+                                    <td><strong>Max Scale:</strong></td>
+                                    <td>@_previewLayer.MaxScaleDenominator.Value.ToString("N0")</td>
+                                </tr>
+                            }
+                            @if (_previewLayer.GeographicBoundingBox != null)
+                            {
+                                <tr>
+                                    <td><strong>Bounding Box:</strong></td>
+                                    <td>
+                                        [@_previewLayer.GeographicBoundingBox.WestLongitude.ToString("F4"),
+                                        @_previewLayer.GeographicBoundingBox.SouthLatitude.ToString("F4"),
+                                        @_previewLayer.GeographicBoundingBox.EastLongitude.ToString("F4"),
+                                        @_previewLayer.GeographicBoundingBox.NorthLatitude.ToString("F4")]
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+
+                    @if (_previewLayer.Styles.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Available Styles:</MudText>
+                        @foreach (var style in _previewLayer.Styles)
+                        {
+                            <MudChip Size="Size.Small" Variant="Variant.Text">@style.Title</MudChip>
+                        }
+                    }
+                </DialogContent>
+                <DialogActions>
+                    <MudButton OnClick="@(() => _showPreviewDialog = false)" Variant="Variant.Text">Close</MudButton>
+                    <MudButton OnClick="@(() => { AddWmsLayerToMap(_previewLayer); _showPreviewDialog = false; })"
+                              Variant="Variant.Filled"
+                              Color="Color.Primary">
+                        Add to Map
+                    </MudButton>
+                </DialogActions>
+            </MudDialog>
+        }
+    </MudPaper>
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this browser component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"ogc-browser-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to add layers to
+    /// </summary>
+    [Parameter]
+    public string? TargetMapId { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Default service URL
+    /// </summary>
+    [Parameter]
+    public string? DefaultServiceUrl { get; set; }
+
+    /// <summary>
+    /// Callback when layer is added to map
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnLayerAdded { get; set; }
+
+    /// <summary>
+    /// Callback when service is connected
+    /// </summary>
+    [Parameter]
+    public EventCallback<OgcServiceInfo> OnServiceConnected { get; set; }
+
+    private OgcService? _ogcService;
+    private OgcServiceInfo? _serviceInfo;
+    private WmsCapabilities? _wmsCapabilities;
+    private WfsCapabilities? _wfsCapabilities;
+    private List<WmsLayer> _wmsLayers = new();
+    private List<WfsFeatureType> _wfsFeatureTypes = new();
+
+    private string _serviceUrl = "";
+    private string _searchTerm = "";
+    private bool _isConnecting = false;
+    private string? _errorMessage;
+
+    private bool _showPreviewDialog = false;
+    private WmsLayer? _previewLayer;
+
+    protected override void OnInitialized()
+    {
+        _ogcService = new OgcService(Http);
+
+        if (!string.IsNullOrEmpty(DefaultServiceUrl))
+        {
+            _serviceUrl = DefaultServiceUrl;
+        }
+    }
+
+    private async Task ConnectToService()
+    {
+        if (string.IsNullOrWhiteSpace(_serviceUrl) || _ogcService == null)
+        {
+            _errorMessage = "Please enter a valid service URL";
+            return;
+        }
+
+        try
+        {
+            _isConnecting = true;
+            _errorMessage = null;
+            StateHasChanged();
+
+            // Detect service type and get capabilities
+            _serviceInfo = await _ogcService.DetectServiceAsync(_serviceUrl);
+
+            if (!_serviceInfo.IsValid)
+            {
+                _errorMessage = _serviceInfo.ErrorMessage ?? "Failed to connect to service";
+                return;
+            }
+
+            // Load capabilities based on service type
+            if (_serviceInfo.ServiceType == OgcServiceType.WMS)
+            {
+                _wmsCapabilities = await _ogcService.GetWmsCapabilitiesAsync(_serviceUrl);
+                if (_wmsCapabilities?.Capability.Layer != null)
+                {
+                    _wmsLayers = FlattenWmsLayers(_wmsCapabilities.Capability.Layer);
+                }
+            }
+            else if (_serviceInfo.ServiceType == OgcServiceType.WFS)
+            {
+                _wfsCapabilities = await _ogcService.GetWfsCapabilitiesAsync(_serviceUrl);
+                if (_wfsCapabilities?.FeatureTypeList != null)
+                {
+                    _wfsFeatureTypes = _wfsCapabilities.FeatureTypeList.FeatureTypes;
+                }
+            }
+
+            await OnServiceConnected.InvokeAsync(_serviceInfo);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error connecting to service: {ex.Message}";
+            Console.Error.WriteLine($"Error connecting to OGC service: {ex}");
+        }
+        finally
+        {
+            _isConnecting = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<WmsLayer> FlattenWmsLayers(WmsLayer rootLayer)
+    {
+        var result = new List<WmsLayer>();
+
+        if (!string.IsNullOrEmpty(rootLayer.Name))
+        {
+            result.Add(rootLayer);
+        }
+
+        foreach (var childLayer in rootLayer.Layers)
+        {
+            result.AddRange(FlattenWmsLayers(childLayer));
+        }
+
+        return result;
+    }
+
+    private List<WmsLayer> GetFilteredWmsLayers()
+    {
+        if (string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            return _wmsLayers;
+        }
+
+        return _wmsLayers.Where(l =>
+            l.Title.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (l.Name?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (l.Abstract?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)
+        ).ToList();
+    }
+
+    private List<WfsFeatureType> GetFilteredWfsFeatureTypes()
+    {
+        if (string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            return _wfsFeatureTypes;
+        }
+
+        return _wfsFeatureTypes.Where(ft =>
+            ft.Title.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            ft.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+            (ft.Abstract?.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)
+        ).ToList();
+    }
+
+    private void PreviewWmsLayer(WmsLayer layer)
+    {
+        _previewLayer = layer;
+        _showPreviewDialog = true;
+    }
+
+    private void PreviewWfsFeatureType(WfsFeatureType featureType)
+    {
+        // TODO: Show feature type preview
+    }
+
+    private async Task AddWmsLayerToMap(WmsLayer layer)
+    {
+        if (layer.Name == null) return;
+
+        var layerId = $"wms-layer-{Guid.NewGuid():N}";
+
+        // Publish message to add WMS layer
+        await Bus.PublishAsync(new LayerAddedMessage
+        {
+            LayerId = layerId,
+            LayerName = layer.Title
+        }, Id);
+
+        await OnLayerAdded.InvokeAsync(layerId);
+    }
+
+    private async Task AddWfsLayerToMap(WfsFeatureType featureType)
+    {
+        var layerId = $"wfs-layer-{Guid.NewGuid():N}";
+
+        // Publish message to add WFS layer
+        await Bus.PublishAsync(new LayerAddedMessage
+        {
+            LayerId = layerId,
+            LayerName = featureType.Title
+        }, Id);
+
+        await OnLayerAdded.InvokeAsync(layerId);
+    }
+
+    /// <summary>
+    /// Public API: Get current service info
+    /// </summary>
+    public OgcServiceInfo? GetServiceInfo() => _serviceInfo;
+
+    /// <summary>
+    /// Public API: Get WMS capabilities
+    /// </summary>
+    public WmsCapabilities? GetWmsCapabilities() => _wmsCapabilities;
+
+    /// <summary>
+    /// Public API: Get WFS capabilities
+    /// </summary>
+    public WfsCapabilities? GetWfsCapabilities() => _wfsCapabilities;
+}

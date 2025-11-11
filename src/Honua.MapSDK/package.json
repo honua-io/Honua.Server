@@ -13,8 +13,11 @@
     "@deck.gl/layers": "^8.9.33",
     "@deck.gl/geo-layers": "^8.9.33",
     "@deck.gl/mesh-layers": "^8.9.33",
+    "@deck.gl/aggregation-layers": "^8.9.33",
+    "@deck.gl/mapbox": "^8.9.33",
     "@loaders.gl/gltf": "^4.0.4",
-    "earcut": "^2.2.4"
+    "earcut": "^2.2.4",
+    "supercluster": "^8.0.1"
   },
   "devDependencies": {
     "jest": "^29.7.0",

@@ -1146,6 +1146,56 @@ public class IsochroneCalculatedMessage
 }
 
 /// <summary>
+/// Published when isochrone origin point is selected on map
+/// </summary>
+public class IsochroneOriginSelectedMessage
+{
+    public required string ComponentId { get; init; }
+    public required double Longitude { get; init; }
+    public required double Latitude { get; init; }
+    public string? Address { get; init; }
+}
+
+/// <summary>
+/// Published when isochrone visibility is toggled
+/// </summary>
+public class IsochroneVisibilityChangedMessage
+{
+    public required string ComponentId { get; init; }
+    public required bool Visible { get; init; }
+}
+
+/// <summary>
+/// Published when isochrone is cleared
+/// </summary>
+public class IsochroneClearedMessage
+{
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when an isochrone polygon is clicked
+/// </summary>
+public class IsochronePolygonClickedMessage
+{
+    public required string ComponentId { get; init; }
+    public required int Interval { get; init; }
+    public required double[] Coordinates { get; init; }
+    public double Area { get; init; }
+}
+
+/// <summary>
+/// Published when isochrone is exported
+/// </summary>
+public class IsochroneExportedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string Format { get; init; }
+    public required string FileName { get; init; }
+    public int PolygonCount { get; init; }
+}
+
+/// <summary>
 /// Published when route is cleared/reset
 /// </summary>
 public class RouteClearedMessage
@@ -1213,4 +1263,66 @@ public class GeometriesExportedMessage
     public required string Format { get; init; }
     public required string Data { get; init; }
     public required int GeometryCount { get; init; }
+}
+
+/// <summary>
+/// Published when a cluster is clicked
+/// </summary>
+public class ClusterClickedMessage
+{
+    public required string MapId { get; init; }
+    public required int ClusterId { get; init; }
+    public required int PointCount { get; init; }
+    public required double[] Coordinates { get; init; }
+    public required int ExpansionZoom { get; init; }
+    public required string ComponentId { get; init; }
+    public Dictionary<string, object> Properties { get; init; } = new();
+}
+
+/// <summary>
+/// Published when cluster statistics are updated (zoom change, data update)
+/// </summary>
+public class ClusterStatisticsUpdatedMessage
+{
+    public required string ComponentId { get; init; }
+    public required int TotalPoints { get; init; }
+    public required int ClusterCount { get; init; }
+    public required int UnclusteredCount { get; init; }
+    public required double ZoomLevel { get; init; }
+    public int MaxClusterSize { get; init; }
+    public double AverageClusterSize { get; init; }
+}
+
+/// <summary>
+/// Published when cluster is spiderfied (expanded to show individual points)
+/// </summary>
+public class ClusterSpiderfiedMessage
+{
+    public required string MapId { get; init; }
+    public required int ClusterId { get; init; }
+    public required int PointCount { get; init; }
+    public required double[] Coordinates { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when cluster extent/bounds are shown
+/// </summary>
+public class ClusterExtentShownMessage
+{
+    public required string MapId { get; init; }
+    public required int ClusterId { get; init; }
+    public required double[] Bounds { get; init; } // [west, south, east, north]
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when fullscreen mode changes
+/// </summary>
+public class FullscreenChangedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string MapId { get; init; }
+    public required bool IsFullscreen { get; init; }
+    public required string TargetElementId { get; init; }
 }

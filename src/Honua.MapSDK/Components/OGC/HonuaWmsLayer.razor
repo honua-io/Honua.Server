@@ -1,0 +1,565 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.OGC
+@using Honua.MapSDK.Services.OGC
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject HttpClient Http
+
+<div class="honua-wms-layer @CssClass" id="@Id">
+    @if (ShowControls && _isInitialized)
+    {
+        <div class="wms-controls">
+            <div class="wms-header">
+                <h4>@LayerTitle</h4>
+                @if (ShowLayerSelector && _availableLayers.Count > 0)
+                {
+                    <button class="wms-toggle-btn" @onclick="ToggleLayerSelector">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" />
+                    </button>
+                }
+            </div>
+
+            @if (_showLayerSelector && _availableLayers.Count > 0)
+            {
+                <div class="wms-layer-selector">
+                    <MudText Typo="Typo.caption" Class="mb-2">Select Layers:</MudText>
+                    @foreach (var layer in _availableLayers)
+                    {
+                        <div class="layer-item">
+                            <MudCheckBox T="bool"
+                                        Checked="@_selectedLayers.Contains(layer.Name ?? "")"
+                                        CheckedChanged="@(value => ToggleLayer(layer, value))"
+                                        Label="@layer.Title"
+                                        Size="Size.Small" />
+                            @if (!string.IsNullOrEmpty(layer.Abstract))
+                            {
+                                <MudTooltip Text="@layer.Abstract">
+                                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Color="Color.Secondary" />
+                                </MudTooltip>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (ShowOpacityControl)
+            {
+                <div class="wms-opacity-control">
+                    <MudText Typo="Typo.caption">Opacity: @((_currentOpacity * 100).ToString("F0"))%</MudText>
+                    <MudSlider T="double"
+                              Value="@(_currentOpacity * 100)"
+                              ValueChanged="@OnOpacityChanged"
+                              Min="0"
+                              Max="100"
+                              Step="5"
+                              Size="Size.Small"
+                              Color="Color.Primary" />
+                </div>
+            }
+
+            @if (ShowLegend && _legendUrl != null)
+            {
+                <div class="wms-legend">
+                    <MudText Typo="Typo.caption" Class="mb-2">Legend:</MudText>
+                    <img src="@_legendUrl" alt="Layer Legend" class="legend-image" />
+                </div>
+            }
+
+            @if (SupportsTime && !string.IsNullOrEmpty(TimeDimension))
+            {
+                <div class="wms-time-control">
+                    <MudText Typo="Typo.caption">Time:</MudText>
+                    <MudTextField T="string"
+                                 Value="@_currentTime"
+                                 ValueChanged="@OnTimeChanged"
+                                 Label="Time (ISO 8601)"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this WMS layer component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"wms-layer-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to sync with (required)
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// WMS service base URL
+    /// </summary>
+    [Parameter]
+    public required string ServiceUrl { get; set; }
+
+    /// <summary>
+    /// WMS version (1.1.1 or 1.3.0)
+    /// </summary>
+    [Parameter]
+    public string Version { get; set; } = "1.3.0";
+
+    /// <summary>
+    /// Layer names to display (comma-separated or list)
+    /// </summary>
+    [Parameter]
+    public List<string> Layers { get; set; } = new();
+
+    /// <summary>
+    /// Coordinate reference system
+    /// </summary>
+    [Parameter]
+    public string Srs { get; set; } = "EPSG:3857";
+
+    /// <summary>
+    /// Image format
+    /// </summary>
+    [Parameter]
+    public string Format { get; set; } = "image/png";
+
+    /// <summary>
+    /// Enable transparency
+    /// </summary>
+    [Parameter]
+    public bool Transparent { get; set; } = true;
+
+    /// <summary>
+    /// Layer opacity (0-1)
+    /// </summary>
+    [Parameter]
+    public double Opacity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Layer title for display
+    /// </summary>
+    [Parameter]
+    public string? LayerTitle { get; set; }
+
+    /// <summary>
+    /// Show interactive controls
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Show layer selector
+    /// </summary>
+    [Parameter]
+    public bool ShowLayerSelector { get; set; } = true;
+
+    /// <summary>
+    /// Show opacity control
+    /// </summary>
+    [Parameter]
+    public bool ShowOpacityControl { get; set; } = true;
+
+    /// <summary>
+    /// Show legend graphic
+    /// </summary>
+    [Parameter]
+    public bool ShowLegend { get; set; } = true;
+
+    /// <summary>
+    /// Enable GetFeatureInfo on click
+    /// </summary>
+    [Parameter]
+    public bool EnableFeatureInfo { get; set; } = true;
+
+    /// <summary>
+    /// GetFeatureInfo format
+    /// </summary>
+    [Parameter]
+    public string FeatureInfoFormat { get; set; } = "application/json";
+
+    /// <summary>
+    /// Support time dimension
+    /// </summary>
+    [Parameter]
+    public bool SupportsTime { get; set; }
+
+    /// <summary>
+    /// Time dimension parameter
+    /// </summary>
+    [Parameter]
+    public string? TimeDimension { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Min zoom level
+    /// </summary>
+    [Parameter]
+    public int? MinZoom { get; set; }
+
+    /// <summary>
+    /// Max zoom level
+    /// </summary>
+    [Parameter]
+    public int? MaxZoom { get; set; }
+
+    /// <summary>
+    /// Auto-load capabilities on initialization
+    /// </summary>
+    [Parameter]
+    public bool AutoLoadCapabilities { get; set; } = true;
+
+    /// <summary>
+    /// Callback when layer is loaded
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnLayerLoaded { get; set; }
+
+    /// <summary>
+    /// Callback when feature info is retrieved
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnFeatureInfo { get; set; }
+
+    private IJSObjectReference? _wmsModule;
+    private IJSObjectReference? _layerInstance;
+    private DotNetObjectReference<HonuaWmsLayer>? _dotNetRef;
+    private OgcService? _ogcService;
+    private WmsCapabilities? _capabilities;
+    private bool _isInitialized = false;
+    private string? _sourceId;
+    private string? _layerId;
+    private double _currentOpacity = 1.0;
+    private string? _currentTime;
+    private string? _legendUrl;
+    private bool _showLayerSelector = false;
+    private List<WmsLayer> _availableLayers = new();
+    private HashSet<string> _selectedLayers = new();
+
+    protected override void OnInitialized()
+    {
+        _currentOpacity = Opacity;
+        _currentTime = TimeDimension;
+        _ogcService = new OgcService(Http);
+
+        if (Layers.Count > 0)
+        {
+            _selectedLayers = new HashSet<string>(Layers);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeLayer();
+        }
+    }
+
+    private async Task InitializeLayer()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load JavaScript module
+            _wmsModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-wms.js"
+            );
+
+            // Load capabilities if auto-load is enabled
+            if (AutoLoadCapabilities && _ogcService != null)
+            {
+                await LoadCapabilitiesAsync();
+            }
+
+            // Initialize WMS layer on map
+            _sourceId = $"wms-source-{Id}";
+            _layerId = $"wms-layer-{Id}";
+
+            var options = new
+            {
+                sourceId = _sourceId,
+                layerId = _layerId,
+                serviceUrl = ServiceUrl,
+                version = Version,
+                layers = _selectedLayers.Count > 0 ? _selectedLayers.ToList() : Layers,
+                srs = Srs,
+                format = Format,
+                transparent = Transparent,
+                opacity = _currentOpacity,
+                minZoom = MinZoom,
+                maxZoom = MaxZoom,
+                time = _currentTime
+            };
+
+            _layerInstance = await _wmsModule.InvokeAsync<IJSObjectReference>(
+                "createWmsLayer",
+                SyncWith,
+                options,
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+
+            // Update legend URL
+            if (ShowLegend && _selectedLayers.Count > 0)
+            {
+                UpdateLegendUrl();
+            }
+
+            // Publish layer added message
+            await Bus.PublishAsync(new LayerAddedMessage
+            {
+                LayerId = _layerId,
+                LayerName = LayerTitle ?? "WMS Layer"
+            }, Id);
+
+            await OnLayerLoaded.InvokeAsync(_layerId);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing WMS layer: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCapabilitiesAsync()
+    {
+        if (_ogcService == null) return;
+
+        try
+        {
+            _capabilities = await _ogcService.GetWmsCapabilitiesAsync(ServiceUrl, Version);
+
+            if (_capabilities?.Capability.Layer != null)
+            {
+                // Flatten layer hierarchy
+                _availableLayers = FlattenLayers(_capabilities.Capability.Layer);
+
+                // Auto-select first queryable layer if no layers specified
+                if (Layers.Count == 0 && _availableLayers.Count > 0)
+                {
+                    var firstQueryable = _availableLayers.FirstOrDefault(l => l.Queryable && !string.IsNullOrEmpty(l.Name));
+                    if (firstQueryable?.Name != null)
+                    {
+                        _selectedLayers.Add(firstQueryable.Name);
+                    }
+                }
+
+                // Set layer title from capabilities if not provided
+                if (string.IsNullOrEmpty(LayerTitle) && _capabilities.Service != null)
+                {
+                    LayerTitle = _capabilities.Service.Title;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading WMS capabilities: {ex.Message}");
+        }
+    }
+
+    private List<WmsLayer> FlattenLayers(WmsLayer rootLayer)
+    {
+        var result = new List<WmsLayer>();
+
+        if (!string.IsNullOrEmpty(rootLayer.Name))
+        {
+            result.Add(rootLayer);
+        }
+
+        foreach (var childLayer in rootLayer.Layers)
+        {
+            result.AddRange(FlattenLayers(childLayer));
+        }
+
+        return result;
+    }
+
+    private async Task ToggleLayer(WmsLayer layer, bool selected)
+    {
+        if (layer.Name == null) return;
+
+        if (selected)
+        {
+            _selectedLayers.Add(layer.Name);
+        }
+        else
+        {
+            _selectedLayers.Remove(layer.Name);
+        }
+
+        await UpdateLayers();
+    }
+
+    private async Task UpdateLayers()
+    {
+        if (!_isInitialized || _layerInstance == null) return;
+
+        try
+        {
+            await _layerInstance.InvokeVoidAsync("updateLayers", _selectedLayers.ToList());
+            UpdateLegendUrl();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating layers: {ex.Message}");
+        }
+    }
+
+    private async Task OnOpacityChanged(double value)
+    {
+        _currentOpacity = value / 100.0;
+
+        if (!_isInitialized || _layerInstance == null) return;
+
+        try
+        {
+            await _layerInstance.InvokeVoidAsync("setOpacity", _currentOpacity);
+
+            await Bus.PublishAsync(new LayerOpacityChangedMessage
+            {
+                LayerId = _layerId!,
+                Opacity = _currentOpacity
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating opacity: {ex.Message}");
+        }
+    }
+
+    private async Task OnTimeChanged(string time)
+    {
+        _currentTime = time;
+
+        if (!_isInitialized || _layerInstance == null) return;
+
+        try
+        {
+            await _layerInstance.InvokeVoidAsync("setTime", _currentTime);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating time: {ex.Message}");
+        }
+    }
+
+    private void ToggleLayerSelector()
+    {
+        _showLayerSelector = !_showLayerSelector;
+    }
+
+    private void UpdateLegendUrl()
+    {
+        if (_selectedLayers.Count == 0) return;
+
+        var request = new WmsGetLegendGraphicRequest
+        {
+            BaseUrl = ServiceUrl,
+            Layer = _selectedLayers.First(),
+            Format = "image/png",
+            Version = Version
+        };
+
+        _legendUrl = _ogcService?.GetLegendGraphicUrl(request);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when feature is clicked (GetFeatureInfo)
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureInfoCallback(string featureInfoJson)
+    {
+        await OnFeatureInfo.InvokeAsync(featureInfoJson);
+
+        // Publish popup request with feature info
+        await Bus.PublishAsync(new OpenPopupRequestMessage
+        {
+            MapId = SyncWith,
+            Coordinates = new double[] { 0, 0 }, // Will be set by JS
+            LayerId = _layerId,
+            Properties = new Dictionary<string, object>
+            {
+                ["featureInfo"] = featureInfoJson
+            }
+        }, Id);
+    }
+
+    /// <summary>
+    /// Public API: Refresh the layer
+    /// </summary>
+    public async Task RefreshAsync()
+    {
+        if (_layerInstance != null)
+        {
+            await _layerInstance.InvokeVoidAsync("refresh");
+        }
+    }
+
+    /// <summary>
+    /// Public API: Set visibility
+    /// </summary>
+    public async Task SetVisibilityAsync(bool visible)
+    {
+        if (_layerInstance != null)
+        {
+            await _layerInstance.InvokeVoidAsync("setVisibility", visible);
+
+            await Bus.PublishAsync(new LayerVisibilityChangedMessage
+            {
+                LayerId = _layerId!,
+                Visible = visible
+            }, Id);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Get capabilities
+    /// </summary>
+    public WmsCapabilities? GetCapabilities() => _capabilities;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_layerInstance != null)
+        {
+            try
+            {
+                await _layerInstance.InvokeVoidAsync("dispose");
+                await _layerInstance.DisposeAsync();
+            }
+            catch { }
+        }
+
+        if (_wmsModule != null)
+        {
+            try
+            {
+                await _wmsModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+
+        if (!string.IsNullOrEmpty(_layerId))
+        {
+            await Bus.PublishAsync(new LayerRemovedMessage
+            {
+                LayerId = _layerId
+            }, Id);
+        }
+    }
+}
