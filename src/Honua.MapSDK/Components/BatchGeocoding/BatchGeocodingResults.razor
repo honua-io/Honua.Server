@@ -1,0 +1,303 @@
+@using Honua.MapSDK.Models.BatchGeocoding
+
+<div class="batch-geocoding-results">
+    <!-- Filter Controls -->
+    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudSelect T="string"
+                   Label="Filter by Quality"
+                   @bind-Value="@_selectedQualityFilter"
+                   Variant="Variant.Outlined"
+                   Dense="true"
+                   Style="max-width: 200px;">
+            <MudSelectItem Value="@("all")">All Results</MudSelectItem>
+            <MudSelectItem Value="@("exact")">Exact Match</MudSelectItem>
+            <MudSelectItem Value="@("high")">High Quality</MudSelectItem>
+            <MudSelectItem Value="@("medium")">Medium Quality</MudSelectItem>
+            <MudSelectItem Value="@("low")">Low Quality</MudSelectItem>
+            <MudSelectItem Value="@("failed")">Failed</MudSelectItem>
+        </MudSelect>
+
+        <MudSelect T="string"
+                   Label="Filter by Status"
+                   @bind-Value="@_selectedStatusFilter"
+                   Variant="Variant.Outlined"
+                   Dense="true"
+                   Style="max-width: 200px;">
+            <MudSelectItem Value="@("all")">All Status</MudSelectItem>
+            <MudSelectItem Value="@("success")">Success</MudSelectItem>
+            <MudSelectItem Value="@("ambiguous")">Ambiguous</MudSelectItem>
+            <MudSelectItem Value="@("failed")">Failed/Error</MudSelectItem>
+        </MudSelect>
+
+        <MudSpacer />
+
+        <MudText Typo="Typo.body2">
+            Showing @_filteredMatches.Count of @Results.Matches.Count results
+        </MudText>
+    </MudStack>
+
+    <!-- Results Table -->
+    <MudTable Items="@_filteredMatches"
+              Dense="true"
+              Hover="true"
+              Striped="true"
+              FixedHeader="true"
+              Height="500px"
+              MultiSelection="true"
+              @bind-SelectedItems="_selectedItems"
+              Loading="@(_filteredMatches.Count == 0)"
+              LoadingProgressColor="Color.Primary">
+        <HeaderContent>
+            <MudTh>Row</MudTh>
+            <MudTh>Original Address</MudTh>
+            <MudTh>Matched Address</MudTh>
+            <MudTh>Latitude</MudTh>
+            <MudTh>Longitude</MudTh>
+            <MudTh>Quality</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Confidence</MudTh>
+            @if (ShowMapActions)
+            {
+                <MudTh>Actions</MudTh>
+            }
+        </HeaderContent>
+        <RowTemplate Context="match">
+            <MudTd DataLabel="Row">@(match.RowIndex + 1)</MudTd>
+            <MudTd DataLabel="Original Address">
+                <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                    @match.OriginalAddress
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Matched Address">
+                <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                    @(match.MatchedAddress ?? "-")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Latitude">
+                @if (match.Latitude.HasValue)
+                {
+                    <MudText Typo="Typo.body2">@match.Latitude.Value.ToString("F6")</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Longitude">
+                @if (match.Longitude.HasValue)
+                {
+                    <MudText Typo="Typo.body2">@match.Longitude.Value.ToString("F6")</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Quality">
+                <MudChip Size="Size.Small"
+                         Color="@GetQualityColor(match.Quality)"
+                         Variant="Variant.Filled">
+                    @match.Quality.ToString()
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip Size="Size.Small"
+                         Color="@GetStatusColor(match.Status)"
+                         Variant="Variant.Text">
+                    @match.Status.ToString()
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Confidence">
+                @if (match.Confidence.HasValue)
+                {
+                    <MudText Typo="Typo.body2">@match.Confidence.Value.ToString("P0")</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                }
+            </MudTd>
+            @if (ShowMapActions)
+            {
+                <MudTd DataLabel="Actions">
+                    <MudStack Row="true" Spacing="1">
+                        @if (match.Status == GeocodingStatus.Error ||
+                             match.Status == GeocodingStatus.NoResults ||
+                             match.Status == GeocodingStatus.Timeout)
+                        {
+                            <MudTooltip Text="Retry geocoding">
+                                <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                               Size="Size.Small"
+                                               Color="Color.Warning"
+                                               OnClick="@(() => OnRetry.InvokeAsync(match))" />
+                            </MudTooltip>
+                        }
+                        @if (match.Latitude.HasValue && match.Longitude.HasValue)
+                        {
+                            <MudTooltip Text="Show on map">
+                                <MudIconButton Icon="@Icons.Material.Filled.Map"
+                                               Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="@(() => OnDisplayOnMap.InvokeAsync(match))" />
+                            </MudTooltip>
+                        }
+                        @if (match.AlternativesCount > 0)
+                        {
+                            <MudTooltip Text="@($"{match.AlternativesCount} alternative results")">
+                                <MudChip Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
+                                    +@match.AlternativesCount
+                                </MudChip>
+                            </MudTooltip>
+                        }
+                    </MudStack>
+                </MudTd>
+            }
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                No results match the selected filters.
+            </MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    <!-- Bulk Actions -->
+    @if (_selectedItems.Count > 0)
+    {
+        <MudPaper Class="pa-3 mt-3" Elevation="1">
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.body2">
+                    <strong>@_selectedItems.Count</strong> items selected
+                </MudText>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           Size="Size.Small"
+                           OnClick="@RetrySelected"
+                           Disabled="@(!_selectedItems.Any(m => m.Status == GeocodingStatus.Error || m.Status == GeocodingStatus.NoResults))">
+                    Retry Failed
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.Delete"
+                           Size="Size.Small"
+                           OnClick="@(() => _selectedItems.Clear())">
+                    Clear Selection
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Batch geocoding results to display.
+    /// </summary>
+    [Parameter]
+    public required BatchGeocodingResult Results { get; set; }
+
+    /// <summary>
+    /// Event callback when retry is requested for an address.
+    /// </summary>
+    [Parameter]
+    public EventCallback<GeocodingMatch> OnRetry { get; set; }
+
+    /// <summary>
+    /// Event callback when display on map is requested.
+    /// </summary>
+    [Parameter]
+    public EventCallback<GeocodingMatch> OnDisplayOnMap { get; set; }
+
+    /// <summary>
+    /// Whether to show map-related actions.
+    /// </summary>
+    [Parameter]
+    public bool ShowMapActions { get; set; } = true;
+
+    private string _selectedQualityFilter = "all";
+    private string _selectedStatusFilter = "all";
+    private List<GeocodingMatch> _filteredMatches = new();
+    private HashSet<GeocodingMatch> _selectedItems = new();
+
+    protected override void OnParametersSet()
+    {
+        FilterResults();
+    }
+
+    protected override void OnInitialized()
+    {
+        FilterResults();
+    }
+
+    private void FilterResults()
+    {
+        _filteredMatches = Results.Matches
+            .Where(m => MatchesQualityFilter(m) && MatchesStatusFilter(m))
+            .ToList();
+    }
+
+    private bool MatchesQualityFilter(GeocodingMatch match)
+    {
+        return _selectedQualityFilter switch
+        {
+            "exact" => match.Quality == MatchQuality.Exact,
+            "high" => match.Quality == MatchQuality.High,
+            "medium" => match.Quality == MatchQuality.Medium,
+            "low" => match.Quality == MatchQuality.Low,
+            "failed" => match.Quality == MatchQuality.Failed,
+            _ => true
+        };
+    }
+
+    private bool MatchesStatusFilter(GeocodingMatch match)
+    {
+        return _selectedStatusFilter switch
+        {
+            "success" => match.Status == GeocodingStatus.Success,
+            "ambiguous" => match.Status == GeocodingStatus.Ambiguous,
+            "failed" => match.Status == GeocodingStatus.Error ||
+                       match.Status == GeocodingStatus.NoResults ||
+                       match.Status == GeocodingStatus.Timeout,
+            _ => true
+        };
+    }
+
+    private Color GetQualityColor(MatchQuality quality)
+    {
+        return quality switch
+        {
+            MatchQuality.Exact => Color.Success,
+            MatchQuality.High => Color.Info,
+            MatchQuality.Medium => Color.Warning,
+            MatchQuality.Low => Color.Default,
+            MatchQuality.Failed => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private Color GetStatusColor(GeocodingStatus status)
+    {
+        return status switch
+        {
+            GeocodingStatus.Success => Color.Success,
+            GeocodingStatus.Ambiguous => Color.Warning,
+            GeocodingStatus.NoResults => Color.Default,
+            GeocodingStatus.Error => Color.Error,
+            GeocodingStatus.Timeout => Color.Error,
+            GeocodingStatus.RateLimited => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private async Task RetrySelected()
+    {
+        foreach (var match in _selectedItems.Where(m =>
+            m.Status == GeocodingStatus.Error ||
+            m.Status == GeocodingStatus.NoResults ||
+            m.Status == GeocodingStatus.Timeout))
+        {
+            await OnRetry.InvokeAsync(match);
+        }
+
+        _selectedItems.Clear();
+    }
+}

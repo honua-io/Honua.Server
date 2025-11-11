@@ -6,6 +6,7 @@ using Honua.MapSDK.Components.Map;
 using Honua.MapSDK.Core;
 using Honua.MapSDK.Logging;
 using Honua.MapSDK.Services;
+using Honua.MapSDK.Services.BatchGeocoding;
 using Honua.MapSDK.Services.DataLoading;
 using Honua.MapSDK.Services.Drawing;
 using Honua.MapSDK.Services.Performance;
@@ -75,6 +76,11 @@ public static class ServiceCollectionExtensions
 
         // Register geocoding search service
         services.AddScoped<GeocodingSearchService>();
+
+        // Register batch geocoding services
+        services.AddHttpClient<BatchGeocodingService>();
+        services.AddScoped<BatchGeocodingService>();
+        services.AddScoped<CsvGeocodingService>();
 
         // Register basemap service
         services.AddSingleton<BasemapService>();
