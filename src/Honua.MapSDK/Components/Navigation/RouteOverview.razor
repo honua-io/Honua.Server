@@ -1,0 +1,418 @@
+@using Honua.MapSDK.Models.Routing
+
+<MudPaper Elevation="2" Class="route-overview">
+    <div class="route-header">
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Route" />
+            Route Overview
+        </MudText>
+    </div>
+
+    @if (Route != null)
+    {
+        <div class="route-content">
+            @* Main route summary *@
+            <MudCard Class="route-card primary-route" @onclick="@(() => OnSelectAlternative.InvokeAsync(Route))">
+                <MudCardContent>
+                    <div class="route-summary">
+                        <div class="route-times">
+                            <MudText Typo="Typo.h5" Color="Color.Primary">
+                                @Route.Summary.FormattedDuration
+                            </MudText>
+                            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                                @Route.Summary.FormattedDistance
+                            </MudText>
+                        </div>
+                        @if (Route.Summary.MainRoads?.Count > 0)
+                        {
+                            <MudText Typo="Typo.body2" Class="via-roads">
+                                via @string.Join(", ", Route.Summary.MainRoads.Take(2))
+                            </MudText>
+                        }
+                        @if (Route.Traffic != null)
+                        {
+                            <div class="traffic-indicator @GetTrafficClass(Route.Traffic.Condition)">
+                                <MudIcon Icon="@Icons.Material.Filled.Traffic" Size="Size.Small" />
+                                <MudText Typo="Typo.caption">@Route.Traffic.Condition</MudText>
+                            </div>
+                        }
+                    </div>
+                    @if (Route.Summary.EstimatedArrivalTime.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                            Arrive by @Route.Summary.EstimatedArrivalTime.Value.ToLocalTime().ToString("h:mm tt")
+                        </MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+
+            @* Alternative routes *@
+            @if (AlternativeRoutes != null && AlternativeRoutes.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-2">Alternative Routes</MudText>
+                @foreach (var altRoute in AlternativeRoutes.Take(2))
+                {
+                    <MudCard Class="route-card alternative-route" @onclick="@(() => OnSelectAlternative.InvokeAsync(altRoute))">
+                        <MudCardContent>
+                            <div class="route-summary">
+                                <div class="route-times">
+                                    <MudText Typo="Typo.h6">
+                                        @altRoute.Summary.FormattedDuration
+                                    </MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        @altRoute.Summary.FormattedDistance
+                                    </MudText>
+                                </div>
+                                @if (altRoute.Summary.MainRoads?.Count > 0)
+                                {
+                                    <MudText Typo="Typo.caption">
+                                        via @string.Join(", ", altRoute.Summary.MainRoads.Take(1))
+                                    </MudText>
+                                }
+                            </div>
+                            <div class="route-comparison">
+                                @{
+                                    var timeDiff = altRoute.Duration - Route.Duration;
+                                    var distDiff = altRoute.Distance - Route.Distance;
+                                }
+                                <MudChip Size="Size.Small" Color="@(timeDiff > 0 ? Color.Warning : Color.Success)">
+                                    @(timeDiff > 0 ? "+" : "")@FormatDuration(Math.Abs(timeDiff))
+                                </MudChip>
+                                @if (altRoute.Summary.TollCost.HasValue && altRoute.Summary.TollCost.Value == 0 && Route.Summary.TollCost > 0)
+                                {
+                                    <MudChip Size="Size.Small" Color="Color.Info">No tolls</MudChip>
+                                }
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            }
+
+            @* Route details *@
+            <MudExpansionPanels Class="mt-3">
+                <MudExpansionPanel Text="Route Details">
+                    <div class="route-details">
+                        <div class="detail-row">
+                            <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" />
+                            <MudText Typo="Typo.body2">Total Distance: @Route.Summary.FormattedDistance</MudText>
+                        </div>
+                        <div class="detail-row">
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                            <MudText Typo="Typo.body2">Estimated Time: @Route.Summary.FormattedDuration</MudText>
+                        </div>
+                        @if (Route.Summary.TollCost.HasValue)
+                        {
+                            <div class="detail-row">
+                                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">Toll Cost: $@Route.Summary.TollCost.Value.ToString("F2")</MudText>
+                            </div>
+                        }
+                        @if (Route.Summary.FuelConsumption.HasValue)
+                        {
+                            <div class="detail-row">
+                                <MudIcon Icon="@Icons.Material.Filled.LocalGasStation" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">Fuel: @Route.Summary.FuelConsumption.Value.ToString("F1")L</MudText>
+                            </div>
+                        }
+                        @if (Route.Summary.AverageSpeed.HasValue)
+                        {
+                            <div class="detail-row">
+                                <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">Avg Speed: @Route.Summary.AverageSpeed.Value.ToString("F0") km/h</MudText>
+                            </div>
+                        }
+                    </div>
+                </MudExpansionPanel>
+
+                <MudExpansionPanel Text="Turn-by-Turn Directions">
+                    <div class="directions-list">
+                        @foreach (var (instruction, index) in Route.Instructions.Select((i, idx) => (i, idx)))
+                        {
+                            <div class="direction-step">
+                                <div class="step-number">@(index + 1)</div>
+                                <div class="step-icon">
+                                    <MudIcon Icon="@GetManeuverIcon(instruction.Maneuver)" Size="Size.Small" />
+                                </div>
+                                <div class="step-content">
+                                    <MudText Typo="Typo.body2">@instruction.Text</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @FormatDistance(instruction.Distance)
+                                        @if (instruction.Time > 0)
+                                        {
+                                            <span> · @FormatDuration(instruction.Time)</span>
+                                        }
+                                    </MudText>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </MudExpansionPanel>
+
+                @if (Route.Traffic != null && Route.Traffic.Delays?.Count > 0)
+                {
+                    <MudExpansionPanel Text="Traffic Delays">
+                        <div class="traffic-delays">
+                            @foreach (var delay in Route.Traffic.Delays)
+                            {
+                                <div class="delay-item">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning"
+                                             Color="@GetDelaySeverityColor(delay.Severity)"
+                                             Size="Size.Small" />
+                                    <div class="delay-content">
+                                        <MudText Typo="Typo.body2">
+                                            @(delay.Reason ?? "Traffic delay")
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            +@FormatDuration(delay.DelaySeconds) delay
+                                        </MudText>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </MudExpansionPanel>
+                }
+            </MudExpansionPanels>
+
+            @* Start Navigation Button *@
+            <MudButton
+                Variant="Variant.Filled"
+                Color="Color.Primary"
+                FullWidth="true"
+                Size="Size.Large"
+                StartIcon="@Icons.Material.Filled.Navigation"
+                OnClick="@(() => OnStartNavigation.InvokeAsync())"
+                Class="mt-4 start-navigation-btn">
+                Start Navigation
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="ma-4">
+            No route available. Calculate a route to see the overview.
+        </MudAlert>
+    }
+</MudPaper>
+
+<style>
+    .route-overview {
+        padding: 16px;
+        max-width: 450px;
+    }
+
+    .route-header {
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(0,0,0,0.12);
+    }
+
+    .route-card {
+        margin-bottom: 12px;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .route-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .primary-route {
+        border: 2px solid #4285F4;
+    }
+
+    .route-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .route-times {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+    }
+
+    .via-roads {
+        color: rgba(0,0,0,0.6);
+    }
+
+    .traffic-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+
+    .traffic-indicator.clear {
+        background: rgba(76, 175, 80, 0.1);
+        color: #4CAF50;
+    }
+
+    .traffic-indicator.light {
+        background: rgba(255, 193, 7, 0.1);
+        color: #FFC107;
+    }
+
+    .traffic-indicator.moderate {
+        background: rgba(255, 152, 0, 0.1);
+        color: #FF9800;
+    }
+
+    .traffic-indicator.heavy,
+    .traffic-indicator.severe {
+        background: rgba(244, 67, 54, 0.1);
+        color: #F44336;
+    }
+
+    .route-comparison {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .route-details {
+        padding: 8px;
+    }
+
+    .detail-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0;
+    }
+
+    .directions-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .direction-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 8px;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .direction-step:last-child {
+        border-bottom: none;
+    }
+
+    .step-number {
+        min-width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #4285F4;
+        color: white;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .step-icon {
+        flex-shrink: 0;
+    }
+
+    .step-content {
+        flex: 1;
+    }
+
+    .traffic-delays {
+        padding: 8px;
+    }
+
+    .delay-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 8px 0;
+    }
+
+    .delay-content {
+        flex: 1;
+    }
+
+    .start-navigation-btn {
+        height: 56px;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public Route? Route { get; set; }
+
+    [Parameter]
+    public List<Route>? AlternativeRoutes { get; set; }
+
+    [Parameter]
+    public EventCallback OnStartNavigation { get; set; }
+
+    [Parameter]
+    public EventCallback<Route> OnSelectAlternative { get; set; }
+
+    private string GetManeuverIcon(ManeuverType maneuver)
+    {
+        return maneuver switch
+        {
+            ManeuverType.TurnLeft => Icons.Material.Filled.TurnLeft,
+            ManeuverType.TurnRight => Icons.Material.Filled.TurnRight,
+            ManeuverType.TurnSlightLeft => Icons.Material.Filled.TurnSlightLeft,
+            ManeuverType.TurnSlightRight => Icons.Material.Filled.TurnSlightRight,
+            ManeuverType.TurnSharpLeft => Icons.Material.Filled.TurnSharpLeft,
+            ManeuverType.TurnSharpRight => Icons.Material.Filled.TurnSharpRight,
+            ManeuverType.UTurn => Icons.Material.Filled.UTurnLeft,
+            ManeuverType.Straight or ManeuverType.Continue => Icons.Material.Filled.Straight,
+            ManeuverType.Merge => Icons.Material.Filled.Merge,
+            ManeuverType.Fork => Icons.Material.Filled.CallSplit,
+            ManeuverType.Roundabout => Icons.Material.Filled.RotateRight,
+            ManeuverType.Arrive => Icons.Material.Filled.Place,
+            ManeuverType.Depart => Icons.Material.Filled.NearMe,
+            _ => Icons.Material.Filled.ArrowForward
+        };
+    }
+
+    private string GetTrafficClass(TrafficCondition condition)
+    {
+        return condition.ToString().ToLower();
+    }
+
+    private Color GetDelaySeverityColor(TrafficSeverity severity)
+    {
+        return severity switch
+        {
+            TrafficSeverity.Minor => Color.Success,
+            TrafficSeverity.Moderate => Color.Warning,
+            TrafficSeverity.Major => Color.Error,
+            TrafficSeverity.Severe => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private string FormatDistance(double meters)
+    {
+        if (meters < 1000)
+        {
+            return $"{(int)meters} m";
+        }
+        return $"{meters / 1000:F1} km";
+    }
+
+    private string FormatDuration(int seconds)
+    {
+        var minutes = seconds / 60;
+        if (minutes < 60)
+        {
+            return $"{minutes} min";
+        }
+        var hours = minutes / 60;
+        var remainingMinutes = minutes % 60;
+        return remainingMinutes > 0 ? $"{hours}h {remainingMinutes}m" : $"{hours}h";
+    }
+}
