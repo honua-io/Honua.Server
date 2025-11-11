@@ -1,0 +1,857 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Models.Streaming
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-streaming @CssClass @(_isDarkMode ? "dark-mode" : "")" @ref="_containerRef" id="@Id">
+    @if (ShowControls)
+    {
+        <div class="honua-streaming-controls">
+            <div class="honua-streaming-header">
+                <h3>@Title</h3>
+                <button class="honua-streaming-close" @onclick="ToggleControls" title="Hide controls">×</button>
+            </div>
+
+            <div class="honua-streaming-status">
+                <div class="honua-streaming-status-indicator @GetStatusClass()">
+                    <span class="status-dot"></span>
+                    <span class="status-text">@GetStatusText()</span>
+                </div>
+                @if (_statistics != null)
+                {
+                    <div class="honua-streaming-stat-small">
+                        @_statistics.CurrentFeatureCount features | @_statistics.MessagesPerSecond.ToString("F1") msg/s
+                    </div>
+                }
+            </div>
+
+            @if (ShowStatistics && _statistics != null)
+            {
+                <div class="honua-streaming-statistics">
+                    <h4>Connection Statistics</h4>
+
+                    <div class="honua-streaming-stat-grid">
+                        <div class="honua-streaming-stat">
+                            <span class="label">Features:</span>
+                            <span class="value">@_statistics.CurrentFeatureCount.ToString("N0")</span>
+                        </div>
+                        <div class="honua-streaming-stat">
+                            <span class="label">Messages:</span>
+                            <span class="value">@_statistics.MessagesReceived.ToString("N0")</span>
+                        </div>
+                        <div class="honua-streaming-stat">
+                            <span class="label">Rate:</span>
+                            <span class="value">@_statistics.MessagesPerSecond.ToString("F1") msg/s</span>
+                        </div>
+                        <div class="honua-streaming-stat">
+                            <span class="label">Data:</span>
+                            <span class="value">@FormatBytes(_statistics.BytesReceived)</span>
+                        </div>
+                        <div class="honua-streaming-stat">
+                            <span class="label">Updates:</span>
+                            <span class="value">@_statistics.FeaturesUpdated.ToString("N0")</span>
+                        </div>
+                        <div class="honua-streaming-stat">
+                            <span class="label">Deletes:</span>
+                            <span class="value">@_statistics.FeaturesDeleted.ToString("N0")</span>
+                        </div>
+                        @if (_statistics.ConnectedAt.HasValue)
+                        {
+                            <div class="honua-streaming-stat">
+                                <span class="label">Uptime:</span>
+                                <span class="value">@FormatDuration(_statistics.Uptime)</span>
+                            </div>
+                        }
+                        @if (_statistics.ErrorCount > 0)
+                        {
+                            <div class="honua-streaming-stat error">
+                                <span class="label">Errors:</span>
+                                <span class="value">@_statistics.ErrorCount</span>
+                            </div>
+                        }
+                    </div>
+
+                    @if (_statistics.ReconnectAttempts > 0)
+                    {
+                        <div class="honua-streaming-reconnect-info">
+                            Reconnection attempts: @_statistics.ReconnectAttempts
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="honua-streaming-actions">
+                @if (_connectionState == ConnectionState.Connected)
+                {
+                    <button class="honua-streaming-button disconnect" @onclick="Disconnect">
+                        Disconnect
+                    </button>
+                }
+                else if (_connectionState == ConnectionState.Disconnected || _connectionState == ConnectionState.Failed)
+                {
+                    <button class="honua-streaming-button connect" @onclick="Connect">
+                        Connect
+                    </button>
+                }
+                else
+                {
+                    <button class="honua-streaming-button" disabled>
+                        Connecting...
+                    </button>
+                }
+
+                @if (_isVisible)
+                {
+                    <button class="honua-streaming-button" @onclick="ToggleVisibility">
+                        Hide Layer
+                    </button>
+                }
+                else
+                {
+                    <button class="honua-streaming-button" @onclick="ToggleVisibility">
+                        Show Layer
+                    </button>
+                }
+
+                <button class="honua-streaming-button" @onclick="ClearFeatures">
+                    Clear Features
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <button class="honua-streaming-toggle" @onclick="ToggleControls" title="Show streaming controls">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+        </button>
+    }
+</div>
+
+<style>
+.honua-streaming {
+    position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.honua-streaming-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 16px;
+    min-width: 300px;
+    max-width: 400px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.honua-streaming.dark-mode .honua-streaming-controls {
+    background: #2d3748;
+    color: #e2e8f0;
+}
+
+.honua-streaming-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.honua-streaming.dark-mode .honua-streaming-header {
+    border-bottom-color: #4a5568;
+}
+
+.honua-streaming-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.honua-streaming-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #718096;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    line-height: 1;
+}
+
+.honua-streaming-close:hover {
+    color: #2d3748;
+}
+
+.honua-streaming.dark-mode .honua-streaming-close:hover {
+    color: #e2e8f0;
+}
+
+.honua-streaming-status {
+    margin-bottom: 16px;
+}
+
+.honua-streaming-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.honua-streaming-status-indicator.connected {
+    background: #d4edda;
+    color: #155724;
+}
+
+.honua-streaming-status-indicator.connecting,
+.honua-streaming-status-indicator.reconnecting {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.honua-streaming-status-indicator.disconnected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.honua-streaming-status-indicator.failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s infinite;
+}
+
+.honua-streaming-status-indicator.connected .status-dot {
+    background: #28a745;
+}
+
+.honua-streaming-status-indicator.connecting .status-dot,
+.honua-streaming-status-indicator.reconnecting .status-dot {
+    background: #ffc107;
+}
+
+.honua-streaming-status-indicator.disconnected .status-dot,
+.honua-streaming-status-indicator.failed .status-dot {
+    background: #dc3545;
+    animation: none;
+}
+
+@@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.honua-streaming-stat-small {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #718096;
+}
+
+.honua-streaming-statistics {
+    margin-bottom: 16px;
+}
+
+.honua-streaming-statistics h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.honua-streaming.dark-mode .honua-streaming-statistics h4 {
+    color: #e2e8f0;
+}
+
+.honua-streaming-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.honua-streaming-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: #f7fafc;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.honua-streaming.dark-mode .honua-streaming-stat {
+    background: #1a202c;
+}
+
+.honua-streaming-stat.error {
+    background: #fff5f5;
+    color: #c53030;
+}
+
+.honua-streaming.dark-mode .honua-streaming-stat.error {
+    background: #742a2a;
+    color: #fc8181;
+}
+
+.honua-streaming-stat .label {
+    color: #718096;
+    font-weight: 500;
+}
+
+.honua-streaming-stat .value {
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.honua-streaming.dark-mode .honua-streaming-stat .value {
+    color: #e2e8f0;
+}
+
+.honua-streaming-reconnect-info {
+    margin-top: 8px;
+    padding: 8px;
+    background: #fff3cd;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #856404;
+}
+
+.honua-streaming-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.honua-streaming-button {
+    flex: 1;
+    min-width: 80px;
+    padding: 8px 16px;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    background: white;
+    color: #2d3748;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.honua-streaming-button:hover:not(:disabled) {
+    background: #f7fafc;
+    border-color: #a0aec0;
+}
+
+.honua-streaming-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.honua-streaming-button.connect {
+    background: #48bb78;
+    color: white;
+    border-color: #48bb78;
+}
+
+.honua-streaming-button.connect:hover {
+    background: #38a169;
+    border-color: #38a169;
+}
+
+.honua-streaming-button.disconnect {
+    background: #f56565;
+    color: white;
+    border-color: #f56565;
+}
+
+.honua-streaming-button.disconnect:hover {
+    background: #e53e3e;
+    border-color: #e53e3e;
+}
+
+.honua-streaming-toggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    border: none;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2d3748;
+    z-index: 1000;
+    transition: all 0.2s;
+}
+
+.honua-streaming-toggle:hover {
+    background: #f7fafc;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.honua-streaming.dark-mode .honua-streaming-toggle {
+    background: #2d3748;
+    color: #e2e8f0;
+}
+</style>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this streaming layer
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"streaming-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Display title for the control panel
+    /// </summary>
+    [Parameter]
+    public string Title { get; set; } = "Real-time Streaming";
+
+    /// <summary>
+    /// Map ID to sync with (required)
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// WebSocket endpoint URL (required)
+    /// </summary>
+    [Parameter]
+    public required string WebSocketUrl { get; set; }
+
+    /// <summary>
+    /// Message format (GeoJSON, JSON, Binary)
+    /// </summary>
+    [Parameter]
+    public MessageFormat MessageFormat { get; set; } = MessageFormat.GeoJson;
+
+    /// <summary>
+    /// Update strategy (Replace, Upsert, Accumulate, UpdateOnly)
+    /// </summary>
+    [Parameter]
+    public UpdateStrategy UpdateStrategy { get; set; } = UpdateStrategy.Upsert;
+
+    /// <summary>
+    /// Maximum number of features to keep (0 = unlimited)
+    /// </summary>
+    [Parameter]
+    public int MaxFeatures { get; set; } = 1000;
+
+    /// <summary>
+    /// Enable automatic reconnection
+    /// </summary>
+    [Parameter]
+    public bool EnableAutoReconnect { get; set; } = true;
+
+    /// <summary>
+    /// Initial reconnection delay (milliseconds)
+    /// </summary>
+    [Parameter]
+    public int ReconnectDelay { get; set; } = 1000;
+
+    /// <summary>
+    /// Maximum reconnection delay (milliseconds)
+    /// </summary>
+    [Parameter]
+    public int MaxReconnectDelay { get; set; } = 30000;
+
+    /// <summary>
+    /// Maximum reconnection attempts (0 = unlimited)
+    /// </summary>
+    [Parameter]
+    public int MaxReconnectAttempts { get; set; } = 0;
+
+    /// <summary>
+    /// Authentication token
+    /// </summary>
+    [Parameter]
+    public string? AuthToken { get; set; }
+
+    /// <summary>
+    /// Update throttle interval (milliseconds)
+    /// </summary>
+    [Parameter]
+    public int UpdateThrottle { get; set; } = 100;
+
+    /// <summary>
+    /// Message buffer size
+    /// </summary>
+    [Parameter]
+    public int BufferSize { get; set; } = 100;
+
+    /// <summary>
+    /// Layer type (circle, line, fill)
+    /// </summary>
+    [Parameter]
+    public string LayerType { get; set; } = "circle";
+
+    /// <summary>
+    /// Layer paint properties (JSON)
+    /// </summary>
+    [Parameter]
+    public object? Paint { get; set; }
+
+    /// <summary>
+    /// Layer layout properties (JSON)
+    /// </summary>
+    [Parameter]
+    public object? Layout { get; set; }
+
+    /// <summary>
+    /// Show control panel
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Show statistics
+    /// </summary>
+    [Parameter]
+    public bool ShowStatistics { get; set; } = true;
+
+    /// <summary>
+    /// Auto-connect on initialization
+    /// </summary>
+    [Parameter]
+    public bool AutoConnect { get; set; } = true;
+
+    /// <summary>
+    /// Dark mode
+    /// </summary>
+    [Parameter]
+    public bool DarkMode { get; set; } = false;
+
+    /// <summary>
+    /// Additional CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Callback when connected
+    /// </summary>
+    [Parameter]
+    public EventCallback OnConnected { get; set; }
+
+    /// <summary>
+    /// Callback when disconnected
+    /// </summary>
+    [Parameter]
+    public EventCallback OnDisconnected { get; set; }
+
+    /// <summary>
+    /// Callback when error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    /// <summary>
+    /// Callback when message is received
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnMessageReceived { get; set; }
+
+    /// <summary>
+    /// Callback when feature is updated
+    /// </summary>
+    [Parameter]
+    public EventCallback<JsonElement> OnFeatureUpdate { get; set; }
+
+    private ElementReference _containerRef;
+    private IJSObjectReference? _streamingModule;
+    private IJSObjectReference? _streamingInstance;
+    private DotNetObjectReference<HonuaStreamingLayer>? _dotNetRef;
+    private bool _isInitialized = false;
+    private bool _isVisible = true;
+    private bool _isDarkMode = false;
+    private ConnectionState _connectionState = ConnectionState.Disconnected;
+    private StreamingStatistics? _statistics;
+    private System.Threading.Timer? _statsUpdateTimer;
+
+    protected override void OnInitialized()
+    {
+        _isDarkMode = DarkMode;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeStreaming();
+        }
+    }
+
+    private async Task InitializeStreaming()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load streaming module
+            _streamingModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/streaming-manager.js"
+            );
+
+            // Get the map instance
+            var mapModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-map.js"
+            );
+
+            var mapInstance = await mapModule.InvokeAsync<IJSObjectReference>("getMapInstance", SyncWith);
+
+            // Initialize streaming manager
+            await _streamingModule.InvokeVoidAsync("initializeStreaming", SyncWith, mapInstance);
+
+            // Create streaming source
+            var sourceId = $"streaming-source-{Id}";
+            var layerId = $"streaming-layer-{Id}";
+
+            var options = new
+            {
+                webSocketUrl = WebSocketUrl,
+                updateStrategy = UpdateStrategy.ToString().ToLowerInvariant(),
+                maxFeatures = MaxFeatures,
+                enableAutoReconnect = EnableAutoReconnect,
+                reconnectDelay = ReconnectDelay,
+                maxReconnectDelay = MaxReconnectDelay,
+                maxReconnectAttempts = MaxReconnectAttempts,
+                authToken = AuthToken,
+                updateThrottle = UpdateThrottle,
+                bufferSize = BufferSize,
+                layerId = layerId,
+                layerType = LayerType,
+                paint = Paint,
+                layout = Layout
+            };
+
+            _streamingInstance = await _streamingModule.InvokeAsync<IJSObjectReference>(
+                "createStreamingSource",
+                SyncWith,
+                sourceId,
+                options,
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+
+            // Start auto-connect if enabled
+            if (!AutoConnect)
+            {
+                await Disconnect();
+            }
+
+            // Start statistics update timer
+            _statsUpdateTimer = new System.Threading.Timer(async _ =>
+            {
+                await UpdateStatistics();
+            }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing streaming: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateStatistics()
+    {
+        if (!_isInitialized || _streamingInstance == null) return;
+
+        try
+        {
+            var stats = await _streamingInstance.InvokeAsync<JsonElement>("getStatistics");
+
+            _statistics = new StreamingStatistics
+            {
+                State = Enum.Parse<ConnectionState>(stats.GetProperty("state").GetString() ?? "disconnected", true),
+                MessagesReceived = stats.GetProperty("messagesReceived").GetInt64(),
+                FeaturesUpdated = stats.GetProperty("featuresUpdated").GetInt64(),
+                FeaturesDeleted = stats.GetProperty("featuresDeleted").GetInt64(),
+                CurrentFeatureCount = stats.GetProperty("currentFeatureCount").GetInt32(),
+                MessagesPerSecond = stats.GetProperty("messagesPerSecond").GetDouble(),
+                ErrorCount = stats.GetProperty("errorCount").GetInt32(),
+                BytesReceived = stats.GetProperty("bytesReceived").GetInt64()
+            };
+
+            if (stats.TryGetProperty("connectedAt", out var connectedAt) && connectedAt.ValueKind != JsonValueKind.Null)
+            {
+                _statistics.ConnectedAt = connectedAt.GetDateTime();
+            }
+
+            if (stats.TryGetProperty("lastMessageAt", out var lastMessageAt) && lastMessageAt.ValueKind != JsonValueKind.Null)
+            {
+                _statistics.LastMessageAt = lastMessageAt.GetDateTime();
+            }
+
+            _connectionState = _statistics.State;
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating statistics: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnConnected()
+    {
+        _connectionState = ConnectionState.Connected;
+        await OnConnected.InvokeAsync();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnDisconnected()
+    {
+        _connectionState = ConnectionState.Disconnected;
+        await OnDisconnected.InvokeAsync();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnError(string error)
+    {
+        await OnError.InvokeAsync(error);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnMessageReceived(string message)
+    {
+        await OnMessageReceived.InvokeAsync(message);
+    }
+
+    [JSInvokable]
+    public async Task OnFeatureUpdate(JsonElement feature)
+    {
+        await OnFeatureUpdate.InvokeAsync(feature);
+    }
+
+    [JSInvokable]
+    public async Task OnStateChanged(string state)
+    {
+        _connectionState = Enum.Parse<ConnectionState>(state, true);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Connect()
+    {
+        if (_streamingInstance != null)
+        {
+            await _streamingInstance.InvokeVoidAsync("connect");
+        }
+    }
+
+    private async Task Disconnect()
+    {
+        if (_streamingInstance != null)
+        {
+            await _streamingInstance.InvokeVoidAsync("disconnect");
+        }
+    }
+
+    private async Task ToggleVisibility()
+    {
+        _isVisible = !_isVisible;
+        if (_streamingInstance != null)
+        {
+            await _streamingInstance.InvokeVoidAsync("setVisibility", _isVisible);
+        }
+    }
+
+    private async Task ClearFeatures()
+    {
+        if (_streamingInstance != null)
+        {
+            await _streamingInstance.InvokeVoidAsync("clearFeatures");
+        }
+    }
+
+    private void ToggleControls()
+    {
+        ShowControls = !ShowControls;
+        StateHasChanged();
+    }
+
+    private string GetStatusClass()
+    {
+        return _connectionState.ToString().ToLowerInvariant();
+    }
+
+    private string GetStatusText()
+    {
+        return _connectionState switch
+        {
+            ConnectionState.Connected => "Connected",
+            ConnectionState.Connecting => "Connecting...",
+            ConnectionState.Reconnecting => "Reconnecting...",
+            ConnectionState.Failed => "Connection Failed",
+            _ => "Disconnected"
+        };
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:F1} {sizes[order]}";
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+            return $"{(int)duration.TotalHours}h {duration.Minutes}m";
+        if (duration.TotalMinutes >= 1)
+            return $"{(int)duration.TotalMinutes}m {duration.Seconds}s";
+        return $"{duration.Seconds}s";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _statsUpdateTimer?.Dispose();
+
+        if (_streamingInstance != null)
+        {
+            await _streamingInstance.InvokeVoidAsync("dispose");
+            await _streamingInstance.DisposeAsync();
+        }
+
+        if (_streamingModule != null)
+        {
+            await _streamingModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}
