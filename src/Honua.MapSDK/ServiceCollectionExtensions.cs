@@ -76,6 +76,12 @@ public static class ServiceCollectionExtensions
         // Register geocoding search service
         services.AddScoped<GeocodingSearchService>();
 
+        // Register basemap service
+        services.AddSingleton<BasemapService>();
+
+        // Register 3D model loading service
+        services.AddScoped<Model3DLoaderService>();
+
         // Register drawing services
         services.AddScoped<IDrawingManager, DrawingManager>();
         services.AddScoped<MeasurementManager>();
