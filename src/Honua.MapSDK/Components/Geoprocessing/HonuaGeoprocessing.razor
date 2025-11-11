@@ -1,0 +1,631 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Geoprocessing
+@using Honua.MapSDK.Services.Geoprocessing
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject IGeoprocessingService GeoprocessingService
+
+<div class="honua-geoprocessing @CssClass" style="@GetContainerStyle()">
+    <MudPaper Elevation="@Elevation" Class="geoprocessing-paper">
+        <div class="geoprocessing-header">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.Architecture" Size="Size.Small" />
+                Geoprocessing
+            </MudText>
+            @if (ShowCloseButton)
+            {
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.Close"
+                    Size="Size.Small"
+                    OnClick="@OnCloseClicked"
+                    aria-label="Close geoprocessing" />
+            }
+        </div>
+
+        <div class="geoprocessing-content">
+            @* Operations Menu *@
+            <MudMenu Label="Operations" Variant="Variant.Outlined" FullWidth="true" StartIcon="@Icons.Material.Filled.Functions">
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Buffer))">
+                    <MudIcon Icon="@Icons.Material.Filled.RadioButtonUnchecked" Size="Size.Small" />
+                    <span class="ml-2">Buffer</span>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Intersect))">
+                    <MudIcon Icon="@Icons.Material.Filled.Grain" Size="Size.Small" />
+                    <span class="ml-2">Intersect</span>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Union))">
+                    <MudIcon Icon="@Icons.Material.Filled.CallMerge" Size="Size.Small" />
+                    <span class="ml-2">Union</span>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Difference))">
+                    <MudIcon Icon="@Icons.Material.Filled.Remove" Size="Size.Small" />
+                    <span class="ml-2">Difference</span>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Clip))">
+                    <MudIcon Icon="@Icons.Material.Filled.ContentCut" Size="Size.Small" />
+                    <span class="ml-2">Clip</span>
+                </MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Area))">
+                    <MudIcon Icon="@Icons.Material.Filled.SquareFoot" Size="Size.Small" />
+                    <span class="ml-2">Measure Area</span>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Length))">
+                    <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" />
+                    <span class="ml-2">Measure Length</span>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Distance))">
+                    <MudIcon Icon="@Icons.Material.Filled.SocialDistance" Size="Size.Small" />
+                    <span class="ml-2">Measure Distance</span>
+                </MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Centroid))">
+                    <MudIcon Icon="@Icons.Material.Filled.CenterFocusStrong" Size="Size.Small" />
+                    <span class="ml-2">Centroid</span>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.ConvexHull))">
+                    <MudIcon Icon="@Icons.Material.Filled.Polyline" Size="Size.Small" />
+                    <span class="ml-2">Convex Hull</span>
+                </MudMenuItem>
+                <MudMenuItem OnClick="@(() => SelectOperation(GeoprocessingOperationType.Voronoi))">
+                    <MudIcon Icon="@Icons.Material.Filled.Hexagon" Size="Size.Small" />
+                    <span class="ml-2">Voronoi</span>
+                </MudMenuItem>
+            </MudMenu>
+
+            @* Current Operation Panel *@
+            @if (_selectedOperation != null)
+            {
+                <MudCard Class="mt-4">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">@_selectedOperation.ToString()</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @* Parameter inputs based on operation type *@
+                        @switch (_selectedOperation.Value)
+                        {
+                            case GeoprocessingOperationType.Buffer:
+                                <MudTextField @bind-Value="_bufferDistance"
+                                              Label="Distance"
+                                              Variant="Variant.Outlined"
+                                              T="double"
+                                              Class="mb-2" />
+                                <MudSelect @bind-Value="_units"
+                                           Label="Units"
+                                           Variant="Variant.Outlined"
+                                           T="string"
+                                           Class="mb-2">
+                                    <MudSelectItem Value="@("meters")">Meters</MudSelectItem>
+                                    <MudSelectItem Value="@("kilometers")">Kilometers</MudSelectItem>
+                                    <MudSelectItem Value="@("miles")">Miles</MudSelectItem>
+                                    <MudSelectItem Value="@("feet")">Feet</MudSelectItem>
+                                </MudSelect>
+                                break;
+
+                            case GeoprocessingOperationType.Area:
+                            case GeoprocessingOperationType.Length:
+                                <MudSelect @bind-Value="_units"
+                                           Label="Units"
+                                           Variant="Variant.Outlined"
+                                           T="string"
+                                           Class="mb-2">
+                                    <MudSelectItem Value="@("meters")">Meters</MudSelectItem>
+                                    <MudSelectItem Value="@("kilometers")">Kilometers</MudSelectItem>
+                                    <MudSelectItem Value="@("miles")">Miles</MudSelectItem>
+                                    <MudSelectItem Value="@("feet")">Feet</MudSelectItem>
+                                    @if (_selectedOperation == GeoprocessingOperationType.Area)
+                                    {
+                                        <MudSelectItem Value="@("hectares")">Hectares</MudSelectItem>
+                                        <MudSelectItem Value="@("acres")">Acres</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                break;
+
+                            case GeoprocessingOperationType.Distance:
+                                <MudText Typo="Typo.body2" Class="mb-2">Click two points on the map</MudText>
+                                <MudSelect @bind-Value="_units"
+                                           Label="Units"
+                                           Variant="Variant.Outlined"
+                                           T="string"
+                                           Class="mb-2">
+                                    <MudSelectItem Value="@("meters")">Meters</MudSelectItem>
+                                    <MudSelectItem Value="@("kilometers")">Kilometers</MudSelectItem>
+                                    <MudSelectItem Value="@("miles")">Miles</MudSelectItem>
+                                    <MudSelectItem Value="@("feet")">Feet</MudSelectItem>
+                                </MudSelect>
+                                break;
+
+                            case GeoprocessingOperationType.Voronoi:
+                                <MudText Typo="Typo.body2" Class="mb-2">Select points for Voronoi diagram</MudText>
+                                break;
+
+                            default:
+                                <MudText Typo="Typo.body2" Class="mb-2">
+                                    Select features on the map to perform this operation
+                                </MudText>
+                                break;
+                        }
+
+                        @* Execute Button *@
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            FullWidth="true"
+                            StartIcon="@Icons.Material.Filled.PlayArrow"
+                            OnClick="@ExecuteOperation"
+                            Disabled="@(_isProcessing || !CanExecute())"
+                            Class="mt-2">
+                            @if (_isProcessing)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <span class="ml-2">Processing...</span>
+                            }
+                            else
+                            {
+                                <span>Execute</span>
+                            }
+                        </MudButton>
+                    </MudCardContent>
+                </MudCard>
+            }
+
+            @* Results Display *@
+            @if (_results.Any())
+            {
+                <MudExpansionPanels Class="mt-4">
+                    <MudExpansionPanel Text="Results" IsInitiallyExpanded="true">
+                        <div class="results-list">
+                            @foreach (var result in _results.Take(10))
+                            {
+                                <MudCard Class="mb-2">
+                                    <MudCardContent>
+                                        <div class="result-header">
+                                            <MudText Typo="Typo.subtitle1">
+                                                <strong>@result.OperationType.ToString()</strong>
+                                            </MudText>
+                                            <MudChip Size="Size.Small"
+                                                     Color="@(result.Success ? Color.Success : Color.Error)">
+                                                @(result.Success ? "Success" : "Failed")
+                                            </MudChip>
+                                        </div>
+
+                                        @if (result.Success)
+                                        {
+                                            @if (result.NumericResult.HasValue)
+                                            {
+                                                <MudText Typo="Typo.body1" Class="mt-2">
+                                                    Result: <strong>@result.NumericResult.Value.ToString("N2") @result.Units</strong>
+                                                </MudText>
+                                            }
+                                            @if (result.BooleanResult.HasValue)
+                                            {
+                                                <MudText Typo="Typo.body1" Class="mt-2">
+                                                    Result: <strong>@(result.BooleanResult.Value ? "True" : "False")</strong>
+                                                </MudText>
+                                            }
+                                            @if (result.ResultGeometry != null)
+                                            {
+                                                <MudButton
+                                                    Variant="Variant.Text"
+                                                    Size="Size.Small"
+                                                    StartIcon="@Icons.Material.Filled.Visibility"
+                                                    OnClick="@(() => ShowResultOnMap(result))"
+                                                    Class="mt-2">
+                                                    Show on Map
+                                                </MudButton>
+                                                <MudButton
+                                                    Variant="Variant.Text"
+                                                    Size="Size.Small"
+                                                    StartIcon="@Icons.Material.Filled.Download"
+                                                    OnClick="@(() => ExportResult(result))"
+                                                    Class="mt-2">
+                                                    Export GeoJSON
+                                                </MudButton>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">
+                                                @result.ErrorMessage
+                                            </MudAlert>
+                                        }
+
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                                            Execution time: @result.ExecutionTimeMs ms
+                                        </MudText>
+                                    </MudCardContent>
+                                </MudCard>
+                            }
+                        </div>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+
+            @* Error Display *@
+            @if (_errorMessage != null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2" CloseIconClicked="@(() => _errorMessage = null)">
+                    @_errorMessage
+                </MudAlert>
+            }
+
+            @* Clear Button *@
+            @if (_results.Any())
+            {
+                <MudButton
+                    Variant="Variant.Text"
+                    Color="Color.Error"
+                    FullWidth="true"
+                    StartIcon="@Icons.Material.Filled.Clear"
+                    OnClick="@ClearResults"
+                    Class="mt-2">
+                    Clear All Results
+                </MudButton>
+            }
+        </div>
+    </MudPaper>
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the geoprocessing component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"geoprocessing-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? MapId { get; set; }
+
+    /// <summary>
+    /// Enabled geoprocessing tools
+    /// </summary>
+    [Parameter]
+    public List<GeoprocessingOperationType>? Tools { get; set; }
+
+    /// <summary>
+    /// Show close button
+    /// </summary>
+    [Parameter]
+    public bool ShowCloseButton { get; set; } = false;
+
+    /// <summary>
+    /// Paper elevation
+    /// </summary>
+    [Parameter]
+    public int Elevation { get; set; } = 2;
+
+    /// <summary>
+    /// Width of the component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "400px";
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Event callback when operation completes
+    /// </summary>
+    [Parameter]
+    public EventCallback<GeoprocessingResult> OnOperationComplete { get; set; }
+
+    /// <summary>
+    /// Event callback when error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    /// <summary>
+    /// Event callback when close is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private IJSObjectReference? _jsModule;
+    private bool _initialized = false;
+    private bool _isProcessing = false;
+    private string? _errorMessage;
+
+    private GeoprocessingOperationType? _selectedOperation;
+    private List<GeoprocessingResult> _results = new();
+
+    // Operation parameters
+    private double _bufferDistance = 100;
+    private string _units = "meters";
+    private object? _selectedFeature;
+    private List<object> _selectedFeatures = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-geoprocessing.js"
+                );
+
+                if (!string.IsNullOrEmpty(MapId))
+                {
+                    await _jsModule.InvokeVoidAsync("initializeGeoprocessing", MapId, new { });
+                }
+
+                _initialized = true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading geoprocessing JS module: {ex.Message}");
+                _errorMessage = "Failed to initialize geoprocessing module";
+            }
+        }
+    }
+
+    private void SelectOperation(GeoprocessingOperationType operation)
+    {
+        _selectedOperation = operation;
+        _errorMessage = null;
+        StateHasChanged();
+    }
+
+    private bool CanExecute()
+    {
+        if (_selectedOperation == null) return false;
+
+        return _selectedOperation.Value switch
+        {
+            GeoprocessingOperationType.Buffer => _selectedFeature != null,
+            GeoprocessingOperationType.Intersect => _selectedFeatures.Count >= 2,
+            GeoprocessingOperationType.Union => _selectedFeatures.Count >= 2,
+            GeoprocessingOperationType.Difference => _selectedFeatures.Count >= 2,
+            GeoprocessingOperationType.Clip => _selectedFeatures.Count >= 2,
+            GeoprocessingOperationType.Area => _selectedFeature != null,
+            GeoprocessingOperationType.Length => _selectedFeature != null,
+            GeoprocessingOperationType.Distance => _selectedFeatures.Count >= 2,
+            GeoprocessingOperationType.Centroid => _selectedFeature != null,
+            GeoprocessingOperationType.ConvexHull => _selectedFeature != null,
+            GeoprocessingOperationType.Voronoi => _selectedFeature != null,
+            _ => false
+        };
+    }
+
+    private async Task ExecuteOperation()
+    {
+        if (!CanExecute() || _selectedOperation == null) return;
+
+        _isProcessing = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var parameters = BuildParameters();
+            var result = await GeoprocessingService.ExecuteOperationAsync(_selectedOperation.Value, parameters);
+
+            _results.Insert(0, result);
+
+            if (result.Success)
+            {
+                // Display result on map if applicable
+                if (result.ResultGeometry != null && _jsModule != null && !string.IsNullOrEmpty(MapId))
+                {
+                    await _jsModule.InvokeVoidAsync("displayResult", MapId, result.Id, result.ResultGeometry, new { });
+                }
+
+                await OnOperationComplete.InvokeAsync(result);
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+                await OnError.InvokeAsync(result.ErrorMessage ?? "Operation failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Operation failed: {ex.Message}";
+            Console.Error.WriteLine($"Geoprocessing error: {ex}");
+            await OnError.InvokeAsync(_errorMessage);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private GeoprocessingParameters BuildParameters()
+    {
+        var parameters = new GeoprocessingParameters
+        {
+            Units = _units
+        };
+
+        switch (_selectedOperation)
+        {
+            case GeoprocessingOperationType.Buffer:
+                parameters.Input = _selectedFeature ?? CreateSamplePolygon();
+                parameters.Distance = _bufferDistance;
+                break;
+
+            case GeoprocessingOperationType.Intersect:
+            case GeoprocessingOperationType.Difference:
+            case GeoprocessingOperationType.Clip:
+                parameters.Input = _selectedFeatures.Count > 0 ? _selectedFeatures[0] : CreateSamplePolygon();
+                parameters.SecondaryInput = _selectedFeatures.Count > 1 ? _selectedFeatures[1] : CreateSamplePolygon();
+                break;
+
+            case GeoprocessingOperationType.Union:
+                parameters.MultipleInputs = _selectedFeatures.Count > 0 ? _selectedFeatures.ToArray() : new[] { CreateSamplePolygon(), CreateSamplePolygon() };
+                break;
+
+            case GeoprocessingOperationType.Area:
+            case GeoprocessingOperationType.Length:
+            case GeoprocessingOperationType.Centroid:
+            case GeoprocessingOperationType.ConvexHull:
+            case GeoprocessingOperationType.Voronoi:
+                parameters.Input = _selectedFeature ?? CreateSamplePolygon();
+                break;
+
+            case GeoprocessingOperationType.Distance:
+                parameters.Point1 = new Coordinate { Longitude = -122.4, Latitude = 37.8 };
+                parameters.Point2 = new Coordinate { Longitude = -122.5, Latitude = 37.9 };
+                break;
+        }
+
+        return parameters;
+    }
+
+    private object CreateSamplePolygon()
+    {
+        // Create a sample polygon for testing
+        return new
+        {
+            type = "Feature",
+            geometry = new
+            {
+                type = "Polygon",
+                coordinates = new[]
+                {
+                    new[]
+                    {
+                        new[] { -122.4, 37.8 },
+                        new[] { -122.4, 37.9 },
+                        new[] { -122.3, 37.9 },
+                        new[] { -122.3, 37.8 },
+                        new[] { -122.4, 37.8 }
+                    }
+                }
+            },
+            properties = new { }
+        };
+    }
+
+    private async Task ShowResultOnMap(GeoprocessingResult result)
+    {
+        if (_jsModule == null || string.IsNullOrEmpty(MapId)) return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("displayResult", MapId, result.Id, result.ResultGeometry, new { });
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to show result on map: {ex.Message}");
+        }
+    }
+
+    private async Task ExportResult(GeoprocessingResult result)
+    {
+        if (result.ResultGeometry == null) return;
+
+        try
+        {
+            var json = JsonSerializer.Serialize(result.ResultGeometry, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            var fileName = $"{result.OperationType.ToString().ToLower()}-{DateTime.Now:yyyy-MM-dd-HHmmss}.geojson";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JS.InvokeVoidAsync("eval", $@"
+                const link = document.createElement('a');
+                link.download = '{fileName}';
+                link.href = 'data:application/geo+json;base64,{base64}';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to export result: {ex.Message}");
+            _errorMessage = "Failed to export result";
+        }
+    }
+
+    private async Task ClearResults()
+    {
+        if (_jsModule != null && !string.IsNullOrEmpty(MapId))
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("clearResults", MapId, null);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to clear results: {ex.Message}");
+            }
+        }
+
+        _results.Clear();
+        _selectedOperation = null;
+        _errorMessage = null;
+        StateHasChanged();
+    }
+
+    private async Task OnCloseClicked()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private string GetContainerStyle()
+    {
+        return $"width: {Width};";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+}
+
+<style>
+    .honua-geoprocessing {
+        font-family: var(--mud-typography-default-family);
+    }
+
+    .geoprocessing-paper {
+        padding: 16px;
+    }
+
+    .geoprocessing-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .geoprocessing-content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .results-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+</style>

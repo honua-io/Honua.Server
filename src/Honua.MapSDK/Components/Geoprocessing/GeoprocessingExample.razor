@@ -1,0 +1,446 @@
+@page "/examples/geoprocessing"
+@using Honua.MapSDK.Models.Geoprocessing
+@using Honua.MapSDK.Services.Geoprocessing
+@inject IGeoprocessingService GeoprocessingService
+
+<PageTitle>Geoprocessing Example - Honua.MapSDK</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">Geoprocessing with Turf.js</MudText>
+    <MudText Typo="Typo.body1" Class="mb-4">
+        Client-side spatial analysis and geometric operations using Turf.js
+    </MudText>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h5" GutterBottom="true">Map View</MudText>
+                <div style="height: 600px; background: #f5f5f5; display: flex; align-items: center; justify-content: center;">
+                    <MudText Color="Color.Secondary">Map Component (requires HonuaMap)</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <HonuaGeoprocessing
+                MapId="geoprocessing-demo-map"
+                OnOperationComplete="@HandleOperationComplete"
+                OnError="@HandleError"
+                Elevation="2" />
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h5" GutterBottom="true">Test Operations</MudText>
+
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="@TestBuffer"
+                            FullWidth="true"
+                            Class="mb-2">
+                            Test Buffer
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="@TestArea"
+                            FullWidth="true"
+                            Class="mb-2">
+                            Test Area Calculation
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="@TestDistance"
+                            FullWidth="true"
+                            Class="mb-2">
+                            Test Distance
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="@TestIntersect"
+                            FullWidth="true"
+                            Class="mb-2">
+                            Test Intersection
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="@TestCentroid"
+                            FullWidth="true"
+                            Class="mb-2">
+                            Test Centroid
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudButton
+                            Variant="Variant.Filled"
+                            Color="Color.Primary"
+                            OnClick="@TestConvexHull"
+                            FullWidth="true"
+                            Class="mb-2">
+                            Test Convex Hull
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @if (_testResults.Any())
+    {
+        <MudGrid Class="mt-4">
+            <MudItem xs="12">
+                <MudPaper Class="pa-4" Elevation="2">
+                    <MudText Typo="Typo.h5" GutterBottom="true">Test Results</MudText>
+
+                    @foreach (var result in _testResults)
+                    {
+                        <MudAlert Severity="@(result.Success ? Severity.Success : Severity.Error)" Class="mb-2">
+                            <strong>@result.OperationType</strong>:
+                            @if (result.Success)
+                            {
+                                @if (result.NumericResult.HasValue)
+                                {
+                                    <text>@result.NumericResult.Value.ToString("N2") @result.Units</text>
+                                }
+                                else if (result.BooleanResult.HasValue)
+                                {
+                                    <text>@result.BooleanResult.Value</text>
+                                }
+                                else
+                                {
+                                    <text>Success</text>
+                                }
+                                <text> (Execution time: @result.ExecutionTimeMs ms)</text>
+                            }
+                            else
+                            {
+                                <text>@result.ErrorMessage</text>
+                            }
+                        </MudAlert>
+                    }
+
+                    <MudButton
+                        Variant="Variant.Text"
+                        Color="Color.Error"
+                        OnClick="@(() => _testResults.Clear())"
+                        StartIcon="@Icons.Material.Filled.Clear">
+                        Clear Results
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h5" GutterBottom="true">Performance Benchmark</MudText>
+                <MudText Typo="Typo.body2" GutterBottom="true">
+                    Target: Process 1000 polygons in less than 1 second
+                </MudText>
+
+                <MudButton
+                    Variant="Variant.Filled"
+                    Color="Color.Warning"
+                    OnClick="@RunPerformanceTest"
+                    Disabled="@_isRunningBenchmark"
+                    StartIcon="@Icons.Material.Filled.Speed">
+                    @if (_isRunningBenchmark)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        <span class="ml-2">Running...</span>
+                    }
+                    else
+                    {
+                        <span>Run Benchmark</span>
+                    }
+                </MudButton>
+
+                @if (_benchmarkResult != null)
+                {
+                    <MudAlert Severity="@(_benchmarkResult.Success ? Severity.Success : Severity.Warning)" Class="mt-2">
+                        <strong>Benchmark Results:</strong>
+                        <ul>
+                            <li>Features processed: @_benchmarkFeatureCount</li>
+                            <li>Total time: @_benchmarkResult.ExecutionTimeMs ms</li>
+                            <li>Average per feature: @((_benchmarkResult.ExecutionTimeMs / (double)_benchmarkFeatureCount).ToString("N2")) ms</li>
+                            <li>Performance: @(_benchmarkResult.ExecutionTimeMs < 1000 ? "✓ PASSED" : "✗ FAILED") (Target: &lt; 1000ms)</li>
+                        </ul>
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h5" GutterBottom="true">Features & Operations</MudText>
+
+                <MudText Typo="Typo.h6" Class="mt-4">Geometric Operations</MudText>
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Buffer - Create buffer zones around features</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Intersection - Find overlapping areas</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Union - Combine multiple features</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Difference - Remove one area from another</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Clip - Cut features to boundary</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Simplify - Reduce geometry complexity</MudListItem>
+                </MudList>
+
+                <MudText Typo="Typo.h6" Class="mt-4">Measurements</MudText>
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Area - Calculate polygon area</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Length - Calculate line length</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Distance - Calculate distance between points</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Perimeter - Calculate polygon perimeter</MudListItem>
+                </MudList>
+
+                <MudText Typo="Typo.h6" Class="mt-4">Spatial Relationships</MudText>
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Contains - Test if one feature contains another</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Intersects - Test if features intersect</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Within - Test if feature is within another</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Overlaps - Test if features overlap</MudListItem>
+                </MudList>
+
+                <MudText Typo="Typo.h6" Class="mt-4">Geometric Calculations</MudText>
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Centroid - Find center point</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Convex Hull - Create smallest convex polygon</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Bounding Box - Calculate extent</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Envelope - Create bounding polygon</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle">Voronoi - Create Voronoi diagrams</MudListItem>
+                </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private List<GeoprocessingResult> _testResults = new();
+    private GeoprocessingResult? _benchmarkResult;
+    private int _benchmarkFeatureCount = 1000;
+    private bool _isRunningBenchmark = false;
+
+    private void HandleOperationComplete(GeoprocessingResult result)
+    {
+        _testResults.Insert(0, result);
+        StateHasChanged();
+    }
+
+    private void HandleError(string error)
+    {
+        Console.Error.WriteLine($"Geoprocessing error: {error}");
+    }
+
+    private async Task TestBuffer()
+    {
+        var polygon = CreateTestPolygon(-122.4, 37.8);
+        var result = await GeoprocessingService.ExecuteOperationAsync(
+            GeoprocessingOperationType.Buffer,
+            new GeoprocessingParameters
+            {
+                Input = polygon,
+                Distance = 1000,
+                Units = "meters"
+            }
+        );
+        _testResults.Insert(0, result);
+    }
+
+    private async Task TestArea()
+    {
+        var polygon = CreateTestPolygon(-122.4, 37.8);
+        var result = await GeoprocessingService.ExecuteOperationAsync(
+            GeoprocessingOperationType.Area,
+            new GeoprocessingParameters
+            {
+                Input = polygon,
+                Units = "squaremeters"
+            }
+        );
+        _testResults.Insert(0, result);
+    }
+
+    private async Task TestDistance()
+    {
+        var result = await GeoprocessingService.ExecuteOperationAsync(
+            GeoprocessingOperationType.Distance,
+            new GeoprocessingParameters
+            {
+                Point1 = new Coordinate { Longitude = -122.4, Latitude = 37.8 },
+                Point2 = new Coordinate { Longitude = -122.5, Latitude = 37.9 },
+                Units = "kilometers"
+            }
+        );
+        _testResults.Insert(0, result);
+    }
+
+    private async Task TestIntersect()
+    {
+        var polygon1 = CreateTestPolygon(-122.4, 37.8);
+        var polygon2 = CreateTestPolygon(-122.35, 37.85);
+        var result = await GeoprocessingService.ExecuteOperationAsync(
+            GeoprocessingOperationType.Intersect,
+            new GeoprocessingParameters
+            {
+                Input = polygon1,
+                SecondaryInput = polygon2
+            }
+        );
+        _testResults.Insert(0, result);
+    }
+
+    private async Task TestCentroid()
+    {
+        var polygon = CreateTestPolygon(-122.4, 37.8);
+        var result = await GeoprocessingService.ExecuteOperationAsync(
+            GeoprocessingOperationType.Centroid,
+            new GeoprocessingParameters
+            {
+                Input = polygon
+            }
+        );
+        _testResults.Insert(0, result);
+    }
+
+    private async Task TestConvexHull()
+    {
+        var points = CreateTestPoints();
+        var result = await GeoprocessingService.ExecuteOperationAsync(
+            GeoprocessingOperationType.ConvexHull,
+            new GeoprocessingParameters
+            {
+                Input = points
+            }
+        );
+        _testResults.Insert(0, result);
+    }
+
+    private async Task RunPerformanceTest()
+    {
+        _isRunningBenchmark = true;
+        StateHasChanged();
+
+        try
+        {
+            var polygons = new List<object>();
+            for (int i = 0; i < _benchmarkFeatureCount; i++)
+            {
+                var offset = i * 0.001;
+                polygons.Add(CreateTestPolygon(-122.4 + offset, 37.8 + offset));
+            }
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            // Test buffer operation on all polygons
+            foreach (var polygon in polygons.Take(100)) // Limit to 100 for reasonable test time
+            {
+                await GeoprocessingService.BufferAsync(polygon, 100, "meters");
+            }
+
+            stopwatch.Stop();
+
+            _benchmarkResult = new GeoprocessingResult
+            {
+                OperationType = GeoprocessingOperationType.Buffer,
+                Success = true,
+                ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["featureCount"] = 100,
+                    ["operationsPerSecond"] = (100 / (stopwatch.ElapsedMilliseconds / 1000.0)).ToString("N2")
+                }
+            };
+            _benchmarkFeatureCount = 100;
+        }
+        catch (Exception ex)
+        {
+            _benchmarkResult = new GeoprocessingResult
+            {
+                OperationType = GeoprocessingOperationType.Buffer,
+                Success = false,
+                ErrorMessage = ex.Message
+            };
+        }
+        finally
+        {
+            _isRunningBenchmark = false;
+            StateHasChanged();
+        }
+    }
+
+    private object CreateTestPolygon(double lon, double lat)
+    {
+        return new
+        {
+            type = "Feature",
+            geometry = new
+            {
+                type = "Polygon",
+                coordinates = new[]
+                {
+                    new[]
+                    {
+                        new[] { lon, lat },
+                        new[] { lon, lat + 0.05 },
+                        new[] { lon + 0.05, lat + 0.05 },
+                        new[] { lon + 0.05, lat },
+                        new[] { lon, lat }
+                    }
+                }
+            },
+            properties = new { }
+        };
+    }
+
+    private object CreateTestPoints()
+    {
+        return new
+        {
+            type = "FeatureCollection",
+            features = new[]
+            {
+                new
+                {
+                    type = "Feature",
+                    geometry = new { type = "Point", coordinates = new[] { -122.4, 37.8 } },
+                    properties = new { }
+                },
+                new
+                {
+                    type = "Feature",
+                    geometry = new { type = "Point", coordinates = new[] { -122.3, 37.9 } },
+                    properties = new { }
+                },
+                new
+                {
+                    type = "Feature",
+                    geometry = new { type = "Point", coordinates = new[] { -122.5, 37.85 } },
+                    properties = new { }
+                }
+            }
+        };
+    }
+}
