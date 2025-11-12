@@ -258,13 +258,4 @@ internal static partial class OgcSharedHandlers
 
         return new[] { CrsHelper.DefaultCrsIdentifier };
     }
-    internal static string FormatContentCrs(string? value)
-        => value.IsNullOrWhiteSpace() ? string.Empty : $"<{value}>";
-
-    /// <summary>
-    /// Adds a Content-Crs header to the result with proper formatting.
-    /// This consolidates the common pattern of calling WithResponseHeader + FormatContentCrs.
-    /// </summary>
-    internal static IResult WithContentCrsHeader(IResult result, string? contentCrs)
-        => WithResponseHeader(result, "Content-Crs", FormatContentCrs(contentCrs));
 }

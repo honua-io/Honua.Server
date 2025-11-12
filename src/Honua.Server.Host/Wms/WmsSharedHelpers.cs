@@ -626,6 +626,7 @@ public sealed record ExpandedRasterMember
     /// </summary>
     public int Order { get; init; }
 
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ExpandedRasterMember(RasterDatasetDefinition dataset, double opacity, string? styleId, int order)
     {
         Dataset = dataset;

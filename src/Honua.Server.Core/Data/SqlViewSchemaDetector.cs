@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Metadata;
@@ -52,7 +53,9 @@ public class SqlViewSchemaDetector
             AddParameterToCommand(command, param);
         }
 
-        using var reader = await command.ExecuteReaderAsync(
+        // Cast to DbCommand for async execution
+        var dbCommand = (DbCommand)command;
+        using var reader = await dbCommand.ExecuteReaderAsync(
             CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo,
             ct);
 

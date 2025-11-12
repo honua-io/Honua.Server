@@ -51,7 +51,7 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
                 location.X, // longitude
                 location.Y, // latitude
                 tenantId,
-                cancellationToken);
+                cancellationToken) ?? new List<Geofence>();
 
             _logger.LogDebug(
                 "Entity {EntityId} at ({Lon}, {Lat}) is inside {Count} geofences",
@@ -64,7 +64,7 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
             var currentStates = await _entityStateRepository.GetEntityStatesAsync(
                 entityId,
                 tenantId,
-                cancellationToken);
+                cancellationToken) ?? new List<EntityGeofenceState>();
 
             var currentGeofenceIds = currentStates
                 .Where(s => s.IsInside)
@@ -136,7 +136,7 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
             // Generate EXIT events
             // Batch query all exit geofences to avoid N+1 problem
             var exitGeofences = exitGeofenceIds.Any()
-                ? await _geofenceRepository.GetByIdsAsync(exitGeofenceIds, tenantId, cancellationToken)
+                ? await _geofenceRepository.GetByIdsAsync(exitGeofenceIds, tenantId, cancellationToken) ?? new List<Geofence>()
                 : new List<Geofence>();
 
             var exitGeofenceMap = exitGeofences.ToDictionary(g => g.Id);

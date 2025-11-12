@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Metadata;
@@ -54,10 +55,10 @@ public class ResilientDataStoreProvider : IDataStoreProvider
         ServiceDefinition service,
         LayerDefinition layer,
         FeatureQuery? query,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // For streaming operations, we wrap the entire enumerable execution
-        await foreach (var record in _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
+        var records = await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
             // Convert IAsyncEnumerable to Task<List> for bulkhead wrapping
             var results = new List<FeatureRecord>();
@@ -66,7 +67,9 @@ public class ResilientDataStoreProvider : IDataStoreProvider
                 results.Add(item);
             }
             return results;
-        }))
+        });
+
+        foreach (var record in records)
         {
             yield return record;
         }
@@ -82,7 +85,7 @@ public class ResilientDataStoreProvider : IDataStoreProvider
     {
         return await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
-            _logger.LogDebug("Executing count query with bulkhead protection for layer {Layer}", layer.Name);
+            _logger.LogDebug("Executing count query with bulkhead protection for layer {Layer}", layer.Title);
             return await _inner.CountAsync(dataSource, service, layer, query, cancellationToken);
         });
     }
@@ -114,7 +117,7 @@ public class ResilientDataStoreProvider : IDataStoreProvider
     {
         return await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
-            _logger.LogDebug("Executing create operation with bulkhead protection for layer {Layer}", layer.Name);
+            _logger.LogDebug("Executing create operation with bulkhead protection for layer {Layer}", layer.Title);
             return await _inner.CreateAsync(dataSource, service, layer, record, transaction, cancellationToken);
         });
     }
@@ -212,7 +215,7 @@ public class ResilientDataStoreProvider : IDataStoreProvider
     {
         return await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
-            _logger.LogDebug("Executing bulk insert operation with bulkhead protection for layer {Layer}", layer.Name);
+            _logger.LogDebug("Executing bulk insert operation with bulkhead protection for layer {Layer}", layer.Title);
             return await _inner.BulkInsertAsync(dataSource, service, layer, records, cancellationToken);
         });
     }
@@ -227,7 +230,7 @@ public class ResilientDataStoreProvider : IDataStoreProvider
     {
         return await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
-            _logger.LogDebug("Executing bulk update operation with bulkhead protection for layer {Layer}", layer.Name);
+            _logger.LogDebug("Executing bulk update operation with bulkhead protection for layer {Layer}", layer.Title);
             return await _inner.BulkUpdateAsync(dataSource, service, layer, updates, cancellationToken);
         });
     }
@@ -242,7 +245,7 @@ public class ResilientDataStoreProvider : IDataStoreProvider
     {
         return await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
-            _logger.LogDebug("Executing bulk delete operation with bulkhead protection for layer {Layer}", layer.Name);
+            _logger.LogDebug("Executing bulk delete operation with bulkhead protection for layer {Layer}", layer.Title);
             return await _inner.BulkDeleteAsync(dataSource, service, layer, featureIds, cancellationToken);
         });
     }
@@ -277,7 +280,7 @@ public class ResilientDataStoreProvider : IDataStoreProvider
     {
         return await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
-            _logger.LogDebug("Executing statistics query with bulkhead protection for layer {Layer}", layer.Name);
+            _logger.LogDebug("Executing statistics query with bulkhead protection for layer {Layer}", layer.Title);
             return await _inner.QueryStatisticsAsync(dataSource, service, layer, statistics, groupByFields, filter, cancellationToken);
         });
     }
@@ -293,7 +296,7 @@ public class ResilientDataStoreProvider : IDataStoreProvider
     {
         return await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
-            _logger.LogDebug("Executing distinct query with bulkhead protection for layer {Layer}", layer.Name);
+            _logger.LogDebug("Executing distinct query with bulkhead protection for layer {Layer}", layer.Title);
             return await _inner.QueryDistinctAsync(dataSource, service, layer, fieldNames, filter, cancellationToken);
         });
     }
@@ -308,7 +311,7 @@ public class ResilientDataStoreProvider : IDataStoreProvider
     {
         return await _bulkheadProvider.ExecuteDatabaseOperationAsync(async () =>
         {
-            _logger.LogDebug("Executing extent query with bulkhead protection for layer {Layer}", layer.Name);
+            _logger.LogDebug("Executing extent query with bulkhead protection for layer {Layer}", layer.Title);
             return await _inner.QueryExtentAsync(dataSource, service, layer, filter, cancellationToken);
         });
     }

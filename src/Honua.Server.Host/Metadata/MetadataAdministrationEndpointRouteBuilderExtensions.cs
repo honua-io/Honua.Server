@@ -54,12 +54,11 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             group.AddEndpointFilter((context, next) => ValueTask.FromResult<object?>(Results.Unauthorized()));
         }
 
-        group.MapPost("/reload", async (IMetadataRegistry registry, ODataModelCache cache, HttpContext context) =>
+        group.MapPost("/reload", async (IMetadataRegistry registry, HttpContext context) =>
         {
             try
             {
                 await registry.ReloadAsync(context.RequestAborted).ConfigureAwait(false);
-                cache.Reset();
                 return Results.Ok(new { status = "reloaded" });
             }
             catch (CacheInvalidationException ex)
@@ -112,7 +111,7 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             return Results.Ok(new { status = "ok", warnings = validation.Warnings, diff });
         });
 
-        group.MapPost("/apply", async (HttpRequest request, IHonuaConfigurationService configurationService, IMetadataRegistry registry, IMetadataSchemaValidator schemaValidator, ODataModelCache cache) =>
+        group.MapPost("/apply", async (HttpRequest request, IHonuaConfigurationService configurationService, IMetadataRegistry registry, IMetadataSchemaValidator schemaValidator) =>
         {
             var payload = await ReadBodyAsync(request).ConfigureAwait(false);
             if (payload.IsNullOrWhiteSpace())
@@ -237,7 +236,6 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             try
             {
                 await registry.ReloadAsync(request.HttpContext.RequestAborted).ConfigureAwait(false);
-                cache.Reset();
             }
             catch (CacheInvalidationException ex)
             {
@@ -299,7 +297,7 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             return Results.Ok(new { snapshot = details.Descriptor, metadata = details.Metadata });
         });
 
-        group.MapPost("/snapshots/{label}/restore", async (string label, IMetadataSnapshotStore store, IMetadataRegistry registry, ODataModelCache cache, HttpRequest request) =>
+        group.MapPost("/snapshots/{label}/restore", async (string label, IMetadataSnapshotStore store, IMetadataRegistry registry, HttpRequest request) =>
         {
             if (quickStartMode)
             {
@@ -310,7 +308,6 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             {
                 await store.RestoreAsync(label, request.HttpContext.RequestAborted).ConfigureAwait(false);
                 await registry.ReloadAsync(request.HttpContext.RequestAborted).ConfigureAwait(false);
-                cache.Reset();
                 return Results.Ok(new { status = "restored", label });
             }
             catch (CacheInvalidationException ex)

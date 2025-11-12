@@ -9,15 +9,9 @@
     <ProjectReference Include="..\Honua.MapSDK\Honua.MapSDK.csproj" />
   </ItemGroup>
 
-  <!-- Optional OData support - only included when EnableOData=true -->
-  <ItemGroup Condition="'$(EnableOData)' == 'true'">
+  <!-- OData v4 support - AOT compatible -->
+  <ItemGroup>
     <ProjectReference Include="..\Honua.Server.Core.OData\Honua.Server.Core.OData.csproj" />
-  </ItemGroup>
-
-  <!-- Exclude OData files from compilation when OData is disabled -->
-  <ItemGroup Condition="'$(EnableOData)' == 'false'">
-    <Compile Remove="OData\**\*.cs" />
-    <Compile Remove="Hosting\ODataInitializationHostedService.cs" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -29,14 +23,6 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeHostRuntimeDependencies</TargetsForTfmSpecificBuildOutput>
 
-    <!-- Optional Features: Set to 'true' to enable, 'false' to disable -->
-    <!-- OData is enabled by default but can be disabled for reduced binary size and better AOT compatibility -->
-    <EnableOData Condition="'$(EnableOData)' == ''">true</EnableOData>
-  </PropertyGroup>
-
-  <!-- Define compilation symbols based on feature flags -->
-  <PropertyGroup Condition="'$(EnableOData)' == 'true'">
-    <DefineConstants>$(DefineConstants);ENABLE_ODATA</DefineConstants>
   </PropertyGroup>
 
   <!-- ReadyToRun Configuration for 30-50% faster startup -->

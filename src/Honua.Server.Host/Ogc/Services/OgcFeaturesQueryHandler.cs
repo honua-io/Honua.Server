@@ -17,7 +17,6 @@ using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Query.Expressions;
 using Honua.Server.Core.Query.Filter;
 using Honua.Server.Core.Raster.Export;
-using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Host.Extensions;
 using Honua.Server.Host.Utilities;
@@ -371,6 +370,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
                 apiMetrics,
                 cacheHeaderService,
                 attachmentHandler,
+                new Core.Elevation.DefaultElevationService(),
                 sanitized,
                 cancellationToken).ConfigureAwait(false);
         }

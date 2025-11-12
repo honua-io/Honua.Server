@@ -102,54 +102,16 @@ internal static partial class OgcFeaturesHandlers
     /// </summary>
     private static ElevationConfiguration? GetElevationConfiguration(LayerDefinition layer)
     {
-        // Check if layer has elevation configuration in extensions
-        if (layer.Extensions?.TryGetValue("elevation", out var elevationObj) == true &&
-            elevationObj is JsonObject elevationJson)
-        {
-            var source = elevationJson.TryGetPropertyValue("source", out var srcNode)
-                ? srcNode?.GetValue<string>()
-                : null;
-
-            var elevationAttr = elevationJson.TryGetPropertyValue("elevationAttribute", out var elevAttrNode)
-                ? elevAttrNode?.GetValue<string>()
-                : null;
-
-            var heightAttr = elevationJson.TryGetPropertyValue("heightAttribute", out var heightAttrNode)
-                ? heightAttrNode?.GetValue<string>()
-                : null;
-
-            var defaultElev = elevationJson.TryGetPropertyValue("defaultElevation", out var defaultElevNode)
-                ? defaultElevNode?.GetValue<double?>()
-                : null;
-
-            var verticalOffset = elevationJson.TryGetPropertyValue("verticalOffset", out var offsetNode)
-                ? offsetNode?.GetValue<double>()
-                : 0.0;
-
-            var includeHeight = elevationJson.TryGetPropertyValue("includeHeight", out var includeHeightNode)
-                ? includeHeightNode?.GetValue<bool>()
-                : false;
-
-            if (source is not null || elevationAttr is not null)
-            {
-                return new ElevationConfiguration
-                {
-                    Source = source,
-                    ElevationAttribute = elevationAttr,
-                    HeightAttribute = heightAttr,
-                    DefaultElevation = defaultElev,
-                    VerticalOffset = verticalOffset ?? 0,
-                    IncludeHeight = includeHeight ?? false
-                };
-            }
-        }
+        // TODO: Check if layer has elevation configuration in extensions when Extensions property is added
+        // For now, we'll skip the extensions check and go directly to fallback logic
+        // The extensions feature will be implemented in a future update
 
         // Fallback: check for common elevation attribute names
         // This provides zero-config support if the layer has standard elevation columns
         var commonElevationNames = new[] { "elevation", "elev", "height", "z", "altitude" };
         foreach (var attrName in commonElevationNames)
         {
-            if (layer.Attributes?.Any(a => string.Equals(a.Name, attrName, StringComparison.OrdinalIgnoreCase)) == true)
+            if (layer.Fields?.Any(f => string.Equals(f.Name, attrName, StringComparison.OrdinalIgnoreCase)) == true)
             {
                 return new ElevationConfiguration
                 {

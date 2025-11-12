@@ -2,7 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Honua.MapSDK.Models.Drone;
+using Honua.Server.Core.Models.Drone;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 

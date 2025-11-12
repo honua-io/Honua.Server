@@ -13,10 +13,4 @@
   <ItemGroup>
     <ProjectReference Include="..\Honua.Server.Core\Honua.Server.Core.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <!-- OData Protocol -->
-    <!-- AspNetCore.OData 9.4.0 requires OData packages >= 8.2.3 -->
-    <PackageReference Include="Microsoft.AspNetCore.OData" Version="9.4.0" />
-  </ItemGroup>
 </Project>

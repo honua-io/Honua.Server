@@ -338,8 +338,7 @@ internal static class RuntimeConfigurationEndpointRouteBuilderExtensions
             string protocol,
             ToggleRequest request,
             HonuaConfigurationService configService,
-            IMetadataRegistry metadataRegistry,
-            ODataModelCache odataCache) =>
+            IMetadataRegistry metadataRegistry) =>
         {
             if (quickStartMode)
             {
@@ -406,9 +405,6 @@ internal static class RuntimeConfigurationEndpointRouteBuilderExtensions
 
             // Update metadata registry
             await metadataRegistry.UpdateAsync(newSnapshot, default);
-
-            // Reset OData cache if needed
-            odataCache.Reset();
 
             return Results.Ok(new
             {

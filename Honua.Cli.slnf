@@ -1,0 +1,12 @@
+{
+  "solution": {
+    "path": "Honua.sln",
+    "projects": [
+      "src/Honua.Cli.AI.Secrets/Honua.Cli.AI.Secrets.csproj",
+      "src/Honua.Cli.AI/Honua.Cli.AI.csproj",
+      "src/Honua.Cli/Honua.Cli.csproj",
+      "tests/Honua.Cli.AI.Tests/Honua.Cli.AI.Tests.csproj",
+      "tests/Honua.Cli.Tests/Honua.Cli.Tests.csproj"
+    ]
+  }
+}

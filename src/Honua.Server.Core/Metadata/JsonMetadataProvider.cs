@@ -121,7 +121,7 @@ public sealed class JsonMetadataProvider : IMetadataProvider, IDisposable
         var rasterDatasets = rasterBuilder.BuildRasterDatasets(document.RasterDatasets);
         var server = schemaParser.BuildServer(document.Server);
 
-        return new MetadataSnapshot(catalog, folders, dataSources, services, layers, rasterDatasets, styles, server);
+        return new MetadataSnapshot(catalog, folders, dataSources, services, layers, rasterDatasets, styles, layerGroups: null, server);
     }
 }
 

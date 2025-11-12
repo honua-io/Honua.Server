@@ -1,0 +1,15 @@
+{
+  "solution": {
+    "path": "Honua.sln",
+    "projects": [
+      "src/Honua.Server.Core.Cloud/Honua.Server.Core.Cloud.csproj",
+      "src/Honua.Server.Core.OData/Honua.Server.Core.OData.csproj",
+      "src/Honua.Server.Core.Raster/Honua.Server.Core.Raster.csproj",
+      "src/Honua.Server.Core/Honua.Server.Core.csproj",
+      "src/Honua.Server.Enterprise/Honua.Server.Enterprise.csproj",
+      "src/Honua.Server.Host/Honua.Server.Host.csproj",
+      "tests/Honua.Server.Deployment.E2ETests/Honua.Server.Deployment.E2ETests.csproj",
+      "tests/Honua.Server.Enterprise.Tests/Honua.Server.Enterprise.Tests.csproj"
+    ]
+  }
+}

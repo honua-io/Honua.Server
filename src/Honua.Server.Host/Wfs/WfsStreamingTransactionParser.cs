@@ -287,7 +287,7 @@ internal static class WfsStreamingTransactionParser
         {
             // Combine the cancellation tokens
             var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken);
-            return new TransactionOperationEnumerator(_reader, _maxOperations, combinedCts.Token, combinedCts);
+            return new TransactionOperationEnumerator(_reader, _maxOperations, combinedCts, combinedCts.Token);
         }
     }
 
@@ -305,7 +305,7 @@ internal static class WfsStreamingTransactionParser
         private TransactionOperation? _current;
         private bool _disposed;
 
-        public TransactionOperationEnumerator(XmlReader reader, int maxOperations, CancellationToken cancellationToken, CancellationTokenSource cts)
+        public TransactionOperationEnumerator(XmlReader reader, int maxOperations, CancellationTokenSource cts, CancellationToken cancellationToken)
         {
             _reader = reader;
             _maxOperations = maxOperations;

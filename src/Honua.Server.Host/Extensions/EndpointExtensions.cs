@@ -9,6 +9,7 @@ using Honua.Server.Host.Carto;
 using Honua.Server.Host.Csw;
 using Honua.Server.Host.Health;
 using Honua.Server.Host.Metadata;
+using Honua.Server.Host.OData;
 using Honua.Server.Host.Ogc;
 using Honua.Server.Host.OpenRosa;
 using Honua.Server.Host.Print;
@@ -108,6 +109,23 @@ internal static class EndpointExtensions
     public static WebApplication MapConditionalServiceEndpoints(this WebApplication app)
     {
         var configurationService = app.Services.GetService<IHonuaConfigurationService>();
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+        // OData v4 endpoints (AOT-compatible implementation)
+        var odataEnabled = configurationService?.Current.Services.OData?.Enabled ?? true;
+        logger.LogWarning("ODATA ENDPOINT REGISTRATION: OData.Enabled = {ODataEnabled}, configService null = {ConfigNull}",
+            odataEnabled, configurationService == null);
+
+        if (odataEnabled)
+        {
+            logger.LogWarning("ODATA ENDPOINT REGISTRATION: Calling MapODataEndpoints()");
+            app.MapODataEndpoints();
+            logger.LogWarning("ODATA ENDPOINT REGISTRATION: MapODataEndpoints() completed");
+        }
+        else
+        {
+            logger.LogWarning("ODATA ENDPOINT REGISTRATION: OData is DISABLED - skipping MapODataEndpoints()");
+        }
 
         if (configurationService?.Current.Services.Wfs.Enabled ?? true)
         {

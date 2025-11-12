@@ -543,6 +543,7 @@ public sealed class PostgresMetadataProvider : IMutableMetadataProvider, IReload
             layers,
             snapshot.RasterDatasets,
             snapshot.Styles,
+            snapshot.LayerGroups,
             snapshot.Server);
 
         await SaveAsync(updatedSnapshot, cancellationToken);

@@ -79,42 +79,6 @@ internal static partial class OgcSharedHandlers
         return RasterFormatHelper.Normalize(raw);
     }
 
-    internal static IReadOnlyList<object> BuildTileMatrixSetLinks(HttpRequest request, string collectionId, string tilesetId)
-    {
-        return new object[]
-        {
-            new
-            {
-                tileMatrixSet = OgcTileMatrixHelper.WorldCrs84QuadId,
-                tileMatrixSetUri = OgcTileMatrixHelper.WorldCrs84QuadUri,
-                crs = OgcTileMatrixHelper.WorldCrs84QuadCrs,
-                href = BuildHref(request, $"/ogc/collections/{collectionId}/tiles/{tilesetId}/{OgcTileMatrixHelper.WorldCrs84QuadId}", null, null)
-            },
-            new
-            {
-                tileMatrixSet = OgcTileMatrixHelper.WorldWebMercatorQuadId,
-                tileMatrixSetUri = OgcTileMatrixHelper.WorldWebMercatorQuadUri,
-                crs = OgcTileMatrixHelper.WorldWebMercatorQuadCrs,
-                href = BuildHref(request, $"/ogc/collections/{collectionId}/tiles/{tilesetId}/{OgcTileMatrixHelper.WorldWebMercatorQuadId}", null, null)
-            }
-        };
-    }
-
-    internal static object BuildTileMatrixSetSummary(HttpRequest request, string id, string uri, string crs)
-    {
-        return new
-        {
-            id,
-            title = id,
-            tileMatrixSetUri = uri,
-            crs,
-            links = new[]
-            {
-                BuildLink(request, $"/ogc/tileMatrixSets/{id}", "self", "application/json", $"{id} definition")
-            }
-        };
-    }
-
     internal static bool DatasetMatchesCollection(RasterDatasetDefinition dataset, ServiceDefinition service, LayerDefinition layer)
     {
         if (dataset.ServiceId.IsNullOrWhiteSpace() || !string.Equals(dataset.ServiceId, service.Id, StringComparison.OrdinalIgnoreCase))
@@ -152,8 +116,6 @@ internal static partial class OgcSharedHandlers
         unresolvedStyle = success ? null : requestedStyleId;
         return success;
     }
-
-    private sealed record SearchCollectionContext(string CollectionId, FeatureContext FeatureContext);
 
     internal static async Task<StyleDefinition?> ResolveStyleDefinitionAsync(
         RasterDatasetDefinition dataset,
@@ -335,27 +297,5 @@ internal static async Task<IReadOnlyList<Geometry>> CollectVectorGeometriesAsync
         }
 
         return Results.File(mvtBytes, "application/vnd.mapbox-vector-tile");
-    }
-    internal static double[] ResolveBounds(LayerDefinition layer, RasterDatasetDefinition? dataset)
-    {
-        if (dataset?.Extent?.Bbox is { Count: > 0 })
-        {
-            var candidate = dataset.Extent.Bbox[0];
-            if (candidate.Length >= 4)
-            {
-                return new[] { candidate[0], candidate[1], candidate[2], candidate[3] };
-            }
-        }
-
-        if (layer.Extent?.Bbox is { Count: > 0 })
-        {
-            var candidate = layer.Extent.Bbox[0];
-            if (candidate.Length >= 4)
-            {
-                return new[] { candidate[0], candidate[1], candidate[2], candidate[3] };
-            }
-        }
-
-        return new[] { -180d, -90d, 180d, 90d };
     }
 }

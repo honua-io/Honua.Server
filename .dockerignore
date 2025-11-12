@@ -11,3 +11,4 @@
 .gitmodules
 .gitignore
 workspaces/
+tests/

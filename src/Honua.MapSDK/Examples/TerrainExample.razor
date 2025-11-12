@@ -3,6 +3,7 @@
 @using Honua.MapSDK.Components.Terrain
 @using Honua.MapSDK.Services.Terrain
 @using MudBlazor
+@using ElevationProfile = Honua.MapSDK.Services.Terrain.ElevationProfile
 
 <PageTitle>Terrain Visualization Example - Honua MapSDK</PageTitle>
 
@@ -52,7 +53,7 @@
                     <!-- Terrain Controls -->
                     <MudText Typo="Typo.h6">Terrain Controls</MudText>
 
-                    <MudSwitch @bind-Checked="_showTerrain" Color="Color.Primary"
+                    <MudSwitch T="bool" @bind-Value="_showTerrain" Color="Color.Primary"
                                Label="Show Terrain" />
 
                     @if (_showTerrain)
@@ -60,28 +61,28 @@
                         <MudDivider />
 
                         <MudText Typo="Typo.subtitle2">Exaggeration</MudText>
-                        <MudSlider @bind-Value="_exaggeration"
+                        <MudSlider Value="_exaggeration"
                                    Min="0.5" Max="5.0" Step="0.1"
                                    ValueLabel="true"
                                    Color="Color.Primary"
-                                   ValueChanged="@OnExaggerationChanged">
+                                   ValueChanged="@(async (double v) => await OnExaggerationChanged(v))">
                             <MudText>@_exaggeration.ToString("F1")</MudText>
                         </MudSlider>
 
-                        <MudSwitch @bind-Checked="_wireframe"
+                        <MudSwitch T="bool" Value="_wireframe"
                                    Color="Color.Secondary"
                                    Label="Wireframe Mode"
-                                   CheckedChanged="@OnWireframeChanged" />
+                                   ValueChanged="@OnWireframeChanged" />
 
                         <MudDivider />
 
                         <!-- Terrain Source Selection -->
                         <MudText Typo="Typo.subtitle2">Data Source</MudText>
-                        <MudRadioGroup @bind-SelectedOption="_terrainSource">
-                            <MudRadio Option="@_mapboxTerrainUrl" Color="Color.Primary">
+                        <MudRadioGroup T="string" @bind-Value="_terrainSource">
+                            <MudRadio T="string" Value="@_mapboxTerrainUrl" Color="Color.Primary">
                                 Mapbox Terrain-RGB
                             </MudRadio>
-                            <MudRadio Option="@_customTerrainUrl" Color="Color.Primary">
+                            <MudRadio T="string" Value="@_customTerrainUrl" Color="Color.Primary">
                                 Custom Server Tiles
                             </MudRadio>
                         </MudRadioGroup>
@@ -92,22 +93,22 @@
                         <MudText Typo="Typo.subtitle2">Material</MudText>
 
                         <MudText Typo="Typo.caption">Ambient</MudText>
-                        <MudSlider @bind-Value="_materialAmbient"
+                        <MudSlider Value="_materialAmbient"
                                    Min="0.0" Max="1.0" Step="0.05"
                                    ValueLabel="true"
-                                   ValueChanged="@OnMaterialChanged" />
+                                   ValueChanged="@(async (double v) => await OnMaterialAmbientChanged(v))" />
 
                         <MudText Typo="Typo.caption">Diffuse</MudText>
-                        <MudSlider @bind-Value="_materialDiffuse"
+                        <MudSlider Value="_materialDiffuse"
                                    Min="0.0" Max="1.0" Step="0.05"
                                    ValueLabel="true"
-                                   ValueChanged="@OnMaterialChanged" />
+                                   ValueChanged="@(async (double v) => await OnMaterialDiffuseChanged(v))" />
 
                         <MudText Typo="Typo.caption">Shininess</MudText>
-                        <MudSlider @bind-Value="_materialShininess"
+                        <MudSlider Value="_materialShininess"
                                    Min="1" Max="128" Step="1"
                                    ValueLabel="true"
-                                   ValueChanged="@OnMaterialChanged" />
+                                   ValueChanged="@(async (double v) => await OnMaterialShininessChanged(v))" />
                     }
 
                     <MudDivider />
@@ -310,6 +311,7 @@ var profile = await _elevationService.QueryPathElevationAsync(
 
     private async Task OnExaggerationChanged(double value)
     {
+        _exaggeration = value;
         if (_terrainLayer != null)
         {
             await _terrainLayer.UpdateExaggerationAsync(value);
@@ -318,10 +320,29 @@ var profile = await _elevationService.QueryPathElevationAsync(
 
     private async Task OnWireframeChanged(bool value)
     {
+        _wireframe = value;
         if (_terrainLayer != null)
         {
             await _terrainLayer.ToggleWireframeAsync();
         }
+    }
+
+    private async Task OnMaterialAmbientChanged(double value)
+    {
+        _materialAmbient = value;
+        await OnMaterialChanged();
+    }
+
+    private async Task OnMaterialDiffuseChanged(double value)
+    {
+        _materialDiffuse = value;
+        await OnMaterialChanged();
+    }
+
+    private async Task OnMaterialShininessChanged(double value)
+    {
+        _materialShininess = value;
+        await OnMaterialChanged();
     }
 
     private async Task OnMaterialChanged()

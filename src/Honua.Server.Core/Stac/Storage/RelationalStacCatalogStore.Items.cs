@@ -7,6 +7,7 @@ using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Utilities;

@@ -326,7 +326,7 @@ public class PostgresAuditLogService : IAuditLogService
 
         return new AuditLogResult
         {
-            Events = events,
+            Events = events.ToList(),
             TotalCount = totalCount,
             Page = query.Page,
             PageSize = query.PageSize

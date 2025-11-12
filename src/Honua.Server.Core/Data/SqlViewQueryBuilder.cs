@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
+using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Utilities;
 
@@ -200,9 +201,3 @@ public sealed class SqlViewQueryBuilder
     }
 }
 
-/// <summary>
-/// Represents a SQL query definition with parameters.
-/// </summary>
-public sealed record QueryDefinition(
-    string Sql,
-    IReadOnlyDictionary<string, object?> Parameters);

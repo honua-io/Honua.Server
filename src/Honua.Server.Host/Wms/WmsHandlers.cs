@@ -84,7 +84,7 @@ internal static class WmsHandlers
             {
                 "GETCAPABILITIES" => await WmsCapabilitiesHandlers.HandleGetCapabilitiesAsync(request, snapshot, rasterRegistry, cancellationToken).ConfigureAwait(false),
                 "GETMAP" => await WmsGetMapHandlers.HandleGetMapAsync(request, snapshot, rasterRegistry, rasterRenderer, cacheProvider, cacheMetrics, wmsOptions, cancellationToken).ConfigureAwait(false),
-                "GETFEATUREINFO" => await WmsGetFeatureInfoHandlers.HandleGetFeatureInfoAsync(request, rasterRegistry, featureRepository, cancellationToken).ConfigureAwait(false),
+                "GETFEATUREINFO" => await WmsGetFeatureInfoHandlers.HandleGetFeatureInfoAsync(request, metadataRegistry, rasterRegistry, featureRepository, cancellationToken).ConfigureAwait(false),
                 "DESCRIBELAYER" => await WmsDescribeLayerHandlers.HandleDescribeLayerAsync(request, snapshot, rasterRegistry, cancellationToken).ConfigureAwait(false),
                 "GETLEGENDGRAPHIC" => await WmsGetLegendGraphicHandlers.HandleGetLegendGraphicAsync(request, snapshot, rasterRegistry, cancellationToken).ConfigureAwait(false),
                 _ => WmsSharedHelpers.CreateException("OperationNotSupported", $"Request '{requestValue}' is not supported.")

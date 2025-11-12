@@ -51,49 +51,6 @@ namespace Honua.Server.Host.Ogc;
 
 internal static partial class OgcSharedHandlers
 {
-    private static bool HasIfMatch(HttpRequest request)
-    {
-        if (!request.Headers.TryGetValue(HeaderNames.IfMatch, out var values))
-        {
-            return false;
-        }
-
-        foreach (var value in values)
-        {
-            if (value.HasValue())
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool PreferReturnMinimal(HttpRequest request)
-    {
-        if (!request.Headers.TryGetValue("Prefer", out var values))
-        {
-            return false;
-        }
-
-        foreach (var header in values)
-        {
-            if (header.IsNullOrWhiteSpace())
-            {
-                continue;
-            }
-
-            var tokens = QueryParsingHelpers.ParseCsv(header);
-            if (tokens.Any(token => string.Equals(token, "return=minimal", StringComparison.OrdinalIgnoreCase)))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-    private static IResult ApplyPreferenceApplied(IResult result, string value)
-        => WithResponseHeader(result, "Preference-Applied", value);
     internal static async Task<JsonDocument?> ParseJsonDocumentAsync(HttpRequest request, CancellationToken cancellationToken)
     {
         Guard.NotNull(request);
@@ -260,16 +217,6 @@ internal static partial class OgcSharedHandlers
         };
 
         return Results.Created($"/ogc/collections/{collectionId}/items", collectionResponse);
-    }
-
-    private static object? ConvertJsonElement(JsonElement element)
-    {
-        return JsonElementConverter.ToObjectWithJsonNode(element);
-    }
-
-    private static string? ConvertJsonElementToString(JsonElement element)
-    {
-        return JsonElementConverter.ToString(element);
     }
 
     internal static bool ValidateIfMatch(HttpRequest request, LayerDefinition layer, FeatureRecord record, out string currentEtag)

@@ -51,83 +51,6 @@ namespace Honua.Server.Host.Ogc;
 
 internal static partial class OgcSharedHandlers
 {
-    private static QueryFilter? CombineFilters(QueryFilter? first, QueryFilter? second)
-    {
-        if (first?.Expression is null)
-        {
-            return second;
-        }
-
-        if (second?.Expression is null)
-        {
-            return first;
-        }
-
-        var combined = new QueryBinaryExpression(first.Expression, QueryBinaryOperator.And, second.Expression);
-        return new QueryFilter(combined);
-    }
-
-    private static (QueryFilter? Filter, IResult? Error) BuildIdsFilter(LayerDefinition layer, IReadOnlyList<string> ids)
-    {
-        if (ids.Count == 0)
-        {
-            return (null, null);
-        }
-
-        // Limit IDs to prevent unbounded OR expressions that hammer the database
-        const int MaxIds = 1000;
-        if (ids.Count > MaxIds)
-        {
-            return (null, CreateValidationProblem($"ids parameter exceeds maximum limit of {MaxIds} identifiers.", "ids"));
-        }
-
-        QueryExpression? expression = null;
-        (string FieldName, string? FieldType) resolved;
-
-        try
-        {
-            resolved = CqlFilterParserUtils.ResolveField(layer, layer.IdField);
-        }
-        catch (Exception ex)
-        {
-            return (null, CreateValidationProblem(ex.Message, "ids"));
-        }
-
-        foreach (var rawId in ids)
-        {
-            if (rawId.IsNullOrWhiteSpace())
-            {
-                continue;
-            }
-
-            var typedValue = CqlFilterParserUtils.ConvertToFieldValue(resolved.FieldType, rawId);
-            var comparison = new QueryBinaryExpression(
-                new QueryFieldReference(resolved.FieldName),
-                QueryBinaryOperator.Equal,
-                new QueryConstant(typedValue));
-
-            expression = expression is null
-                ? comparison
-                : new QueryBinaryExpression(expression, QueryBinaryOperator.Or, comparison);
-        }
-
-        if (expression is null)
-        {
-            return (null, CreateValidationProblem("ids parameter must include at least one non-empty value.", "ids"));
-        }
-
-        return (new QueryFilter(expression), null);
-    }
-    internal static bool LooksLikeJson(string? value)
-    {
-        if (value.IsNullOrWhiteSpace())
-        {
-            return false;
-        }
-
-        var trimmed = value.TrimStart();
-        return trimmed.StartsWith("{", StringComparison.Ordinal) || trimmed.StartsWith("[", StringComparison.Ordinal);
-    }
     internal static object BuildQueryablesSchema(LayerDefinition layer)
     {
         var properties = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -250,6 +173,80 @@ internal static partial class OgcSharedHandlers
         return schema;
     }
 
+    internal static void AppendStyleMetadata(IDictionary<string, object?> target, LayerDefinition layer)
+    {
+        if (target is null)
+        {
+            return;
+        }
+
+        if (layer.DefaultStyleId.HasValue())
+        {
+            target["honua:defaultStyleId"] = layer.DefaultStyleId;
+        }
+
+        var styleIds = BuildOrderedStyleIds(layer);
+        if (styleIds.Count > 0)
+        {
+            target["honua:styleIds"] = styleIds;
+        }
+
+        if (layer.MinScale is double minScale)
+        {
+            target["honua:minScale"] = minScale;
+        }
+
+        if (layer.MaxScale is double maxScale)
+        {
+            target["honua:maxScale"] = maxScale;
+        }
+    }
+
+    internal static IResult WithResponseHeader(IResult result, string headerName, string headerValue)
+        => new HeaderResult(result, headerName, headerValue);
+
+    internal static IReadOnlyList<string> BuildOrderedStyleIds(LayerDefinition layer)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var results = new List<string>();
+
+        if (layer.DefaultStyleId.HasValue() && seen.Add(layer.DefaultStyleId))
+        {
+            results.Add(layer.DefaultStyleId);
+        }
+
+        foreach (var styleId in layer.StyleIds)
+        {
+            if (styleId.HasValue() && seen.Add(styleId))
+            {
+                results.Add(styleId);
+            }
+        }
+
+        return results.Count == 0 ? Array.Empty<string>() : results;
+    }
+
+    internal static IReadOnlyList<string> BuildOrderedStyleIds(LayerGroupDefinition layerGroup)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var results = new List<string>();
+
+        if (layerGroup.DefaultStyleId.HasValue() && seen.Add(layerGroup.DefaultStyleId))
+        {
+            results.Add(layerGroup.DefaultStyleId);
+        }
+
+        foreach (var styleId in layerGroup.StyleIds)
+        {
+            if (styleId.HasValue() && seen.Add(styleId))
+            {
+                results.Add(styleId);
+            }
+        }
+
+        return results;
+    }
+
     internal static List<OgcLink> BuildCollectionLinks(HttpRequest request, ServiceDefinition service, LayerDefinition layer, string collectionId)
     {
         var links = new List<OgcLink>(layer.Links.Select(ToLink));
@@ -279,87 +276,61 @@ internal static partial class OgcSharedHandlers
         return links;
     }
 
-    private static void AppendStyleMetadata(IDictionary<string, object?> target, LayerDefinition layer)
+    internal static List<OgcLink> BuildLayerGroupCollectionLinks(HttpRequest request, ServiceDefinition service, LayerGroupDefinition layerGroup, string collectionId)
     {
-        if (target is null)
+        var links = new List<OgcLink>(layerGroup.Links.Select(ToLink));
+        links.AddRange(new[]
         {
-            return;
+            BuildLink(request, $"/ogc/collections/{collectionId}", "self", "application/json", "This collection"),
+            BuildLink(request, $"/ogc/collections/{collectionId}", "alternate", "text/html", "This collection as HTML"),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "items", "application/geo+json", "Features in this layer group"),
+            BuildLink(request, $"/ogc/collections/{collectionId}/items", "http://www.opengis.net/def/rel/ogc/1.0/items", "application/geo+json", "Features")
+        });
+
+        if (layerGroup.StyleIds.Count > 0)
+        {
+            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles", "styles", "application/json", "Styles for this layer group"));
         }
 
-        if (layer.DefaultStyleId.HasValue())
-        {
-            target["honua:defaultStyleId"] = layer.DefaultStyleId;
-        }
-
-        var styleIds = BuildOrderedStyleIds(layer);
-        if (styleIds.Count > 0)
-        {
-            target["honua:styleIds"] = styleIds;
-        }
-
-        if (layer.MinScale is double minScale)
-        {
-            target["honua:minScale"] = minScale;
-        }
-
-        if (layer.MaxScale is double maxScale)
-        {
-            target["honua:maxScale"] = maxScale;
-        }
+        return links;
     }
 
-    internal static IReadOnlyList<string> BuildOrderedStyleIds(LayerDefinition layer)
+    internal static IReadOnlyList<object> BuildTileMatrixSetLinks(HttpRequest request, string collectionId, string tilesetId)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var results = new List<string>();
-
-        if (layer.DefaultStyleId.HasValue() && seen.Add(layer.DefaultStyleId))
+        return new object[]
         {
-            results.Add(layer.DefaultStyleId);
-        }
-
-        foreach (var styleId in layer.StyleIds)
-        {
-            if (styleId.HasValue() && seen.Add(styleId))
+            new
             {
-                results.Add(styleId);
-            }
-        }
-
-        return results.Count == 0 ? Array.Empty<string>() : results;
-    }
-    internal static IResult WithResponseHeader(IResult result, string headerName, string headerValue)
-        => new HeaderResult(result, headerName, headerValue);
-
-    internal static string FormatContentCrs(string? value)
-        => value.IsNullOrWhiteSpace() ? string.Empty : $"<{value}>";
-
-    /// <summary>
-    /// Adds a Content-Crs header to the result with proper formatting.
-    /// This consolidates the common pattern of calling WithResponseHeader + FormatContentCrs.
-    /// </summary>
-    internal static IResult WithContentCrsHeader(IResult result, string? contentCrs)
-        => WithResponseHeader(result, "Content-Crs", FormatContentCrs(contentCrs));
-    internal static IReadOnlyList<string> BuildOrderedStyleIds(LayerGroupDefinition layerGroup)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var results = new List<string>();
-
-        if (layerGroup.DefaultStyleId.HasValue() && seen.Add(layerGroup.DefaultStyleId))
-        {
-            results.Add(layerGroup.DefaultStyleId);
-        }
-
-        foreach (var styleId in layerGroup.StyleIds)
-        {
-            if (styleId.HasValue() && seen.Add(styleId))
+                tileMatrixSet = OgcTileMatrixHelper.WorldCrs84QuadId,
+                tileMatrixSetUri = OgcTileMatrixHelper.WorldCrs84QuadUri,
+                crs = OgcTileMatrixHelper.WorldCrs84QuadCrs,
+                href = BuildHref(request, $"/ogc/collections/{collectionId}/tiles/{tilesetId}/{OgcTileMatrixHelper.WorldCrs84QuadId}", null, null)
+            },
+            new
             {
-                results.Add(styleId);
+                tileMatrixSet = OgcTileMatrixHelper.WorldWebMercatorQuadId,
+                tileMatrixSetUri = OgcTileMatrixHelper.WorldWebMercatorQuadUri,
+                crs = OgcTileMatrixHelper.WorldWebMercatorQuadCrs,
+                href = BuildHref(request, $"/ogc/collections/{collectionId}/tiles/{tilesetId}/{OgcTileMatrixHelper.WorldWebMercatorQuadId}", null, null)
             }
-        }
-
-        return results;
+        };
     }
+
+    internal static object BuildTileMatrixSetSummary(HttpRequest request, string id, string uri, string crs)
+    {
+        return new
+        {
+            id,
+            title = id,
+            tileMatrixSetUri = uri,
+            crs,
+            links = new[]
+            {
+                BuildLink(request, $"/ogc/tileMatrixSets/{id}", "self", "application/json", $"{id} definition")
+            }
+        };
+    }
+
     internal static IResult CreateValidationProblem(string detail, string parameter)
     {
         var problemDetails = new ProblemDetails
@@ -377,4 +348,14 @@ internal static partial class OgcSharedHandlers
     {
         return Results.Problem(detail, statusCode: StatusCodes.Status404NotFound, title: "Not Found");
     }
+
+    internal static string FormatContentCrs(string? value)
+        => value.IsNullOrWhiteSpace() ? string.Empty : $"<{value}>";
+
+    /// <summary>
+    /// Adds a Content-Crs header to the result with proper formatting.
+    /// This consolidates the common pattern of calling WithResponseHeader + FormatContentCrs.
+    /// </summary>
+    internal static IResult WithContentCrsHeader(IResult result, string? contentCrs)
+        => WithResponseHeader(result, "Content-Crs", FormatContentCrs(contentCrs));
 }

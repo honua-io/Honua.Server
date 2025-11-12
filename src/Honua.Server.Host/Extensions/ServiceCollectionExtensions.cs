@@ -367,7 +367,8 @@ public static class ServiceCollectionExtensions
 
 #if ENABLE_ODATA
     /// <summary>
-    /// Configures OData services with dynamic routing and metadata model generation.
+    /// Configures OData services (AOT-compatible implementation using Minimal APIs).
+    /// OData endpoints are registered via MapODataEndpoints in EndpointExtensions.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration.</param>
@@ -378,69 +379,10 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration,
         IMvcBuilder mvcBuilder)
     {
-        // Register OData services first (model cache, builders, etc.)
-        services.AddHonuaOData();
+        // OData v4 is now implemented using AOT-compatible Minimal APIs
+        // Endpoints are registered in MapODataEndpoints() - no Microsoft.AspNetCore.OData dependencies
 
-        // Build a temporary service provider to resolve dependencies during configuration
-        using var tempProvider = services.BuildServiceProvider();
-
-        var logger = tempProvider.GetRequiredService<ILogger<Program>>();
-        var metadataRegistry = tempProvider.GetRequiredService<IMetadataRegistry>();
-        var modelCache = tempProvider.GetRequiredService<ODataModelCache>();
-        var configService = tempProvider.GetRequiredService<IHonuaConfigurationService>();
-
-        // Ensure metadata is initialized synchronously
-        // This is acceptable because: (1) tests initialize metadata synchronously anyway,
-        // (2) production metadata loading is fast (JSON/DB config), and (3) this only runs once at startup
-        try
-        {
-            metadataRegistry.EnsureInitializedAsync(CancellationToken.None).GetAwaiter().GetResult();
-            logger.LogInformation("Metadata registry initialized for OData service configuration");
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to initialize metadata registry during OData configuration. OData endpoints may not be functional until metadata is loaded.");
-        }
-
-        // Build the EDM model synchronously
-        ODataModelDescriptor? modelDescriptor = null;
-        try
-        {
-            modelDescriptor = modelCache.GetOrCreateAsync(CancellationToken.None).GetAwaiter().GetResult();
-            logger.LogInformation("OData EDM model built with {EntityCount} entity types", modelDescriptor.EntitySets.Count);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to build OData EDM model during service configuration. OData endpoints will not be functional.");
-        }
-
-        // Configure OData with the built model
-        mvcBuilder.AddOData(options =>
-        {
-            options.Count().Filter().Expand().Select().OrderBy();
-            options.Conventions.Add(new DynamicODataRoutingConvention());
-
-            // Register routes BEFORE MapControllers() is called
-            // This is critical: routes must be registered during service configuration,
-            // not in a hosted service which runs AFTER the middleware pipeline is configured
-            if (modelDescriptor != null)
-            {
-                const string routePrefix = "odata";
-                options.AddRouteComponents(routePrefix, modelDescriptor.Model);
-                logger.LogInformation("OData route registered at '/{RoutePrefix}' with {EntityTypeCount} entity types", routePrefix, modelDescriptor.EntitySets.Count);
-
-                // Apply configuration options
-                var odataConfig = configService.Current.Services.OData;
-                if (odataConfig.MaxPageSize > 0)
-                {
-                    options.SetMaxTop(odataConfig.MaxPageSize);
-                    logger.LogInformation("OData max page size set to {MaxPageSize}", odataConfig.MaxPageSize);
-                }
-            }
-        });
-
-        // Register hosted service for catalog warm-up only
-        // OData initialization is now handled synchronously above
+        // Register hosted service for catalog warm-up
         services.AddHostedService<CatalogProjectionWarmupHostedService>();
 
         return services;

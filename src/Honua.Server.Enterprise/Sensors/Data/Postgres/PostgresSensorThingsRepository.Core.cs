@@ -5,6 +5,7 @@ using System.Data;
 using System.Linq;
 using Dapper;
 using Honua.Server.Enterprise.Data;
+using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Enterprise.Sensors.Query;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.IO;

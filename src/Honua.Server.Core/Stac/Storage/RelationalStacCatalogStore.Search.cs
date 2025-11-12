@@ -10,6 +10,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Observability;
+using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
 namespace Honua.Server.Core.Stac.Storage;
 
 /// <summary>

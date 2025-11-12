@@ -6,6 +6,7 @@ using System.Text.Json;
 using Dapper;
 using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Enterprise.Sensors.Query;
+using Microsoft.Extensions.Logging;
 using Geometry = NetTopologySuite.Geometries.Geometry;
 
 namespace Honua.Server.Enterprise.Sensors.Data.Postgres;
@@ -172,7 +173,7 @@ public sealed partial class PostgresSensorThingsRepository
 
         return new PagedResult<Datastream>
         {
-            Items = datastreams,
+            Items = datastreams.ToList(),
             TotalCount = totalCount,
             NextLink = nextLink
         };

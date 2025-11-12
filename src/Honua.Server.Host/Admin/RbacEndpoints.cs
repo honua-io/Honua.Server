@@ -152,6 +152,7 @@ public static class RbacEndpoints
             snapshot.Layers,
             snapshot.RasterDatasets,
             snapshot.Styles,
+            snapshot.LayerGroups,
             updatedServer);
 
         await registry.UpdateAsync(updatedSnapshot, cancellationToken);
@@ -225,6 +226,7 @@ public static class RbacEndpoints
             snapshot.Layers,
             snapshot.RasterDatasets,
             snapshot.Styles,
+            snapshot.LayerGroups,
             updatedServer);
 
         await registry.UpdateAsync(updatedSnapshot, cancellationToken);
@@ -278,6 +280,7 @@ public static class RbacEndpoints
             snapshot.Layers,
             snapshot.RasterDatasets,
             snapshot.Styles,
+            snapshot.LayerGroups,
             updatedServer);
 
         await registry.UpdateAsync(updatedSnapshot, cancellationToken);
@@ -352,6 +355,7 @@ public static class RbacEndpoints
             snapshot.Layers,
             snapshot.RasterDatasets,
             snapshot.Styles,
+            snapshot.LayerGroups,
             updatedServer);
 
         await registry.UpdateAsync(updatedSnapshot, cancellationToken);

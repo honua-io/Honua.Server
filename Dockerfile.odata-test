@@ -1,0 +1,44 @@
+# Optimized Dockerfile for OData container tests
+# Uses layer caching to dramatically speed up builds
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /source
+
+# Copy NuGet config and build props FIRST (rarely changes)
+COPY NuGet.Config Directory.Build.props ./
+
+# Copy ONLY project files for restore (this layer will be cached unless projects change)
+COPY src/*/*.csproj ./
+# Reconstruct directory structure for csproj files
+RUN for file in $(ls *.csproj); do \
+    mkdir -p src/${file%.*}/ && \
+    mv $file src/${file%.*}/; \
+    done
+
+# Restore packages (CACHED LAYER - only re-runs if .csproj or NuGet.Config changes)
+RUN dotnet restore src/Honua.Server.Host/Honua.Server.Host.csproj
+
+# Now copy all source code (this invalidates cache, but restore is already done)
+COPY src/ ./src/
+
+# Build and publish
+RUN dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
+    --configuration Debug \
+    --output /app/publish \
+    --no-restore \
+    /p:UseAppHost=false \
+    /p:ErrorOnDuplicatePublishOutputFiles=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+WORKDIR /app
+
+ENV ASPNETCORE_URLS=http://+:8080
+
+COPY --from=build /app/publish ./
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/healthz/live || exit 1
+
+ENTRYPOINT ["dotnet", "Honua.Server.Host.dll"]

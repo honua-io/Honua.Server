@@ -173,6 +173,7 @@ internal static partial class OgcSharedHandlers
 
         return format != 0;
     }
+
     internal static string GetMimeType(OgcResponseFormat format)
         => format switch
         {

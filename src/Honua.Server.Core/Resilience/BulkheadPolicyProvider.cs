@@ -106,7 +106,7 @@ public class BulkheadPolicyProvider
     {
         try
         {
-            return await DatabaseBulkhead.ExecuteAsync(async token => await operation(), default);
+            return await DatabaseBulkhead.ExecuteAsync(async (CancellationToken _) => await operation());
         }
         catch (Polly.RateLimiting.RateLimiterRejectedException ex)
         {
@@ -130,7 +130,7 @@ public class BulkheadPolicyProvider
     {
         try
         {
-            return await ExternalApiBulkhead.ExecuteAsync(async token => await operation(), default);
+            return await ExternalApiBulkhead.ExecuteAsync(async (CancellationToken _) => await operation());
         }
         catch (Polly.RateLimiting.RateLimiterRejectedException ex)
         {
@@ -152,7 +152,7 @@ public class BulkheadPolicyProvider
     {
         try
         {
-            await DatabaseBulkhead.ExecuteAsync(async token => { await operation(); return 0; }, default);
+            await DatabaseBulkhead.ExecuteAsync(async (CancellationToken _) => { await operation(); });
         }
         catch (Polly.RateLimiting.RateLimiterRejectedException ex)
         {
@@ -174,7 +174,7 @@ public class BulkheadPolicyProvider
     {
         try
         {
-            await ExternalApiBulkhead.ExecuteAsync(async token => { await operation(); return 0; }, default);
+            await ExternalApiBulkhead.ExecuteAsync(async (CancellationToken _) => { await operation(); });
         }
         catch (Polly.RateLimiting.RateLimiterRejectedException ex)
         {

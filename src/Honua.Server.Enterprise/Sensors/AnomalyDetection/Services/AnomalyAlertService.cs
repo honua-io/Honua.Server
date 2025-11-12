@@ -288,10 +288,10 @@ public interface IAnomalyAlertService
 /// </summary>
 public sealed record AlertDeliveryResult
 {
-    public int TotalAnomalies { get; init; }
-    public int AlertsSent { get; init; }
-    public int AlertsSkipped { get; init; }
-    public int AlertsFailed { get; init; }
+    public int TotalAnomalies { get; set; }
+    public int AlertsSent { get; set; }
+    public int AlertsSkipped { get; set; }
+    public int AlertsFailed { get; set; }
     public List<string>? Errors { get; set; }
 
     public bool AllSucceeded => AlertsFailed == 0 && AlertsSent == TotalAnomalies - AlertsSkipped;

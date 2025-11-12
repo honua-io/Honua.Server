@@ -51,34 +51,6 @@ namespace Honua.Server.Host.Ogc;
 
 internal static partial class OgcSharedHandlers
 {
-    internal static List<OgcLink> BuildCollectionLinks(HttpRequest request, ServiceDefinition service, LayerDefinition layer, string collectionId)
-    {
-        var links = new List<OgcLink>(layer.Links.Select(ToLink));
-        links.AddRange(new[]
-        {
-            BuildLink(request, $"/ogc/collections/{collectionId}", "self", "application/json", layer.Title),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "items", "application/geo+json", $"Items for {layer.Title}"),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/vnd.google-earth.kml+xml", $"Items for {layer.Title} (KML)", null, new Dictionary<string, string?> { ["f"] = "kml" }),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/vnd.google-earth.kmz", $"Items for {layer.Title} (KMZ)", null, new Dictionary<string, string?> { ["f"] = "kmz" }),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "alternate", "application/geopackage+sqlite3", $"Items for {layer.Title} (GeoPackage)", null, new Dictionary<string, string?> { ["f"] = "geopackage" }),
-            BuildLink(request, $"/ogc/collections/{collectionId}/queryables", "queryables", "application/json", $"Queryables for {layer.Title}")
-        });
-
-        if (layer.DefaultStyleId.HasValue())
-        {
-            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles/{layer.DefaultStyleId}", "stylesheet", "application/vnd.ogc.sld+xml", $"Default style for {layer.Title}"));
-        }
-
-        foreach (var styleId in layer.StyleIds)
-        {
-            if (!string.Equals(styleId, layer.DefaultStyleId, StringComparison.OrdinalIgnoreCase))
-            {
-                links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles/{styleId}", "stylesheet", "application/vnd.ogc.sld+xml", $"Style '{styleId}'"));
-            }
-        }
-
-        return links;
-    }
     internal static List<OgcLink> BuildItemsLinks(HttpRequest request, string collectionId, FeatureQuery query, long? numberMatched, OgcResponseFormat format, string contentType)
     {
         var basePath = $"/ogc/collections/{collectionId}/items";
@@ -186,41 +158,7 @@ internal static List<OgcLink> BuildSearchLinks(HttpRequest request, IReadOnlyLis
 
         return links;
     }
-    internal static IReadOnlyList<object> BuildTileMatrixSetLinks(HttpRequest request, string collectionId, string tilesetId)
-    {
-        return new object[]
-        {
-            new
-            {
-                tileMatrixSet = OgcTileMatrixHelper.WorldCrs84QuadId,
-                tileMatrixSetUri = OgcTileMatrixHelper.WorldCrs84QuadUri,
-                crs = OgcTileMatrixHelper.WorldCrs84QuadCrs,
-                href = BuildHref(request, $"/ogc/collections/{collectionId}/tiles/{tilesetId}/{OgcTileMatrixHelper.WorldCrs84QuadId}", null, null)
-            },
-            new
-            {
-                tileMatrixSet = OgcTileMatrixHelper.WorldWebMercatorQuadId,
-                tileMatrixSetUri = OgcTileMatrixHelper.WorldWebMercatorQuadUri,
-                crs = OgcTileMatrixHelper.WorldWebMercatorQuadCrs,
-                href = BuildHref(request, $"/ogc/collections/{collectionId}/tiles/{tilesetId}/{OgcTileMatrixHelper.WorldWebMercatorQuadId}", null, null)
-            }
-        };
-    }
 
-    internal static object BuildTileMatrixSetSummary(HttpRequest request, string id, string uri, string crs)
-    {
-        return new
-        {
-            id,
-            title = id,
-            tileMatrixSetUri = uri,
-            crs,
-            links = new[]
-            {
-                BuildLink(request, $"/ogc/tileMatrixSets/{id}", "self", "application/json", $"{id} definition")
-            }
-        };
-    }
     internal static OgcLink BuildLink(HttpRequest request, string relativePath, string rel, string type, string? title, FeatureQuery? query = null, IDictionary<string, string?>? overrides = null)
     {
         var href = BuildHref(request, relativePath, query, overrides);
@@ -354,45 +292,5 @@ internal static List<OgcLink> BuildSearchLinks(HttpRequest request, IReadOnlyLis
         // Use RequestLinkHelper for consistent URL generation with proxy header support
         // Use versionedPath to preserve the version prefix from the incoming request
         return request.BuildAbsoluteUrl(versionedPath, queryParameters);
-    }
-    internal static IReadOnlyList<OgcLink> BuildFeatureLinks(
-        HttpRequest request,
-        string collectionId,
-        LayerDefinition layer,
-        FeatureComponents components,
-        IReadOnlyList<OgcLink>? additionalLinks)
-    {
-        var links = new List<OgcLink>();
-        if (components.FeatureId.HasValue())
-        {
-            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/items/{components.FeatureId}", "self", "application/geo+json", $"Feature {components.FeatureId}"));
-        }
-
-        links.Add(BuildLink(request, $"/ogc/collections/{collectionId}", "collection", "application/json", layer.Title));
-
-        if (additionalLinks is not null)
-        {
-            links.AddRange(additionalLinks);
-        }
-
-        return links;
-    }
-    internal static List<OgcLink> BuildLayerGroupCollectionLinks(HttpRequest request, ServiceDefinition service, LayerGroupDefinition layerGroup, string collectionId)
-    {
-        var links = new List<OgcLink>(layerGroup.Links.Select(ToLink));
-        links.AddRange(new[]
-        {
-            BuildLink(request, $"/ogc/collections/{collectionId}", "self", "application/json", "This collection"),
-            BuildLink(request, $"/ogc/collections/{collectionId}", "alternate", "text/html", "This collection as HTML"),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "items", "application/geo+json", "Features in this layer group"),
-            BuildLink(request, $"/ogc/collections/{collectionId}/items", "http://www.opengis.net/def/rel/ogc/1.0/items", "application/geo+json", "Features")
-        });
-
-        if (layerGroup.StyleIds.Count > 0)
-        {
-            links.Add(BuildLink(request, $"/ogc/collections/{collectionId}/styles", "styles", "application/json", "Styles for this layer group"));
-        }
-
-        return links;
     }
 }

@@ -318,7 +318,8 @@ internal static class WfsGetFeatureHandlers
         var urnCrs = WfsHelpers.ToUrn(requestedCrs);
 
         // Extract SQL view parameters if layer has SQL view
-        var sqlViewParameters = WfsHelpers.ExtractSqlViewParameters(layer, query);
+        // TODO: Re-implement ExtractSqlViewParameters
+        IReadOnlyDictionary<string, string>? sqlViewParameters = null;
 
         var resultQuery = new FeatureQuery(
             Limit: count,

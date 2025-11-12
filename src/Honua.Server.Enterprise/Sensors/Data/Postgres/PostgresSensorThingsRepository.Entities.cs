@@ -7,6 +7,7 @@ using System.Text.Json;
 using Dapper;
 using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Enterprise.Sensors.Query;
+using Microsoft.Extensions.Logging;
 using Geometry = NetTopologySuite.Geometries.Geometry;
 using StaLocation = Honua.Server.Enterprise.Sensors.Models.Location;
 
@@ -73,7 +74,7 @@ public sealed partial class PostgresSensorThingsRepository
                     CreatedAt = r.created_at,
                     UpdatedAt = r.updated_at,
                     SelfLink = $"{_config.BasePath}/Locations({r.id})"
-                });
+                }).ToList();
 
                 historicalLocation = historicalLocation with { Locations = locations };
             }
@@ -134,7 +135,7 @@ public sealed partial class PostgresSensorThingsRepository
 
         return new PagedResult<HistoricalLocation>
         {
-            Items = historicalLocationsWithLinks,
+            Items = historicalLocationsWithLinks.ToList(),
             TotalCount = totalCount,
             NextLink = nextLink
         };
@@ -212,7 +213,7 @@ public sealed partial class PostgresSensorThingsRepository
 
         return new PagedResult<Sensor>
         {
-            Items = sensorsWithLinks,
+            Items = sensorsWithLinks.ToList(),
             TotalCount = totalCount,
             NextLink = nextLink
         };
@@ -357,7 +358,7 @@ public sealed partial class PostgresSensorThingsRepository
 
         return new PagedResult<ObservedProperty>
         {
-            Items = observedPropertiesWithLinks,
+            Items = observedPropertiesWithLinks.ToList(),
             TotalCount = totalCount,
             NextLink = nextLink
         };
@@ -574,7 +575,7 @@ public sealed partial class PostgresSensorThingsRepository
 
         return new PagedResult<FeatureOfInterest>
         {
-            Items = items,
+            Items = items.ToList(),
             TotalCount = totalCount
         };
     }

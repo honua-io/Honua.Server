@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Host.Extensions;
 using Honua.Server.Host.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -127,6 +128,9 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.ConfigureHonuaRequestPipeline();
+
+// Register conditional service endpoints (OData, OpenRosa, etc.)
+app.MapConditionalServiceEndpoints();
 
 app.Run();
 
