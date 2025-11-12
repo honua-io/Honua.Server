@@ -1,16 +1,29 @@
 # Honua Configuration Reference
 
-Complete reference for configuring Honua server via `appsettings.json` and environment variables.
+**IMPORTANT: This document covers application settings only (appsettings.json). For service, data source, and layer configuration, you must use Configuration V2 (HCL format).**
+
+See [Configuration V2 Reference](../configuration-v2-reference.md) for complete HCL configuration documentation.
+
+Complete reference for configuring Honua server application settings via `appsettings.json` and environment variables.
 
 ## Table of Contents
+- [Configuration V2 (Required)](#configuration-v2-required)
 - [Authentication](#authentication)
-- [Metadata Provider](#metadata-provider)
 - [Services](#services)
 - [Attachments](#attachments)
 - [OData](#odata)
 - [Server](#server)
 - [Observability](#observability)
 - [Environment Variables](#environment-variables)
+
+## Configuration V2 (Required)
+
+**All service, data source, and layer configuration must use Configuration V2 (HCL format).**
+
+Legacy metadata.json configuration is no longer supported. See:
+- [Configuration V2 Reference](../configuration-v2-reference.md)
+- [Migration Guide](../configuration-v2-migration.md)
+- [BREAKING_CHANGES.md](../../BREAKING_CHANGES.md)
 
 ## Authentication
 

@@ -1,16 +1,21 @@
 # Production Configuration Guide
 
+## Configuration V2 (Required)
+
+**IMPORTANT: Honua Server now uses Configuration V2 exclusively. Legacy metadata.json configuration is no longer supported.**
+
+All configuration must use HCL format in `.honua` files. See [Configuration V2 Reference](docs/configuration-v2-reference.md) for complete documentation.
+
 ## Required Environment Variables
 
 ### Core Configuration
 
 ```bash
+# Configuration V2 file location (required)
+HONUA_CONFIG="./honua.config.hcl"
+
 # Connection Strings
 ConnectionStrings__Redis="server:6379,password=SECRET,connectTimeout=5000"
-
-# Metadata
-honua__metadata__provider="json"  # or postgres, s3
-honua__metadata__path="./metadata/metadata.json"
 
 # Security
 honua__security__apiKey__enabled="true"
@@ -53,13 +58,14 @@ The application validates configuration at startup and will fail fast with clear
 
 The main Honua server (`Honua.Server.Host`) performs these validations:
 
-1. **Redis Connection**
+1. **Configuration V2**
+   - HCL configuration file must be valid and loadable
+   - All required blocks (honua, data_source, service, layer) must be properly defined
+   - See [Configuration V2 Validation](docs/configuration-v2-reference.md#validation)
+
+2. **Redis Connection**
    - Must be configured
    - Cannot point to localhost in Production environment
-
-2. **Metadata Configuration**
-   - Provider must be specified (json, postgres, or s3)
-   - Path must be configured
 
 3. **AllowedHosts**
    - Cannot be "*" in Production environment

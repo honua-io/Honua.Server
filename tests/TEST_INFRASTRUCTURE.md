@@ -29,7 +29,7 @@ The Honua.Server test infrastructure is designed for **comprehensive, fast, and 
 
 - **Shared Test Containers:** Reduce startup time from 39+ containers to 3 shared containers
 - **Parallel Execution:** Tests run in parallel for maximum throughput
-- **Configuration V2 Support:** Test declarative HCL-based configuration
+- **Configuration V2 Required:** All tests must use declarative HCL-based configuration (legacy configuration removed)
 - **Real Database Testing:** TestContainers provide real PostgreSQL, MySQL, and Redis instances
 - **Isolation:** Tests are isolated while sharing infrastructure
 
@@ -227,7 +227,8 @@ public bool IsRedisReady { get; }
 
 **Features:**
 - Uses real TestContainer databases
-- Configurable via `appsettings.Test.json`
+- Configurable via Configuration V2 (HCL)
+- Generates minimal test configuration dynamically
 - Service overrides via `ConfigureTestServices`
 - Test environment isolation
 
@@ -523,9 +524,11 @@ public class WfsApiTests : IClassFixture<DatabaseFixture>
 
 ## Configuration V2 in Tests
 
+**IMPORTANT: Configuration V2 is mandatory. All tests must use ConfigurationV2TestFixture.**
+
 ### Testing HCL Configuration
 
-Configuration V2 uses HCL (HashiCorp Configuration Language) for declarative service configuration. The test infrastructure provides specialized fixtures for testing Configuration V2.
+Configuration V2 uses HCL (HashiCorp Configuration Language) for declarative service configuration. Legacy configuration (metadata.json, ConfigurationLoader) has been removed.
 
 ### TestConfigurationBuilder Methods
 

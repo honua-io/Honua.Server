@@ -23,7 +23,9 @@
 
 ## Overview
 
-Configuration V2 introduces **declarative HCL-based configuration** for Honua.Server. This guide helps you migrate existing tests from the old imperative configuration style to the new declarative approach.
+**IMPORTANT: Configuration V2 is now the only supported configuration system. Legacy configuration has been removed.**
+
+Configuration V2 uses **declarative HCL-based configuration** for Honua.Server. This guide helps you migrate existing tests to use Configuration V2.
 
 ### What is Configuration V2?
 
@@ -33,11 +35,11 @@ Configuration V2 uses HCL (HashiCorp Configuration Language) to define:
 - Layers (spatial data layers)
 - Caches (Redis, in-memory)
 
-### Migration Timeline
+### Migration Status
 
-- **Phase 1:** New tests use Configuration V2 (current)
-- **Phase 2:** Gradually migrate existing tests (ongoing)
-- **Phase 3:** Deprecate old configuration style (future)
+- **Legacy configuration system:** REMOVED
+- **Configuration V2:** MANDATORY for all tests
+- **All tests must use:** ConfigurationV2TestFixture or TestConfigurationBuilder
 
 ---
 

@@ -98,17 +98,23 @@ public sealed class ConfigurationLoader
     public HonuaConfiguration Load(IConfiguration configuration, string? basePath = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        var metadataSection = configuration.GetSection("metadata");
-        if (!metadataSection.Exists())
-        {
-            throw new InvalidDataException("Configuration must include 'metadata' section.");
-        }
 
-        var metadata = new MetadataConfiguration
+        // LEGACY CONFIGURATION SYSTEM - DEPRECATED
+        // This method loads configuration from IConfiguration (appsettings.json/yaml)
+        // Configuration V2 (.hcl files) is now the recommended approach
+        // The 'metadata' section is now optional to support Configuration V2-only deployments
+
+        var metadataSection = configuration.GetSection("metadata");
+        MetadataConfiguration? metadata = null;
+
+        if (metadataSection.Exists())
         {
-            Provider = metadataSection["provider"] ?? string.Empty,
-            Path = metadataSection["path"] ?? string.Empty
-        };
+            metadata = new MetadataConfiguration
+            {
+                Provider = metadataSection["provider"] ?? string.Empty,
+                Path = metadataSection["path"] ?? string.Empty
+            };
+        }
 
         var odataSection = configuration.GetSection("odata");
         var odataDefaults = ODataConfiguration.Default;
@@ -269,36 +275,47 @@ public sealed class ConfigurationLoader
 
     private static HonuaConfiguration Normalize(HonuaConfiguration config, string basePath)
     {
-        var normalizedProvider = config.Metadata.Provider?.Trim();
-        if (normalizedProvider.IsNullOrWhiteSpace())
-        {
-            throw new InvalidDataException("Metadata provider must be specified.");
-        }
+        // LEGACY CONFIGURATION SYSTEM - DEPRECATED
+        // Metadata is now optional to support Configuration V2-only deployments
+        // If metadata is not provided, Configuration V2 will be used instead
 
-        var metadataPath = config.Metadata.Path ?? string.Empty;
-        if (metadataPath.HasValue())
-        {
-            var providerIsFileBased = IsFileBasedMetadataProvider(normalizedProvider);
+        MetadataConfiguration? normalizedMetadata = null;
 
-            if (providerIsFileBased)
+        if (config.Metadata is not null)
+        {
+            var normalizedProvider = config.Metadata.Provider?.Trim();
+            if (normalizedProvider.IsNullOrWhiteSpace())
             {
-                metadataPath = Path.IsPathRooted(metadataPath)
-                    ? Path.GetFullPath(metadataPath)
-                    : Path.GetFullPath(Path.Combine(basePath, metadataPath));
+                throw new InvalidDataException("Metadata provider must be specified when metadata section is present.");
             }
-            else
+
+            var metadataPath = config.Metadata.Path ?? string.Empty;
+            if (metadataPath.HasValue())
             {
-                metadataPath = metadataPath.Trim();
+                var providerIsFileBased = IsFileBasedMetadataProvider(normalizedProvider);
+
+                if (providerIsFileBased)
+                {
+                    metadataPath = Path.IsPathRooted(metadataPath)
+                        ? Path.GetFullPath(metadataPath)
+                        : Path.GetFullPath(Path.Combine(basePath, metadataPath));
+                }
+                else
+                {
+                    metadataPath = metadataPath.Trim();
+                }
             }
+
+            normalizedMetadata = new MetadataConfiguration
+            {
+                Provider = normalizedProvider,
+                Path = metadataPath
+            };
         }
 
         return new HonuaConfiguration
         {
-            Metadata = new MetadataConfiguration
-            {
-                Provider = normalizedProvider,
-                Path = metadataPath
-            },
+            Metadata = normalizedMetadata,
             Services = NormalizeServices(config.Services, basePath),
             Attachments = NormalizeAttachments(config.Attachments, basePath)
         };

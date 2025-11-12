@@ -1,23 +1,25 @@
 # Migrating to Configuration 2.0
 
-This guide helps you migrate from the old fragmented configuration system to Configuration 2.0.
+This guide helps you migrate from the legacy configuration system to Configuration 2.0.
 
 ---
 
 ## Overview
 
-### Old System (Before Configuration 2.0)
+### Legacy System (Removed)
 
-Configuration was fragmented across **4+ sources**:
+**IMPORTANT: Legacy configuration has been removed. Configuration V2 is now the only supported configuration system.**
+
+The old system used fragmented configuration across multiple sources:
 
 1. **Environment Variables** - Service enablement, connection strings
 2. **appsettings.json** - ASP.NET Core settings, logging
-3. **metadata.json** - Data sources, services, layers, fields
+3. **metadata.json** - Data sources, services, layers, fields (NO LONGER SUPPORTED)
 4. **Program.cs** - Manual service registration, DI, middleware
 
-### New System (Configuration 2.0)
+### Current System (Configuration 2.0)
 
-**Single source of truth**: One `.honua` file that replaces all of the above.
+**Single source of truth**: One `.honua` HCL file provides declarative configuration for all services, data sources, and layers.
 
 ---
 
@@ -55,7 +57,7 @@ honua config init:v2 --template production
 
 ### Step 3: Migrate Data Sources
 
-#### Old System (metadata.json)
+#### Legacy System (metadata.json) - NO LONGER SUPPORTED
 
 ```json
 {
@@ -69,7 +71,7 @@ honua config init:v2 --template production
 }
 ```
 
-#### New System (honua.config.hcl)
+#### Configuration V2 (honua.config.hcl) - REQUIRED
 
 ```hcl
 data_source "postgres_main" {

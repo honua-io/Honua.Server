@@ -56,19 +56,17 @@ public sealed class ODataContainerFixture : IAsyncLifetime
             await image.CreateAsync();
         }
 
-        // Create test metadata JSON and database
-        var metadataPath = CreateTestMetadata();
+        // Create test Configuration V2 HCL file and database
+        var configPath = CreateTestConfigurationV2();
         CreateTestDatabase();
 
-        // Start container with test configuration using the shared image
+        // Start container with Configuration V2 using the shared image
         _container = new ContainerBuilder()
             .WithImage(imageName)
-            .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
-            .WithEnvironment("HONUA__METADATA__PROVIDER", "json")
-            .WithEnvironment("HONUA__METADATA__PATH", "/app/testdata/metadata.json")
-            .WithEnvironment("ConnectionStrings__HonuaDb", "Data Source=/app/testdata/test.db")
-            .WithEnvironment("HONUA__AUTHENTICATION__ENFORCE", "false")
-            .WithEnvironment("HONUA__SERVICES__ODATA__ENABLED", "true")
+            .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Test")
+            .WithEnvironment("HONUA_CONFIG_PATH", "/app/testdata/config.honua")
+            .WithEnvironment("HONUA_CONFIG_V2_ENABLED", "true")
+            .WithEnvironment("DATABASE_URL", "Data Source=/app/testdata/test.db")
             .WithBindMount(_testDataPath, "/app/testdata")
             .WithPortBinding(8080, true)
             .WithWaitStrategy(Wait.ForUnixContainer()
@@ -114,98 +112,58 @@ public sealed class ODataContainerFixture : IAsyncLifetime
         }
     }
 
-    private string CreateTestMetadata()
+    private string CreateTestConfigurationV2()
     {
-        var metadataPath = Path.Combine(_testDataPath, "metadata.json");
+        var configPath = Path.Combine(_testDataPath, "config.honua");
 
-        // Generate valid metadata JSON that matches JsonMetadataProvider schema
-        var metadata = $$"""
-        {
-          "catalog": {
-            "id": "honua-odata-test",
-            "title": "Honua OData Test Catalog",
-            "description": "Test catalog for OData endpoint tests",
-            "version": "1.0.0"
-          },
-          "folders": [
-            {
-              "id": "transportation",
-              "title": "Transportation"
+        // Generate Configuration V2 HCL that replaces the legacy JSON metadata
+        var config = """
+        honua {
+            version     = "2.0"
+            environment = "test"
+            log_level   = "information"
+        }
+
+        data_source "sqlite_primary" {
+            provider   = "sqlite"
+            connection = env("DATABASE_URL")
+
+            pool {
+                min_size = 1
+                max_size = 5
             }
-          ],
-          "dataSources": [
-            {
-              "id": "sqlite-primary",
-              "provider": "sqlite",
-              "connectionString": "Data Source=/app/testdata/test.db"
+        }
+
+        service "odata" {
+            enabled = true
+        }
+
+        service "ogc_api" {
+            enabled     = true
+            item_limit  = 1000
+        }
+
+        layer "roads_primary" {
+            title       = "Primary Roads"
+            description = "Road centerline reference layer"
+            data_source = data_source.sqlite_primary
+            table       = "roads_primary"
+            id_field    = "road_id"
+            introspect_fields = true
+
+            geometry {
+                column = "geom"
+                type   = "LineString"
+                srid   = 4326
             }
-          ],
-          "services": [
-            {
-              "id": "roads",
-              "title": "Road Centerlines",
-              "folderId": "transportation",
-              "serviceType": "feature",
-              "dataSourceId": "sqlite-primary",
-              "enabled": true,
-              "description": "Road centerline reference layer",
-              "ogc": {
-                "collectionsEnabled": true,
-                "itemLimit": 1000
-              }
-            }
-          ],
-          "layers": [
-            {
-              "id": "roads-primary",
-              "serviceId": "roads",
-              "title": "Primary Roads",
-              "geometryType": "LineString",
-              "idField": "road_id",
-              "displayField": "name",
-              "geometryField": "geom",
-              "itemType": "feature",
-              "storage": {
-                "table": "roads_primary",
-                "geometryColumn": "geom",
-                "primaryKey": "road_id",
-                "srid": 4326
-              },
-              "fields": [
-                {
-                  "name": "road_id",
-                  "dataType": "int",
-                  "nullable": false
-                },
-                {
-                  "name": "name",
-                  "dataType": "string",
-                  "nullable": true
-                },
-                {
-                  "name": "status",
-                  "dataType": "string",
-                  "nullable": true
-                },
-                {
-                  "name": "length_km",
-                  "dataType": "double",
-                  "nullable": true
-                }
-              ]
-            }
-          ],
-          "styles": [],
-          "layerGroups": [],
-          "server": {
-            "allowedHosts": ["*"]
-          }
+
+            services = [service.odata, service.ogc_api]
         }
         """;
 
-        File.WriteAllText(metadataPath, metadata);
+        File.WriteAllText(configPath, config);
 
-        return metadataPath;
+        return configPath;
     }
 
     private static async Task<bool> ImageExistsAsync(string imageName)

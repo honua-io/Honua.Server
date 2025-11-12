@@ -51,6 +51,15 @@ public sealed class MetadataMergeService
     {
         ArgumentNullException.ThrowIfNull(plan);
 
+        // LEGACY CONFIGURATION SYSTEM - DEPRECATED
+        // This method requires legacy metadata configuration
+        if (_configurationService.Current.Metadata is null)
+        {
+            throw new InvalidOperationException(
+                "Legacy metadata configuration is required for migration operations. " +
+                "Please provide a 'metadata' section in your configuration with a valid provider (json/yaml) and path.");
+        }
+
         var metadataPath = _configurationService.Current.Metadata.Path;
         if (string.IsNullOrWhiteSpace(metadataPath))
         {

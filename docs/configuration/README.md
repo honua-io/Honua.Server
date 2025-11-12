@@ -2,9 +2,22 @@
 
 Complete configuration reference for Honua Server.
 
+## Configuration V2 (Required)
+
+**IMPORTANT: Honua Server now uses Configuration V2 exclusively. Legacy metadata.json configuration is no longer supported.**
+
+All service, data source, and layer configuration must be defined in HCL format using `.honua` files.
+
+See [Configuration V2 Reference](../configuration-v2-reference.md) for complete HCL configuration documentation.
+
 ## Configuration Sources
 
-Honua uses ASP.NET Core configuration with the following precedence (highest to lowest):
+Honua uses a hybrid configuration approach:
+
+1. **Configuration V2 (HCL)** - Services, data sources, layers (required)
+2. **ASP.NET Core configuration** - Application settings (appsettings.json, environment variables)
+
+### Precedence for Application Settings
 
 1. Command-line arguments
 2. Environment variables

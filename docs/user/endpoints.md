@@ -158,15 +158,18 @@
 > Attachments must be enabled per-layer in metadata. See [Attachments Guide](attachments.md) for configuration.
 
 ## Administrative API
+
+**Note:** Configuration management now uses Configuration V2 (HCL). Legacy metadata.json endpoints are deprecated.
+
 | Operation | Endpoint | Example | Notes |
 |-----------|----------|---------|-------|
-| Reload metadata | POST /admin/metadata/reload | curl -X POST -H "Authorization: Bearer {token}" "https://localhost:5000/admin/metadata/reload" | Reload metadata from disk |
-| Validate metadata | POST /admin/metadata/validate | curl -X POST -H "Authorization: Bearer {token}" -H "Content-Type: application/json" -d @metadata.json "https://localhost:5000/admin/metadata/validate" | Validate metadata schema |
-| Apply metadata | POST /admin/metadata/apply | curl -X POST -H "Authorization: Bearer {token}" -H "Content-Type: application/json" -d @metadata.json "https://localhost:5000/admin/metadata/apply" | Apply new metadata |
-| Diff metadata | POST /admin/metadata/diff | curl -X POST -H "Authorization: Bearer {token}" -H "Content-Type: application/json" -d @metadata.json "https://localhost:5000/admin/metadata/diff" | Compare metadata changes |
-| List snapshots | GET /admin/metadata/snapshots | curl -H "Authorization: Bearer {token}" "https://localhost:5000/admin/metadata/snapshots" | List metadata backups |
-| Create snapshot | POST /admin/metadata/snapshots | curl -X POST -H "Authorization: Bearer {token}" -d '{"label":"backup-2025-10-01","notes":"Pre-migration"}' "https://localhost:5000/admin/metadata/snapshots" | Create metadata backup |
-| Restore snapshot | POST /admin/metadata/snapshots/{label}/restore | curl -X POST -H "Authorization: Bearer {token}" "https://localhost:5000/admin/metadata/snapshots/backup-2025-10-01/restore" | Restore from backup |
+| Reload configuration | POST /admin/config/reload | curl -X POST -H "Authorization: Bearer {token}" "https://localhost:5000/admin/config/reload" | Reload Configuration V2 from disk |
+| Validate configuration | POST /admin/config/validate | curl -X POST -H "Authorization: Bearer {token}" -H "Content-Type: text/plain" --data-binary @honua.config.hcl "https://localhost:5000/admin/config/validate" | Validate Configuration V2 HCL |
+| Apply configuration | POST /admin/config/apply | curl -X POST -H "Authorization: Bearer {token}" -H "Content-Type: text/plain" --data-binary @honua.config.hcl "https://localhost:5000/admin/config/apply" | Apply new Configuration V2 |
+| Diff configuration | POST /admin/config/diff | curl -X POST -H "Authorization: Bearer {token}" -H "Content-Type: text/plain" --data-binary @honua.config.hcl "https://localhost:5000/admin/config/diff" | Compare configuration changes |
+| List snapshots | GET /admin/config/snapshots | curl -H "Authorization: Bearer {token}" "https://localhost:5000/admin/config/snapshots" | List configuration backups |
+| Create snapshot | POST /admin/config/snapshots | curl -X POST -H "Authorization: Bearer {token}" -d '{"label":"backup-2025-11-11","notes":"Pre-migration"}' "https://localhost:5000/admin/config/snapshots" | Create configuration backup |
+| Restore snapshot | POST /admin/config/snapshots/{label}/restore | curl -X POST -H "Authorization: Bearer {token}" "https://localhost:5000/admin/config/snapshots/backup-2025-11-11/restore" | Restore from backup |
 | Create migration job | POST /admin/migrations/jobs | curl -X POST -H "Authorization: Bearer {token}" -d '{"sourceUrl":"https://services.arcgis.com/.../FeatureServer","targetProvider":"postgis",...}' "https://localhost:5000/admin/migrations/jobs" | Migrate from ArcGIS Server |
 | List migrations | GET /admin/migrations/jobs | curl -H "Authorization: Bearer {token}" "https://localhost:5000/admin/migrations/jobs" | List migration jobs |
 | Get migration status | GET /admin/migrations/jobs/{jobId} | curl -H "Authorization: Bearer {token}" "https://localhost:5000/admin/migrations/jobs/migration-abc123" | Migration job details |

@@ -191,9 +191,22 @@ public static class ServiceCollectionExtensions
             return MetadataSchemaValidator.CreateDefault(cache);
         });
 
+        // LEGACY CONFIGURATION SYSTEM - DEPRECATED
+        // Metadata provider is only registered if legacy configuration is present
+        // Configuration V2 (.hcl files) uses a different metadata system
         services.AddSingleton<IMetadataProvider>(_ =>
         {
             var metadata = configurationService.Current.Metadata;
+
+            // If no legacy metadata configuration, skip provider registration
+            // This allows Configuration V2-only deployments to work
+            if (metadata is null)
+            {
+                // Return a no-op provider that throws when accessed
+                // This prevents null reference exceptions while making it clear legacy config is missing
+                return new NoOpMetadataProvider();
+            }
+
             return metadata.Provider.ToLowerInvariant() switch
             {
                 "json" => new JsonMetadataProvider(metadata.Path),

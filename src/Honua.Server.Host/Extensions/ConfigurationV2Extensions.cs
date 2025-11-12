@@ -2,7 +2,6 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using Honua.Server.Core.Configuration.V2;
-using Honua.Server.Core.Configuration.V2.Services;
 using Honua.Server.Core.Plugins;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -17,8 +16,8 @@ namespace Honua.Server.Host.Extensions;
 public static class ConfigurationV2Extensions
 {
     /// <summary>
-    /// Attempts to load and register Configuration V2 from a .honua file if present.
-    /// Coexists with legacy configuration system - Configuration V2 takes precedence when available.
+    /// Loads and registers Configuration V2 from a .honua file if present.
+    /// Services are registered through the plugin system - each service must have a corresponding plugin.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">The application configuration.</param>
@@ -64,7 +63,7 @@ public static class ConfigurationV2Extensions
         if (string.IsNullOrWhiteSpace(configPath) || !File.Exists(configPath))
         {
             logger.LogInformation(
-                "No Configuration V2 file found. Using legacy configuration system. " +
+                "No Configuration V2 file found. " +
                 "To use Configuration V2, create a honua.config.hcl file or set HONUA_CONFIG_PATH.");
             return services;
         }
@@ -190,15 +189,8 @@ public static class ConfigurationV2Extensions
                 }
             }
 
-            // Register legacy Configuration V2 services (IServiceRegistration) for services NOT covered by plugins
-            logger.LogInformation("Registering legacy Configuration V2 services...");
-            services.AddHonuaFromConfiguration(honuaConfig, options =>
-            {
-                // options.LogLevel = LogLevel.Information; // LogLevel property not available
-            });
-
-            // Note: The ServiceRegistrationDiscovery will still register services,
-            // but plugins take precedence at runtime if both are available.
+            // All service registration is now handled by plugins loaded above
+            // Legacy IServiceRegistration system is no longer used
 
             logger.LogInformation(
                 "Configuration V2 loaded successfully: {DataSources} data sources, {Services} services, {Layers} layers, {Plugins} plugins",
@@ -211,15 +203,15 @@ public static class ConfigurationV2Extensions
         }
         catch (Exception ex)
         {
-            // Log error but don't fail startup - fall back to legacy configuration
-            logger.LogError(ex, "Failed to load Configuration V2 from {Path}. Falling back to legacy configuration.", configPath);
+            // Log error but don't fail startup
+            logger.LogError(ex, "Failed to load Configuration V2 from {Path}.", configPath);
             return services;
         }
     }
 
     /// <summary>
     /// Maps Configuration V2 service endpoints if Configuration V2 is active.
-    /// Should be called after MapHonuaEndpoints().
+    /// All service endpoints are registered through plugins.
     /// </summary>
     /// <param name="app">The web application.</param>
     /// <returns>The web application for method chaining.</returns>
@@ -308,10 +300,8 @@ public static class ConfigurationV2Extensions
                     string.Join(", ", pluginServiceIds));
             }
 
-            // Map endpoints using the legacy service registration system
-            // This will handle services that don't have plugins yet
-            logger.LogInformation("Mapping legacy Configuration V2 endpoints...");
-            app.MapHonuaEndpoints(honuaConfig);
+            // All endpoint mapping is now handled by plugins loaded above
+            // Legacy service registration system is no longer used
 
             logger.LogInformation("Configuration V2 endpoints mapped successfully");
         }

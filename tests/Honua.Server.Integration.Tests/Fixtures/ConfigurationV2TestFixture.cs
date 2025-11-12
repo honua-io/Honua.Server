@@ -71,9 +71,6 @@ public class ConfigurationV2TestFixture<TProgram> : WebApplicationFactory<TProgr
             var interpolatedConfig = InterpolateConnectionStrings(_honuaConfiguration);
             File.WriteAllText(_tempConfigFilePath, interpolatedConfig);
 
-            // Add Configuration V2 file to the configuration
-            config.AddJsonFile("appsettings.Test.json", optional: true);
-
             // Load and register the Configuration V2
             try
             {
@@ -88,9 +85,14 @@ public class ConfigurationV2TestFixture<TProgram> : WebApplicationFactory<TProgr
             var configOverrides = new Dictionary<string, string?>
             {
                 ["HONUA_CONFIG_PATH"] = _tempConfigFilePath,
+                ["HONUA_CONFIG_V2_ENABLED"] = "true",
                 ["DATABASE_URL"] = _databaseFixture.PostgresConnectionString,
                 ["MYSQL_URL"] = _databaseFixture.MySqlConnectionString,
-                ["REDIS_URL"] = _databaseFixture.RedisConnectionString
+                ["REDIS_URL"] = _databaseFixture.RedisConnectionString,
+                // Provide legacy fallbacks for compatibility during migration
+                ["ConnectionStrings:DefaultConnection"] = _databaseFixture.PostgresConnectionString,
+                ["ConnectionStrings:MySql"] = _databaseFixture.MySqlConnectionString,
+                ["ConnectionStrings:Redis"] = _databaseFixture.RedisConnectionString
             };
 
             config.AddInMemoryCollection(configOverrides);

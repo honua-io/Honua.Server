@@ -8,7 +8,10 @@ namespace Honua.Server.Core.Configuration;
 
 public sealed class HonuaConfiguration
 {
-    public required MetadataConfiguration Metadata { get; init; }
+    // LEGACY CONFIGURATION SYSTEM - DEPRECATED
+    // Metadata is now optional to support Configuration V2-only deployments
+    // When null, Configuration V2 (.hcl files) will be used instead
+    public MetadataConfiguration? Metadata { get; init; }
     public ServicesConfiguration Services { get; init; } = ServicesConfiguration.Default;
     public AttachmentConfiguration Attachments { get; init; } = AttachmentConfiguration.Default;
     public ExternalServiceSecurityConfiguration ExternalServiceSecurity { get; init; } = ExternalServiceSecurityConfiguration.Default;
