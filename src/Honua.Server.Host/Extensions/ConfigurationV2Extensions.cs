@@ -194,7 +194,7 @@ public static class ConfigurationV2Extensions
             logger.LogInformation("Registering legacy Configuration V2 services...");
             services.AddHonuaFromConfiguration(honuaConfig, options =>
             {
-                options.LogLevel = LogLevel.Information;
+                // options.LogLevel = LogLevel.Information; // LogLevel property not available
             });
 
             // Note: The ServiceRegistrationDiscovery will still register services,

@@ -35,4 +35,10 @@
 		<ProjectReference Include="..\..\src\Honua.Server.Core.Raster\Honua.Server.Core.Raster.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<None Update="xunit.runner.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
 </Project>

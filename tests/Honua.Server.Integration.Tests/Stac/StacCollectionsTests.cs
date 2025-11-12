@@ -16,10 +16,11 @@ namespace Honua.Server.Integration.Tests.Stac;
 /// Integration tests for STAC Collections API endpoints.
 /// Tests collection listing and metadata retrieval.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "STAC")]
 [Trait("Endpoint", "Collections")]
-public class StacCollectionsTests : IClassFixture<DatabaseFixture>
+public class StacCollectionsTests
 {
     private readonly DatabaseFixture _databaseFixture;
 

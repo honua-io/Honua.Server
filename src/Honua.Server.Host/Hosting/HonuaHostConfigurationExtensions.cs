@@ -52,7 +52,7 @@ internal static class HonuaHostConfigurationExtensions
         builder.Services.AddHonuaRasterServices();
         builder.Services.AddHonuaStacServices();
         builder.Services.AddHonuaCartoServices();
-        builder.Services.AddSensorThings(builder.Configuration); // OGC SensorThings API v1.1
+        // builder.Services.AddSensorThings(builder.Configuration); // OGC SensorThings API v1.1 - Not yet implemented
 
         // Register SensorThings SignalR broadcaster (if WebSocket streaming enabled)
         // Enterprise features disabled
@@ -69,10 +69,10 @@ internal static class HonuaHostConfigurationExtensions
             ?? builder.Configuration.GetConnectionString("DefaultConnection");
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            builder.Services.AddGeoEventServices(connectionString, builder.Configuration);
+            // builder.Services.AddGeoEventServices(connectionString, builder.Configuration); // Not yet implemented
 
             // Register SignalR hub for real-time event streaming
-            builder.Services.AddSingleton<IGeoEventBroadcaster, SignalRGeoEventBroadcaster>();
+            // builder.Services.AddSingleton<IGeoEventBroadcaster, SignalRGeoEventBroadcaster>(); // Not yet implemented
 
             // Register GeoETL services (Enterprise feature)
             // Enterprise features disabled

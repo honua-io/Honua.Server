@@ -15,10 +15,11 @@ namespace Honua.Server.Integration.Tests.GeoservicesREST;
 /// Integration tests for GeoServices REST Image Server API endpoints.
 /// Tests raster operations including imagery export and catalog queries.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "GeoservicesREST")]
 [Trait("Endpoint", "ImageServer")]
-public class ImageServerTests : IClassFixture<DatabaseFixture>
+public class ImageServerTests
 {
     private readonly DatabaseFixture _databaseFixture;
 

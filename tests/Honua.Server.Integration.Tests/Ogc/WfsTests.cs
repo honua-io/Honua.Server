@@ -15,10 +15,11 @@ namespace Honua.Server.Integration.Tests.Ogc;
 /// Integration tests for OGC WFS (Web Feature Service) endpoints.
 /// Tests WFS 2.0/3.0 operations including GetCapabilities, GetFeature, and transactions.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "OGC")]
 [Trait("Endpoint", "WFS")]
-public class WfsTests : IClassFixture<DatabaseFixture>
+public class WfsTests
 {
     private readonly DatabaseFixture _databaseFixture;
 
