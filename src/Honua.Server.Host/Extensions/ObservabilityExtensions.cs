@@ -94,6 +94,7 @@ internal static class ObservabilityExtensions
         services.AddSingleton<IApiMetrics, ApiMetrics>();
         services.AddSingleton<IDatabaseMetrics, DatabaseMetrics>();
         services.AddSingleton<ICacheMetrics, CacheMetrics>();
+        services.AddSingleton<IQueryMetrics, QueryMetrics>();
         services.AddSingleton<IVectorTileMetrics, VectorTileMetrics>();
         services.AddSingleton<ISecurityMetrics, SecurityMetrics>();
         services.AddSingleton<IBusinessMetrics, BusinessMetrics>();
@@ -114,6 +115,7 @@ internal static class ObservabilityExtensions
                 metricBuilder.AddMeter("Honua.Server.Api");
                 metricBuilder.AddMeter("Honua.Server.Database");
                 metricBuilder.AddMeter("Honua.Server.Cache");
+                metricBuilder.AddMeter("Honua.Server.Query");
                 metricBuilder.AddMeter("Honua.Server.VectorTiles");
                 metricBuilder.AddMeter("Honua.Server.Security");
                 metricBuilder.AddMeter("Honua.Server.Business");

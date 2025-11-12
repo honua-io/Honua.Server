@@ -36,15 +36,21 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
 {
     private readonly IOgcCollectionResolver _collectionResolver;
     private readonly IOgcFeaturesGeoJsonHandler _geoJsonHandler;
+    private readonly FilterParsingCacheService _filterCache;
+    private readonly FilterParsingCacheOptions _cacheOptions;
     private readonly ILogger<OgcFeaturesQueryHandler> _logger;
 
     public OgcFeaturesQueryHandler(
         IOgcCollectionResolver collectionResolver,
         IOgcFeaturesGeoJsonHandler geoJsonHandler,
+        FilterParsingCacheService filterCache,
+        Microsoft.Extensions.Options.IOptions<FilterParsingCacheOptions> cacheOptions,
         ILogger<OgcFeaturesQueryHandler> logger)
     {
         _collectionResolver = collectionResolver ?? throw new ArgumentNullException(nameof(collectionResolver));
         _geoJsonHandler = geoJsonHandler ?? throw new ArgumentNullException(nameof(geoJsonHandler));
+        _filterCache = filterCache ?? throw new ArgumentNullException(nameof(filterCache));
+        _cacheOptions = cacheOptions?.Value ?? throw new ArgumentNullException(nameof(cacheOptions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -178,16 +184,53 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
             var treatAsJsonFilter = string.Equals(filterLangNormalized, "cql2-json", StringComparison.Ordinal) ||
                                     (filterLangNormalized is null && OgcSharedHandlers.LooksLikeJson(rawFilter));
 
+            // Determine filter language for caching
+            var effectiveFilterLanguage = treatAsJsonFilter ? "cql2-json" : "cql-text";
+            if (filterLangNormalized is not null)
+            {
+                effectiveFilterLanguage = filterLangNormalized;
+            }
+
             try
             {
-                if (treatAsJsonFilter)
+                // Use cache if enabled, otherwise parse directly
+                if (_cacheOptions.Enabled)
                 {
-                    combinedFilter = Cql2JsonParser.Parse(rawFilter, layer, normalizedFilterCrs);
-                    filterLangNormalized ??= "cql2-json";
+                    combinedFilter = _filterCache.GetOrParse(
+                        rawFilter,
+                        effectiveFilterLanguage,
+                        layer,
+                        normalizedFilterCrs,
+                        () =>
+                        {
+                            // Parse function - only called on cache miss
+                            if (treatAsJsonFilter)
+                            {
+                                return Cql2JsonParser.Parse(rawFilter, layer, normalizedFilterCrs);
+                            }
+                            else
+                            {
+                                return CqlFilterParser.Parse(rawFilter, layer);
+                            }
+                        });
                 }
                 else
                 {
-                    combinedFilter = CqlFilterParser.Parse(rawFilter, layer);
+                    // Cache disabled - parse directly
+                    if (treatAsJsonFilter)
+                    {
+                        combinedFilter = Cql2JsonParser.Parse(rawFilter, layer, normalizedFilterCrs);
+                    }
+                    else
+                    {
+                        combinedFilter = CqlFilterParser.Parse(rawFilter, layer);
+                    }
+                }
+
+                // Update filter language for consistency
+                if (treatAsJsonFilter)
+                {
+                    filterLangNormalized ??= "cql2-json";
                 }
             }
             catch (Exception ex)

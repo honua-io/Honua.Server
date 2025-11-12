@@ -9,6 +9,7 @@ using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Raster;
 using Honua.Server.Core.Styling;
+using Honua.Server.Host.Services;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,7 @@ internal static class WmsCapabilitiesHandlers
         HttpRequest request,
         [FromServices] MetadataSnapshot snapshot,
         [FromServices] IRasterDatasetRegistry rasterRegistry,
+        [FromServices] ICapabilitiesCache capabilitiesCache,
         CancellationToken cancellationToken) =>
         await ActivityScope.ExecuteAsync(
             HonuaTelemetry.OgcProtocols,
@@ -38,8 +40,27 @@ internal static class WmsCapabilitiesHandlers
                 var datasets = await rasterRegistry.GetAllAsync(cancellationToken).ConfigureAwait(false);
                 activity.AddTag("wms.dataset_count", datasets.Count);
 
+                // Extract version and language from request
+                var query = request.Query;
+                var version = QueryParsingHelpers.GetQueryValue(query, "version") ?? "1.3.0";
+                var acceptLanguage = request.Headers["Accept-Language"].FirstOrDefault();
+
+                // Try to get from cache
+                if (capabilitiesCache.TryGetCapabilities("wms", "global", version, acceptLanguage, out var cachedXml))
+                {
+                    activity.AddTag("wms.cache_hit", true);
+                    return Results.Content(cachedXml, "application/xml");
+                }
+
+                activity.AddTag("wms.cache_hit", false);
+
+                // Cache miss - generate capabilities
                 var builder = new WmsCapabilitiesBuilder(rasterRegistry);
                 var xml = await builder.BuildCapabilitiesAsync(snapshot, request, cancellationToken).ConfigureAwait(false);
+
+                // Store in cache
+                await capabilitiesCache.SetCapabilitiesAsync("wms", "global", version, acceptLanguage, xml, cancellationToken)
+                    .ConfigureAwait(false);
 
                 return Results.Content(xml, "application/xml");
             }).ConfigureAwait(false);

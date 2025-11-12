@@ -82,11 +82,31 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Ogc.Services.IOgcTilesHandler, Ogc.Services.OgcTilesHandler>();
         services.AddSingleton<Ogc.Services.IOgcFeaturesRenderingHandler, Ogc.Services.OgcFeaturesRenderingHandler>();
 
+        // Register filter parsing cache (performance optimization)
+        services.AddOptions<Ogc.Services.FilterParsingCacheOptions>()
+            .Bind(configuration.GetSection("FilterParsingCache"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<Ogc.Services.FilterParsingCacheMetrics>();
+        services.AddSingleton<Ogc.Services.FilterParsingCacheService>();
+
         // Register WMS options with validation for memory management and limits
         services.AddOptions<WmsOptions>()
             .Bind(configuration.GetSection(WmsOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+
+        // Register OGC API options with validation
+        services.AddOptions<OgcApiOptions>()
+            .Bind(configuration.GetSection(OgcApiOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        // Register capabilities caching services (performance optimization)
+        services.AddHonuaCapabilitiesCache(configuration);
+
+        // Register OGC collections list caching services (performance optimization)
+        services.AddHonuaOgcCollectionsCache();
 
         return services;
     }
@@ -203,6 +223,56 @@ public static class ServiceCollectionExtensions
 
         // Register WFS schema cache
         services.AddSingleton<IWfsSchemaCache, WfsSchemaCache>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds capabilities caching services for OGC GetCapabilities responses.
+    /// Includes WFS, WMS, WCS, WMTS, and CSW capabilities caching with automatic invalidation.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    public static IServiceCollection AddHonuaCapabilitiesCache(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Register capabilities cache options with validation
+        services.AddOptions<Services.CapabilitiesCacheOptions>()
+            .Bind(configuration.GetSection(Services.CapabilitiesCacheOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        // Register capabilities cache service
+        services.AddSingleton<Services.ICapabilitiesCache, Services.CapabilitiesCache>();
+
+        // Register background service for automatic cache invalidation on metadata changes
+        services.AddHostedService<Services.CapabilitiesCacheInvalidationService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds OGC API collections list caching services for improved performance.
+    /// Caches collections list responses (JSON and HTML) with automatic invalidation on metadata changes.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <remarks>
+    /// Implements the caching strategy from PERFORMANCE_OPTIMIZATION_OPPORTUNITIES.md:
+    /// - Cache key format: ogc:collections:{service_id}:{format}:{accept_language}
+    /// - Default TTL: 10 minutes (configurable via OgcApi:CollectionsCacheDurationSeconds)
+    /// - Maximum entries: 500 (configurable via OgcApi:MaxCachedCollections)
+    /// - Automatic invalidation on service/layer metadata updates
+    /// </remarks>
+    public static IServiceCollection AddHonuaOgcCollectionsCache(this IServiceCollection services)
+    {
+        // Register OGC collections cache service
+        services.AddSingleton<IOgcCollectionsCache, OgcCollectionsCache>();
+
+        // Register background service for automatic cache invalidation on metadata changes
+        services.AddHostedService<OgcCollectionsCacheInvalidationService>();
 
         return services;
     }

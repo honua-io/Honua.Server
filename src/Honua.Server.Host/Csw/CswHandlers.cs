@@ -7,6 +7,7 @@ using System.Xml.Linq;
 using Honua.Server.Core.Catalog;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Observability;
+using Honua.Server.Host.Services;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -86,9 +87,12 @@ internal static class CswHandlers
 
         var metadataSnapshot = await metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
+        // Get capabilities cache from DI
+        var capabilitiesCache = context.RequestServices.GetRequiredService<ICapabilitiesCache>();
+
         return requestValue.ToUpperInvariant() switch
         {
-            "GETCAPABILITIES" => await HandleGetCapabilitiesAsync(request, metadataSnapshot, cancellationToken),
+            "GETCAPABILITIES" => await HandleGetCapabilitiesAsync(request, metadataSnapshot, capabilitiesCache, cancellationToken),
             "DESCRIBERECORD" => HandleDescribeRecord(request),
             "GETRECORDS" => await HandleGetRecordsAsync(request, query, catalog, metadataSnapshot, parameters, cancellationToken),
             "GETRECORDBYID" => await HandleGetRecordByIdAsync(request, query, catalog, metadataRegistry, parameters, cancellationToken),
@@ -98,10 +102,30 @@ internal static class CswHandlers
         };
     }
 
-    private static async Task<IResult> HandleGetCapabilitiesAsync(HttpRequest request, MetadataSnapshot metadata, CancellationToken cancellationToken)
+    private static async Task<IResult> HandleGetCapabilitiesAsync(
+        HttpRequest request,
+        MetadataSnapshot metadata,
+        ICapabilitiesCache capabilitiesCache,
+        CancellationToken cancellationToken)
     {
+        // Extract version and language from request
+        var query = request.Query;
+        var version = QueryParsingHelpers.GetQueryValue(query, "version") ?? "2.0.2";
+        var acceptLanguage = request.Headers["Accept-Language"].FirstOrDefault();
+
+        // Try to get from cache
+        if (capabilitiesCache.TryGetCapabilities("csw", "global", version, acceptLanguage, out var cachedXml))
+        {
+            return Results.Content(cachedXml, "application/xml; charset=utf-8");
+        }
+
+        // Cache miss - generate capabilities
         var builder = new CswCapabilitiesBuilder();
         var capabilities = await builder.BuildCapabilitiesAsync(metadata, request, cancellationToken).ConfigureAwait(false);
+
+        // Store in cache
+        await capabilitiesCache.SetCapabilitiesAsync("csw", "global", version, acceptLanguage, capabilities, cancellationToken)
+            .ConfigureAwait(false);
 
         return Results.Content(capabilities, "application/xml; charset=utf-8");
     }

@@ -58,4 +58,29 @@ public sealed class OgcApiOptions
     /// </summary>
     [Range(0, 30)]
     public int DefaultMaxZoom { get; set; } = 14;
+
+    /// <summary>
+    /// Duration in seconds to cache OGC API collections list responses.
+    /// Set to 0 or null to disable caching.
+    /// Recommended: 600 seconds (10 minutes).
+    /// </summary>
+    /// <remarks>
+    /// Collections list caching improves performance by avoiding repeated metadata
+    /// queries and serialization. The cache is automatically invalidated when
+    /// service or layer metadata is updated.
+    /// </remarks>
+    [Range(0, 3600)]
+    public int? CollectionsCacheDurationSeconds { get; set; } = 600;
+
+    /// <summary>
+    /// Maximum number of collections list responses to cache.
+    /// Each combination of service, format, and language is cached separately.
+    /// Set to 0 or null to use the default (500 entries).
+    /// </summary>
+    /// <remarks>
+    /// Typical entry count: (number of services + 1 for "all") × 2 formats × language variants.
+    /// For example: (10 services + 1) × 2 formats × 3 languages = 66 entries.
+    /// </remarks>
+    [Range(1, 10000)]
+    public int? MaxCachedCollections { get; set; } = 500;
 }
