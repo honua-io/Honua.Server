@@ -1,11 +1,13 @@
 @page "/style-editor"
-@page "/style-editor/{LayerId}"
+@page "/style-editor/map/{MapId}"
 @using Honua.MapSDK.Components.Map
 @using Honua.MapSDK.Models
 @using Honua.MapSDK.Services
 @using System.Text.Json
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject HttpClient Http
+@inject IMapConfigurationService ConfigService
 
 <PageTitle>Style Editor - Honua</PageTitle>
 
@@ -216,8 +218,9 @@
 
 @code {
     [Parameter]
-    public string? LayerId { get; set; }
+    public string? MapId { get; set; }
 
+    private string? _mapConfigId;
     private List<LayerDefinition> _layers = new();
     private LayerDefinition? _selectedLayer;
     private string _layerSearchQuery = "";
@@ -226,6 +229,7 @@
     private bool _isSaving = false;
     private bool _syncPreview = true;
     private MapConfiguration? _mapConfiguration;
+    private bool _isLoading = true;
 
     // Undo/Redo
     private Stack<string> _undoStack = new();
@@ -246,62 +250,170 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadLayers();
-        await InitializeMapConfiguration();
-
-        if (!string.IsNullOrEmpty(LayerId))
+        _isLoading = true;
+        try
         {
-            var layer = _layers.FirstOrDefault(l => l.Id == LayerId);
-            if (layer != null)
+            if (!string.IsNullOrEmpty(MapId))
             {
-                SelectLayer(layer);
+                await LoadMapConfiguration();
             }
+            else
+            {
+                // Initialize with empty map
+                await InitializeMapConfiguration();
+            }
+
+            if (_layers.Any())
+            {
+                SelectLayer(_layers.First());
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading map: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
         }
     }
 
-    private async Task LoadLayers()
+    private async Task LoadMapConfiguration()
     {
-        // TODO: Load layers from service
-        // For now, create sample layers
-        _layers = new List<LayerDefinition>
+        try
         {
-            new VectorLayer
+            var response = await Http.GetAsync($"/admin/api/map-configurations/{MapId}");
+            if (response.IsSuccessStatusCode)
             {
-                Id = "layer-1",
-                Name = "Points",
-                Type = "circle",
-                SourceId = "points-source",
-                Paint = new Dictionary<string, object>
+                var entity = await response.Content.ReadFromJsonAsync<MapConfigurationEntity>();
+                if (entity != null)
                 {
-                    ["circle-radius"] = 6,
-                    ["circle-color"] = "#3388ff"
-                }
-            },
-            new VectorLayer
-            {
-                Id = "layer-2",
-                Name = "Lines",
-                Type = "line",
-                SourceId = "lines-source",
-                Paint = new Dictionary<string, object>
-                {
-                    ["line-color"] = "#ff0000",
-                    ["line-width"] = 2
-                }
-            },
-            new VectorLayer
-            {
-                Id = "layer-3",
-                Name = "Polygons",
-                Type = "fill",
-                SourceId = "polygons-source",
-                Paint = new Dictionary<string, object>
-                {
-                    ["fill-color"] = "#00ff00",
-                    ["fill-opacity"] = 0.5
+                    _mapConfiguration = JsonSerializer.Deserialize<MapConfiguration>(entity.Configuration);
+                    _mapConfigId = entity.Id;
+
+                    if (_mapConfiguration != null)
+                    {
+                        // Convert LayerConfiguration to LayerDefinition for editing
+                        ConvertLayersForEditing();
+                    }
                 }
             }
-        };
+            else
+            {
+                Snackbar.Add("Map configuration not found", Severity.Warning);
+                await InitializeMapConfiguration();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading map configuration: {ex.Message}", Severity.Error);
+            await InitializeMapConfiguration();
+        }
+    }
+
+    private void ConvertLayersForEditing()
+    {
+        if (_mapConfiguration == null) return;
+
+        _layers.Clear();
+
+        foreach (var layerConfig in _mapConfiguration.Layers)
+        {
+            LayerDefinition layerDef;
+
+            switch (layerConfig.Type)
+            {
+                case LayerType.Vector:
+                case LayerType.Fill:
+                case LayerType.Line:
+                case LayerType.Symbol:
+                case LayerType.Cluster:
+                    layerDef = new VectorLayer
+                    {
+                        Id = layerConfig.Id,
+                        Name = layerConfig.Name,
+                        Type = MapLayerTypeToString(layerConfig.Type),
+                        SourceId = layerConfig.Source,
+                        Visible = layerConfig.Visible,
+                        Opacity = layerConfig.Opacity,
+                        MinZoom = layerConfig.MinZoom,
+                        MaxZoom = layerConfig.MaxZoom,
+                        PopupTemplate = layerConfig.PopupTemplate,
+                        Paint = ConvertStyleToPaint(layerConfig.Style, layerConfig.Type),
+                        Layout = new Dictionary<string, object>()
+                    };
+                    break;
+
+                case LayerType.Raster:
+                    layerDef = new RasterLayer
+                    {
+                        Id = layerConfig.Id,
+                        Name = layerConfig.Name,
+                        Type = "raster",
+                        SourceId = layerConfig.Source,
+                        Visible = layerConfig.Visible,
+                        Opacity = layerConfig.Opacity,
+                        MinZoom = layerConfig.MinZoom,
+                        MaxZoom = layerConfig.MaxZoom
+                    };
+                    break;
+
+                case LayerType.Heatmap:
+                    layerDef = new VectorLayer
+                    {
+                        Id = layerConfig.Id,
+                        Name = layerConfig.Name,
+                        Type = "heatmap",
+                        SourceId = layerConfig.Source,
+                        Visible = layerConfig.Visible,
+                        Opacity = layerConfig.Opacity,
+                        MinZoom = layerConfig.MinZoom,
+                        MaxZoom = layerConfig.MaxZoom,
+                        Paint = new Dictionary<string, object>
+                        {
+                            ["heatmap-radius"] = 30,
+                            ["heatmap-intensity"] = 1
+                        }
+                    };
+                    break;
+
+                default:
+                    continue;
+            }
+
+            _layers.Add(layerDef);
+        }
+    }
+
+    private string MapLayerTypeToString(LayerType type) => type switch
+    {
+        LayerType.Fill => "fill",
+        LayerType.Line => "line",
+        LayerType.Symbol => "symbol",
+        LayerType.Cluster => "circle",
+        LayerType.Heatmap => "heatmap",
+        LayerType.Raster => "raster",
+        _ => "fill"
+    };
+
+    private Dictionary<string, object> ConvertStyleToPaint(LayerStyle style, LayerType type)
+    {
+        var paint = new Dictionary<string, object>();
+
+        if (style.FillColor != null)
+            paint["fill-color"] = style.FillColor;
+        if (style.FillOpacity.HasValue)
+            paint["fill-opacity"] = style.FillOpacity.Value;
+        if (style.LineColor != null)
+            paint["line-color"] = style.LineColor;
+        if (style.LineWidth.HasValue)
+            paint["line-width"] = style.LineWidth.Value;
+        if (style.CircleColor != null)
+            paint["circle-color"] = style.CircleColor;
+        if (style.CircleRadius.HasValue)
+            paint["circle-radius"] = style.CircleRadius.Value;
+
+        return paint;
     }
 
     private async Task InitializeMapConfiguration()
@@ -317,6 +429,23 @@
                 Projection = "mercator"
             },
             Layers = new List<LayerConfiguration>()
+        };
+
+        // Create sample layers for demo
+        _layers = new List<LayerDefinition>
+        {
+            new VectorLayer
+            {
+                Id = "layer-1",
+                Name = "Sample Points",
+                Type = "circle",
+                SourceId = "sample-source",
+                Paint = new Dictionary<string, object>
+                {
+                    ["circle-radius"] = 6,
+                    ["circle-color"] = "#3388ff"
+                }
+            }
         };
     }
 
@@ -501,8 +630,14 @@
 
     private void RefreshPreview()
     {
-        // TODO: Update map with new layer styles
-        StateHasChanged();
+        if (_mapConfiguration != null)
+        {
+            // Convert current layer styles to configuration
+            ConvertLayersForSaving();
+
+            // Trigger re-render of map component
+            StateHasChanged();
+        }
     }
 
     private void HandleMapLoaded()
@@ -515,11 +650,50 @@
         _isSaving = true;
         try
         {
-            // TODO: Save styles to server
-            await Task.Delay(500); // Simulate save
+            if (_mapConfiguration == null)
+            {
+                Snackbar.Add("No map configuration to save", Severity.Warning);
+                return;
+            }
 
-            _hasUnsavedChanges = false;
-            Snackbar.Add("Styles saved successfully", Severity.Success);
+            // Convert LayerDefinitions back to LayerConfigurations
+            ConvertLayersForSaving();
+
+            // Validate
+            var validation = ConfigService.Validate(_mapConfiguration);
+            if (!validation.IsValid)
+            {
+                Snackbar.Add($"Validation failed: {string.Join(", ", validation.Errors)}", Severity.Error);
+                return;
+            }
+
+            var configJson = ConfigService.ExportAsJson(_mapConfiguration, false);
+
+            if (!string.IsNullOrEmpty(_mapConfigId))
+            {
+                // Update existing map configuration
+                var response = await Http.PutAsJsonAsync($"/admin/api/map-configurations/{_mapConfigId}", new
+                {
+                    name = _mapConfiguration.Name,
+                    description = _mapConfiguration.Description,
+                    configuration = configJson
+                });
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _hasUnsavedChanges = false;
+                    Snackbar.Add("Styles saved successfully", Severity.Success);
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    Snackbar.Add($"Error saving styles: {error}", Severity.Error);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Cannot save: No map configuration ID", Severity.Warning);
+            }
         }
         catch (Exception ex)
         {
@@ -529,6 +703,68 @@
         {
             _isSaving = false;
         }
+    }
+
+    private void ConvertLayersForSaving()
+    {
+        if (_mapConfiguration == null) return;
+
+        _mapConfiguration.Layers.Clear();
+
+        foreach (var layerDef in _layers)
+        {
+            var layerConfig = new LayerConfiguration
+            {
+                Id = layerDef.Id,
+                Name = layerDef.Name,
+                Type = StringToLayerType(layerDef.Type),
+                Source = layerDef.SourceId,
+                Visible = layerDef.Visible,
+                Opacity = layerDef.Opacity,
+                MinZoom = layerDef.MinZoom,
+                MaxZoom = layerDef.MaxZoom,
+                PopupTemplate = layerDef.PopupTemplate,
+                Style = ConvertPaintToStyle(layerDef)
+            };
+
+            _mapConfiguration.Layers.Add(layerConfig);
+        }
+
+        _mapConfiguration.UpdatedAt = DateTime.UtcNow;
+    }
+
+    private LayerType StringToLayerType(string type) => type.ToLower() switch
+    {
+        "fill" => LayerType.Fill,
+        "line" => LayerType.Line,
+        "symbol" => LayerType.Symbol,
+        "circle" => LayerType.Cluster,
+        "heatmap" => LayerType.Heatmap,
+        "raster" => LayerType.Raster,
+        _ => LayerType.Vector
+    };
+
+    private LayerStyle ConvertPaintToStyle(LayerDefinition layerDef)
+    {
+        var style = new LayerStyle();
+
+        if (layerDef is VectorLayer vectorLayer && vectorLayer.Paint != null)
+        {
+            if (vectorLayer.Paint.TryGetValue("fill-color", out var fillColor))
+                style.FillColor = fillColor;
+            if (vectorLayer.Paint.TryGetValue("fill-opacity", out var fillOpacity))
+                style.FillOpacity = Convert.ToDouble(fillOpacity);
+            if (vectorLayer.Paint.TryGetValue("line-color", out var lineColor))
+                style.LineColor = lineColor;
+            if (vectorLayer.Paint.TryGetValue("line-width", out var lineWidth))
+                style.LineWidth = Convert.ToDouble(lineWidth);
+            if (vectorLayer.Paint.TryGetValue("circle-color", out var circleColor))
+                style.CircleColor = circleColor;
+            if (vectorLayer.Paint.TryGetValue("circle-radius", out var circleRadius))
+                style.CircleRadius = Convert.ToDouble(circleRadius);
+        }
+
+        return style;
     }
 
     private void ShowJsonEditor()

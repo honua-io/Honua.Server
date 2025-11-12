@@ -61,11 +61,45 @@ User Input → Property Panel → UpdatePaint/UpdateLayout
 
 ### Standalone Page
 
-Navigate to `/style-editor` or `/style-editor/{layerId}`:
+Navigate to `/style-editor/map/{mapId}`:
 
 ```razor
 @page "/style-editor"
-@page "/style-editor/{LayerId}"
+@page "/style-editor/map/{MapId}"
+```
+
+**From Map Editor:**
+```csharp
+// MapEditor.razor adds a "Style Layers" button:
+<MudButton Variant="Variant.Outlined"
+          StartIcon="@Icons.Material.Filled.Palette"
+          OnClick="@(() => Navigation.NavigateTo($"/style-editor/map/{Id}"))">
+    Style Layers
+</MudButton>
+```
+
+**Direct URL:**
+```
+https://yourhonua.com/style-editor/map/abc123-map-id
+```
+
+### Integration with Map Configuration
+
+The editor loads and saves to the Honua map configuration API:
+
+```csharp
+// Load from server
+var response = await Http.GetAsync($"/admin/api/map-configurations/{MapId}");
+var entity = await response.Content.ReadFromJsonAsync<MapConfigurationEntity>();
+_mapConfiguration = JsonSerializer.Deserialize<MapConfiguration>(entity.Configuration);
+
+// Save to server
+var configJson = ConfigService.ExportAsJson(_mapConfiguration, false);
+await Http.PutAsJsonAsync($"/admin/api/map-configurations/{_mapConfigId}", new {
+    name = _mapConfiguration.Name,
+    description = _mapConfiguration.Description,
+    configuration = configJson
+});
 ```
 
 ### Dialog/Modal (Future)
@@ -74,7 +108,7 @@ Can be adapted for use in dialogs:
 
 ```razor
 <MudDialog>
-    <StyleEditor LayerId="@selectedLayerId" />
+    <StyleEditor MapId="@selectedMapId" />
 </MudDialog>
 ```
 
@@ -83,7 +117,7 @@ Can be adapted for use in dialogs:
 Embed in other components:
 
 ```razor
-<StyleEditor LayerId="@layerId"
+<StyleEditor MapId="@mapId"
              OnStyleChanged="HandleStyleChange" />
 ```
 

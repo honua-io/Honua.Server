@@ -30,6 +30,14 @@
                 }
             </MudStack>
             <MudStack Row="true" Spacing="2">
+                @if (IsEditMode && !string.IsNullOrEmpty(Id))
+                {
+                    <MudButton Variant="Variant.Outlined"
+                              StartIcon="@Icons.Material.Filled.Palette"
+                              OnClick="@(() => Navigation.NavigateTo($"/style-editor/map/{Id}"))">
+                        Style Layers
+                    </MudButton>
+                }
                 <MudButton Variant="Variant.Outlined"
                           StartIcon="@Icons.Material.Filled.Visibility"
                           OnClick="TogglePreview">

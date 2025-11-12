@@ -40,15 +40,25 @@ The Honua Style Editor is a comprehensive, visual tool for styling map layers. B
 
 ### Accessing the Style Editor
 
-Navigate to `/style-editor` in the Honua Admin interface.
+There are two ways to access the Style Editor:
+
+1. **From Map Editor**:
+   - Open an existing map in the Map Editor (`/maps/edit/{mapId}`)
+   - Click the "Style Layers" button in the header
+   - This opens the Style Editor with all layers from that map pre-loaded
+
+2. **Direct Navigation**:
+   - Navigate to `/style-editor/map/{mapId}` directly
+   - Replace `{mapId}` with your map configuration ID
 
 ### Basic Workflow
 
-1. **Select a Layer**: Choose from the layer tree on the left
-2. **Choose a Preset** (optional): Start with a predefined style
-3. **Customize Properties**: Adjust colors, sizes, opacity, etc.
-4. **Preview Changes**: View real-time updates in the map preview
-5. **Save**: Save your styled layer configuration
+1. **Load a Map**: Open a map from the Map Editor or navigate directly with a map ID
+2. **Select a Layer**: Choose from the layer tree on the left
+3. **Choose a Preset** (optional): Start with a predefined style
+4. **Customize Properties**: Adjust colors, sizes, opacity, etc.
+5. **Preview Changes**: View real-time updates in the map preview
+6. **Save**: Styles are saved back to the map configuration on the server
 
 ## User Interface
 
@@ -209,15 +219,53 @@ Direct access to the underlying MapLibre GL style JSON for power users.
 | `Ctrl/Cmd + E` | Export JSON |
 | `Esc` | Close editor |
 
-## Supported Formats
+## Integration with Honua
 
-### Import
+### Data Persistence
+
+The Style Editor integrates directly with Honua's persistence framework:
+
+- **Loading**: Reads map configurations from `/admin/api/map-configurations/{id}`
+- **Saving**: Updates map configurations via PUT to `/admin/api/map-configurations/{id}`
+- **Format**: Stores styles in the `LayerConfiguration.Style` property as part of the `MapConfiguration` JSON
+
+### Data Flow
+
+```
+Map Configuration (Server)
+    ↓ Load
+LayerConfiguration → LayerDefinition (Editing)
+    ↓ Edit
+LayerDefinition.Paint/Layout (MapLibre Properties)
+    ↓ Save
+LayerConfiguration.Style ← Convert Back
+    ↓ Persist
+Map Configuration (Server)
+```
+
+### Conversion Process
+
+**Loading** (LayerConfiguration → LayerDefinition):
+- `LayerConfiguration` has simplified `LayerStyle` properties
+- Converted to `LayerDefinition` with full `Paint` and `Layout` dictionaries
+- Enables editing with full MapLibre GL property support
+
+**Saving** (LayerDefinition → LayerConfiguration):
+- `LayerDefinition.Paint` properties extracted
+- Converted back to `LayerStyle` simplified format
+- Stored in map configuration JSON on server
+
+### Supported Formats
+
+#### Import
 - MapLibre GL Style JSON
+- Map Configuration JSON (Honua format)
 - SLD (Styled Layer Descriptor) - via conversion
 - YSLD (YAML SLD) - via conversion
 
-### Export
+#### Export
 - MapLibre GL Style JSON (primary)
+- Map Configuration JSON (Honua format)
 - SLD (Styled Layer Descriptor)
 - YSLD (YAML SLD)
 - CSS (basic properties)
