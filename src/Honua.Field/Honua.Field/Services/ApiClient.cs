@@ -11,11 +11,12 @@ namespace HonuaField.Services;
 /// HTTP API client for communicating with Honua Server
 /// Handles authentication, error handling, and request/response logging
 /// </summary>
-public class ApiClient : IApiClient
+public class ApiClient : IApiClient, IDisposable
 {
 	private readonly HttpClient _httpClient;
 	private readonly ISettingsService _settingsService;
 	private readonly JsonSerializerOptions _jsonOptions;
+	private bool _disposed;
 
 	public ApiClient(ISettingsService settingsService)
 	{
@@ -284,6 +285,20 @@ public class ApiClient : IApiClient
 		{
 			StatusCode = response.StatusCode
 		};
+	}
+
+	/// <summary>
+	/// Disposes the HTTP client and releases resources to prevent memory leaks.
+	/// </summary>
+	public void Dispose()
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_httpClient?.Dispose();
+		_disposed = true;
 	}
 }
 

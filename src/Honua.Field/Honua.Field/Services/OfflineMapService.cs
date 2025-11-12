@@ -13,7 +13,7 @@ namespace HonuaField.Services;
 /// Implementation of IOfflineMapService for managing offline map tiles
 /// Supports XYZ tile downloading, MBTiles format, retry logic, and storage management
 /// </summary>
-public class OfflineMapService : IOfflineMapService
+public class OfflineMapService : IOfflineMapService, IDisposable
 {
 	private const int MAX_RETRY_ATTEMPTS = 3;
 	private const int RETRY_DELAY_MS = 1000;
@@ -24,6 +24,7 @@ public class OfflineMapService : IOfflineMapService
 	private readonly HttpClient _httpClient;
 	private readonly IMapRepository _mapRepository;
 	private readonly string _tilesDirectory;
+	private bool _disposed;
 
 	private static readonly List<TileSource> _tileSources = new()
 	{
@@ -578,6 +579,24 @@ public class OfflineMapService : IOfflineMapService
 			BytesDownloaded = bytesDownloaded,
 			FailedTiles = failedTiles
 		});
+	}
+
+	#endregion
+
+	#region IDisposable
+
+	/// <summary>
+	/// Disposes the HTTP client and releases resources to prevent memory leaks.
+	/// </summary>
+	public void Dispose()
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_httpClient?.Dispose();
+		_disposed = true;
 	}
 
 	#endregion
