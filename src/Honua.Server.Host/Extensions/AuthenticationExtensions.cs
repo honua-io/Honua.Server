@@ -77,6 +77,11 @@ public static class AuthenticationExtensions
             if (enforceAuth)
             {
                 // When enforcement is enabled, require authenticated users with specific roles
+                options.AddPolicy("RequireUser", policy =>
+                {
+                    policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, LocalBasicAuthenticationDefaults.Scheme);
+                    policy.RequireAuthenticatedUser();
+                });
                 options.AddPolicy("RequireAdministrator", policy =>
                 {
                     policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, LocalBasicAuthenticationDefaults.Scheme);
@@ -111,6 +116,13 @@ public static class AuthenticationExtensions
                 //   - True when IsAuthenticated is false (not authenticated)
                 //   - True when IsAuthenticated is null (not authenticated)
                 //   - False when IsAuthenticated is true (authenticated)
+                options.AddPolicy("RequireUser", policy =>
+                {
+                    policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, LocalBasicAuthenticationDefaults.Scheme);
+                    policy.RequireAssertion(context =>
+                        context.User.Identity?.IsAuthenticated == true);
+                });
+
                 options.AddPolicy("RequireAdministrator", policy =>
                 {
                     policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, LocalBasicAuthenticationDefaults.Scheme);

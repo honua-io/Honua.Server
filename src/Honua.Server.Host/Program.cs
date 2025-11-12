@@ -73,6 +73,32 @@ if (corsAllowAnyOrigin && builder.Environment.IsProduction())
     validationErrors.Add("CORS allowAnyOrigin must be false in Production");
 }
 
+// Check token revocation fail-closed configuration
+var failClosedOnRedisError = config.GetValue<bool?>("TokenRevocation:FailClosedOnRedisError") ?? true;
+if (!failClosedOnRedisError)
+{
+    if (builder.Environment.IsProduction())
+    {
+        var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
+        logger.LogWarning(
+            "SECURITY WARNING: TokenRevocation:FailClosedOnRedisError is set to false in Production. " +
+            "This is a SECURITY RISK. If Redis becomes unavailable, revoked tokens (from logout, password reset, " +
+            "account compromise, etc.) may be accepted as valid. Production deployments should ALWAYS use " +
+            "FailClosedOnRedisError=true with Redis high availability (cluster/sentinel) to ensure security. " +
+            "Current environment: {Environment}",
+            builder.Environment.EnvironmentName);
+    }
+    else
+    {
+        var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
+        logger.LogInformation(
+            "TokenRevocation:FailClosedOnRedisError is set to false in {Environment} environment. " +
+            "This means if Redis is unavailable, revoked tokens will be accepted. " +
+            "This is acceptable for development/testing but NOT for production.",
+            builder.Environment.EnvironmentName);
+    }
+}
+
 // If validation failed, log and exit (unless in test environment)
 if (validationErrors.Any() && !isTestEnvironment)
 {

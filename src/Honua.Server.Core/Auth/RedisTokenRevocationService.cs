@@ -212,6 +212,42 @@ public sealed class RedisTokenRevocationService : ITokenRevocationService, IHeal
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// SECURITY: This implementation uses fail-closed behavior by default when Redis errors occur.
+    ///
+    /// Normal Operation (Redis Available):
+    /// - For individual token checks: Queries Redis for "revoked_token:{tokenId}"
+    /// - For user revocation checks: Compares token issue time against user revocation timestamp
+    /// - Returns true if revoked, false if not found
+    ///
+    /// Error Handling (Redis Unavailable):
+    /// When FailClosedOnRedisError = true (RECOMMENDED):
+    /// - Catches all Redis exceptions (connection failures, timeouts, etc.)
+    /// - Returns true (treats all tokens as revoked)
+    /// - Logs error with SECURITY_AUDIT tag
+    /// - Denies authentication to prevent accepting revoked tokens
+    /// - Impact: Service remains secure but temporarily unavailable for auth
+    ///
+    /// When FailClosedOnRedisError = false (NOT RECOMMENDED):
+    /// - Catches all Redis exceptions
+    /// - Returns false (treats all tokens as valid)
+    /// - Logs warning with SECURITY_AUDIT tag
+    /// - Allows authentication to proceed
+    /// - RISK: Revoked tokens (from logout, password reset, etc.) will be accepted
+    /// - Only use in dev/test where uptime > security
+    ///
+    /// Implementation Details:
+    /// - Token checks are wrapped in try/catch to handle Redis failures
+    /// - Configuration value FailClosedOnRedisError controls behavior
+    /// - All failures are logged with context for debugging
+    /// - Performance metrics are recorded via OpenTelemetry
+    ///
+    /// Operational Guidance:
+    /// - Production: Set FailClosedOnRedisError=true + Redis HA (cluster/sentinel)
+    /// - Monitor: Set up alerts on Redis health check failures
+    /// - Incident Response: Have runbook for Redis outage scenarios
+    /// - Testing: Verify fail-closed behavior with chaos engineering
+    /// </remarks>
     public async Task<bool> IsTokenRevokedAsync(string tokenId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenId);
