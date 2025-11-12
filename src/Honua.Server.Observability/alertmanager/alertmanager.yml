@@ -1,7 +1,8 @@
 global:
   resolve_timeout: 5m
-  # Slack webhook URL (configure this)
-  # slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+  # Slack webhook URL - Get from: https://api.slack.com/messaging/webhooks
+  # Create an Incoming Webhook at: https://YOUR_WORKSPACE.slack.com/apps/manage/custom-integrations
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
 
 # Route alerts to different receivers based on labels
 route:
@@ -37,35 +38,62 @@ route:
 
 receivers:
   - name: 'default'
-    # Configure your default notification channel
-    # webhook_configs:
-    #   - url: 'http://your-webhook-endpoint'
+    # Default notification channel - configure for email or webhook
+    email_configs:
+      - to: '${ALERT_EMAIL_TO}'
+        from: '${ALERT_EMAIL_FROM}'
+        smarthost: '${SMTP_SERVER}:587'
+        auth_username: '${SMTP_USERNAME}'
+        auth_password: '${SMTP_PASSWORD}'
+        headers:
+          Subject: 'Honua Alert: {{ .GroupLabels.alertname }}'
+        # SMTP configuration notes:
+        # - Gmail: smtp.gmail.com:587 with app password
+        # - Outlook: smtp.office365.com:587
+        # - SendGrid: smtp.sendgrid.net:587 with API key as password
+        # - AWS SES: email-smtp.us-east-1.amazonaws.com:587
 
   - name: 'slack-warnings'
-    # slack_configs:
-    #   - channel: '#honua-alerts'
-    #     title: 'Honua Warning Alert'
-    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
-    #     send_resolved: true
+    # Slack notifications for warning-level alerts
+    # Get webhook URL from: https://api.slack.com/messaging/webhooks
+    slack_configs:
+      - channel: '#honua-alerts'
+        title: 'Honua Warning Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
 
   - name: 'slack-build-queue'
-    # slack_configs:
-    #   - channel: '#honua-build-queue'
-    #     title: 'Honua Build Queue Alert'
-    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
-    #     send_resolved: true
+    # Slack notifications for build queue issues
+    slack_configs:
+      - channel: '#honua-build-queue'
+        title: 'Honua Build Queue Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
 
   - name: 'slack-license'
-    # slack_configs:
-    #   - channel: '#honua-license'
-    #     title: 'Honua License Alert'
-    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
-    #     send_resolved: true
+    # Slack notifications for license expiration warnings
+    slack_configs:
+      - channel: '#honua-license'
+        title: 'Honua License Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
 
   - name: 'pagerduty'
-    # pagerduty_configs:
-    #   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
-    #     description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+    # PagerDuty integration for critical alerts requiring immediate response
+    # Get integration key from: PagerDuty > Services > [Your Service] > Integrations > Events API V2
+    # Documentation: https://www.pagerduty.com/docs/guides/prometheus-integration-guide/
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_INTEGRATION_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        severity: '{{ if eq .CommonLabels.severity "critical" }}critical{{ else }}error{{ end }}'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+          alertname: '{{ .GroupLabels.alertname }}'
+          service: '{{ .GroupLabels.service }}'
 
 # Inhibition rules (prevent certain alerts from firing when others are active)
 inhibit_rules:

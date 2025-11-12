@@ -1,0 +1,973 @@
+# Prometheus Recording Rules for Honua Server
+# ============================================
+# These pre-compute expensive queries and create SLI/SLO metrics for monitoring service health.
+#
+# DEFINITIONS:
+# - SLI (Service Level Indicator): Actual measured performance metric
+# - SLO (Service Level Objective): Target performance threshold we commit to
+# - Error Budget: Allowed amount of downtime/errors before breaking SLO
+#
+# SLO TARGETS:
+# - Availability: 99.9% uptime (3 nines) = 0.1% error budget = ~43 minutes downtime/month
+# - Latency: P95 < 5 seconds, P99 < 10 seconds
+# - Database: P95 query latency < 1 second
+# - Cache Hit Rate: > 80%
+#
+# ERROR BUDGET ALERTING:
+# Uses Google SRE Workbook multi-window multi-burn-rate strategy:
+# - Fast burn (14.4x): 1h window, 2% budget consumed = exhausted in 2 days
+# - Slow burn (6x): 6h window, ~3.6% budget consumed = exhausted in 5 days
+#
+# REFERENCES:
+# - Google SRE Workbook: https://sre.google/workbook/alerting-on-slos/
+# - Prometheus Best Practices: https://prometheus.io/docs/practices/rules/
+
+groups:
+  # ===========================================================================
+  # AVAILABILITY SLI - HTTP Request Success Rate
+  # Target: 99.9% of HTTP requests are successful (non-5xx)
+  # ===========================================================================
+  - name: honua_sli_availability
+    interval: 30s
+    rules:
+      # Availability over multiple time windows
+      # Formula: 1 - (5xx_errors / total_requests)
+      # Result: 1.0 = 100% available, 0.999 = 99.9% available
+
+      - record: honua:availability:success_rate_5m
+        expr: |
+          1 - (
+            sum(rate(honua_http_requests_total{http_status_class="5xx"}[5m]))
+            /
+            sum(rate(honua_http_requests_total[5m]))
+          )
+        labels:
+          sli: availability
+          window: 5m
+
+      - record: honua:availability:success_rate_30m
+        expr: |
+          1 - (
+            sum(rate(honua_http_requests_total{http_status_class="5xx"}[30m]))
+            /
+            sum(rate(honua_http_requests_total[30m]))
+          )
+        labels:
+          sli: availability
+          window: 30m
+
+      - record: honua:availability:success_rate_1h
+        expr: |
+          1 - (
+            sum(rate(honua_http_requests_total{http_status_class="5xx"}[1h]))
+            /
+            sum(rate(honua_http_requests_total[1h]))
+          )
+        labels:
+          sli: availability
+          window: 1h
+
+      - record: honua:availability:success_rate_6h
+        expr: |
+          1 - (
+            sum(rate(honua_http_requests_total{http_status_class="5xx"}[6h]))
+            /
+            sum(rate(honua_http_requests_total[6h]))
+          )
+        labels:
+          sli: availability
+          window: 6h
+
+      - record: honua:availability:success_rate_1d
+        expr: |
+          1 - (
+            sum(rate(honua_http_requests_total{http_status_class="5xx"}[1d]))
+            /
+            sum(rate(honua_http_requests_total[1d]))
+          )
+        labels:
+          sli: availability
+          window: 1d
+
+      - record: honua:availability:success_rate_3d
+        expr: |
+          1 - (
+            sum(rate(honua_http_requests_total{http_status_class="5xx"}[3d]))
+            /
+            sum(rate(honua_http_requests_total[3d]))
+          )
+        labels:
+          sli: availability
+          window: 3d
+
+      - record: honua:availability:success_rate_30d
+        expr: |
+          1 - (
+            sum(rate(honua_http_requests_total{http_status_class="5xx"}[30d]))
+            /
+            sum(rate(honua_http_requests_total[30d]))
+          )
+        labels:
+          sli: availability
+          window: 30d
+
+      # Per-endpoint availability (for identifying problematic endpoints)
+      - record: honua:availability:success_rate_by_endpoint_5m
+        expr: |
+          1 - (
+            sum(rate(honua_http_requests_total{http_status_class="5xx"}[5m])) by (http_endpoint)
+            /
+            sum(rate(honua_http_requests_total[5m])) by (http_endpoint)
+          )
+        labels:
+          sli: availability
+          window: 5m
+
+  # ===========================================================================
+  # ERROR BUDGET TRACKING
+  # Target: 99.9% availability = 0.1% error budget (0.001)
+  # ===========================================================================
+  - name: honua_slo_error_budget
+    interval: 30s
+    rules:
+      # Error budget remaining as a percentage
+      # Formula: error_budget_remaining = error_budget - (1 - availability)
+      # Positive = within budget, Negative = budget exceeded
+      # 0.001 = 0.1% error budget for 99.9% SLO
+
+      - record: honua:error_budget:remaining_5m
+        expr: |
+          0.001 - (1 - honua:availability:success_rate_5m)
+        labels:
+          slo: availability
+          target: "99.9"
+          window: 5m
+
+      - record: honua:error_budget:remaining_1h
+        expr: |
+          0.001 - (1 - honua:availability:success_rate_1h)
+        labels:
+          slo: availability
+          target: "99.9"
+          window: 1h
+
+      - record: honua:error_budget:remaining_6h
+        expr: |
+          0.001 - (1 - honua:availability:success_rate_6h)
+        labels:
+          slo: availability
+          target: "99.9"
+          window: 6h
+
+      - record: honua:error_budget:remaining_1d
+        expr: |
+          0.001 - (1 - honua:availability:success_rate_1d)
+        labels:
+          slo: availability
+          target: "99.9"
+          window: 1d
+
+      - record: honua:error_budget:remaining_30d
+        expr: |
+          0.001 - (1 - honua:availability:success_rate_30d)
+        labels:
+          slo: availability
+          target: "99.9"
+          window: 30d
+
+      # Error budget remaining as percentage (0-100)
+      - record: honua:error_budget:remaining_percent_30d
+        expr: |
+          (honua:error_budget:remaining_30d / 0.001) * 100
+        labels:
+          slo: availability
+          target: "99.9"
+
+      # Error budget burn rate (multiplier of allowed burn rate)
+      # Formula: burn_rate = (1 - availability) / error_budget
+      # 1.0 = burning at exactly the allowed rate
+      # > 1.0 = burning faster than allowed
+      # 14.4 = consuming 2% of monthly budget per hour (exhausted in 2 days)
+      # 6.0 = consuming ~0.6% of monthly budget per hour (exhausted in 5 days)
+
+      - record: honua:error_budget:burn_rate_5m
+        expr: |
+          (1 - honua:availability:success_rate_5m) / 0.001
+        labels:
+          slo: availability
+          window: 5m
+
+      - record: honua:error_budget:burn_rate_1h
+        expr: |
+          (1 - honua:availability:success_rate_1h) / 0.001
+        labels:
+          slo: availability
+          window: 1h
+
+      - record: honua:error_budget:burn_rate_6h
+        expr: |
+          (1 - honua:availability:success_rate_6h) / 0.001
+        labels:
+          slo: availability
+          window: 6h
+
+  # ===========================================================================
+  # LATENCY SLI - HTTP Request Duration
+  # Target: P95 < 5s, P99 < 10s
+  # ===========================================================================
+  - name: honua_sli_latency
+    interval: 30s
+    rules:
+      # P50 (median) latency in milliseconds
+      - record: honua:latency:p50_5m
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(honua_http_request_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p50
+          window: 5m
+
+      - record: honua:latency:p50_1h
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(honua_http_request_duration_bucket[1h])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p50
+          window: 1h
+
+      # P95 latency in milliseconds
+      - record: honua:latency:p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_http_request_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p95
+          window: 5m
+
+      - record: honua:latency:p95_30m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_http_request_duration_bucket[30m])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p95
+          window: 30m
+
+      - record: honua:latency:p95_1h
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_http_request_duration_bucket[1h])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p95
+          window: 1h
+
+      - record: honua:latency:p95_6h
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_http_request_duration_bucket[6h])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p95
+          window: 6h
+
+      - record: honua:latency:p95_1d
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_http_request_duration_bucket[1d])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p95
+          window: 1d
+
+      # P99 latency in milliseconds
+      - record: honua:latency:p99_5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_http_request_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p99
+          window: 5m
+
+      - record: honua:latency:p99_30m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_http_request_duration_bucket[30m])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p99
+          window: 30m
+
+      - record: honua:latency:p99_1h
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_http_request_duration_bucket[1h])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p99
+          window: 1h
+
+      - record: honua:latency:p99_6h
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_http_request_duration_bucket[6h])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p99
+          window: 6h
+
+      - record: honua:latency:p99_1d
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_http_request_duration_bucket[1d])) by (le)
+          )
+        labels:
+          sli: latency
+          quantile: p99
+          window: 1d
+
+      # Latency SLI: Percentage of requests meeting target (P95 < 5000ms)
+      # 1.0 = all requests meet target, 0.0 = no requests meet target
+      - record: honua:latency:success_rate_5s_5m
+        expr: |
+          (
+            sum(rate(honua_http_request_duration_bucket{le="5000"}[5m]))
+            /
+            sum(rate(honua_http_request_duration_count[5m]))
+          )
+        labels:
+          sli: latency
+          target: 5s
+          window: 5m
+
+      - record: honua:latency:success_rate_5s_1h
+        expr: |
+          (
+            sum(rate(honua_http_request_duration_bucket{le="5000"}[1h]))
+            /
+            sum(rate(honua_http_request_duration_count[1h]))
+          )
+        labels:
+          sli: latency
+          target: 5s
+          window: 1h
+
+      # Latency SLI: Percentage of requests meeting target (P99 < 10000ms)
+      - record: honua:latency:success_rate_10s_5m
+        expr: |
+          (
+            sum(rate(honua_http_request_duration_bucket{le="10000"}[5m]))
+            /
+            sum(rate(honua_http_request_duration_count[5m]))
+          )
+        labels:
+          sli: latency
+          target: 10s
+          window: 5m
+
+      - record: honua:latency:success_rate_10s_1h
+        expr: |
+          (
+            sum(rate(honua_http_request_duration_bucket{le="10000"}[1h]))
+            /
+            sum(rate(honua_http_request_duration_count[1h]))
+          )
+        labels:
+          sli: latency
+          target: 10s
+          window: 1h
+
+      # Per-endpoint latency (for identifying slow endpoints)
+      - record: honua:latency:p95_by_endpoint_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_http_request_duration_bucket[5m])) by (le, http_endpoint)
+          )
+        labels:
+          sli: latency
+          quantile: p95
+          window: 5m
+
+      - record: honua:latency:p99_by_endpoint_5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_http_request_duration_bucket[5m])) by (le, http_endpoint)
+          )
+        labels:
+          sli: latency
+          quantile: p99
+          window: 5m
+
+  # ===========================================================================
+  # ERROR RATE SLI - 4xx vs 5xx Errors
+  # 4xx = Client errors (not counted against SLO)
+  # 5xx = Server errors (counted against SLO)
+  # ===========================================================================
+  - name: honua_sli_errors
+    interval: 30s
+    rules:
+      # 4xx error rate (client errors)
+      - record: honua:errors:4xx_rate_5m
+        expr: |
+          sum(rate(honua_http_requests_total{http_status_class="4xx"}[5m]))
+          /
+          sum(rate(honua_http_requests_total[5m]))
+        labels:
+          error_class: client
+          window: 5m
+
+      - record: honua:errors:4xx_rate_1h
+        expr: |
+          sum(rate(honua_http_requests_total{http_status_class="4xx"}[1h]))
+          /
+          sum(rate(honua_http_requests_total[1h]))
+        labels:
+          error_class: client
+          window: 1h
+
+      # 5xx error rate (server errors)
+      - record: honua:errors:5xx_rate_5m
+        expr: |
+          sum(rate(honua_http_requests_total{http_status_class="5xx"}[5m]))
+          /
+          sum(rate(honua_http_requests_total[5m]))
+        labels:
+          error_class: server
+          window: 5m
+
+      - record: honua:errors:5xx_rate_1h
+        expr: |
+          sum(rate(honua_http_requests_total{http_status_class="5xx"}[1h]))
+          /
+          sum(rate(honua_http_requests_total[1h]))
+        labels:
+          error_class: server
+          window: 1h
+
+      - record: honua:errors:5xx_rate_1d
+        expr: |
+          sum(rate(honua_http_requests_total{http_status_class="5xx"}[1d]))
+          /
+          sum(rate(honua_http_requests_total[1d]))
+        labels:
+          error_class: server
+          window: 1d
+
+      # Per-endpoint error rates
+      - record: honua:errors:5xx_rate_by_endpoint_5m
+        expr: |
+          sum(rate(honua_http_requests_total{http_status_class="5xx"}[5m])) by (http_endpoint)
+          /
+          sum(rate(honua_http_requests_total[5m])) by (http_endpoint)
+        labels:
+          error_class: server
+          window: 5m
+
+      # Specific status code rates (for debugging)
+      - record: honua:errors:rate_by_status_5m
+        expr: |
+          sum(rate(honua_http_requests_total[5m])) by (http_status_code)
+        labels:
+          window: 5m
+
+  # ===========================================================================
+  # DATABASE SLI - Query Performance & Availability
+  # Target: P95 query latency < 1000ms, 99.9% success rate
+  # ===========================================================================
+  - name: honua_sli_database
+    interval: 30s
+    rules:
+      # Database query success rate
+      - record: honua:database:success_rate_5m
+        expr: |
+          sum(rate(honua_database_queries{success="True"}[5m]))
+          /
+          sum(rate(honua_database_queries[5m]))
+        labels:
+          sli: database_availability
+          window: 5m
+
+      - record: honua:database:success_rate_1h
+        expr: |
+          sum(rate(honua_database_queries{success="True"}[1h]))
+          /
+          sum(rate(honua_database_queries[1h]))
+        labels:
+          sli: database_availability
+          window: 1h
+
+      # Database query latency percentiles
+      - record: honua:database:query_duration_p50_5m
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(honua_database_query_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: database_latency
+          quantile: p50
+          window: 5m
+
+      - record: honua:database:query_duration_p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_database_query_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: database_latency
+          quantile: p95
+          window: 5m
+
+      - record: honua:database:query_duration_p95_1h
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_database_query_duration_bucket[1h])) by (le)
+          )
+        labels:
+          sli: database_latency
+          quantile: p95
+          window: 1h
+
+      - record: honua:database:query_duration_p99_5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_database_query_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: database_latency
+          quantile: p99
+          window: 5m
+
+      - record: honua:database:query_duration_p99_1h
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_database_query_duration_bucket[1h])) by (le)
+          )
+        labels:
+          sli: database_latency
+          quantile: p99
+          window: 1h
+
+      # Per-query-type latency
+      - record: honua:database:query_duration_p95_by_type_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_database_query_duration_bucket[5m])) by (le, query_type)
+          )
+        labels:
+          sli: database_latency
+          quantile: p95
+          window: 5m
+
+      # Database connection pool utilization
+      - record: honua:database:connection_pool_utilization
+        expr: |
+          postgres_pool_connections_active
+          /
+          (postgres_pool_connections_total > 0)
+        labels:
+          sli: database_connections
+
+      # Database connection errors rate
+      - record: honua:database:connection_error_rate_5m
+        expr: |
+          sum(rate(honua_database_connection_errors[5m]))
+        labels:
+          sli: database_errors
+          window: 5m
+
+      # Slow query rate (queries > 1000ms)
+      - record: honua:database:slow_query_rate_5m
+        expr: |
+          sum(rate(honua_database_slow_queries[5m]))
+        labels:
+          sli: database_performance
+          window: 5m
+
+  # ===========================================================================
+  # CACHE SLI - Hit Rate & Performance
+  # Target: > 80% hit rate
+  # ===========================================================================
+  - name: honua_sli_cache
+    interval: 30s
+    rules:
+      # Cache hit rate (primary cache performance metric)
+      - record: honua:cache:hit_rate_5m
+        expr: |
+          sum(rate(honua_cache_hits[5m]))
+          /
+          (sum(rate(honua_cache_hits[5m])) + sum(rate(honua_cache_misses[5m])))
+        labels:
+          sli: cache_performance
+          window: 5m
+
+      - record: honua:cache:hit_rate_1h
+        expr: |
+          sum(rate(honua_cache_hits[1h]))
+          /
+          (sum(rate(honua_cache_hits[1h])) + sum(rate(honua_cache_misses[1h])))
+        labels:
+          sli: cache_performance
+          window: 1h
+
+      - record: honua:cache:hit_rate_1d
+        expr: |
+          sum(rate(honua_cache_hits[1d]))
+          /
+          (sum(rate(honua_cache_hits[1d])) + sum(rate(honua_cache_misses[1d])))
+        labels:
+          sli: cache_performance
+          window: 1d
+
+      # Cache miss rate
+      - record: honua:cache:miss_rate_5m
+        expr: |
+          sum(rate(honua_cache_misses[5m]))
+          /
+          (sum(rate(honua_cache_hits[5m])) + sum(rate(honua_cache_misses[5m])))
+        labels:
+          sli: cache_performance
+          window: 5m
+
+      # Per-cache hit rate (for identifying problematic caches)
+      - record: honua:cache:hit_rate_by_cache_5m
+        expr: |
+          sum(rate(honua_cache_hits[5m])) by (cache_name)
+          /
+          (sum(rate(honua_cache_hits[5m])) by (cache_name) + sum(rate(honua_cache_misses[5m])) by (cache_name))
+        labels:
+          sli: cache_performance
+          window: 5m
+
+      # Cache operation latency
+      - record: honua:cache:operation_duration_p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_cache_operation_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: cache_latency
+          quantile: p95
+          window: 5m
+
+      - record: honua:cache:operation_duration_p99_5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_cache_operation_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: cache_latency
+          quantile: p99
+          window: 5m
+
+      # Cache eviction rate (indicator of cache pressure)
+      - record: honua:cache:eviction_rate_5m
+        expr: |
+          sum(rate(honua_cache_evictions[5m]))
+        labels:
+          sli: cache_pressure
+          window: 5m
+
+      # Cache error rate
+      - record: honua:cache:error_rate_5m
+        expr: |
+          sum(rate(honua_cache_errors[5m]))
+        labels:
+          sli: cache_errors
+          window: 5m
+
+  # ===========================================================================
+  # INFRASTRUCTURE SLI - System Health
+  # Monitor GC, memory, thread pool, CPU
+  # ===========================================================================
+  - name: honua_sli_infrastructure
+    interval: 30s
+    rules:
+      # GC pause duration percentiles
+      - record: honua:infrastructure:gc_pause_p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(honua_infrastructure_gc_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: gc_performance
+          quantile: p95
+          window: 5m
+
+      - record: honua:infrastructure:gc_pause_p99_5m
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(honua_infrastructure_gc_duration_bucket[5m])) by (le)
+          )
+        labels:
+          sli: gc_performance
+          quantile: p99
+          window: 5m
+
+      # GC collection rate by generation
+      - record: honua:infrastructure:gc_rate_5m
+        expr: |
+          sum(rate(honua_infrastructure_gc_collections[5m])) by (gc_generation)
+        labels:
+          sli: gc_frequency
+          window: 5m
+
+      # Thread pool availability (percentage of worker threads available)
+      - record: honua:infrastructure:threadpool_worker_availability
+        expr: |
+          avg(honua_infrastructure_threadpool_worker_threads)
+          /
+          avg(honua_infrastructure_threadpool_max_threads{thread_type="worker"})
+        labels:
+          sli: threadpool_health
+
+      # Thread pool queue length (backlog indicator)
+      - record: honua:infrastructure:threadpool_queue_avg_5m
+        expr: |
+          avg_over_time(honua_infrastructure_threadpool_queue_length[5m])
+        labels:
+          sli: threadpool_health
+          window: 5m
+
+      # Memory pressure (working set as percentage of available memory)
+      # Assumes 8GB available memory - adjust for your environment
+      - record: honua:infrastructure:memory_pressure_percent
+        expr: |
+          (avg(honua_infrastructure_memory_working_set) / (8 * 1024 * 1024 * 1024)) * 100
+        labels:
+          sli: memory_health
+
+      # CPU usage percentage
+      - record: honua:infrastructure:cpu_usage_avg_5m
+        expr: |
+          avg_over_time(honua_infrastructure_cpu_usage_percent[5m])
+        labels:
+          sli: cpu_health
+          window: 5m
+
+  # ===========================================================================
+  # SLO ALERTS - Multi-Window Multi-Burn-Rate
+  # Based on Google SRE Workbook Chapter 5
+  # ===========================================================================
+  - name: honua_slo_alerts
+    interval: 30s
+    rules:
+      # ---------------------------------------------------------------------------
+      # CRITICAL: Fast burn rate alert (14.4x)
+      # Detects when 2% of monthly error budget is consumed in 1 hour
+      # At this rate, monthly budget will be exhausted in ~2 days
+      # ---------------------------------------------------------------------------
+      - alert: ErrorBudgetBurnRateFast
+        expr: |
+          honua:error_budget:burn_rate_1h > 14.4
+          and
+          honua:error_budget:burn_rate_5m > 14.4
+        for: 2m
+        labels:
+          severity: critical
+          slo: availability
+          component: http
+          burn_rate: fast
+        annotations:
+          summary: "Critical: Fast error budget burn detected ({{ $value | humanize }}x)"
+          description: |
+            Error budget is burning at {{ $value | humanize }}x the allowed rate.
+            At this rate, the monthly error budget will be exhausted in approximately 2 days.
+
+            Current availability (1h): {{ with query "honua:availability:success_rate_1h" }}{{ . | first | value | humanizePercentage }}{{ end }}
+            Target availability: 99.9%
+            Error budget remaining (30d): {{ with query "honua:error_budget:remaining_percent_30d" }}{{ . | first | value | humanize }}%{{ end }}
+
+            IMMEDIATE ACTION REQUIRED:
+            1. Check error logs for 5xx errors
+            2. Review recent deployments
+            3. Check infrastructure health
+            4. Consider rolling back recent changes
+          dashboard: https://grafana.example.com/d/slo-overview
+          runbook: https://wiki.example.com/runbooks/error-budget-fast-burn
+
+      # ---------------------------------------------------------------------------
+      # WARNING: Slow burn rate alert (6x)
+      # Detects when ~3.6% of monthly error budget is consumed in 6 hours
+      # At this rate, monthly budget will be exhausted in ~5 days
+      # ---------------------------------------------------------------------------
+      - alert: ErrorBudgetBurnRateSlow
+        expr: |
+          honua:error_budget:burn_rate_6h > 6
+          and
+          honua:error_budget:burn_rate_1h > 6
+        for: 15m
+        labels:
+          severity: warning
+          slo: availability
+          component: http
+          burn_rate: slow
+        annotations:
+          summary: "Warning: Slow error budget burn detected ({{ $value | humanize }}x)"
+          description: |
+            Error budget is burning at {{ $value | humanize }}x the allowed rate.
+            At this rate, the monthly error budget will be exhausted in approximately 5 days.
+
+            Current availability (6h): {{ with query "honua:availability:success_rate_6h" }}{{ . | first | value | humanizePercentage }}{{ end }}
+            Target availability: 99.9%
+            Error budget remaining (30d): {{ with query "honua:error_budget:remaining_percent_30d" }}{{ . | first | value | humanize }}%{{ end }}
+
+            ACTION REQUIRED:
+            1. Investigate error patterns
+            2. Review application metrics
+            3. Check for degraded performance
+            4. Plan mitigation if burn continues
+          dashboard: https://grafana.example.com/d/slo-overview
+          runbook: https://wiki.example.com/runbooks/error-budget-slow-burn
+
+      # ---------------------------------------------------------------------------
+      # CRITICAL: Latency SLO violation (P95 > 5s)
+      # ---------------------------------------------------------------------------
+      - alert: LatencyP95Violation
+        expr: |
+          honua:latency:p95_5m > 5000
+          and
+          honua:latency:p95_30m > 5000
+        for: 5m
+        labels:
+          severity: critical
+          slo: latency
+          component: http
+        annotations:
+          summary: "Critical: P95 latency exceeds 5s ({{ $value | humanize }}ms)"
+          description: |
+            P95 latency is {{ $value | humanize }}ms, exceeding the 5000ms SLO target.
+
+            P95 latency (5m): {{ with query "honua:latency:p95_5m" }}{{ . | first | value | humanize }}ms{{ end }}
+            P99 latency (5m): {{ with query "honua:latency:p99_5m" }}{{ . | first | value | humanize }}ms{{ end }}
+            Target: < 5000ms
+
+            ACTION REQUIRED:
+            1. Check slow request logs
+            2. Review database query performance
+            3. Check cache hit rates
+            4. Investigate infrastructure bottlenecks
+          dashboard: https://grafana.example.com/d/latency-overview
+          runbook: https://wiki.example.com/runbooks/latency-violation
+
+      # ---------------------------------------------------------------------------
+      # WARNING: Latency SLO degradation (P95 > 4s but < 5s)
+      # ---------------------------------------------------------------------------
+      - alert: LatencyP95Degradation
+        expr: |
+          honua:latency:p95_5m > 4000
+          and
+          honua:latency:p95_5m < 5000
+        for: 10m
+        labels:
+          severity: warning
+          slo: latency
+          component: http
+        annotations:
+          summary: "Warning: P95 latency approaching SLO limit ({{ $value | humanize }}ms)"
+          description: |
+            P95 latency is {{ $value | humanize }}ms, approaching the 5000ms SLO target.
+
+            P95 latency (5m): {{ with query "honua:latency:p95_5m" }}{{ . | first | value | humanize }}ms{{ end }}
+            Target: < 5000ms
+
+            Investigate before it becomes critical.
+
+      # ---------------------------------------------------------------------------
+      # CRITICAL: Database query latency violation (P95 > 1s)
+      # ---------------------------------------------------------------------------
+      - alert: DatabaseLatencyP95Violation
+        expr: |
+          honua:database:query_duration_p95_5m > 1000
+          and
+          honua:database:query_duration_p95_1h > 1000
+        for: 5m
+        labels:
+          severity: critical
+          slo: latency
+          component: database
+        annotations:
+          summary: "Critical: Database P95 query latency exceeds 1s ({{ $value | humanize }}ms)"
+          description: |
+            Database P95 query latency is {{ $value | humanize }}ms, exceeding the 1000ms target.
+
+            P95 latency (5m): {{ with query "honua:database:query_duration_p95_5m" }}{{ . | first | value | humanize }}ms{{ end }}
+            P99 latency (5m): {{ with query "honua:database:query_duration_p99_5m" }}{{ . | first | value | humanize }}ms{{ end }}
+
+            ACTION REQUIRED:
+            1. Check database connection pool
+            2. Review slow query logs
+            3. Check for missing indexes
+            4. Review query execution plans
+          dashboard: https://grafana.example.com/d/database-overview
+
+      # ---------------------------------------------------------------------------
+      # WARNING: Cache hit rate below target (< 80%)
+      # ---------------------------------------------------------------------------
+      - alert: CacheHitRateLow
+        expr: |
+          honua:cache:hit_rate_1h < 0.80
+        for: 15m
+        labels:
+          severity: warning
+          slo: cache_performance
+          component: cache
+        annotations:
+          summary: "Warning: Cache hit rate below 80% ({{ $value | humanizePercentage }})"
+          description: |
+            Cache hit rate is {{ $value | humanizePercentage }}, below the 80% target.
+
+            Hit rate (1h): {{ with query "honua:cache:hit_rate_1h" }}{{ . | first | value | humanizePercentage }}{{ end }}
+            Target: > 80%
+
+            This may lead to increased latency and database load.
+
+            ACTION REQUIRED:
+            1. Check cache size and eviction rate
+            2. Review cache TTL configuration
+            3. Monitor database load
+            4. Consider cache warming strategies
+          dashboard: https://grafana.example.com/d/cache-overview
+
+      # ---------------------------------------------------------------------------
+      # WARNING: Error budget exhausted (monthly)
+      # ---------------------------------------------------------------------------
+      - alert: ErrorBudgetExhausted
+        expr: |
+          honua:error_budget:remaining_30d < 0
+        for: 5m
+        labels:
+          severity: critical
+          slo: availability
+          component: http
+        annotations:
+          summary: "CRITICAL: Monthly error budget exhausted"
+          description: |
+            The monthly error budget has been exhausted. We are now operating outside our SLO.
+
+            Error budget remaining: {{ with query "honua:error_budget:remaining_percent_30d" }}{{ . | first | value | humanize }}%{{ end }}
+            Current availability (30d): {{ with query "honua:availability:success_rate_30d" }}{{ . | first | value | humanizePercentage }}{{ end }}
+            Target availability: 99.9%
+
+            IMMEDIATE ACTION REQUIRED:
+            1. Implement feature freeze
+            2. Focus on stability over new features
+            3. Review and fix root causes of errors
+            4. Consider emergency rollbacks
+            5. Communicate status to stakeholders
+          dashboard: https://grafana.example.com/d/slo-overview
+          runbook: https://wiki.example.com/runbooks/error-budget-exhausted

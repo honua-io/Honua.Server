@@ -4,12 +4,22 @@ Use this checklist to ensure proper observability configuration when deploying H
 
 ## Pre-Deployment Checklist
 
+### 0. Cloud Provider Configuration (Choose One)
+
+- [ ] **Option A: Self-Hosted (default)** - Set `observability.cloudProvider` to `none`
+- [ ] **Option B: Azure** - Set `observability.cloudProvider` to `azure` and configure Application Insights connection string
+- [ ] **Option C: AWS** - Set `observability.cloudProvider` to `aws` and configure region + OTLP endpoint
+- [ ] **Option D: GCP** - Set `observability.cloudProvider` to `gcp` and configure project ID + OTLP endpoint
+- [ ] Verify cloud provider credentials are configured (environment variables or IAM roles)
+- [ ] See [Cloud Provider Setup Guide](../observability/cloud-provider-setup.md) for detailed instructions
+
 ### 1. Metrics Configuration
 
 - [ ] Verify `observability.metrics.enabled` is `true` in production config
 - [ ] Confirm metrics endpoint is set (default: `/metrics`)
 - [ ] Test metrics endpoint accessibility with authentication
 - [ ] Create service account with Viewer role for Prometheus scraping
+- [ ] Verify recording rules are loaded in Prometheus (see `/prometheus/recording-rules.yml`)
 
 **Command to test:**
 ```bash
@@ -78,7 +88,64 @@ export observability__tracing__otlpEndpoint=http://tempo:4317
 - Configure log shipping (Filebeat, Fluentd, Promtail, etc.)
 - Set up log retention policies
 
-### 6. Alerting
+### 6. Health Check Configuration
+
+- [ ] Verify health check endpoints are accessible:
+  - `/health` - Overall health status
+  - `/health/live` - Liveness probe (always healthy if running)
+  - `/health/ready` - Readiness probe (checks database and queue)
+- [ ] Configure Kubernetes liveness and readiness probes to use health endpoints
+- [ ] Verify all health checks are passing:
+  - Database connectivity and migrations
+  - Build queue status
+  - License validation
+  - Registry availability
+- [ ] Set up health check monitoring in load balancer/orchestrator
+
+**Health check test commands:**
+```bash
+# Test overall health
+curl https://your-server/health
+
+# Test liveness (for K8s)
+curl https://your-server/health/live
+
+# Test readiness (for K8s)
+curl https://your-server/health/ready
+```
+
+### 7. SLI/SLO Monitoring Setup
+
+- [ ] Verify recording rules are loaded in Prometheus (`/prometheus/recording-rules.yml`)
+- [ ] Review default SLO targets:
+  - Availability: 99.9% (error budget: 0.1%)
+  - Latency: P95 < 5 seconds
+- [ ] Adjust SLO targets for your environment if needed
+- [ ] Configure SLO alerts (multi-window multi-burn-rate)
+- [ ] Set up error budget tracking dashboard
+- [ ] Document SLO review process and cadence
+- [ ] See [SLI/SLO Monitoring Guide](../observability/sli-slo-monitoring.md) for details
+
+**Key SLI metrics to monitor:**
+- `honua:availability:ratio_5m` - 5-minute availability
+- `honua:error_budget:remaining_5m` - Error budget remaining
+- `honua:error_budget:burn_rate_5m` - Error budget burn rate
+- `honua:latency:p95_5m` - P95 latency (5-minute window)
+
+### 8. Recording Rules Deployment
+
+- [ ] Copy recording rules to Prometheus: `cp src/Honua.Server.Observability/prometheus/recording-rules.yml /etc/prometheus/`
+- [ ] Update Prometheus config to load recording rules:
+  ```yaml
+  rule_files:
+    - "alerts.yml"
+    - "recording-rules.yml"
+  ```
+- [ ] Reload Prometheus configuration: `curl -X POST http://localhost:9090/-/reload`
+- [ ] Verify rules are loaded: Check Prometheus UI → Status → Rules
+- [ ] Confirm recording rules are evaluating: Query `honua:availability:ratio_5m` in Prometheus
+
+### 9. Alerting
 
 - [ ] Import Prometheus alert rules from `src/Honua.Server.Observability/prometheus/alerts.yml`
 - [ ] Configure Alertmanager notification channels (email, Slack, PagerDuty)
@@ -92,14 +159,16 @@ export observability__tracing__otlpEndpoint=http://tempo:4317
 - Service availability
 - Database connection issues
 - Memory/CPU usage
+- SLO violations (error budget burn rate)
 
-### 7. Security
+### 10. Security
 
 - [ ] Metrics endpoint requires authentication (except QuickStart mode)
 - [ ] Request logging does NOT log headers by default
 - [ ] Tracing does not include PII or sensitive data
 - [ ] Review logs for any accidental sensitive data exposure
 - [ ] Configure network policies to restrict metrics endpoint access
+- [ ] Verify cloud provider credentials follow principle of least privilege
 
 **Security verification:**
 ```bash
@@ -110,13 +179,14 @@ curl https://your-server/metrics
 curl -u viewer:password https://your-server/metrics
 ```
 
-### 8. Performance Validation
+### 11. Performance Validation
 
 - [ ] Measure CPU overhead (expect ~1-3% increase)
 - [ ] Monitor memory usage (expect ~10-50 MB increase)
 - [ ] Verify no significant latency impact on requests
 - [ ] Check disk I/O for log volume
 - [ ] Validate network traffic for metrics scraping
+- [ ] Test recording rules performance (should complete in < 30s)
 
 **Performance benchmarks:**
 - Metrics collection: ~1-2% CPU overhead
@@ -300,8 +370,11 @@ Create or update `appsettings.Production.json`:
 
 ## Documentation Links
 
-- [Observability Migration Guide](observability-migration-guide.md)
-- [Configuration Guide](README.md)
+- [Observability Migration Guide](../configuration/observability-migration-guide.md)
+- [Cloud Provider Setup Guide](../observability/cloud-provider-setup.md)
+- [SLI/SLO Monitoring Guide](../observability/sli-slo-monitoring.md)
+- [Migration Guide](../observability/migration-guide.md)
+- [Configuration Guide](../user/configuration.md)
 - [Distributed Tracing Guide](../architecture/tracing.md)
 - [Observability README](../../src/Honua.Server.Observability/README.md)
 

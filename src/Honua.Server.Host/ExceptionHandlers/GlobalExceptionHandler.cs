@@ -3,9 +3,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Exceptions;
+using Honua.Server.Core.Logging;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Observability.CorrelationId;
 using Microsoft.AspNetCore.Diagnostics;
@@ -59,7 +61,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         return true; // Exception handled
     }
 
-    private void LogException(Exception exception, HttpContext context, bool isTransient)
+    private async void LogException(Exception exception, HttpContext context, bool isTransient)
     {
         var endpoint = context.GetEndpoint();
         var endpointName = endpoint?.DisplayName ?? context.Request.Path;
@@ -75,8 +77,15 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         activity?.SetTag("error", true);
         activity?.SetTag("correlation.id", correlationId);
 
-        // Log with structured data including correlation ID
-        using (_logger.BeginScope(new Dictionary<string, object>
+        // Try to capture request body for better error context (POST/PUT/PATCH only)
+        string? requestBody = null;
+        if (context.Request.Method is "POST" or "PUT" or "PATCH")
+        {
+            requestBody = await TryReadRequestBodyAsync(context);
+        }
+
+        // Build logging scope with structured data including correlation ID
+        var scopeData = new Dictionary<string, object>
         {
             ["ExceptionType"] = exception.GetType().Name,
             ["Endpoint"] = endpointName,
@@ -85,7 +94,16 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             ["TraceId"] = context.TraceIdentifier,
             ["CorrelationId"] = correlationId,
             ["IsTransient"] = isTransient
-        }))
+        };
+
+        // Add request body to scope if available (for error context)
+        if (requestBody != null)
+        {
+            scopeData["RequestBody"] = requestBody;
+        }
+
+        // Log with structured data including correlation ID
+        using (_logger.BeginScope(scopeData))
         {
             // Transient errors are warnings (expected, will retry)
             if (isTransient)
@@ -297,5 +315,46 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
 
         // In development, include the actual exception message for debugging
         return exception.Message;
+    }
+
+    /// <summary>
+    /// Attempts to read the request body for error logging context.
+    /// Automatically redacts sensitive information (passwords, API keys, tokens, etc.)
+    /// before returning. Returns null if body cannot be read or is too large.
+    /// </summary>
+    /// <param name="context">The HTTP context containing the request.</param>
+    /// <returns>The redacted request body as a string, or null if unavailable.</returns>
+    private async Task<string?> TryReadRequestBodyAsync(HttpContext context)
+    {
+        // Only log JSON request bodies
+        if (context.Request.ContentType?.Contains("application/json") != true)
+            return null;
+
+        // Limit request body logging to 10KB to avoid memory issues
+        if (context.Request.ContentLength > 10240)
+            return "[Request body too large to log]";
+
+        try
+        {
+            // Enable buffering to allow multiple reads of the request body
+            context.Request.EnableBuffering();
+            context.Request.Body.Position = 0;
+
+            using var reader = new StreamReader(context.Request.Body, leaveOpen: true);
+            var body = await reader.ReadToEndAsync();
+
+            // Reset position for potential subsequent reads
+            context.Request.Body.Position = 0;
+
+            // Redact sensitive information before logging
+            return SensitiveDataRedactor.Redact(body);
+        }
+        catch (Exception ex)
+        {
+            // If we can't read the body, don't fail the exception handler
+            // Log at Debug level to avoid noise in production logs
+            _logger.LogDebug(ex, "Failed to read request body for error logging");
+            return null;
+        }
     }
 }
