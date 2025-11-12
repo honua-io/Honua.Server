@@ -1,0 +1,349 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@page "/dashboards/view/{DashboardId:guid}"
+@using Honua.Server.Core.Models.Dashboard
+@using Honua.Admin.Blazor.Components.Dashboard.Widgets
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@(_dashboard?.Name ?? "Dashboard") - Honua</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: 100vh;">
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Color="Color.Inherit"
+                       OnClick="@(() => Navigation.NavigateTo("/dashboards"))" />
+        <MudText Typo="Typo.h6">@(_dashboard?.Name ?? "Loading...")</MudText>
+        <MudSpacer />
+
+        @if (_dashboard != null)
+        {
+            @if (_canEdit)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Inherit"
+                               OnClick="@(() => Navigation.NavigateTo($"/dashboards/designer/{DashboardId}"))"
+                               Title="Edit Dashboard" />
+            }
+
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Inherit"
+                           OnClick="@RefreshDashboard" Disabled="@_isRefreshing"
+                           Title="Refresh Data" />
+
+            @if (_dashboard.RefreshInterval.HasValue && _autoRefresh)
+            {
+                <MudChip Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.AutoMode">
+                    Auto-refresh: @_dashboard.RefreshInterval s
+                </MudChip>
+            }
+
+            <MudIconButton Icon="@(_autoRefresh ? Icons.Material.Filled.PauseCircle : Icons.Material.Filled.PlayCircle)"
+                           Color="Color.Inherit"
+                           OnClick="@ToggleAutoRefresh"
+                           Title="@(_autoRefresh ? "Pause" : "Resume") Auto-refresh" />
+
+            <MudIconButton Icon="@Icons.Material.Filled.Fullscreen" Color="Color.Inherit"
+                           OnClick="@ToggleFullscreen"
+                           Title="Toggle Fullscreen" />
+        }
+    </MudAppBar>
+
+    <div class="dashboard-container pa-4" Style="height: calc(100vh - 64px); overflow: auto; background-color: @(_dashboard?.Theme?.Background ?? "#f5f5f5");">
+        @if (_dashboard == null)
+        {
+            <MudProgressCircular Indeterminate="true" Class="ma-4" />
+        }
+        else if (!_dashboard.Widgets.Any())
+        {
+            <MudPaper Class="pa-8 d-flex flex-column align-center justify-center" Elevation="0"
+                      Style="height: 400px;">
+                <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" Class="mb-4" />
+                <MudText Typo="Typo.h6">This dashboard is empty</MudText>
+                @if (_canEdit)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4"
+                               OnClick="@(() => Navigation.NavigateTo($"/dashboards/designer/{DashboardId}"))">
+                        Add Widgets
+                    </MudButton>
+                }
+            </MudPaper>
+        }
+        else
+        {
+            <div class="dashboard-grid" style="position: relative; min-height: 800px;">
+                @foreach (var widget in _dashboard.Widgets.Where(w => w.Visible))
+                {
+                    <div class="widget-container" style="@GetWidgetStyle(widget)">
+                        <MudPaper Class="pa-0" Elevation="2" Style="height: 100%;">
+                            @if (widget.Config.ShowHeader)
+                            {
+                                <div class="widget-header pa-3" style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0;">
+                                    <MudText Typo="Typo.subtitle1">@widget.Title</MudText>
+                                </div>
+                            }
+                            <div class="widget-content" style="height: @(widget.Config.ShowHeader ? "calc(100% - 56px)" : "100%"); overflow: auto;">
+                                @RenderWidget(widget)
+                            </div>
+                        </MudPaper>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid DashboardId { get; set; }
+
+    private DashboardDefinition? _dashboard;
+    private Dictionary<Guid, List<Dictionary<string, object>>> _widgetData = new();
+    private Dictionary<string, object> _globalFilters = new();
+    private bool _isRefreshing = false;
+    private bool _canEdit = false;
+    private bool _autoRefresh = true;
+    private Timer? _refreshTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboard();
+        await LoadAllWidgetData();
+        SetupAutoRefresh();
+    }
+
+    private async Task LoadDashboard()
+    {
+        try
+        {
+            _dashboard = await Http.GetFromJsonAsync<DashboardDefinition>($"/api/dashboards/{DashboardId}");
+            if (_dashboard != null)
+            {
+                // Check if current user can edit (simplified - should check actual user ID)
+                _canEdit = true; // Would check: _dashboard.OwnerId == currentUserId
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading dashboard: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadAllWidgetData()
+    {
+        if (_dashboard == null) return;
+
+        foreach (var widget in _dashboard.Widgets)
+        {
+            await LoadWidgetData(widget);
+        }
+    }
+
+    private async Task LoadWidgetData(WidgetDefinition widget)
+    {
+        if (widget.DataSource == null) return;
+
+        try
+        {
+            // Load data based on data source type
+            switch (widget.DataSource.Type.ToLower())
+            {
+                case "layer":
+                    await LoadLayerData(widget);
+                    break;
+                case "query":
+                    await LoadQueryData(widget);
+                    break;
+                case "api":
+                    await LoadApiData(widget);
+                    break;
+                case "static":
+                    LoadStaticData(widget);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data for widget {widget.Id}: {ex.Message}");
+        }
+    }
+
+    private async Task LoadLayerData(WidgetDefinition widget)
+    {
+        // Load data from a layer using OData query
+        if (string.IsNullOrEmpty(widget.DataSource?.Source)) return;
+
+        var url = $"/odata/{widget.DataSource.Source}";
+        if (!string.IsNullOrEmpty(widget.DataSource.Filter))
+        {
+            url += $"?$filter={widget.DataSource.Filter}";
+        }
+
+        var data = await Http.GetFromJsonAsync<ODataResponse<Dictionary<string, object>>>(url);
+        if (data?.Value != null)
+        {
+            _widgetData[widget.Id] = data.Value;
+        }
+    }
+
+    private async Task LoadQueryData(WidgetDefinition widget)
+    {
+        // Execute a custom query (implementation depends on your query service)
+        _widgetData[widget.Id] = new List<Dictionary<string, object>>();
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadApiData(WidgetDefinition widget)
+    {
+        if (string.IsNullOrEmpty(widget.DataSource?.Source)) return;
+
+        var data = await Http.GetFromJsonAsync<List<Dictionary<string, object>>>(widget.DataSource.Source);
+        if (data != null)
+        {
+            _widgetData[widget.Id] = data;
+        }
+    }
+
+    private void LoadStaticData(WidgetDefinition widget)
+    {
+        if (widget.DataSource?.Data is List<Dictionary<string, object>> staticData)
+        {
+            _widgetData[widget.Id] = staticData;
+        }
+    }
+
+    private RenderFragment RenderWidget(WidgetDefinition widget)
+    {
+        return builder =>
+        {
+            var data = _widgetData.ContainsKey(widget.Id) ? _widgetData[widget.Id] : null;
+
+            switch (widget.Type.ToLower())
+            {
+                case "map":
+                    builder.OpenComponent<MapWidget>(0);
+                    builder.AddAttribute(1, "Config", widget.Config as MapWidgetConfig);
+                    builder.AddAttribute(2, "DataSource", widget.DataSource);
+                    builder.AddAttribute(3, "OnSelectionChanged", EventCallback.Factory.Create<object>(this, HandleWidgetInteraction));
+                    builder.CloseComponent();
+                    break;
+
+                case "chart":
+                    builder.OpenComponent<ChartWidget>(0);
+                    builder.AddAttribute(1, "Config", widget.Config as ChartWidgetConfig);
+                    builder.AddAttribute(2, "DataSource", widget.DataSource);
+                    builder.AddAttribute(3, "Data", data);
+                    builder.AddAttribute(4, "OnDataPointClick", EventCallback.Factory.Create<object>(this, HandleWidgetInteraction));
+                    builder.CloseComponent();
+                    break;
+
+                case "table":
+                    builder.OpenComponent<TableWidget>(0);
+                    builder.AddAttribute(1, "Config", widget.Config as TableWidgetConfig);
+                    builder.AddAttribute(2, "DataSource", widget.DataSource);
+                    builder.AddAttribute(3, "Data", data);
+                    builder.AddAttribute(4, "OnRowSelected", EventCallback.Factory.Create<Dictionary<string, object>>(this, HandleWidgetInteraction));
+                    builder.CloseComponent();
+                    break;
+
+                case "filter":
+                    builder.OpenComponent<FilterWidget>(0);
+                    builder.AddAttribute(1, "Config", widget.Config as FilterWidgetConfig);
+                    builder.AddAttribute(2, "OnFiltersChanged", EventCallback.Factory.Create<Dictionary<string, object>>(this, HandleFilterChange));
+                    builder.CloseComponent();
+                    break;
+
+                case "kpi":
+                    builder.OpenComponent<KpiWidget>(0);
+                    builder.AddAttribute(1, "Config", widget.Config as KpiWidgetConfig);
+                    builder.AddAttribute(2, "DataSource", widget.DataSource);
+                    builder.AddAttribute(3, "Data", data);
+                    builder.CloseComponent();
+                    break;
+            }
+        };
+    }
+
+    private string GetWidgetStyle(WidgetDefinition widget)
+    {
+        if (_dashboard == null) return "";
+
+        var rowHeight = _dashboard.Layout.RowHeight;
+        var gap = _dashboard.Layout.Gap;
+
+        var left = (widget.Position.X * (100.0 / _dashboard.Layout.Columns));
+        var width = (widget.Position.Width * (100.0 / _dashboard.Layout.Columns));
+        var top = (widget.Position.Y * rowHeight) + (widget.Position.Y * gap);
+        var height = (widget.Position.Height * rowHeight) + ((widget.Position.Height - 1) * gap);
+
+        return $"position: absolute; left: {left}%; width: {width}%; top: {top}px; height: {height}px;";
+    }
+
+    private async Task RefreshDashboard()
+    {
+        _isRefreshing = true;
+        await LoadAllWidgetData();
+        _isRefreshing = false;
+        StateHasChanged();
+    }
+
+    private void SetupAutoRefresh()
+    {
+        if (_dashboard?.RefreshInterval > 0 && _autoRefresh)
+        {
+            _refreshTimer?.Dispose();
+            _refreshTimer = new Timer(async _ =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    await RefreshDashboard();
+                });
+            }, null, TimeSpan.FromSeconds(_dashboard.RefreshInterval.Value),
+                     TimeSpan.FromSeconds(_dashboard.RefreshInterval.Value));
+        }
+    }
+
+    private void ToggleAutoRefresh()
+    {
+        _autoRefresh = !_autoRefresh;
+        if (_autoRefresh)
+        {
+            SetupAutoRefresh();
+        }
+        else
+        {
+            _refreshTimer?.Dispose();
+        }
+    }
+
+    private void ToggleFullscreen()
+    {
+        // Would use JS interop to toggle fullscreen
+        Snackbar.Add("Fullscreen toggle not yet implemented", Severity.Info);
+    }
+
+    private async Task HandleWidgetInteraction(object data)
+    {
+        // Handle cross-widget interactions based on connections
+        // This would apply filters to connected widgets
+        await Task.CompletedTask;
+    }
+
+    private async Task HandleFilterChange(Dictionary<string, object> filters)
+    {
+        _globalFilters = filters;
+        // Re-load data for widgets that should respond to filters
+        await LoadAllWidgetData();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+
+    private class ODataResponse<T>
+    {
+        public List<T>? Value { get; set; }
+    }
+}

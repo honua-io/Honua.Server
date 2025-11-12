@@ -1,0 +1,384 @@
+@page "/tours"
+@using Honua.Admin.Blazor.Services
+@inject TourService TourService
+@inject OnboardingService OnboardingService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Tour Management - Honua Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.Tour" Class="mr-2" />
+        Tour Management
+    </MudText>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="mb-4">
+        <MudTabPanel Text="Pre-Built Tours" Icon="@Icons.Material.Filled.AutoStories">
+            <MudCard Class="mt-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Available Tours</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Interactive guided tours to help users learn the platform
+                        </MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                                   Color="Color.Primary"
+                                   Variant="Variant.Text"
+                                   OnClick="LoadToursAsync">
+                            Refresh
+                        </MudButton>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudGrid>
+                        @foreach (var tour in _availableTours)
+                        {
+                            var isCompleted = _completedTours.Contains(tour.Key);
+
+                            <MudItem xs="12" md="6">
+                                <MudCard Elevation="1" Class="pa-3">
+                                    <div class="d-flex justify-space-between align-center mb-2">
+                                        <MudText Typo="Typo.h6">
+                                            @GetTourTitle(tour.Key)
+                                        </MudText>
+                                        @if (isCompleted)
+                                        {
+                                            <MudChip Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle">
+                                                Completed
+                                            </MudChip>
+                                        }
+                                    </div>
+
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                                        @GetTourDescription(tour.Key)
+                                    </MudText>
+
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                                        <MudIcon Icon="@Icons.Material.Filled.ViewList" Size="Size.Small" Class="mr-1" />
+                                        @tour.Value.Steps.Count steps
+                                    </MudText>
+
+                                    <div class="d-flex gap-2">
+                                        <MudButton StartIcon="@Icons.Material.Filled.PlayArrow"
+                                                   Color="Color.Primary"
+                                                   Variant="Variant.Filled"
+                                                   Size="Size.Small"
+                                                   OnClick="@(() => StartTourAsync(tour.Key, tour.Value))">
+                                            Start Tour
+                                        </MudButton>
+
+                                        @if (isCompleted)
+                                        {
+                                            <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                                                       Color="Color.Default"
+                                                       Variant="Variant.Outlined"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => ResetTourAsync(tour.Key))">
+                                                Reset
+                                            </MudButton>
+                                        }
+                                    </div>
+                                </MudCard>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Tour Progress" Icon="@Icons.Material.Filled.Analytics">
+            <MudCard Class="mt-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Tour Completion Statistics</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_tourProgress != null)
+                    {
+                        <div class="mb-4">
+                            <MudText Typo="Typo.h3" Align="Align.Center" Color="Color.Primary">
+                                @_tourProgress.Percentage%
+                            </MudText>
+                            <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
+                                @_tourProgress.Completed of @_tourProgress.Total tours completed
+                            </MudText>
+                        </div>
+
+                        <MudProgressLinear Value="@_tourProgress.Percentage"
+                                           Color="Color.Primary"
+                                           Size="Size.Large"
+                                           Class="mb-4" />
+
+                        <MudDivider Class="my-4" />
+
+                        <MudText Typo="Typo.h6" Class="mb-3">Completed Tours</MudText>
+                        @if (_completedTours.Any())
+                        {
+                            <MudList>
+                                @foreach (var tourId in _completedTours)
+                                {
+                                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                                        <MudText Typo="Typo.body1">@GetTourTitle(tourId)</MudText>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info">
+                                No tours completed yet. Start a tour to get familiar with the platform!
+                            </MudAlert>
+                        }
+                    }
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton StartIcon="@Icons.Material.Filled.RestartAlt"
+                               Color="Color.Warning"
+                               Variant="Variant.Text"
+                               OnClick="ResetAllToursAsync">
+                        Reset All Tours
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Onboarding Checklist" Icon="@Icons.Material.Filled.Checklist">
+            <MudCard Class="mt-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">User Onboarding Progress</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Manage onboarding checklist and user progress
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_onboardingProgress != null)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mb-3">
+                            The onboarding checklist helps new users get started with Honua.
+                            It tracks completion of key tasks and provides guided tours.
+                        </MudAlert>
+
+                        <div class="mb-4">
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>Progress:</strong> @_onboardingProgress.CompletedItemsCount / @_onboardingProgress.TotalItemsCount items completed
+                            </MudText>
+                            <MudProgressLinear Value="@_onboardingProgress.ProgressPercentage"
+                                               Color="Color.Primary"
+                                               Size="Size.Medium" />
+                        </div>
+
+                        @if (_onboardingProgress.IsFullyCompleted)
+                        {
+                            <MudAlert Severity="Severity.Success" Icon="@Icons.Material.Filled.Celebration">
+                                All onboarding items completed!
+                            </MudAlert>
+                        }
+
+                        <MudDivider Class="my-4" />
+
+                        <MudText Typo="Typo.h6" Class="mb-3">Checklist Items</MudText>
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Task</th>
+                                    <th>Category</th>
+                                    <th>Completed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in _onboardingProgress.ChecklistItems)
+                                {
+                                    <tr>
+                                        <td>
+                                            @if (item.IsCompleted)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                            }
+                                            else
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.RadioButtonUnchecked" Color="Color.Default" Size="Size.Small" />
+                                            }
+                                        </td>
+                                        <td>
+                                            <MudText Typo="Typo.body2">@item.Title</MudText>
+                                        </td>
+                                        <td>
+                                            <MudChip Size="Size.Small">@item.Category</MudChip>
+                                        </td>
+                                        <td>
+                                            @if (item.CompletedAt.HasValue)
+                                            {
+                                                <MudText Typo="Typo.caption">@item.CompletedAt.Value.ToString("MMM dd, yyyy")</MudText>
+                                            }
+                                            else
+                                            {
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">Not completed</MudText>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton StartIcon="@Icons.Material.Filled.RestartAlt"
+                               Color="Color.Warning"
+                               Variant="Variant.Text"
+                               OnClick="ResetOnboardingAsync">
+                        Reset Onboarding
+                    </MudButton>
+                    @if (_onboardingProgress?.IsDismissed == true)
+                    {
+                        <MudButton StartIcon="@Icons.Material.Filled.Visibility"
+                                   Color="Color.Primary"
+                                   Variant="Variant.Text"
+                                   OnClick="ShowChecklistAsync">
+                            Show Checklist
+                        </MudButton>
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Sample Data" Icon="@Icons.Material.Filled.DataObject">
+            <MudCard Class="mt-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Sample Datasets & Examples</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Pre-loaded sample data for testing and demonstration
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                        Sample datasets and example maps are available to help new users explore Honua's capabilities.
+                        These are managed by the <code>SampleDataLoader</code> service.
+                    </MudAlert>
+
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Sample data features include:
+                    </MudText>
+                    <MudList>
+                        <MudListItem Icon="@Icons.Material.Filled.Public">World Cities with population data</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Map">Country boundaries and demographics</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Warning">Recent earthquake data (USGS)</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Landscape">National parks and protected areas</MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Route">Road networks</MudListItem>
+                    </MudList>
+
+                    <MudDivider Class="my-4" />
+
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        Sample data can be loaded programmatically via the <code>SampleDataLoader</code> service or through import workflows.
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private Dictionary<string, TourConfiguration> _availableTours = new();
+    private List<string> _completedTours = new();
+    private TourProgress? _tourProgress;
+    private OnboardingProgress? _onboardingProgress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadToursAsync();
+    }
+
+    private async Task LoadToursAsync()
+    {
+        _availableTours = TourDefinitions.GetAllTours();
+        _completedTours = await TourService.GetCompletedToursAsync();
+        _tourProgress = await TourService.GetTourProgressAsync();
+        _onboardingProgress = await OnboardingService.GetProgressAsync();
+    }
+
+    private async Task StartTourAsync(string tourId, TourConfiguration config)
+    {
+        try
+        {
+            await TourService.StartTourAsync(tourId, config);
+            Snackbar.Add($"Tour started: {GetTourTitle(tourId)}", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to start tour: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ResetTourAsync(string tourId)
+    {
+        await TourService.ResetTourAsync(tourId);
+        await LoadToursAsync();
+        Snackbar.Add($"Tour reset: {GetTourTitle(tourId)}", Severity.Success);
+    }
+
+    private async Task ResetAllToursAsync()
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Reset All Tours",
+            "Are you sure you want to reset all tour completion status?",
+            yesText: "Reset", cancelText: "Cancel");
+
+        if (result == true)
+        {
+            await TourService.ResetAllToursAsync();
+            await LoadToursAsync();
+            Snackbar.Add("All tours have been reset", Severity.Success);
+        }
+    }
+
+    private async Task ResetOnboardingAsync()
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Reset Onboarding",
+            "Are you sure you want to reset all onboarding progress?",
+            yesText: "Reset", cancelText: "Cancel");
+
+        if (result == true)
+        {
+            await OnboardingService.ResetProgressAsync();
+            await LoadToursAsync();
+            Snackbar.Add("Onboarding progress has been reset", Severity.Success);
+        }
+    }
+
+    private async Task ShowChecklistAsync()
+    {
+        await OnboardingService.ShowChecklistAsync();
+        await LoadToursAsync();
+        Snackbar.Add("Onboarding checklist is now visible", Severity.Success);
+    }
+
+    private string GetTourTitle(string tourId) => tourId switch
+    {
+        "welcome-tour" => "Welcome to Honua",
+        "map-creation-tour" => "Map Creation",
+        "data-upload-tour" => "Data Upload",
+        "dashboard-tour" => "Dashboard Creation",
+        "sharing-tour" => "Sharing & Collaboration",
+        _ => tourId
+    };
+
+    private string GetTourDescription(string tourId) => tourId switch
+    {
+        "welcome-tour" => "Introduction to the Honua platform and main features",
+        "map-creation-tour" => "Learn how to create interactive maps with multiple layers",
+        "data-upload-tour" => "Import spatial data in various formats",
+        "dashboard-tour" => "Build custom dashboards with widgets and visualizations",
+        "sharing-tour" => "Share data and collaborate with your team",
+        _ => "Guided tour"
+    };
+}

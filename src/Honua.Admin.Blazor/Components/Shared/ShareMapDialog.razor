@@ -1,0 +1,291 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Share Map</MudText>
+
+        @if (!string.IsNullOrEmpty(_shareUrl))
+        {
+            <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background-color: #f5f5f5;">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Share URL</MudText>
+                <MudTextField @bind-Value="_shareUrl"
+                              ReadOnly="true"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                              OnAdornmentClick="CopyShareUrl"
+                              FullWidth="true" />
+            </MudPaper>
+
+            <MudExpansionPanels Class="mb-4">
+                <MudExpansionPanel Text="Embed Code (iframe)">
+                    <MudTextField @bind-Value="_embedCode"
+                                  ReadOnly="true"
+                                  Variant="Variant.Outlined"
+                                  Lines="5"
+                                  FullWidth="true" />
+                    <MudButton OnClick="CopyEmbedCode"
+                               StartIcon="@Icons.Material.Filled.ContentCopy"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Class="mt-2">
+                        Copy Embed Code
+                    </MudButton>
+                </MudExpansionPanel>
+
+                <MudExpansionPanel Text="Embed Code (JavaScript)">
+                    <MudTextField @bind-Value="_jsEmbedCode"
+                                  ReadOnly="true"
+                                  Variant="Variant.Outlined"
+                                  Lines="8"
+                                  FullWidth="true" />
+                    <MudButton OnClick="CopyJsEmbedCode"
+                               StartIcon="@Icons.Material.Filled.ContentCopy"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Class="mt-2">
+                        Copy JavaScript Code
+                    </MudButton>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+
+        <MudGrid>
+            <MudItem xs="12">
+                <MudSelect @bind-Value="_permission" Label="Permission Level" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("view")">View Only</MudSelectItem>
+                    <MudSelectItem Value="@("comment")">View & Comment</MudSelectItem>
+                    <MudSelectItem Value="@("edit")">View & Edit</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSwitch @bind-Checked="_allowGuestAccess" Color="Color.Primary">
+                    Allow Guest Access (no login required)
+                </MudSwitch>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSelect @bind-Value="_expirationOption" Label="Expiration" Variant="Variant.Outlined" T="string">
+                    <MudSelectItem Value="@("never")">Never</MudSelectItem>
+                    <MudSelectItem Value="@("7days")">7 Days</MudSelectItem>
+                    <MudSelectItem Value="@("30days")">30 Days</MudSelectItem>
+                    <MudSelectItem Value="@("90days")">90 Days</MudSelectItem>
+                    <MudSelectItem Value="@("custom")">Custom</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            @if (_expirationOption == "custom")
+            {
+                <MudItem xs="12">
+                    <MudDatePicker @bind-Date="_customExpirationDate"
+                                   Label="Expiration Date"
+                                   Variant="Variant.Outlined"
+                                   MinDate="DateTime.Today" />
+                </MudItem>
+            }
+
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_password"
+                              Label="Password (optional)"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Password"
+                              HelperText="Leave blank for no password protection" />
+            </MudItem>
+        </MudGrid>
+
+        <MudExpansionPanels Class="mt-4">
+            <MudExpansionPanel Text="Embed Settings">
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudTextField @bind-Value="_embedWidth" Label="Width" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField @bind-Value="_embedHeight" Label="Height" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudSwitch @bind-Checked="_showZoomControls" Color="Color.Primary">Show Zoom Controls</MudSwitch>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudSwitch @bind-Checked="_showLayerSwitcher" Color="Color.Primary">Show Layer Switcher</MudSwitch>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudSwitch @bind-Checked="_showSearch" Color="Color.Primary">Show Search</MudSwitch>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudSwitch @bind-Checked="_showScaleBar" Color="Color.Primary">Show Scale Bar</MudSwitch>
+                    </MudItem>
+                </MudGrid>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        @if (_isLoading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mt-4" />
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="CreateOrUpdateShare" Disabled="_isLoading">
+            @if (string.IsNullOrEmpty(_shareUrl))
+            {
+                <text>Create Share Link</text>
+            }
+            else
+            {
+                <text>Update Settings</text>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string MapId { get; set; } = string.Empty;
+    [Parameter] public string? ExistingToken { get; set; }
+
+    private bool _isLoading = false;
+    private string _permission = "view";
+    private bool _allowGuestAccess = true;
+    private string _expirationOption = "never";
+    private DateTime? _customExpirationDate;
+    private string _password = string.Empty;
+    private string _embedWidth = "100%";
+    private string _embedHeight = "600px";
+    private bool _showZoomControls = true;
+    private bool _showLayerSwitcher = true;
+    private bool _showSearch = false;
+    private bool _showScaleBar = true;
+
+    private string _shareUrl = string.Empty;
+    private string _embedCode = string.Empty;
+    private string _jsEmbedCode = string.Empty;
+    private string _currentToken = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(ExistingToken))
+        {
+            _currentToken = ExistingToken;
+            await LoadExistingShare();
+        }
+    }
+
+    private async Task LoadExistingShare()
+    {
+        // TODO: Load existing share token settings
+        _isLoading = true;
+        try
+        {
+            // API call to get share token details
+            // var response = await HttpClient.GetAsync($"/api/v1/maps/share/{ExistingToken}");
+            // Parse and populate fields
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateOrUpdateShare()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var expiresAt = CalculateExpirationDate();
+
+            var request = new
+            {
+                permission = _permission,
+                allowGuestAccess = _allowGuestAccess,
+                expiresAt = expiresAt,
+                password = string.IsNullOrWhiteSpace(_password) ? null : _password,
+                embedSettings = new
+                {
+                    width = _embedWidth,
+                    height = _embedHeight,
+                    showZoomControls = _showZoomControls,
+                    showLayerSwitcher = _showLayerSwitcher,
+                    showSearch = _showSearch,
+                    showScaleBar = _showScaleBar
+                }
+            };
+
+            // TODO: Make API call to create/update share
+            // var response = await HttpClient.PostAsJsonAsync($"/api/v1/maps/{MapId}/share", request);
+            // var result = await response.Content.ReadFromJsonAsync<ShareTokenResponse>();
+
+            // For now, simulate the response
+            _currentToken = Guid.NewGuid().ToString("N").Substring(0, 16);
+            _shareUrl = $"{GetBaseUrl()}/share/{_currentToken}";
+            _embedCode = $"<iframe src=\"{_shareUrl}\" width=\"{_embedWidth}\" height=\"{_embedHeight}\" style=\"border:none;\"></iframe>";
+            _jsEmbedCode = $@"<div id=""honua-map-{_currentToken}""></div>
+<script src=""{GetBaseUrl()}/js/honua-embed.js""></script>
+<script>
+  HonuaEmbed.init({{
+    container: 'honua-map-{_currentToken}',
+    shareToken: '{_currentToken}',
+    width: '{_embedWidth}',
+    height: '{_embedHeight}'
+  }});
+</script>";
+
+            Snackbar.Add("Share link created successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating share link: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private DateTime? CalculateExpirationDate()
+    {
+        return _expirationOption switch
+        {
+            "7days" => DateTime.UtcNow.AddDays(7),
+            "30days" => DateTime.UtcNow.AddDays(30),
+            "90days" => DateTime.UtcNow.AddDays(90),
+            "custom" => _customExpirationDate?.ToUniversalTime(),
+            _ => null
+        };
+    }
+
+    private string GetBaseUrl()
+    {
+        // TODO: Get actual base URL from configuration
+        return "https://your-honua-instance.com";
+    }
+
+    private async Task CopyShareUrl()
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _shareUrl);
+        Snackbar.Add("Share URL copied to clipboard!", Severity.Success);
+    }
+
+    private async Task CopyEmbedCode()
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _embedCode);
+        Snackbar.Add("Embed code copied to clipboard!", Severity.Success);
+    }
+
+    private async Task CopyJsEmbedCode()
+    {
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _jsEmbedCode);
+        Snackbar.Add("JavaScript code copied to clipboard!", Severity.Success);
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

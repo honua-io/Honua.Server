@@ -1,0 +1,115 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Server.Core.Models.Dashboard
+
+<div class="kpi-widget">
+    @if (Config != null && _value.HasValue)
+    {
+        <MudPaper Class="pa-6 d-flex flex-column align-center justify-center" Elevation="2"
+                  Style="@($"height: 100%; background-color: {Config.Color ?? "#f5f5f5"};")">
+            @if (!string.IsNullOrEmpty(Config.Icon))
+            {
+                <MudIcon Icon="@Config.Icon" Size="Size.Large" Class="mb-3" />
+            }
+
+            <MudText Typo="Typo.h3" Class="font-weight-bold">
+                @FormatValue(_value.Value)
+            </MudText>
+
+            @if (Config.ShowTrend && _trend != 0)
+            {
+                <MudChip Size="Size.Small" Class="mt-2"
+                         Color="@(_trend > 0 ? Color.Success : Color.Error)"
+                         Icon="@(_trend > 0 ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)">
+                    @Math.Abs(_trend).ToString("0.0")%
+                </MudChip>
+            }
+        </MudPaper>
+    }
+    else if (Config == null)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Default">Configure KPI settings</MudText>
+    }
+    else
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+</div>
+
+@code {
+    [Parameter]
+    public KpiWidgetConfig? Config { get; set; }
+
+    [Parameter]
+    public WidgetDataSource? DataSource { get; set; }
+
+    [Parameter]
+    public List<Dictionary<string, object>>? Data { get; set; }
+
+    private double? _value;
+    private double _trend = 0;
+
+    protected override void OnParametersSet()
+    {
+        if (Config != null && Data != null && Data.Any())
+        {
+            CalculateValue();
+        }
+    }
+
+    private void CalculateValue()
+    {
+        if (Config == null || Data == null || !Data.Any())
+        {
+            _value = null;
+            return;
+        }
+
+        var values = Data
+            .Where(d => d.ContainsKey(Config.ValueField))
+            .Select(d => d[Config.ValueField])
+            .Where(v => v != null)
+            .Select(v => Convert.ToDouble(v))
+            .ToList();
+
+        if (!values.Any())
+        {
+            _value = null;
+            return;
+        }
+
+        _value = Config.Aggregation.ToLower() switch
+        {
+            "sum" => values.Sum(),
+            "avg" or "average" => values.Average(),
+            "count" => values.Count,
+            "min" => values.Min(),
+            "max" => values.Max(),
+            _ => values.Sum()
+        };
+
+        // Calculate trend (simplified - would need historical data for real trend)
+        if (Config.ShowTrend && values.Count > 1)
+        {
+            var recent = values.TakeLast(values.Count / 2).Average();
+            var previous = values.Take(values.Count / 2).Average();
+            if (previous != 0)
+            {
+                _trend = ((recent - previous) / previous) * 100;
+            }
+        }
+    }
+
+    private string FormatValue(double value)
+    {
+        var formatted = !string.IsNullOrEmpty(Config?.Format)
+            ? value.ToString(Config.Format)
+            : value.ToString("N0");
+
+        var prefix = Config?.Prefix ?? "";
+        var suffix = Config?.Suffix ?? "";
+
+        return $"{prefix}{formatted}{suffix}";
+    }
+}

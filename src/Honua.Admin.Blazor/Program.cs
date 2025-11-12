@@ -71,6 +71,11 @@ builder.Services.AddScoped<DraftStorageService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<DataExportService>();
 
+// Register onboarding and tutorial services
+builder.Services.AddScoped<TourService>();
+builder.Services.AddScoped<OnboardingService>();
+builder.Services.AddScoped<SampleDataLoader>();
+
 // SECURITY: Register user context service for tenant isolation and user identity extraction
 builder.Services.AddScoped<UserContextService>();
 

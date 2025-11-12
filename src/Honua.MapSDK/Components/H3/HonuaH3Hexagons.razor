@@ -1,0 +1,435 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-h3-hexagons @CssClass" @ref="_containerRef" id="@Id">
+    @if (ShowControls)
+    {
+        <div class="honua-h3-controls">
+            <div class="honua-h3-header">
+                <h3>H3 Hexagonal Binning</h3>
+                <button class="honua-h3-close" @onclick="ToggleControls" title="Hide controls">×</button>
+            </div>
+
+            <div class="honua-h3-control-group">
+                <label for="@($"{Id}-resolution")">
+                    Resolution: <span class="honua-h3-value">@_currentResolution</span>
+                    <small>(@GetResolutionInfo())</small>
+                </label>
+                <input
+                    id="@($"{Id}-resolution")"
+                    type="range"
+                    min="0"
+                    max="15"
+                    step="1"
+                    value="@_currentResolution"
+                    @oninput="OnResolutionChanged"
+                    class="honua-h3-slider" />
+            </div>
+
+            <div class="honua-h3-control-group">
+                <label for="@($"{Id}-aggregation")">Aggregation</label>
+                <select
+                    id="@($"{Id}-aggregation")"
+                    value="@_currentAggregation"
+                    @onchange="OnAggregationChanged"
+                    class="honua-h3-select">
+                    <option value="count">Count</option>
+                    <option value="sum">Sum</option>
+                    <option value="average">Average</option>
+                    <option value="min">Minimum</option>
+                    <option value="max">Maximum</option>
+                    <option value="stddev">Std Deviation</option>
+                    <option value="median">Median</option>
+                </select>
+            </div>
+
+            @if (_currentAggregation != "count" && _availableProperties.Count > 0)
+            {
+                <div class="honua-h3-control-group">
+                    <label for="@($"{Id}-value-field")">Value Field</label>
+                    <select
+                        id="@($"{Id}-value-field")"
+                        value="@(_currentValueField ?? "")"
+                        @onchange="OnValueFieldChanged"
+                        class="honua-h3-select">
+                        <option value="">Select field...</option>
+                        @foreach (var prop in _availableProperties)
+                        {
+                            <option value="@prop">@prop</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            <div class="honua-h3-control-group">
+                <label for="@($"{Id}-opacity")">
+                    Opacity: <span class="honua-h3-value">@((_currentOpacity * 100).ToString("F0"))%</span>
+                </label>
+                <input
+                    id="@($"{Id}-opacity")"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value="@_currentOpacity"
+                    @oninput="OnOpacityChanged"
+                    class="honua-h3-slider" />
+            </div>
+
+            <div class="honua-h3-control-group">
+                <label for="@($"{Id}-color-scheme")">Color Scheme</label>
+                <select
+                    id="@($"{Id}-color-scheme")"
+                    value="@_currentColorScheme"
+                    @onchange="OnColorSchemeChanged"
+                    class="honua-h3-select">
+                    <option value="YlOrRd">Yellow-Orange-Red</option>
+                    <option value="Blues">Blues</option>
+                    <option value="Greens">Greens</option>
+                    <option value="Viridis">Viridis</option>
+                    <option value="Plasma">Plasma</option>
+                    <option value="Inferno">Inferno</option>
+                    <option value="Turbo">Turbo</option>
+                </select>
+            </div>
+
+            <div class="honua-h3-control-group">
+                <button class="honua-h3-button" @onclick="RefreshHexagons">
+                    🔄 Refresh
+                </button>
+                <button class="honua-h3-button" @onclick="ClearHexagons">
+                    🗑️ Clear
+                </button>
+            </div>
+
+            @if (_hexagonStats != null)
+            {
+                <div class="honua-h3-stats">
+                    <h4>Statistics</h4>
+                    <div class="honua-h3-stat">
+                        <span>Hexagons:</span>
+                        <strong>@_hexagonStats.HexagonCount</strong>
+                    </div>
+                    <div class="honua-h3-stat">
+                        <span>Points:</span>
+                        <strong>@_hexagonStats.PointCount</strong>
+                    </div>
+                    <div class="honua-h3-stat">
+                        <span>Avg Area:</span>
+                        <strong>@FormatArea(_hexagonStats.AvgHexagonArea)</strong>
+                    </div>
+                    @if (_hexagonStats.MinValue.HasValue)
+                    {
+                        <div class="honua-h3-stat">
+                            <span>Min Value:</span>
+                            <strong>@_hexagonStats.MinValue.Value.ToString("N2")</strong>
+                        </div>
+                    }
+                    @if (_hexagonStats.MaxValue.HasValue)
+                    {
+                        <div class="honua-h3-stat">
+                            <span>Max Value:</span>
+                            <strong>@_hexagonStats.MaxValue.Value.ToString("N2")</strong>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (!ShowControls)
+    {
+        <button class="honua-h3-toggle" @onclick="ToggleControls" title="Show H3 controls">
+            ⬡ H3
+        </button>
+    }
+</div>
+
+@code {
+    private ElementReference _containerRef;
+    private IJSObjectReference? _module;
+    private IJSObjectReference? _layerRef;
+    private string _subscriptionId = Guid.NewGuid().ToString();
+    private List<string> _availableProperties = new();
+    private H3Stats? _hexagonStats;
+
+    // Current settings
+    private int _currentResolution = 7;
+    private string _currentAggregation = "count";
+    private string? _currentValueField;
+    private double _currentOpacity = 0.7;
+    private string _currentColorScheme = "YlOrRd";
+
+    [Parameter] public string Id { get; set; } = $"honua-h3-{Guid.NewGuid():N}";
+    [Parameter] public string CssClass { get; set; } = "";
+    [Parameter] public bool ShowControls { get; set; } = true;
+    [Parameter] public int Resolution { get; set; } = 7;
+    [Parameter] public string Aggregation { get; set; } = "count";
+    [Parameter] public string? ValueField { get; set; }
+    [Parameter] public double Opacity { get; set; } = 0.7;
+    [Parameter] public string ColorScheme { get; set; } = "YlOrRd";
+    [Parameter] public bool AutoRefresh { get; set; } = true;
+    [Parameter] public string? SourceLayer { get; set; }
+    [Parameter] public EventCallback<H3HexagonClickEventArgs> OnHexagonClick { get; set; }
+    [Parameter] public EventCallback<H3Stats> OnStatsUpdated { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentResolution = Resolution;
+        _currentAggregation = Aggregation;
+        _currentValueField = ValueField;
+        _currentOpacity = Opacity;
+        _currentColorScheme = ColorScheme;
+
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _module = await JS.InvokeAsync<IJSObjectReference>("import",
+                    "./Components/H3/HonuaH3Hexagons.razor.js");
+
+                await InitializeH3Layer();
+
+                // Subscribe to map events
+                Bus.Subscribe<MapReadyMessage>(_subscriptionId, async msg => await OnMapReady(msg));
+                Bus.Subscribe<LayerAddedMessage>(_subscriptionId, async msg => await OnLayerAdded(msg));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing H3 hexagons: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task InitializeH3Layer()
+    {
+        if (_module == null) return;
+
+        var options = new
+        {
+            id = Id,
+            resolution = _currentResolution,
+            aggregation = _currentAggregation,
+            valueField = _currentValueField,
+            opacity = _currentOpacity,
+            colorScheme = _currentColorScheme,
+            sourceLayer = SourceLayer
+        };
+
+        _layerRef = await _module.InvokeAsync<IJSObjectReference>("initializeH3Layer", options);
+    }
+
+    private async Task OnMapReady(MapReadyMessage msg)
+    {
+        if (AutoRefresh)
+        {
+            await RefreshHexagons();
+        }
+    }
+
+    private async Task OnLayerAdded(LayerAddedMessage msg)
+    {
+        if (msg.LayerId == SourceLayer && AutoRefresh)
+        {
+            await RefreshHexagons();
+        }
+    }
+
+    public async Task RefreshHexagons()
+    {
+        if (_layerRef == null || _module == null) return;
+
+        try
+        {
+            var options = new
+            {
+                resolution = _currentResolution,
+                aggregation = _currentAggregation,
+                valueField = _currentValueField,
+                opacity = _currentOpacity,
+                colorScheme = _currentColorScheme
+            };
+
+            var result = await _module.InvokeAsync<JsonElement>("refreshHexagons", _layerRef, options);
+
+            // Update statistics
+            if (result.TryGetProperty("stats", out var stats))
+            {
+                _hexagonStats = new H3Stats
+                {
+                    HexagonCount = stats.GetProperty("hexagonCount").GetInt32(),
+                    PointCount = stats.GetProperty("pointCount").GetInt32(),
+                    AvgHexagonArea = stats.GetProperty("avgHexagonArea").GetDouble(),
+                    MinValue = stats.TryGetProperty("minValue", out var min) ? min.GetDouble() : null,
+                    MaxValue = stats.TryGetProperty("maxValue", out var max) ? max.GetDouble() : null
+                };
+
+                if (OnStatsUpdated.HasDelegate)
+                {
+                    await OnStatsUpdated.InvokeAsync(_hexagonStats);
+                }
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing H3 hexagons: {ex.Message}");
+        }
+    }
+
+    public async Task ClearHexagons()
+    {
+        if (_layerRef == null || _module == null) return;
+
+        try
+        {
+            await _module.InvokeVoidAsync("clearHexagons", _layerRef);
+            _hexagonStats = null;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error clearing H3 hexagons: {ex.Message}");
+        }
+    }
+
+    private async Task OnResolutionChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _currentResolution = value;
+            if (AutoRefresh)
+            {
+                await RefreshHexagons();
+            }
+        }
+    }
+
+    private async Task OnAggregationChanged(ChangeEventArgs e)
+    {
+        _currentAggregation = e.Value?.ToString() ?? "count";
+        if (AutoRefresh)
+        {
+            await RefreshHexagons();
+        }
+    }
+
+    private async Task OnValueFieldChanged(ChangeEventArgs e)
+    {
+        _currentValueField = e.Value?.ToString();
+        if (AutoRefresh)
+        {
+            await RefreshHexagons();
+        }
+    }
+
+    private async Task OnOpacityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            _currentOpacity = value;
+            if (AutoRefresh && _layerRef != null && _module != null)
+            {
+                await _module.InvokeVoidAsync("updateOpacity", _layerRef, value);
+            }
+        }
+    }
+
+    private async Task OnColorSchemeChanged(ChangeEventArgs e)
+    {
+        _currentColorScheme = e.Value?.ToString() ?? "YlOrRd";
+        if (AutoRefresh)
+        {
+            await RefreshHexagons();
+        }
+    }
+
+    private void ToggleControls()
+    {
+        ShowControls = !ShowControls;
+    }
+
+    private string GetResolutionInfo()
+    {
+        return _currentResolution switch
+        {
+            0 => "~4,250km edge",
+            1 => "~607km edge",
+            2 => "~87km edge",
+            3 => "~12km edge",
+            4 => "~1.8km edge",
+            5 => "~259m edge",
+            6 => "~37m edge",
+            7 => "~5.3m edge",
+            8 => "~0.76m edge",
+            9 => "~11cm edge",
+            10 => "~1.5cm edge",
+            11 => "~2.2mm edge",
+            12 => "~0.3mm edge",
+            13 => "~0.05mm edge",
+            14 => "~0.007mm edge",
+            15 => "~0.001mm edge",
+            _ => ""
+        };
+    }
+
+    private string FormatArea(double areaM2)
+    {
+        if (areaM2 >= 1_000_000)
+        {
+            return $"{(areaM2 / 1_000_000):N2} km²";
+        }
+        return $"{areaM2:N2} m²";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module != null)
+        {
+            try
+            {
+                if (_layerRef != null)
+                {
+                    await _module.InvokeVoidAsync("disposeH3Layer", _layerRef);
+                    await _layerRef.DisposeAsync();
+                }
+                await _module.DisposeAsync();
+            }
+            catch { }
+        }
+
+        Bus.Unsubscribe(_subscriptionId);
+    }
+}
+
+@code {
+    public class H3Stats
+    {
+        public int HexagonCount { get; set; }
+        public int PointCount { get; set; }
+        public double AvgHexagonArea { get; set; }
+        public double? MinValue { get; set; }
+        public double? MaxValue { get; set; }
+    }
+
+    public class H3HexagonClickEventArgs
+    {
+        public string H3Index { get; set; } = "";
+        public int Count { get; set; }
+        public double Value { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+    }
+}

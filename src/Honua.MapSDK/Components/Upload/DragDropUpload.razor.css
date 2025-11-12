@@ -1,0 +1,220 @@
+.honua-drag-drop-upload {
+    width: 100%;
+    position: relative;
+}
+
+.upload-zone {
+    border: 2px dashed #cbd5e0;
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #f7fafc;
+}
+
+.upload-zone:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.honua-drag-drop-upload.dragging .upload-zone {
+    border-color: #3b82f6;
+    background: #dbeafe;
+    border-style: solid;
+    transform: scale(1.02);
+}
+
+.upload-icon {
+    margin: 0 auto 16px;
+    color: #64748b;
+}
+
+.honua-drag-drop-upload.dragging .upload-icon {
+    color: #3b82f6;
+}
+
+.upload-text h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+}
+
+.upload-text p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 4px 0;
+}
+
+.upload-text p.max-size {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.processing-zone {
+    text-align: center;
+    padding: 48px 24px;
+    background: #f7fafc;
+    border-radius: 12px;
+}
+
+.processing-spinner {
+    margin: 0 auto 24px;
+    color: #3b82f6;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.processing-info h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 16px 0;
+}
+
+.detection-info {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    text-align: left;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.detection-info p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #475569;
+}
+
+.progress-bar {
+    width: 100%;
+    max-width: 400px;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 16px auto;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.progress-text {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.success-zone {
+    text-align: center;
+    padding: 48px 24px;
+    background: #f0fdf4;
+    border: 2px solid #86efac;
+    border-radius: 12px;
+}
+
+.success-icon {
+    margin: 0 auto 16px;
+    color: #10b981;
+}
+
+.success-info h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #065f46;
+    margin: 0 0 16px 0;
+}
+
+.data-summary {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px auto;
+    text-align: left;
+    max-width: 400px;
+}
+
+.data-summary p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #475569;
+}
+
+.reset-button {
+    margin-top: 16px;
+    padding: 10px 24px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reset-button:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    color: #991b1b;
+}
+
+.error-message svg {
+    flex-shrink: 0;
+}
+
+.error-message span {
+    flex: 1;
+    font-size: 14px;
+}
+
+.close-error {
+    background: none;
+    border: none;
+    color: #991b1b;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.close-error:hover {
+    background: #fee2e2;
+}

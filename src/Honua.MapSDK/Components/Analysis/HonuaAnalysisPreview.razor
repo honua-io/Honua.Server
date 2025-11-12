@@ -1,0 +1,337 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+@using Microsoft.JSInterop
+@using System.Text.Json
+@inject IJSRuntime JS
+
+<div class="honua-analysis-preview @CssClass">
+    @if (ShowControls)
+    {
+        <div class="preview-controls">
+            <div class="preview-header">
+                <h3>@Title</h3>
+                @if (IsLoading)
+                {
+                    <span class="preview-loading">
+                        <span class="spinner"></span>
+                        Loading preview...
+                    </span>
+                }
+                else if (PreviewMetadata != null)
+                {
+                    <span class="preview-info">
+                        @PreviewMetadata.PreviewFeatures features
+                        (@PreviewMetadata.ExecutionTimeMs ms)
+                    </span>
+                }
+            </div>
+
+            @if (Parameters != null)
+            {
+                <div class="parameter-controls">
+                    @ParameterControls
+                </div>
+            }
+
+            <div class="preview-actions">
+                <button class="btn btn-preview" @onclick="RefreshPreview" disabled="@IsLoading">
+                    Refresh Preview
+                </button>
+                <button class="btn btn-execute" @onclick="ExecuteFull" disabled="@IsLoading">
+                    Execute Full Operation
+                </button>
+                <button class="btn btn-clear" @onclick="ClearPreview">
+                    Clear
+                </button>
+            </div>
+
+            @if (ValidationMessages.Any())
+            {
+                <div class="validation-messages">
+                    @foreach (var message in ValidationMessages)
+                    {
+                        <div class="validation-message @message.Type">
+                            @message.Text
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Map view ID to attach preview layer to.
+    /// </summary>
+    [Parameter]
+    public string? MapViewId { get; set; }
+
+    /// <summary>
+    /// Process ID to preview.
+    /// </summary>
+    [Parameter]
+    public required string ProcessId { get; set; }
+
+    /// <summary>
+    /// Input parameters for the process.
+    /// </summary>
+    [Parameter]
+    public Dictionary<string, object>? Parameters { get; set; }
+
+    /// <summary>
+    /// Custom parameter controls.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ParameterControls { get; set; }
+
+    /// <summary>
+    /// Title of the preview panel.
+    /// </summary>
+    [Parameter]
+    public string Title { get; set; } = "Analysis Preview";
+
+    /// <summary>
+    /// Show controls panel.
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Enable streaming preview.
+    /// </summary>
+    [Parameter]
+    public bool Stream { get; set; }
+
+    /// <summary>
+    /// Maximum features to show in preview.
+    /// </summary>
+    [Parameter]
+    public int MaxFeatures { get; set; } = 100;
+
+    /// <summary>
+    /// Enable spatial sampling.
+    /// </summary>
+    [Parameter]
+    public bool SpatialSampling { get; set; } = true;
+
+    /// <summary>
+    /// Simplify geometries for faster rendering.
+    /// </summary>
+    [Parameter]
+    public bool Simplify { get; set; } = true;
+
+    /// <summary>
+    /// Auto-refresh preview when parameters change.
+    /// </summary>
+    [Parameter]
+    public bool AutoRefresh { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class.
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Callback when preview is loaded.
+    /// </summary>
+    [Parameter]
+    public EventCallback<PreviewResult> OnPreviewLoaded { get; set; }
+
+    /// <summary>
+    /// Callback when full execution is requested.
+    /// </summary>
+    [Parameter]
+    public EventCallback<Dictionary<string, object>> OnExecute { get; set; }
+
+    private bool IsLoading { get; set; }
+    private PreviewMetadata? PreviewMetadata { get; set; }
+    private List<ValidationMessage> ValidationMessages { get; set; } = new();
+    private IJSObjectReference? _previewLayerModule;
+    private string? _previewLayerId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _previewLayerModule = await JS.InvokeAsync<IJSObjectReference>(
+            "import", "./Components/Analysis/preview-layer.js");
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AutoRefresh && Parameters != null)
+        {
+            await ValidateAndPreview();
+        }
+    }
+
+    private async Task ValidateAndPreview()
+    {
+        if (Parameters == null) return;
+
+        ValidationMessages.Clear();
+
+        // Validate inputs first
+        await ValidateInputs();
+
+        // Only preview if no errors
+        if (!ValidationMessages.Any(m => m.Type == "error"))
+        {
+            await RefreshPreview();
+        }
+    }
+
+    private async Task ValidateInputs()
+    {
+        if (Parameters == null) return;
+
+        try
+        {
+            var response = await JS.InvokeAsync<JsonElement>(
+                "fetch",
+                $"/processes/{ProcessId}/validate",
+                new
+                {
+                    method = "POST",
+                    headers = new { ContentType = "application/json" },
+                    body = JsonSerializer.Serialize(Parameters)
+                });
+
+            if (response.TryGetProperty("valid", out var valid) && valid.GetBoolean())
+            {
+                if (response.TryGetProperty("warnings", out var warnings))
+                {
+                    foreach (var warning in warnings.EnumerateArray())
+                    {
+                        ValidationMessages.Add(new ValidationMessage
+                        {
+                            Type = "warning",
+                            Text = warning.GetString() ?? ""
+                        });
+                    }
+                }
+            }
+            else if (response.TryGetProperty("errors", out var errors))
+            {
+                foreach (var error in errors.EnumerateArray())
+                {
+                    ValidationMessages.Add(new ValidationMessage
+                    {
+                        Type = "error",
+                        Text = error.GetString() ?? ""
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ValidationMessages.Add(new ValidationMessage
+            {
+                Type = "error",
+                Text = $"Validation failed: {ex.Message}"
+            });
+        }
+    }
+
+    private async Task RefreshPreview()
+    {
+        if (Parameters == null) return;
+
+        IsLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var url = $"/processes/{ProcessId}/preview?" +
+                      $"maxFeatures={MaxFeatures}&" +
+                      $"spatialSampling={SpatialSampling}&" +
+                      $"simplify={Simplify}&" +
+                      $"stream={Stream}";
+
+            if (_previewLayerModule != null)
+            {
+                var result = await _previewLayerModule.InvokeAsync<PreviewResult>(
+                    "loadPreview",
+                    MapViewId,
+                    url,
+                    Parameters);
+
+                if (result?.Metadata != null)
+                {
+                    PreviewMetadata = result.Metadata;
+                    _previewLayerId = result.LayerId;
+
+                    await OnPreviewLoaded.InvokeAsync(result);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ValidationMessages.Add(new ValidationMessage
+            {
+                Type = "error",
+                Text = $"Preview failed: {ex.Message}"
+            });
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearPreview()
+    {
+        if (_previewLayerModule != null && _previewLayerId != null)
+        {
+            await _previewLayerModule.InvokeVoidAsync("clearPreview", MapViewId, _previewLayerId);
+            _previewLayerId = null;
+            PreviewMetadata = null;
+            ValidationMessages.Clear();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExecuteFull()
+    {
+        if (Parameters != null)
+        {
+            await OnExecute.InvokeAsync(Parameters);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await ClearPreview();
+
+        if (_previewLayerModule != null)
+        {
+            await _previewLayerModule.DisposeAsync();
+        }
+    }
+
+    public class PreviewResult
+    {
+        public string? LayerId { get; set; }
+        public PreviewMetadata? Metadata { get; set; }
+        public JsonElement? Data { get; set; }
+    }
+
+    public class PreviewMetadata
+    {
+        public bool IsPreview { get; set; }
+        public long? TotalFeatures { get; set; }
+        public int PreviewFeatures { get; set; }
+        public bool SpatialSampling { get; set; }
+        public bool Simplified { get; set; }
+        public long ExecutionTimeMs { get; set; }
+        public string? Message { get; set; }
+        public List<string>? Warnings { get; set; }
+    }
+
+    private class ValidationMessage
+    {
+        public required string Type { get; set; }
+        public required string Text { get; set; }
+    }
+}

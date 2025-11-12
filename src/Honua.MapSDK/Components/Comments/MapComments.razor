@@ -1,0 +1,451 @@
+@*
+Copyright (c) 2025 HonuaIO
+Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.Text.Json
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject ILogger<MapComments> Logger
+@implements IAsyncDisposable
+
+<div class="honua-map-comments">
+    @if (ShowPanel)
+    {
+        <div class="comments-panel @(IsPanelCollapsed ? "collapsed" : "")">
+            <div class="panel-header">
+                <h3>
+                    Comments (@Comments.Count)
+                    @if (UnreadCount > 0)
+                    {
+                        <span class="badge badge-primary">@UnreadCount new</span>
+                    }
+                </h3>
+                <div class="panel-actions">
+                    @if (!IsPanelCollapsed)
+                    {
+                        <button class="btn btn-sm" @onclick="ToggleFilters">
+                            <i class="icon-filter"></i> Filters
+                        </button>
+                    }
+                    <button class="btn btn-sm" @onclick="TogglePanel">
+                        <i class="icon-@(IsPanelCollapsed ? "expand" : "collapse")"></i>
+                    </button>
+                </div>
+            </div>
+
+            @if (!IsPanelCollapsed)
+            {
+                @if (ShowFilters)
+                {
+                    <div class="filters-section">
+                        <select @bind="FilterStatus" @bind:after="ApplyFilters">
+                            <option value="">All Status</option>
+                            <option value="open">Open</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                        <select @bind="FilterCategory" @bind:after="ApplyFilters">
+                            <option value="">All Categories</option>
+                            @foreach (var cat in Categories)
+                            {
+                                <option value="@cat">@cat</option>
+                            }
+                        </select>
+                        <select @bind="FilterPriority" @bind:after="ApplyFilters">
+                            <option value="">All Priorities</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                }
+
+                <div class="comments-list">
+                    @if (IsLoading)
+                    {
+                        <div class="loading">Loading comments...</div>
+                    }
+                    else if (FilteredComments.Count == 0)
+                    {
+                        <div class="no-comments">No comments yet. Click on the map to add one!</div>
+                    }
+                    else
+                    {
+                        @foreach (var comment in FilteredComments)
+                        {
+                            <CommentItem Comment="@comment"
+                                        OnReply="HandleReply"
+                                        OnResolve="HandleResolve"
+                                        OnDelete="HandleDelete"
+                                        OnReaction="HandleReaction"
+                                        OnSelect="HandleSelectComment" />
+                        }
+                    }
+                </div>
+
+                @if (IsAddingComment)
+                {
+                    <div class="comment-editor">
+                        <h4>@(ReplyToComment != null ? "Reply" : "New Comment")</h4>
+                        <textarea @bind="NewCommentText"
+                                 placeholder="Enter your comment... (use @username to mention)"
+                                 rows="4"></textarea>
+
+                        <div class="editor-toolbar">
+                            <div class="comment-options">
+                                <select @bind="NewCommentPriority">
+                                    <option value="low">Low Priority</option>
+                                    <option value="medium">Medium Priority</option>
+                                    <option value="high">High Priority</option>
+                                    <option value="critical">Critical</option>
+                                </select>
+                                <input type="text" @bind="NewCommentCategory" placeholder="Category" />
+                                <input type="color" @bind="NewCommentColor" title="Marker color" />
+                            </div>
+                            <div class="editor-actions">
+                                <button class="btn btn-secondary" @onclick="CancelComment">Cancel</button>
+                                <button class="btn btn-primary" @onclick="SubmitComment" disabled="@IsSaving">
+                                    @(IsSaving ? "Saving..." : "Post Comment")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    @if (ShowMapMarkers)
+    {
+        <div id="@MarkersContainerId" class="comments-markers-container"></div>
+    }
+</div>
+
+@code {
+    [Parameter] public string MapId { get; set; } = string.Empty;
+    [Parameter] public string ApiBaseUrl { get; set; } = "/api/v1";
+    [Parameter] public bool ShowPanel { get; set; } = true;
+    [Parameter] public bool ShowMapMarkers { get; set; } = true;
+    [Parameter] public bool EnableRealTime { get; set; } = true;
+    [Parameter] public string[] Categories { get; set; } = Array.Empty<string>();
+    [Parameter] public EventCallback<MapComment> OnCommentCreated { get; set; }
+    [Parameter] public EventCallback<MapComment> OnCommentSelected { get; set; }
+
+    private List<MapComment> Comments { get; set; } = new();
+    private List<MapComment> FilteredComments => FilterComments();
+    private bool IsLoading { get; set; }
+    private bool IsSaving { get; set; }
+    private bool IsPanelCollapsed { get; set; }
+    private bool ShowFilters { get; set; }
+    private bool IsAddingComment { get; set; }
+    private int UnreadCount { get; set; }
+
+    private string? FilterStatus { get; set; }
+    private string? FilterCategory { get; set; }
+    private string? FilterPriority { get; set; }
+
+    private string NewCommentText { get; set; } = string.Empty;
+    private string NewCommentPriority { get; set; } = "medium";
+    private string? NewCommentCategory { get; set; }
+    private string NewCommentColor { get; set; } = "#FF5733";
+    private MapComment? ReplyToComment { get; set; }
+    private double? ClickedLongitude { get; set; }
+    private double? ClickedLatitude { get; set; }
+
+    private string MarkersContainerId { get; set; } = $"map-comment-markers-{Guid.NewGuid()}";
+    private HubConnection? _hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadComments();
+
+        if (EnableRealTime)
+        {
+            await SetupSignalR();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && ShowMapMarkers)
+        {
+            await RenderMapMarkers();
+        }
+    }
+
+    private async Task LoadComments()
+    {
+        IsLoading = true;
+        try
+        {
+            var url = $"{ApiBaseUrl}/maps/{MapId}/comments";
+            var response = await Http.GetFromJsonAsync<List<MapComment>>(url);
+            if (response != null)
+            {
+                Comments = response;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load comments for map {MapId}", MapId);
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SetupSignalR()
+    {
+        try
+        {
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl($"{ApiBaseUrl.Replace("/api/v1", "")}/hubs/comments")
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hubConnection.On<MapComment>("CommentCreated", async (comment) =>
+            {
+                if (comment.MapId == MapId)
+                {
+                    Comments.Add(comment);
+                    UnreadCount++;
+                    await InvokeAsync(StateHasChanged);
+                    await RenderMapMarkers();
+                }
+            });
+
+            _hubConnection.On<MapComment>("CommentUpdated", async (comment) =>
+            {
+                if (comment.MapId == MapId)
+                {
+                    var existing = Comments.FirstOrDefault(c => c.Id == comment.Id);
+                    if (existing != null)
+                    {
+                        var index = Comments.IndexOf(existing);
+                        Comments[index] = comment;
+                        await InvokeAsync(StateHasChanged);
+                        await RenderMapMarkers();
+                    }
+                }
+            });
+
+            _hubConnection.On<CommentDeletedEvent>("CommentDeleted", async (evt) =>
+            {
+                if (evt.MapId == MapId)
+                {
+                    var comment = Comments.FirstOrDefault(c => c.Id == evt.CommentId);
+                    if (comment != null)
+                    {
+                        Comments.Remove(comment);
+                        await InvokeAsync(StateHasChanged);
+                        await RenderMapMarkers();
+                    }
+                }
+            });
+
+            await _hubConnection.StartAsync();
+            await _hubConnection.InvokeAsync("JoinMap", MapId);
+
+            Logger.LogInformation("Connected to CommentHub for map {MapId}", MapId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to connect to CommentHub");
+        }
+    }
+
+    public async Task StartAddingComment(double longitude, double latitude)
+    {
+        ClickedLongitude = longitude;
+        ClickedLatitude = latitude;
+        IsAddingComment = true;
+        ReplyToComment = null;
+        NewCommentText = string.Empty;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SubmitComment()
+    {
+        if (string.IsNullOrWhiteSpace(NewCommentText))
+            return;
+
+        IsSaving = true;
+        try
+        {
+            var request = new
+            {
+                CommentText = NewCommentText,
+                Priority = NewCommentPriority,
+                Category = NewCommentCategory,
+                Color = NewCommentColor,
+                ParentId = ReplyToComment?.Id,
+                Longitude = ClickedLongitude,
+                Latitude = ClickedLatitude,
+                GeometryType = "point"
+            };
+
+            var url = $"{ApiBaseUrl}/maps/{MapId}/comments";
+            var response = await Http.PostAsJsonAsync(url, request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var comment = await response.Content.ReadFromJsonAsync<MapComment>();
+                if (comment != null)
+                {
+                    await OnCommentCreated.InvokeAsync(comment);
+                }
+                CancelComment();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create comment");
+        }
+        finally
+        {
+            IsSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CancelComment()
+    {
+        IsAddingComment = false;
+        ReplyToComment = null;
+        NewCommentText = string.Empty;
+        NewCommentCategory = null;
+        ClickedLongitude = null;
+        ClickedLatitude = null;
+        StateHasChanged();
+    }
+
+    private void HandleReply(MapComment comment)
+    {
+        ReplyToComment = comment;
+        IsAddingComment = true;
+        StateHasChanged();
+    }
+
+    private async Task HandleResolve(MapComment comment)
+    {
+        try
+        {
+            var url = $"{ApiBaseUrl}/maps/{MapId}/comments/{comment.Id}/resolve";
+            await Http.PostAsync(url, null);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to resolve comment {CommentId}", comment.Id);
+        }
+    }
+
+    private async Task HandleDelete(MapComment comment)
+    {
+        try
+        {
+            var url = $"{ApiBaseUrl}/maps/{MapId}/comments/{comment.Id}";
+            await Http.DeleteAsync(url);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete comment {CommentId}", comment.Id);
+        }
+    }
+
+    private async Task HandleReaction(MapComment comment, string reactionType)
+    {
+        try
+        {
+            var url = $"{ApiBaseUrl}/maps/{MapId}/comments/{comment.Id}/reactions";
+            await Http.PostAsJsonAsync(url, new { ReactionType = reactionType });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to add reaction to comment {CommentId}", comment.Id);
+        }
+    }
+
+    private async Task HandleSelectComment(MapComment comment)
+    {
+        await OnCommentSelected.InvokeAsync(comment);
+    }
+
+    private void TogglePanel()
+    {
+        IsPanelCollapsed = !IsPanelCollapsed;
+    }
+
+    private void ToggleFilters()
+    {
+        ShowFilters = !ShowFilters;
+    }
+
+    private void ApplyFilters()
+    {
+        StateHasChanged();
+    }
+
+    private List<MapComment> FilterComments()
+    {
+        var filtered = Comments.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(FilterStatus))
+            filtered = filtered.Where(c => c.Status == FilterStatus);
+
+        if (!string.IsNullOrEmpty(FilterCategory))
+            filtered = filtered.Where(c => c.Category == FilterCategory);
+
+        if (!string.IsNullOrEmpty(FilterPriority))
+            filtered = filtered.Where(c => c.Priority == FilterPriority);
+
+        return filtered.OrderByDescending(c => c.CreatedAt).ToList();
+    }
+
+    private async Task RenderMapMarkers()
+    {
+        if (!ShowMapMarkers) return;
+
+        try
+        {
+            var markers = Comments
+                .Where(c => c.Longitude.HasValue && c.Latitude.HasValue)
+                .Select(c => new
+                {
+                    id = c.Id,
+                    longitude = c.Longitude,
+                    latitude = c.Latitude,
+                    color = c.Color ?? "#FF5733",
+                    status = c.Status,
+                    priority = c.Priority
+                });
+
+            await JSRuntime.InvokeVoidAsync("HonuaComments.renderMarkers", MarkersContainerId, markers);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to render map markers");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            try
+            {
+                await _hubConnection.InvokeAsync("LeaveMap", MapId);
+                await _hubConnection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error disposing CommentHub connection");
+            }
+        }
+    }
+
+    private record CommentDeletedEvent(string MapId, string CommentId);
+}

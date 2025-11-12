@@ -1,0 +1,128 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+<div class="parameter-control clip-control">
+    <label class="parameter-label">
+        Clip Geometry Selection
+    </label>
+
+    <div class="geometry-selector">
+        @if (AvailableGeometries != null && AvailableGeometries.Any())
+        {
+            @foreach (var geometry in AvailableGeometries)
+            {
+                <div class="geometry-item @(geometry.Id == SelectedGeometryId ? "selected" : "")"
+                     @onclick="() => SelectGeometry(geometry.Id)">
+                    <div class="geometry-icon">
+                        @GetGeometryIcon(geometry.Type)
+                    </div>
+                    <div class="geometry-name">@geometry.Name</div>
+                    @if (geometry.FeatureCount > 0)
+                    {
+                        <div class="geometry-count">
+                            @geometry.FeatureCount features
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            <div class="no-geometries">
+                <p>No clip geometries available. Draw or import a geometry to use as clip boundary.</p>
+                @if (ShowDrawButton)
+                {
+                    <button class="btn btn-primary" @onclick="OnDrawClipGeometry">
+                        Draw Clip Area
+                    </button>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="parameter-options">
+        <div class="option-group">
+            <label class="option-checkbox">
+                <input type="checkbox"
+                       checked="@PreserveOriginalExtent"
+                       @onchange="OnPreserveExtentChanged" />
+                <span>Preserve original extent</span>
+            </label>
+        </div>
+
+        <div class="option-group">
+            <label class="option-checkbox">
+                <input type="checkbox"
+                       checked="@MaintainTopology"
+                       @onchange="OnMaintainTopologyChanged" />
+                <span>Maintain topology</span>
+            </label>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? SelectedGeometryId { get; set; }
+
+    [Parameter]
+    public EventCallback<string> SelectedGeometryIdChanged { get; set; }
+
+    [Parameter]
+    public List<GeometryInfo>? AvailableGeometries { get; set; }
+
+    [Parameter]
+    public bool PreserveOriginalExtent { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> PreserveOriginalExtentChanged { get; set; }
+
+    [Parameter]
+    public bool MaintainTopology { get; set; } = true;
+
+    [Parameter]
+    public EventCallback<bool> MaintainTopologyChanged { get; set; }
+
+    [Parameter]
+    public bool ShowDrawButton { get; set; } = true;
+
+    [Parameter]
+    public EventCallback OnDrawClipGeometry { get; set; }
+
+    private async Task SelectGeometry(string geometryId)
+    {
+        SelectedGeometryId = geometryId;
+        await SelectedGeometryIdChanged.InvokeAsync(geometryId);
+    }
+
+    private async Task OnPreserveExtentChanged(ChangeEventArgs e)
+    {
+        PreserveOriginalExtent = e.Value as bool? ?? false;
+        await PreserveOriginalExtentChanged.InvokeAsync(PreserveOriginalExtent);
+    }
+
+    private async Task OnMaintainTopologyChanged(ChangeEventArgs e)
+    {
+        MaintainTopology = e.Value as bool? ?? true;
+        await MaintainTopologyChanged.InvokeAsync(MaintainTopology);
+    }
+
+    private string GetGeometryIcon(string geometryType)
+    {
+        return geometryType.ToLowerInvariant() switch
+        {
+            "polygon" or "multipolygon" => "⬟",
+            "linestring" or "multilinestring" => "―",
+            "point" or "multipoint" => "●",
+            _ => "◆"
+        };
+    }
+
+    public class GeometryInfo
+    {
+        public required string Id { get; set; }
+        public required string Name { get; set; }
+        public required string Type { get; set; }
+        public int FeatureCount { get; set; }
+    }
+}

@@ -1,0 +1,262 @@
+@using Honua.Admin.Blazor.Services
+@inject OnboardingService OnboardingService
+@inject TourService TourService
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+@if (_progress != null && !_progress.IsDismissed)
+{
+    <MudCard Class="mb-4" Elevation="2">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <div class="d-flex align-items-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Rocket" Class="mr-2" Color="Color.Primary" />
+                    <MudText Typo="Typo.h6">Getting Started with Honua</MudText>
+                </div>
+            </CardHeaderContent>
+            <CardHeaderActions>
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Size="Size.Small"
+                               OnClick="DismissChecklist"
+                               Title="Dismiss checklist" />
+            </CardHeaderActions>
+        </MudCardHeader>
+
+        <MudCardContent>
+            @if (_progress.IsFullyCompleted)
+            {
+                <MudAlert Severity="Severity.Success" Icon="@Icons.Material.Filled.Celebration" Class="mb-3">
+                    <MudText Typo="Typo.body1">
+                        <strong>Congratulations!</strong> You've completed all onboarding tasks!
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="mt-1">
+                        You're now ready to unlock the full potential of Honua. Great job!
+                    </MudText>
+                </MudAlert>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @_progress.CompletedItemsCount of @_progress.TotalItemsCount tasks completed
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Primary">
+                            <strong>@_progress.ProgressPercentage%</strong>
+                        </MudText>
+                    </div>
+                    <MudProgressLinear Value="@_progress.ProgressPercentage"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Class="mb-3" />
+                </div>
+            }
+
+            @* Group items by category *@
+            @foreach (var category in GetCategories())
+            {
+                var itemsInCategory = _progress.ChecklistItems.Where(i => i.Category == category).ToList();
+
+                <MudText Typo="Typo.subtitle2" Class="mt-3 mb-2" Color="Color.Secondary">
+                    @category
+                </MudText>
+
+                @foreach (var item in itemsInCategory)
+                {
+                    <div class="checklist-item d-flex align-items-start mb-2 pa-2 rounded"
+                         style="@(item.IsCompleted ? "opacity: 0.6;" : "")">
+                        <MudCheckBox T="bool"
+                                     Checked="@item.IsCompleted"
+                                     CheckedChanged="@(async (bool isChecked) => await ToggleItemAsync(item.Id, isChecked))"
+                                     Color="Color.Success"
+                                     Class="mt-n1" />
+
+                        <div class="flex-grow-1 ml-2">
+                            <MudText Typo="Typo.body1"
+                                     Class="@(item.IsCompleted ? "text-decoration-line-through" : "")">
+                                <strong>@item.Title</strong>
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @item.Description
+                            </MudText>
+
+                            <div class="mt-1">
+                                @if (!string.IsNullOrEmpty(item.TourId))
+                                {
+                                    <MudButton Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.PlayCircle"
+                                               Color="Color.Primary"
+                                               Variant="Variant.Text"
+                                               OnClick="@(() => StartTourAsync(item.TourId, item.Id))">
+                                        Start Tour
+                                    </MudButton>
+                                }
+
+                                @if (!string.IsNullOrEmpty(item.ActionUrl))
+                                {
+                                    <MudButton Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.ArrowForward"
+                                               Color="Color.Primary"
+                                               Variant="Variant.Text"
+                                               OnClick="@(() => NavigateToAction(item.ActionUrl))">
+                                        Go There
+                                    </MudButton>
+                                }
+
+                                @if (item.IsCompleted && item.CompletedAt.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Success" Class="ml-2 d-inline">
+                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                        Completed @FormatCompletedDate(item.CompletedAt.Value)
+                                    </MudText>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </MudCardContent>
+
+        @if (!_progress.IsFullyCompleted)
+        {
+            <MudCardActions>
+                <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                           Color="Color.Default"
+                           Variant="Variant.Text"
+                           OnClick="ResetProgressAsync">
+                    Reset Progress
+                </MudButton>
+            </MudCardActions>
+        }
+    </MudCard>
+}
+
+@code {
+    private OnboardingProgress? _progress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _progress = await OnboardingService.GetProgressAsync();
+
+        // Subscribe to progress changes
+        OnboardingService.OnProgressChanged += HandleProgressChanged;
+
+        // Subscribe to tour completion events
+        TourService.OnTourCompleted += HandleTourCompleted;
+    }
+
+    private async Task HandleProgressChanged()
+    {
+        _progress = await OnboardingService.GetProgressAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleTourCompleted(string tourId)
+    {
+        // Find checklist item associated with this tour
+        var item = _progress?.ChecklistItems.FirstOrDefault(i => i.TourId == tourId);
+        if (item != null && !item.IsCompleted)
+        {
+            await OnboardingService.CompleteItemAsync(item.Id);
+        }
+    }
+
+    private async Task ToggleItemAsync(string itemId, bool isCompleted)
+    {
+        if (isCompleted)
+        {
+            await OnboardingService.CompleteItemAsync(itemId);
+        }
+        else
+        {
+            await OnboardingService.UncompleteItemAsync(itemId);
+        }
+    }
+
+    private async Task StartTourAsync(string tourId, string itemId)
+    {
+        var tour = TourDefinitions.GetTourById(tourId);
+        if (tour != null)
+        {
+            try
+            {
+                await TourService.StartTourAsync(tourId, tour);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to start tour: {ex.Message}");
+            }
+        }
+    }
+
+    private void NavigateToAction(string url)
+    {
+        Navigation.NavigateTo(url);
+    }
+
+    private async Task DismissChecklist()
+    {
+        await OnboardingService.DismissChecklistAsync();
+    }
+
+    private async Task ResetProgressAsync()
+    {
+        await OnboardingService.ResetProgressAsync();
+    }
+
+    private List<string> GetCategories()
+    {
+        if (_progress == null) return new List<string>();
+
+        return _progress.ChecklistItems
+            .Select(i => i.Category)
+            .Distinct()
+            .OrderBy(c => GetCategoryOrder(c))
+            .ToList();
+    }
+
+    private int GetCategoryOrder(string category) => category switch
+    {
+        "Getting Started" => 1,
+        "Data Management" => 2,
+        "Visualization" => 3,
+        "Collaboration" => 4,
+        "Advanced" => 5,
+        _ => 99
+    };
+
+    private string FormatCompletedDate(DateTimeOffset date)
+    {
+        var elapsed = DateTimeOffset.UtcNow - date;
+
+        if (elapsed.TotalMinutes < 1)
+            return "just now";
+        if (elapsed.TotalHours < 1)
+            return $"{(int)elapsed.TotalMinutes}m ago";
+        if (elapsed.TotalDays < 1)
+            return $"{(int)elapsed.TotalHours}h ago";
+        if (elapsed.TotalDays < 7)
+            return $"{(int)elapsed.TotalDays}d ago";
+
+        return date.ToString("MMM d");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        OnboardingService.OnProgressChanged -= HandleProgressChanged;
+        if (TourService != null)
+        {
+            TourService.OnTourCompleted -= HandleTourCompleted;
+        }
+    }
+}
+
+<style>
+    .checklist-item {
+        transition: background-color 0.2s;
+    }
+
+    .checklist-item:hover {
+        background-color: var(--mud-palette-action-hover);
+    }
+</style>

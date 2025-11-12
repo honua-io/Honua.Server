@@ -1,0 +1,295 @@
+@*
+    Copyright (c) 2025 HonuaIO
+    Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+@using Honua.MapSDK.Services.Import
+@using Honua.MapSDK.Models.Import
+@using System.Text.Json
+@inject IJSRuntime JSRuntime
+
+<div class="honua-upload-visualize">
+    @if (ShowUploadArea || UploadedData == null)
+    {
+        <div class="upload-section @(MapPosition == "right" || MapPosition == "bottom" ? "with-map" : "")">
+            <DragDropUpload CssClass="@UploadCssClass"
+                           MaxFileSizeMB="@MaxFileSizeMB"
+                           AutoParse="true"
+                           AutoVisualize="true"
+                           ShowResetButton="@ShowResetButton"
+                           OnDataParsed="HandleDataParsed"
+                           OnFormatDetected="HandleFormatDetected"
+                           OnStyleGenerated="HandleStyleGenerated"
+                           OnError="HandleError"
+                           @bind-UploadedData="UploadedData" />
+        </div>
+    }
+
+    @if (ShowMap && UploadedData != null)
+    {
+        <div class="map-section @MapPosition">
+            <div id="@_mapId" class="upload-map"></div>
+
+            @if (ShowDataSummary)
+            {
+                <div class="data-summary-overlay">
+                    <div class="summary-header">
+                        <h4>Data Summary</h4>
+                        <button @onclick="ToggleSummary" class="toggle-button">
+                            @(_summaryExpanded ? "▼" : "▶")
+                        </button>
+                    </div>
+
+                    @if (_summaryExpanded)
+                    {
+                        <div class="summary-content">
+                            <div class="summary-item">
+                                <span class="label">Format:</span>
+                                <span class="value">@UploadedData.Format</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Features:</span>
+                                <span class="value">@UploadedData.ValidRows / @UploadedData.TotalRows</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(UploadedData.CRS))
+                            {
+                                <div class="summary-item">
+                                    <span class="label">CRS:</span>
+                                    <span class="value">@UploadedData.CRS</span>
+                                </div>
+                            }
+                            @if (UploadedData.Fields.Any())
+                            {
+                                <div class="summary-item">
+                                    <span class="label">Fields:</span>
+                                    <span class="value">@UploadedData.Fields.Count</span>
+                                </div>
+                            }
+                            @if (UploadedData.BoundingBox != null && UploadedData.BoundingBox.Length == 4)
+                            {
+                                <div class="summary-item">
+                                    <span class="label">Bounds:</span>
+                                    <span class="value">
+                                        [@UploadedData.BoundingBox[0].ToString("F2"),
+                                        @UploadedData.BoundingBox[1].ToString("F2"),
+                                        @UploadedData.BoundingBox[2].ToString("F2"),
+                                        @UploadedData.BoundingBox[3].ToString("F2")]
+                                    </span>
+                                </div>
+                            }
+
+                            @if (UploadedData.Errors.Any())
+                            {
+                                <div class="summary-item errors">
+                                    <span class="label">Errors:</span>
+                                    <span class="value">@UploadedData.Errors.Count</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (ShowLayerControls && _currentStyle != null)
+            {
+                <div class="layer-controls">
+                    <button @onclick="ToggleLayer" class="control-button">
+                        @(_layerVisible ? "Hide Layer" : "Show Layer")
+                    </button>
+                    <button @onclick="ZoomToData" class="control-button">
+                        Zoom to Data
+                    </button>
+                    @if (ShowResetButton)
+                    {
+                        <button @onclick="ClearData" class="control-button danger">
+                            Clear Data
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? UploadCssClass { get; set; }
+    [Parameter] public int MaxFileSizeMB { get; set; } = 500;
+    [Parameter] public bool ShowMap { get; set; } = true;
+    [Parameter] public bool ShowUploadArea { get; set; } = true;
+    [Parameter] public bool ShowDataSummary { get; set; } = true;
+    [Parameter] public bool ShowLayerControls { get; set; } = true;
+    [Parameter] public bool ShowResetButton { get; set; } = true;
+    [Parameter] public string MapPosition { get; set; } = "right"; // "right", "left", "bottom", "top"
+    [Parameter] public int MapHeight { get; set; } = 600;
+    [Parameter] public string? MapStyle { get; set; } = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+    [Parameter] public EventCallback<ParsedData> OnDataLoaded { get; set; }
+    [Parameter] public EventCallback<StyleDefinition> OnStyleApplied { get; set; }
+    [Parameter] public ParsedData? UploadedData { get; set; }
+
+    private string _mapId = $"upload-map-{Guid.NewGuid():N}";
+    private IJSObjectReference? _jsModule;
+    private IJSObjectReference? _mapInstance;
+    private StyleDefinition? _currentStyle;
+    private EnhancedFormatDetectionResult? _detectionResult;
+    private bool _summaryExpanded = true;
+    private bool _layerVisible = true;
+    private object? _visualizationHandle;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && ShowMap)
+        {
+            try
+            {
+                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/Honua.MapSDK/js/drag-drop-upload.js");
+
+                // Initialize map
+                await InitializeMapAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to initialize map: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task InitializeMapAsync()
+    {
+        try
+        {
+            // Use MapLibre GL JS to create the map
+            await JSRuntime.InvokeVoidAsync("eval", $@"
+                if (!window.honuaMaps) window.honuaMaps = {{}};
+                window.honuaMaps['{_mapId}'] = new maplibregl.Map({{
+                    container: '{_mapId}',
+                    style: '{MapStyle}',
+                    center: [0, 0],
+                    zoom: 1
+                }});
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing map: {ex.Message}");
+        }
+    }
+
+    private async Task HandleDataParsed(ParsedData data)
+    {
+        UploadedData = data;
+        await OnDataLoaded.InvokeAsync(data);
+
+        // Visualize on map if available
+        if (ShowMap && _currentStyle != null && _jsModule != null)
+        {
+            await VisualizeDataAsync();
+        }
+
+        StateHasChanged();
+    }
+
+    private Task HandleFormatDetected(EnhancedFormatDetectionResult result)
+    {
+        _detectionResult = result;
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleStyleGenerated(StyleDefinition style)
+    {
+        _currentStyle = style;
+        await OnStyleApplied.InvokeAsync(style);
+
+        // Visualize on map if data is already loaded
+        if (ShowMap && UploadedData != null && _jsModule != null)
+        {
+            await VisualizeDataAsync();
+        }
+    }
+
+    private Task HandleError(string error)
+    {
+        Console.WriteLine($"Upload error: {error}");
+        return Task.CompletedTask;
+    }
+
+    private async Task VisualizeDataAsync()
+    {
+        if (UploadedData == null || _currentStyle == null || _jsModule == null) return;
+
+        try
+        {
+            // Convert ParsedData to GeoJSON
+            var geojson = ConvertToGeoJSON(UploadedData);
+            var geojsonStr = JsonSerializer.Serialize(geojson);
+
+            // Visualize on map
+            _visualizationHandle = await _jsModule.InvokeAsync<object>(
+                "visualizeGeoJSON",
+                _mapId,
+                geojson,
+                _currentStyle,
+                new { autoZoom = true }
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error visualizing data: {ex.Message}");
+        }
+    }
+
+    private object ConvertToGeoJSON(ParsedData data)
+    {
+        return new
+        {
+            type = "FeatureCollection",
+            features = data.Features.Select(f => new
+            {
+                type = "Feature",
+                id = f.Id,
+                geometry = f.Geometry,
+                properties = f.Properties
+            }).ToArray()
+        };
+    }
+
+    private async Task ToggleLayer()
+    {
+        _layerVisible = !_layerVisible;
+        // Implement layer visibility toggle via JS interop
+        StateHasChanged();
+    }
+
+    private async Task ZoomToData()
+    {
+        if (UploadedData != null && _jsModule != null)
+        {
+            await VisualizeDataAsync(); // This includes auto-zoom
+        }
+    }
+
+    private async Task ClearData()
+    {
+        UploadedData = null;
+        _currentStyle = null;
+        _detectionResult = null;
+        _visualizationHandle = null;
+        StateHasChanged();
+    }
+
+    private void ToggleSummary()
+    {
+        _summaryExpanded = !_summaryExpanded;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.DisposeAsync();
+            }
+            catch { }
+        }
+    }
+}
