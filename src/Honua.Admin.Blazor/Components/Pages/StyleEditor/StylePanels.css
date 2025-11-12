@@ -1,0 +1,86 @@
+/* Common styles for all style panels */
+
+.style-panel {
+    padding: 8px 0;
+}
+
+.property-group {
+    margin-bottom: 12px;
+}
+
+.property-label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: var(--mud-palette-text-secondary);
+}
+
+.color-picker {
+    width: 48px;
+    height: 38px;
+    border: 1px solid var(--mud-palette-divider);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 2px;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-picker::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+}
+
+.color-picker::-moz-color-swatch {
+    border: none;
+    border-radius: 2px;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
+.flex-wrap {
+    flex-wrap: wrap;
+}
+
+/* Expansion panel adjustments */
+.mud-expand-panel {
+    margin-bottom: 8px !important;
+}
+
+.mud-expand-panel-header {
+    font-size: 0.875rem !important;
+}
+
+/* Alert styling in panels */
+.mud-alert ul {
+    font-size: 0.75rem;
+    margin: 0;
+}
+
+/* Slider customization */
+.mud-slider {
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+/* Dense form fields */
+.mud-input-control-margin-dense {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .property-group {
+        margin-bottom: 16px;
+    }
+
+    .color-picker {
+        width: 40px;
+        height: 32px;
+    }
+}
