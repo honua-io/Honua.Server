@@ -47,8 +47,13 @@ public class SearchDebouncer : IDisposable
 
     private void OnTimerElapsed(object? sender, ElapsedEventArgs e)
     {
-        _debounceTimer?.Dispose();
-        _debounceTimer = null;
+        // Unsubscribe event handler before disposing to prevent memory leak
+        if (_debounceTimer != null)
+        {
+            _debounceTimer.Elapsed -= OnTimerElapsed;
+            _debounceTimer.Dispose();
+            _debounceTimer = null;
+        }
 
         if (_pendingAction != null)
         {
@@ -72,8 +77,12 @@ public class SearchDebouncer : IDisposable
     /// </summary>
     public void Dispose()
     {
-        _debounceTimer?.Dispose();
-        _debounceTimer = null;
+        if (_debounceTimer != null)
+        {
+            _debounceTimer.Elapsed -= OnTimerElapsed;
+            _debounceTimer.Dispose();
+            _debounceTimer = null;
+        }
         _pendingAction = null;
     }
 }
