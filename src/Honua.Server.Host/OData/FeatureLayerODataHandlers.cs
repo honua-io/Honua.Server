@@ -9,6 +9,7 @@ using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.OData;
 using Honua.Server.Core.OData.Query;
+using Honua.Server.Core.Query;
 using NetTopologySuite.IO;
 
 namespace Honua.Server.Host.OData;
@@ -130,13 +131,18 @@ public static class FeatureLayerODataHandlers
         var (serviceId, layerId) = ParseEntitySetName(entitySetName);
 
         // Resolve metadata
+        var snapshot = await metadataRegistry.GetSnapshotAsync(ct);
         var (dataSource, service, layer) = await ResolveMetadata(metadataRegistry, serviceId, layerId, ct);
+
+        // Build entity definition for filter translation
+        var entityDefinitionBuilder = new MetadataQueryModelBuilder();
+        var entityDefinition = entityDefinitionBuilder.Build(snapshot, service, layer);
 
         // Parse OData query options
         var queryOptions = QueryOptionsParser.Parse(filter, null, select, orderby, top, skip, count);
 
-        // Convert to FeatureQuery
-        var featureQuery = ODataQueryAdapter.ToFeatureQuery(queryOptions);
+        // Convert to FeatureQuery with entity definition
+        var featureQuery = ODataQueryAdapter.ToFeatureQuery(queryOptions) with { EntityDefinition = entityDefinition };
 
         // Execute query
         var features = new List<FeatureRecord>();
@@ -310,11 +316,16 @@ public static class FeatureLayerODataHandlers
         CancellationToken ct = default)
     {
         var (serviceId, layerId) = ParseEntitySetName(entitySetName);
+        var snapshot = await metadataRegistry.GetSnapshotAsync(ct);
         var (dataSource, service, layer) = await ResolveMetadata(metadataRegistry, serviceId, layerId, ct);
+
+        // Build entity definition for filter translation
+        var entityDefinitionBuilder = new MetadataQueryModelBuilder();
+        var entityDefinition = entityDefinitionBuilder.Build(snapshot, service, layer);
 
         // Parse filter if provided
         var queryOptions = QueryOptionsParser.Parse(filter, null, null, null, null, null, false);
-        var featureQuery = ODataQueryAdapter.ToFeatureQuery(queryOptions);
+        var featureQuery = ODataQueryAdapter.ToFeatureQuery(queryOptions) with { EntityDefinition = entityDefinition };
 
         // Get count
         var count = await dataStore.CountAsync(dataSource, service, layer, featureQuery, ct);

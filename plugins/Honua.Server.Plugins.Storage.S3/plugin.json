@@ -1,0 +1,98 @@
+{
+  "id": "honua.plugins.storage.s3",
+  "name": "AWS S3 Cloud Storage Plugin",
+  "version": "1.0.0",
+  "description": "AWS S3 object storage provider with support for presigned URLs, server-side encryption, versioning, lifecycle policies, and CloudFront CDN integration.",
+  "author": "HonuaIO",
+  "pluginType": "cloud_storage",
+  "assembly": "Honua.Server.Plugins.Storage.S3.dll",
+  "entryPoint": "Honua.Server.Plugins.Storage.S3.S3CloudStoragePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0",
+  "capabilities": {
+    "providerKey": "s3",
+    "cloudProvider": "AWS",
+    "supportsPresignedUrls": true,
+    "supportsEncryption": true,
+    "supportsVersioning": true,
+    "supportsLifecyclePolicies": true,
+    "supportsReplication": true,
+    "supportsCdn": true,
+    "supportsMetadata": true,
+    "supportsAcl": true,
+    "maxFileSizeBytes": 5497558138880,
+    "supportsMultipartUpload": true,
+    "supportsStreamingUpload": true
+  },
+  "configuration": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "attachment_storage": {
+          "type": "object",
+          "description": "Attachment storage profile configuration",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["s3"],
+              "description": "Cloud storage provider type"
+            },
+            "s3": {
+              "type": "object",
+              "description": "AWS S3 specific configuration",
+              "properties": {
+                "bucket_name": {
+                  "type": "string",
+                  "description": "S3 bucket name (required)",
+                  "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "Optional prefix/folder path within the bucket"
+                },
+                "region": {
+                  "type": "string",
+                  "description": "AWS region (e.g., us-east-1, eu-west-1)",
+                  "examples": ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"]
+                },
+                "service_url": {
+                  "type": "string",
+                  "description": "Custom S3 endpoint URL (for S3-compatible services like MinIO)",
+                  "format": "uri"
+                },
+                "access_key_id": {
+                  "type": "string",
+                  "description": "AWS access key ID (alternative to instance profile)"
+                },
+                "secret_access_key": {
+                  "type": "string",
+                  "description": "AWS secret access key (alternative to instance profile)"
+                },
+                "force_path_style": {
+                  "type": "boolean",
+                  "description": "Use path-style URLs instead of virtual-hosted URLs (required for some S3-compatible services)",
+                  "default": false
+                },
+                "use_instance_profile": {
+                  "type": "boolean",
+                  "description": "Use EC2 instance profile or ECS task role for authentication",
+                  "default": true
+                },
+                "presign_expiry_seconds": {
+                  "type": "integer",
+                  "description": "Expiry time in seconds for presigned URLs",
+                  "default": 900,
+                  "minimum": 1,
+                  "maximum": 604800
+                }
+              },
+              "required": ["bucket_name"]
+            }
+          },
+          "required": ["provider", "s3"]
+        }
+      }
+    },
+    "example": "# AWS S3 Attachment Storage Configuration Examples\n\n# Example 1: Using Instance Profile (recommended for EC2/ECS)\nattachment_storage \"production\" {\n  provider = \"s3\"\n  \n  s3 {\n    bucket_name          = \"honua-attachments\"\n    prefix               = \"attachments/\"\n    region               = \"us-east-1\"\n    use_instance_profile = true\n    presign_expiry_seconds = 900\n  }\n}\n\n# Example 2: Using Access Keys (for development or non-AWS environments)\nattachment_storage \"development\" {\n  provider = \"s3\"\n  \n  s3 {\n    bucket_name          = \"honua-dev-attachments\"\n    prefix               = \"dev/\"\n    region               = \"us-west-2\"\n    access_key_id        = \"AKIAIOSFODNN7EXAMPLE\"\n    secret_access_key    = \"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\"\n    use_instance_profile = false\n  }\n}\n\n# Example 3: S3-Compatible Storage (MinIO, DigitalOcean Spaces, etc.)\nattachment_storage \"minio\" {\n  provider = \"s3\"\n  \n  s3 {\n    bucket_name          = \"honua-attachments\"\n    service_url          = \"https://minio.example.com:9000\"\n    access_key_id        = \"minioadmin\"\n    secret_access_key    = \"minioadmin\"\n    force_path_style     = true\n    use_instance_profile = false\n  }\n}\n\n# Example 4: Multi-Region with CloudFront CDN\nattachment_storage \"global\" {\n  provider = \"s3\"\n  \n  s3 {\n    bucket_name          = \"honua-global-attachments\"\n    prefix               = \"public/\"\n    region               = \"us-east-1\"\n    use_instance_profile = true\n    # CloudFront CDN distribution should be configured separately\n    # to point to this S3 bucket\n  }\n}"
+  }
+}

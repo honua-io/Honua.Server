@@ -1,0 +1,73 @@
+{
+  "id": "honua.plugins.storage.gcp",
+  "name": "GCP Cloud Storage Plugin",
+  "version": "1.0.0",
+  "description": "Google Cloud Storage provider with support for signed URLs, server-side encryption, object versioning, and multi-region replication.",
+  "author": "HonuaIO",
+  "pluginType": "cloud_storage",
+  "assembly": "Honua.Server.Plugins.Storage.GCP.dll",
+  "entryPoint": "Honua.Server.Plugins.Storage.GCP.GcpCloudStoragePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0",
+  "capabilities": {
+    "providerKey": "gcs",
+    "cloudProvider": "GCP",
+    "supportsPresignedUrls": true,
+    "supportsEncryption": true,
+    "supportsVersioning": true,
+    "supportsLifecyclePolicies": true,
+    "supportsReplication": true,
+    "supportsCdn": true,
+    "supportsMetadata": true,
+    "supportsAcl": true,
+    "maxFileSizeBytes": 5497558138880,
+    "supportsMultipartUpload": true,
+    "supportsStreamingUpload": true
+  },
+  "configuration": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "attachment_storage": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["gcs"],
+              "description": "Cloud storage provider type"
+            },
+            "gcs": {
+              "type": "object",
+              "properties": {
+                "bucketName": {
+                  "type": "string",
+                  "description": "GCS bucket name (must be globally unique, 3-63 characters, lowercase)"
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "Optional prefix/folder path for all attachments (default: 'attachments/')"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "GCP project ID (optional, can be inferred from credentials)"
+                },
+                "credentialsPath": {
+                  "type": "string",
+                  "description": "Path to service account JSON key file (alternative to Application Default Credentials)"
+                },
+                "useApplicationDefaultCredentials": {
+                  "type": "boolean",
+                  "description": "Use Application Default Credentials (GOOGLE_APPLICATION_CREDENTIALS, gcloud CLI, or GCE/GKE metadata)",
+                  "default": true
+                }
+              },
+              "required": ["bucketName"]
+            }
+          },
+          "required": ["provider", "gcs"]
+        }
+      }
+    },
+    "example": "attachment_storage \"default\" {\n  provider = \"gcs\"\n  \n  gcs {\n    bucket_name = \"my-honua-attachments\"\n    prefix      = \"attachments/\"\n    project_id  = \"my-gcp-project\"\n    \n    # Option 1: Use service account key file\n    credentials_path = \"/path/to/service-account-key.json\"\n    \n    # Option 2: Use Application Default Credentials (ADC)\n    # use_application_default_credentials = true\n  }\n}\n\n# Multi-region bucket example\nattachment_storage \"production\" {\n  provider = \"gcs\"\n  \n  gcs {\n    bucket_name                         = \"honua-prod-attachments-us\"\n    prefix                              = \"prod/\"\n    use_application_default_credentials = true\n  }\n}\n\n# Development example with explicit credentials\nattachment_storage \"development\" {\n  provider = \"gcs\"\n  \n  gcs {\n    bucket_name      = \"honua-dev-attachments\"\n    prefix           = \"dev/\"\n    project_id       = \"honua-dev-project\"\n    credentials_path = \"${env.HOME}/.gcp/honua-dev-sa.json\"\n  }\n}"
+  }
+}

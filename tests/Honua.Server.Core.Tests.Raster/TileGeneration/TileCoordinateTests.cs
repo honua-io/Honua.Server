@@ -64,8 +64,10 @@ public class TileCoordinateTests
         var (lat, lon) = tile.ToLatLon();
 
         // Assert
-        lat.Should().BeApproximately(originalLat, 0.1);
-        lon.Should().BeApproximately(originalLon, 0.1);
+        // Tile coordinates represent discrete grid cells, so there's expected precision loss
+        // At zoom 10, each tile represents ~0.35 degrees, so we use a tolerance of 0.5 degrees
+        lat.Should().BeApproximately(originalLat, 0.5);
+        lon.Should().BeApproximately(originalLon, 0.5);
     }
 
     [Theory]

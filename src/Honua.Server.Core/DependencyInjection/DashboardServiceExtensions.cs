@@ -3,6 +3,7 @@
 
 using Honua.Server.Core.Data.Dashboard;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.DependencyInjection;
 

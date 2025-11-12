@@ -151,7 +151,7 @@ public sealed class ODataContainerFixture : IAsyncLifetime
             id_field    = "road_id"
             introspect_fields = true
 
-            geometry {
+            geometry = {
                 column = "geom"
                 type   = "LineString"
                 srid   = 4326

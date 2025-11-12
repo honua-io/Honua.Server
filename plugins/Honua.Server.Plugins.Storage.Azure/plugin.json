@@ -1,0 +1,72 @@
+{
+  "id": "honua.plugins.storage.azure",
+  "name": "Azure Blob Storage Plugin",
+  "version": "1.0.0",
+  "description": "Enterprise-grade Azure Blob Storage provider with SAS token support, server-side encryption, geo-redundant storage, and Azure CDN integration.",
+  "author": "HonuaIO",
+  "pluginType": "cloud_storage",
+  "assembly": "Honua.Server.Plugins.Storage.Azure.dll",
+  "entryPoint": "Honua.Server.Plugins.Storage.Azure.AzureBlobStoragePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0",
+  "capabilities": {
+    "providerKey": "azureblob",
+    "cloudProvider": "Azure",
+    "supportsPresignedUrls": true,
+    "supportsEncryption": true,
+    "supportsVersioning": true,
+    "supportsLifecyclePolicies": true,
+    "supportsReplication": true,
+    "supportsCdn": true,
+    "supportsMetadata": true,
+    "supportsAcl": true,
+    "maxFileSizeBytes": 190734863360000,
+    "supportsMultipartUpload": true,
+    "supportsStreamingUpload": true
+  },
+  "configuration": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "attachment_storage": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["azureblob"],
+              "description": "Cloud storage provider type"
+            },
+            "azure": {
+              "type": "object",
+              "properties": {
+                "connection_string": {
+                  "type": "string",
+                  "description": "Azure Storage connection string (use DefaultAzureCredential if not specified)"
+                },
+                "container_name": {
+                  "type": "string",
+                  "description": "Azure Blob Storage container name (3-63 characters, lowercase, numbers, hyphens only)",
+                  "pattern": "^[a-z0-9](?:[a-z0-9]|(?<!-)-(?!-))*[a-z0-9]$",
+                  "minLength": 3,
+                  "maxLength": 63
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "Optional prefix for blob keys (e.g., 'attachments/')"
+                },
+                "ensure_container": {
+                  "type": "boolean",
+                  "description": "Automatically create container if it doesn't exist",
+                  "default": true
+                }
+              },
+              "required": ["connection_string", "container_name"]
+            }
+          },
+          "required": ["provider", "azure"]
+        }
+      }
+    },
+    "example": "attachment_storage \"azure_primary\" {\n  provider = \"azureblob\"\n  \n  azure {\n    connection_string = \"DefaultEndpointsProtocol=https;AccountName=mystorageaccount;AccountKey=...;EndpointSuffix=core.windows.net\"\n    container_name    = \"attachments\"\n    prefix            = \"honua/\"\n    ensure_container  = true\n  }\n}\n\n# Using Azure Managed Identity (recommended for production)\nattachment_storage \"azure_managed_identity\" {\n  provider = \"azureblob\"\n  \n  azure {\n    # Leave connection_string empty to use DefaultAzureCredential\n    # This will use managed identity, environment variables, or Azure CLI credentials\n    connection_string = \"\" # Uses DefaultAzureCredential\n    container_name    = \"production-attachments\"\n    prefix            = \"uploads/\"\n    ensure_container  = false\n  }\n}\n\n# Development using Azurite (local emulator)\nattachment_storage \"azure_local\" {\n  provider = \"azureblob\"\n  \n  azure {\n    connection_string = \"UseDevelopmentStorage=true\"\n    container_name    = \"test-attachments\"\n    ensure_container  = true\n  }\n}"
+  }
+}

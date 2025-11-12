@@ -1,0 +1,43 @@
+{
+  "id": "honua.plugins.database.postgresql",
+  "name": "PostgreSQL/PostGIS Database Plugin",
+  "version": "1.0.0",
+  "description": "Full-featured PostgreSQL/PostGIS database provider with spatial extensions, MVT tile generation, and advanced geospatial capabilities.",
+  "author": "HonuaIO",
+  "pluginType": "database",
+  "assembly": "Honua.Server.Plugins.Database.PostgreSQL.dll",
+  "entryPoint": "Honua.Server.Plugins.Database.PostgreSQL.PostgreSQLDatabasePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0",
+  "capabilities": {
+    "providerKey": "postgis",
+    "providerType": "Relational",
+    "supportsNativeGeometry": true,
+    "supportsNativeMvt": true,
+    "supportsTransactions": true,
+    "supportsSpatialIndexes": true
+  },
+  "configuration": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "data_source": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["postgresql", "postgis"],
+              "description": "Database provider type"
+            },
+            "connection": {
+              "type": "string",
+              "description": "PostgreSQL connection string"
+            }
+          },
+          "required": ["provider", "connection"]
+        }
+      }
+    },
+    "example": "data_source \"my_db\" {\n  provider   = \"postgresql\"\n  connection = \"Host=localhost;Database=gis;Username=postgres;Password=secret\"\n}"
+  }
+}

@@ -6,45 +6,25 @@ using Honua.Server.Core.Configuration.V2;
 // using Honua.Server.Enterprise.Sensors.Extensions;
 // using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Host.Admin;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Authentication;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Carto;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Csw;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Health;
-using Honua.Server.Core.Configuration.V2;
-using Honua.Server.Host.Metadata;
-using Honua.Server.Core.Configuration.V2;
+// using Honua.Server.Host.Metadata;  // Commented out due to build error - methods accessed via global namespace
 using Honua.Server.Host.OData;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Ogc;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.OpenRosa;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Print;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Raster;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Records;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Security;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wcs;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wfs;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wms;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wmts;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Builder;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.DependencyInjection;
-using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.Extensions;
 
@@ -249,7 +229,7 @@ internal static class EndpointExtensions
     /// <returns>The web application for method chaining.</returns>
     public static WebApplication MapAdministrationEndpoints(this WebApplication app)
     {
-        app.MapMetadataAdministration();
+        global::Honua.Server.Host.Metadata.MetadataAdministrationEndpointRouteBuilderExtensions.MapMetadataAdministration(app);
         app.MapDataIngestionAdministration();
         // app.MapMigrationAdministration(); // Removed: Legacy migration endpoints deleted
         app.MapRasterTileCacheAdministration();
@@ -263,6 +243,24 @@ internal static class EndpointExtensions
 
         // Map MapSDK configuration endpoints (visual map builder)
         app.MapMapConfigurationEndpoints();
+
+        // Map geofence alert administration endpoints
+        app.MapGeofenceAlertAdministrationEndpoints();
+
+        // Map alert management endpoints
+        _ = ((IEndpointRouteBuilder)app).MapAdminAlertEndpoints();
+
+        // Map feature flag management endpoints
+        _ = ((IEndpointRouteBuilder)app).MapAdminFeatureFlagEndpoints();
+
+        // Map audit log endpoints
+        _ = ((IEndpointRouteBuilder)app).MapAuditLogEndpoints();
+
+        // Map spatial index diagnostics endpoints
+        _ = ((IEndpointRouteBuilder)app).MapSpatialIndexDiagnosticsEndpoints();
+
+        // Map server configuration endpoints (CORS, etc.)
+        _ = ((IEndpointRouteBuilder)app).MapAdminServerEndpoints();
 
         // Map GeoETL endpoints (Enterprise feature)
         // Enterprise features disabled

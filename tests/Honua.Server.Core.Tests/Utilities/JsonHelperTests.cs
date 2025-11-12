@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using System.Collections.Generic;
+using System.Text.Json;
 using FluentAssertions;
 using Honua.Server.Core.Utilities;
 using Xunit;
@@ -20,7 +21,7 @@ public class JsonHelperTests
         var json = JsonHelper.Serialize(obj);
 
         // Assert
-        json.Should().Contain("Name");
+        json.Should().Contain("name"); // Web defaults use camelCase
         json.Should().Contain("Test");
         json.Should().Contain("123");
     }
@@ -41,16 +42,14 @@ public class JsonHelperTests
     }
 
     [Fact]
-    public void Deserialize_WithInvalidJson_ReturnsNull()
+    public void Deserialize_WithInvalidJson_ThrowsException()
     {
         // Arrange
         var json = "invalid json";
 
-        // Act
-        var result = JsonHelper.Deserialize<TestObject>(json);
-
-        // Assert
-        result.Should().BeNull();
+        // Act & Assert
+        var act = () => JsonHelper.Deserialize<TestObject>(json);
+        act.Should().Throw<JsonException>();
     }
 
     [Fact]
@@ -96,7 +95,7 @@ public class JsonHelperTests
 
         // Assert
         json.Should().Contain("\n"); // Should have line breaks
-        json.Should().Contain("Name");
+        json.Should().Contain("name"); // Web defaults use camelCase
         json.Should().Contain("Test");
     }
 

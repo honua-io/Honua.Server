@@ -3,47 +3,26 @@
 using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Versioning;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Admin;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Authentication;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Carto;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Csw;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Health;
-using Honua.Server.Core.Configuration.V2;
-using Honua.Server.Host.Metadata;
-using Honua.Server.Core.Configuration.V2;
+// using Honua.Server.Host.Metadata;  // Commented out due to build error - methods accessed via global namespace
 using Honua.Server.Host.Ogc;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.OpenRosa;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Print;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Raster;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Records;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Security;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wcs;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wfs;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wms;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wmts;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Builder;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Routing;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.DependencyInjection;
-using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.Extensions;
 
@@ -190,12 +169,12 @@ internal static class VersionedEndpointExtensions
 
         if (IsServiceEnabled("csw", true))
         {
-            group.MapCswEndpoints();
+            group.MapCswEndpoints("v1");
         }
 
         if (IsServiceEnabled("wcs", true))
         {
-            group.MapWcsEndpoints();
+            group.MapWcsEndpoints("v1");
         }
 
         if (IsServiceEnabled("wmts", true))
@@ -205,7 +184,7 @@ internal static class VersionedEndpointExtensions
 
         if (IsServiceEnabled("zarr", true))
         {
-            group.MapZarrTimeSeriesEndpoints();
+            group.MapZarrTimeSeriesEndpoints("v1");
         }
 
         return group;
@@ -218,7 +197,7 @@ internal static class VersionedEndpointExtensions
     /// <returns>The route group for method chaining.</returns>
     private static RouteGroupBuilder MapAdministrationEndpoints(this RouteGroupBuilder group)
     {
-        group.MapMetadataAdministration();
+        global::Honua.Server.Host.Metadata.MetadataAdministrationEndpointRouteBuilderExtensions.MapMetadataAdministration(group);
         group.MapDataIngestionAdministration();
         // group.MapMigrationAdministration(); // Removed: Legacy migration endpoints deleted
         group.MapRasterTileCacheAdministration();
@@ -233,6 +212,21 @@ internal static class VersionedEndpointExtensions
         group.MapTracingConfiguration();
         group.MapDegradationStatusEndpoints();
         group.MapGeofenceAlertAdministrationEndpoints();
+
+        // Map alert management endpoints
+        group.MapAdminAlertEndpoints();
+
+        // Map feature flag management endpoints
+        _ = ((IEndpointRouteBuilder)group).MapAdminFeatureFlagEndpoints();
+
+        // Map audit log endpoints
+        _ = ((IEndpointRouteBuilder)group).MapAuditLogEndpoints();
+
+        // Map spatial index diagnostics endpoints
+        _ = ((IEndpointRouteBuilder)group).MapSpatialIndexDiagnosticsEndpoints();
+
+        // Map server configuration endpoints (CORS, etc.)
+        group.MapAdminServerEndpoints();
 
         return group;
     }

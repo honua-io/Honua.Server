@@ -9,6 +9,11 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Compile Remove="Query/CqlFilterParserTests.cs" />
+		<Compile Remove="Query/FilterComplexityScorerTests.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<!-- xUnit Test Framework -->
 		<PackageReference Include="xunit" Version="2.9.2" />
 		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">

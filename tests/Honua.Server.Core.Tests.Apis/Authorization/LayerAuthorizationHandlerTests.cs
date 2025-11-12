@@ -2,11 +2,14 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Honua.Server.Core.Authorization;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -14,17 +17,41 @@ namespace Honua.Server.Core.Tests.Apis.Authorization;
 
 public class LayerAuthorizationHandlerTests
 {
-    private readonly Mock<IResourceAuthorizationService> _mockAuthService;
+    private readonly Mock<IResourceAuthorizationCache> _mockCache;
+    private readonly Mock<ILogger<LayerAuthorizationHandler>> _mockLogger;
+    private readonly Mock<IOptionsMonitor<ResourceAuthorizationOptions>> _mockOptions;
+    private readonly ResourceAuthorizationMetrics _metrics;
     private readonly LayerAuthorizationHandler _handler;
 
     public LayerAuthorizationHandlerTests()
     {
-        _mockAuthService = new Mock<IResourceAuthorizationService>();
-        _handler = new LayerAuthorizationHandler(_mockAuthService.Object);
+        _mockCache = new Mock<IResourceAuthorizationCache>();
+        _mockLogger = new Mock<ILogger<LayerAuthorizationHandler>>();
+        _mockOptions = new Mock<IOptionsMonitor<ResourceAuthorizationOptions>>();
+
+        // Create a real metrics instance with a mock meter factory
+        var mockMeterFactory = new Mock<IMeterFactory>();
+        var mockMeter = new Mock<Meter>("TestMeter");
+        mockMeterFactory.Setup(x => x.Create(It.IsAny<MeterOptions>())).Returns(new Meter("TestMeter"));
+        _metrics = new ResourceAuthorizationMetrics(mockMeterFactory.Object);
+
+        // Setup default options
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy>()
+        });
+
+        _handler = new LayerAuthorizationHandler(
+            _mockCache.Object,
+            _metrics,
+            _mockLogger.Object,
+            _mockOptions.Object);
     }
 
     [Fact]
-    public async Task HandleRequirementAsync_WithAuthorizedUser_Succeeds()
+    public async Task AuthorizeAsync_WithAuthorizedUser_Succeeds()
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
@@ -33,23 +60,37 @@ public class LayerAuthorizationHandlerTests
             new Claim(ClaimTypes.Role, "User")
         }, "TestAuth"));
 
-        var requirement = new ResourceAccessRequirement("Read");
-        var resource = new LayerResource { LayerId = "layer-1", CollectionId = "collection-1" };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+        var policy = new ResourcePolicy
+        {
+            Id = "test-policy",
+            ResourceType = "layer",
+            ResourcePattern = "layer-1",
+            AllowedOperations = new List<string> { "Read" },
+            Roles = new List<string> { "User" },
+            Enabled = true,
+            Priority = 100
+        };
 
-        _mockAuthService
-            .Setup(x => x.CanAccessLayerAsync("user-123", "layer-1", "Read"))
-            .ReturnsAsync(true);
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy> { policy }
+        });
+
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "layer", "layer-1", "Read");
 
         // Assert
-        context.HasSucceeded.Should().BeTrue();
+        result.Succeeded.Should().BeTrue();
     }
 
     [Fact]
-    public async Task HandleRequirementAsync_WithUnauthorizedUser_Fails()
+    public async Task AuthorizeAsync_WithUnauthorizedUser_Fails()
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
@@ -57,40 +98,52 @@ public class LayerAuthorizationHandlerTests
             new Claim(ClaimTypes.NameIdentifier, "user-456")
         }, "TestAuth"));
 
-        var requirement = new ResourceAccessRequirement("Write");
-        var resource = new LayerResource { LayerId = "layer-2", CollectionId = "collection-1" };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+        // No matching policy for this user
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy>()
+        });
 
-        _mockAuthService
-            .Setup(x => x.CanAccessLayerAsync("user-456", "layer-2", "Write"))
-            .ReturnsAsync(false);
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "layer", "layer-2", "Write");
 
         // Assert
-        context.HasSucceeded.Should().BeFalse();
-        context.HasFailed.Should().BeTrue();
+        result.Succeeded.Should().BeFalse();
+        result.FailureReason.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
-    public async Task HandleRequirementAsync_WithAnonymousUser_Fails()
+    public async Task AuthorizeAsync_WithAnonymousUser_Fails()
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity()); // Not authenticated
-        var requirement = new ResourceAccessRequirement("Read");
-        var resource = new LayerResource { LayerId = "layer-3", CollectionId = "collection-1" };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy>()
+        });
+
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "layer", "layer-3", "Read");
 
         // Assert
-        context.HasSucceeded.Should().BeFalse();
+        result.Succeeded.Should().BeFalse();
     }
 
     [Fact]
-    public async Task HandleRequirementAsync_WithAdminRole_AlwaysSucceeds()
+    public async Task AuthorizeAsync_WithAdminRole_AlwaysSucceeds()
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
@@ -99,19 +152,23 @@ public class LayerAuthorizationHandlerTests
             new Claim(ClaimTypes.Role, "Administrator")
         }, "TestAuth"));
 
-        var requirement = new ResourceAccessRequirement("Delete");
-        var resource = new LayerResource { LayerId = "layer-4", CollectionId = "collection-1" };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+        // No policies, but admin role should grant access
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy>()
+        });
 
-        _mockAuthService
-            .Setup(x => x.CanAccessLayerAsync("admin-123", "layer-4", "Delete"))
-            .ReturnsAsync(true);
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "layer", "layer-4", "Delete");
 
         // Assert
-        context.HasSucceeded.Should().BeTrue();
+        result.Succeeded.Should().BeTrue();
     }
 
     [Theory]
@@ -119,41 +176,41 @@ public class LayerAuthorizationHandlerTests
     [InlineData("Write")]
     [InlineData("Delete")]
     [InlineData("Admin")]
-    public async Task HandleRequirementAsync_WithDifferentOperations_ChecksCorrectPermission(string operation)
+    public async Task AuthorizeAsync_WithDifferentOperations_ChecksCorrectPermission(string operation)
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, "user-789")
+            new Claim(ClaimTypes.NameIdentifier, "user-789"),
+            new Claim(ClaimTypes.Role, "TestRole")
         }, "TestAuth"));
 
-        var requirement = new ResourceAccessRequirement(operation);
-        var resource = new LayerResource { LayerId = "layer-5", CollectionId = "collection-1" };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+        var policy = new ResourcePolicy
+        {
+            Id = "wildcard-policy",
+            ResourceType = "layer",
+            ResourcePattern = "layer-5",
+            AllowedOperations = new List<string> { "*" }, // Allow all operations
+            Roles = new List<string> { "TestRole" },
+            Enabled = true,
+            Priority = 100
+        };
 
-        _mockAuthService
-            .Setup(x => x.CanAccessLayerAsync("user-789", "layer-5", operation))
-            .ReturnsAsync(true);
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy> { policy }
+        });
+
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "layer", "layer-5", operation);
 
         // Assert
-        _mockAuthService.Verify(
-            x => x.CanAccessLayerAsync("user-789", "layer-5", operation),
-            Times.Once);
+        result.Succeeded.Should().BeTrue();
     }
-}
-
-// Mock classes for testing
-public class ResourceAccessRequirement : IAuthorizationRequirement
-{
-    public string Operation { get; }
-    public ResourceAccessRequirement(string operation) => Operation = operation;
-}
-
-public class LayerResource
-{
-    public string LayerId { get; set; } = string.Empty;
-    public string CollectionId { get; set; } = string.Empty;
 }

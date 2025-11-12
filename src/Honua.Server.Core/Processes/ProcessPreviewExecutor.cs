@@ -104,7 +104,7 @@ public sealed class ProcessPreviewExecutor
                 }
             };
         }
-        catch (OperationCanceledException) when (timeoutCts.Token.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             job.MarkFailed("Preview operation timed out");
             return new PreviewExecutionResult
