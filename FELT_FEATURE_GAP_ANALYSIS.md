@@ -9,8 +9,16 @@
 
 Felt.com is a modern, cloud-native GIS platform focused on ease of use, collaboration, and rapid application development. While Honua has a strong foundation in OGC standards compliance and enterprise GIS capabilities, there are several user-experience and workflow-focused features from Felt that could enhance Honua's offering.
 
-### Key Differentiators in Felt (Not in Honua):
-- **AI-Powered Map Creation** - Natural language to map generation
+### Honua's AI Capabilities (NOT A GAP):
+✅ **Honua HAS extensive AI features:**
+- **AI-Powered GeoETL Workflow Generation** (Enterprise) - Natural language to ETL workflow: "Buffer buildings by 50 meters" → executable workflow
+- **Honua.Cli.AI** - Full AI DevSecOps assistant with 28 specialized agents for infrastructure, optimization, deployment
+- **Natural Language Infrastructure Queries** - "My queries on cities table are slow" → optimization plan
+- **LLM Parameter Extraction** - Intelligent agent selection and orchestration
+- **Support for OpenAI, Anthropic (Claude), Ollama (local models)**
+
+### Key Differentiators in Felt (Different Focus):
+- **AI-Powered END-USER Map Creation** - Natural language to interactive map for non-technical users (Honua's AI focuses on ETL/infrastructure)
 - **Zero-Configuration UX** - Extreme simplicity in data upload and visualization
 - **Built-in No-Code Dashboard Builder** - Visual dashboard creation without coding
 - **Integrated Field Data Collection App** with offline-first design (Honua has HonuaField but with different capabilities)
@@ -23,10 +31,101 @@ Felt.com is a modern, cloud-native GIS platform focused on ease of use, collabor
 
 ---
 
-## 1. AI & Automation Features
+## ✅ Honua's Existing AI Capabilities (NOT GAPS)
 
-### ❌ **AI-Powered Map Creation (Felt AI)**
-**Status:** Not Implemented in Honua
+### 1. **AI-Powered GeoETL Workflow Generation** (Enterprise)
+**Location:** `Honua.Server.Enterprise/ETL/AI/`
+**API Endpoint:** `POST /admin/api/geoetl/ai/generate`
+
+**Capabilities:**
+- Natural language to executable ETL workflow conversion
+- Example: "Buffer buildings by 50 meters and export to geopackage" → complete workflow with nodes and edges
+- Supports OpenAI and Azure OpenAI (GPT-4, GPT-3.5-turbo)
+- 17 node types with automatic validation
+- Workflow explanation in natural language
+- Cost: ~$0.20-$0.25 per generation (GPT-4)
+
+**Use Cases:**
+- Data transformation workflows without coding
+- Complex multi-step GIS processes
+- ETL pipeline automation
+
+### 2. **Honua.Cli.AI** - Full AI DevSecOps Assistant
+**Location:** `Honua.Cli.AI/`
+**Supported LLMs:** OpenAI, Anthropic (Claude), Ollama (local models)
+
+**28 Specialized AI Agents:**
+- Architecture Planning
+- Data Migration
+- Deployment
+- Diagnostics
+- Infrastructure Services
+- Observability
+- Performance Optimization
+- Security & Compliance
+- Upgrade & Documentation
+- And 19+ more specialized agents
+
+**Key Features:**
+- **Natural Language Infrastructure Queries:**
+  - "My queries on the cities table are slow" → generates optimization plan
+  - "Deploy Honua to AWS" → AI-powered deployment
+  - "Troubleshoot network connectivity" → diagnostics workflow
+- **Plan/Apply Workflow** (Terraform-style)
+  - Review changes before execution
+  - Risk assessment (Low/Medium/High/Critical)
+  - Automatic rollback plan generation
+- **Multi-Agent Orchestration** using Microsoft Semantic Kernel
+  - Intelligent agent selection based on request
+  - LLM-powered parameter extraction
+  - Input/output guardrails for safety
+- **Privacy-First Design:**
+  - Scoped token architecture (AI never sees raw credentials)
+  - Time-limited tokens (10-30 min)
+  - AES-256 encryption for secrets
+  - Opt-in telemetry with PII sanitization
+- **Security Scanning:**
+  - Checkov integration (1,000+ security policies)
+  - Blocks deployment on CRITICAL/HIGH severity issues
+  - CIS, PCI-DSS, HIPAA compliance checks
+
+**Example Usage:**
+```bash
+honua devsecops "Optimize queries on the cities table"
+
+# AI analyzes database, generates optimization plan:
+# 1. Analyze table statistics
+# 2. Create spatial index (CONCURRENTLY)
+# 3. Verify index usage
+#
+# User reviews and approves → automatic execution
+```
+
+### 3. **LLM-Based Workflow Processes**
+**Location:** `Honua.Cli.AI/Services/Processes/`
+
+**Long-Running AI Workflows:**
+- Deployment processes
+- Upgrade workflows
+- Metadata extraction
+- GitOps synchronization
+- Benchmark execution
+- Certificate renewal
+- Network diagnostics
+
+**Capabilities:**
+- Automatic workflow type detection from natural language
+- LLM-powered parameter extraction
+- Multi-step orchestrated execution
+- Process state tracking
+- Telemetry and cost monitoring
+
+---
+
+## 1. AI & Automation Features (GAPS)
+
+### ⚠️ **AI-Powered END-USER Map Creation (Felt AI)**
+**Status:** Different Scope - Honua has AI for ETL/Infrastructure, not end-user map creation
 **Description:** Users can describe what they want in natural language, and Felt generates the map, tools, and spatial applications automatically.
 
 **Felt Capability:**
@@ -36,11 +135,28 @@ Felt.com is a modern, cloud-native GIS platform focused on ease of use, collabor
 - 75% reduction in deployment time claimed
 
 **Honua Status:**
-- Has LLM-based deployment agents (experimental) for infrastructure
-- No natural language map creation interface
-- No prompt-to-map conversion
+✅ **HAS AI capabilities but different focus:**
+- ✅ **AI-Powered GeoETL Workflow Generation** (Enterprise): `POST /admin/api/geoetl/ai/generate`
+  - Natural language to ETL workflow: "Buffer buildings by 50 meters and export to geopackage" → executable workflow
+  - Supports OpenAI and Azure OpenAI
+  - 17 node types with automatic validation
+- ✅ **Honua.Cli.AI** - Full AI DevSecOps Assistant:
+  - 28 specialized AI agents (deployment, performance, security, diagnostics, etc.)
+  - Natural language infrastructure queries: "My queries on cities table are slow" → optimization plan
+  - LLM-powered parameter extraction for workflows
+  - Plan/Apply workflow (Terraform-style) with risk assessment
+  - Supports OpenAI, Anthropic (Claude), Ollama (local models)
+- ✅ **Multi-Agent Orchestration** using Microsoft Semantic Kernel
+  - Intelligent agent selection based on user requests
+  - Input/output guardrails for safety
+  - Long-running workflow processes
 
-**Priority:** HIGH - Major UX differentiator, aligns with modern AI-first workflows
+**Gap:**
+- ❌ No **end-user-facing** natural language map creation (current AI targets developers/admins, not map consumers)
+- ❌ No simple "Show me X on a map" interface for non-technical users
+- ❌ No AI-powered visual layer creation from natural language
+
+**Priority:** MEDIUM-HIGH - Honua has strong AI foundation for enterprise/developer use cases, but could extend to end-user map creation for broader adoption
 
 ---
 
@@ -523,7 +639,7 @@ Felt.com is a modern, cloud-native GIS platform focused on ease of use, collabor
 ## Summary: Priority Matrix
 
 ### 🔴 **HIGH Priority** (Largest UX/Market Impact)
-1. **AI-Powered Map Creation** - Major differentiator, aligns with AI trends
+1. **AI-Powered END-USER Map Creation** - Extend existing AI (GeoETL/CLI) to end-user map generation
 2. **Live Analysis Previews** - Eliminates trial-and-error, massive UX win
 3. **No-Code Dashboard Builder** - Critical for business users
 4. **Zero-Click Sharing** - Essential for non-technical user adoption
@@ -609,13 +725,16 @@ For enterprise sales, Honua needs:
 - Cloud-native SaaS model
 
 **The Gap:**
-Honua has superior technical foundations and enterprise capabilities, but Felt has a more polished, accessible user experience. Closing the gap requires focusing on UX, AI integration, no-code tools, and simplified workflows while maintaining Honua's technical advantages.
+Honua has superior technical foundations, enterprise capabilities, AND advanced AI for developers/admins (GeoETL workflow generation, DevSecOps agents). Felt has a more polished, accessible user experience for non-technical end users. Closing the gap requires extending Honua's existing AI capabilities to end-user map creation, adding no-code tools, and simplifying workflows while maintaining Honua's technical advantages.
 
 **Biggest Opportunities:**
-1. AI-powered map creation and analysis
+1. **Extend existing AI to end-user map creation** - Honua already has GeoETL workflow AI and 28 CLI agents; add end-user-facing natural language map generation
 2. No-code dashboard builder
 3. Live analysis previews
 4. Simplified sharing and embedding
 5. Interactive onboarding and templates
+
+**Key Insight:**
+Honua is NOT behind on AI - it has sophisticated AI for enterprise/developer use cases. The opportunity is to make that AI accessible to non-technical map consumers.
 
 By addressing these gaps, Honua can combine its enterprise-grade technical foundation with Felt's approachable user experience, creating a best-of-both-worlds platform.
