@@ -58,8 +58,8 @@ public class ODataContainerTests
     [Fact]
     public async Task ODataEndpoints_ShouldHonorQueryOptions()
     {
-        // Arrange - Assuming "Roads" entity set exists based on test metadata
-        var queryUrl = "/odata/Roads?$top=5&$select=name";
+        // Arrange - Entity set name is generated as {serviceId}_{layerId} = "roads_roads_primary" (hyphens converted to underscores)
+        var queryUrl = "/odata/roads_roads_primary?$top=5&$select=name";
 
         // Act
         var response = await _fixture.Client.GetAsync(queryUrl);
@@ -77,7 +77,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldSupportFiltering()
     {
         // Arrange
-        var filterUrl = "/odata/Roads?$filter=status eq 'active'";
+        var filterUrl = "/odata/roads_roads_primary?$filter=status eq 'active'";
 
         // Act
         var response = await _fixture.Client.GetAsync(filterUrl);
@@ -92,7 +92,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldSupportOrdering()
     {
         // Arrange
-        var orderUrl = "/odata/Roads?$orderby=name desc&$top=10";
+        var orderUrl = "/odata/roads_roads_primary?$orderby=name desc&$top=10";
 
         // Act
         var response = await _fixture.Client.GetAsync(orderUrl);
@@ -107,7 +107,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldSupportCounting()
     {
         // Arrange
-        var countUrl = "/odata/Roads/$count";
+        var countUrl = "/odata/roads_roads_primary/$count";
 
         // Act
         var response = await _fixture.Client.GetAsync(countUrl);
@@ -123,7 +123,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldSupportPagination()
     {
         // Arrange
-        var skipUrl = "/odata/Roads?$top=5&$skip=2";
+        var skipUrl = "/odata/roads_roads_primary?$top=5&$skip=2";
 
         // Act
         var response = await _fixture.Client.GetAsync(skipUrl);
@@ -140,7 +140,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldSupportComplexFiltering()
     {
         // Arrange - Test AND operation in filter
-        var complexFilterUrl = "/odata/Roads?$filter=status eq 'active' and length_km gt 10";
+        var complexFilterUrl = "/odata/roads_roads_primary?$filter=status eq 'active' and length_km gt 10";
 
         // Act
         var response = await _fixture.Client.GetAsync(complexFilterUrl);
@@ -155,7 +155,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldSupportCombinedQueryOptions()
     {
         // Arrange - Test multiple query options together
-        var combinedUrl = "/odata/Roads?$filter=status eq 'active'&$orderby=name&$top=10&$select=name,status";
+        var combinedUrl = "/odata/roads_roads_primary?$filter=status eq 'active'&$orderby=name&$top=10&$select=name,status";
 
         // Act
         var response = await _fixture.Client.GetAsync(combinedUrl);
@@ -171,7 +171,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldReturnCountInResponse()
     {
         // Arrange - Test $count=true query option
-        var countInlineUrl = "/odata/Roads?$count=true&$top=5";
+        var countInlineUrl = "/odata/roads_roads_primary?$count=true&$top=5";
 
         // Act
         var response = await _fixture.Client.GetAsync(countInlineUrl);
@@ -186,7 +186,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldHandleInvalidFilter()
     {
         // Arrange - Test error handling with invalid filter
-        var invalidFilterUrl = "/odata/Roads?$filter=invalid_field eq 'test'";
+        var invalidFilterUrl = "/odata/roads_roads_primary?$filter=invalid_field eq 'test'";
 
         // Act
         var response = await _fixture.Client.GetAsync(invalidFilterUrl);
@@ -200,7 +200,7 @@ public class ODataContainerTests
     public async Task ODataEndpoints_ShouldSupportSelectWithMultipleFields()
     {
         // Arrange - Test selecting multiple specific fields
-        var selectUrl = "/odata/Roads?$select=name,status,length_km&$top=5";
+        var selectUrl = "/odata/roads_roads_primary?$select=name,status,length_km&$top=5";
 
         // Act
         var response = await _fixture.Client.GetAsync(selectUrl);

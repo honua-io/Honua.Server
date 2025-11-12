@@ -56,8 +56,9 @@ public sealed class ODataContainerFixture : IAsyncLifetime
             await image.CreateAsync();
         }
 
-        // Create test metadata JSON
+        // Create test metadata JSON and database
         var metadataPath = CreateTestMetadata();
+        CreateTestDatabase();
 
         // Start container with test configuration using the shared image
         _container = new ContainerBuilder()
@@ -66,6 +67,8 @@ public sealed class ODataContainerFixture : IAsyncLifetime
             .WithEnvironment("HONUA__METADATA__PROVIDER", "json")
             .WithEnvironment("HONUA__METADATA__PATH", "/app/testdata/metadata.json")
             .WithEnvironment("ConnectionStrings__HonuaDb", "Data Source=/app/testdata/test.db")
+            .WithEnvironment("HONUA__AUTHENTICATION__ENFORCE", "false")
+            .WithEnvironment("HONUA__SERVICES__ODATA__ENABLED", "true")
             .WithBindMount(_testDataPath, "/app/testdata")
             .WithPortBinding(8080, true)
             .WithWaitStrategy(Wait.ForUnixContainer()
@@ -134,7 +137,7 @@ public sealed class ODataContainerFixture : IAsyncLifetime
             {
               "id": "sqlite-primary",
               "provider": "sqlite",
-              "connectionString": "Data Source=file:honua-odata-test?mode=memory&cache=shared"
+              "connectionString": "Data Source=/app/testdata/test.db"
             }
           ],
           "services": [
@@ -250,6 +253,43 @@ public sealed class ODataContainerFixture : IAsyncLifetime
         }
 
         throw new InvalidOperationException("Could not find solution directory containing Dockerfile.odata-test. Make sure tests are run from within the solution.");
+    }
+
+    private void CreateTestDatabase()
+    {
+        var dbPath = Path.Combine(_testDataPath, "test.db");
+        var connectionString = $"Data Source={dbPath}";
+
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection(connectionString);
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+
+        // Create table
+        command.CommandText = @"
+CREATE TABLE roads_primary (
+    road_id INTEGER PRIMARY KEY,
+    name TEXT,
+    status TEXT,
+    length_km REAL,
+    geom TEXT
+)";
+        command.ExecuteNonQuery();
+
+        // Insert test data
+        command.CommandText = @"
+INSERT INTO roads_primary (road_id, name, status, length_km, geom) VALUES
+(1, 'Main Street', 'active', 5.2, 'LINESTRING(-122.4 45.5, -122.3 45.6)'),
+(2, 'Oak Avenue', 'active', 3.1, 'LINESTRING(-122.5 45.4, -122.4 45.5)'),
+(3, 'Pine Road', 'inactive', 7.8, 'LINESTRING(-122.3 45.6, -122.2 45.7)'),
+(4, 'Elm Boulevard', 'active', 12.5, 'LINESTRING(-122.6 45.3, -122.4 45.4)'),
+(5, 'Maple Drive', 'active', 4.3, 'LINESTRING(-122.4 45.4, -122.3 45.4)'),
+(6, 'Cedar Lane', 'inactive', 2.1, 'LINESTRING(-122.5 45.5, -122.5 45.6)'),
+(7, 'Birch Way', 'active', 8.9, 'LINESTRING(-122.2 45.7, -122.1 45.8)'),
+(8, 'Willow Path', 'active', 15.3, 'LINESTRING(-122.6 45.2, -122.3 45.3)'),
+(9, 'Spruce Circle', 'inactive', 1.7, 'LINESTRING(-122.45 45.45, -122.45 45.46)'),
+(10, 'Ash Terrace', 'active', 6.4, 'LINESTRING(-122.35 45.55, -122.25 45.65)')";
+        command.ExecuteNonQuery();
     }
 }
 

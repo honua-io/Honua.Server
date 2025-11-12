@@ -26,7 +26,8 @@ RUN dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
     --configuration Debug \
     --output /app/publish \
     --no-restore \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:ErrorOnDuplicatePublishOutputFiles=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app

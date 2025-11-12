@@ -244,13 +244,11 @@ public class HonuaTestWebApplicationFactory : WebApplicationFactory<Program>, ID
         services.RemoveAll<IOutputCacheInvalidationService>();
         services.RemoveAll<IOutputCacheStore>();
         services.RemoveAll<IStyleRepository>();
-        services.RemoveAll<ODataInitializationHostedService>();
 
         // Remove STAC synchronization hosted service
         var hostedServices = services
             .Where(descriptor => descriptor.ServiceType == typeof(IHostedService) &&
-                                 (descriptor.ImplementationType?.Name == "StacCatalogSynchronizationHostedService" ||
-                                  descriptor.ImplementationType == typeof(ODataInitializationHostedService)))
+                                 descriptor.ImplementationType?.Name == "StacCatalogSynchronizationHostedService")
             .ToList();
 
         foreach (var descriptor in hostedServices)

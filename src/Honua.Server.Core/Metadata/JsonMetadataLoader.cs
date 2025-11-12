@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Performance;
@@ -26,7 +27,16 @@ internal sealed class JsonMetadataLoader
     {
         try
         {
-            var result = await JsonHelper.LoadFromFileAsync<MetadataDocument>(metadataPath, JsonSerializerOptionsRegistry.DevTooling, cancellationToken);
+            // Use reflection-based serialization options to support metadata files created from anonymous objects
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true,
+                MaxDepth = 64,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+            var result = await JsonHelper.LoadFromFileAsync<MetadataDocument>(metadataPath, options, cancellationToken);
             return result ?? throw new InvalidDataException("Metadata file is empty or invalid.");
         }
         catch (JsonException ex)
@@ -50,7 +60,16 @@ internal sealed class JsonMetadataLoader
 
         try
         {
-            return JsonHelper.Deserialize<MetadataDocument>(json, JsonSerializerOptionsRegistry.DevTooling)
+            // Use reflection-based serialization options to support metadata strings created from anonymous objects
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true,
+                MaxDepth = 64,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+            return JsonHelper.Deserialize<MetadataDocument>(json, options)
                    ?? throw new InvalidDataException("Metadata payload is empty or invalid.");
         }
         catch (JsonException ex)

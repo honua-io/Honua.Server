@@ -35,6 +35,8 @@
     <PackageReference Include="FluentAssertions" Version="8.6.0" />
     <!-- Docker container testing -->
     <PackageReference Include="Testcontainers" Version="3.10.0" />
+    <!-- SQLite for test database creation -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.9" />
   </ItemGroup>
 
   <ItemGroup>
