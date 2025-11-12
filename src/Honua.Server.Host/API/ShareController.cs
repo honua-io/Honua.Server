@@ -49,6 +49,18 @@ public class ShareController : ControllerBase
         [FromRoute] string mapId,
         [FromBody] CreateShareRequest request)
     {
+        // Validate mapId
+        if (string.IsNullOrWhiteSpace(mapId) || mapId.Length > 200)
+        {
+            return BadRequest(new { error = "Invalid mapId. Must be between 1 and 200 characters." });
+        }
+
+        // Validate ExpiresAt is in the future if provided
+        if (request.ExpiresAt.HasValue && request.ExpiresAt.Value <= DateTime.UtcNow)
+        {
+            return BadRequest(new { error = "ExpiresAt must be a future date." });
+        }
+
         try
         {
             var userId = User.Identity?.Name ?? "anonymous";
@@ -190,6 +202,16 @@ public class ShareController : ControllerBase
             return NotFound(new { error = "Share not found" });
         }
 
+        // Verify ownership
+        var userId = User.Identity?.Name ?? "anonymous";
+        if (shareToken.CreatedBy != userId && !User.IsInRole("administrator"))
+        {
+            _logger.LogWarning(
+                "User {UserId} attempted to update share {Token} owned by {OwnerId}",
+                userId, token, shareToken.CreatedBy);
+            return Forbid();
+        }
+
         if (request.Permission != null)
             shareToken.Permission = request.Permission;
 
@@ -220,11 +242,21 @@ public class ShareController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateShare([FromRoute] string token)
     {
-        var (isValid, _, _) = await _shareService.ValidateShareAsync(token);
+        var (isValid, shareToken, _) = await _shareService.ValidateShareAsync(token);
 
-        if (!isValid)
+        if (!isValid || shareToken == null)
         {
             return NotFound(new { error = "Share not found" });
+        }
+
+        // Verify ownership
+        var userId = User.Identity?.Name ?? "anonymous";
+        if (shareToken.CreatedBy != userId && !User.IsInRole("administrator"))
+        {
+            _logger.LogWarning(
+                "User {UserId} attempted to deactivate share {Token} owned by {OwnerId}",
+                userId, token, shareToken.CreatedBy);
+            return Forbid();
         }
 
         await _shareService.DeactivateShareAsync(token);
@@ -415,10 +447,17 @@ public class ShareController : ControllerBase
 
 public class CreateShareRequest
 {
+    [RegularExpression(@"^(view|edit|comment)$", ErrorMessage = "Permission must be 'view', 'edit', or 'comment'")]
     public string? Permission { get; set; }
+
     public bool AllowGuestAccess { get; set; } = true;
+
+    [FutureDate(ErrorMessage = "ExpiresAt must be a future date")]
     public DateTime? ExpiresAt { get; set; }
+
+    [StringLength(500, ErrorMessage = "Password cannot exceed 500 characters")]
     public string? Password { get; set; }
+
     public EmbedSettings? EmbedSettings { get; set; }
 }
 
@@ -490,4 +529,29 @@ public class ShareCommentResponse
     public string? MapId { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ShareToken { get; set; }
+}
+
+/// <summary>
+/// Validation attribute to ensure a DateTime is in the future.
+/// </summary>
+public class FutureDateAttribute : ValidationAttribute
+{
+    protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
+    {
+        if (value == null)
+        {
+            return ValidationResult.Success; // Null is valid (optional field)
+        }
+
+        if (value is DateTime dateTime)
+        {
+            if (dateTime <= DateTime.UtcNow)
+            {
+                return new ValidationResult(ErrorMessage ?? "Date must be in the future.");
+            }
+            return ValidationResult.Success;
+        }
+
+        return new ValidationResult("Invalid date format.");
+    }
 }

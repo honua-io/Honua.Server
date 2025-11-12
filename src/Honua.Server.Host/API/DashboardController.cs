@@ -39,7 +39,7 @@ public class DashboardController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(DashboardDefinition), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<DashboardDefinition>> GetDashboard(Guid id)
+    public async Task<ActionResult> GetDashboard(Guid id)
     {
         var dashboard = await _repository.GetByIdAsync(id);
         if (dashboard == null)
@@ -47,14 +47,24 @@ public class DashboardController : ControllerBase
             return NotFound(new { message = "Dashboard not found" });
         }
 
-        // Check access permissions
         var userId = GetUserId();
-        if (!dashboard.IsPublic && dashboard.OwnerId != userId)
+        var isOwner = dashboard.OwnerId == userId;
+
+        // Check access permissions
+        if (!dashboard.IsPublic && !isOwner)
         {
             return Forbid();
         }
 
-        return Ok(dashboard);
+        // Return different DTO based on ownership
+        if (isOwner)
+        {
+            return Ok(ToOwnerDto(dashboard));
+        }
+        else
+        {
+            return Ok(ToPublicDto(dashboard));
+        }
     }
 
     /// <summary>
@@ -76,11 +86,12 @@ public class DashboardController : ControllerBase
     /// <response code="200">List of public dashboards</response>
     [HttpGet("public")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(List<DashboardDefinition>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<DashboardDefinition>>> GetPublicDashboards()
+    [ProducesResponseType(typeof(List<PublicDashboardDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<PublicDashboardDto>>> GetPublicDashboards()
     {
         var dashboards = await _repository.GetPublicDashboardsAsync();
-        return Ok(dashboards);
+        var dtos = dashboards.Select(d => ToPublicDto(d)).ToList();
+        return Ok(dtos);
     }
 
     /// <summary>
@@ -101,8 +112,8 @@ public class DashboardController : ControllerBase
     /// <param name="q">Search query</param>
     /// <response code="200">List of matching dashboards</response>
     [HttpGet("search")]
-    [ProducesResponseType(typeof(List<DashboardDefinition>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<DashboardDefinition>>> SearchDashboards([FromQuery] string q)
+    [ProducesResponseType(typeof(List<PublicDashboardDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<PublicDashboardDto>>> SearchDashboards([FromQuery] string q)
     {
         if (string.IsNullOrWhiteSpace(q))
         {
@@ -111,9 +122,12 @@ public class DashboardController : ControllerBase
 
         var dashboards = await _repository.SearchAsync(q);
 
-        // Filter by access permissions
+        // Filter by access permissions and return appropriate DTOs
         var userId = GetUserId();
-        var accessible = dashboards.Where(d => d.IsPublic || d.OwnerId == userId).ToList();
+        var accessible = dashboards
+            .Where(d => d.IsPublic || d.OwnerId == userId)
+            .Select(d => d.OwnerId == userId ? (PublicDashboardDto)ToOwnerDto(d) : ToPublicDto(d))
+            .ToList();
 
         return Ok(accessible);
     }
@@ -359,6 +373,46 @@ public class DashboardController : ControllerBase
         return CreatedAtAction(nameof(GetDashboard), new { id }, dashboard);
     }
 
+    private PublicDashboardDto ToPublicDto(DashboardDefinition dashboard)
+    {
+        return new PublicDashboardDto
+        {
+            Id = dashboard.Id,
+            Name = dashboard.Name,
+            Description = dashboard.Description,
+            Tags = dashboard.Tags,
+            Layout = dashboard.Layout,
+            Widgets = dashboard.Widgets,
+            Connections = dashboard.Connections,
+            IsPublic = dashboard.IsPublic,
+            RefreshInterval = dashboard.RefreshInterval,
+            Theme = dashboard.Theme,
+            CreatedAt = dashboard.CreatedAt,
+            UpdatedAt = dashboard.UpdatedAt
+        };
+    }
+
+    private OwnerDashboardDto ToOwnerDto(DashboardDefinition dashboard)
+    {
+        return new OwnerDashboardDto
+        {
+            Id = dashboard.Id,
+            Name = dashboard.Name,
+            Description = dashboard.Description,
+            Tags = dashboard.Tags,
+            Layout = dashboard.Layout,
+            Widgets = dashboard.Widgets,
+            Connections = dashboard.Connections,
+            IsPublic = dashboard.IsPublic,
+            RefreshInterval = dashboard.RefreshInterval,
+            Theme = dashboard.Theme,
+            CreatedAt = dashboard.CreatedAt,
+            UpdatedAt = dashboard.UpdatedAt,
+            OwnerId = dashboard.OwnerId,
+            IsTemplate = dashboard.IsTemplate
+        };
+    }
+
     private string GetUserId()
     {
         return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -416,6 +470,36 @@ public class ShareDashboardRequest
 public class CloneDashboardRequest
 {
     public string? Name { get; set; }
+}
+
+/// <summary>
+/// Public dashboard view without sensitive metadata.
+/// </summary>
+public class PublicDashboardDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public List<string> Tags { get; set; } = new();
+    public DashboardLayout Layout { get; set; } = new();
+    public List<WidgetDefinition> Widgets { get; set; } = new();
+    public List<WidgetConnection> Connections { get; set; } = new();
+    public bool IsPublic { get; set; }
+    public int? RefreshInterval { get; set; }
+    public DashboardTheme? Theme { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+
+    // Explicitly exclude: OwnerId, IsTemplate, internal metadata
+}
+
+/// <summary>
+/// Full dashboard view with all metadata for owners.
+/// </summary>
+public class OwnerDashboardDto : PublicDashboardDto
+{
+    public string OwnerId { get; set; } = string.Empty;
+    public bool IsTemplate { get; set; }
 }
 
 #endregion
