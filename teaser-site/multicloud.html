@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HonuaIO - Multi-Cloud Geospatial Platform</title>
+    <meta name="description" content="HonuaIO deploys geospatial services across AWS, Azure, GCP, and the edge with pluginized workflows for raster, vector, and AI workloads. Join the beta waitlist.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1e40af;
+            --accent: #7c3aed;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --border-color: #e2e8f0;
+            --success-color: #10b981;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-primary);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary-color);
+            letter-spacing: -0.02em;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success-color);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Hero */
+        .hero {
+            padding: 80px 0 40px;
+            background: linear-gradient(180deg, rgba(37,99,235,0.08), rgba(124,58,237,0.06));
+        }
+
+        .hero-content {
+            max-width: 860px;
+            margin: 0 auto 48px;
+            text-align: center;
+        }
+
+        .hero-tagline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 999px;
+            background: rgba(37, 99, 235, 0.15);
+            color: var(--primary-color);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 52px;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            margin-bottom: 20px;
+        }
+
+        .hero-subtitle {
+            font-size: 22px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .hero-persona {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .cloud-badges {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .cloud-badge {
+            padding: 8px 18px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            font-size: 14px;
+            font-weight: 600;
+            background: white;
+        }
+
+        .hero-cta {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .btn-primary {
+            padding: 14px 28px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            text-decoration: none;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+        }
+
+        .btn-secondary {
+            padding: 14px 28px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .trust-note {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .hero-card {
+            margin: 40px auto 0;
+            max-width: 800px;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            padding: 32px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 24px;
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+        }
+
+        .hero-card h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .newsletter-panel {
+            margin: 56px auto 0;
+            max-width: 640px;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            padding: 36px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        }
+
+        .newsletter-panel h2 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .newsletter-panel p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 12px;
+            flex-direction: column;
+        }
+
+        .form-input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Architecture */
+        .architecture {
+            padding: 80px 0;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .section-tagline {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--primary-color);
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 40px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+        }
+
+        .section-subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+            max-width: 680px;
+            margin: 0 auto;
+        }
+
+        .architecture-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+        }
+
+        .architecture-card {
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 28px;
+            background: var(--bg-secondary);
+        }
+
+        .architecture-card h3 {
+            font-size: 22px;
+            margin-bottom: 12px;
+        }
+
+        .architecture-card ul {
+            margin-top: 16px;
+            padding-left: 18px;
+            color: var(--text-secondary);
+        }
+
+        /* Capabilities */
+        .capabilities {
+            padding: 80px 0;
+            background: var(--bg-secondary);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 28px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+            border-color: var(--primary-color);
+        }
+
+        .feature-card h4 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+
+        /* Outputs */
+        .outputs {
+            padding: 80px 0;
+        }
+
+        .output-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .output-card {
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 24px;
+            background: var(--bg-secondary);
+        }
+
+        .output-card h5 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .output-card ul {
+            padding-left: 18px;
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+
+        /* CTA */
+        .footer-cta {
+            padding: 80px 0;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent));
+            color: white;
+            text-align: center;
+        }
+
+        .footer-cta h2 {
+            font-size: 40px;
+            font-weight: 800;
+            margin-bottom: 18px;
+        }
+
+        .footer-cta p {
+            font-size: 18px;
+            margin-bottom: 32px;
+            opacity: 0.92;
+        }
+
+        .footer-cta .btn-primary {
+            background: white;
+            color: var(--primary-color);
+        }
+
+        /* Stats near bottom */
+        .stats {
+            padding: 64px 0;
+            background: var(--text-primary);
+            color: white;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 32px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 15px;
+            opacity: 0.75;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 32px 0;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 36px;
+            }
+
+            .hero-card {
+                grid-template-columns: 1fr;
+            }
+
+            .newsletter-panel {
+                padding: 28px;
+            }
+
+            .form-group {
+                flex-direction: column;
+            }
+
+            .footer-cta h2 {
+                font-size: 32px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .form-group {
+                flex-direction: row;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">HonuaIO</div>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    Beta waitlist open
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-tagline">Multi-cloud by design</div>
+                <h1>Deploy geospatial services anywhere in minutes</h1>
+                <p class="hero-subtitle">HonuaIO ships as ultra-light plugins so you can run the same stack across AWS, Azure, GCP, sovereign clouds, or bare metal without rewrites.</p>
+                <p class="hero-persona">Built for GIS leads, digital twin teams, and real-time field operations.</p>
+                <div class="cloud-badges">
+                    <span class="cloud-badge">AWS</span>
+                    <span class="cloud-badge">Azure</span>
+                    <span class="cloud-badge">Google Cloud</span>
+                    <span class="cloud-badge">Kubernetes</span>
+                    <span class="cloud-badge">Edge / Air Gap</span>
+                </div>
+                <div class="hero-cta">
+                    <a href="#newsletter-form" class="btn-primary">Notify Me</a>
+                    <a href="#architecture" class="btn-secondary">See Architecture</a>
+                </div>
+                <div class="trust-note">Monthly build notes. 50 founding beta seats available.</div>
+                <div class="hero-card">
+                    <div>
+                        <h3>Pluginized data plane</h3>
+                        <p>Ship GeoETL, routing, rendering, and AI pipelines as &lt;30 MB containers that hot-reload without touching your control plane.</p>
+                    </div>
+                    <div>
+                        <h3>Environment parity</h3>
+                        <p>One manifest targets S3, Blob, or GCS plus Postgres, Spanner, Cosmos, or any PostGIS-compatible store.</p>
+                    </div>
+                    <div>
+                        <h3>Integrated observability</h3>
+                        <p>Trace every plugin across regions with OpenTelemetry exports to CloudWatch, Azure Monitor, or Grafana.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="newsletter-panel" id="signup">
+                <h2>Get on the beta calendar</h2>
+                <p>We onboard a handful of teams each month with architecture reviews, migration guides, and sandbox credits.</p>
+                <form class="form-group" id="newsletter-form" name="newsletter" method="POST" data-name="Newsletter">
+                    <input type="email" class="form-input" placeholder="Work email" required name="email" data-name="Email" id="email-input">
+                    <button type="submit" class="btn-primary">Request Invite</button>
+                </form>
+                <div class="trust-note" style="text-align:left;margin-top:12px;">We'll only reach out with beta logistics and product updates.</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="architecture" id="architecture">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tagline">Run anywhere</div>
+                <h2 class="section-title">Pluginized architecture that mirrors every cloud</h2>
+                <p class="section-subtitle">Drop HonuaIO alongside your existing data plane. Each capability is a signed plugin with consistent APIs, Terraform modules, and Helm charts.</p>
+            </div>
+            <div class="architecture-grid">
+                <div class="architecture-card">
+                    <h3>Deployment profiles</h3>
+                    <p>Choose the surface that matches your workload without changing code.</p>
+                    <ul>
+                        <li>Kubernetes &amp; serverless targets</li>
+                        <li>FIPS + air-gapped bundles</li>
+                        <li>Edge streaming on Jetson &amp; rugged PCs</li>
+                    </ul>
+                </div>
+                <div class="architecture-card">
+                    <h3>Data &amp; event plugins</h3>
+                    <p>Combine database, storage, and queue plugins per region.</p>
+                    <ul>
+                        <li>PostgreSQL, Spanner, Dynamo, Cosmos</li>
+                        <li>S3, Azure Blob, GCS, MinIO</li>
+                        <li>Kafka, Event Hubs, Pub/Sub</li>
+                    </ul>
+                </div>
+                <div class="architecture-card">
+                    <h3>Observability baked in</h3>
+                    <p>Per-plugin SLOs with latency budgeting, replay, and drift detection.</p>
+                    <ul>
+                        <li>OpenTelemetry traces + metrics</li>
+                        <li>Audit-grade plugin logs</li>
+                        <li>Automated failover drills</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="capabilities">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tagline">What you can launch</div>
+                <h2 class="section-title">Data infrastructure, real-time ops, and AI in one stack</h2>
+                <p class="section-subtitle">Pick the lanes you need today and add more plugins as your mission expands.</p>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>GeoETL pipelines</h4>
+                    <p>Streaming and batch ETL with CQL2 filters, topology validation, and delta publishing to STAC + vector tiles.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>GeoEvents</h4>
+                    <p>&lt;100 ms latency geofencing, IoT routing, and alerting tied to your existing MQTT/Kafka topics.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Route &amp; optimization</h4>
+                    <p>Multi-stop planners, isochrones, and network analysis that tap GraphHopper, OSRM, or indoor networks.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>3D &amp; reality capture</h4>
+                    <p>Stream IFC, point clouds, Cesium 3D Tiles, and terrain meshes with GPU-accelerated styling.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>AI-assisted ops</h4>
+                    <p>LLM-based workflow generation, anomaly detection, and feature extraction tuned for geospatial datasets.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Collaboration &amp; compliance</h4>
+                    <p>Versioned edits, approval workflows, and auditable lineage for regulated environments.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="outputs">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tagline">Raster + delivery</div>
+                <h2 class="section-title">Serve every format your teams expect</h2>
+                <p class="section-subtitle">HonuaIO speaks both classic and next-gen standards so you can move data between desktop GIS, cloud analytics, and mission systems without friction.</p>
+            </div>
+            <div class="output-grid">
+                <div class="output-card">
+                    <h5>Raster &amp; imagery</h5>
+                    <ul>
+                        <li>Cloud-Optimized GeoTIFF (COG) generation</li>
+                        <li>On-the-fly WMTS/WMS tiles with dynamic styling</li>
+                        <li>WCS &amp; STAC asset publishing with temporal filters</li>
+                    </ul>
+                </div>
+                <div class="output-card">
+                    <h5>Vector &amp; analysis outputs</h5>
+                    <ul>
+                        <li>Vector tiles, GeoPackage, GeoParquet, FeatureServices</li>
+                        <li>Batch exports to shapefile, FGDB, DXF when legacy is required</li>
+                        <li>APIs for OGC API Features, Esri REST, and GraphQL</li>
+                    </ul>
+                </div>
+                <div class="output-card">
+                    <h5>Delivery targets</h5>
+                    <ul>
+                        <li>Push to S3, Azure Blob, GCS, or on-prem NAS</li>
+                        <li>Signed URLs and presigned bundles for partners</li>
+                        <li>Automated cache invalidation + CDN hooks</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="footer-cta">
+        <div class="container">
+            <h2>Be part of the founding cohort</h2>
+            <p>Get migration playbooks, reference architectures, and direct access to the core engineering team.</p>
+            <a href="#newsletter-form" class="btn-primary">Reserve a Beta Slot</a>
+        </div>
+    </section>
+
+    <section class="stats">
+        <div class="container">
+            <div class="stats-grid">
+                <div>
+                    <div class="stat-number">10+</div>
+                    <div class="stat-label">OGC &amp; Esri-compatible APIs out of the box</div>
+                </div>
+                <div>
+                    <div class="stat-number">11+</div>
+                    <div class="stat-label">Databases + data lakes supported at launch</div>
+                </div>
+                <div>
+                    <div class="stat-number">30&nbsp;MB</div>
+                    <div class="stat-label">Average plugin image size for rapid rollouts</div>
+                </div>
+                <div>
+                    <div class="stat-number">40+</div>
+                    <div class="stat-label">Raster &amp; vector operations ready today</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div>&copy; 2025 HonuaIO &mdash; Crafted by engineers who built national-scale GIS infrastructure.</div>
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('newsletter-form').addEventListener('submit', function(e) {
+            console.log('Form submitted');
+        });
+    </script>
+</body>
+</html>
