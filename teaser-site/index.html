@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Honua - Cloud-Native Geospatial Server</title>
-    <meta name="description" content="The modern geospatial server built for the cloud. Standards-compliant. Zero vendor lock-in. Coming soon.">
+    <title>HonuaIO - Cloud-Native Geospatial Platform</title>
+    <meta name="description" content="The modern geospatial platform built for the cloud. Standards-compliant. Zero vendor lock-in. Coming soon.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -409,7 +409,7 @@
     <header class="header">
         <div class="container">
             <div class="header-content">
-                <div class="logo">Honua</div>
+                <div class="logo">HonuaIO</div>
                 <div class="status-badge">
                     <span class="status-dot"></span>
                     In Development
@@ -424,12 +424,12 @@
             <div class="hero-tagline">Coming Soon</div>
             <h1>
                 The Cloud-Native<br>
-                <span class="gradient-text">Geospatial Server</span><br>
+                <span class="gradient-text">Geospatial Platform</span><br>
                 for the Modern Era
             </h1>
             <p class="hero-subtitle">
-                Standards-compliant. Zero vendor lock-in. Serverless-ready.
-                Deploy anywhere, serve everywhere.
+                Standards-compliant. Zero vendor lock-in. Plugin-powered.
+                From GeoETL to AI-driven analytics—everything you need in one platform.
             </p>
 
             <!-- Newsletter Signup -->
@@ -467,12 +467,12 @@
                     <div class="stat-label">Database Providers</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">40+</div>
-                    <div class="stat-label">Spatial Operations</div>
+                    <div class="stat-number">&lt;30MB</div>
+                    <div class="stat-label">Plugin Images</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">100%</div>
-                    <div class="stat-label">Cloud-Native</div>
+                    <div class="stat-number">40+</div>
+                    <div class="stat-label">Spatial Operations</div>
                 </div>
             </div>
         </div>
@@ -491,10 +491,10 @@
             <div class="features-grid">
                 <div class="feature-card">
                     <div class="feature-icon">⚡</div>
-                    <h3 class="feature-title">Serverless-Ready</h3>
+                    <h3 class="feature-title">Plugin-Powered Architecture</h3>
                     <p class="feature-description">
-                        Deploy to Kubernetes, AWS Lambda, Google Cloud Run, or Azure Container Apps.
-                        Lite variant under 80MB with 50% faster cold starts.
+                        Deploy only what you need with ultra-lightweight plugins under 30MB each.
+                        Modular design for Kubernetes, serverless, and edge deployments.
                     </p>
                 </div>
 
@@ -508,11 +508,47 @@
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">🔓</div>
-                    <h3 class="feature-title">Zero Vendor Lock-In</h3>
+                    <div class="feature-icon">🔄</div>
+                    <h3 class="feature-title">GeoETL</h3>
                     <p class="feature-description">
-                        Works with PostgreSQL, MySQL, BigQuery, Snowflake, MongoDB, and more.
-                        Choose your database, your cloud, your way.
+                        Transform, validate, and distribute geospatial data with built-in ETL workflows.
+                        Support for 14+ formats including GeoPackage, Shapefile, and Cloud-Optimized GeoTIFF.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📡</div>
+                    <h3 class="feature-title">GeoEvents</h3>
+                    <p class="feature-description">
+                        Real-time geofencing and IoT event processing with &lt;100ms latency.
+                        Perfect for asset tracking, fleet management, and proximity alerts.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3 class="feature-title">Geoprocessing</h3>
+                    <p class="feature-description">
+                        40+ spatial operations including buffer, union, dissolve, heatmaps, clustering,
+                        and terrain analysis. CQL2 filtering for complex spatial queries.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3 class="feature-title">3D Visualization</h3>
+                    <p class="feature-description">
+                        WebGL-based 3D rendering with IFC import, point cloud support for LiDAR and drones,
+                        and terrain elevation profiles. Full VR/AR ready.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3 class="feature-title">AI-Powered</h3>
+                    <p class="feature-description">
+                        ML-driven anomaly detection, AI-assisted workflow generation, and LLM-based
+                        deployment automation. Smart geospatial intelligence built-in.
                     </p>
                 </div>
 
@@ -520,8 +556,8 @@
                     <div class="feature-icon">🤝</div>
                     <h3 class="feature-title">Real-Time Collaboration</h3>
                     <p class="feature-description">
-                        Multi-user editing with automatic conflict resolution, versioning,
-                        and live updates via WebSocket connections.
+                        Multi-user editing with automatic conflict resolution, data versioning,
+                        and live updates via WebSocket. Git-like workflows for geospatial data.
                     </p>
                 </div>
 
@@ -529,44 +565,8 @@
                     <div class="feature-icon">📱</div>
                     <h3 class="feature-title">Mobile-First</h3>
                     <p class="feature-description">
-                        Native field data collection app for iOS, Android, Windows, and macOS
-                        with offline-first design and automatic sync.
-                    </p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🎨</div>
-                    <h3 class="feature-title">Visual Map Builder</h3>
-                    <p class="feature-description">
-                        No-code map creation with live preview. Export to JSON, YAML, HTML,
-                        or Blazor components with GPU-accelerated rendering.
-                    </p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">📊</div>
-                    <h3 class="feature-title">Advanced Analytics</h3>
-                    <p class="feature-description">
-                        40+ spatial operations including buffer, union, dissolve, heatmaps,
-                        clustering, and CQL2 filtering for complex queries.
-                    </p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🔐</div>
-                    <h3 class="feature-title">Enterprise Security</h3>
-                    <p class="feature-description">
-                        OAuth 2.0, OIDC, SAML 2.0, role-based access control,
-                        multi-tenancy support, and comprehensive audit logging.
-                    </p>
-                </div>
-
-                <div class="feature-card">
-                    <div class="feature-icon">🔍</div>
-                    <h3 class="feature-title">Full Observability</h3>
-                    <p class="feature-description">
-                        OpenTelemetry integration with Prometheus metrics, distributed tracing,
-                        structured logging, and health check endpoints.
+                        Native field data collection app for iOS, Android, Windows, and macOS.
+                        Offline-first with biometric auth and automatic sync.
                     </p>
                 </div>
             </div>
@@ -577,7 +577,7 @@
     <section class="footer-cta">
         <div class="container">
             <h2>Ready to Transform Your Geospatial Infrastructure?</h2>
-            <p>Join the waitlist and be among the first to experience Honua.</p>
+            <p>Join the waitlist and be among the first to experience HonuaIO.</p>
             <a href="#newsletter-form" class="btn-primary" onclick="document.getElementById('email-input').focus(); return false;">Get Early Access</a>
         </div>
     </section>
@@ -586,8 +586,8 @@
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
-                <div class="footer-logo">Honua</div>
-                <div class="footer-text">© 2025 Honua. All rights reserved.</div>
+                <div class="footer-logo">HonuaIO</div>
+                <div class="footer-text">© 2025 HonuaIO. All rights reserved.</div>
             </div>
         </div>
     </footer>

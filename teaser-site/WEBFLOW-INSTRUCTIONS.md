@@ -1,14 +1,14 @@
-# Honua Teaser Site - Webflow Import Instructions
+# HonuaIO Teaser Site - Webflow Import Instructions
 
-This guide will help you import the Honua teaser site into Webflow.
+This guide will help you import the HonuaIO teaser site into Webflow.
 
 ## Quick Overview
 
 The teaser site includes:
 - Modern, responsive landing page design
 - Email newsletter signup form
-- Feature showcase with 9 key features
-- Statistics section highlighting Honua's capabilities
+- Feature showcase with 9 key features (GeoETL, GeoEvents, Geoprocessing, 3D, AI)
+- Statistics section highlighting HonuaIO's capabilities (10+ OGC standards, 11+ databases, <30MB plugins)
 - Mobile-responsive design
 - Clean, professional styling
 
@@ -51,7 +51,7 @@ This method gives you complete control over the design in Webflow's visual edito
 1. Add a **Section** element
 2. Inside: Add a **Container** (max-width: 1200px)
 3. Add a **Div Block** with flex display (space-between)
-4. Left side: Add **Heading** with text "Honua" (class: `logo`)
+4. Left side: Add **Heading** with text "HonuaIO" (class: `logo`)
 5. Right side: Add **Div** with text "In Development" (class: `status-badge`)
 
 #### Hero Section
@@ -201,8 +201,8 @@ Before publishing, test:
 ## SEO Optimization
 
 ### Add in Webflow Page Settings:
-1. **Title Tag**: "Honua - Cloud-Native Geospatial Server | Coming Soon"
-2. **Meta Description**: "The modern geospatial server built for the cloud. Standards-compliant. Zero vendor lock-in. Serverless-ready. Join our waitlist."
+1. **Title Tag**: "HonuaIO - Cloud-Native Geospatial Platform | Coming Soon"
+2. **Meta Description**: "The modern geospatial platform built for the cloud. Standards-compliant. Plugin-powered. From GeoETL to AI-driven analytics. Join our waitlist."
 3. **Open Graph Image**: Create a 1200x630px image with your branding
 4. **Twitter Card**: Summary with large image
 
@@ -242,7 +242,7 @@ For Webflow-specific issues:
 - [Webflow Forum](https://forum.webflow.com/)
 - Webflow Support Chat (in Designer)
 
-For Honua-related questions:
+For HonuaIO-related questions:
 - Stay tuned for updates via the newsletter!
 
 ---
@@ -266,4 +266,4 @@ If you encounter issues:
 3. Test form submissions in preview mode before publishing
 4. Clear browser cache if styles don't appear
 
-Good luck with your Honua teaser launch! 🚀
+Good luck with your HonuaIO teaser launch! 🚀

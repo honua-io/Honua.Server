@@ -1,32 +1,32 @@
-# Honua Teaser Site
+# HonuaIO Teaser Site
 
-A modern, responsive landing page for Honua - the cloud-native geospatial server.
+A modern, responsive landing page for HonuaIO - the cloud-native geospatial platform.
 
 ## Overview
 
-This teaser site is designed to build anticipation and collect email signups for Honua's launch without revealing the GitHub repository URL yet.
+This teaser site is designed to build anticipation and collect email signups for HonuaIO's launch without revealing the GitHub repository URL yet.
 
 ## What's Included
 
 - **Clean, modern design** with gradient accents and smooth animations
 - **Email newsletter signup form** as the main CTA
-- **Feature showcase** highlighting 9 key capabilities
-- **Statistics section** with impressive numbers (10+ OGC standards, 11+ databases, etc.)
+- **Feature showcase** highlighting 9 key capabilities (GeoETL, GeoEvents, Geoprocessing, 3D, AI)
+- **Statistics section** with impressive numbers (10+ OGC standards, 11+ databases, <30MB plugins)
 - **Fully responsive** design that works on all devices
 - **Fast loading** with embedded CSS and minimal dependencies
 - **Easy to customize** with CSS custom properties
 
 ## Key Features Highlighted
 
-1. Serverless-Ready Architecture
+1. Plugin-Powered Architecture (under 30MB per plugin)
 2. Standards-First Approach (OGC compliance)
-3. Zero Vendor Lock-In
-4. Real-Time Collaboration
-5. Mobile-First Design
-6. Visual Map Builder
-7. Advanced Analytics (40+ spatial operations)
-8. Enterprise Security
-9. Full Observability
+3. GeoETL - Data transformation and distribution
+4. GeoEvents - Real-time geofencing and IoT
+5. Geoprocessing - 40+ spatial operations
+6. 3D Visualization - Point clouds, IFC, terrain
+7. AI-Powered - ML and automation
+8. Real-Time Collaboration
+9. Mobile-First Design
 
 ## Quick Start
 
@@ -130,7 +130,7 @@ For questions about:
 
 ## License
 
-This teaser site is part of the Honua project.
+This teaser site is part of the HonuaIO project.
 
 ---
 
