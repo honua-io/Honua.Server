@@ -21,7 +21,7 @@ public sealed class FileSystemAttachmentStoreProvider : IAttachmentStoreProvider
 
     public string ProviderKey => AttachmentStoreProviderKeys.FileSystem;
 
-    public IAttachmentStore Create(string profileId, AttachmentStorageProfileConfiguration profileConfiguration)
+    public IAttachmentStore Create(string profileId, AttachmentStorageProfileOptions profileConfiguration)
     {
         Guard.NotNull(profileConfiguration);
         var rootPath = profileConfiguration.FileSystem?.RootPath;

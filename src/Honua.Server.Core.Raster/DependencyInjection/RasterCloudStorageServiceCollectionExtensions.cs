@@ -25,7 +25,7 @@ public static class RasterCloudStorageServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddCloudCogCacheStorage(
         this IServiceCollection services,
-        RasterCacheConfiguration rasterCacheConfig,
+        RasterCacheOptions rasterCacheConfig,
         string basePath)
     {
         ArgumentNullException.ThrowIfNull(rasterCacheConfig);
@@ -63,7 +63,7 @@ public static class RasterCloudStorageServiceCollectionExtensions
         return services;
     }
 
-    private static S3CogCacheStorage CreateS3CogStorage(RasterCacheConfiguration cfg, ILoggerFactory loggerFactory)
+    private static S3CogCacheStorage CreateS3CogStorage(RasterCacheOptions cfg, ILoggerFactory loggerFactory)
     {
         if (cfg.CogCacheS3Bucket.IsNullOrWhiteSpace())
         {
@@ -101,7 +101,7 @@ public static class RasterCloudStorageServiceCollectionExtensions
         return new S3CogCacheStorage(client, cfg.CogCacheS3Bucket!, cfg.CogCacheS3Prefix, storageLogger, ownsClient: true);
     }
 
-    private static AzureBlobCogCacheStorage CreateAzureCogStorage(RasterCacheConfiguration cfg, ILoggerFactory loggerFactory)
+    private static AzureBlobCogCacheStorage CreateAzureCogStorage(RasterCacheOptions cfg, ILoggerFactory loggerFactory)
     {
         if (cfg.CogCacheAzureConnectionString.IsNullOrWhiteSpace())
         {
@@ -117,7 +117,7 @@ public static class RasterCloudStorageServiceCollectionExtensions
         return new AzureBlobCogCacheStorage(containerClient, cfg.CogCacheAzurePrefix, cfg.CogCacheAzureEnsureContainer, storageLogger, ownsContainer: true);
     }
 
-    private static GcsCogCacheStorage CreateGcsCogStorage(RasterCacheConfiguration cfg, string basePath, ILoggerFactory loggerFactory)
+    private static GcsCogCacheStorage CreateGcsCogStorage(RasterCacheOptions cfg, string basePath, ILoggerFactory loggerFactory)
     {
         if (cfg.CogCacheGcsBucket.IsNullOrWhiteSpace())
         {

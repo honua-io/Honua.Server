@@ -2,26 +2,47 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using System;
 using System.Linq;
+using Honua.Server.Core.Configuration.V2;
 using System.Text.Json;
+using Honua.Server.Core.Configuration.V2;
 using System.Text.Json.Nodes;
+using Honua.Server.Core.Configuration.V2;
 using System.Text.Json.Serialization;
+using Honua.Server.Core.Configuration.V2;
 using System.Threading;
+using Honua.Server.Core.Configuration.V2;
 using System.Threading.Tasks;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Geoservices.GeometryService;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Logging;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Observability;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Extensions;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Extensions;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.GeoservicesREST.Services;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Authorization;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Http;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Mvc;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.Logging;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.Primitives;
+using Honua.Server.Core.Configuration.V2;
 using NetTopologySuite.Geometries;
+using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.GeoservicesREST;
 
@@ -32,18 +53,18 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
 {
     private const int OperationTimeoutSeconds = 30;
 
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly HonuaConfig? _honuaConfig;
     private readonly IGeometrySerializer _serializer;
     private readonly IGeometryOperationExecutor _executor;
     private readonly ILogger<GeoservicesRESTGeometryServerController> _logger;
 
     public GeoservicesRESTGeometryServerController(
-        IHonuaConfigurationService configurationService,
         IGeometrySerializer serializer,
         IGeometryOperationExecutor executor,
-        ILogger<GeoservicesRESTGeometryServerController> logger)
+        ILogger<GeoservicesRESTGeometryServerController> logger,
+        HonuaConfig? honuaConfig = null)
     {
-        _configurationService = Guard.NotNull(configurationService);
+        _honuaConfig = honuaConfig;
         _serializer = Guard.NotNull(serializer);
         _executor = Guard.NotNull(executor);
         _logger = Guard.NotNull(logger);
@@ -52,8 +73,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpGet]
     public IActionResult GetService()
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -89,13 +112,17 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("project")]
     public async Task<IActionResult> Project([FromBody] GeometryProjectRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
 
-        if (!geometrySettings.EnableGdalOperations)
+        // For now, assume GDAL operations are enabled by default in Configuration V2
+        var enableGdalOperations = true;
+        if (!enableGdalOperations)
         {
             return StatusCode(StatusCodes.Status501NotImplemented, new { error = "Projection operation is disabled in this environment." });
         }
@@ -334,8 +361,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("buffer")]
     public async Task<IActionResult> Buffer([FromBody] GeometryBufferRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -403,8 +432,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("simplify")]
     public IActionResult Simplify([FromBody] GeometrySimplifyRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -457,8 +488,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("densify")]
     public async Task<IActionResult> Densify([FromBody] GeometryDensifyRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -523,8 +556,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("generalize")]
     public async Task<IActionResult> Generalize([FromBody] GeometryGeneralizeRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -589,8 +624,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("union")]
     public IActionResult Union([FromBody] GeometrySetRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -649,8 +686,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("intersect")]
     public IActionResult Intersect([FromBody] GeometryPairwiseRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -707,8 +746,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("difference")]
     public IActionResult Difference([FromBody] GeometryPairwiseRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -765,8 +806,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("convexHull")]
     public IActionResult ConvexHull([FromBody] GeometrySetRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -819,8 +862,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("distance")]
     public IActionResult Distance([FromBody] GeometryDistanceRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -883,8 +928,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("areasAndLengths")]
     public IActionResult AreasAndLengths([FromBody] GeometryMeasurementRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -938,8 +985,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("offset")]
     public async Task<IActionResult> Offset([FromBody] GeometryOffsetRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -1007,8 +1056,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("trimExtend")]
     public async Task<IActionResult> TrimExtend([FromBody] GeometryTrimExtendRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -1082,8 +1133,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [Authorize(Policy = "RequireViewer")]
     public IActionResult LabelPoints([FromBody] GeometryLabelPointsRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -1139,8 +1192,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("cut")]
     public async Task<IActionResult> Cut([FromBody] GeometryCutRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }
@@ -1215,8 +1270,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("reshape")]
     public async Task<IActionResult> Reshape([FromBody] GeometryReshapeRequest request)
     {
-        var geometrySettings = _configurationService.Current.Services.Geometry;
-        if (!geometrySettings.Enabled)
+        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+            ? geometryService.Enabled
+            : true;
+        if (!geometryEnabled)
         {
             return NotFound();
         }

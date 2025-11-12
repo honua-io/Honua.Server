@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Honua.Server.Core.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
 using Honua.Server.Core.Utilities;
@@ -12,18 +13,18 @@ namespace Honua.Server.Core.Attachments;
 
 public sealed class AttachmentStoreSelector : DisposableBase, IAttachmentStoreSelector
 {
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly IOptionsMonitor<AttachmentConfigurationOptions> _configurationMonitor;
     private readonly IDictionary<string, IAttachmentStoreProvider> _providers;
     private readonly ILogger<AttachmentStoreSelector> _logger;
     private readonly ConcurrentDictionary<string, IAttachmentStore> _cache = new(StringComparer.OrdinalIgnoreCase);
     private IDisposable? _changeRegistration;
 
     public AttachmentStoreSelector(
-        IHonuaConfigurationService configurationService,
+        IOptionsMonitor<AttachmentConfigurationOptions> configurationMonitor,
         IEnumerable<IAttachmentStoreProvider> providers,
         ILogger<AttachmentStoreSelector> logger)
     {
-        _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
+        _configurationMonitor = configurationMonitor ?? throw new ArgumentNullException(nameof(configurationMonitor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         var providerMap = new Dictionary<string, IAttachmentStoreProvider>(StringComparer.OrdinalIgnoreCase);
@@ -60,7 +61,7 @@ public sealed class AttachmentStoreSelector : DisposableBase, IAttachmentStoreSe
 
     private IAttachmentStore CreateStore(string profileId)
     {
-        var config = _configurationService.Current.Attachments;
+        var config = _configurationMonitor.CurrentValue;
         if (!config.Profiles.TryGetValue(profileId, out var profile))
         {
             throw new AttachmentStoreNotFoundException(profileId);
@@ -82,9 +83,7 @@ public sealed class AttachmentStoreSelector : DisposableBase, IAttachmentStoreSe
     private void RegisterForConfigurationChanges()
     {
         _changeRegistration?.Dispose();
-        _changeRegistration = ChangeToken.OnChange(
-            () => _configurationService.GetChangeToken(),
-            OnConfigurationChanged);
+        _changeRegistration = _configurationMonitor.OnChange(_ => OnConfigurationChanged());
     }
 
     private void OnConfigurationChanged()

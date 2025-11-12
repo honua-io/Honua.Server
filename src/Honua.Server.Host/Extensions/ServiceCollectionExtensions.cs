@@ -224,8 +224,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Honua.Server.Core.Raster.Caching.IRasterTileCacheProvider>(sp =>
         {
             var factory = sp.GetRequiredService<Honua.Server.Core.Raster.Caching.IRasterTileCacheProviderFactory>();
-            var configService = sp.GetRequiredService<IHonuaConfigurationService>();
-            var rasterTileCacheConfig = configService.Current.Services.RasterTiles;
+            var rasterCacheOptions = sp.GetService<IOptions<RasterCacheOptions>>()?.Value;
+            // Default configuration if not configured
+            var rasterTileCacheConfig = rasterCacheOptions ?? new RasterCacheOptions
+            {
+                CogCacheEnabled = true,
+                CogCacheProvider = "filesystem"
+            };
             return factory.Create(rasterTileCacheConfig);
         });
 

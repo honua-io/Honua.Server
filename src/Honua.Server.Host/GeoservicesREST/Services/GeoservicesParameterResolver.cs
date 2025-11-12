@@ -22,10 +22,9 @@ internal static class GeoservicesParameterResolver
     private const int FallbackDefaultMaxRecordCount = 1000;
 
     public static (GeoservicesResponseFormat Format, bool PrettyPrint) ResolveFormat(
-        IQueryCollection query,
-        GeoservicesRESTConfiguration? config = null)
+        IQueryCollection query)
     {
-        var defaultFormat = config?.DefaultFormat ?? FallbackDefaultFormat;
+        var defaultFormat = FallbackDefaultFormat;
         var format = query.TryGetValue("f", out var formatValues) ? formatValues[^1] : defaultFormat;
         return NormalizeFormat(format);
     }
@@ -33,12 +32,11 @@ internal static class GeoservicesParameterResolver
     public static int? ResolveLimit(
         IQueryCollection query,
         CatalogServiceView serviceView,
-        CatalogLayerView layerView,
-        GeoservicesRESTConfiguration? config = null)
+        CatalogLayerView layerView)
     {
         var layerLimit = layerView.Layer.Query.MaxRecordCount;
         var serviceLimit = serviceView.Service.Ogc.ItemLimit;
-        var configDefaultLimit = config?.DefaultMaxRecordCount;
+        var configDefaultLimit = (int?)null;
 
         var rawValue = query.TryGetValue("resultRecordCount", out var limitValues) && limitValues.Count > 0
             ? limitValues[^1]

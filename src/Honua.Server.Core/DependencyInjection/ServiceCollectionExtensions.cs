@@ -162,20 +162,6 @@ public static class ServiceCollectionExtensions
         // Add configuration validation - this will validate on startup
         services.AddConfigurationValidation();
 
-        var loader = new ConfigurationLoader();
-        var honuaConfig = loader.Load(honuaSection, basePath);
-        var configurationService = new HonuaConfigurationService(honuaConfig);
-
-        services.AddSingleton<IHonuaConfigurationService>(configurationService);
-        services.AddSingleton(configurationService);
-
-        // Register HonuaConfiguration for validation by binding the already-loaded configuration
-        services.AddSingleton<IOptions<HonuaConfiguration>>(new OptionsWrapper<HonuaConfiguration>(honuaConfig));
-        services.AddSingleton<IOptionsMonitor<HonuaConfiguration>>(sp =>
-        {
-            return new StaticOptionsMonitor<HonuaConfiguration>(honuaConfig);
-        });
-
         // Add distributed and memory caching support
         services.AddHonuaCaching(configuration);
 
@@ -191,30 +177,9 @@ public static class ServiceCollectionExtensions
             return MetadataSchemaValidator.CreateDefault(cache);
         });
 
-        // LEGACY CONFIGURATION SYSTEM - DEPRECATED
-        // Metadata provider is only registered if legacy configuration is present
-        // Configuration V2 (.hcl files) uses a different metadata system
-        services.AddSingleton<IMetadataProvider>(_ =>
-        {
-            var metadata = configurationService.Current.Metadata;
-
-            // If no legacy metadata configuration, skip provider registration
-            // This allows Configuration V2-only deployments to work
-            if (metadata is null)
-            {
-                // Return a no-op provider that throws when accessed
-                // This prevents null reference exceptions while making it clear legacy config is missing
-                return new NoOpMetadataProvider();
-            }
-
-            return metadata.Provider.ToLowerInvariant() switch
-            {
-                "json" => new JsonMetadataProvider(metadata.Path),
-                "yaml" => new YamlMetadataProvider(metadata.Path),
-                _ => throw new NotSupportedException(
-                    $"Metadata provider '{metadata.Provider}' is not supported. Supported providers: json, yaml.")
-            };
-        });
+        // Configuration V2 metadata system is now mandatory
+        // Legacy metadata provider registration has been removed
+        // Metadata provider should be registered via Configuration V2 system
 
         services.AddSingleton<IDataStoreProviderFactory, DataStoreProviderFactory>();
         services.AddSingleton<IFeatureContextResolver, FeatureContextResolver>();
@@ -257,7 +222,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<VectorStacCatalogBuilder>();
         services.AddSingleton<IRasterStacCatalogSynchronizer, RasterStacCatalogSynchronizer>();
         services.AddSingleton<IVectorStacCatalogSynchronizer, VectorStacCatalogSynchronizer>();
-        services.AddSingleton<IStacCatalogStore>(_ => new StacCatalogStoreFactory().Create(configurationService.Current.Services.Stac));
+
+        // Register STAC catalog store with configuration from appsettings
+        services.Configure<StacCatalogOptions>(configuration.GetSection(StacCatalogOptions.SectionName));
+        services.AddSingleton<IStacCatalogStore>(sp =>
+        {
+            var stacOptions = sp.GetRequiredService<IOptions<StacCatalogOptions>>().Value;
+            return new StacCatalogStoreFactory().Create(stacOptions);
+        });
 
         services.AddSingleton<IAuthRepository>(sp =>
         {
@@ -315,6 +287,23 @@ public static class ServiceCollectionExtensions
         // Register metadata cache metrics
         services.AddSingleton<MetadataCacheMetrics>();
 
+        // METADATA PROVIDER REGISTRATION
+        // Configuration V2 with HclMetadataProvider is now the only supported metadata source
+        services.AddSingleton<IMetadataProvider>(sp =>
+        {
+            // Configuration V2 is now mandatory
+            var v2ConfigPath = configuration.GetValue<string>("Honua:ConfigurationV2:Path");
+            if (string.IsNullOrWhiteSpace(v2ConfigPath))
+            {
+                throw new InvalidOperationException(
+                    "Configuration V2 path is required. Legacy metadata providers (JSON/YAML) have been removed. " +
+                    "Please configure 'Honua:ConfigurationV2:Path' in appsettings.json to point to your .hcl configuration file.");
+            }
+
+            var v2Config = Configuration.V2.HonuaConfigLoader.Load(v2ConfigPath);
+            return new HclMetadataProvider(v2Config);
+        });
+
         services.AddSingleton<IMetadataRegistry>(sp =>
         {
             var provider = sp.GetRequiredService<IMetadataProvider>();
@@ -344,8 +333,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGeometrySerializer, EsriGeometrySerializer>();
         services.AddSingleton<IGeometryOperationExecutor, GeometryOperationExecutor>();
 
-        services.AddSingleton<IMetadataSnapshotStore, FileMetadataSnapshotStore>();
-        services.AddSingleton<ISecurityConfigurationValidator, SecurityConfigurationValidator>();
+        // Metadata snapshot store removed - legacy feature that depended on file-based metadata configuration
+        // Security configuration validator removed - legacy feature
         services.AddSingleton<Observability.IApiMetrics, Observability.ApiMetrics>();
         services.AddSingleton<Observability.ICircuitBreakerMetrics, Observability.CircuitBreakerMetrics>();
 
@@ -359,9 +348,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Resilience.TenantResourceLimiter>();
         services.AddSingleton<Resilience.MemoryCircuitBreaker>();
 
-        services.AddHostedService<SecurityValidationHostedService>();
-        services.AddHostedService<MetadataInitializationHostedService>();
-        services.AddHostedService<ServiceApiValidationHostedService>();
+        // Security validation hosted service removed - legacy feature
+        // MetadataInitializationHostedService and ServiceApiValidationHostedService removed - handled by Configuration V2
         services.AddHostedService<AuthInitializationHostedService>();
 
         services.AddSingleton<IDataIngestionQueueStore>(sp =>
@@ -382,7 +370,8 @@ public static class ServiceCollectionExtensions
 
         // Note: DataIngestionService is now registered in Honua.Server.Core.Raster
 
-        // Configure GeoservicesRest client with hedging for latency-sensitive migration operations
+        // GeoservicesRest migration services removed - legacy feature that depended on file-based metadata configuration
+        // Configure GeoservicesRest client with hedging for latency-sensitive operations
         services.AddHttpClient<Migration.GeoservicesRest.IGeoservicesRestServiceClient, Migration.GeoservicesRest.GeoservicesRestServiceClient>()
             .AddResilienceHandler("geoservices-hedging", (builder, context) =>
             {
@@ -392,12 +381,6 @@ public static class ServiceCollectionExtensions
                 var hedgingPipeline = CreateHttpHedgingPipeline(context.ServiceProvider, metrics);
                 builder.AddPipeline(hedgingPipeline);
             });
-        services.AddSingleton<Migration.GeoservicesRest.GeoservicesRESTMigrationService>();
-        services.AddSingleton<Migration.MetadataMergeService>();
-        services.AddSingleton<Migration.LayerSchemaCreator>();
-        services.AddSingleton<Migration.EsriServiceMigrationService>();
-        services.AddSingleton<Migration.IEsriServiceMigrationService>(sp => sp.GetRequiredService<Migration.EsriServiceMigrationService>());
-        services.AddHostedService(sp => sp.GetRequiredService<Migration.EsriServiceMigrationService>());
 
         services.AddSingleton<IFeatureEditAuthorizationService, FeatureEditAuthorizationService>();
         services.AddSingleton<IFeatureEditConstraintValidator, FeatureEditConstraintValidator>();
@@ -438,10 +421,12 @@ public static class ServiceCollectionExtensions
         // Note: Cloud attachment providers (S3, Azure Blob, GCS) are now registered
         // in Honua.Server.Core.Cloud project via AddCloudAttachmentStoreProviders extension method
 
-        var attachmentProfiles = (configurationService.Current.Attachments?.Profiles?.Values as IEnumerable<AttachmentStorageProfileConfiguration>)
-                                 ?? Enumerable.Empty<AttachmentStorageProfileConfiguration>();
+        // Register attachment configuration options
+        services.Configure<AttachmentConfigurationOptions>(configuration.GetSection(AttachmentConfigurationOptions.SectionName));
 
-        if (attachmentProfiles.Any(profile => profile != null && string.Equals(profile.Provider, AttachmentStoreProviderKeys.Database, StringComparison.OrdinalIgnoreCase)))
+        // Conditionally register database attachment provider if any profile uses it
+        var attachmentConfig = configuration.GetSection(AttachmentConfigurationOptions.SectionName).Get<AttachmentConfigurationOptions>();
+        if (attachmentConfig?.Profiles?.Values.Any(profile => profile != null && string.Equals(profile.Provider, AttachmentStoreProviderKeys.Database, StringComparison.OrdinalIgnoreCase)) == true)
         {
             services.AddSingleton<IAttachmentStoreProvider>(sp => new DatabaseAttachmentStoreProvider(sp.GetRequiredService<ILoggerFactory>()));
         }
@@ -453,7 +438,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<OpenRosa.ISubmissionProcessor, OpenRosa.SubmissionProcessor>();
         services.AddSingleton<OpenRosa.ISubmissionRepository>(sp =>
         {
-            var config = sp.GetRequiredService<IHonuaConfigurationService>();
             var connectionString = Path.Combine(basePath, "data", "openrosa-submissions.db");
             return new OpenRosa.SqliteSubmissionRepository($"Data Source={connectionString}");
         });

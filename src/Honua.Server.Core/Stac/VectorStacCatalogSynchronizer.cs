@@ -9,6 +9,7 @@ using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Utilities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Honua.Server.Core.Stac;
 
@@ -43,7 +44,7 @@ public sealed class VectorStacCatalogSynchronizer : DisposableBase, IVectorStacC
     private const int ExistingScanPageSize = 128;
 
     private readonly IStacCatalogStore _store;
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly IOptionsMonitor<StacCatalogOptions> _stacOptions;
     private readonly IMetadataRegistry _metadataRegistry;
     private readonly VectorStacCatalogBuilder _builder;
     private readonly ILogger<VectorStacCatalogSynchronizer> _logger;
@@ -51,13 +52,13 @@ public sealed class VectorStacCatalogSynchronizer : DisposableBase, IVectorStacC
 
     public VectorStacCatalogSynchronizer(
         IStacCatalogStore store,
-        IHonuaConfigurationService configurationService,
+        IOptionsMonitor<StacCatalogOptions> stacOptions,
         IMetadataRegistry metadataRegistry,
         VectorStacCatalogBuilder builder,
         ILogger<VectorStacCatalogSynchronizer> logger)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
+        _stacOptions = stacOptions ?? throw new ArgumentNullException(nameof(stacOptions));
         _metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
         _builder = builder ?? throw new ArgumentNullException(nameof(builder));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -321,7 +322,7 @@ public sealed class VectorStacCatalogSynchronizer : DisposableBase, IVectorStacC
 
     private bool IsEnabled()
     {
-        return _configurationService.Current.Services.Stac.Enabled;
+        return _stacOptions.CurrentValue.Enabled;
     }
 
     private string? GetBaseUri()

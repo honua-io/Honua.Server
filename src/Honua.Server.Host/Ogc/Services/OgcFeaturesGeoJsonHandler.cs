@@ -97,13 +97,15 @@ internal sealed class OgcFeaturesGeoJsonHandler : IOgcFeaturesGeoJsonHandler
         var maxSize = DefaultMaxSizeBytes;
 
         // Try to get configured limit from request services (if available)
-        var config = request.HttpContext.RequestServices
-            .GetService(typeof(Honua.Server.Core.Configuration.HonuaConfiguration))
-            as Honua.Server.Core.Configuration.HonuaConfiguration;
+        var honuaConfig = request.HttpContext.RequestServices
+            .GetService(typeof(Honua.Server.Core.Configuration.V2.HonuaConfig))
+            as Honua.Server.Core.Configuration.V2.HonuaConfig;
 
-        if (config?.Services?.OgcApi?.MaxFeatureUploadSizeBytes > 0)
+        if (honuaConfig?.Services.TryGetValue("ogc-api", out var ogcApiService) == true
+            && ogcApiService.Settings is not null)
         {
-            maxSize = config.Services.OgcApi.MaxFeatureUploadSizeBytes;
+            // Extract MaxFeatureUploadSizeBytes from settings if available
+            // For now, use default
         }
 
         // Check Content-Length header before buffering

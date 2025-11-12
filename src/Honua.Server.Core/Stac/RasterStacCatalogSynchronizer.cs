@@ -9,6 +9,7 @@ using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Utilities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Honua.Server.Core.Stac;
 
@@ -24,7 +25,7 @@ public sealed class RasterStacCatalogSynchronizer : DisposableBase, IRasterStacC
     private const int ExistingScanPageSize = 128;
 
     private readonly IStacCatalogStore _store;
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly IOptionsMonitor<StacCatalogOptions> _stacOptions;
     private readonly IMetadataRegistry _metadataRegistry;
     private readonly RasterStacCatalogBuilder _builder;
     private readonly VectorStacCatalogBuilder _vectorBuilder;
@@ -33,14 +34,14 @@ public sealed class RasterStacCatalogSynchronizer : DisposableBase, IRasterStacC
 
     public RasterStacCatalogSynchronizer(
         IStacCatalogStore store,
-        IHonuaConfigurationService configurationService,
+        IOptionsMonitor<StacCatalogOptions> stacOptions,
         IMetadataRegistry metadataRegistry,
         RasterStacCatalogBuilder builder,
         VectorStacCatalogBuilder vectorBuilder,
         ILogger<RasterStacCatalogSynchronizer> logger)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
+        _stacOptions = stacOptions ?? throw new ArgumentNullException(nameof(stacOptions));
         _metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
         _builder = builder ?? throw new ArgumentNullException(nameof(builder));
         _vectorBuilder = vectorBuilder ?? throw new ArgumentNullException(nameof(vectorBuilder));
@@ -319,7 +320,7 @@ public sealed class RasterStacCatalogSynchronizer : DisposableBase, IRasterStacC
 
     private bool IsEnabled()
     {
-        return _configurationService.Current.Services.Stac.Enabled;
+        return _stacOptions.CurrentValue.Enabled;
     }
 
     protected override void Dispose(bool disposing)

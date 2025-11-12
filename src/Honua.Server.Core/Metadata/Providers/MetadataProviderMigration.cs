@@ -184,19 +184,9 @@ public sealed class MetadataProviderMigration
 
         try
         {
-            // Load from file
-            var json = await File.ReadAllTextAsync(inputPath, cancellationToken);
-            var snapshot = JsonMetadataProvider.Parse(json);
-
-            _logger.LogInformation(
-                "Loaded metadata from file: {Services} services, {Layers} layers",
-                snapshot.Services.Count,
-                snapshot.Layers.Count);
-
-            // Save to destination
-            await mutableDestination.SaveAsync(snapshot, cancellationToken);
-
-            _logger.LogInformation("✓ Metadata import completed successfully");
+            // Load from file - note: JsonMetadataProvider has been removed
+            // This method is now deprecated and should use HclMetadataProvider instead
+            throw new NotSupportedException("JsonMetadataProvider has been removed. Use HclMetadataProvider with Configuration V2 instead.");
         }
         catch (Exception ex)
         {

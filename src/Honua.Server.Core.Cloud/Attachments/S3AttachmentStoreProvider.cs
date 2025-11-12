@@ -24,10 +24,10 @@ public sealed class S3AttachmentStoreProvider : IAttachmentStoreProvider, IAsync
 
     public string ProviderKey => AttachmentStoreProviderKeys.S3;
 
-    public IAttachmentStore Create(string profileId, AttachmentStorageProfileConfiguration profileConfiguration)
+    public IAttachmentStore Create(string profileId, AttachmentStorageProfileOptions profileConfiguration)
     {
         Guard.NotNull(profileConfiguration);
-        var s3Config = profileConfiguration.S3 ?? AttachmentS3StorageConfiguration.Default;
+        var s3Config = profileConfiguration.S3 ?? new AttachmentS3StorageOptions();
         if (string.IsNullOrWhiteSpace(s3Config.BucketName))
         {
             throw new InvalidOperationException($"S3 attachment profile '{profileId}' must specify s3.bucketName.");
@@ -55,7 +55,7 @@ public sealed class S3AttachmentStoreProvider : IAttachmentStoreProvider, IAsync
         _clientCache.Clear();
     }
 
-    private static IAmazonS3 CreateClient(AttachmentS3StorageConfiguration configuration)
+    private static IAmazonS3 CreateClient(AttachmentS3StorageOptions configuration)
     {
         var clientConfig = new AmazonS3Config
         {

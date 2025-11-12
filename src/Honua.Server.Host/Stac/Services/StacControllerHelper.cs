@@ -1,13 +1,21 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using System.Linq;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Http;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Mvc;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Net.Http.Headers;
+using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.Stac.Services;
 
@@ -17,17 +25,17 @@ namespace Honua.Server.Host.Stac.Services;
 /// </summary>
 public sealed class StacControllerHelper
 {
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly HonuaConfig? _honuaConfig;
 
-    public StacControllerHelper(IHonuaConfigurationService configurationService)
+    public StacControllerHelper(HonuaConfig? honuaConfig = null)
     {
-        _configurationService = Guard.NotNull(configurationService);
+        _honuaConfig = honuaConfig;
     }
 
     /// <summary>
     /// Checks if STAC is enabled in the configuration.
     /// </summary>
-    public bool IsStacEnabled() => StacRequestHelpers.IsStacEnabled(_configurationService);
+    public bool IsStacEnabled() => StacRequestHelpers.IsStacEnabled(_honuaConfig);
 
     /// <summary>
     /// Builds the base URI from an HTTP request.

@@ -20,10 +20,10 @@ public static class CloudServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddCloudAttachmentStoreProviders(
         this IServiceCollection services,
-        AttachmentConfiguration? attachmentConfig)
+        AttachmentConfigurationOptions? attachmentConfig)
     {
-        var attachmentProfiles = (attachmentConfig?.Profiles?.Values as System.Collections.Generic.IEnumerable<AttachmentStorageProfileConfiguration>)
-                                 ?? Enumerable.Empty<AttachmentStorageProfileConfiguration>();
+        var attachmentProfiles = (attachmentConfig?.Profiles?.Values as System.Collections.Generic.IEnumerable<AttachmentStorageProfileOptions>)
+                                 ?? Enumerable.Empty<AttachmentStorageProfileOptions>();
 
         if (attachmentProfiles.Any(profile => profile != null && string.Equals(profile.Provider, AttachmentStoreProviderKeys.S3, StringComparison.OrdinalIgnoreCase)))
         {

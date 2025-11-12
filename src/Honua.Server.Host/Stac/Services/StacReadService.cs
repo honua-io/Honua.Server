@@ -1,16 +1,27 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using System.Linq;
+using Honua.Server.Core.Configuration.V2;
 using System.Threading;
+using Honua.Server.Core.Configuration.V2;
 using System.Threading.Tasks;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Observability;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Stac;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.Logging;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Extensions;
+using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.Stac.Services;
 
@@ -20,18 +31,18 @@ namespace Honua.Server.Host.Stac.Services;
 public sealed class StacReadService
 {
     private readonly IStacCatalogStore _store;
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly HonuaConfig? _honuaConfig;
     private readonly StacMetrics _metrics;
     private readonly ILogger<StacReadService> _logger;
 
     public StacReadService(
         IStacCatalogStore store,
-        IHonuaConfigurationService configurationService,
         StacMetrics metrics,
-        ILogger<StacReadService> logger)
+        ILogger<StacReadService> logger,
+        HonuaConfig? honuaConfig = null)
     {
         _store = Guard.NotNull(store);
-        _configurationService = Guard.NotNull(configurationService);
+        _honuaConfig = honuaConfig;
         _metrics = Guard.NotNull(metrics);
         _logger = Guard.NotNull(logger);
     }
@@ -39,7 +50,7 @@ public sealed class StacReadService
     /// <summary>
     /// Checks if STAC is enabled in the configuration.
     /// </summary>
-    public bool IsStacEnabled() => StacRequestHelpers.IsStacEnabled(_configurationService);
+    public bool IsStacEnabled() => StacRequestHelpers.IsStacEnabled(_honuaConfig);
 
     /// <summary>
     /// Gets all collections from the catalog.

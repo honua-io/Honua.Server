@@ -83,8 +83,11 @@ public sealed class StacBackfillCommand : AsyncCommand<StacBackfillCommand.Setti
         MetadataSnapshot snapshot;
         try
         {
-            var metadataProvider = new JsonMetadataProvider(metadataPath);
-            snapshot = await metadataProvider.LoadAsync().ConfigureAwait(false);
+            // TODO: Update to use HclMetadataProvider with Configuration V2
+            // JsonMetadataProvider has been removed - this command needs migration
+            throw new NotSupportedException(
+                "StacBackfillCommand requires migration to Configuration V2. " +
+                "JsonMetadataProvider has been removed. Use HclMetadataProvider instead.");
         }
         catch (Exception ex)
         {

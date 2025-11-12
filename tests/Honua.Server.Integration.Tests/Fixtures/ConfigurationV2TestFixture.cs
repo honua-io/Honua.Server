@@ -105,9 +105,8 @@ public class ConfigurationV2TestFixture<TProgram> : WebApplicationFactory<TProgr
             {
                 services.AddSingleton(LoadedConfig);
 
-                // Register Configuration V2 services
-                // TODO: Uncomment when full integration is complete
-                // services.AddHonuaFromConfiguration(LoadedConfig);
+                // Note: Service registration is now handled by the plugin system
+                // via AddHonuaConfigurationV2() in ConfigurationV2Extensions.cs
             }
         });
 

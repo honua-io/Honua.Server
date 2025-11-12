@@ -1,29 +1,50 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Configuration.V2;
 // Enterprise features disabled
 // using Honua.Server.Enterprise.Sensors.Extensions;
 // using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Host.Admin;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Authentication;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Carto;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Csw;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Health;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Metadata;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.OData;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Ogc;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.OpenRosa;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Print;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Raster;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Records;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Security;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wcs;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wfs;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wms;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wmts;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Builder;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.DependencyInjection;
+using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.Extensions;
 
@@ -49,8 +70,11 @@ internal static class EndpointExtensions
 
         // Map OGC endpoints at root level for OGC API spec compliance
         // The OGC API specification expects the landing page at /ogc, not /v1/ogc
-        var configService = app.Services.GetService<IHonuaConfigurationService>();
-        if (configService?.Current.Services.OgcApi.Enabled ?? true)
+        var honuaConfig = app.Services.GetService<HonuaConfig>();
+        var ogcApiEnabled = honuaConfig?.Services.TryGetValue("ogc-api", out var ogcApiService) == true
+            ? ogcApiService.Enabled
+            : true;
+        if (ogcApiEnabled)
         {
             app.MapOgcEndpoints();
         }
@@ -109,13 +133,23 @@ internal static class EndpointExtensions
     /// <returns>The web application for method chaining.</returns>
     public static WebApplication MapConditionalServiceEndpoints(this WebApplication app)
     {
-        var configurationService = app.Services.GetService<IHonuaConfigurationService>();
+        var honuaConfig = app.Services.GetService<HonuaConfig>();
         var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
+        // Helper to check if a service is enabled
+        bool IsServiceEnabled(string serviceId, bool defaultValue = true)
+        {
+            if (honuaConfig?.Services.TryGetValue(serviceId, out var service) == true)
+            {
+                return service.Enabled;
+            }
+            return defaultValue;
+        }
+
         // OData v4 endpoints (AOT-compatible implementation)
-        var odataEnabled = configurationService?.Current.Services.OData?.Enabled ?? true;
-        logger.LogWarning("ODATA ENDPOINT REGISTRATION: OData.Enabled = {ODataEnabled}, configService null = {ConfigNull}",
-            odataEnabled, configurationService == null);
+        var odataEnabled = IsServiceEnabled("odata", true);
+        logger.LogWarning("ODATA ENDPOINT REGISTRATION: OData.Enabled = {ODataEnabled}, honuaConfig null = {ConfigNull}",
+            odataEnabled, honuaConfig == null);
 
         if (odataEnabled)
         {
@@ -128,37 +162,37 @@ internal static class EndpointExtensions
             logger.LogWarning("ODATA ENDPOINT REGISTRATION: OData is DISABLED - skipping MapODataEndpoints()");
         }
 
-        if (configurationService?.Current.Services.Wfs.Enabled ?? true)
+        if (IsServiceEnabled("wfs", true))
         {
             app.MapWfs();
         }
 
-        if (configurationService?.Current.Services.Wms.Enabled ?? true)
+        if (IsServiceEnabled("wms", true))
         {
             app.MapWms();
         }
 
-        if (configurationService?.Current.Services.Print.Enabled ?? true)
+        if (IsServiceEnabled("print", true))
         {
             app.MapMapFishPrint();
         }
 
-        if (configurationService?.Current.Services.Csw.Enabled ?? true)
+        if (IsServiceEnabled("csw", true))
         {
             app.MapCswEndpoints();
         }
 
-        if (configurationService?.Current.Services.Wcs.Enabled ?? true)
+        if (IsServiceEnabled("wcs", true))
         {
             app.MapWcsEndpoints();
         }
 
-        if (configurationService?.Current.Services.Wmts.Enabled ?? true)
+        if (IsServiceEnabled("wmts", true))
         {
             app.MapWmtsEndpoints();
         }
 
-        if (configurationService?.Current.Services.Zarr.Enabled ?? true)
+        if (IsServiceEnabled("zarr", true))
         {
             app.MapZarrTimeSeriesEndpoints();
         }
@@ -217,13 +251,13 @@ internal static class EndpointExtensions
     {
         app.MapMetadataAdministration();
         app.MapDataIngestionAdministration();
-        app.MapMigrationAdministration();
+        // app.MapMigrationAdministration(); // Removed: Legacy migration endpoints deleted
         app.MapRasterTileCacheAdministration();
         app.MapRasterTileCacheStatistics();
         app.MapRasterTileCacheQuota();
         app.MapRasterMosaicEndpoints();
         app.MapRasterAnalyticsEndpoints();
-        app.MapRuntimeConfiguration();
+        // app.MapRuntimeConfiguration(); // Removed: Legacy runtime config endpoints deleted
         app.MapLoggingConfiguration();
         app.MapTokenRevocationEndpoints();
 

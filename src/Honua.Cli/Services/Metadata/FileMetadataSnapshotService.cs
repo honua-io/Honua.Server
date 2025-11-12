@@ -180,8 +180,11 @@ public sealed class FileMetadataSnapshotService : IMetadataSnapshotService
                 {
                     try
                     {
-                        var provider = new JsonMetadataProvider(metadataFile);
-                        var snapshot = await provider.LoadAsync().ConfigureAwait(false);
+                        // TODO: Update to use HclMetadataProvider with Configuration V2
+                        // JsonMetadataProvider has been removed - this service needs migration
+                        throw new NotSupportedException(
+                            "FileMetadataSnapshotService requires migration to Configuration V2. " +
+                            "JsonMetadataProvider has been removed. Use HclMetadataProvider instead.");
 
                         foreach (var layer in snapshot.Layers)
                         {

@@ -2,24 +2,39 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using System;
 using System.Collections.Generic;
+using Honua.Server.Core.Configuration.V2;
 using System.Text;
+using Honua.Server.Core.Configuration.V2;
 using System.Text.Json;
+using Honua.Server.Core.Configuration.V2;
 using System.Text.Json.Nodes;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Query;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Stac;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Extensions;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Extensions;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Http;
+using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.Stac;
 
 internal static class StacRequestHelpers
 {
-    public static bool IsStacEnabled(IHonuaConfigurationService configurationService)
+    public static bool IsStacEnabled(HonuaConfig? honuaConfig)
     {
-        return configurationService.Current.Services.Stac.Enabled;
+        if (honuaConfig?.Services.TryGetValue("stac", out var stacService) == true)
+        {
+            return stacService.Enabled;
+        }
+        return true; // Default to enabled if not using Configuration V2
     }
 
     /// <summary>

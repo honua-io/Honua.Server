@@ -45,7 +45,7 @@ public sealed class KerchunkReferenceStore : IKerchunkReferenceStore
     private readonly IKerchunkCacheProvider _cacheProvider;
     private readonly IDistributedLock _distributedLock;
     private readonly ILogger<KerchunkReferenceStore> _logger;
-    private readonly RasterCacheConfiguration _config;
+    private readonly RasterCacheOptions _config;
 
     // Fallback in-memory locks for backward compatibility when distributed locking is disabled
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _fallbackLocks = new();
@@ -56,7 +56,7 @@ public sealed class KerchunkReferenceStore : IKerchunkReferenceStore
         IKerchunkGenerator generator,
         IKerchunkCacheProvider cacheProvider,
         IDistributedLock distributedLock,
-        IOptions<HonuaConfiguration> options,
+        IOptions<RasterCacheOptions> options,
         ILogger<KerchunkReferenceStore> logger)
     {
         _generator = generator ?? throw new ArgumentNullException(nameof(generator));
@@ -64,8 +64,7 @@ public sealed class KerchunkReferenceStore : IKerchunkReferenceStore
         _distributedLock = distributedLock ?? throw new ArgumentNullException(nameof(distributedLock));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        var honuaConfig = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _config = honuaConfig.RasterCache;
+        _config = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _generationTimeout = _config.DistributedLockTimeout;
 
         if (_config.EnableDistributedLocking)

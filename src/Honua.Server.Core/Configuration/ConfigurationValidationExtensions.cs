@@ -19,8 +19,7 @@ public static class ConfigurationValidationExtensions
     public static IServiceCollection AddConfigurationValidation(this IServiceCollection services)
     {
         // Register validators for each configuration section
-        services.AddSingleton<IValidateOptions<HonuaConfiguration>, HonuaConfigurationValidator>();
-        services.AddSingleton<IValidateOptions<HonuaConfiguration>, SecurityConfigurationOptionsValidator>();
+        // HonuaConfiguration and SecurityConfigurationOptionsValidator removed - legacy features
         services.AddSingleton<IValidateOptions<HonuaAuthenticationOptions>, HonuaAuthenticationOptionsValidator>();
         services.AddSingleton<IValidateOptions<OpenRosaOptions>, OpenRosaOptionsValidator>();
         services.AddSingleton<IValidateOptions<ConnectionStringOptions>, ConnectionStringOptionsValidator>();
@@ -32,8 +31,7 @@ public static class ConfigurationValidationExtensions
         services.AddSingleton<IValidateOptions<DataIngestionOptions>, DataIngestionOptionsValidator>();
         services.AddSingleton<IValidateOptions<DataAccessOptions>, DataAccessOptionsValidator>();
 
-        // Register the hosted service that validates on startup
-        services.AddHostedService<ConfigurationValidationHostedService>();
+        // ConfigurationValidationHostedService removed - legacy feature
 
         return services;
     }
