@@ -1,0 +1,359 @@
+@using Honua.MapSDK.Models
+
+<div class="style-panel">
+    @if (VectorLayer != null)
+    {
+        <MudStack Spacing="2">
+            <!-- Text Field -->
+            <MudTextField @bind-Value="@TextField"
+                         Label="Text Field"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Placeholder="name"
+                         HelperText="Property name to display as label" />
+
+            <!-- Text Color -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">Text Color</MudText>
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <input type="color"
+                           value="@TextColor"
+                           @oninput="OnTextColorChanged"
+                           class="color-picker" />
+                    <MudTextField @bind-Value="@TextColor"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Placeholder="#000000"
+                                 Class="flex-1" />
+                </MudStack>
+            </div>
+
+            <!-- Text Size -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Text Size: @TextSize px
+                </MudText>
+                <MudSlider @bind-Value="@TextSize"
+                          Min="8"
+                          Max="48"
+                          Step="1"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @TextSize px
+                </MudSlider>
+            </div>
+
+            <!-- Font -->
+            <MudSelect @bind-Value="@TextFont"
+                      Label="Font"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense">
+                <MudSelectItem Value="@("Open Sans Regular")">Open Sans</MudSelectItem>
+                <MudSelectItem Value="@("Arial Unicode MS Regular")">Arial</MudSelectItem>
+                <MudSelectItem Value="@("Roboto Regular")">Roboto</MudSelectItem>
+                <MudSelectItem Value="@("Noto Sans Regular")">Noto Sans</MudSelectItem>
+            </MudSelect>
+
+            <!-- Text Halo -->
+            <MudSwitch @bind-Value="@UseHalo"
+                      Label="Text Halo"
+                      Color="Color.Primary"
+                      Class="mb-2" />
+
+            @if (UseHalo)
+            {
+                <div class="property-group">
+                    <MudText Typo="Typo.caption" Class="property-label">Halo Color</MudText>
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <input type="color"
+                               value="@HaloColor"
+                               @oninput="OnHaloColorChanged"
+                               class="color-picker" />
+                        <MudTextField @bind-Value="@HaloColor"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Placeholder="#ffffff"
+                                     Class="flex-1" />
+                    </MudStack>
+                </div>
+
+                <div class="property-group">
+                    <MudText Typo="Typo.caption" Class="property-label">
+                        Halo Width: @HaloWidth px
+                    </MudText>
+                    <MudSlider @bind-Value="@HaloWidth"
+                              Min="0"
+                              Max="5"
+                              Step="0.5"
+                              Variant="Variant.Filled"
+                              Color="Color.Primary">
+                        @HaloWidth px
+                    </MudSlider>
+                </div>
+            }
+
+            <!-- Text Anchor -->
+            <MudSelect @bind-Value="@TextAnchor"
+                      Label="Text Anchor"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense">
+                <MudSelectItem Value="@("center")">Center</MudSelectItem>
+                <MudSelectItem Value="@("left")">Left</MudSelectItem>
+                <MudSelectItem Value="@("right")">Right</MudSelectItem>
+                <MudSelectItem Value="@("top")">Top</MudSelectItem>
+                <MudSelectItem Value="@("bottom")">Bottom</MudSelectItem>
+                <MudSelectItem Value="@("top-left")">Top Left</MudSelectItem>
+                <MudSelectItem Value="@("top-right")">Top Right</MudSelectItem>
+                <MudSelectItem Value="@("bottom-left")">Bottom Left</MudSelectItem>
+                <MudSelectItem Value="@("bottom-right")">Bottom Right</MudSelectItem>
+            </MudSelect>
+
+            <!-- Advanced Options -->
+            <MudExpansionPanels Elevation="0" Class="mt-2">
+                <MudExpansionPanel Text="Advanced">
+                    <MudSwitch @bind-Value="@AllowOverlap"
+                              Label="Allow Overlap"
+                              Color="Color.Primary" />
+
+                    <MudSwitch @bind-Value="@Optional"
+                              Label="Optional (Hide if overlaps)"
+                              Color="Color.Primary"
+                              Class="mt-2" />
+
+                    <MudNumericField @bind-Value="@TextOpacity"
+                                    Label="Text Opacity"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense"
+                                    Min="0"
+                                    Max="1"
+                                    Step="0.1"
+                                    Class="mt-2" />
+
+                    <MudNumericField @bind-Value="@TextRotation"
+                                    Label="Text Rotation (degrees)"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense"
+                                    Min="0"
+                                    Max="360"
+                                    Class="mt-2" />
+
+                    <MudNumericField @bind-Value="@LetterSpacing"
+                                    Label="Letter Spacing"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense"
+                                    Step="0.1"
+                                    Class="mt-2" />
+
+                    <MudNumericField @bind-Value="@MaxWidth"
+                                    Label="Max Width (ems)"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense"
+                                    Min="0"
+                                    Class="mt-2" />
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudStack>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public LayerDefinition? Layer { get; set; }
+
+    [Parameter]
+    public EventCallback OnStyleChanged { get; set; }
+
+    private VectorLayer? VectorLayer => Layer as VectorLayer;
+
+    private string _textField = "{name}";
+    private string TextField
+    {
+        get => _textField;
+        set
+        {
+            _textField = value;
+            UpdateLayout("text-field", value);
+        }
+    }
+
+    private string _textColor = "#000000";
+    private string TextColor
+    {
+        get => _textColor;
+        set
+        {
+            _textColor = value;
+            UpdatePaint("text-color", value);
+        }
+    }
+
+    private double _textSize = 12.0;
+    private double TextSize
+    {
+        get => _textSize;
+        set
+        {
+            _textSize = value;
+            UpdateLayout("text-size", value);
+        }
+    }
+
+    private string _textFont = "Open Sans Regular";
+    private string TextFont
+    {
+        get => _textFont;
+        set
+        {
+            _textFont = value;
+            UpdateLayout("text-font", new[] { value });
+        }
+    }
+
+    private bool _useHalo = true;
+    private bool UseHalo
+    {
+        get => _useHalo;
+        set
+        {
+            _useHalo = value;
+            if (value)
+            {
+                UpdatePaint("text-halo-color", HaloColor);
+                UpdatePaint("text-halo-width", HaloWidth);
+            }
+            else
+            {
+                RemovePaintProperty("text-halo-color");
+                RemovePaintProperty("text-halo-width");
+            }
+        }
+    }
+
+    private string _haloColor = "#ffffff";
+    private string HaloColor
+    {
+        get => _haloColor;
+        set
+        {
+            _haloColor = value;
+            if (UseHalo)
+            {
+                UpdatePaint("text-halo-color", value);
+            }
+        }
+    }
+
+    private double _haloWidth = 2.0;
+    private double HaloWidth
+    {
+        get => _haloWidth;
+        set
+        {
+            _haloWidth = value;
+            if (UseHalo)
+            {
+                UpdatePaint("text-halo-width", value);
+            }
+        }
+    }
+
+    private string _textAnchor = "center";
+    private string TextAnchor
+    {
+        get => _textAnchor;
+        set
+        {
+            _textAnchor = value;
+            UpdateLayout("text-anchor", value);
+        }
+    }
+
+    private bool AllowOverlap { get; set; } = false;
+    private bool Optional { get; set; } = true;
+    private double TextOpacity { get; set; } = 1.0;
+    private double TextRotation { get; set; } = 0;
+    private double LetterSpacing { get; set; } = 0;
+    private double MaxWidth { get; set; } = 10;
+
+    protected override void OnParametersSet()
+    {
+        if (VectorLayer != null)
+        {
+            LoadCurrentValues();
+        }
+    }
+
+    private void LoadCurrentValues()
+    {
+        if (VectorLayer == null) return;
+
+        if (VectorLayer.Layout?.TryGetValue("text-field", out var field) == true)
+        {
+            _textField = field?.ToString() ?? "{name}";
+        }
+
+        if (VectorLayer.Paint?.TryGetValue("text-color", out var color) == true)
+        {
+            _textColor = color?.ToString() ?? "#000000";
+        }
+
+        if (VectorLayer.Layout?.TryGetValue("text-size", out var size) == true)
+        {
+            _textSize = Convert.ToDouble(size);
+        }
+
+        if (VectorLayer.Paint?.TryGetValue("text-halo-color", out var haloColor) == true)
+        {
+            _useHalo = true;
+            _haloColor = haloColor?.ToString() ?? "#ffffff";
+        }
+
+        if (VectorLayer.Paint?.TryGetValue("text-halo-width", out var haloWidth) == true)
+        {
+            _haloWidth = Convert.ToDouble(haloWidth);
+        }
+
+        if (VectorLayer.Layout?.TryGetValue("text-anchor", out var anchor) == true)
+        {
+            _textAnchor = anchor?.ToString() ?? "center";
+        }
+    }
+
+    private void OnTextColorChanged(ChangeEventArgs e)
+    {
+        TextColor = e.Value?.ToString() ?? "#000000";
+    }
+
+    private void OnHaloColorChanged(ChangeEventArgs e)
+    {
+        HaloColor = e.Value?.ToString() ?? "#ffffff";
+    }
+
+    private void UpdatePaint(string property, object value)
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        VectorLayer.Paint[property] = value;
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+
+    private void UpdateLayout(string property, object value)
+    {
+        if (VectorLayer == null) return;
+
+        VectorLayer.Layout ??= new Dictionary<string, object>();
+        VectorLayer.Layout[property] = value;
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+
+    private void RemovePaintProperty(string property)
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        VectorLayer.Paint.Remove(property);
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+}

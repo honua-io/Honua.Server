@@ -1,0 +1,269 @@
+@using Honua.MapSDK.Models
+
+<div class="style-panel">
+    @if (Layer != null)
+    {
+        <MudStack Spacing="2">
+            <!-- Layer Visibility -->
+            <MudSwitch @bind-Value="@IsVisible"
+                      Label="Layer Visible"
+                      Color="Color.Primary" />
+
+            <!-- Opacity -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Layer Opacity: @Opacity.ToString("P0")
+                </MudText>
+                <MudSlider @bind-Value="@Opacity"
+                          Min="0"
+                          Max="1"
+                          Step="0.05"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @Opacity.ToString("P0")
+                </MudSlider>
+            </div>
+
+            <MudDivider Class="my-2" />
+
+            <!-- Zoom Range -->
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Zoom Range</MudText>
+
+            <MudSwitch @bind-Value="@UseMinZoom"
+                      Label="Set Minimum Zoom"
+                      Color="Color.Primary" />
+
+            @if (UseMinZoom)
+            {
+                <div class="property-group">
+                    <MudText Typo="Typo.caption" Class="property-label">
+                        Minimum Zoom: @MinZoom
+                    </MudText>
+                    <MudSlider @bind-Value="@MinZoom"
+                              Min="0"
+                              Max="22"
+                              Step="0.5"
+                              Variant="Variant.Filled"
+                              Color="Color.Info">
+                        @MinZoom
+                    </MudSlider>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Layer will be hidden below zoom level @MinZoom
+                    </MudText>
+                </div>
+            }
+
+            <MudSwitch @bind-Value="@UseMaxZoom"
+                      Label="Set Maximum Zoom"
+                      Color="Color.Primary"
+                      Class="mt-2" />
+
+            @if (UseMaxZoom)
+            {
+                <div class="property-group">
+                    <MudText Typo="Typo.caption" Class="property-label">
+                        Maximum Zoom: @MaxZoom
+                    </MudText>
+                    <MudSlider @bind-Value="@MaxZoom"
+                              Min="0"
+                              Max="22"
+                              Step="0.5"
+                              Variant="Variant.Filled"
+                              Color="Color.Info">
+                        @MaxZoom
+                    </MudSlider>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Layer will be hidden above zoom level @MaxZoom
+                    </MudText>
+                </div>
+            }
+
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                Zoom Level Reference:
+                <ul class="pl-4 mt-1 mb-0">
+                    <li>0-2: World/Continent</li>
+                    <li>3-6: Country/State</li>
+                    <li>7-10: Region/City</li>
+                    <li>11-14: District/Neighborhood</li>
+                    <li>15-18: Street/Building</li>
+                    <li>19-22: Detail/Indoor</li>
+                </ul>
+            </MudAlert>
+
+            <!-- Z-Index -->
+            <MudDivider Class="my-2" />
+
+            <MudNumericField @bind-Value="@ZIndex"
+                            Label="Z-Index (Layer Order)"
+                            Variant="Variant.Outlined"
+                            Margin="Margin.Dense"
+                            HelperText="Higher values appear on top" />
+
+            <!-- Layer Group -->
+            <MudTextField @bind-Value="@GroupId"
+                         Label="Layer Group ID"
+                         Variant="Variant.Outlined"
+                         Margin="Margin.Dense"
+                         Placeholder="Optional"
+                         HelperText="Group layers together" />
+        </MudStack>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public LayerDefinition? Layer { get; set; }
+
+    [Parameter]
+    public EventCallback OnStyleChanged { get; set; }
+
+    private bool _isVisible = true;
+    private bool IsVisible
+    {
+        get => _isVisible;
+        set
+        {
+            _isVisible = value;
+            if (Layer != null)
+            {
+                Layer.Visible = value;
+                Layer.UpdatedAt = DateTime.UtcNow;
+                OnStyleChanged.InvokeAsync();
+            }
+        }
+    }
+
+    private double _opacity = 1.0;
+    private double Opacity
+    {
+        get => _opacity;
+        set
+        {
+            _opacity = value;
+            if (Layer != null)
+            {
+                Layer.Opacity = value;
+                Layer.UpdatedAt = DateTime.UtcNow;
+                OnStyleChanged.InvokeAsync();
+            }
+        }
+    }
+
+    private bool _useMinZoom = false;
+    private bool UseMinZoom
+    {
+        get => _useMinZoom;
+        set
+        {
+            _useMinZoom = value;
+            if (Layer != null)
+            {
+                Layer.MinZoom = value ? MinZoom : null;
+                Layer.UpdatedAt = DateTime.UtcNow;
+                OnStyleChanged.InvokeAsync();
+            }
+        }
+    }
+
+    private double _minZoom = 0;
+    private double MinZoom
+    {
+        get => _minZoom;
+        set
+        {
+            _minZoom = value;
+            if (Layer != null && UseMinZoom)
+            {
+                Layer.MinZoom = value;
+                Layer.UpdatedAt = DateTime.UtcNow;
+                OnStyleChanged.InvokeAsync();
+            }
+        }
+    }
+
+    private bool _useMaxZoom = false;
+    private bool UseMaxZoom
+    {
+        get => _useMaxZoom;
+        set
+        {
+            _useMaxZoom = value;
+            if (Layer != null)
+            {
+                Layer.MaxZoom = value ? MaxZoom : null;
+                Layer.UpdatedAt = DateTime.UtcNow;
+                OnStyleChanged.InvokeAsync();
+            }
+        }
+    }
+
+    private double _maxZoom = 22;
+    private double MaxZoom
+    {
+        get => _maxZoom;
+        set
+        {
+            _maxZoom = value;
+            if (Layer != null && UseMaxZoom)
+            {
+                Layer.MaxZoom = value;
+                Layer.UpdatedAt = DateTime.UtcNow;
+                OnStyleChanged.InvokeAsync();
+            }
+        }
+    }
+
+    private int _zIndex = 0;
+    private int ZIndex
+    {
+        get => _zIndex;
+        set
+        {
+            _zIndex = value;
+            if (Layer != null)
+            {
+                Layer.ZIndex = value;
+                Layer.UpdatedAt = DateTime.UtcNow;
+                OnStyleChanged.InvokeAsync();
+            }
+        }
+    }
+
+    private string? _groupId;
+    private string? GroupId
+    {
+        get => _groupId;
+        set
+        {
+            _groupId = value;
+            if (Layer != null)
+            {
+                Layer.GroupId = value;
+                Layer.UpdatedAt = DateTime.UtcNow;
+                OnStyleChanged.InvokeAsync();
+            }
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Layer != null)
+        {
+            LoadCurrentValues();
+        }
+    }
+
+    private void LoadCurrentValues()
+    {
+        if (Layer == null) return;
+
+        _isVisible = Layer.Visible;
+        _opacity = Layer.Opacity;
+        _useMinZoom = Layer.MinZoom.HasValue;
+        _minZoom = Layer.MinZoom ?? 0;
+        _useMaxZoom = Layer.MaxZoom.HasValue;
+        _maxZoom = Layer.MaxZoom ?? 22;
+        _zIndex = Layer.ZIndex;
+        _groupId = Layer.GroupId;
+    }
+}

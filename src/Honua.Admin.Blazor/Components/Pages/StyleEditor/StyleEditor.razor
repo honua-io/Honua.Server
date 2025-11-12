@@ -1,0 +1,545 @@
+@page "/style-editor"
+@page "/style-editor/{LayerId}"
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services
+@using System.Text.Json
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Style Editor - Honua</PageTitle>
+
+<div class="style-editor-container">
+    <!-- Header -->
+    <MudPaper Class="style-editor-header pa-3" Elevation="2">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                              OnClick="@(() => Navigation.NavigateTo("/maps"))" />
+                <MudText Typo="Typo.h5">Style Editor</MudText>
+                @if (_hasUnsavedChanges)
+                {
+                    <MudChip Size="Size.Small" Color="Color.Warning">Unsaved Changes</MudChip>
+                }
+            </MudStack>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined"
+                          StartIcon="@Icons.Material.Filled.Undo"
+                          OnClick="Undo"
+                          Disabled="@(!CanUndo)">
+                    Undo
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                          StartIcon="@Icons.Material.Filled.Redo"
+                          OnClick="Redo"
+                          Disabled="@(!CanRedo)">
+                    Redo
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                          StartIcon="@Icons.Material.Filled.Code"
+                          OnClick="ShowJsonEditor">
+                    View JSON
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                          StartIcon="@Icons.Material.Filled.FileDownload"
+                          OnClick="ExportStyle">
+                    Export
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                          Color="Color.Primary"
+                          StartIcon="@Icons.Material.Filled.Save"
+                          OnClick="SaveStyle"
+                          Disabled="@_isSaving">
+                    @(_isSaving ? "Saving..." : "Save")
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <div class="style-editor-content">
+        <!-- Left Panel: Layer Tree & Properties -->
+        <div class="style-editor-left-panel">
+            <MudPaper Class="panel-container" Elevation="1">
+                <!-- Layer Selection -->
+                <div class="panel-section">
+                    <MudText Typo="Typo.h6" Class="section-title">Layers</MudText>
+                    <MudTextField @bind-Value="_layerSearchQuery"
+                                 Placeholder="Search layers..."
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Adornment="Adornment.Start"
+                                 AdornmentIcon="@Icons.Material.Filled.Search"
+                                 Class="mb-2" />
+
+                    <div class="layer-tree">
+                        @foreach (var layer in FilteredLayers)
+                        {
+                            <div class="layer-item @(_selectedLayer?.Id == layer.Id ? "selected" : "")"
+                                 @onclick="@(() => SelectLayer(layer))">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                        <MudIcon Icon="@GetLayerIcon(layer.Type)" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">@layer.Name</MudText>
+                                    </MudStack>
+                                    <MudIconButton Icon="@(layer.Visible ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                                  Size="Size.Small"
+                                                  OnClick="@(() => ToggleLayerVisibility(layer))"
+                                                  OnClick:stopPropagation="true" />
+                                </MudStack>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <MudDivider />
+
+                <!-- Style Properties -->
+                @if (_selectedLayer != null)
+                {
+                    <div class="panel-section style-properties">
+                        <MudText Typo="Typo.h6" Class="section-title">Style Properties</MudText>
+
+                        <!-- Presets -->
+                        <MudSelect @bind-Value="_selectedPreset"
+                                  Label="Style Preset"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  OnSelectedValuesChanged="ApplyPreset"
+                                  Class="mb-3">
+                            <MudSelectItem Value="@("custom")">Custom</MudSelectItem>
+                            <MudSelectItem Value="@("default")">Default</MudSelectItem>
+                            <MudSelectItem Value="@("highlight")">Highlight</MudSelectItem>
+                            <MudSelectItem Value="@("muted")">Muted</MudSelectItem>
+                            <MudSelectItem Value="@("bold")">Bold</MudSelectItem>
+                        </MudSelect>
+
+                        <!-- Geometry Type Specific Panels -->
+                        @if (IsVectorLayer)
+                        {
+                            <MudExpansionPanels MultiExpansion="true" Elevation="0">
+                                @if (HasFillProperties)
+                                {
+                                    <MudExpansionPanel Text="Fill" IsInitiallyExpanded="true">
+                                        <FillStylePanel Layer="@_selectedLayer"
+                                                       OnStyleChanged="HandleStyleChange" />
+                                    </MudExpansionPanel>
+                                }
+
+                                @if (HasStrokeProperties)
+                                {
+                                    <MudExpansionPanel Text="Stroke" IsInitiallyExpanded="true">
+                                        <StrokeStylePanel Layer="@_selectedLayer"
+                                                         OnStyleChanged="HandleStyleChange" />
+                                    </MudExpansionPanel>
+                                }
+
+                                @if (HasTextProperties)
+                                {
+                                    <MudExpansionPanel Text="Text">
+                                        <TextStylePanel Layer="@_selectedLayer"
+                                                       OnStyleChanged="HandleStyleChange" />
+                                    </MudExpansionPanel>
+                                }
+
+                                @if (HasSymbolProperties)
+                                {
+                                    <MudExpansionPanel Text="Symbol">
+                                        <SymbolStylePanel Layer="@_selectedLayer"
+                                                         OnStyleChanged="HandleStyleChange" />
+                                    </MudExpansionPanel>
+                                }
+
+                                <MudExpansionPanel Text="Visibility">
+                                    <VisibilityPanel Layer="@_selectedLayer"
+                                                    OnStyleChanged="HandleStyleChange" />
+                                </MudExpansionPanel>
+                            </MudExpansionPanels>
+                        }
+                        else if (_selectedLayer.Type == "raster")
+                        {
+                            <RasterStylePanel Layer="@_selectedLayer"
+                                            OnStyleChanged="HandleStyleChange" />
+                        }
+                        else if (_selectedLayer.Type == "heatmap")
+                        {
+                            <HeatmapStylePanel Layer="@_selectedLayer"
+                                             OnStyleChanged="HandleStyleChange" />
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="panel-section">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-center pa-4">
+                            Select a layer to edit its style
+                        </MudText>
+                    </div>
+                }
+            </MudPaper>
+        </div>
+
+        <!-- Right Panel: Map Preview -->
+        <div class="style-editor-right-panel">
+            <MudPaper Class="preview-container" Elevation="1">
+                <div class="preview-header">
+                    <MudText Typo="Typo.h6">Preview</MudText>
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                      Size="Size.Small"
+                                      OnClick="RefreshPreview"
+                                      Title="Refresh Preview" />
+                        <MudIconButton Icon="@(_syncPreview ? Icons.Material.Filled.Sync : Icons.Material.Filled.SyncDisabled)"
+                                      Size="Size.Small"
+                                      OnClick="ToggleSyncPreview"
+                                      Title="Toggle Auto-Sync" />
+                    </MudStack>
+                </div>
+                <div class="preview-map">
+                    @if (_mapConfiguration != null)
+                    {
+                        <HonuaMap Configuration="@_mapConfiguration"
+                                 Style="width: 100%; height: 100%;"
+                                 OnMapLoaded="HandleMapLoaded" />
+                    }
+                    else
+                    {
+                        <div class="preview-placeholder">
+                            <MudProgressCircular Indeterminate="true" />
+                            <MudText Typo="Typo.body2" Class="mt-2">Loading map...</MudText>
+                        </div>
+                    }
+                </div>
+            </MudPaper>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? LayerId { get; set; }
+
+    private List<LayerDefinition> _layers = new();
+    private LayerDefinition? _selectedLayer;
+    private string _layerSearchQuery = "";
+    private string _selectedPreset = "custom";
+    private bool _hasUnsavedChanges = false;
+    private bool _isSaving = false;
+    private bool _syncPreview = true;
+    private MapConfiguration? _mapConfiguration;
+
+    // Undo/Redo
+    private Stack<string> _undoStack = new();
+    private Stack<string> _redoStack = new();
+    private bool CanUndo => _undoStack.Count > 0;
+    private bool CanRedo => _redoStack.Count > 0;
+
+    private IEnumerable<LayerDefinition> FilteredLayers =>
+        string.IsNullOrWhiteSpace(_layerSearchQuery)
+            ? _layers
+            : _layers.Where(l => l.Name.Contains(_layerSearchQuery, StringComparison.OrdinalIgnoreCase));
+
+    private bool IsVectorLayer => _selectedLayer is VectorLayer;
+    private bool HasFillProperties => IsVectorLayer && (_selectedLayer?.Type.Contains("fill") == true || _selectedLayer?.Type.Contains("polygon") == true);
+    private bool HasStrokeProperties => IsVectorLayer && (_selectedLayer?.Type.Contains("line") == true || _selectedLayer?.Type.Contains("stroke") == true);
+    private bool HasTextProperties => IsVectorLayer && _selectedLayer?.Type.Contains("symbol") == true;
+    private bool HasSymbolProperties => IsVectorLayer && _selectedLayer?.Type.Contains("symbol") == true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLayers();
+        await InitializeMapConfiguration();
+
+        if (!string.IsNullOrEmpty(LayerId))
+        {
+            var layer = _layers.FirstOrDefault(l => l.Id == LayerId);
+            if (layer != null)
+            {
+                SelectLayer(layer);
+            }
+        }
+    }
+
+    private async Task LoadLayers()
+    {
+        // TODO: Load layers from service
+        // For now, create sample layers
+        _layers = new List<LayerDefinition>
+        {
+            new VectorLayer
+            {
+                Id = "layer-1",
+                Name = "Points",
+                Type = "circle",
+                SourceId = "points-source",
+                Paint = new Dictionary<string, object>
+                {
+                    ["circle-radius"] = 6,
+                    ["circle-color"] = "#3388ff"
+                }
+            },
+            new VectorLayer
+            {
+                Id = "layer-2",
+                Name = "Lines",
+                Type = "line",
+                SourceId = "lines-source",
+                Paint = new Dictionary<string, object>
+                {
+                    ["line-color"] = "#ff0000",
+                    ["line-width"] = 2
+                }
+            },
+            new VectorLayer
+            {
+                Id = "layer-3",
+                Name = "Polygons",
+                Type = "fill",
+                SourceId = "polygons-source",
+                Paint = new Dictionary<string, object>
+                {
+                    ["fill-color"] = "#00ff00",
+                    ["fill-opacity"] = 0.5
+                }
+            }
+        };
+    }
+
+    private async Task InitializeMapConfiguration()
+    {
+        _mapConfiguration = new MapConfiguration
+        {
+            Name = "Style Editor Preview",
+            Settings = new MapSettings
+            {
+                Style = "https://demotiles.maplibre.org/style.json",
+                Center = new[] { -98.5795, 39.8283 },
+                Zoom = 4,
+                Projection = "mercator"
+            },
+            Layers = new List<LayerConfiguration>()
+        };
+    }
+
+    private void SelectLayer(LayerDefinition layer)
+    {
+        _selectedLayer = layer;
+        _selectedPreset = "custom";
+        StateHasChanged();
+    }
+
+    private void ToggleLayerVisibility(LayerDefinition layer)
+    {
+        SaveStateForUndo();
+        layer.Visible = !layer.Visible;
+        _hasUnsavedChanges = true;
+        if (_syncPreview)
+        {
+            RefreshPreview();
+        }
+    }
+
+    private string GetLayerIcon(string layerType) => layerType.ToLower() switch
+    {
+        "fill" or "polygon" => Icons.Material.Filled.Polyline,
+        "line" or "linestring" => Icons.Material.Filled.Timeline,
+        "circle" or "point" => Icons.Material.Filled.Circle,
+        "symbol" => Icons.Material.Filled.PushPin,
+        "raster" => Icons.Material.Filled.Image,
+        "heatmap" => Icons.Material.Filled.Whatshot,
+        "fill-extrusion" => Icons.Material.Filled.ViewInAr,
+        _ => Icons.Material.Filled.Layers
+    };
+
+    private void HandleStyleChange()
+    {
+        SaveStateForUndo();
+        _hasUnsavedChanges = true;
+        _selectedPreset = "custom";
+
+        if (_syncPreview)
+        {
+            RefreshPreview();
+        }
+    }
+
+    private void ApplyPreset(IEnumerable<string> values)
+    {
+        var preset = values.FirstOrDefault();
+        if (preset == "custom" || _selectedLayer == null) return;
+
+        SaveStateForUndo();
+
+        // Apply preset styles based on selected preset
+        if (_selectedLayer is VectorLayer vectorLayer)
+        {
+            ApplyVectorPreset(vectorLayer, preset);
+        }
+
+        _hasUnsavedChanges = true;
+        RefreshPreview();
+    }
+
+    private void ApplyVectorPreset(VectorLayer layer, string preset)
+    {
+        switch (preset)
+        {
+            case "default":
+                if (layer.Type == "fill")
+                {
+                    layer.Paint["fill-color"] = "#3388ff";
+                    layer.Paint["fill-opacity"] = 0.5;
+                }
+                else if (layer.Type == "line")
+                {
+                    layer.Paint["line-color"] = "#3388ff";
+                    layer.Paint["line-width"] = 2;
+                }
+                else if (layer.Type == "circle")
+                {
+                    layer.Paint["circle-color"] = "#3388ff";
+                    layer.Paint["circle-radius"] = 6;
+                }
+                break;
+
+            case "highlight":
+                if (layer.Type == "fill")
+                {
+                    layer.Paint["fill-color"] = "#ffff00";
+                    layer.Paint["fill-opacity"] = 0.6;
+                }
+                else if (layer.Type == "line")
+                {
+                    layer.Paint["line-color"] = "#ffff00";
+                    layer.Paint["line-width"] = 3;
+                }
+                else if (layer.Type == "circle")
+                {
+                    layer.Paint["circle-color"] = "#ffff00";
+                    layer.Paint["circle-radius"] = 8;
+                }
+                break;
+
+            case "muted":
+                if (layer.Type == "fill")
+                {
+                    layer.Paint["fill-color"] = "#888888";
+                    layer.Paint["fill-opacity"] = 0.3;
+                }
+                else if (layer.Type == "line")
+                {
+                    layer.Paint["line-color"] = "#888888";
+                    layer.Paint["line-width"] = 1;
+                }
+                else if (layer.Type == "circle")
+                {
+                    layer.Paint["circle-color"] = "#888888";
+                    layer.Paint["circle-radius"] = 4;
+                }
+                break;
+
+            case "bold":
+                if (layer.Type == "fill")
+                {
+                    layer.Paint["fill-color"] = "#ff0000";
+                    layer.Paint["fill-opacity"] = 0.7;
+                }
+                else if (layer.Type == "line")
+                {
+                    layer.Paint["line-color"] = "#ff0000";
+                    layer.Paint["line-width"] = 4;
+                }
+                else if (layer.Type == "circle")
+                {
+                    layer.Paint["circle-color"] = "#ff0000";
+                    layer.Paint["circle-radius"] = 10;
+                }
+                break;
+        }
+    }
+
+    private void SaveStateForUndo()
+    {
+        var state = JsonSerializer.Serialize(_layers);
+        _undoStack.Push(state);
+        _redoStack.Clear();
+    }
+
+    private void Undo()
+    {
+        if (!CanUndo) return;
+
+        var currentState = JsonSerializer.Serialize(_layers);
+        _redoStack.Push(currentState);
+
+        var previousState = _undoStack.Pop();
+        _layers = JsonSerializer.Deserialize<List<LayerDefinition>>(previousState) ?? new();
+
+        RefreshPreview();
+    }
+
+    private void Redo()
+    {
+        if (!CanRedo) return;
+
+        var currentState = JsonSerializer.Serialize(_layers);
+        _undoStack.Push(currentState);
+
+        var nextState = _redoStack.Pop();
+        _layers = JsonSerializer.Deserialize<List<LayerDefinition>>(nextState) ?? new();
+
+        RefreshPreview();
+    }
+
+    private void ToggleSyncPreview()
+    {
+        _syncPreview = !_syncPreview;
+        if (_syncPreview)
+        {
+            RefreshPreview();
+        }
+    }
+
+    private void RefreshPreview()
+    {
+        // TODO: Update map with new layer styles
+        StateHasChanged();
+    }
+
+    private void HandleMapLoaded()
+    {
+        // Map is loaded and ready
+    }
+
+    private async Task SaveStyle()
+    {
+        _isSaving = true;
+        try
+        {
+            // TODO: Save styles to server
+            await Task.Delay(500); // Simulate save
+
+            _hasUnsavedChanges = false;
+            Snackbar.Add("Styles saved successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving styles: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void ShowJsonEditor()
+    {
+        // TODO: Show JSON editor dialog
+        Snackbar.Add("JSON editor coming soon", Severity.Info);
+    }
+
+    private void ExportStyle()
+    {
+        // TODO: Export style to JSON/SLD/etc.
+        Snackbar.Add("Export functionality coming soon", Severity.Info);
+    }
+}
