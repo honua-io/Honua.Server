@@ -1,0 +1,569 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.OGC
+@using Honua.MapSDK.Services.OGC
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject HttpClient Http
+
+<div class="honua-wfs-layer @CssClass" id="@Id">
+    @if (ShowControls && _isInitialized)
+    {
+        <div class="wfs-controls">
+            <div class="wfs-header">
+                <h4>@LayerTitle</h4>
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                }
+            </div>
+
+            @if (ShowFeatureTypeSelector && _availableFeatureTypes.Count > 0)
+            {
+                <div class="wfs-feature-type-selector">
+                    <MudSelect T="string"
+                              Value="@FeatureType"
+                              ValueChanged="@OnFeatureTypeChanged"
+                              Label="Feature Type"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense">
+                        @foreach (var ft in _availableFeatureTypes)
+                        {
+                            <MudSelectItem Value="@ft.Name">@ft.Title</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            }
+
+            @if (ShowFilterControls)
+            {
+                <div class="wfs-filter-controls">
+                    <MudExpansionPanels>
+                        <MudExpansionPanel Text="Filters">
+                            <MudTextField T="string"
+                                         @bind-Value="@_cqlFilter"
+                                         Label="CQL Filter"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         HelperText="e.g., population > 1000000" />
+
+                            <MudTextField T="string"
+                                         @bind-Value="@_propertyNames"
+                                         Label="Property Names (comma-separated)"
+                                         Variant="Variant.Outlined"
+                                         Margin="Margin.Dense"
+                                         HelperText="Leave empty for all properties" />
+
+                            <MudNumericField T="int?"
+                                           @bind-Value="@_maxFeatures"
+                                           Label="Max Features"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense" />
+
+                            <MudButton OnClick="@ApplyFilters"
+                                      Variant="Variant.Filled"
+                                      Color="Color.Primary"
+                                      Size="Size.Small"
+                                      Class="mt-2">
+                                Apply Filters
+                            </MudButton>
+
+                            <MudButton OnClick="@ClearFilters"
+                                      Variant="Variant.Text"
+                                      Color="Color.Default"
+                                      Size="Size.Small"
+                                      Class="mt-2 ml-2">
+                                Clear
+                            </MudButton>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </div>
+            }
+
+            @if (ShowStatistics && _statistics != null)
+            {
+                <div class="wfs-statistics">
+                    <MudText Typo="Typo.caption" Class="mt-2">
+                        Features: @_statistics.NumberReturned
+                        @if (_statistics.NumberOfFeatures > _statistics.NumberReturned)
+                        {
+                            <span> / @_statistics.NumberOfFeatures total</span>
+                        }
+                    </MudText>
+                </div>
+            }
+
+            @if (EnablePagination && _statistics != null && _statistics.NumberOfFeatures > (_maxFeatures ?? 100))
+            {
+                <div class="wfs-pagination">
+                    <MudPagination Count="@GetTotalPages()"
+                                  Selected="@_currentPage"
+                                  SelectedChanged="@OnPageChanged"
+                                  Size="Size.Small"
+                                  Color="Color.Primary" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this WFS layer component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"wfs-layer-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to sync with (required)
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// WFS service base URL
+    /// </summary>
+    [Parameter]
+    public required string ServiceUrl { get; set; }
+
+    /// <summary>
+    /// WFS version (1.0.0, 1.1.0, or 2.0.0)
+    /// </summary>
+    [Parameter]
+    public string Version { get; set; } = "2.0.0";
+
+    /// <summary>
+    /// Feature type name
+    /// </summary>
+    [Parameter]
+    public required string FeatureType { get; set; }
+
+    /// <summary>
+    /// Coordinate reference system
+    /// </summary>
+    [Parameter]
+    public string? Srs { get; set; }
+
+    /// <summary>
+    /// Output format
+    /// </summary>
+    [Parameter]
+    public string OutputFormat { get; set; } = "application/json";
+
+    /// <summary>
+    /// CQL filter expression
+    /// </summary>
+    [Parameter]
+    public string? CqlFilter { get; set; }
+
+    /// <summary>
+    /// Maximum number of features to retrieve
+    /// </summary>
+    [Parameter]
+    public int? MaxFeatures { get; set; } = 1000;
+
+    /// <summary>
+    /// Property names to retrieve (null = all)
+    /// </summary>
+    [Parameter]
+    public List<string>? PropertyNames { get; set; }
+
+    /// <summary>
+    /// Layer title for display
+    /// </summary>
+    [Parameter]
+    public string? LayerTitle { get; set; }
+
+    /// <summary>
+    /// Show interactive controls
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Show feature type selector
+    /// </summary>
+    [Parameter]
+    public bool ShowFeatureTypeSelector { get; set; } = true;
+
+    /// <summary>
+    /// Show filter controls
+    /// </summary>
+    [Parameter]
+    public bool ShowFilterControls { get; set; } = true;
+
+    /// <summary>
+    /// Show statistics
+    /// </summary>
+    [Parameter]
+    public bool ShowStatistics { get; set; } = true;
+
+    /// <summary>
+    /// Enable pagination
+    /// </summary>
+    [Parameter]
+    public bool EnablePagination { get; set; } = true;
+
+    /// <summary>
+    /// Auto-load data on initialization
+    /// </summary>
+    [Parameter]
+    public bool AutoLoad { get; set; } = true;
+
+    /// <summary>
+    /// Auto-load capabilities on initialization
+    /// </summary>
+    [Parameter]
+    public bool AutoLoadCapabilities { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Style configuration for features
+    /// </summary>
+    [Parameter]
+    public object? StyleConfig { get; set; }
+
+    /// <summary>
+    /// Callback when features are loaded
+    /// </summary>
+    [Parameter]
+    public EventCallback<WfsFeatureCollection> OnFeaturesLoaded { get; set; }
+
+    /// <summary>
+    /// Callback when feature is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<WfsFeature> OnFeatureClick { get; set; }
+
+    private IJSObjectReference? _wfsModule;
+    private IJSObjectReference? _layerInstance;
+    private DotNetObjectReference<HonuaWfsLayer>? _dotNetRef;
+    private OgcService? _ogcService;
+    private WfsCapabilities? _capabilities;
+    private WfsFeatureCollection? _statistics;
+    private bool _isInitialized = false;
+    private bool _isLoading = false;
+    private string? _sourceId;
+    private string? _layerId;
+    private List<WfsFeatureType> _availableFeatureTypes = new();
+
+    // Filter controls
+    private string? _cqlFilter;
+    private string? _propertyNames;
+    private int? _maxFeatures;
+    private int _currentPage = 1;
+
+    protected override void OnInitialized()
+    {
+        _ogcService = new OgcService(Http);
+        _cqlFilter = CqlFilter;
+        _maxFeatures = MaxFeatures;
+        _propertyNames = PropertyNames != null ? string.Join(",", PropertyNames) : null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeLayer();
+        }
+    }
+
+    private async Task InitializeLayer()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load JavaScript module
+            _wfsModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-wfs.js"
+            );
+
+            // Load capabilities if auto-load is enabled
+            if (AutoLoadCapabilities && _ogcService != null)
+            {
+                await LoadCapabilitiesAsync();
+            }
+
+            // Initialize WFS layer on map
+            _sourceId = $"wfs-source-{Id}";
+            _layerId = $"wfs-layer-{Id}";
+
+            var options = new
+            {
+                sourceId = _sourceId,
+                layerId = _layerId,
+                serviceUrl = ServiceUrl,
+                version = Version,
+                featureType = FeatureType,
+                outputFormat = OutputFormat,
+                styleConfig = StyleConfig
+            };
+
+            _layerInstance = await _wfsModule.InvokeAsync<IJSObjectReference>(
+                "createWfsLayer",
+                SyncWith,
+                options,
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+
+            // Load features if auto-load is enabled
+            if (AutoLoad)
+            {
+                await LoadFeaturesAsync();
+            }
+
+            // Publish layer added message
+            await Bus.PublishAsync(new LayerAddedMessage
+            {
+                LayerId = _layerId,
+                LayerName = LayerTitle ?? $"WFS: {FeatureType}"
+            }, Id);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing WFS layer: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCapabilitiesAsync()
+    {
+        if (_ogcService == null) return;
+
+        try
+        {
+            _capabilities = await _ogcService.GetWfsCapabilitiesAsync(ServiceUrl, Version);
+
+            if (_capabilities?.FeatureTypeList != null)
+            {
+                _availableFeatureTypes = _capabilities.FeatureTypeList.FeatureTypes;
+
+                // Set layer title from capabilities if not provided
+                if (string.IsNullOrEmpty(LayerTitle) && _capabilities.Service != null)
+                {
+                    LayerTitle = _capabilities.Service.Title;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading WFS capabilities: {ex.Message}");
+        }
+    }
+
+    private async Task LoadFeaturesAsync()
+    {
+        if (_ogcService == null || !_isInitialized) return;
+
+        try
+        {
+            _isLoading = true;
+            StateHasChanged();
+
+            var options = new WfsQueryOptions
+            {
+                FeatureType = FeatureType,
+                Version = Version,
+                Srs = Srs,
+                CqlFilter = _cqlFilter,
+                MaxFeatures = _maxFeatures,
+                StartIndex = EnablePagination ? (_currentPage - 1) * (_maxFeatures ?? 100) : null,
+                OutputFormat = OutputFormat
+            };
+
+            if (!string.IsNullOrEmpty(_propertyNames))
+            {
+                options.PropertyNames = _propertyNames.Split(',').Select(p => p.Trim()).ToList();
+            }
+
+            var features = await _ogcService.GetFeaturesAsync(ServiceUrl, options);
+
+            if (features != null && _layerInstance != null)
+            {
+                _statistics = features;
+
+                // Convert to GeoJSON format
+                var geoJson = new
+                {
+                    type = "FeatureCollection",
+                    features = features.Features.Select(f => new
+                    {
+                        type = "Feature",
+                        id = f.Id,
+                        geometry = f.Geometry,
+                        properties = f.Properties
+                    })
+                };
+
+                var geoJsonString = JsonSerializer.Serialize(geoJson);
+                await _layerInstance.InvokeVoidAsync("updateFeatures", geoJsonString);
+
+                await OnFeaturesLoaded.InvokeAsync(features);
+
+                // Publish data loaded message
+                await Bus.PublishAsync(new DataLoadedMessage
+                {
+                    ComponentId = Id,
+                    FeatureCount = features.NumberReturned,
+                    Source = FeatureType
+                }, Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading WFS features: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnFeatureTypeChanged(string featureType)
+    {
+        FeatureType = featureType;
+        _currentPage = 1;
+        await LoadFeaturesAsync();
+    }
+
+    private async Task ApplyFilters()
+    {
+        _currentPage = 1;
+        await LoadFeaturesAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        _cqlFilter = null;
+        _propertyNames = null;
+        _maxFeatures = MaxFeatures;
+        _currentPage = 1;
+        await LoadFeaturesAsync();
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _currentPage = page;
+        await LoadFeaturesAsync();
+    }
+
+    private int GetTotalPages()
+    {
+        if (_statistics == null || _maxFeatures == null || _maxFeatures == 0)
+            return 1;
+
+        return (int)Math.Ceiling((double)_statistics.NumberOfFeatures / _maxFeatures.Value);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when feature is clicked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureClickCallback(string featureJson)
+    {
+        try
+        {
+            var feature = JsonSerializer.Deserialize<WfsFeature>(featureJson);
+            if (feature != null)
+            {
+                await OnFeatureClick.InvokeAsync(feature);
+
+                // Publish feature clicked message
+                await Bus.PublishAsync(new FeatureClickedMessage
+                {
+                    MapId = SyncWith,
+                    LayerId = _layerId!,
+                    FeatureId = feature.Id ?? Guid.NewGuid().ToString(),
+                    Properties = feature.Properties,
+                    Geometry = feature.Geometry
+                }, Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error in feature click callback: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Public API: Refresh features
+    /// </summary>
+    public async Task RefreshAsync()
+    {
+        await LoadFeaturesAsync();
+    }
+
+    /// <summary>
+    /// Public API: Set visibility
+    /// </summary>
+    public async Task SetVisibilityAsync(bool visible)
+    {
+        if (_layerInstance != null)
+        {
+            await _layerInstance.InvokeVoidAsync("setVisibility", visible);
+
+            await Bus.PublishAsync(new LayerVisibilityChangedMessage
+            {
+                LayerId = _layerId!,
+                Visible = visible
+            }, Id);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Get capabilities
+    /// </summary>
+    public WfsCapabilities? GetCapabilities() => _capabilities;
+
+    /// <summary>
+    /// Public API: Get current features
+    /// </summary>
+    public WfsFeatureCollection? GetFeatures() => _statistics;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_layerInstance != null)
+        {
+            try
+            {
+                await _layerInstance.InvokeVoidAsync("dispose");
+                await _layerInstance.DisposeAsync();
+            }
+            catch { }
+        }
+
+        if (_wfsModule != null)
+        {
+            try
+            {
+                await _wfsModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+
+        if (!string.IsNullOrEmpty(_layerId))
+        {
+            await Bus.PublishAsync(new LayerRemovedMessage
+            {
+                LayerId = _layerId
+            }, Id);
+        }
+    }
+}

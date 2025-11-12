@@ -1,0 +1,487 @@
+@using Microsoft.JSInterop
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Models.Model3D
+@using Honua.MapSDK.Services
+@using System.Text.Json
+@implements IAsyncDisposable
+
+@*
+    Honua3DModel Component
+
+    Loads and displays GLTF/GLB 3D models on a map with support for:
+    - Model positioning (lat/lng/altitude)
+    - Rotation and scaling
+    - Animations
+    - Level of Detail (LOD)
+    - Interactive picking
+*@
+
+<div class="honua-3d-model @CssClass" style="@Style">
+    @if (ShowDebugInfo && _modelInfo != null)
+    {
+        <div class="model-debug-info">
+            <strong>@ModelId</strong><br/>
+            Triangles: @_modelInfo.TriangleCount.ToString("N0")<br/>
+            Vertices: @_modelInfo.VertexCount.ToString("N0")<br/>
+            @if (_modelInfo.Animations.Count > 0)
+            {
+                <span>Animations: @_modelInfo.Animations.Count</span><br/>
+            }
+            Load Time: @(_modelInfo.LoadTimeMs?.ToString("F0") ?? "?")ms
+        </div>
+    }
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this model instance
+    /// </summary>
+    [Parameter]
+    public required string ModelId { get; set; }
+
+    /// <summary>
+    /// Map ID to attach the model to
+    /// </summary>
+    [Parameter]
+    public required string MapId { get; set; }
+
+    /// <summary>
+    /// URL to the GLTF or GLB model file
+    /// </summary>
+    [Parameter]
+    public required string ModelUrl { get; set; }
+
+    /// <summary>
+    /// Geographic position (latitude, longitude) where the model should be placed
+    /// </summary>
+    [Parameter]
+    public required Coordinate3D Position { get; set; }
+
+    /// <summary>
+    /// Altitude/height above ground in meters
+    /// </summary>
+    [Parameter]
+    public double Altitude { get; set; } = 0;
+
+    /// <summary>
+    /// Model scale factor (1.0 = original size)
+    /// </summary>
+    [Parameter]
+    public double Scale { get; set; } = 1.0;
+
+    /// <summary>
+    /// Model rotation in radians (x, y, z)
+    /// </summary>
+    [Parameter]
+    public Vector3? Rotation { get; set; }
+
+    /// <summary>
+    /// Enable animations if the model has them
+    /// </summary>
+    [Parameter]
+    public bool EnableAnimation { get; set; } = true;
+
+    /// <summary>
+    /// Index of the animation to play (0-based)
+    /// </summary>
+    [Parameter]
+    public int AnimationIndex { get; set; } = 0;
+
+    /// <summary>
+    /// Animation playback speed (1.0 = normal speed)
+    /// </summary>
+    [Parameter]
+    public double AnimationSpeed { get; set; } = 1.0;
+
+    /// <summary>
+    /// Loop animation playback
+    /// </summary>
+    [Parameter]
+    public bool LoopAnimation { get; set; } = true;
+
+    /// <summary>
+    /// Enable Level of Detail (LOD) support
+    /// </summary>
+    [Parameter]
+    public bool EnableLOD { get; set; } = false;
+
+    /// <summary>
+    /// LOD levels configuration
+    /// </summary>
+    [Parameter]
+    public List<Model3DLodLevel>? LodLevels { get; set; }
+
+    /// <summary>
+    /// Enable interactive picking (raycasting)
+    /// </summary>
+    [Parameter]
+    public bool EnablePicking { get; set; } = true;
+
+    /// <summary>
+    /// Show debug information overlay
+    /// </summary>
+    [Parameter]
+    public bool ShowDebugInfo { get; set; } = false;
+
+    /// <summary>
+    /// Preload the model on initialization
+    /// </summary>
+    [Parameter]
+    public bool Preload { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Child content
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Event fired when the model is successfully loaded
+    /// </summary>
+    [Parameter]
+    public EventCallback<Model3DInfo> OnModelLoaded { get; set; }
+
+    /// <summary>
+    /// Event fired when the model fails to load
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnModelError { get; set; }
+
+    /// <summary>
+    /// Event fired when the model is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<Model3DPickResult> OnModelClick { get; set; }
+
+    /// <summary>
+    /// Event fired when animation completes
+    /// </summary>
+    [Parameter]
+    public EventCallback<int> OnAnimationComplete { get; set; }
+
+    /// <summary>
+    /// Event fired on loading progress
+    /// </summary>
+    [Parameter]
+    public EventCallback<double> OnLoadProgress { get; set; }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    [Inject]
+    private Model3DLoaderService ModelLoader { get; set; } = default!;
+
+    [Inject]
+    private ILogger<Honua3DModel> Logger { get; set; } = default!;
+
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<Honua3DModel>? _dotNetRef;
+    private Model3DInfo? _modelInfo;
+    private bool _initialized = false;
+    private bool _isLoading = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeAsync();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized)
+        {
+            // Update model position if parameters changed
+            await UpdateModelPositionAsync();
+            await UpdateModelTransformAsync();
+        }
+    }
+
+    /// <summary>
+    /// Initialize the 3D model component
+    /// </summary>
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            // Load JavaScript module
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./js/model-3d-loader.js");
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Check if Three.js is available
+            var isAvailable = await _jsModule.InvokeAsync<bool>("eval",
+                "HonuaModel3D.isAvailable()");
+
+            if (!isAvailable)
+            {
+                Logger.LogWarning("Three.js not available. Cannot load 3D models.");
+                await OnModelError.InvokeAsync("Three.js not loaded. Please include Three.js library.");
+                return;
+            }
+
+            // Initialize the 3D system for this map
+            var mapExists = await JS.InvokeAsync<bool>("eval",
+                $"window.HonuaMap && window.HonuaMap._maps && window.HonuaMap._maps.has('{MapId}')");
+
+            if (!mapExists)
+            {
+                Logger.LogError("Map '{MapId}' not found", MapId);
+                await OnModelError.InvokeAsync($"Map '{MapId}' not found");
+                return;
+            }
+
+            var map = await JS.InvokeAsync<IJSObjectReference>("eval",
+                $"window.HonuaMap._maps.get('{MapId}')");
+
+            await _jsModule.InvokeVoidAsync("HonuaModel3D.initialize", MapId, map, new
+            {
+                enableLighting = true,
+                enablePicking = EnablePicking
+            });
+
+            _initialized = true;
+
+            // Load the model
+            if (Preload)
+            {
+                await LoadModelAsync();
+            }
+
+            Logger.LogInformation("Honua3DModel initialized for model '{ModelId}'", ModelId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to initialize Honua3DModel");
+            await OnModelError.InvokeAsync(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Load the 3D model
+    /// </summary>
+    public async Task LoadModelAsync()
+    {
+        if (!_initialized || _isLoading)
+            return;
+
+        _isLoading = true;
+
+        try
+        {
+            // Validate URL
+            if (!ModelLoader.ValidateModelUrl(ModelUrl))
+            {
+                throw new ArgumentException($"Invalid model URL: {ModelUrl}");
+            }
+
+            // Server-side validation and metadata
+            var serverInfo = await ModelLoader.LoadModelAsync(ModelUrl, preload: false);
+
+            // Client-side loading with Three.js
+            var options = new
+            {
+                modelUrl = ModelUrl,
+                position = new { latitude = Position.Latitude, longitude = Position.Longitude },
+                altitude = Altitude,
+                scale = Scale,
+                rotation = Rotation?.ToArray() ?? new double[] { 0, 0, 0 },
+                enableAnimation = EnableAnimation,
+                animationIndex = AnimationIndex,
+                enableLOD = EnableLOD,
+                lodLevels = LodLevels,
+                onProgress = _dotNetRef
+            };
+
+            var modelInfoJson = await _jsModule!.InvokeAsync<JsonElement>(
+                "HonuaModel3D.loadModel", MapId, ModelId, ModelUrl, options);
+
+            // Parse model info
+            _modelInfo = JsonSerializer.Deserialize<Model3DInfo>(modelInfoJson.GetRawText());
+
+            if (_modelInfo != null)
+            {
+                await OnModelLoaded.InvokeAsync(_modelInfo);
+                StateHasChanged();
+            }
+
+            Logger.LogInformation("Model '{ModelId}' loaded successfully", ModelId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load model '{ModelId}'", ModelId);
+            await OnModelError.InvokeAsync(ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Update model position
+    /// </summary>
+    private async Task UpdateModelPositionAsync()
+    {
+        if (!_initialized || _jsModule == null)
+            return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("HonuaModel3D.positionModelOnMap", MapId, ModelId, new
+            {
+                position = new { latitude = Position.Latitude, longitude = Position.Longitude },
+                altitude = Altitude
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to update model position");
+        }
+    }
+
+    /// <summary>
+    /// Update model transformation (scale, rotation)
+    /// </summary>
+    private async Task UpdateModelTransformAsync()
+    {
+        if (!_initialized || _jsModule == null)
+            return;
+
+        try
+        {
+            // This would be implemented in the JS module
+            // For now, we'd need to reload the model with new transforms
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to update model transform");
+        }
+    }
+
+    /// <summary>
+    /// Play a specific animation
+    /// </summary>
+    /// <param name="animationIndex">Index of the animation to play</param>
+    /// <param name="speed">Playback speed</param>
+    /// <param name="loop">Loop the animation</param>
+    public async Task PlayAnimationAsync(int animationIndex, double speed = 1.0, bool loop = true)
+    {
+        if (!_initialized || _jsModule == null)
+            return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("HonuaModel3D.updateAnimation", MapId, ModelId, new
+            {
+                animationIndex = animationIndex,
+                timeScale = speed,
+                loop = loop,
+                play = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to play animation");
+        }
+    }
+
+    /// <summary>
+    /// Stop animation playback
+    /// </summary>
+    public async Task StopAnimationAsync()
+    {
+        if (!_initialized || _jsModule == null)
+            return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("HonuaModel3D.updateAnimation", MapId, ModelId, new
+            {
+                play = false
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to stop animation");
+        }
+    }
+
+    /// <summary>
+    /// Remove the model from the map
+    /// </summary>
+    public async Task RemoveModelAsync()
+    {
+        if (!_initialized || _jsModule == null)
+            return;
+
+        try
+        {
+            await _jsModule.InvokeVoidAsync("HonuaModel3D.removeModel", MapId, ModelId);
+            _modelInfo = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to remove model");
+        }
+    }
+
+    /// <summary>
+    /// JavaScript callback for load progress
+    /// </summary>
+    [JSInvokable]
+    public async Task OnLoadProgressCallback(double percent)
+    {
+        await OnLoadProgress.InvokeAsync(percent);
+    }
+
+    /// <summary>
+    /// Get model information
+    /// </summary>
+    public Model3DInfo? GetModelInfo() => _modelInfo;
+
+    /// <summary>
+    /// Check if the model is loaded
+    /// </summary>
+    public bool IsLoaded => _modelInfo != null;
+
+    /// <summary>
+    /// Dispose of resources
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_initialized && _jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("HonuaModel3D.removeModel", MapId, ModelId);
+            }
+            catch
+            {
+                // Ignore disposal errors
+            }
+        }
+
+        _dotNetRef?.Dispose();
+
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+}

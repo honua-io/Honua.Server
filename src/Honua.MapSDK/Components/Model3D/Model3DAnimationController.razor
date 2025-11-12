@@ -1,0 +1,466 @@
+@using Honua.MapSDK.Models.Model3D
+@using Microsoft.JSInterop
+
+@*
+    Model3DAnimationController Component
+
+    Provides UI controls for managing 3D model animations:
+    - Play/Pause
+    - Animation selection
+    - Speed control
+    - Timeline scrubber
+    - Loop toggle
+*@
+
+<div class="model-3d-animation-controller @CssClass" style="@Style">
+    @if (ModelInfo != null && ModelInfo.Animations.Count > 0)
+    {
+        <div class="animation-controls">
+            <div class="animation-header">
+                <h4>Animations (@ModelInfo.Animations.Count)</h4>
+            </div>
+
+            <div class="animation-selector">
+                <label for="animation-select">Animation:</label>
+                <select id="animation-select" @onchange="OnAnimationChanged" value="@_currentAnimationIndex">
+                    @foreach (var anim in ModelInfo.Animations)
+                    {
+                        <option value="@anim.Index">
+                            @anim.Name (@anim.Duration.ToString("F1")s)
+                        </option>
+                    }
+                </select>
+            </div>
+
+            @if (_currentAnimation != null)
+            {
+                <div class="animation-info">
+                    <small>
+                        Duration: @_currentAnimation.Duration.ToString("F2")s |
+                        Channels: @_currentAnimation.ChannelCount
+                    </small>
+                </div>
+
+                <div class="playback-controls">
+                    <button class="btn-icon" @onclick="TogglePlayPause" title="@(_isPlaying ? "Pause" : "Play")">
+                        @if (_isPlaying)
+                        {
+                            <span>⏸️</span>
+                        }
+                        else
+                        {
+                            <span>▶️</span>
+                        }
+                    </button>
+
+                    <button class="btn-icon" @onclick="StopAnimation" title="Stop">
+                        <span>⏹️</span>
+                    </button>
+
+                    <button class="btn-icon" @onclick="RestartAnimation" title="Restart">
+                        <span>⏮️</span>
+                    </button>
+                </div>
+
+                <div class="timeline-control">
+                    <label>Timeline:</label>
+                    <input type="range"
+                           min="0"
+                           max="@(_currentAnimation.Duration * 100)"
+                           step="1"
+                           value="@(_currentTime * 100)"
+                           @oninput="OnTimelineChanged"
+                           disabled="@_isPlaying"
+                           class="timeline-slider" />
+                    <span class="time-display">
+                        @_currentTime.ToString("F2")s / @_currentAnimation.Duration.ToString("F2")s
+                    </span>
+                </div>
+
+                <div class="speed-control">
+                    <label for="speed-input">Speed:</label>
+                    <input type="range"
+                           id="speed-input"
+                           min="0.1"
+                           max="3.0"
+                           step="0.1"
+                           value="@_playbackSpeed"
+                           @oninput="OnSpeedChanged"
+                           class="speed-slider" />
+                    <span class="speed-value">@_playbackSpeed.ToString("F1")x</span>
+                </div>
+
+                <div class="loop-control">
+                    <label>
+                        <input type="checkbox"
+                               checked="@_loopEnabled"
+                               @onchange="OnLoopChanged" />
+                        Loop Animation
+                    </label>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="no-animations">
+            <p>No animations available for this model.</p>
+        </div>
+    }
+</div>
+
+<style>
+    .model-3d-animation-controller {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 12px;
+        max-width: 400px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .animation-header h4 {
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        color: #333;
+    }
+
+    .animation-selector {
+        margin-bottom: 12px;
+    }
+
+    .animation-selector label {
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .animation-selector select {
+        width: 100%;
+        padding: 6px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .animation-info {
+        margin-bottom: 12px;
+        padding: 8px;
+        background: #f5f5f5;
+        border-radius: 4px;
+    }
+
+    .animation-info small {
+        color: #666;
+        font-size: 12px;
+    }
+
+    .playback-controls {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .btn-icon {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        background: white;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+        background: #f0f0f0;
+        border-color: #999;
+    }
+
+    .btn-icon:active {
+        transform: scale(0.95);
+    }
+
+    .timeline-control,
+    .speed-control {
+        margin-bottom: 12px;
+    }
+
+    .timeline-control label,
+    .speed-control label {
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .timeline-slider,
+    .speed-slider {
+        width: 100%;
+        margin-bottom: 4px;
+    }
+
+    .time-display,
+    .speed-value {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .loop-control {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #eee;
+    }
+
+    .loop-control label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .no-animations {
+        padding: 20px;
+        text-align: center;
+        color: #999;
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Reference to the Honua3DModel component to control
+    /// </summary>
+    [Parameter]
+    public Honua3DModel? Model { get; set; }
+
+    /// <summary>
+    /// Model information containing animation data
+    /// </summary>
+    [Parameter]
+    public Model3DInfo? ModelInfo { get; set; }
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Event fired when animation is played
+    /// </summary>
+    [Parameter]
+    public EventCallback<int> OnAnimationPlay { get; set; }
+
+    /// <summary>
+    /// Event fired when animation is paused
+    /// </summary>
+    [Parameter]
+    public EventCallback OnAnimationPause { get; set; }
+
+    /// <summary>
+    /// Event fired when animation is stopped
+    /// </summary>
+    [Parameter]
+    public EventCallback OnAnimationStop { get; set; }
+
+    /// <summary>
+    /// Event fired when animation changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<int> OnAnimationChanged { get; set; }
+
+    [Inject]
+    private ILogger<Model3DAnimationController> Logger { get; set; } = default!;
+
+    private int _currentAnimationIndex = 0;
+    private Model3DAnimation? _currentAnimation;
+    private bool _isPlaying = false;
+    private double _currentTime = 0;
+    private double _playbackSpeed = 1.0;
+    private bool _loopEnabled = true;
+    private System.Threading.Timer? _timelineTimer;
+
+    protected override void OnParametersSet()
+    {
+        if (ModelInfo != null && ModelInfo.Animations.Count > 0)
+        {
+            _currentAnimation = ModelInfo.Animations[_currentAnimationIndex];
+        }
+    }
+
+    private async Task OnAnimationChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var index))
+        {
+            _currentAnimationIndex = index;
+            _currentAnimation = ModelInfo?.Animations[index];
+            _currentTime = 0;
+
+            if (Model != null)
+            {
+                await Model.PlayAnimationAsync(index, _playbackSpeed, _loopEnabled);
+                _isPlaying = true;
+                StartTimelineTimer();
+            }
+
+            await OnAnimationChanged.InvokeAsync(index);
+        }
+    }
+
+    private async Task TogglePlayPause()
+    {
+        if (_isPlaying)
+        {
+            await PauseAnimation();
+        }
+        else
+        {
+            await PlayAnimation();
+        }
+    }
+
+    private async Task PlayAnimation()
+    {
+        if (Model == null || _currentAnimation == null) return;
+
+        try
+        {
+            await Model.PlayAnimationAsync(_currentAnimationIndex, _playbackSpeed, _loopEnabled);
+            _isPlaying = true;
+            StartTimelineTimer();
+            await OnAnimationPlay.InvokeAsync(_currentAnimationIndex);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to play animation");
+        }
+    }
+
+    private async Task PauseAnimation()
+    {
+        if (Model == null) return;
+
+        try
+        {
+            await Model.StopAnimationAsync();
+            _isPlaying = false;
+            StopTimelineTimer();
+            await OnAnimationPause.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to pause animation");
+        }
+    }
+
+    private async Task StopAnimation()
+    {
+        if (Model == null) return;
+
+        try
+        {
+            await Model.StopAnimationAsync();
+            _isPlaying = false;
+            _currentTime = 0;
+            StopTimelineTimer();
+            await OnAnimationStop.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to stop animation");
+        }
+    }
+
+    private async Task RestartAnimation()
+    {
+        await StopAnimation();
+        await Task.Delay(100); // Brief delay to ensure stop is processed
+        await PlayAnimation();
+    }
+
+    private void OnTimelineChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            _currentTime = value / 100.0;
+            // In a full implementation, we'd seek to this time in the animation
+        }
+    }
+
+    private async Task OnSpeedChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var speed))
+        {
+            _playbackSpeed = speed;
+
+            if (_isPlaying && Model != null)
+            {
+                // Update the playback speed
+                await Model.PlayAnimationAsync(_currentAnimationIndex, _playbackSpeed, _loopEnabled);
+            }
+        }
+    }
+
+    private async Task OnLoopChanged(ChangeEventArgs e)
+    {
+        _loopEnabled = e.Value?.ToString() == "true";
+
+        if (_isPlaying && Model != null)
+        {
+            // Update the loop setting
+            await Model.PlayAnimationAsync(_currentAnimationIndex, _playbackSpeed, _loopEnabled);
+        }
+    }
+
+    private void StartTimelineTimer()
+    {
+        StopTimelineTimer();
+
+        _timelineTimer = new System.Threading.Timer(
+            callback: async _ =>
+            {
+                if (_isPlaying && _currentAnimation != null)
+                {
+                    _currentTime += 0.1 * _playbackSpeed;
+
+                    if (_currentTime >= _currentAnimation.Duration)
+                    {
+                        if (_loopEnabled)
+                        {
+                            _currentTime = 0;
+                        }
+                        else
+                        {
+                            _currentTime = _currentAnimation.Duration;
+                            _isPlaying = false;
+                            StopTimelineTimer();
+                        }
+                    }
+
+                    await InvokeAsync(StateHasChanged);
+                }
+            },
+            state: null,
+            dueTime: TimeSpan.FromMilliseconds(100),
+            period: TimeSpan.FromMilliseconds(100)
+        );
+    }
+
+    private void StopTimelineTimer()
+    {
+        _timelineTimer?.Dispose();
+        _timelineTimer = null;
+    }
+
+    public void Dispose()
+    {
+        StopTimelineTimer();
+    }
+}

@@ -1,0 +1,432 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Sky
+@using Honua.MapSDK.Services.Sky
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject SunPositionService SunPositionService
+
+<div class="honua-time-of-day-controller @CssClass" style="@Style">
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h6">Time of Day</MudText>
+
+            <MudDatePicker
+                Label="Date"
+                @bind-Date="_selectedDate"
+                DateChanged="@OnDateChanged"
+                Variant="Variant.Outlined"
+                Dense="true" />
+
+            <MudTimePicker
+                Label="Time"
+                @bind-Time="_selectedTime"
+                TimeChanged="@OnTimeChanged"
+                Variant="Variant.Outlined"
+                Dense="true" />
+
+            <MudDivider />
+
+            <MudText Typo="Typo.subtitle2">Location</MudText>
+
+            <MudNumericField
+                T="double"
+                Label="Latitude"
+                @bind-Value="_latitude"
+                Min="-90"
+                Max="90"
+                Step="0.1"
+                Variant="Variant.Outlined"
+                Dense="true"
+                Adornment="Adornment.End"
+                AdornmentText="°" />
+
+            <MudNumericField
+                T="double"
+                Label="Longitude"
+                @bind-Value="_longitude"
+                Min="-180"
+                Max="180"
+                Step="0.1"
+                Variant="Variant.Outlined"
+                Dense="true"
+                Adornment="Adornment.End"
+                AdornmentText="°" />
+
+            @if (ShowLocationPresets)
+            {
+                <MudSelect
+                    T="string"
+                    Label="Location Presets"
+                    Value="@_selectedLocationPreset"
+                    ValueChanged="@OnLocationPresetChanged"
+                    Variant="Variant.Outlined"
+                    Dense="true"
+                    Clearable="true">
+                    <MudSelectItem Value="@("")">Custom</MudSelectItem>
+                    @foreach (var preset in _locationPresets)
+                    {
+                        <MudSelectItem Value="@preset.Key">@preset.Key</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            <MudDivider />
+
+            @if (ShowSunInfo)
+            {
+                <MudText Typo="Typo.subtitle2">Sun Position</MudText>
+
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.body2">
+                        <strong>Azimuth:</strong> @_currentSunPosition.Azimuth.ToString("F2")°
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        <strong>Altitude:</strong> @_currentSunPosition.Altitude.ToString("F2")°
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        <strong>Time of Day:</strong> @_currentSunPosition.TimeOfDay
+                    </MudText>
+
+                    @if (_sunTimes != null)
+                    {
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.body2">
+                            <strong>Sunrise:</strong> @(_sunTimes.Sunrise?.ToLocalTime().ToString("HH:mm") ?? "N/A")
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Solar Noon:</strong> @(_sunTimes.SolarNoon?.ToLocalTime().ToString("HH:mm") ?? "N/A")
+                        </MudText>
+                        <MudText Typo="Typo.body2">
+                            <strong>Sunset:</strong> @(_sunTimes.Sunset?.ToLocalTime().ToString("HH:mm") ?? "N/A")
+                        </MudText>
+                        @if (_sunTimes.DayLength.HasValue)
+                        {
+                            <MudText Typo="Typo.body2">
+                                <strong>Day Length:</strong> @_sunTimes.DayLength.Value.ToString("F1") hours
+                            </MudText>
+                        }
+                    }
+                </MudStack>
+            }
+
+            @if (ShowPresets)
+            {
+                <MudDivider />
+
+                <MudText Typo="Typo.subtitle2">Quick Presets</MudText>
+
+                <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                    @foreach (var preset in _timePresets)
+                    {
+                        <MudButton
+                            Size="Size.Small"
+                            Variant="Variant.Outlined"
+                            Color="Color.Primary"
+                            OnClick="@(() => ApplyTimePreset(preset.Key))">
+                            @preset.Key
+                        </MudButton>
+                    }
+                </MudStack>
+            }
+
+            @if (ShowSkyPresets)
+            {
+                <MudDivider />
+
+                <MudText Typo="Typo.subtitle2">Sky Presets</MudText>
+
+                <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                    @foreach (var presetName in SkyPresets.GetPresetNames())
+                    {
+                        <MudButton
+                            Size="Size.Small"
+                            Variant="Variant.Outlined"
+                            Color="Color.Secondary"
+                            OnClick="@(() => ApplySkyPreset(presetName))">
+                            @presetName
+                        </MudButton>
+                    }
+                </MudStack>
+            }
+
+            <MudButton
+                Variant="Variant.Filled"
+                Color="Color.Primary"
+                FullWidth="true"
+                OnClick="@UpdateTimeAndPosition">
+                Apply
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the controller
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"time-controller-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Initial date/time
+    /// </summary>
+    [Parameter]
+    public DateTime InitialDateTime { get; set; } = DateTime.Now;
+
+    /// <summary>
+    /// Initial location
+    /// </summary>
+    [Parameter]
+    public Coordinate InitialLocation { get; set; } = new Coordinate(21.3099, -157.8581); // Honolulu, HI
+
+    /// <summary>
+    /// Show location preset selector
+    /// </summary>
+    [Parameter]
+    public bool ShowLocationPresets { get; set; } = true;
+
+    /// <summary>
+    /// Show sun information panel
+    /// </summary>
+    [Parameter]
+    public bool ShowSunInfo { get; set; } = true;
+
+    /// <summary>
+    /// Show time preset buttons
+    /// </summary>
+    [Parameter]
+    public bool ShowPresets { get; set; } = true;
+
+    /// <summary>
+    /// Show sky preset buttons
+    /// </summary>
+    [Parameter]
+    public bool ShowSkyPresets { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Event callback when time changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<DateTime> OnTimeUpdated { get; set; }
+
+    /// <summary>
+    /// Event callback when location changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<Coordinate> OnLocationUpdated { get; set; }
+
+    private DateTime? _selectedDate;
+    private TimeSpan? _selectedTime;
+    private double _latitude;
+    private double _longitude;
+    private string _selectedLocationPreset = "";
+    private SunPosition _currentSunPosition = new SunPosition(180, 45);
+    private SunTimes? _sunTimes;
+
+    private readonly Dictionary<string, Coordinate> _locationPresets = new()
+    {
+        { "Honolulu, HI", new Coordinate(21.3099, -157.8581) },
+        { "New York, NY", new Coordinate(40.7128, -74.0060) },
+        { "London, UK", new Coordinate(51.5074, -0.1278) },
+        { "Tokyo, Japan", new Coordinate(35.6762, 139.6503) },
+        { "Sydney, Australia", new Coordinate(-33.8688, 151.2093) },
+        { "Paris, France", new Coordinate(48.8566, 2.3522) },
+        { "Reykjavik, Iceland", new Coordinate(64.1466, -21.9426) },
+        { "Singapore", new Coordinate(1.3521, 103.8198) },
+        { "Anchorage, AK", new Coordinate(61.2181, -149.9003) },
+        { "Rio de Janeiro, Brazil", new Coordinate(-22.9068, -43.1729) }
+    };
+
+    private readonly Dictionary<string, int> _timePresets = new()
+    {
+        { "Midnight", 0 },
+        { "3 AM", 3 },
+        { "Sunrise", 6 },
+        { "9 AM", 9 },
+        { "Noon", 12 },
+        { "3 PM", 15 },
+        { "Sunset", 18 },
+        { "9 PM", 21 }
+    };
+
+    protected override void OnInitialized()
+    {
+        _selectedDate = InitialDateTime.Date;
+        _selectedTime = InitialDateTime.TimeOfDay;
+        _latitude = InitialLocation.Latitude;
+        _longitude = InitialLocation.Longitude;
+
+        UpdateSunPosition();
+        CalculateSunTimes();
+    }
+
+    private void OnDateChanged(DateTime? date)
+    {
+        _selectedDate = date;
+        UpdateSunPosition();
+        CalculateSunTimes();
+    }
+
+    private void OnTimeChanged(TimeSpan? time)
+    {
+        _selectedTime = time;
+        UpdateSunPosition();
+    }
+
+    private void OnLocationPresetChanged(string presetName)
+    {
+        _selectedLocationPreset = presetName;
+
+        if (!string.IsNullOrEmpty(presetName) && _locationPresets.TryGetValue(presetName, out var location))
+        {
+            _latitude = location.Latitude;
+            _longitude = location.Longitude;
+            UpdateSunPosition();
+            CalculateSunTimes();
+        }
+    }
+
+    private void UpdateSunPosition()
+    {
+        try
+        {
+            var dateTime = GetCurrentDateTime();
+
+            _currentSunPosition = SunPositionService.Calculate(
+                dateTime,
+                _latitude,
+                _longitude,
+                0
+            );
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating sun position: {ex.Message}");
+        }
+    }
+
+    private void CalculateSunTimes()
+    {
+        try
+        {
+            var date = _selectedDate ?? DateTime.Now.Date;
+
+            _sunTimes = SunPositionService.CalculateSunTimes(
+                date,
+                _latitude,
+                _longitude,
+                0
+            );
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error calculating sun times: {ex.Message}");
+        }
+    }
+
+    private DateTime GetCurrentDateTime()
+    {
+        var date = _selectedDate ?? DateTime.Now.Date;
+        var time = _selectedTime ?? DateTime.Now.TimeOfDay;
+        return date.Add(time);
+    }
+
+    private async Task UpdateTimeAndPosition()
+    {
+        var dateTime = GetCurrentDateTime();
+
+        // Publish sun position update
+        await Bus.PublishAsync(new UpdateSunPositionRequestMessage
+        {
+            MapId = SyncWith ?? "",
+            ComponentId = Id,
+            Azimuth = _currentSunPosition.Azimuth,
+            Altitude = _currentSunPosition.Altitude,
+            TransitionDuration = 1000
+        }, Id);
+
+        // Auto-update sky based on sun position
+        var skyColor = SunPositionService.InterpolateSkyColor(_currentSunPosition.Altitude);
+        await Bus.PublishAsync(new UpdateSkyRequestMessage
+        {
+            MapId = SyncWith ?? "",
+            ComponentId = Id,
+            SkyType = "Atmosphere",
+            SkyColor = skyColor,
+            EnableAtmosphere = true,
+            AtmosphereIntensity = 1.0,
+            EnableStars = _currentSunPosition.Altitude < -6
+        }, Id);
+
+        // Invoke callbacks
+        await OnTimeUpdated.InvokeAsync(dateTime);
+        await OnLocationUpdated.InvokeAsync(new Coordinate(_latitude, _longitude));
+    }
+
+    private async Task ApplyTimePreset(string presetName)
+    {
+        if (_timePresets.TryGetValue(presetName, out var hour))
+        {
+            var date = _selectedDate ?? DateTime.Now.Date;
+
+            // For sunrise/sunset, use calculated times if available
+            if (presetName == "Sunrise" && _sunTimes?.Sunrise.HasValue == true)
+            {
+                var sunrise = _sunTimes.Sunrise.Value.ToLocalTime();
+                _selectedTime = sunrise.TimeOfDay;
+            }
+            else if (presetName == "Sunset" && _sunTimes?.Sunset.HasValue == true)
+            {
+                var sunset = _sunTimes.Sunset.Value.ToLocalTime();
+                _selectedTime = sunset.TimeOfDay;
+            }
+            else
+            {
+                _selectedTime = TimeSpan.FromHours(hour);
+            }
+
+            UpdateSunPosition();
+            await UpdateTimeAndPosition();
+        }
+    }
+
+    private async Task ApplySkyPreset(string presetName)
+    {
+        await Bus.PublishAsync(new ApplySkyPresetRequestMessage
+        {
+            MapId = SyncWith ?? "",
+            ComponentId = Id,
+            PresetName = presetName,
+            TransitionDuration = 1000
+        }, Id);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Task.CompletedTask;
+    }
+}

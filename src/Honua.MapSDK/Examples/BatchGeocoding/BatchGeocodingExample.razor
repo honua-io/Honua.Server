@@ -1,0 +1,266 @@
+@page "/examples/batch-geocoding"
+@using Honua.MapSDK.Components.BatchGeocoding
+@using Honua.MapSDK.Models.BatchGeocoding
+
+<PageTitle>Batch Geocoding Example - Honua.MapSDK</PageTitle>
+
+<div class="batch-geocoding-example pa-4">
+    <MudText Typo="Typo.h4" Class="mb-2">Batch Geocoding Example</MudText>
+    <MudText Typo="Typo.body1" Class="mb-4">
+        Upload a CSV file with addresses and geocode them in bulk using various providers.
+    </MudText>
+
+    <!-- Provider Information Cards -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" md="6" lg="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Public" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6">Nominatim</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2" Class="mb-2">OpenStreetMap geocoding service</MudText>
+                    <MudChip Size="Size.Small" Color="Color.Success">Free</MudChip>
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.caption"><strong>Rate Limit:</strong> 1 req/sec</MudText>
+                    <MudText Typo="Typo.caption"><strong>Coverage:</strong> Global</MudText>
+                    <MudText Typo="Typo.caption"><strong>Accuracy:</strong> Good</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6" lg="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Cloud" Color="Color.Info" />
+                        <MudText Typo="Typo.h6">Azure Maps</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2" Class="mb-2">Microsoft Azure geocoding</MudText>
+                    <MudChip Size="Size.Small" Color="Color.Warning">Paid</MudChip>
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.caption"><strong>Rate Limit:</strong> 50 req/sec</MudText>
+                    <MudText Typo="Typo.caption"><strong>Coverage:</strong> Global</MudText>
+                    <MudText Typo="Typo.caption"><strong>Accuracy:</strong> Excellent</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6" lg="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.LocationOn" Color="Color.Error" />
+                        <MudText Typo="Typo.h6">Google Maps</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2" Class="mb-2">Google geocoding API</MudText>
+                    <MudChip Size="Size.Small" Color="Color.Warning">Paid</MudChip>
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.caption"><strong>Rate Limit:</strong> 50 req/sec</MudText>
+                    <MudText Typo="Typo.caption"><strong>Coverage:</strong> Global</MudText>
+                    <MudText Typo="Typo.caption"><strong>Accuracy:</strong> Excellent</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" md="6" lg="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.CloudQueue" Color="Color.Secondary" />
+                        <MudText Typo="Typo.h6">AWS Location</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2" Class="mb-2">Amazon Location Service</MudText>
+                    <MudChip Size="Size.Small" Color="Color.Warning">Paid</MudChip>
+                    <MudDivider Class="my-2" />
+                    <MudText Typo="Typo.caption"><strong>Rate Limit:</strong> 50 req/sec</MudText>
+                    <MudText Typo="Typo.caption"><strong>Coverage:</strong> Global</MudText>
+                    <MudText Typo="Typo.caption"><strong>Accuracy:</strong> Excellent</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Features Overview -->
+    <MudExpansionPanels Class="mb-4">
+        <MudExpansionPanel Text="Features & Capabilities">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudList Dense="true">
+                        <MudListSubheader>Core Features</MudListSubheader>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            CSV upload with drag-and-drop
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Multi-provider support (Nominatim, Azure, Google, AWS)
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Real-time progress tracking
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Provider-specific rate limiting
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Result quality scoring (Exact, High, Medium, Low)
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Address column auto-detection
+                        </MudListItem>
+                    </MudList>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudList Dense="true">
+                        <MudListSubheader>Advanced Features</MudListSubheader>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Automatic retry with exponential backoff
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Results validation and filtering
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Download geocoded results to CSV
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Display results on map
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Cancellation support
+                        </MudListItem>
+                        <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                            Virtualized table for large datasets (10k+ rows)
+                        </MudListItem>
+                    </MudList>
+                </MudItem>
+            </MudGrid>
+        </MudExpansionPanel>
+
+        <MudExpansionPanel Text="CSV Format Guidelines">
+            <MudText Typo="Typo.h6" Class="mb-2">Required Format</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Your CSV file should contain a header row with column names. The batch geocoder will automatically
+                detect address columns, or you can manually select the column containing addresses.
+            </MudText>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Supported Address Formats</MudText>
+            <MudList Dense="true">
+                <MudListItem Icon="@Icons.Material.Filled.LocationOn">
+                    <strong>Single Column:</strong> Full address in one column (e.g., "1600 Amphitheatre Parkway, Mountain View, CA 94043")
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.LocationOn">
+                    <strong>Multiple Columns:</strong> Separate columns for street, city, state, ZIP (can be combined automatically)
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.LocationOn">
+                    <strong>International:</strong> Addresses from any country (provider-dependent)
+                </MudListItem>
+            </MudList>
+
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                <strong>Tip:</strong> For best results, include as much detail as possible in your addresses (street, city, state/province, postal code, country).
+            </MudAlert>
+        </MudExpansionPanel>
+
+        <MudExpansionPanel Text="Rate Limiting & Performance">
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Each geocoding provider has different rate limits. The batch geocoder automatically enforces these limits
+                to prevent API throttling and ensure reliable operation.
+            </MudText>
+
+            <MudSimpleTable Dense="true" Bordered="true">
+                <thead>
+                    <tr>
+                        <th>Provider</th>
+                        <th>Default Rate Limit</th>
+                        <th>Est. Time for 100 Addresses</th>
+                        <th>Est. Time for 1,000 Addresses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Nominatim</td>
+                        <td>1 req/sec</td>
+                        <td>~1.7 minutes</td>
+                        <td>~17 minutes</td>
+                    </tr>
+                    <tr>
+                        <td>Azure Maps</td>
+                        <td>50 req/sec</td>
+                        <td>~2 seconds</td>
+                        <td>~20 seconds</td>
+                    </tr>
+                    <tr>
+                        <td>Google Maps</td>
+                        <td>50 req/sec</td>
+                        <td>~2 seconds</td>
+                        <td>~20 seconds</td>
+                    </tr>
+                    <tr>
+                        <td>AWS Location</td>
+                        <td>50 req/sec</td>
+                        <td>~2 seconds</td>
+                        <td>~20 seconds</td>
+                    </tr>
+                </tbody>
+            </MudSimpleTable>
+
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">
+                <strong>Note:</strong> These are estimates. Actual times may vary based on network latency, server load, and address complexity.
+            </MudAlert>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+
+    <!-- Batch Geocoder Component -->
+    <HonuaBatchGeocoder MapId="batch-example-map"
+                        ServerUrl="@_serverUrl"
+                        DefaultProvider="nominatim"
+                        MaxConcurrentRequests="10"
+                        ShowResultsOnMap="false"
+                        OnGeocodingComplete="@HandleGeocodingComplete" />
+
+    <!-- Completion Message -->
+    @if (_completionMessage != null)
+    {
+        <MudAlert Severity="Severity.Success" Dense="true" Class="mt-4" CloseIconClicked="@(() => _completionMessage = null)">
+            @_completionMessage
+        </MudAlert>
+    }
+
+    <!-- Usage Example Code -->
+    <MudExpansionPanels Class="mt-4">
+        <MudExpansionPanel Text="View Usage Code">
+            <MudText Typo="Typo.h6" Class="mb-2">Razor Component</MudText>
+            <MudPaper Class="pa-3 mb-3" Elevation="0" Style="background-color: #f5f5f5;">
+                <pre><code>@@page "/batch-geocoding"
+@@using Honua.MapSDK.Components.BatchGeocoding
+
+&lt;HonuaBatchGeocoder
+    MapId="my-map"
+    ServerUrl="http://localhost:5000"
+    DefaultProvider="nominatim"
+    MaxConcurrentRequests="10"
+    ShowResultsOnMap="true"
+    OnGeocodingComplete="@@HandleGeocodingComplete" /&gt;
+
+@@code {
+    private void HandleGeocodingComplete(BatchGeocodingResult result)
+    {
+        Console.WriteLine($"Geocoded {result.Statistics.SuccessCount} addresses");
+    }
+}</code></pre>
+            </MudPaper>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Service Registration (Program.cs)</MudText>
+            <MudPaper Class="pa-3" Elevation="0" Style="background-color: #f5f5f5;">
+                <pre><code>// Add Honua.MapSDK services
+builder.Services.AddHonuaMapSDK();</code></pre>
+            </MudPaper>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+</div>
+
+@code {
+    private string _serverUrl = "http://localhost:5000";
+    private string? _completionMessage;
+
+    private void HandleGeocodingComplete(BatchGeocodingResult result)
+    {
+        _completionMessage = $"Batch geocoding completed! Successfully geocoded {result.Statistics.SuccessCount} out of {result.Statistics.TotalAddresses} addresses in {result.Duration?.TotalSeconds:F1} seconds.";
+        StateHasChanged();
+    }
+}

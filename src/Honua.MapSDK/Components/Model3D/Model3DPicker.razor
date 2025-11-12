@@ -1,0 +1,367 @@
+@using Honua.MapSDK.Models.Model3D
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+
+@*
+    Model3DPicker Component
+
+    Provides interactive picking (raycasting) for 3D models on the map.
+    Allows users to click on models and retrieve intersection information.
+*@
+
+<div class="model-3d-picker @CssClass" style="@Style">
+    @if (ShowPickInfo && _lastPickResult != null)
+    {
+        <div class="pick-info-panel">
+            <h4>Pick Info</h4>
+            <div class="pick-details">
+                <strong>Model:</strong> @_lastPickResult.ModelId<br/>
+                <strong>Distance:</strong> @_lastPickResult.Distance.ToString("F2")m<br/>
+                @if (_lastPickResult.MeshName != null)
+                {
+                    <strong>Mesh:</strong> @_lastPickResult.MeshName<br/>
+                }
+                <strong>Point:</strong> @_lastPickResult.Point.ToString()<br/>
+                @if (_lastPickResult.Normal != null)
+                {
+                    <strong>Normal:</strong> @_lastPickResult.Normal.ToString()<br/>
+                }
+                @if (_lastPickResult.UV != null)
+                {
+                    <strong>UV:</strong> @_lastPickResult.UV.ToString()<br/>
+                }
+            </div>
+            <button @onclick="ClearPickInfo" class="btn-clear">Clear</button>
+        </div>
+    }
+    @ChildContent
+</div>
+
+<style>
+    .model-3d-picker {
+        position: relative;
+    }
+
+    .pick-info-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        min-width: 250px;
+        z-index: 1000;
+    }
+
+    .pick-info-panel h4 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        color: #333;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+    }
+
+    .pick-details {
+        font-size: 12px;
+        line-height: 1.6;
+        color: #666;
+    }
+
+    .pick-details strong {
+        color: #333;
+    }
+
+    .btn-clear {
+        margin-top: 8px;
+        padding: 4px 12px;
+        background: #f0f0f0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        width: 100%;
+    }
+
+    .btn-clear:hover {
+        background: #e0e0e0;
+    }
+
+    .pick-cursor {
+        cursor: crosshair !important;
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Map ID to attach the picker to
+    /// </summary>
+    [Parameter]
+    public required string MapId { get; set; }
+
+    /// <summary>
+    /// Enable picking functionality
+    /// </summary>
+    [Parameter]
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Show pick information panel
+    /// </summary>
+    [Parameter]
+    public bool ShowPickInfo { get; set; } = true;
+
+    /// <summary>
+    /// Maximum picking distance in meters
+    /// </summary>
+    [Parameter]
+    public double MaxDistance { get; set; } = 10000;
+
+    /// <summary>
+    /// Highlight picked model
+    /// </summary>
+    [Parameter]
+    public bool HighlightOnPick { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Child content
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Event fired when a model is picked
+    /// </summary>
+    [Parameter]
+    public EventCallback<Model3DPickResult> OnModelPicked { get; set; }
+
+    /// <summary>
+    /// Event fired when picking fails (no model hit)
+    /// </summary>
+    [Parameter]
+    public EventCallback OnPickMiss { get; set; }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    [Inject]
+    private ILogger<Model3DPicker> Logger { get; set; } = default!;
+
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<Model3DPicker>? _dotNetRef;
+    private bool _initialized = false;
+    private Model3DPickResult? _lastPickResult;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeAsync();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized)
+        {
+            await UpdatePickerSettingsAsync();
+        }
+    }
+
+    /// <summary>
+    /// Initialize the picker
+    /// </summary>
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./js/model-3d-loader.js");
+
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Setup click handler on map
+            await SetupClickHandlerAsync();
+
+            _initialized = true;
+            Logger.LogInformation("Model3DPicker initialized for map '{MapId}'", MapId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to initialize Model3DPicker");
+        }
+    }
+
+    /// <summary>
+    /// Setup click handler for picking
+    /// </summary>
+    private async Task SetupClickHandlerAsync()
+    {
+        if (!_initialized || _jsModule == null)
+            return;
+
+        try
+        {
+            // Register click handler with the map
+            await JS.InvokeVoidAsync("eval", $@"
+                (function() {{
+                    const map = window.HonuaMap._maps.get('{MapId}');
+                    if (!map) return;
+
+                    map.on('click', async (e) => {{
+                        if ({(Enabled ? "true" : "false")}) {{
+                            const result = HonuaModel3D.pickModel('{MapId}', e.point.x, e.point.y);
+                            if (result) {{
+                                await DotNet.invokeMethodAsync('{_dotNetRef?.Value.GetType().Assembly.GetName().Name}',
+                                    'OnModelPickedCallback',
+                                    result);
+                            }} else {{
+                                await DotNet.invokeMethodAsync('{_dotNetRef?.Value.GetType().Assembly.GetName().Name}',
+                                    'OnPickMissCallback');
+                            }}
+                        }}
+                    }});
+                }})();
+            ");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to setup click handler");
+        }
+    }
+
+    /// <summary>
+    /// Update picker settings
+    /// </summary>
+    private async Task UpdatePickerSettingsAsync()
+    {
+        // Update picker configuration
+        // This could be implemented to update raycaster settings in JS
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Pick a model at screen coordinates
+    /// </summary>
+    /// <param name="screenX">Screen X coordinate</param>
+    /// <param name="screenY">Screen Y coordinate</param>
+    public async Task<Model3DPickResult?> PickAtAsync(double screenX, double screenY)
+    {
+        if (!_initialized || _jsModule == null)
+            return null;
+
+        try
+        {
+            var resultJson = await _jsModule.InvokeAsync<JsonElement?>(
+                "HonuaModel3D.pickModel", MapId, screenX, screenY);
+
+            if (resultJson.HasValue)
+            {
+                var result = System.Text.Json.JsonSerializer.Deserialize<Model3DPickResult>(
+                    resultJson.Value.GetRawText());
+                return result;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to pick model");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// JavaScript callback when a model is picked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnModelPickedCallback(JsonElement pickData)
+    {
+        try
+        {
+            var result = System.Text.Json.JsonSerializer.Deserialize<Model3DPickResult>(
+                pickData.GetRawText());
+
+            if (result != null)
+            {
+                _lastPickResult = result;
+                await OnModelPicked.InvokeAsync(result);
+                StateHasChanged();
+
+                Logger.LogDebug("Model picked: {ModelId} at distance {Distance}m",
+                    result.ModelId, result.Distance);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to process pick callback");
+        }
+    }
+
+    /// <summary>
+    /// JavaScript callback when picking misses all models
+    /// </summary>
+    [JSInvokable]
+    public async Task OnPickMissCallback()
+    {
+        await OnPickMiss.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Clear the pick information display
+    /// </summary>
+    private void ClearPickInfo()
+    {
+        _lastPickResult = null;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Get the last pick result
+    /// </summary>
+    public Model3DPickResult? GetLastPickResult() => _lastPickResult;
+
+    /// <summary>
+    /// Enable picking
+    /// </summary>
+    public void Enable()
+    {
+        Enabled = true;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Disable picking
+    /// </summary>
+    public void Disable()
+    {
+        Enabled = false;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Dispose of resources
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+}

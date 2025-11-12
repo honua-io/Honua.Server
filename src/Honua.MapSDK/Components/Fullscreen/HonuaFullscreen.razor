@@ -1,0 +1,322 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-fullscreen @GetPositionClass() @CssClass" style="@Style">
+    @if (_mapReady || AlwaysShow)
+    {
+        <MudTooltip Text="@GetTooltipText()">
+            <MudIconButton
+                Icon="@GetIcon()"
+                Color="@ButtonColor"
+                Variant="@ButtonVariant"
+                Size="@ButtonSize"
+                OnClick="@ToggleFullscreen"
+                Disabled="@(!_isSupported || Disabled)"
+                Class="fullscreen-button"
+                aria-label="@(_isFullscreen ? "Exit fullscreen" : "Enter fullscreen")" />
+        </MudTooltip>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the fullscreen control
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"fullscreen-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Position on the map: top-right, top-left, bottom-right, bottom-left, or null for embedded
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; } = "top-right";
+
+    /// <summary>
+    /// Button color
+    /// </summary>
+    [Parameter]
+    public Color ButtonColor { get; set; } = Color.Default;
+
+    /// <summary>
+    /// Button variant
+    /// </summary>
+    [Parameter]
+    public Variant ButtonVariant { get; set; } = Variant.Filled;
+
+    /// <summary>
+    /// Button size
+    /// </summary>
+    [Parameter]
+    public Size ButtonSize { get; set; } = Size.Medium;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Show control even if map is not ready
+    /// </summary>
+    [Parameter]
+    public bool AlwaysShow { get; set; } = false;
+
+    /// <summary>
+    /// Disable the button
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; } = false;
+
+    /// <summary>
+    /// Enable keyboard shortcuts (F11 for fullscreen, Esc to exit)
+    /// </summary>
+    [Parameter]
+    public bool EnableKeyboardShortcuts { get; set; } = true;
+
+    /// <summary>
+    /// Element ID to make fullscreen (defaults to map container)
+    /// </summary>
+    [Parameter]
+    public string? TargetElementId { get; set; }
+
+    /// <summary>
+    /// Icon to show when not in fullscreen mode
+    /// </summary>
+    [Parameter]
+    public string EnterIcon { get; set; } = Icons.Material.Filled.Fullscreen;
+
+    /// <summary>
+    /// Icon to show when in fullscreen mode
+    /// </summary>
+    [Parameter]
+    public string ExitIcon { get; set; } = Icons.Material.Filled.FullscreenExit;
+
+    /// <summary>
+    /// Event callback when fullscreen state changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnFullscreenChanged { get; set; }
+
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaFullscreen>? _dotNetRef;
+    private bool _isFullscreen = false;
+    private bool _mapReady = false;
+    private bool _isSupported = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-fullscreen.js"
+                );
+
+                _dotNetRef = DotNetObjectReference.Create(this);
+
+                // Check if fullscreen is supported
+                _isSupported = await _jsModule.InvokeAsync<bool>("isFullscreenSupported");
+
+                // Initialize fullscreen with keyboard shortcuts
+                var targetId = TargetElementId ?? SyncWith ?? "document";
+                await _jsModule.InvokeVoidAsync("initializeFullscreen", targetId, _dotNetRef, EnableKeyboardShortcuts);
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading fullscreen JS module: {ex.Message}");
+                _isSupported = false;
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Toggle fullscreen mode
+    /// </summary>
+    public async Task ToggleFullscreen()
+    {
+        if (_jsModule == null || !_isSupported)
+            return;
+
+        try
+        {
+            var targetId = TargetElementId ?? SyncWith;
+            var success = await _jsModule.InvokeAsync<bool>("toggleFullscreen", targetId);
+
+            if (success)
+            {
+                _isFullscreen = !_isFullscreen;
+                await OnFullscreenStateChanged(_isFullscreen);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error toggling fullscreen: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Enter fullscreen mode
+    /// </summary>
+    public async Task EnterFullscreen()
+    {
+        if (_jsModule == null || !_isSupported || _isFullscreen)
+            return;
+
+        try
+        {
+            var targetId = TargetElementId ?? SyncWith;
+            var success = await _jsModule.InvokeAsync<bool>("enterFullscreen", targetId);
+
+            if (success)
+            {
+                _isFullscreen = true;
+                await OnFullscreenStateChanged(true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error entering fullscreen: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Exit fullscreen mode
+    /// </summary>
+    public async Task ExitFullscreen()
+    {
+        if (_jsModule == null || !_isSupported || !_isFullscreen)
+            return;
+
+        try
+        {
+            var success = await _jsModule.InvokeAsync<bool>("exitFullscreen");
+
+            if (success)
+            {
+                _isFullscreen = false;
+                await OnFullscreenStateChanged(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error exiting fullscreen: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// JavaScript callback when fullscreen state changes (triggered by browser or keyboard)
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFullscreenChange(bool isFullscreen)
+    {
+        _isFullscreen = isFullscreen;
+        await OnFullscreenStateChanged(isFullscreen);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnFullscreenStateChanged(bool isFullscreen)
+    {
+        // Publish message to ComponentBus
+        await Bus.PublishAsync(new FullscreenChangedMessage
+        {
+            ComponentId = Id,
+            MapId = SyncWith ?? "",
+            IsFullscreen = isFullscreen,
+            TargetElementId = TargetElementId ?? SyncWith ?? ""
+        }, Id);
+
+        // Invoke callback
+        await OnFullscreenChanged.InvokeAsync(isFullscreen);
+
+        StateHasChanged();
+    }
+
+    private string GetIcon()
+    {
+        return _isFullscreen ? ExitIcon : EnterIcon;
+    }
+
+    private string GetTooltipText()
+    {
+        if (!_isSupported)
+            return "Fullscreen not supported";
+
+        if (Disabled)
+            return "Fullscreen disabled";
+
+        var shortcutText = EnableKeyboardShortcuts ? " (F11)" : "";
+        return _isFullscreen ? $"Exit fullscreen (Esc)" : $"Enter fullscreen{shortcutText}";
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "fullscreen-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "fullscreen-floating fullscreen-top-right",
+            "top-left" => "fullscreen-floating fullscreen-top-left",
+            "bottom-right" => "fullscreen-floating fullscreen-bottom-right",
+            "bottom-left" => "fullscreen-floating fullscreen-bottom-left",
+            _ => "fullscreen-embedded"
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("cleanup");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error cleaning up fullscreen module: {ex.Message}");
+            }
+
+            await _jsModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

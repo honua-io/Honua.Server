@@ -1,0 +1,173 @@
+@using Honua.MapSDK.Models.BatchGeocoding
+
+<MudCard Class="mb-4">
+    <MudCardContent>
+        <MudText Typo="Typo.h6" Class="mb-3">Processing...</MudText>
+
+        @if (Progress != null)
+        {
+            var stats = Progress.Statistics;
+
+            <!-- Overall Progress Bar -->
+            <MudProgressLinear Value="@stats.ProgressPercentage"
+                               Color="Color.Primary"
+                               Size="Size.Large"
+                               Class="mb-3">
+                <MudText Typo="Typo.body2" Color="Color.Surface">
+                    @stats.ProcessedCount / @stats.TotalAddresses (@stats.ProgressPercentage.ToString("F1")%)
+                </MudText>
+            </MudProgressLinear>
+
+            <!-- Current Address -->
+            @if (!string.IsNullOrEmpty(Progress.CurrentAddress))
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    <MudText Typo="Typo.body2">
+                        <strong>Processing:</strong> @Progress.CurrentAddress
+                    </MudText>
+                </MudAlert>
+            }
+
+            <!-- Statistics Grid -->
+            <MudGrid Class="mb-3">
+                <MudItem xs="6" sm="3">
+                    <MudPaper Class="pa-2 text-center" Elevation="0">
+                        <MudText Typo="Typo.h6" Color="Color.Success">@stats.SuccessCount</MudText>
+                        <MudText Typo="Typo.caption">Success</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Class="pa-2 text-center" Elevation="0">
+                        <MudText Typo="Typo.h6" Color="Color.Error">@stats.FailedCount</MudText>
+                        <MudText Typo="Typo.caption">Failed</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Class="pa-2 text-center" Elevation="0">
+                        <MudText Typo="Typo.h6" Color="Color.Warning">@stats.AmbiguousCount</MudText>
+                        <MudText Typo="Typo.caption">Ambiguous</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Class="pa-2 text-center" Elevation="0">
+                        <MudText Typo="Typo.h6" Color="Color.Info">@stats.ProcessedCount</MudText>
+                        <MudText Typo="Typo.caption">Processed</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Performance Stats -->
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2">
+                        <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Small" Class="mr-1" />
+                        <strong>Average Time:</strong> @stats.AverageTimeMs.ToString("F0")ms per address
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudText Typo="Typo.body2">
+                        <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" Class="mr-1" />
+                        <strong>Est. Remaining:</strong> @FormatTimeSpan(stats.EstimatedTimeRemaining)
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.body2">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                        <strong>Success Rate:</strong> @stats.SuccessRate.ToString("F1")%
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Recent Errors -->
+            @if (Progress.RecentErrors != null && Progress.RecentErrors.Count > 0)
+            {
+                <MudExpansionPanels Class="mb-3">
+                    <MudExpansionPanel Text="Recent Errors" MaxHeight="200">
+                        <MudList Dense="true">
+                            @foreach (var error in Progress.RecentErrors.Take(10))
+                            {
+                                <MudListItem Icon="@Icons.Material.Filled.Error" IconColor="Color.Error">
+                                    <MudText Typo="Typo.body2" Color="Color.Error">@error</MudText>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+
+            <!-- Control Buttons -->
+            <MudStack Row="true" Spacing="2" Justify="Justify.Center">
+                @if (Progress.IsPaused)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               StartIcon="@Icons.Material.Filled.PlayArrow"
+                               OnClick="@(() => OnResume.InvokeAsync())">
+                        Resume
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Warning"
+                               StartIcon="@Icons.Material.Filled.Pause"
+                               OnClick="@(() => OnPause.InvokeAsync())"
+                               Disabled="true">
+                        Pause (Coming Soon)
+                    </MudButton>
+                }
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.Stop"
+                           OnClick="@(() => OnCancel.InvokeAsync())">
+                    Cancel
+                </MudButton>
+            </MudStack>
+        }
+        else
+        {
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+            <MudText Typo="Typo.body1" Class="mt-2">Initializing batch geocoding...</MudText>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    /// <summary>
+    /// Current progress information.
+    /// </summary>
+    [Parameter]
+    public BatchGeocodingProgress? Progress { get; set; }
+
+    /// <summary>
+    /// Event callback when pause is requested.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnPause { get; set; }
+
+    /// <summary>
+    /// Event callback when resume is requested.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnResume { get; set; }
+
+    /// <summary>
+    /// Event callback when cancel is requested.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string FormatTimeSpan(TimeSpan? timeSpan)
+    {
+        if (timeSpan == null || timeSpan.Value == TimeSpan.Zero)
+            return "Calculating...";
+
+        if (timeSpan.Value.TotalSeconds < 60)
+            return $"{timeSpan.Value.TotalSeconds:F0}s";
+
+        if (timeSpan.Value.TotalMinutes < 60)
+            return $"{timeSpan.Value.TotalMinutes:F1}m";
+
+        return $"{timeSpan.Value.TotalHours:F1}h";
+    }
+}

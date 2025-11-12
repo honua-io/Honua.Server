@@ -1,0 +1,512 @@
+@using Honua.MapSDK.Models.BatchGeocoding
+@using Honua.MapSDK.Services.BatchGeocoding
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text
+@inject ILogger<HonuaBatchGeocoder> Logger
+
+<div class="honua-batch-geocoder @CssClass">
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudText Typo="Typo.h5" Class="mb-4">
+            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Class="mr-2" />
+            Batch Geocoding
+        </MudText>
+
+        @if (!_isProcessing && _results == null)
+        {
+            <!-- 1. Upload Section -->
+            <MudCard Class="mb-4">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">1. Upload CSV File</MudText>
+                    <InputFile id="csvFileInput"
+                               OnChange="@HandleFileSelected"
+                               accept=".csv"
+                               hidden />
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton HtmlTag="label"
+                                   for="csvFileInput"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Upload">
+                            Choose CSV File
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Secondary"
+                                   StartIcon="@Icons.Material.Filled.Download"
+                                   OnClick="@DownloadSampleCsv">
+                            Download Sample CSV
+                        </MudButton>
+                    </MudStack>
+                    @if (!string.IsNullOrEmpty(_uploadedFileName))
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mt-3">
+                            File uploaded: <strong>@_uploadedFileName</strong> (@_totalAddresses addresses)
+                        </MudAlert>
+                    }
+                    @if (!string.IsNullOrEmpty(_uploadError))
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3" CloseIconClicked="@(() => _uploadError = null)">
+                            @_uploadError
+                        </MudAlert>
+                    }
+                </MudCardContent>
+            </MudCard>
+
+            <!-- 2. Configuration Section -->
+            @if (_csvHeaders.Count > 0)
+            {
+                <MudCard Class="mb-4">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6" Class="mb-3">2. Configuration</MudText>
+                        <MudGrid>
+                            <MudItem xs="12" sm="6">
+                                <MudSelect T="string"
+                                           Label="Geocoding Provider"
+                                           @bind-Value="@_selectedProvider"
+                                           Variant="Variant.Outlined">
+                                    <MudSelectItem Value="@("nominatim")">Nominatim (OpenStreetMap) - Free, 1 req/sec</MudSelectItem>
+                                    <MudSelectItem Value="@("azure-maps")">Azure Maps - 50 req/sec</MudSelectItem>
+                                    <MudSelectItem Value="@("google-maps")">Google Maps - 50 req/sec</MudSelectItem>
+                                    <MudSelectItem Value="@("aws-location")">AWS Location - 50 req/sec</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudSelect T="string"
+                                           Label="Address Column"
+                                           @bind-Value="@_selectedAddressColumn"
+                                           Variant="Variant.Outlined"
+                                           HelperText="Select the column containing addresses">
+                                    @foreach (var header in _csvHeaders)
+                                    {
+                                        <MudSelectItem Value="@header">@header</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.body2" Class="mb-2">Max Concurrent Requests: @_maxConcurrentRequests</MudText>
+                                <MudSlider T="int"
+                                           @bind-Value="@_maxConcurrentRequests"
+                                           Min="1"
+                                           Max="50"
+                                           Step="1"
+                                           Color="Color.Primary">
+                                    Rate Limit: @_maxConcurrentRequests req/sec
+                                </MudSlider>
+                            </MudItem>
+                            @if (ShowResultsOnMap)
+                            {
+                                <MudItem xs="12">
+                                    <MudCheckBox T="bool"
+                                                 @bind-Value="@_displayOnMapAfterComplete"
+                                                 Label="Display results on map when complete"
+                                                 Color="Color.Primary" />
+                                </MudItem>
+                            }
+                        </MudGrid>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   OnClick="@StartBatchGeocoding"
+                                   Disabled="@(string.IsNullOrEmpty(_selectedAddressColumn))"
+                                   Class="mt-3">
+                            Start Batch Geocoding
+                        </MudButton>
+                    </MudCardContent>
+                </MudCard>
+            }
+        }
+
+        <!-- 3. Progress Section -->
+        @if (_isProcessing)
+        {
+            <BatchGeocodingProgress Progress="@_currentProgress"
+                                    OnPause="@PauseBatchGeocoding"
+                                    OnResume="@ResumeBatchGeocoding"
+                                    OnCancel="@CancelBatchGeocoding" />
+        }
+
+        <!-- 4. Results Section -->
+        @if (_results != null)
+        {
+            <MudCard Class="mb-4">
+                <MudCardContent>
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6">Results</MudText>
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Download"
+                                       OnClick="@DownloadResults"
+                                       Size="Size.Small">
+                                Download CSV
+                            </MudButton>
+                            @if (ShowResultsOnMap && !string.IsNullOrEmpty(MapId))
+                            {
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Secondary"
+                                           StartIcon="@Icons.Material.Filled.Map"
+                                           OnClick="@DisplayAllOnMap"
+                                           Size="Size.Small">
+                                    Display on Map
+                                </MudButton>
+                            }
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Default"
+                                       StartIcon="@Icons.Material.Filled.Refresh"
+                                       OnClick="@ResetGeocoder"
+                                       Size="Size.Small">
+                                Start New
+                            </MudButton>
+                        </MudStack>
+                    </MudStack>
+
+                    <!-- Statistics Summary -->
+                    <MudGrid Class="mb-4">
+                        <MudItem xs="6" sm="3">
+                            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-success-lighten);">
+                                <MudText Typo="Typo.h4" Color="Color.Success">@_results.Statistics.SuccessCount</MudText>
+                                <MudText Typo="Typo.body2">Success</MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-error-lighten);">
+                                <MudText Typo="Typo.h4" Color="Color.Error">@_results.Statistics.FailedCount</MudText>
+                                <MudText Typo="Typo.body2">Failed</MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-warning-lighten);">
+                                <MudText Typo="Typo.h4" Color="Color.Warning">@_results.Statistics.AmbiguousCount</MudText>
+                                <MudText Typo="Typo.body2">Ambiguous</MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudPaper Class="pa-3 text-center" Elevation="0" Style="background-color: var(--mud-palette-info-lighten);">
+                                <MudText Typo="Typo.h4" Color="Color.Info">@_results.Statistics.TotalAddresses</MudText>
+                                <MudText Typo="Typo.body2">Total</MudText>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- Results Table -->
+                    <BatchGeocodingResults Results="@_results"
+                                           OnRetry="@RetryFailedAddress"
+                                           OnDisplayOnMap="@DisplayAddressOnMap"
+                                           ShowMapActions="@ShowResultsOnMap" />
+                </MudCardContent>
+            </MudCard>
+        }
+    </MudPaper>
+</div>
+
+@code {
+    /// <summary>
+    /// Map ID to display results on.
+    /// </summary>
+    [Parameter]
+    public string? MapId { get; set; }
+
+    /// <summary>
+    /// Server URL for Honua.Server API.
+    /// </summary>
+    [Parameter]
+    public string ServerUrl { get; set; } = "http://localhost:5000";
+
+    /// <summary>
+    /// Default geocoding provider.
+    /// </summary>
+    [Parameter]
+    public string DefaultProvider { get; set; } = "nominatim";
+
+    /// <summary>
+    /// Maximum concurrent requests for rate limiting.
+    /// </summary>
+    [Parameter]
+    public int MaxConcurrentRequests { get; set; } = 10;
+
+    /// <summary>
+    /// Whether to show map-related actions.
+    /// </summary>
+    [Parameter]
+    public bool ShowResultsOnMap { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class.
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Event callback when geocoding completes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<BatchGeocodingResult> OnGeocodingComplete { get; set; }
+
+    [Inject]
+    private BatchGeocodingService GeocodingService { get; set; } = default!;
+
+    [Inject]
+    private CsvGeocodingService CsvService { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    private string? _uploadedFileName;
+    private string? _uploadError;
+    private byte[]? _csvContent;
+    private List<string> _csvHeaders = new();
+    private List<string> _addresses = new();
+    private List<Dictionary<string, string>> _originalRows = new();
+    private int _totalAddresses;
+
+    private string _selectedProvider = "nominatim";
+    private string? _selectedAddressColumn;
+    private int _maxConcurrentRequests = 10;
+    private bool _displayOnMapAfterComplete = true;
+
+    private bool _isProcessing;
+    private BatchGeocodingProgress? _currentProgress;
+    private BatchGeocodingResult? _results;
+    private CancellationTokenSource? _cancellationTokenSource;
+
+    protected override void OnInitialized()
+    {
+        _selectedProvider = DefaultProvider;
+        _maxConcurrentRequests = MaxConcurrentRequests;
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _uploadError = null;
+        _uploadedFileName = null;
+        _csvHeaders.Clear();
+        _addresses.Clear();
+        _originalRows.Clear();
+
+        try
+        {
+            var file = e.File;
+            if (file == null)
+                return;
+
+            if (!file.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                _uploadError = "Please select a CSV file.";
+                return;
+            }
+
+            // Read file (max 10MB)
+            const long maxFileSize = 10 * 1024 * 1024;
+            if (file.Size > maxFileSize)
+            {
+                _uploadError = $"File size exceeds {maxFileSize / 1024 / 1024}MB limit.";
+                return;
+            }
+
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            _csvContent = memoryStream.ToArray();
+
+            // Parse CSV
+            var config = new CsvImportConfiguration
+            {
+                HasHeader = true,
+                Delimiter = ',',
+                Encoding = "UTF-8"
+            };
+
+            var options = new BatchGeocodingOptions
+            {
+                SkipEmptyAddresses = true,
+                IncludeOriginalData = true
+            };
+
+            var (addresses, headers, rows) = await CsvService.ParseCsvAsync(_csvContent, config, options);
+
+            _addresses = addresses;
+            _csvHeaders = headers;
+            _originalRows = rows;
+            _totalAddresses = addresses.Count;
+            _uploadedFileName = file.Name;
+
+            // Auto-detect address column
+            _selectedAddressColumn = CsvService.DetermineAddressColumn(headers, options) >= 0
+                ? headers[CsvService.DetermineAddressColumn(headers, options)]
+                : headers.FirstOrDefault();
+
+            Logger.LogInformation("CSV uploaded: {FileName} with {Count} addresses", file.Name, addresses.Count);
+        }
+        catch (Exception ex)
+        {
+            _uploadError = $"Failed to process CSV: {ex.Message}";
+            Logger.LogError(ex, "CSV upload failed");
+        }
+    }
+
+    private async Task DownloadSampleCsv()
+    {
+        try
+        {
+            var sampleCsv = await CsvService.GenerateSampleCsvAsync();
+            var fileName = "sample_addresses.csv";
+
+            await JS.InvokeVoidAsync("downloadFile", fileName, "text/csv", Convert.ToBase64String(sampleCsv));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to download sample CSV");
+        }
+    }
+
+    private async Task StartBatchGeocoding()
+    {
+        if (_addresses.Count == 0 || string.IsNullOrEmpty(_selectedAddressColumn))
+            return;
+
+        _isProcessing = true;
+        _results = null;
+        _cancellationTokenSource = new CancellationTokenSource();
+
+        try
+        {
+            var request = new BatchGeocodingRequest
+            {
+                Addresses = _addresses,
+                Provider = _selectedProvider,
+                ServerUrl = ServerUrl,
+                MaxConcurrentRequests = _maxConcurrentRequests,
+                MaxRetries = 3,
+                TimeoutMs = 10000
+            };
+
+            var progress = new Progress<BatchGeocodingProgress>(p =>
+            {
+                _currentProgress = p;
+                InvokeAsync(StateHasChanged);
+            });
+
+            _results = await GeocodingService.ProcessBatchAsync(request, progress, _cancellationTokenSource.Token);
+
+            Logger.LogInformation("Batch geocoding completed: {Success}/{Total} successful",
+                _results.Statistics.SuccessCount,
+                _results.Statistics.TotalAddresses);
+
+            await OnGeocodingComplete.InvokeAsync(_results);
+
+            if (_displayOnMapAfterComplete && ShowResultsOnMap)
+            {
+                await DisplayAllOnMap();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogInformation("Batch geocoding cancelled");
+        }
+        catch (Exception ex)
+        {
+            _uploadError = $"Geocoding failed: {ex.Message}";
+            Logger.LogError(ex, "Batch geocoding failed");
+        }
+        finally
+        {
+            _isProcessing = false;
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+        }
+    }
+
+    private Task PauseBatchGeocoding()
+    {
+        // TODO: Implement pause logic
+        return Task.CompletedTask;
+    }
+
+    private Task ResumeBatchGeocoding()
+    {
+        // TODO: Implement resume logic
+        return Task.CompletedTask;
+    }
+
+    private void CancelBatchGeocoding()
+    {
+        _cancellationTokenSource?.Cancel();
+    }
+
+    private async Task RetryFailedAddress(GeocodingMatch match)
+    {
+        try
+        {
+            var retried = await GeocodingService.RetryGeocodeAsync(match, _selectedProvider, ServerUrl);
+
+            // Update result in list
+            if (_results != null)
+            {
+                var index = _results.Matches.FindIndex(m => m.RowIndex == match.RowIndex);
+                if (index >= 0)
+                {
+                    _results.Matches[index] = retried;
+                    StateHasChanged();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Retry failed for address: {Address}", match.OriginalAddress);
+        }
+    }
+
+    private Task DisplayAddressOnMap(GeocodingMatch match)
+    {
+        // TODO: Implement display single address on map
+        return Task.CompletedTask;
+    }
+
+    private Task DisplayAllOnMap()
+    {
+        // TODO: Implement display all successful results on map
+        return Task.CompletedTask;
+    }
+
+    private async Task DownloadResults()
+    {
+        if (_results == null)
+            return;
+
+        try
+        {
+            var config = new CsvExportConfiguration
+            {
+                IncludeOriginalColumns = true,
+                IncludeQuality = true,
+                IncludeStatus = true,
+                IncludeConfidence = true,
+                IncludeMatchedAddress = true
+            };
+
+            var csvBytes = await CsvService.WriteCsvAsync(_results, _csvHeaders, _originalRows, config);
+            var fileName = $"geocoded_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+
+            await JS.InvokeVoidAsync("downloadFile", fileName, "text/csv", Convert.ToBase64String(csvBytes));
+
+            Logger.LogInformation("Results downloaded: {FileName}", fileName);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to download results");
+        }
+    }
+
+    private void ResetGeocoder()
+    {
+        _uploadedFileName = null;
+        _uploadError = null;
+        _csvContent = null;
+        _csvHeaders.Clear();
+        _addresses.Clear();
+        _originalRows.Clear();
+        _totalAddresses = 0;
+        _results = null;
+        _currentProgress = null;
+        _isProcessing = false;
+    }
+}

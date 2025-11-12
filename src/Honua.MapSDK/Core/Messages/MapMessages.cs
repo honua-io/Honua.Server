@@ -1146,6 +1146,56 @@ public class IsochroneCalculatedMessage
 }
 
 /// <summary>
+/// Published when isochrone origin point is selected on map
+/// </summary>
+public class IsochroneOriginSelectedMessage
+{
+    public required string ComponentId { get; init; }
+    public required double Longitude { get; init; }
+    public required double Latitude { get; init; }
+    public string? Address { get; init; }
+}
+
+/// <summary>
+/// Published when isochrone visibility is toggled
+/// </summary>
+public class IsochroneVisibilityChangedMessage
+{
+    public required string ComponentId { get; init; }
+    public required bool Visible { get; init; }
+}
+
+/// <summary>
+/// Published when isochrone is cleared
+/// </summary>
+public class IsochroneClearedMessage
+{
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when an isochrone polygon is clicked
+/// </summary>
+public class IsochronePolygonClickedMessage
+{
+    public required string ComponentId { get; init; }
+    public required int Interval { get; init; }
+    public required double[] Coordinates { get; init; }
+    public double Area { get; init; }
+}
+
+/// <summary>
+/// Published when isochrone is exported
+/// </summary>
+public class IsochroneExportedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string Format { get; init; }
+    public required string FileName { get; init; }
+    public int PolygonCount { get; init; }
+}
+
+/// <summary>
 /// Published when route is cleared/reset
 /// </summary>
 public class RouteClearedMessage
@@ -1213,4 +1263,380 @@ public class GeometriesExportedMessage
     public required string Format { get; init; }
     public required string Data { get; init; }
     public required int GeometryCount { get; init; }
+}
+
+/// <summary>
+/// Published when a cluster is clicked
+/// </summary>
+public class ClusterClickedMessage
+{
+    public required string MapId { get; init; }
+    public required int ClusterId { get; init; }
+    public required int PointCount { get; init; }
+    public required double[] Coordinates { get; init; }
+    public required int ExpansionZoom { get; init; }
+    public required string ComponentId { get; init; }
+    public Dictionary<string, object> Properties { get; init; } = new();
+}
+
+/// <summary>
+/// Published when cluster statistics are updated (zoom change, data update)
+/// </summary>
+public class ClusterStatisticsUpdatedMessage
+{
+    public required string ComponentId { get; init; }
+    public required int TotalPoints { get; init; }
+    public required int ClusterCount { get; init; }
+    public required int UnclusteredCount { get; init; }
+    public required double ZoomLevel { get; init; }
+    public int MaxClusterSize { get; init; }
+    public double AverageClusterSize { get; init; }
+}
+
+/// <summary>
+/// Published when cluster is spiderfied (expanded to show individual points)
+/// </summary>
+public class ClusterSpiderfiedMessage
+{
+    public required string MapId { get; init; }
+    public required int ClusterId { get; init; }
+    public required int PointCount { get; init; }
+    public required double[] Coordinates { get; init; }
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when cluster extent/bounds are shown
+/// </summary>
+public class ClusterExtentShownMessage
+{
+    public required string MapId { get; init; }
+    public required int ClusterId { get; init; }
+    public required double[] Bounds { get; init; } // [west, south, east, north]
+    public required string ComponentId { get; init; }
+}
+
+/// <summary>
+/// Published when fullscreen mode changes
+/// </summary>
+public class FullscreenChangedMessage
+{
+    public required string ComponentId { get; init; }
+    public required string MapId { get; init; }
+    public required bool IsFullscreen { get; init; }
+    public required string TargetElementId { get; init; }
+}
+
+/// <summary>
+/// Published when map projection changes (e.g., from Mercator to Globe)
+/// </summary>
+public class ProjectionChangedMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component that triggered the projection change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// New projection type (mercator, globe, etc.)
+    /// </summary>
+    public required string Projection { get; init; }
+
+    /// <summary>
+    /// Whether atmosphere is enabled (for globe projection)
+    /// </summary>
+    public bool AtmosphereEnabled { get; init; }
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    public int TransitionDuration { get; init; } = 1000;
+}
+
+/// <summary>
+/// Request to change map projection
+/// </summary>
+public class ChangeProjectionRequestMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Target projection type (mercator, globe, etc.)
+    /// </summary>
+    public required string Projection { get; init; }
+
+    /// <summary>
+    /// Component requesting the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Whether to enable atmosphere (for globe projection)
+    /// </summary>
+    public bool EnableAtmosphere { get; init; } = true;
+
+    /// <summary>
+    /// Whether to enable smooth transition
+    /// </summary>
+    public bool EnableTransition { get; init; } = true;
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    public int TransitionDuration { get; init; } = 1000;
+}
+
+/// <summary>
+/// Published when sky layer configuration changes
+/// </summary>
+public class SkyConfigurationChangedMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component that triggered the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Sky type (Gradient, Atmosphere, Solid, Custom)
+    /// </summary>
+    public required string SkyType { get; init; }
+
+    /// <summary>
+    /// Sky color (CSS color string)
+    /// </summary>
+    public string? SkyColor { get; init; }
+
+    /// <summary>
+    /// Whether atmosphere is enabled
+    /// </summary>
+    public bool EnableAtmosphere { get; init; }
+
+    /// <summary>
+    /// Atmosphere intensity (0.0 to 1.0)
+    /// </summary>
+    public double AtmosphereIntensity { get; init; } = 1.0;
+}
+
+/// <summary>
+/// Request to update sky layer configuration
+/// </summary>
+public class UpdateSkyRequestMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component requesting the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Sky type
+    /// </summary>
+    public required string SkyType { get; init; }
+
+    /// <summary>
+    /// Sky color
+    /// </summary>
+    public string? SkyColor { get; init; }
+
+    /// <summary>
+    /// Horizon color
+    /// </summary>
+    public string? HorizonColor { get; init; }
+
+    /// <summary>
+    /// Horizon blend factor
+    /// </summary>
+    public double HorizonBlend { get; init; } = 0.1;
+
+    /// <summary>
+    /// Enable atmosphere
+    /// </summary>
+    public bool EnableAtmosphere { get; init; } = true;
+
+    /// <summary>
+    /// Atmosphere intensity
+    /// </summary>
+    public double AtmosphereIntensity { get; init; } = 1.0;
+
+    /// <summary>
+    /// Atmosphere color
+    /// </summary>
+    public string? AtmosphereColor { get; init; }
+
+    /// <summary>
+    /// Enable stars
+    /// </summary>
+    public bool EnableStars { get; init; } = true;
+}
+
+/// <summary>
+/// Published when sun position is updated
+/// </summary>
+public class SunPositionChangedMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component that triggered the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Solar azimuth in degrees (0 = North, 90 = East, 180 = South, 270 = West)
+    /// </summary>
+    public required double Azimuth { get; init; }
+
+    /// <summary>
+    /// Solar altitude in degrees (0 = horizon, 90 = zenith, negative = below horizon)
+    /// </summary>
+    public required double Altitude { get; init; }
+
+    /// <summary>
+    /// Current date/time for the sun position
+    /// </summary>
+    public DateTime DateTime { get; init; }
+
+    /// <summary>
+    /// Time of day category
+    /// </summary>
+    public string? TimeOfDay { get; init; }
+}
+
+/// <summary>
+/// Request to update sun position
+/// </summary>
+public class UpdateSunPositionRequestMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component requesting the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Solar azimuth in degrees
+    /// </summary>
+    public required double Azimuth { get; init; }
+
+    /// <summary>
+    /// Solar altitude in degrees
+    /// </summary>
+    public required double Altitude { get; init; }
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    public int TransitionDuration { get; init; } = 1000;
+}
+
+/// <summary>
+/// Published when day/night cycle state changes
+/// </summary>
+public class DayNightCycleStateChangedMessage
+{
+    /// <summary>
+    /// Component ID
+    /// </summary>
+    public required string ComponentId { get; init; }
+
+    /// <summary>
+    /// Whether cycle is playing
+    /// </summary>
+    public required bool IsPlaying { get; init; }
+
+    /// <summary>
+    /// Current date/time in the cycle
+    /// </summary>
+    public required DateTime CurrentDateTime { get; init; }
+
+    /// <summary>
+    /// Speed multiplier (1.0 = real-time, 60.0 = 1 hour per minute, etc.)
+    /// </summary>
+    public required double Speed { get; init; }
+
+    /// <summary>
+    /// Current sun azimuth
+    /// </summary>
+    public double SunAzimuth { get; init; }
+
+    /// <summary>
+    /// Current sun altitude
+    /// </summary>
+    public double SunAltitude { get; init; }
+}
+
+/// <summary>
+/// Request to start/stop day/night cycle
+/// </summary>
+public class DayNightCycleControlRequestMessage
+{
+    /// <summary>
+    /// Component ID
+    /// </summary>
+    public required string ComponentId { get; init; }
+
+    /// <summary>
+    /// Action: "play", "pause", "stop"
+    /// </summary>
+    public required string Action { get; init; }
+
+    /// <summary>
+    /// Speed multiplier
+    /// </summary>
+    public double? Speed { get; init; }
+
+    /// <summary>
+    /// Start date/time for the cycle
+    /// </summary>
+    public DateTime? StartDateTime { get; init; }
+}
+
+/// <summary>
+/// Request to apply a sky preset
+/// </summary>
+public class ApplySkyPresetRequestMessage
+{
+    /// <summary>
+    /// Map component ID
+    /// </summary>
+    public required string MapId { get; init; }
+
+    /// <summary>
+    /// Component requesting the change
+    /// </summary>
+    public string? ComponentId { get; init; }
+
+    /// <summary>
+    /// Preset name (e.g., "Clear Day", "Sunset", "Night")
+    /// </summary>
+    public required string PresetName { get; init; }
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    public int TransitionDuration { get; init; } = 1000;
 }

@@ -1,0 +1,556 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Esri
+@using Honua.MapSDK.Services.Esri
+@using Microsoft.JSInterop
+@using MudBlazor
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject HttpClient Http
+
+<div class="honua-esri-feature-layer @CssClass" id="@Id">
+    @if (ShowControls && _isInitialized)
+    {
+        <div class="esri-controls">
+            <div class="esri-header">
+                <h4>@LayerTitle</h4>
+                @if (ShowRefreshButton)
+                {
+                    <button class="esri-refresh-btn" @onclick="RefreshAsync">
+                        <MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" />
+                    </button>
+                }
+            </div>
+
+            @if (ShowLayerInfo && _layerMetadata != null)
+            {
+                <div class="esri-layer-info">
+                    <MudText Typo="Typo.caption"><strong>Type:</strong> @_layerMetadata.GeometryType</MudText>
+                    <MudText Typo="Typo.caption"><strong>Features:</strong> @_featureCount</MudText>
+                    @if (!string.IsNullOrEmpty(_layerMetadata.Description))
+                    {
+                        <MudText Typo="Typo.caption">@_layerMetadata.Description</MudText>
+                    }
+                </div>
+            }
+
+            @if (ShowOpacityControl)
+            {
+                <div class="esri-opacity-control">
+                    <MudText Typo="Typo.caption">Opacity: @((_currentOpacity * 100).ToString("F0"))%</MudText>
+                    <MudSlider T="double"
+                              Value="@(_currentOpacity * 100)"
+                              ValueChanged="@OnOpacityChanged"
+                              Min="0"
+                              Max="100"
+                              Step="5"
+                              Size="Size.Small"
+                              Color="Color.Primary" />
+                </div>
+            }
+
+            @if (EnableEditing && _layerMetadata?.Capabilities?.Contains("Create,Update,Delete") == true)
+            {
+                <div class="esri-edit-controls">
+                    <MudText Typo="Typo.caption" Class="mb-2">Editing:</MudText>
+                    <MudButton Size="Size.Small"
+                              Variant="Variant.Outlined"
+                              Color="Color.Primary"
+                              OnClick="@(() => _editMode = !_editMode)">
+                        @(_editMode ? "Exit Edit Mode" : "Enter Edit Mode")
+                    </MudButton>
+                </div>
+            }
+
+            @if (_errorMessage != null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-2">@_errorMessage</MudAlert>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this layer component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"esri-feature-layer-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to sync with (required)
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// FeatureServer layer URL (e.g., https://services.arcgis.com/.../FeatureServer/0)
+    /// </summary>
+    [Parameter]
+    public required string ServiceUrl { get; set; }
+
+    /// <summary>
+    /// Layer title for display
+    /// </summary>
+    [Parameter]
+    public string? LayerTitle { get; set; }
+
+    /// <summary>
+    /// Enable editing operations (add, update, delete)
+    /// </summary>
+    [Parameter]
+    public bool EnableEditing { get; set; }
+
+    /// <summary>
+    /// Enable attachment support
+    /// </summary>
+    [Parameter]
+    public bool EnableAttachments { get; set; }
+
+    /// <summary>
+    /// Authentication token
+    /// </summary>
+    [Parameter]
+    public string? Token { get; set; }
+
+    /// <summary>
+    /// Where clause for layer definition
+    /// </summary>
+    [Parameter]
+    public string? DefinitionExpression { get; set; }
+
+    /// <summary>
+    /// Show interactive controls
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Show layer information panel
+    /// </summary>
+    [Parameter]
+    public bool ShowLayerInfo { get; set; } = true;
+
+    /// <summary>
+    /// Show opacity control
+    /// </summary>
+    [Parameter]
+    public bool ShowOpacityControl { get; set; } = true;
+
+    /// <summary>
+    /// Show refresh button
+    /// </summary>
+    [Parameter]
+    public bool ShowRefreshButton { get; set; } = true;
+
+    /// <summary>
+    /// Layer opacity (0-1)
+    /// </summary>
+    [Parameter]
+    public double Opacity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Min zoom level
+    /// </summary>
+    [Parameter]
+    public int? MinZoom { get; set; }
+
+    /// <summary>
+    /// Max zoom level
+    /// </summary>
+    [Parameter]
+    public int? MaxZoom { get; set; }
+
+    /// <summary>
+    /// Auto-load layer on initialization
+    /// </summary>
+    [Parameter]
+    public bool AutoLoad { get; set; } = true;
+
+    /// <summary>
+    /// Maximum features to query at once
+    /// </summary>
+    [Parameter]
+    public int MaxFeatures { get; set; } = 1000;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Callback when layer is loaded
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnLayerLoaded { get; set; }
+
+    /// <summary>
+    /// Callback when feature is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<EsriFeature> OnFeatureClick { get; set; }
+
+    /// <summary>
+    /// Callback when edit is complete
+    /// </summary>
+    [Parameter]
+    public EventCallback<EsriApplyEditsResult> OnEditComplete { get; set; }
+
+    private IJSObjectReference? _esriModule;
+    private IJSObjectReference? _layerInstance;
+    private DotNetObjectReference<HonuaEsriFeatureLayer>? _dotNetRef;
+    private EsriFeatureServerClient? _client;
+    private EsriLayerMetadata? _layerMetadata;
+    private bool _isInitialized = false;
+    private string? _sourceId;
+    private string? _layerId;
+    private double _currentOpacity = 1.0;
+    private bool _editMode = false;
+    private int _featureCount = 0;
+    private string? _errorMessage;
+
+    protected override void OnInitialized()
+    {
+        _currentOpacity = Opacity;
+        _client = new EsriFeatureServerClient(Http);
+
+        if (!string.IsNullOrEmpty(Token))
+        {
+            _client.SetToken(Token);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && AutoLoad)
+        {
+            await InitializeLayerAsync();
+        }
+    }
+
+    private async Task InitializeLayerAsync()
+    {
+        try
+        {
+            _errorMessage = null;
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load JavaScript module
+            _esriModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-esri.js"
+            );
+
+            // Get layer metadata
+            if (_client != null)
+            {
+                _layerMetadata = await _client.GetLayerMetadataAsync(ServiceUrl);
+
+                // Set layer title from metadata if not provided
+                if (string.IsNullOrEmpty(LayerTitle))
+                {
+                    LayerTitle = _layerMetadata.Name ?? "Esri Feature Layer";
+                }
+
+                // Query features
+                var queryParams = new EsriQueryParameters
+                {
+                    Where = DefinitionExpression ?? "1=1",
+                    ReturnGeometry = true,
+                    OutFields = new List<string> { "*" },
+                    ResultRecordCount = MaxFeatures,
+                    OutSpatialReference = 3857 // Web Mercator
+                };
+
+                var featureSet = await _client.QueryAsync(ServiceUrl, queryParams);
+                _featureCount = featureSet.Features.Count;
+
+                // Convert to GeoJSON
+                var geoJson = EsriFeatureServerClient.ConvertToGeoJson(featureSet);
+                var geoJsonString = NetTopologySuite.IO.GeoJsonSerializer.Create().Serialize(geoJson);
+
+                // Initialize layer on map
+                _sourceId = $"esri-source-{Id}";
+                _layerId = $"esri-layer-{Id}";
+
+                var options = new
+                {
+                    sourceId = _sourceId,
+                    layerId = _layerId,
+                    geoJson = geoJsonString,
+                    opacity = _currentOpacity,
+                    minZoom = MinZoom,
+                    maxZoom = MaxZoom,
+                    geometryType = _layerMetadata.GeometryType,
+                    drawingInfo = _layerMetadata.DrawingInfo
+                };
+
+                _layerInstance = await _esriModule.InvokeAsync<IJSObjectReference>(
+                    "createEsriFeatureLayer",
+                    SyncWith,
+                    options,
+                    _dotNetRef
+                );
+
+                _isInitialized = true;
+
+                // Publish layer added message
+                await Bus.PublishAsync(new LayerAddedMessage
+                {
+                    LayerId = _layerId,
+                    LayerName = LayerTitle ?? "Esri Feature Layer"
+                }, Id);
+
+                await OnLayerLoaded.InvokeAsync(_layerId);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error initializing Esri layer: {ex.Message}";
+            Console.Error.WriteLine(_errorMessage);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnOpacityChanged(double value)
+    {
+        _currentOpacity = value / 100.0;
+
+        if (!_isInitialized || _layerInstance == null) return;
+
+        try
+        {
+            await _layerInstance.InvokeVoidAsync("setOpacity", _currentOpacity);
+
+            await Bus.PublishAsync(new LayerOpacityChangedMessage
+            {
+                LayerId = _layerId!,
+                Opacity = _currentOpacity
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating opacity: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when feature is clicked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFeatureClickCallback(string featureJson)
+    {
+        try
+        {
+            var feature = System.Text.Json.JsonSerializer.Deserialize<EsriFeature>(featureJson);
+            if (feature != null)
+            {
+                await OnFeatureClick.InvokeAsync(feature);
+
+                // Publish popup request with feature info
+                await Bus.PublishAsync(new OpenPopupRequestMessage
+                {
+                    MapId = SyncWith,
+                    Coordinates = new double[] { 0, 0 }, // Will be set by JS
+                    LayerId = _layerId,
+                    Properties = feature.Attributes.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => (object?)(kvp.Value?.ToString() ?? "")
+                    )
+                }, Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error handling feature click: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Public API: Refresh the layer
+    /// </summary>
+    public async Task RefreshAsync()
+    {
+        if (_client == null) return;
+
+        try
+        {
+            _errorMessage = null;
+
+            var queryParams = new EsriQueryParameters
+            {
+                Where = DefinitionExpression ?? "1=1",
+                ReturnGeometry = true,
+                OutFields = new List<string> { "*" },
+                ResultRecordCount = MaxFeatures,
+                OutSpatialReference = 3857
+            };
+
+            var featureSet = await _client.QueryAsync(ServiceUrl, queryParams);
+            _featureCount = featureSet.Features.Count;
+
+            var geoJson = EsriFeatureServerClient.ConvertToGeoJson(featureSet);
+            var geoJsonString = NetTopologySuite.IO.GeoJsonSerializer.Create().Serialize(geoJson);
+
+            if (_layerInstance != null)
+            {
+                await _layerInstance.InvokeVoidAsync("updateData", geoJsonString);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error refreshing layer: {ex.Message}";
+            Console.Error.WriteLine(_errorMessage);
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Public API: Set visibility
+    /// </summary>
+    public async Task SetVisibilityAsync(bool visible)
+    {
+        if (_layerInstance != null)
+        {
+            await _layerInstance.InvokeVoidAsync("setVisibility", visible);
+
+            await Bus.PublishAsync(new LayerVisibilityChangedMessage
+            {
+                LayerId = _layerId!,
+                Visible = visible
+            }, Id);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Get layer metadata
+    /// </summary>
+    public EsriLayerMetadata? GetMetadata() => _layerMetadata;
+
+    /// <summary>
+    /// Public API: Add features
+    /// </summary>
+    public async Task<EsriApplyEditsResult?> AddFeaturesAsync(EsriFeature[] features)
+    {
+        if (_client == null || !EnableEditing) return null;
+
+        try
+        {
+            var result = await _client.AddFeaturesAsync(ServiceUrl, features);
+            await OnEditComplete.InvokeAsync(result);
+            await RefreshAsync();
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error adding features: {ex.Message}";
+            Console.Error.WriteLine(_errorMessage);
+            StateHasChanged();
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Public API: Update features
+    /// </summary>
+    public async Task<EsriApplyEditsResult?> UpdateFeaturesAsync(EsriFeature[] features)
+    {
+        if (_client == null || !EnableEditing) return null;
+
+        try
+        {
+            var result = await _client.UpdateFeaturesAsync(ServiceUrl, features);
+            await OnEditComplete.InvokeAsync(result);
+            await RefreshAsync();
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error updating features: {ex.Message}";
+            Console.Error.WriteLine(_errorMessage);
+            StateHasChanged();
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Public API: Delete features
+    /// </summary>
+    public async Task<EsriApplyEditsResult?> DeleteFeaturesAsync(int[] objectIds)
+    {
+        if (_client == null || !EnableEditing) return null;
+
+        try
+        {
+            var result = await _client.DeleteFeaturesAsync(ServiceUrl, objectIds);
+            await OnEditComplete.InvokeAsync(result);
+            await RefreshAsync();
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error deleting features: {ex.Message}";
+            Console.Error.WriteLine(_errorMessage);
+            StateHasChanged();
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Public API: Get attachments
+    /// </summary>
+    public async Task<EsriAttachmentInfo[]> GetAttachmentsAsync(int objectId)
+    {
+        if (_client == null || !EnableAttachments) return Array.Empty<EsriAttachmentInfo>();
+
+        try
+        {
+            return await _client.GetAttachmentsAsync(ServiceUrl, objectId);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error getting attachments: {ex.Message}";
+            Console.Error.WriteLine(_errorMessage);
+            StateHasChanged();
+            return Array.Empty<EsriAttachmentInfo>();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_layerInstance != null)
+        {
+            try
+            {
+                await _layerInstance.InvokeVoidAsync("dispose");
+                await _layerInstance.DisposeAsync();
+            }
+            catch { }
+        }
+
+        if (_esriModule != null)
+        {
+            try
+            {
+                await _esriModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+
+        if (!string.IsNullOrEmpty(_layerId))
+        {
+            await Bus.PublishAsync(new LayerRemovedMessage
+            {
+                LayerId = _layerId
+            }, Id);
+        }
+    }
+}

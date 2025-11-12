@@ -1,0 +1,623 @@
+@using Honua.MapSDK.Models.Navigation
+@using Honua.MapSDK.Models.Routing
+@using Honua.MapSDK.Services.Navigation
+@using Honua.MapSDK.Services.Routing
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="honua-navigation @CssClass" style="@GetContainerStyle()">
+    @if (ShowNavigationPanel && _navigationSession != null)
+    {
+        <NavigationPanel
+            Session="@_navigationSession"
+            Progress="@_currentProgress"
+            OnStopNavigation="@HandleStopNavigation"
+            OnPauseNavigation="@HandlePauseNavigation"
+            OnResumeNavigation="@HandleResumeNavigation"
+            ShowLaneGuidance="@ShowLaneGuidance" />
+    }
+
+    @if (ShowRouteOverview && _currentRoute != null && _navigationSession == null)
+    {
+        <RouteOverview
+            Route="@_currentRoute"
+            AlternativeRoutes="@_alternativeRoutes"
+            OnStartNavigation="@HandleStartNavigation"
+            OnSelectAlternative="@HandleSelectAlternative" />
+    }
+
+    @if (_errorMessage != null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2" CloseIconClicked="@ClearError">
+            @_errorMessage
+        </MudAlert>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the navigation component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"navigation-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// Origin coordinates [longitude, latitude]
+    /// </summary>
+    [Parameter]
+    public double[]? Origin { get; set; }
+
+    /// <summary>
+    /// Destination coordinates [longitude, latitude]
+    /// </summary>
+    [Parameter]
+    public double[]? Destination { get; set; }
+
+    /// <summary>
+    /// Optional waypoints between origin and destination
+    /// </summary>
+    [Parameter]
+    public List<double[]>? Waypoints { get; set; }
+
+    /// <summary>
+    /// Routing provider to use
+    /// </summary>
+    [Parameter]
+    public RoutingEngine Provider { get; set; } = RoutingEngine.OSRM;
+
+    /// <summary>
+    /// Travel mode for navigation
+    /// </summary>
+    [Parameter]
+    public TravelMode TravelMode { get; set; } = TravelMode.Driving;
+
+    /// <summary>
+    /// Enable voice guidance
+    /// </summary>
+    [Parameter]
+    public bool EnableVoiceGuidance { get; set; } = true;
+
+    /// <summary>
+    /// Enable automatic rerouting
+    /// </summary>
+    [Parameter]
+    public bool EnableRerouting { get; set; } = true;
+
+    /// <summary>
+    /// Show lane guidance
+    /// </summary>
+    [Parameter]
+    public bool ShowLaneGuidance { get; set; } = true;
+
+    /// <summary>
+    /// Show navigation panel UI
+    /// </summary>
+    [Parameter]
+    public bool ShowNavigationPanel { get; set; } = true;
+
+    /// <summary>
+    /// Show route overview before starting
+    /// </summary>
+    [Parameter]
+    public bool ShowRouteOverview { get; set; } = true;
+
+    /// <summary>
+    /// Auto-start navigation when route is calculated
+    /// </summary>
+    [Parameter]
+    public bool AutoStart { get; set; } = false;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Width of the component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "100%";
+
+    /// <summary>
+    /// Navigation service instance (optional, will create if not provided)
+    /// </summary>
+    [Parameter]
+    public NavigationService? NavigationService { get; set; }
+
+    /// <summary>
+    /// Voice guidance service instance (optional, will create if not provided)
+    /// </summary>
+    [Parameter]
+    public VoiceGuidanceService? VoiceGuidanceService { get; set; }
+
+    /// <summary>
+    /// Routing service for route calculation (optional)
+    /// </summary>
+    [Parameter]
+    public IRoutingService? RoutingService { get; set; }
+
+    /// <summary>
+    /// Event callback when navigation starts
+    /// </summary>
+    [Parameter]
+    public EventCallback<NavigationSession> OnNavigationStarted { get; set; }
+
+    /// <summary>
+    /// Event callback when navigation step changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<NavigationProgress> OnStepChanged { get; set; }
+
+    /// <summary>
+    /// Event callback when user goes off route
+    /// </summary>
+    [Parameter]
+    public EventCallback<NavigationSession> OnOffRoute { get; set; }
+
+    /// <summary>
+    /// Event callback when arrived at destination
+    /// </summary>
+    [Parameter]
+    public EventCallback<NavigationSession> OnArrived { get; set; }
+
+    private NavigationService? _navService;
+    private VoiceGuidanceService? _voiceService;
+    private IJSObjectReference? _jsModule;
+    private IJSObjectReference? _voiceModule;
+
+    private NavigationSession? _navigationSession;
+    private NavigationProgress? _currentProgress;
+    private Route? _currentRoute;
+    private List<Route> _alternativeRoutes = new();
+    private string? _errorMessage;
+
+    private Timer? _locationUpdateTimer;
+    private int _previousStepIndex = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _navService = NavigationService ?? new NavigationService(
+            routingServices: RoutingService != null ? new[] { RoutingService } : null
+        );
+
+        if (EnableVoiceGuidance)
+        {
+            _voiceService = VoiceGuidanceService ?? new VoiceGuidanceService(JS);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/navigation-manager.js"
+                );
+
+                await _jsModule.InvokeVoidAsync("initializeNavigation", SyncWith, new
+                {
+                    cameraFollowMode = true,
+                    navigationZoom = 16,
+                    cameraPitch = 45,
+                    showProgressLine = true
+                });
+
+                // Setup location update callback
+                var dotNetRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("eval", $@"
+                    window.honuaNavigationLocationUpdated = (mapId, lng, lat, heading) => {{
+                        if (mapId === '{SyncWith}') {{
+                            dotNetRef.invokeMethodAsync('OnLocationUpdated', lng, lat, heading);
+                        }}
+                    }};
+                    window.dotNetRef = {System.Text.Json.JsonSerializer.Serialize(dotNetRef)};
+                ");
+
+                // Initialize voice guidance if enabled
+                if (EnableVoiceGuidance && _voiceService != null)
+                {
+                    await _voiceService.InitializeAsync(new NavigationOptions
+                    {
+                        EnableVoiceGuidance = true,
+                        VoiceLanguage = "en-US"
+                    });
+                }
+
+                // Calculate initial route if origin and destination are set
+                if (Origin != null && Destination != null)
+                {
+                    await CalculateRouteAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Failed to initialize navigation: {ex.Message}";
+                Console.Error.WriteLine($"Navigation initialization error: {ex}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Calculate route from origin to destination
+    /// </summary>
+    public async Task CalculateRouteAsync()
+    {
+        if (Origin == null || Destination == null || RoutingService == null)
+        {
+            _errorMessage = "Origin, destination, and routing service are required";
+            return;
+        }
+
+        try
+        {
+            var waypoints = new List<Waypoint>
+            {
+                new Waypoint
+                {
+                    Coordinates = Origin,
+                    Type = WaypointType.Start
+                }
+            };
+
+            if (Waypoints != null && Waypoints.Count > 0)
+            {
+                waypoints.AddRange(Waypoints.Select(w => new Waypoint
+                {
+                    Coordinates = w,
+                    Type = WaypointType.Via
+                }));
+            }
+
+            waypoints.Add(new Waypoint
+            {
+                Coordinates = Destination,
+                Type = WaypointType.End
+            });
+
+            var options = new RouteOptions
+            {
+                TravelMode = TravelMode,
+                IncludeInstructions = true,
+                IncludeTraffic = true,
+                MaxAlternatives = 2
+            };
+
+            _currentRoute = await RoutingService.CalculateRouteAsync(waypoints, options);
+
+            // Get alternatives
+            try
+            {
+                _alternativeRoutes = await RoutingService.GetAlternativesAsync(waypoints, options);
+            }
+            catch
+            {
+                _alternativeRoutes = new List<Route>();
+            }
+
+            if (AutoStart)
+            {
+                await HandleStartNavigation();
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to calculate route: {ex.Message}";
+            Console.Error.WriteLine($"Route calculation error: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Start navigation with current route
+    /// </summary>
+    private async Task HandleStartNavigation()
+    {
+        if (_currentRoute == null || _navService == null)
+        {
+            _errorMessage = "No route available for navigation";
+            return;
+        }
+
+        try
+        {
+            var navOptions = new NavigationOptions
+            {
+                EnableVoiceGuidance = EnableVoiceGuidance,
+                EnableRerouting = EnableRerouting,
+                ShowLaneGuidance = ShowLaneGuidance,
+                CameraFollowMode = true,
+                NavigationZoomLevel = 16,
+                CameraPitch = 45
+            };
+
+            _navigationSession = await _navService.StartNavigationAsync(_currentRoute, navOptions);
+
+            // Start navigation visualization on map
+            if (_jsModule != null)
+            {
+                await _jsModule.InvokeVoidAsync("startNavigation", SyncWith, new
+                {
+                    id = _currentRoute.Id,
+                    geometry = _currentRoute.Geometry,
+                    waypoints = _currentRoute.Waypoints.Select(w => new
+                    {
+                        longitude = w.Longitude,
+                        latitude = w.Latitude,
+                        type = w.Type.ToString()
+                    })
+                });
+            }
+
+            // Start periodic location updates (simulated or real)
+            StartLocationUpdates();
+
+            await OnNavigationStarted.InvokeAsync(_navigationSession);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to start navigation: {ex.Message}";
+            Console.Error.WriteLine($"Navigation start error: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Handle alternative route selection
+    /// </summary>
+    private async Task HandleSelectAlternative(Route alternativeRoute)
+    {
+        _currentRoute = alternativeRoute;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Callback from JavaScript when location is updated
+    /// </summary>
+    [JSInvokable]
+    public async Task OnLocationUpdated(double lng, double lat, double? heading)
+    {
+        if (_navigationSession == null || _navService == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Update navigation with current location
+            _currentProgress = await _navService.UpdateLocationAsync(
+                _navigationSession.Id,
+                new[] { lng, lat },
+                heading
+            );
+
+            // Check for step change
+            if (_currentProgress.CurrentStepIndex != _previousStepIndex)
+            {
+                _previousStepIndex = _currentProgress.CurrentStepIndex;
+                await OnStepChanged.InvokeAsync(_currentProgress);
+
+                // Get voice instructions for new step
+                if (EnableVoiceGuidance && _voiceService != null)
+                {
+                    var instructions = await _navService.GetVoiceInstructionsAsync(
+                        _navigationSession.Id,
+                        _currentProgress.DistanceToNextManeuver
+                    );
+
+                    foreach (var instruction in instructions)
+                    {
+                        await _voiceService.SpeakInstructionAsync(instruction);
+                    }
+                }
+            }
+
+            // Check if off route
+            if (_navigationSession.IsOffRoute && EnableRerouting)
+            {
+                await OnOffRoute.InvokeAsync(_navigationSession);
+                await HandleReroute(new[] { lng, lat });
+            }
+
+            // Check if arrived
+            if (_navigationSession.State == NavigationState.Arrived)
+            {
+                await HandleArrival();
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Location update error: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Handle rerouting
+    /// </summary>
+    private async Task HandleReroute(double[] currentLocation)
+    {
+        if (_navigationSession == null || _navService == null)
+        {
+            return;
+        }
+
+        try
+        {
+            _navigationSession = await _navService.RerouteAsync(
+                _navigationSession.Id,
+                currentLocation,
+                Provider.ToString()
+            );
+
+            // Update map with new route
+            if (_jsModule != null && _navigationSession.Route != null)
+            {
+                await _jsModule.InvokeVoidAsync("startNavigation", SyncWith, new
+                {
+                    id = _navigationSession.Route.Id,
+                    geometry = _navigationSession.Route.Geometry,
+                    waypoints = _navigationSession.Route.Waypoints
+                });
+            }
+
+            if (EnableVoiceGuidance && _voiceService != null)
+            {
+                await _voiceService.SpeakAsync("Route recalculated", priority: 10);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Rerouting failed: {ex.Message}";
+            Console.Error.WriteLine($"Reroute error: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// Handle arrival at destination
+    /// </summary>
+    private async Task HandleArrival()
+    {
+        if (_navigationSession == null)
+        {
+            return;
+        }
+
+        StopLocationUpdates();
+
+        if (EnableVoiceGuidance && _voiceService != null)
+        {
+            await _voiceService.SpeakAsync("You have arrived at your destination", priority: 10);
+        }
+
+        await OnArrived.InvokeAsync(_navigationSession);
+    }
+
+    /// <summary>
+    /// Stop navigation
+    /// </summary>
+    private async Task HandleStopNavigation()
+    {
+        if (_navService != null && _navigationSession != null)
+        {
+            await _navService.StopNavigationAsync(_navigationSession.Id);
+        }
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("stopNavigation", SyncWith);
+        }
+
+        if (_voiceService != null)
+        {
+            await _voiceService.StopAsync();
+        }
+
+        StopLocationUpdates();
+
+        _navigationSession = null;
+        _currentProgress = null;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Pause navigation
+    /// </summary>
+    private async Task HandlePauseNavigation()
+    {
+        if (_navService != null && _navigationSession != null)
+        {
+            await _navService.PauseNavigationAsync(_navigationSession.Id);
+            StopLocationUpdates();
+
+            if (_voiceService != null)
+            {
+                await _voiceService.PauseAsync();
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Resume navigation
+    /// </summary>
+    private async Task HandleResumeNavigation()
+    {
+        if (_navService != null && _navigationSession != null)
+        {
+            await _navService.ResumeNavigationAsync(_navigationSession.Id);
+            StartLocationUpdates();
+
+            if (_voiceService != null)
+            {
+                await _voiceService.ResumeAsync();
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Start location update timer (for simulation or polling)
+    /// </summary>
+    private void StartLocationUpdates()
+    {
+        StopLocationUpdates();
+        // Location updates are handled by JavaScript geolocation API
+        // This could be used for simulation mode
+    }
+
+    /// <summary>
+    /// Stop location update timer
+    /// </summary>
+    private void StopLocationUpdates()
+    {
+        _locationUpdateTimer?.Dispose();
+        _locationUpdateTimer = null;
+    }
+
+    private void ClearError()
+    {
+        _errorMessage = null;
+    }
+
+    private string GetContainerStyle()
+    {
+        return $"width: {Width};";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        StopLocationUpdates();
+
+        if (_navigationSession != null && _navService != null)
+        {
+            await _navService.StopNavigationAsync(_navigationSession.Id);
+        }
+
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+
+        if (_voiceService != null)
+        {
+            await _voiceService.DisposeAsync();
+        }
+
+        GC.SuppressFinalize(this);
+    }
+}

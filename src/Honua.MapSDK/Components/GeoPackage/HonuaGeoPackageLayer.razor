@@ -1,0 +1,427 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.GeoPackage
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ComponentBus Bus
+
+@*
+    HonuaGeoPackageLayer - Display a layer from a GeoPackage file on the map
+
+    Usage:
+    <HonuaGeoPackageLayer GpkgUrl="sample.gpkg"
+                          LayerName="cities"
+                          SyncWith="map1" />
+*@
+
+@code {
+    /// <summary>
+    /// Unique identifier for this component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"gpkg-layer-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// URL to the GeoPackage file
+    /// </summary>
+    [Parameter]
+    public string? GpkgUrl { get; set; }
+
+    /// <summary>
+    /// GeoPackage file as byte array (alternative to GpkgUrl)
+    /// </summary>
+    [Parameter]
+    public byte[]? GpkgData { get; set; }
+
+    /// <summary>
+    /// File name (used when GpkgData is provided)
+    /// </summary>
+    [Parameter]
+    public string FileName { get; set; } = "data.gpkg";
+
+    /// <summary>
+    /// Layer/table name to display
+    /// </summary>
+    [Parameter]
+    public string? LayerName { get; set; }
+
+    /// <summary>
+    /// Display name for the layer
+    /// </summary>
+    [Parameter]
+    public string? DisplayName { get; set; }
+
+    /// <summary>
+    /// Enable client-side caching
+    /// </summary>
+    [Parameter]
+    public bool EnableCaching { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of features to load
+    /// </summary>
+    [Parameter]
+    public int MaxFeatures { get; set; } = 10000;
+
+    /// <summary>
+    /// Layer visibility
+    /// </summary>
+    [Parameter]
+    public bool Visible { get; set; } = true;
+
+    /// <summary>
+    /// Layer opacity (0-1)
+    /// </summary>
+    [Parameter]
+    public double Opacity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Feature style configuration (JSON)
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Enable feature click/identify
+    /// </summary>
+    [Parameter]
+    public bool EnableIdentify { get; set; } = true;
+
+    /// <summary>
+    /// Spatial filter bounding box [minX, minY, maxX, maxY]
+    /// </summary>
+    [Parameter]
+    public double[]? BoundingBoxFilter { get; set; }
+
+    /// <summary>
+    /// Attribute filter (SQL WHERE clause without WHERE)
+    /// </summary>
+    [Parameter]
+    public string? AttributeFilter { get; set; }
+
+    /// <summary>
+    /// Callback when layer is loaded
+    /// </summary>
+    [Parameter]
+    public EventCallback<GpkgLayer> OnLayerLoaded { get; set; }
+
+    /// <summary>
+    /// Callback when feature is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<JsonElement> OnFeatureClick { get; set; }
+
+    /// <summary>
+    /// Callback when error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    private int? _readerId;
+    private GeoPackageInfo? _gpkgInfo;
+    private GpkgLayer? _layerInfo;
+    private bool _isLoaded = false;
+    private bool _mapReady = false;
+    private string? _mapLayerId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadGeoPackageAsync();
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                InvokeAsync(async () => await TryDisplayLayerAsync());
+            }
+        });
+    }
+
+    private async Task LoadGeoPackageAsync()
+    {
+        try
+        {
+            // Create reader
+            _readerId = await JS.InvokeAsync<int>("HonuaGeoPackage.DotNetHelper.createReader");
+
+            // Load GPKG
+            if (GpkgUrl != null)
+            {
+                var result = await JS.InvokeAsync<JsonElement>("HonuaGeoPackage.DotNetHelper.loadFromUrl", _readerId, GpkgUrl);
+                if (result.TryGetProperty("success", out var success) && !success.GetBoolean())
+                {
+                    var error = result.GetProperty("error").GetString();
+                    await OnError.InvokeAsync($"Failed to load GeoPackage: {error}");
+                    return;
+                }
+            }
+            else if (GpkgData != null)
+            {
+                var result = await JS.InvokeAsync<JsonElement>("HonuaGeoPackage.DotNetHelper.loadFromBytes", _readerId, GpkgData, FileName);
+                if (result.TryGetProperty("success", out var success) && !success.GetBoolean())
+                {
+                    var error = result.GetProperty("error").GetString();
+                    await OnError.InvokeAsync($"Failed to load GeoPackage: {error}");
+                    return;
+                }
+            }
+            else
+            {
+                await OnError.InvokeAsync("Either GpkgUrl or GpkgData must be provided");
+                return;
+            }
+
+            // Get GPKG info
+            var infoJson = await JS.InvokeAsync<JsonElement>("HonuaGeoPackage.DotNetHelper.getInfo", _readerId);
+            _gpkgInfo = JsonSerializer.Deserialize<GeoPackageInfo>(infoJson.GetRawText());
+
+            if (_gpkgInfo == null)
+            {
+                await OnError.InvokeAsync("Failed to parse GeoPackage info");
+                return;
+            }
+
+            // Find the layer
+            if (string.IsNullOrEmpty(LayerName) && _gpkgInfo.Layers.Count > 0)
+            {
+                // Use first feature layer if no layer specified
+                _layerInfo = _gpkgInfo.Layers.FirstOrDefault(l => l.DataType == "features");
+                LayerName = _layerInfo?.TableName;
+            }
+            else
+            {
+                _layerInfo = _gpkgInfo.Layers.FirstOrDefault(l => l.TableName == LayerName);
+            }
+
+            if (_layerInfo == null)
+            {
+                await OnError.InvokeAsync($"Layer '{LayerName}' not found in GeoPackage");
+                return;
+            }
+
+            if (_layerInfo.DataType != "features")
+            {
+                await OnError.InvokeAsync($"Layer '{LayerName}' is not a feature layer");
+                return;
+            }
+
+            _isLoaded = true;
+
+            await OnLayerLoaded.InvokeAsync(_layerInfo);
+            await TryDisplayLayerAsync();
+        }
+        catch (Exception ex)
+        {
+            await OnError.InvokeAsync($"Error loading GeoPackage: {ex.Message}");
+        }
+    }
+
+    private async Task TryDisplayLayerAsync()
+    {
+        if (!_isLoaded || !_mapReady || _readerId == null || _layerInfo == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Query features
+            var request = new GpkgFeatureRequest
+            {
+                LayerName = LayerName!,
+                MaxFeatures = MaxFeatures,
+                BoundingBox = BoundingBoxFilter,
+                AttributeFilter = AttributeFilter
+            };
+
+            var response = await JS.InvokeAsync<GpkgFeatureResponse>(
+                "HonuaGeoPackage.DotNetHelper.queryFeatures",
+                _readerId,
+                request
+            );
+
+            if (!string.IsNullOrEmpty(response.Error))
+            {
+                await OnError.InvokeAsync($"Failed to query features: {response.Error}");
+                return;
+            }
+
+            // Add to map as GeoJSON layer
+            _mapLayerId = $"gpkg-{Id}-{LayerName}";
+            var layerName = DisplayName ?? _layerInfo.Identifier ?? LayerName;
+
+            await Bus.PublishAsync(new AddGeoJsonLayerMessage
+            {
+                MapId = SyncWith ?? "*",
+                LayerId = _mapLayerId,
+                LayerName = layerName,
+                GeoJson = response.GeoJson,
+                Visible = Visible,
+                Opacity = Opacity,
+                Style = Style,
+                EnableIdentify = EnableIdentify
+            }, Id);
+
+            // Zoom to layer if bounds available
+            if (response.BoundingBox != null && response.BoundingBox.Length == 4)
+            {
+                await Bus.PublishAsync(new FitBoundsRequestMessage
+                {
+                    MapId = SyncWith ?? "*",
+                    Bounds = response.BoundingBox,
+                    Padding = 50
+                }, Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnError.InvokeAsync($"Error displaying layer: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Refresh the layer with current filters
+    /// </summary>
+    public async Task RefreshAsync()
+    {
+        if (_isLoaded && _mapReady)
+        {
+            // Remove existing layer
+            if (_mapLayerId != null)
+            {
+                await Bus.PublishAsync(new RemoveLayerMessage
+                {
+                    MapId = SyncWith ?? "*",
+                    LayerId = _mapLayerId
+                }, Id);
+            }
+
+            // Re-display with current filters
+            await TryDisplayLayerAsync();
+        }
+    }
+
+    /// <summary>
+    /// Set visibility
+    /// </summary>
+    public async Task SetVisibilityAsync(bool visible)
+    {
+        Visible = visible;
+
+        if (_mapLayerId != null)
+        {
+            await Bus.PublishAsync(new SetLayerVisibilityMessage
+            {
+                MapId = SyncWith ?? "*",
+                LayerId = _mapLayerId,
+                Visible = visible
+            }, Id);
+        }
+    }
+
+    /// <summary>
+    /// Set opacity
+    /// </summary>
+    public async Task SetOpacityAsync(double opacity)
+    {
+        Opacity = opacity;
+
+        if (_mapLayerId != null)
+        {
+            await Bus.PublishAsync(new SetLayerOpacityMessage
+            {
+                MapId = SyncWith ?? "*",
+                LayerId = _mapLayerId,
+                Opacity = opacity
+            }, Id);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Remove layer from map
+        if (_mapLayerId != null)
+        {
+            try
+            {
+                await Bus.PublishAsync(new RemoveLayerMessage
+                {
+                    MapId = SyncWith ?? "*",
+                    LayerId = _mapLayerId
+                }, Id);
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
+
+        // Close reader
+        if (_readerId.HasValue)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("HonuaGeoPackage.DotNetHelper.closeReader", _readerId.Value);
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
+    }
+}
+
+@* Message classes for component bus *@
+@code {
+    private class AddGeoJsonLayerMessage
+    {
+        public string MapId { get; set; } = string.Empty;
+        public string LayerId { get; set; } = string.Empty;
+        public string LayerName { get; set; } = string.Empty;
+        public string GeoJson { get; set; } = string.Empty;
+        public bool Visible { get; set; } = true;
+        public double Opacity { get; set; } = 1.0;
+        public string? Style { get; set; }
+        public bool EnableIdentify { get; set; } = true;
+    }
+
+    private class RemoveLayerMessage
+    {
+        public string MapId { get; set; } = string.Empty;
+        public string LayerId { get; set; } = string.Empty;
+    }
+
+    private class SetLayerVisibilityMessage
+    {
+        public string MapId { get; set; } = string.Empty;
+        public string LayerId { get; set; } = string.Empty;
+        public bool Visible { get; set; }
+    }
+
+    private class SetLayerOpacityMessage
+    {
+        public string MapId { get; set; } = string.Empty;
+        public string LayerId { get; set; } = string.Empty;
+        public double Opacity { get; set; }
+    }
+}

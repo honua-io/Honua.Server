@@ -1,0 +1,513 @@
+@page "/examples/streaming"
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Components.Streaming
+@using Honua.MapSDK.Examples
+@using Honua.MapSDK.Models.Streaming
+@using Microsoft.Extensions.Logging
+@using System.Text.Json
+@inject ILogger<StreamingExample> Logger
+@implements IAsyncDisposable
+
+<PageTitle>Real-time Streaming Example - Honua MapSDK</PageTitle>
+
+<div class="streaming-example">
+    <div class="streaming-example-header">
+        <h1>Real-time Data Streaming</h1>
+        <p>WebSocket-based live vehicle tracking demonstration</p>
+    </div>
+
+    <div class="streaming-example-content">
+        <div class="streaming-example-sidebar">
+            <div class="streaming-example-section">
+                <h3>Mock Server Control</h3>
+                @if (!_serverRunning)
+                {
+                    <button class="streaming-example-button primary" @onclick="StartMockServer">
+                        Start Mock Server
+                    </button>
+                }
+                else
+                {
+                    <button class="streaming-example-button danger" @onclick="StopMockServer">
+                        Stop Mock Server
+                    </button>
+                }
+
+                @if (_serverRunning && _mockServer != null)
+                {
+                    <div class="streaming-example-info">
+                        <p><strong>WebSocket URL:</strong></p>
+                        <code>@_mockServer.WebSocketUrl</code>
+                        <p class="mt-2"><strong>Simulating:</strong> @_mockServer.VehicleCount vehicles</p>
+                        <p><strong>Update Rate:</strong> @_mockServer.UpdateInterval ms</p>
+                    </div>
+                }
+            </div>
+
+            <div class="streaming-example-section">
+                <h3>Configuration</h3>
+                <div class="streaming-example-form">
+                    <label>
+                        Vehicle Count:
+                        <input type="number" @bind="_vehicleCount" min="1" max="50" disabled="@_serverRunning" />
+                    </label>
+                    <label>
+                        Update Interval (ms):
+                        <input type="number" @bind="_updateInterval" min="100" max="5000" disabled="@_serverRunning" />
+                    </label>
+                    <label>
+                        Max Features:
+                        <input type="number" @bind="_maxFeatures" min="0" max="10000" />
+                    </label>
+                </div>
+            </div>
+
+            <div class="streaming-example-section">
+                <h3>Layer Options</h3>
+                <div class="streaming-example-form">
+                    <label>
+                        <input type="checkbox" @bind="_showLabels" @onchange="UpdateLayerStyle" />
+                        Show Labels
+                    </label>
+                    <label>
+                        <input type="checkbox" @bind="_showTrails" @onchange="UpdateLayerStyle" />
+                        Show Movement Trails
+                    </label>
+                    <label>
+                        Update Strategy:
+                        <select @bind="_updateStrategy">
+                            <option value="@UpdateStrategy.Upsert">Upsert (Update or Insert)</option>
+                            <option value="@UpdateStrategy.Replace">Replace All</option>
+                            <option value="@UpdateStrategy.Accumulate">Accumulate (Keep Old)</option>
+                            <option value="@UpdateStrategy.UpdateOnly">Update Only (No New)</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+
+            @if (_recentFeatures.Any())
+            {
+                <div class="streaming-example-section">
+                    <h3>Recent Updates</h3>
+                    <div class="streaming-example-recent">
+                        @foreach (var feature in _recentFeatures.Take(5))
+                        {
+                            <div class="streaming-example-feature">
+                                <span class="feature-id">@feature.Id</span>
+                                <span class="feature-info">
+                                    @feature.Speed km/h • @feature.Type
+                                </span>
+                                <span class="feature-time">@feature.Time.ToString("HH:mm:ss")</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="streaming-example-section">
+                    <div class="streaming-example-error">
+                        <strong>Error:</strong> @_errorMessage
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="streaming-example-map-container">
+            <HonuaMap Id="@_mapId"
+                      Center="@_mapCenter"
+                      Zoom="12"
+                      Style="mapbox://styles/mapbox/dark-v11"
+                      Height="100%"
+                      @ref="_map" />
+
+            @if (_serverRunning && _mockServer != null)
+            {
+                <HonuaStreamingLayer Id="@_streamingLayerId"
+                                     SyncWith="@_mapId"
+                                     WebSocketUrl="@_mockServer.WebSocketUrl"
+                                     MessageFormat="MessageFormat.GeoJson"
+                                     UpdateStrategy="_updateStrategy"
+                                     MaxFeatures="_maxFeatures"
+                                     EnableAutoReconnect="true"
+                                     ReconnectDelay="1000"
+                                     UpdateThrottle="100"
+                                     LayerType="circle"
+                                     Paint="@_layerPaint"
+                                     ShowControls="true"
+                                     ShowStatistics="true"
+                                     AutoConnect="true"
+                                     OnConnected="HandleConnected"
+                                     OnDisconnected="HandleDisconnected"
+                                     OnError="HandleError"
+                                     OnFeatureUpdate="HandleFeatureUpdate"
+                                     @ref="_streamingLayer" />
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+.streaming-example {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.streaming-example-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.streaming-example-header h1 {
+    margin: 0 0 8px 0;
+    font-size: 28px;
+    font-weight: 600;
+}
+
+.streaming-example-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 16px;
+}
+
+.streaming-example-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.streaming-example-sidebar {
+    width: 350px;
+    background: #f7fafc;
+    border-right: 1px solid #e2e8f0;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.streaming-example-section {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.streaming-example-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.streaming-example-button {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.streaming-example-button.primary {
+    background: #48bb78;
+    color: white;
+}
+
+.streaming-example-button.primary:hover {
+    background: #38a169;
+}
+
+.streaming-example-button.danger {
+    background: #f56565;
+    color: white;
+}
+
+.streaming-example-button.danger:hover {
+    background: #e53e3e;
+}
+
+.streaming-example-info {
+    margin-top: 12px;
+    padding: 12px;
+    background: #edf2f7;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.streaming-example-info p {
+    margin: 0 0 4px 0;
+}
+
+.streaming-example-info code {
+    display: block;
+    padding: 8px;
+    background: white;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    overflow-x: auto;
+    word-break: break-all;
+}
+
+.streaming-example-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.streaming-example-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.streaming-example-form input[type="number"],
+.streaming-example-form select {
+    padding: 8px;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.streaming-example-form input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+}
+
+.streaming-example-form label:has(input[type="checkbox"]) {
+    flex-direction: row;
+    align-items: center;
+}
+
+.streaming-example-recent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.streaming-example-feature {
+    padding: 8px;
+    background: #edf2f7;
+    border-radius: 4px;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.feature-id {
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.feature-info {
+    color: #4a5568;
+}
+
+.feature-time {
+    color: #718096;
+    font-size: 11px;
+}
+
+.streaming-example-error {
+    padding: 12px;
+    background: #fff5f5;
+    border: 1px solid #feb2b2;
+    border-radius: 6px;
+    color: #c53030;
+    font-size: 13px;
+}
+
+.streaming-example-map-container {
+    flex: 1;
+    position: relative;
+}
+
+.mt-2 {
+    margin-top: 8px;
+}
+</style>
+
+@code {
+    private string _mapId = "streaming-map";
+    private string _streamingLayerId = "streaming-layer";
+    private double[] _mapCenter = new[] { -157.8581, 21.3099 }; // Honolulu
+    private HonuaMap? _map;
+    private HonuaStreamingLayer? _streamingLayer;
+
+    private MockStreamingServer? _mockServer;
+    private bool _serverRunning = false;
+    private string? _errorMessage;
+
+    // Configuration
+    private int _vehicleCount = 10;
+    private int _updateInterval = 1000;
+    private int _maxFeatures = 1000;
+    private UpdateStrategy _updateStrategy = UpdateStrategy.Upsert;
+    private bool _showLabels = true;
+    private bool _showTrails = false;
+
+    private List<FeatureUpdate> _recentFeatures = new();
+
+    private object _layerPaint = new
+    {
+        circle_radius = new object[]
+        {
+            "interpolate",
+            new[] { "linear" },
+            new[] { "get", "speed" },
+            0, 6,
+            50, 8,
+            100, 12
+        },
+        circle_color = new[] { "get", "color" },
+        circle_opacity = 0.8,
+        circle_stroke_width = 2,
+        circle_stroke_color = "#ffffff"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.CompletedTask;
+    }
+
+    private async Task StartMockServer()
+    {
+        try
+        {
+            _errorMessage = null;
+
+            _mockServer = new MockStreamingServer(Logger, 8080)
+            {
+                VehicleCount = _vehicleCount,
+                UpdateInterval = _updateInterval,
+                CenterLatitude = _mapCenter[1],
+                CenterLongitude = _mapCenter[0],
+                MovementRadius = 0.05
+            };
+
+            await _mockServer.StartAsync();
+            _serverRunning = true;
+
+            Logger.LogInformation("Mock server started at {Url}", _mockServer.WebSocketUrl);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to start server: {ex.Message}";
+            Logger.LogError(ex, "Error starting mock server");
+            StateHasChanged();
+        }
+    }
+
+    private async Task StopMockServer()
+    {
+        try
+        {
+            if (_mockServer != null)
+            {
+                await _mockServer.StopAsync();
+                await _mockServer.DisposeAsync();
+                _mockServer = null;
+            }
+
+            _serverRunning = false;
+            _recentFeatures.Clear();
+
+            Logger.LogInformation("Mock server stopped");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error stopping server: {ex.Message}";
+            Logger.LogError(ex, "Error stopping mock server");
+            StateHasChanged();
+        }
+    }
+
+    private void HandleConnected()
+    {
+        Logger.LogInformation("Streaming layer connected");
+        _errorMessage = null;
+        StateHasChanged();
+    }
+
+    private void HandleDisconnected()
+    {
+        Logger.LogInformation("Streaming layer disconnected");
+        StateHasChanged();
+    }
+
+    private void HandleError(string error)
+    {
+        Logger.LogError("Streaming error: {Error}", error);
+        _errorMessage = error;
+        StateHasChanged();
+    }
+
+    private void HandleFeatureUpdate(JsonElement feature)
+    {
+        try
+        {
+            if (feature.TryGetProperty("properties", out var props))
+            {
+                var update = new FeatureUpdate
+                {
+                    Id = props.GetProperty("id").GetString() ?? "unknown",
+                    Type = props.GetProperty("type").GetString() ?? "unknown",
+                    Speed = props.TryGetProperty("speed", out var speed) ? speed.GetInt32() : 0,
+                    Time = DateTime.Now
+                };
+
+                _recentFeatures.Insert(0, update);
+
+                // Keep only last 20 updates
+                if (_recentFeatures.Count > 20)
+                {
+                    _recentFeatures.RemoveAt(_recentFeatures.Count - 1);
+                }
+
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error handling feature update");
+        }
+    }
+
+    private async Task UpdateLayerStyle()
+    {
+        // Update layer style based on options
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_mockServer != null)
+        {
+            await _mockServer.DisposeAsync();
+        }
+    }
+
+    private class FeatureUpdate
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public int Speed { get; set; }
+        public DateTime Time { get; set; }
+    }
+}

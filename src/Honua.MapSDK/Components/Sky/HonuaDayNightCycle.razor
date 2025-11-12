@@ -1,0 +1,397 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Sky
+@using Honua.MapSDK.Services.Sky
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject SunPositionService SunPositionService
+
+<div class="honua-day-night-cycle @CssClass" style="@Style">
+    @if (ShowControls)
+    {
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Spacing="3">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6">Day/Night Cycle</MudText>
+                    <MudIconButton
+                        Icon="@(_isPlaying ? Icons.Material.Filled.Pause : Icons.Material.Filled.PlayArrow)"
+                        Color="Color.Primary"
+                        OnClick="@TogglePlayback"
+                        Size="Size.Large"
+                        aria-label="@(_isPlaying ? "Pause" : "Play")" />
+                </MudStack>
+
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.body2">
+                        <strong>Current Time:</strong> @_currentDateTime.ToString("yyyy-MM-dd HH:mm:ss")
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        <strong>Sun Position:</strong> Az: @_currentSunPosition.Azimuth.ToString("F1")°, Alt: @_currentSunPosition.Altitude.ToString("F1")°
+                    </MudText>
+                    <MudText Typo="Typo.body2">
+                        <strong>Time of Day:</strong> @_currentSunPosition.TimeOfDay
+                    </MudText>
+                </MudStack>
+
+                <MudSlider
+                    T="double"
+                    Min="0"
+                    Max="24"
+                    Step="0.25"
+                    Value="@_timeOfDayHours"
+                    ValueChanged="@OnTimeSliderChanged"
+                    Color="Color.Primary"
+                    ValueLabel="true"
+                    ValueLabelFormat="@(value => $"{(int)value:D2}:{((value % 1) * 60):00}")" />
+
+                <MudStack Row="true" Spacing="2">
+                    <MudSelect
+                        T="double"
+                        Label="Speed"
+                        @bind-Value="Speed"
+                        Variant="Variant.Outlined"
+                        Dense="true">
+                        <MudSelectItem Value="1.0">1x (Real-time)</MudSelectItem>
+                        <MudSelectItem Value="60.0">60x (1 hour/min)</MudSelectItem>
+                        <MudSelectItem Value="360.0">360x (1 hour/10s)</MudSelectItem>
+                        <MudSelectItem Value="720.0">720x (1 hour/5s)</MudSelectItem>
+                        <MudSelectItem Value="1440.0">1440x (1 day/min)</MudSelectItem>
+                    </MudSelect>
+
+                    <MudButton
+                        Variant="Variant.Outlined"
+                        Color="Color.Secondary"
+                        OnClick="@Reset"
+                        StartIcon="@Icons.Material.Filled.Refresh">
+                        Reset
+                    </MudButton>
+                </MudStack>
+
+                @if (ShowQuickActions)
+                {
+                    <MudStack Row="true" Spacing="1">
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => JumpToTimeOfDay(6))">Sunrise</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => JumpToTimeOfDay(12))">Noon</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => JumpToTimeOfDay(18))">Sunset</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => JumpToTimeOfDay(0))">Midnight</MudButton>
+                    </MudStack>
+                }
+            </MudStack>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the day/night cycle controller
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"day-night-cycle-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Location for sun position calculation
+    /// </summary>
+    [Parameter]
+    public Coordinate Location { get; set; } = new Coordinate(21.3099, -157.8581); // Honolulu, HI
+
+    /// <summary>
+    /// Start date/time for the cycle
+    /// </summary>
+    [Parameter]
+    public DateTime StartDateTime { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Speed multiplier (1.0 = real-time, 60.0 = 1 hour per minute, etc.)
+    /// </summary>
+    [Parameter]
+    public double Speed { get; set; } = 360.0;
+
+    /// <summary>
+    /// Auto-start playback on initialization
+    /// </summary>
+    [Parameter]
+    public bool AutoPlay { get; set; } = false;
+
+    /// <summary>
+    /// Show playback controls UI
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Show quick action buttons (sunrise, noon, etc.)
+    /// </summary>
+    [Parameter]
+    public bool ShowQuickActions { get; set; } = true;
+
+    /// <summary>
+    /// Update interval in milliseconds
+    /// </summary>
+    [Parameter]
+    public int UpdateInterval { get; set; } = 100;
+
+    /// <summary>
+    /// Enable smooth transitions for sun position updates
+    /// </summary>
+    [Parameter]
+    public bool EnableSmoothTransitions { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Event callback when cycle state changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnPlaybackStateChanged { get; set; }
+
+    /// <summary>
+    /// Event callback when time changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<DateTime> OnTimeChanged { get; set; }
+
+    private bool _isPlaying = false;
+    private DateTime _currentDateTime;
+    private SunPosition _currentSunPosition = new SunPosition(180, 45);
+    private System.Threading.Timer? _updateTimer;
+    private DateTime _lastUpdate;
+    private double _timeOfDayHours = 12.0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentDateTime = StartDateTime;
+        _lastUpdate = DateTime.Now;
+        _timeOfDayHours = _currentDateTime.Hour + _currentDateTime.Minute / 60.0;
+
+        // Calculate initial sun position
+        await UpdateSunPosition();
+
+        SetupSubscriptions();
+
+        if (AutoPlay)
+        {
+            await StartPlayback();
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for cycle control requests
+        Bus.Subscribe<DayNightCycleControlRequestMessage>(async args =>
+        {
+            if (args.Message.ComponentId == Id)
+            {
+                switch (args.Message.Action.ToLowerInvariant())
+                {
+                    case "play":
+                        await StartPlayback();
+                        break;
+                    case "pause":
+                        await PausePlayback();
+                        break;
+                    case "stop":
+                        await StopPlayback();
+                        break;
+                }
+
+                if (args.Message.Speed.HasValue)
+                {
+                    Speed = args.Message.Speed.Value;
+                }
+
+                if (args.Message.StartDateTime.HasValue)
+                {
+                    _currentDateTime = args.Message.StartDateTime.Value;
+                    await UpdateSunPosition();
+                }
+            }
+        });
+    }
+
+    private async Task TogglePlayback()
+    {
+        if (_isPlaying)
+        {
+            await PausePlayback();
+        }
+        else
+        {
+            await StartPlayback();
+        }
+    }
+
+    private async Task StartPlayback()
+    {
+        if (_isPlaying) return;
+
+        _isPlaying = true;
+        _lastUpdate = DateTime.Now;
+
+        // Start update timer
+        _updateTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await UpdateCycle();
+            });
+        }, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(UpdateInterval));
+
+        await OnPlaybackStateChanged.InvokeAsync(true);
+        await PublishStateChanged();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PausePlayback()
+    {
+        if (!_isPlaying) return;
+
+        _isPlaying = false;
+        _updateTimer?.Dispose();
+        _updateTimer = null;
+
+        await OnPlaybackStateChanged.InvokeAsync(false);
+        await PublishStateChanged();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task StopPlayback()
+    {
+        await PausePlayback();
+        _currentDateTime = StartDateTime;
+        await UpdateSunPosition();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Reset()
+    {
+        await StopPlayback();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task UpdateCycle()
+    {
+        if (!_isPlaying) return;
+
+        var now = DateTime.Now;
+        var elapsed = (now - _lastUpdate).TotalSeconds;
+        _lastUpdate = now;
+
+        // Advance time based on speed multiplier
+        _currentDateTime = _currentDateTime.AddSeconds(elapsed * Speed);
+        _timeOfDayHours = _currentDateTime.Hour + _currentDateTime.Minute / 60.0;
+
+        // Update sun position
+        await UpdateSunPosition();
+
+        // Invoke callback
+        await OnTimeChanged.InvokeAsync(_currentDateTime);
+
+        // Publish state changed
+        await PublishStateChanged();
+
+        StateHasChanged();
+    }
+
+    private async Task UpdateSunPosition()
+    {
+        try
+        {
+            // Calculate sun position
+            _currentSunPosition = SunPositionService.Calculate(
+                _currentDateTime,
+                Location.Latitude,
+                Location.Longitude,
+                Location.Elevation ?? 0
+            );
+
+            // Publish sun position update
+            await Bus.PublishAsync(new UpdateSunPositionRequestMessage
+            {
+                MapId = SyncWith ?? "",
+                ComponentId = Id,
+                Azimuth = _currentSunPosition.Azimuth,
+                Altitude = _currentSunPosition.Altitude,
+                TransitionDuration = EnableSmoothTransitions ? UpdateInterval : 0
+            }, Id);
+
+            // Auto-update sky based on sun position
+            var skyColor = SunPositionService.InterpolateSkyColor(_currentSunPosition.Altitude);
+            await Bus.PublishAsync(new UpdateSkyRequestMessage
+            {
+                MapId = SyncWith ?? "",
+                ComponentId = Id,
+                SkyType = "Atmosphere",
+                SkyColor = skyColor,
+                EnableAtmosphere = true,
+                AtmosphereIntensity = 1.0,
+                EnableStars = _currentSunPosition.Altitude < -6
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating sun position: {ex.Message}");
+        }
+    }
+
+    private async Task OnTimeSliderChanged(double hours)
+    {
+        _timeOfDayHours = hours;
+
+        // Update current date time while preserving date
+        var date = _currentDateTime.Date;
+        var hour = (int)hours;
+        var minutes = (int)((hours % 1.0) * 60);
+        _currentDateTime = date.AddHours(hour).AddMinutes(minutes);
+
+        await UpdateSunPosition();
+        StateHasChanged();
+    }
+
+    private async Task JumpToTimeOfDay(int hour)
+    {
+        var date = _currentDateTime.Date;
+        _currentDateTime = date.AddHours(hour);
+        _timeOfDayHours = hour;
+
+        await UpdateSunPosition();
+        StateHasChanged();
+    }
+
+    private async Task PublishStateChanged()
+    {
+        await Bus.PublishAsync(new DayNightCycleStateChangedMessage
+        {
+            ComponentId = Id,
+            IsPlaying = _isPlaying,
+            CurrentDateTime = _currentDateTime,
+            Speed = Speed,
+            SunAzimuth = _currentSunPosition.Azimuth,
+            SunAltitude = _currentSunPosition.Altitude
+        }, Id);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _updateTimer?.Dispose();
+        _updateTimer = null;
+    }
+}

@@ -1,0 +1,283 @@
+@page "/examples/model3d"
+@using Honua.MapSDK.Components.Model3D
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Models.Model3D
+
+@*
+    3D Model Loading Example
+
+    Demonstrates GLTF/GLB model loading with:
+    - Model positioning on map
+    - Animation controls
+    - Interactive picking
+    - LOD support
+    - Multiple models
+*@
+
+<h2>Advanced 3D Model Loading (GLTF/GLB)</h2>
+
+<div class="example-container">
+    <div class="map-container">
+        <HonuaMapLibre @ref="_map"
+                       MapId="model3d-map"
+                       Center="_mapCenter"
+                       Zoom="16"
+                       Pitch="60"
+                       Bearing="0"
+                       Style="width: 100%; height: 600px;">
+
+            @if (_map != null && _showModel1)
+            {
+                <Honua3DModel @ref="_model1"
+                             MapId="model3d-map"
+                             ModelId="building-model"
+                             ModelUrl="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb"
+                             Position="_building1Position"
+                             Altitude="50"
+                             Scale="20"
+                             Rotation="_buildingRotation"
+                             EnableAnimation="true"
+                             AnimationIndex="0"
+                             EnableLOD="false"
+                             ShowDebugInfo="true"
+                             OnModelLoaded="OnModel1Loaded"
+                             OnModelError="OnModelError"
+                             OnModelClick="OnModelClicked" />
+            }
+
+            @if (_map != null && _showModel2)
+            {
+                <Honua3DModel MapId="model3d-map"
+                             ModelId="vehicle-model"
+                             ModelUrl="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb"
+                             Position="_vehicle1Position"
+                             Altitude="20"
+                             Scale="5"
+                             EnableAnimation="false"
+                             ShowDebugInfo="true"
+                             OnModelLoaded="OnModel2Loaded"
+                             OnModelError="OnModelError" />
+            }
+
+            @if (_map != null && _enablePicking)
+            {
+                <Model3DPicker MapId="model3d-map"
+                              ShowPickInfo="true"
+                              OnModelPicked="OnModelPicked"
+                              OnPickMiss="OnPickMiss" />
+            }
+        </HonuaMapLibre>
+    </div>
+
+    <div class="controls-panel">
+        <h3>Model Controls</h3>
+
+        <div class="control-group">
+            <h4>Models</h4>
+            <label>
+                <input type="checkbox" @bind="_showModel1" />
+                Show Building Model
+            </label>
+            <label>
+                <input type="checkbox" @bind="_showModel2" />
+                Show Vehicle Model
+            </label>
+        </div>
+
+        <div class="control-group">
+            <h4>Picking</h4>
+            <label>
+                <input type="checkbox" @bind="_enablePicking" />
+                Enable Interactive Picking
+            </label>
+        </div>
+
+        @if (_model1Info != null)
+        {
+            <div class="control-group">
+                <h4>Building Model Info</h4>
+                <div class="model-stats">
+                    <p><strong>Format:</strong> @_model1Info.Format</p>
+                    <p><strong>Triangles:</strong> @_model1Info.TriangleCount.ToString("N0")</p>
+                    <p><strong>Vertices:</strong> @_model1Info.VertexCount.ToString("N0")</p>
+                    <p><strong>Meshes:</strong> @_model1Info.MeshCount</p>
+                    <p><strong>Materials:</strong> @_model1Info.MaterialCount</p>
+                    <p><strong>Load Time:</strong> @(_model1Info.LoadTimeMs?.ToString("F0") ?? "?")ms</p>
+                    <p><strong>Performance:</strong> @_model1Info.GetPerformanceCategory()</p>
+                </div>
+            </div>
+
+            @if (_model1Info.Animations.Count > 0)
+            {
+                <div class="control-group">
+                    <Model3DAnimationController Model="_model1"
+                                               ModelInfo="_model1Info"
+                                               OnAnimationPlay="OnAnimationPlay"
+                                               OnAnimationPause="OnAnimationPause" />
+                </div>
+            }
+        }
+
+        @if (_lastPickedModel != null)
+        {
+            <div class="control-group picked-info">
+                <h4>Last Picked Model</h4>
+                <p><strong>Model:</strong> @_lastPickedModel.ModelId</p>
+                <p><strong>Distance:</strong> @_lastPickedModel.Distance.ToString("F2")m</p>
+                <p><strong>Point:</strong> @_lastPickedModel.Point.ToString()</p>
+            </div>
+        }
+
+        <div class="control-group">
+            <h4>Sample Models</h4>
+            <p>Using Khronos glTF Sample Models:</p>
+            <ul class="sample-list">
+                <li>Box - Simple animated cube</li>
+                <li>Damaged Helmet - PBR materials demo</li>
+            </ul>
+            <small>
+                More samples at:
+                <a href="https://github.com/KhronosGroup/glTF-Sample-Models" target="_blank">
+                    glTF-Sample-Models
+                </a>
+            </small>
+        </div>
+    </div>
+</div>
+
+<style>
+    .example-container {
+        display: flex;
+        gap: 20px;
+        margin: 20px 0;
+    }
+
+    .map-container {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .controls-panel {
+        width: 350px;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 16px;
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .controls-panel h3 {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .control-group {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .control-group:last-child {
+        border-bottom: none;
+    }
+
+    .control-group h4 {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        color: #555;
+    }
+
+    .control-group label {
+        display: block;
+        margin-bottom: 8px;
+        cursor: pointer;
+    }
+
+    .model-stats p {
+        margin: 4px 0;
+        font-size: 13px;
+    }
+
+    .picked-info {
+        background: #f0f8ff;
+        padding: 12px;
+        border-radius: 4px;
+    }
+
+    .sample-list {
+        font-size: 13px;
+        margin: 8px 0;
+    }
+
+    .sample-list li {
+        margin: 4px 0;
+    }
+</style>
+
+@code {
+    private HonuaMapLibre? _map;
+    private Honua3DModel? _model1;
+    private Model3DInfo? _model1Info;
+    private Model3DInfo? _model2Info;
+    private Model3DPickResult? _lastPickedModel;
+
+    private bool _showModel1 = true;
+    private bool _showModel2 = false;
+    private bool _enablePicking = true;
+
+    // San Francisco coordinates
+    private Coordinate3D _mapCenter = Coordinate3D.Create2D(-122.4194, 37.7749);
+    private Coordinate3D _building1Position = Coordinate3D.Create2D(-122.4194, 37.7749);
+    private Coordinate3D _vehicle1Position = Coordinate3D.Create2D(-122.4184, 37.7749);
+
+    private Vector3 _buildingRotation = new Vector3 { X = 0, Y = 0, Z = 0 };
+
+    private void OnModel1Loaded(Model3DInfo info)
+    {
+        _model1Info = info;
+        StateHasChanged();
+        Console.WriteLine($"Model 1 loaded: {info.TriangleCount} triangles in {info.LoadTimeMs}ms");
+    }
+
+    private void OnModel2Loaded(Model3DInfo info)
+    {
+        _model2Info = info;
+        StateHasChanged();
+        Console.WriteLine($"Model 2 loaded: {info.TriangleCount} triangles in {info.LoadTimeMs}ms");
+    }
+
+    private void OnModelError(string error)
+    {
+        Console.Error.WriteLine($"Model load error: {error}");
+    }
+
+    private void OnModelClicked(Model3DPickResult result)
+    {
+        _lastPickedModel = result;
+        StateHasChanged();
+        Console.WriteLine($"Model clicked: {result.ModelId}");
+    }
+
+    private void OnModelPicked(Model3DPickResult result)
+    {
+        _lastPickedModel = result;
+        StateHasChanged();
+    }
+
+    private void OnPickMiss()
+    {
+        Console.WriteLine("Pick missed all models");
+    }
+
+    private void OnAnimationPlay(int index)
+    {
+        Console.WriteLine($"Animation {index} playing");
+    }
+
+    private void OnAnimationPause()
+    {
+        Console.WriteLine("Animation paused");
+    }
+}

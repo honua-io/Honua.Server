@@ -1,0 +1,172 @@
+/* HonuaGlobeControl Component Styles */
+
+.honua-globe-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+/* Floating positioning */
+.globe-control-floating {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    padding: 4px;
+}
+
+.globe-control-top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.globe-control-top-left {
+    top: 10px;
+    left: 10px;
+}
+
+.globe-control-bottom-right {
+    bottom: 10px;
+    right: 10px;
+}
+
+.globe-control-bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+/* Embedded positioning (in a toolbar or panel) */
+.globe-control-embedded {
+    display: inline-flex;
+}
+
+/* Button styling */
+.globe-control-button {
+    transition: all 0.3s ease-in-out;
+}
+
+.globe-control-button:hover {
+    transform: scale(1.05) rotate(15deg);
+}
+
+.globe-control-button:active {
+    transform: scale(0.95);
+}
+
+/* Disabled state */
+.globe-control-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Active globe state indicator */
+.honua-globe-control[data-globe="true"] .globe-control-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+/* Animation for icon change */
+.globe-control-button ::deep .mud-icon-root {
+    transition: transform 0.3s ease-in-out;
+}
+
+.globe-control-button:hover ::deep .mud-icon-root {
+    animation: globe-spin 2s linear infinite;
+}
+
+/* Globe spin animation */
+@keyframes globe-spin {
+    from {
+        transform: rotateY(0deg);
+    }
+    to {
+        transform: rotateY(360deg);
+    }
+}
+
+/* Pulsing effect for active globe */
+.honua-globe-control[data-globe="true"] .globe-control-button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(102, 126, 234, 0.3);
+    animation: globe-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes globe-pulse {
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.5;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .globe-control-floating {
+        background: rgba(30, 30, 30, 0.95);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .globe-control-floating {
+        padding: 2px;
+    }
+
+    .globe-control-top-right,
+    .globe-control-bottom-right {
+        right: 5px;
+    }
+
+    .globe-control-top-left,
+    .globe-control-bottom-left {
+        left: 5px;
+    }
+
+    .globe-control-top-right,
+    .globe-control-top-left {
+        top: 5px;
+    }
+
+    .globe-control-bottom-right,
+    .globe-control-bottom-left {
+        bottom: 5px;
+    }
+}
+
+/* Tooltip enhancement */
+.honua-globe-control .mud-tooltip {
+    font-size: 0.875rem;
+}
+
+/* Loading state */
+.globe-control-button.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.globe-control-button.loading ::deep .mud-icon-root {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
