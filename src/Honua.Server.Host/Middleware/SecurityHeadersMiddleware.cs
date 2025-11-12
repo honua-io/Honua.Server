@@ -218,6 +218,30 @@ public class SecurityHeadersMiddleware
             headers["X-Permitted-Cross-Domain-Policies"] = xPermittedCrossDomainPolicies;
         }
 
+        // Cross-Origin-Embedder-Policy (COEP)
+        // Prevents a document from loading cross-origin resources that don't explicitly grant permission
+        // Provides defense-in-depth against Spectre/Meltdown-class attacks
+        if (!string.IsNullOrEmpty(options.CrossOriginEmbedderPolicy) && !headers.ContainsKey("Cross-Origin-Embedder-Policy"))
+        {
+            headers["Cross-Origin-Embedder-Policy"] = options.CrossOriginEmbedderPolicy;
+        }
+
+        // Cross-Origin-Opener-Policy (COOP)
+        // Prevents cross-origin documents from being able to open a window and interact with it
+        // Provides isolation for your browsing context group
+        if (!string.IsNullOrEmpty(options.CrossOriginOpenerPolicy) && !headers.ContainsKey("Cross-Origin-Opener-Policy"))
+        {
+            headers["Cross-Origin-Opener-Policy"] = options.CrossOriginOpenerPolicy;
+        }
+
+        // Cross-Origin-Resource-Policy (CORP)
+        // Controls which origins can load a given resource
+        // Protects against cross-origin attacks
+        if (!string.IsNullOrEmpty(options.CrossOriginResourcePolicy) && !headers.ContainsKey("Cross-Origin-Resource-Policy"))
+        {
+            headers["Cross-Origin-Resource-Policy"] = options.CrossOriginResourcePolicy;
+        }
+
         // Remove server header to avoid information disclosure
         if (options.RemoveServerHeaders)
         {

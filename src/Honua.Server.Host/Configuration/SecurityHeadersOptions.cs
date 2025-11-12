@@ -69,6 +69,30 @@ public sealed class SecurityHeadersOptions
     public string? XPermittedCrossDomainPolicies { get; set; }
 
     /// <summary>
+    /// Gets or sets the Cross-Origin-Embedder-Policy header value.
+    /// Controls whether the document can load cross-origin resources.
+    /// Provides defense-in-depth against Spectre/Meltdown-class attacks.
+    /// Recommended: "require-corp" for enhanced security.
+    /// </summary>
+    public string? CrossOriginEmbedderPolicy { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Cross-Origin-Opener-Policy header value.
+    /// Controls whether a document can open a cross-origin window.
+    /// Provides isolation against cross-origin attacks.
+    /// Recommended: "same-origin" for enhanced security.
+    /// </summary>
+    public string? CrossOriginOpenerPolicy { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Cross-Origin-Resource-Policy header value.
+    /// Controls whether a resource can be loaded by cross-origin requests.
+    /// Provides protection against cross-origin attacks.
+    /// Recommended: "same-origin" for enhanced security.
+    /// </summary>
+    public string? CrossOriginResourcePolicy { get; set; }
+
+    /// <summary>
     /// Gets or sets whether to remove server identification headers.
     /// Removes: Server, X-Powered-By, X-AspNet-Version, X-AspNetMvc-Version.
     /// Default: true.

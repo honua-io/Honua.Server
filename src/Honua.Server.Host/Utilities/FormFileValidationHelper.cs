@@ -112,10 +112,88 @@ internal static class FormFileValidationHelper
             return (false, $"Invalid file type '{extension}'. Allowed types: {string.Join(", ", allowedExtensions)}", null);
         }
 
+        // Validate file signature (magic bytes)
+        using (var stream = file.OpenReadStream())
+        {
+            if (!ValidateFileSignature(stream, extension))
+            {
+                return (false, $"File signature does not match extension '{extension}'. The file may be corrupted or renamed.", null);
+            }
+        }
+
         // Generate sanitized filename to prevent path traversal attacks
         var safeFileName = $"{Guid.NewGuid():N}{extension}";
 
         return (true, null, safeFileName);
+    }
+
+    /// <summary>
+    /// Validates that a file's magic bytes match its declared extension.
+    /// </summary>
+    /// <param name="fileStream">The file stream to validate.</param>
+    /// <param name="extension">The expected file extension (e.g., ".pdf").</param>
+    /// <returns>True if the file signature matches the extension, false otherwise.</returns>
+    /// <remarks>
+    /// This method reads up to 16 bytes from the stream to check the file signature.
+    /// The stream position is reset after validation.
+    ///
+    /// Note: Some formats (like .docx, .xlsx, .zip) share the same signature (ZIP format).
+    /// This validation prevents obvious spoofing but cannot distinguish between ZIP-based formats.
+    /// </remarks>
+    public static bool ValidateFileSignature(Stream fileStream, string extension)
+    {
+        if (fileStream == null || !fileStream.CanRead || !fileStream.CanSeek)
+            return false;
+
+        // Check if we have signatures for this extension
+        if (!FileSignatures.KnownSignatures.TryGetValue(extension, out var signatures))
+        {
+            // No known signatures for this extension - allow it
+            // (Validation is opt-in for known types only)
+            return true;
+        }
+
+        // Save original position
+        var originalPosition = fileStream.Position;
+
+        try
+        {
+            fileStream.Seek(0, SeekOrigin.Begin);
+
+            // Read up to 16 bytes for signature checking
+            var headerBytes = new byte[16];
+            var bytesRead = fileStream.Read(headerBytes, 0, headerBytes.Length);
+
+            if (bytesRead == 0)
+                return false; // Empty file
+
+            // Check against all known signatures for this extension
+            foreach (var signature in signatures)
+            {
+                if (bytesRead >= signature.Length)
+                {
+                    bool matches = true;
+                    for (int i = 0; i < signature.Length; i++)
+                    {
+                        if (headerBytes[i] != signature[i])
+                        {
+                            matches = false;
+                            break;
+                        }
+                    }
+
+                    if (matches)
+                        return true;
+                }
+            }
+
+            return false; // No signature matched
+        }
+        finally
+        {
+            // Always reset stream position
+            fileStream.Seek(originalPosition, SeekOrigin.Begin);
+        }
     }
 
     /// <summary>
@@ -135,4 +213,84 @@ internal static class FormFileValidationHelper
             _ => $"{bytes} bytes"
         };
     }
+}
+
+/// <summary>
+/// Known file signatures (magic bytes) for common file types.
+/// </summary>
+internal static class FileSignatures
+{
+    /// <summary>
+    /// File signature definitions mapping extensions to their magic byte patterns.
+    /// Multiple signatures per extension handle format variations.
+    /// </summary>
+    public static readonly Dictionary<string, byte[][]> KnownSignatures = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Images
+        { ".png", new[] { new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A } } },
+        { ".jpg", new[] {
+            new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 },
+            new byte[] { 0xFF, 0xD8, 0xFF, 0xE1 },
+            new byte[] { 0xFF, 0xD8, 0xFF, 0xE2 },
+            new byte[] { 0xFF, 0xD8, 0xFF, 0xE8 }
+        } },
+        { ".jpeg", new[] {
+            new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 },
+            new byte[] { 0xFF, 0xD8, 0xFF, 0xE1 },
+            new byte[] { 0xFF, 0xD8, 0xFF, 0xE2 },
+            new byte[] { 0xFF, 0xD8, 0xFF, 0xE8 }
+        } },
+        { ".gif", new[] {
+            new byte[] { 0x47, 0x49, 0x46, 0x38, 0x37, 0x61 }, // GIF87a
+            new byte[] { 0x47, 0x49, 0x46, 0x38, 0x39, 0x61 }  // GIF89a
+        } },
+        { ".bmp", new[] { new byte[] { 0x42, 0x4D } } },
+        { ".tif", new[] {
+            new byte[] { 0x49, 0x49, 0x2A, 0x00 }, // Little-endian
+            new byte[] { 0x4D, 0x4D, 0x00, 0x2A }  // Big-endian
+        } },
+        { ".tiff", new[] {
+            new byte[] { 0x49, 0x49, 0x2A, 0x00 },
+            new byte[] { 0x4D, 0x4D, 0x00, 0x2A }
+        } },
+        { ".webp", new[] { new byte[] { 0x52, 0x49, 0x46, 0x46 } } },
+
+        // Documents
+        { ".pdf", new[] { new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D } } },
+        { ".docx", new[] { new byte[] { 0x50, 0x4B, 0x03, 0x04 } } }, // ZIP-based
+        { ".xlsx", new[] { new byte[] { 0x50, 0x4B, 0x03, 0x04 } } }, // ZIP-based
+        { ".pptx", new[] { new byte[] { 0x50, 0x4B, 0x03, 0x04 } } }, // ZIP-based
+
+        // Archives
+        { ".zip", new[] {
+            new byte[] { 0x50, 0x4B, 0x03, 0x04 },
+            new byte[] { 0x50, 0x4B, 0x05, 0x06 },
+            new byte[] { 0x50, 0x4B, 0x07, 0x08 }
+        } },
+        { ".7z", new[] { new byte[] { 0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C } } },
+        { ".rar", new[] { new byte[] { 0x52, 0x61, 0x72, 0x21, 0x1A, 0x07 } } },
+        { ".gz", new[] { new byte[] { 0x1F, 0x8B } } },
+        { ".tar", new[] { new byte[] { 0x75, 0x73, 0x74, 0x61, 0x72 } } },
+
+        // GIS formats
+        { ".shp", new[] { new byte[] { 0x00, 0x00, 0x27, 0x0A } } },
+        { ".geojson", new[] { new byte[] { 0x7B } } }, // JSON starts with {
+        { ".json", new[] {
+            new byte[] { 0x7B }, // {
+            new byte[] { 0x5B }  // [
+        } },
+        { ".xml", new[] {
+            new byte[] { 0x3C, 0x3F, 0x78, 0x6D, 0x6C }, // <?xml
+            new byte[] { 0xEF, 0xBB, 0xBF, 0x3C, 0x3F, 0x78, 0x6D, 0x6C } // BOM + <?xml
+        } },
+        { ".kml", new[] {
+            new byte[] { 0x3C, 0x3F, 0x78, 0x6D, 0x6C },
+            new byte[] { 0xEF, 0xBB, 0xBF, 0x3C, 0x3F, 0x78, 0x6D, 0x6C }
+        } },
+
+        // CSV (plain text - harder to validate, just check for valid UTF-8)
+        { ".csv", new[] {
+            new byte[] { 0xEF, 0xBB, 0xBF }, // UTF-8 BOM (optional)
+        } }
+    };
 }
