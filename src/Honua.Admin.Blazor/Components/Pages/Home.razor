@@ -1,19 +1,40 @@
 @page "/"
 @using Honua.Admin.Blazor.Shared.Services
 @using Honua.Admin.Blazor.Shared.Models
+@using Honua.Admin.Blazor.Services
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject ServiceApiClient ServiceApi
 @inject NavigationState NavState
+@inject TourService TourService
+@inject OnboardingService OnboardingService
 
 <PageTitle>Dashboard - Honua Admin</PageTitle>
 
-<MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
-<MudText Class="mb-4">Welcome to the Honua Admin UI</MudText>
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h3" GutterBottom="true">Dashboard</MudText>
+        <MudText Class="mb-4">Welcome to the Honua Admin UI</MudText>
+    </div>
+    <div>
+        <MudButton StartIcon="@Icons.Material.Filled.Tour"
+                   Color="Color.Primary"
+                   Variant="Variant.Outlined"
+                   OnClick="StartWelcomeTourAsync">
+            Take a Tour
+        </MudButton>
+    </div>
+</div>
 
 @if (_loading)
 {
     <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+
+@* Onboarding Checklist - shown to new users *@
+@if (_shouldShowOnboarding)
+{
+    <OnboardingChecklist />
 }
 
 <MudGrid>
@@ -103,6 +124,7 @@
     private int _layerCount = 0;
     private int _folderCount = 0;
     private bool _loading = true;
+    private bool _shouldShowOnboarding = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -110,6 +132,18 @@
         NavState.Reset();
 
         await LoadDashboardDataAsync();
+
+        // Check if we should show onboarding
+        _shouldShowOnboarding = await OnboardingService.ShouldShowOnboardingAsync();
+
+        // Auto-start welcome tour for first-time users
+        var hasCompletedWelcomeTour = await TourService.IsTourCompletedAsync("welcome-tour");
+        if (!hasCompletedWelcomeTour && _shouldShowOnboarding)
+        {
+            // Wait a bit before auto-starting the tour to let the page load
+            await Task.Delay(1500);
+            await StartWelcomeTourAsync();
+        }
     }
 
     private async Task LoadDashboardDataAsync()
@@ -133,6 +167,19 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task StartWelcomeTourAsync()
+    {
+        try
+        {
+            var welcomeTour = TourDefinitions.WelcomeTour;
+            await TourService.StartTourAsync("welcome-tour", welcomeTour);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to start welcome tour: {ex.Message}");
         }
     }
 }

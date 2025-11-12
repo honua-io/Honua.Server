@@ -1,0 +1,189 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Server.Core.Models.Dashboard
+@inject IJSRuntime JS
+
+<div class="chart-widget" style="height: 100%; width: 100%;">
+    @if (Config != null && _chartData != null)
+    {
+        <div id="@ChartId" class="chart-container" style="height: 100%; width: 100%;"></div>
+    }
+    else if (Config == null)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Default">Configure chart settings</MudText>
+    }
+    else
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+</div>
+
+@code {
+    [Parameter]
+    public ChartWidgetConfig? Config { get; set; }
+
+    [Parameter]
+    public WidgetDataSource? DataSource { get; set; }
+
+    [Parameter]
+    public List<Dictionary<string, object>>? Data { get; set; }
+
+    [Parameter]
+    public EventCallback<object> OnDataPointClick { get; set; }
+
+    private string ChartId = $"chart-{Guid.NewGuid():N}";
+    private object? _chartData;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Config != null && Data != null)
+        {
+            await PrepareChartData();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Config != null && _chartData != null)
+        {
+            await RenderChart();
+        }
+    }
+
+    private async Task PrepareChartData()
+    {
+        if (Config == null || Data == null) return;
+
+        var labels = new List<string>();
+        var datasets = new List<object>();
+
+        // Process data based on chart type
+        switch (Config.ChartType.ToLower())
+        {
+            case "bar":
+            case "line":
+            case "area":
+                await PrepareSeriesData(labels, datasets);
+                break;
+            case "pie":
+            case "doughnut":
+                await PreparePieData(labels, datasets);
+                break;
+        }
+
+        _chartData = new
+        {
+            labels = labels,
+            datasets = datasets
+        };
+    }
+
+    private Task PrepareSeriesData(List<string> labels, List<object> datasets)
+    {
+        if (Data == null || Config == null) return Task.CompletedTask;
+
+        // Extract labels from X-axis field
+        if (!string.IsNullOrEmpty(Config.XAxis))
+        {
+            labels.AddRange(Data.Select(d => d.ContainsKey(Config.XAxis) ? d[Config.XAxis]?.ToString() ?? "" : ""));
+        }
+
+        // Create datasets for each Y-axis field
+        foreach (var yField in Config.YAxis)
+        {
+            var values = Data.Select(d =>
+            {
+                if (d.ContainsKey(yField) && d[yField] != null)
+                {
+                    if (double.TryParse(d[yField].ToString(), out var val))
+                        return val;
+                }
+                return 0.0;
+            }).ToList();
+
+            datasets.Add(new
+            {
+                label = yField,
+                data = values,
+                backgroundColor = Config.Colors.Count > datasets.Count ? Config.Colors[datasets.Count] : GetDefaultColor(datasets.Count),
+                borderColor = Config.Colors.Count > datasets.Count ? Config.Colors[datasets.Count] : GetDefaultColor(datasets.Count)
+            });
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task PreparePieData(List<string> labels, List<object> datasets)
+    {
+        if (Data == null || Config == null) return Task.CompletedTask;
+
+        // For pie charts, typically use one field for labels and one for values
+        var labelField = Config.XAxis ?? Data.First().Keys.First();
+        var valueField = Config.YAxis.FirstOrDefault() ?? Data.First().Keys.Skip(1).First();
+
+        labels.AddRange(Data.Select(d => d.ContainsKey(labelField) ? d[labelField]?.ToString() ?? "" : ""));
+
+        var values = Data.Select(d =>
+        {
+            if (d.ContainsKey(valueField) && d[valueField] != null)
+            {
+                if (double.TryParse(d[valueField].ToString(), out var val))
+                    return val;
+            }
+            return 0.0;
+        }).ToList();
+
+        var colors = Config.Colors.Count > 0 ? Config.Colors : Enumerable.Range(0, values.Count).Select(GetDefaultColor).ToList();
+
+        datasets.Add(new
+        {
+            data = values,
+            backgroundColor = colors
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private async Task RenderChart()
+    {
+        if (Config == null || _chartData == null) return;
+
+        var options = new
+        {
+            type = Config.ChartType.ToLower(),
+            data = _chartData,
+            options = new
+            {
+                responsive = true,
+                maintainAspectRatio = false,
+                plugins = new
+                {
+                    legend = new
+                    {
+                        display = Config.ShowLegend
+                    }
+                }
+            }
+        };
+
+        try
+        {
+            await JS.InvokeVoidAsync("renderChart", ChartId, options);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error rendering chart: {ex.Message}");
+        }
+    }
+
+    private string GetDefaultColor(int index)
+    {
+        var defaultColors = new[]
+        {
+            "#4CAF50", "#2196F3", "#FF9800", "#F44336", "#9C27B0",
+            "#00BCD4", "#FFEB3B", "#795548", "#607D8B", "#E91E63"
+        };
+        return defaultColors[index % defaultColors.Length];
+    }
+}

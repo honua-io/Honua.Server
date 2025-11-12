@@ -1,0 +1,144 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+<div class="parameter-control buffer-control">
+    <label class="parameter-label">
+        Buffer Distance
+        <span class="parameter-value">@Distance @Unit</span>
+    </label>
+
+    <div class="slider-container">
+        <input type="range"
+               class="parameter-slider"
+               min="@MinDistance"
+               max="@MaxDistance"
+               step="@Step"
+               value="@Distance"
+               @oninput="OnDistanceChanged" />
+
+        <div class="slider-track">
+            <div class="slider-progress" style="width: @GetProgressPercentage()%"></div>
+        </div>
+    </div>
+
+    <div class="parameter-options">
+        <div class="option-group">
+            <label class="option-label">Unit</label>
+            <select class="option-select" value="@Unit" @onchange="OnUnitChanged">
+                <option value="meters">Meters</option>
+                <option value="kilometers">Kilometers</option>
+                <option value="feet">Feet</option>
+                <option value="miles">Miles</option>
+            </select>
+        </div>
+
+        <div class="option-group">
+            <label class="option-checkbox">
+                <input type="checkbox"
+                       checked="@UnionResults"
+                       @onchange="OnUnionChanged" />
+                <span>Union overlapping results</span>
+            </label>
+        </div>
+    </div>
+
+    @if (ShowQuickPresets)
+    {
+        <div class="quick-presets">
+            <span class="presets-label">Quick Presets:</span>
+            @foreach (var preset in Presets)
+            {
+                <button class="preset-btn" @onclick="() => ApplyPreset(preset)">
+                    @preset.Label
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public double Distance { get; set; } = 100;
+
+    [Parameter]
+    public EventCallback<double> DistanceChanged { get; set; }
+
+    [Parameter]
+    public string Unit { get; set; } = "meters";
+
+    [Parameter]
+    public EventCallback<string> UnitChanged { get; set; }
+
+    [Parameter]
+    public bool UnionResults { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> UnionResultsChanged { get; set; }
+
+    [Parameter]
+    public double MinDistance { get; set; } = 1;
+
+    [Parameter]
+    public double MaxDistance { get; set; } = 1000;
+
+    [Parameter]
+    public double Step { get; set; } = 1;
+
+    [Parameter]
+    public bool ShowQuickPresets { get; set; } = true;
+
+    [Parameter]
+    public List<DistancePreset>? CustomPresets { get; set; }
+
+    private List<DistancePreset> Presets => CustomPresets ?? DefaultPresets;
+
+    private static readonly List<DistancePreset> DefaultPresets = new()
+    {
+        new DistancePreset { Label = "10m", Value = 10, Unit = "meters" },
+        new DistancePreset { Label = "50m", Value = 50, Unit = "meters" },
+        new DistancePreset { Label = "100m", Value = 100, Unit = "meters" },
+        new DistancePreset { Label = "500m", Value = 500, Unit = "meters" },
+        new DistancePreset { Label = "1km", Value = 1, Unit = "kilometers" }
+    };
+
+    private async Task OnDistanceChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var distance))
+        {
+            Distance = distance;
+            await DistanceChanged.InvokeAsync(Distance);
+        }
+    }
+
+    private async Task OnUnitChanged(ChangeEventArgs e)
+    {
+        Unit = e.Value?.ToString() ?? "meters";
+        await UnitChanged.InvokeAsync(Unit);
+    }
+
+    private async Task OnUnionChanged(ChangeEventArgs e)
+    {
+        UnionResults = e.Value as bool? ?? false;
+        await UnionResultsChanged.InvokeAsync(UnionResults);
+    }
+
+    private async Task ApplyPreset(DistancePreset preset)
+    {
+        Distance = preset.Value;
+        Unit = preset.Unit;
+        await DistanceChanged.InvokeAsync(Distance);
+        await UnitChanged.InvokeAsync(Unit);
+    }
+
+    private double GetProgressPercentage()
+    {
+        return ((Distance - MinDistance) / (MaxDistance - MinDistance)) * 100;
+    }
+
+    public class DistancePreset
+    {
+        public required string Label { get; set; }
+        public double Value { get; set; }
+        public string Unit { get; set; } = "meters";
+    }
+}

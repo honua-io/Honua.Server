@@ -1,0 +1,134 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Server.Core.Metadata
+
+<div class="symbol-editor">
+    @if (GeometryType == "point" || GeometryType == "polygon")
+    {
+        <div class="form-group">
+            <label>Fill Color</label>
+            <input type="color" class="form-control" @bind="Symbol.FillColor" @bind:after="OnSymbolChanged" />
+        </div>
+    }
+
+    @if (GeometryType == "point" || GeometryType == "line" || GeometryType == "polygon")
+    {
+        <div class="form-group">
+            <label>Stroke Color</label>
+            <input type="color" class="form-control" @bind="Symbol.StrokeColor" @bind:after="OnSymbolChanged" />
+        </div>
+
+        <div class="form-group">
+            <label>Stroke Width</label>
+            <input type="number" class="form-control" min="0" max="20" step="0.5"
+                   value="@(Symbol.StrokeWidth ?? 1)" @onchange="@((e) => OnStrokeWidthChanged(e))" />
+        </div>
+    }
+
+    @if (GeometryType == "point")
+    {
+        <div class="form-group">
+            <label>Size</label>
+            <input type="number" class="form-control" min="1" max="50" step="1"
+                   value="@(Symbol.Size ?? 8)" @onchange="@((e) => OnSizeChanged(e))" />
+        </div>
+    }
+
+    <div class="form-group">
+        <label>Opacity</label>
+        <input type="range" class="form-range" min="0" max="1" step="0.05"
+               value="@(Symbol.Opacity ?? 0.7)" @onchange="@((e) => OnOpacityChanged(e))" />
+        <span class="opacity-value">@((Symbol.Opacity ?? 0.7):P0)</span>
+    </div>
+
+    @if (GeometryType == "line")
+    {
+        <div class="form-group">
+            <label>Line Style</label>
+            <select class="form-select" @bind="Symbol.StrokeStyle" @bind:after="OnSymbolChanged">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+            </select>
+        </div>
+    }
+
+    <div class="symbol-preview">
+        <div class="preview-container">
+            @if (GeometryType == "point")
+            {
+                <svg width="60" height="60">
+                    <circle cx="30" cy="30" r="@((Symbol.Size ?? 8) / 2)"
+                            fill="@Symbol.FillColor"
+                            stroke="@Symbol.StrokeColor"
+                            stroke-width="@(Symbol.StrokeWidth ?? 1.5)"
+                            opacity="@(Symbol.Opacity ?? 0.7)" />
+                </svg>
+            }
+            else if (GeometryType == "line")
+            {
+                <svg width="60" height="60">
+                    <line x1="5" y1="30" x2="55" y2="30"
+                          stroke="@Symbol.StrokeColor"
+                          stroke-width="@(Symbol.StrokeWidth ?? 2)"
+                          opacity="@(Symbol.Opacity ?? 0.7)"
+                          stroke-dasharray="@(Symbol.StrokeStyle == "dashed" ? "5,5" : Symbol.StrokeStyle == "dotted" ? "2,2" : "none")" />
+                </svg>
+            }
+            else if (GeometryType == "polygon")
+            {
+                <svg width="60" height="60">
+                    <rect x="10" y="10" width="40" height="40"
+                          fill="@Symbol.FillColor"
+                          stroke="@Symbol.StrokeColor"
+                          stroke-width="@(Symbol.StrokeWidth ?? 1.5)"
+                          opacity="@(Symbol.Opacity ?? 0.7)" />
+                </svg>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public required SimpleStyleDefinition Symbol { get; set; }
+
+    [Parameter]
+    public string GeometryType { get; set; } = "polygon";
+
+    [Parameter]
+    public EventCallback<SimpleStyleDefinition> OnSymbolChange { get; set; }
+
+    private void OnSymbolChanged()
+    {
+        OnSymbolChange.InvokeAsync(Symbol);
+    }
+
+    private void OnStrokeWidthChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            Symbol = Symbol with { StrokeWidth = value };
+            OnSymbolChanged();
+        }
+    }
+
+    private void OnSizeChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            Symbol = Symbol with { Size = value };
+            OnSymbolChanged();
+        }
+    }
+
+    private void OnOpacityChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var value))
+        {
+            Symbol = Symbol with { Opacity = value };
+            OnSymbolChanged();
+        }
+    }
+}

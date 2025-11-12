@@ -1,0 +1,395 @@
+/* Copyright (c) 2025 HonuaIO
+ * Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+ */
+
+.honua-map-comments {
+    position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.comments-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 350px;
+    max-height: 80vh;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    transition: width 0.3s ease;
+}
+
+.comments-panel.collapsed {
+    width: 50px;
+    max-height: 50px;
+}
+
+.panel-header {
+    padding: 15px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+    border-radius: 8px 8px 0 0;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.badge-primary {
+    background: #007bff;
+    color: white;
+}
+
+.badge-guest {
+    background: #6c757d;
+    color: white;
+}
+
+.badge-category {
+    background: #17a2b8;
+    color: white;
+    margin-right: 5px;
+}
+
+.badge-priority {
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.badge-low {
+    background: #28a745;
+    color: white;
+}
+
+.badge-medium {
+    background: #ffc107;
+    color: #333;
+}
+
+.badge-high {
+    background: #fd7e14;
+    color: white;
+}
+
+.badge-critical {
+    background: #dc3545;
+    color: white;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.btn, .btn-sm, .btn-action {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: background 0.2s;
+}
+
+.btn:hover, .btn-sm:hover, .btn-action:hover {
+    background: #e9ecef;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-danger {
+    color: #dc3545;
+}
+
+.btn-danger:hover {
+    background: #f8d7da;
+}
+
+.filters-section {
+    padding: 15px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.filters-section select {
+    padding: 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.comments-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.loading, .no-comments {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.comment-editor {
+    border-top: 1px solid #e0e0e0;
+    padding: 15px;
+    background: #f8f9fa;
+}
+
+.comment-editor h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.comment-editor textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    margin-bottom: 10px;
+}
+
+.editor-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.comment-options {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.comment-options select,
+.comment-options input[type="text"] {
+    flex: 1;
+    min-width: 100px;
+    padding: 6px 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.comment-options input[type="color"] {
+    width: 40px;
+    height: 32px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Comment Item Styles */
+.comment-item {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.comment-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-color: #007bff;
+}
+
+.comment-item.status-resolved {
+    background: #f0f8f0;
+    border-left: 3px solid #28a745;
+}
+
+.comment-item.status-closed {
+    background: #f8f9fa;
+    opacity: 0.7;
+}
+
+.comment-item.priority-high {
+    border-left: 3px solid #fd7e14;
+}
+
+.comment-item.priority-critical {
+    border-left: 3px solid #dc3545;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.comment-author {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.comment-author strong {
+    color: #333;
+}
+
+.comment-meta {
+    font-size: 11px;
+    color: #6c757d;
+}
+
+.comment-time {
+    font-size: 11px;
+}
+
+.comment-edited {
+    font-style: italic;
+    margin-left: 4px;
+}
+
+.comment-body {
+    margin-bottom: 10px;
+}
+
+.comment-body p {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #333;
+}
+
+.comment-resolved {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    background: #d4edda;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #155724;
+    margin-top: 8px;
+}
+
+.comment-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 8px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.comment-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #6c757d;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-action {
+    padding: 4px 8px;
+    font-size: 11px;
+    color: #007bff;
+}
+
+.comment-replies {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.replies-indicator {
+    font-size: 12px;
+    color: #007bff;
+    font-weight: 500;
+}
+
+/* Map markers container */
+.comments-markers-container {
+    pointer-events: none;
+}
+
+/* Scrollbar styling */
+.comments-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.comments-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.comments-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.comments-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Icon placeholders (use your preferred icon library) */
+.icon-filter::before { content: "⚙"; }
+.icon-expand::before { content: "⬆"; }
+.icon-collapse::before { content: "⬇"; }
+.icon-pin::before { content: "📌"; }
+.icon-check::before { content: "✓"; }
+.icon-comment::before { content: "💬"; }
+.icon-heart::before { content: "♥"; }
+.icon-map-pin::before { content: "📍"; }
+.icon-reply::before { content: "↩"; }
+.icon-trash::before { content: "🗑"; }

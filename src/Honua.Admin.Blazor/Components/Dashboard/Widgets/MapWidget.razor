@@ -1,0 +1,74 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Server.Core.Models.Dashboard
+@inject IJSRuntime JS
+
+<div class="map-widget" style="height: 100%; width: 100%;">
+    @if (Config != null)
+    {
+        <div id="@MapId" class="map-container" style="height: 100%; width: 100%;"></div>
+    }
+    else
+    {
+        <MudText Typo="Typo.body2" Color="Color.Default">Configure map settings</MudText>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public MapWidgetConfig? Config { get; set; }
+
+    [Parameter]
+    public WidgetDataSource? DataSource { get; set; }
+
+    [Parameter]
+    public EventCallback<object> OnSelectionChanged { get; set; }
+
+    private string MapId = $"map-{Guid.NewGuid():N}";
+    private DotNetObjectReference<MapWidget>? _dotNetRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Config != null)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await InitializeMap();
+        }
+    }
+
+    private async Task InitializeMap()
+    {
+        if (Config == null) return;
+
+        var center = Config.Center ?? new[] { -122.4194, 37.7749 }; // Default to San Francisco
+        var options = new
+        {
+            container = MapId,
+            center = center,
+            zoom = Config.Zoom,
+            style = Config.BaseMapStyle ?? "mapbox://styles/mapbox/streets-v12",
+            interactive = Config.Interactive
+        };
+
+        try
+        {
+            await JS.InvokeVoidAsync("initializeMapWidget", MapId, options, _dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing map: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task HandleFeatureClick(object feature)
+    {
+        await OnSelectionChanged.InvokeAsync(feature);
+    }
+
+    public void Dispose()
+    {
+        _dotNetRef?.Dispose();
+    }
+}

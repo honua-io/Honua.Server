@@ -1,0 +1,230 @@
+/* Copyright (c) 2025 HonuaIO */
+/* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. */
+
+.parameter-control {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.parameter-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 8px;
+}
+
+.parameter-value {
+    font-size: 13px;
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+.slider-container {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.parameter-slider {
+    width: 100%;
+    height: 6px;
+    background: transparent;
+    outline: none;
+    -webkit-appearance: none;
+    position: relative;
+    z-index: 2;
+}
+
+.parameter-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #3b82f6;
+    border: 2px solid white;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.parameter-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.parameter-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #3b82f6;
+    border: 2px solid white;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.parameter-slider::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.slider-track {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: #e5e7eb;
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+.slider-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    border-radius: 3px;
+    transition: width 0.1s ease;
+}
+
+.parameter-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.option-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.option-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.option-select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.option-select:hover {
+    border-color: #9ca3af;
+}
+
+.option-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.option-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #374151;
+    cursor: pointer;
+}
+
+.option-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.quick-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.presets-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.preset-btn {
+    padding: 4px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: white;
+    font-size: 13px;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.preset-btn:active {
+    background: #e5e7eb;
+}
+
+/* Geometry selector styles */
+.geometry-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.geometry-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.geometry-item:hover {
+    background: #f9fafb;
+    border-color: #3b82f6;
+}
+
+.geometry-item.selected {
+    background: #eff6ff;
+    border-color: #3b82f6;
+}
+
+.geometry-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+}
+
+.geometry-name {
+    flex: 1;
+    font-size: 14px;
+    color: #374151;
+}
+
+.geometry-count {
+    font-size: 12px;
+    color: #9ca3af;
+}

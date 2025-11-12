@@ -1,0 +1,136 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Server.Core.Models.Dashboard
+
+<div class="table-widget" style="height: 100%; width: 100%;">
+    @if (Config != null && Data != null)
+    {
+        <MudTable Items="@Data" Dense="true" Hover="true" Striped="true"
+                  Filter="new Func<Dictionary<string, object>, bool>(FilterFunc)"
+                  FixedHeader="true" Height="100%"
+                  @bind-SelectedItem="_selectedItem"
+                  OnRowClick="@HandleRowClick">
+            <ToolBarContent>
+                @if (Config.Filterable)
+                {
+                    <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium"
+                                  Class="mt-0" Immediate="true" />
+                }
+            </ToolBarContent>
+            <HeaderContent>
+                @foreach (var column in Config.Columns.Where(c => c.Visible))
+                {
+                    <MudTh>
+                        @if (column.Sortable && Config.Sortable)
+                        {
+                            <MudTableSortLabel SortBy="new Func<Dictionary<string, object>, object>(x => x.ContainsKey(column.Field) ? x[column.Field] : null)">
+                                @column.Header
+                            </MudTableSortLabel>
+                        }
+                        else
+                        {
+                            @column.Header
+                        }
+                    </MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate>
+                @foreach (var column in Config.Columns.Where(c => c.Visible))
+                {
+                    <MudTd DataLabel="@column.Header">
+                        @FormatValue(context, column)
+                    </MudTd>
+                }
+            </RowTemplate>
+            <PagerContent>
+                @if (Config.Paginated)
+                {
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                }
+            </PagerContent>
+        </MudTable>
+    }
+    else if (Config == null)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Default">Configure table settings</MudText>
+    }
+    else
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+</div>
+
+@code {
+    [Parameter]
+    public TableWidgetConfig? Config { get; set; }
+
+    [Parameter]
+    public WidgetDataSource? DataSource { get; set; }
+
+    [Parameter]
+    public List<Dictionary<string, object>>? Data { get; set; }
+
+    [Parameter]
+    public EventCallback<Dictionary<string, object>> OnRowSelected { get; set; }
+
+    private string _searchString = "";
+    private Dictionary<string, object>? _selectedItem;
+
+    private bool FilterFunc(Dictionary<string, object> item)
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (Config == null) return true;
+
+        foreach (var column in Config.Columns)
+        {
+            if (item.ContainsKey(column.Field))
+            {
+                var value = item[column.Field]?.ToString() ?? "";
+                if (value.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task HandleRowClick(TableRowClickEventArgs<Dictionary<string, object>> args)
+    {
+        if (Config?.Selectable == true)
+        {
+            await OnRowSelected.InvokeAsync(args.Item);
+        }
+    }
+
+    private string FormatValue(Dictionary<string, object> row, TableColumnConfig column)
+    {
+        if (!row.ContainsKey(column.Field))
+            return "";
+
+        var value = row[column.Field];
+        if (value == null)
+            return "";
+
+        if (!string.IsNullOrEmpty(column.Format))
+        {
+            // Apply formatting based on column.Format
+            if (value is DateTime dateValue)
+            {
+                return dateValue.ToString(column.Format);
+            }
+            else if (value is double or decimal or float or int or long)
+            {
+                if (double.TryParse(value.ToString(), out var numValue))
+                {
+                    return numValue.ToString(column.Format);
+                }
+            }
+        }
+
+        return value.ToString() ?? "";
+    }
+}

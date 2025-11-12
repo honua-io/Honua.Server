@@ -43,6 +43,24 @@ public static class OgcProcessesEndpointRouteBuilderExtensions
             .Produces<object>(StatusCodes.Status404NotFound)
 ;
 
+        // Preview endpoints
+        group.MapPost("/{processId}/preview", OgcProcessesPreviewHandlers.ExecutePreview)
+            .WithName("ExecutePreview")
+            .WithSummary("Execute a process in preview mode for quick feedback")
+            .WithDescription("Executes a process with optimizations for quick preview. Results are limited and may be simplified.")
+            .Produces<object>(StatusCodes.Status200OK)
+            .Produces<object>(StatusCodes.Status400BadRequest)
+            .Produces<object>(StatusCodes.Status404NotFound)
+;
+
+        group.MapPost("/{processId}/validate", OgcProcessesPreviewHandlers.ValidatePreviewInputs)
+            .WithName("ValidatePreviewInputs")
+            .WithSummary("Validate process inputs without executing")
+            .WithDescription("Validates inputs and returns potential errors and warnings")
+            .Produces<object>(StatusCodes.Status200OK)
+            .Produces<object>(StatusCodes.Status404NotFound)
+;
+
         // Job management
         var jobsGroup = endpoints.MapGroup("/jobs")
             .WithTags("OGC API - Processes - Jobs");

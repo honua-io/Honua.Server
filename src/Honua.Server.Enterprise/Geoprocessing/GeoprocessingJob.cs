@@ -286,6 +286,7 @@ public static class GeoprocessingOperation
     public const string Heatmap = "heatmap";
     public const string Density = "density";
     public const string Cluster = "cluster";
+    public const string H3Binning = "h3_binning";
 
     // Raster operations
     public const string RasterMosaic = "raster_mosaic";

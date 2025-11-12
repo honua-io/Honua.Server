@@ -1,0 +1,332 @@
+@*
+    Copyright (c) 2025 HonuaIO
+    Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+@using Honua.MapSDK.Services.Import
+@using Honua.MapSDK.Models.Import
+@using Microsoft.AspNetCore.Components.Forms
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<div class="honua-drag-drop-upload @(_isDragging ? "dragging" : "") @(CssClass)">
+    @if (!_isProcessing && UploadedData == null)
+    {
+        <div class="upload-zone"
+             @ref="_dropZoneRef"
+             @onclick="OpenFilePicker"
+             @ondragenter="HandleDragEnter"
+             @ondragover="HandleDragOver"
+             @ondragleave="HandleDragLeave"
+             @ondrop="HandleDrop">
+
+            <div class="upload-icon">
+                @if (_isDragging)
+                {
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="64" height="64">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                }
+                else
+                {
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="64" height="64">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                    </svg>
+                }
+            </div>
+
+            <div class="upload-text">
+                <h3>@(_isDragging ? DropMessage : SelectMessage)</h3>
+                <p>@SupportedFormatsText</p>
+                @if (MaxFileSizeMB > 0)
+                {
+                    <p class="max-size">Maximum file size: @MaxFileSizeMB MB</p>
+                }
+            </div>
+        </div>
+
+        <InputFile @ref="_inputFileRef"
+                   OnChange="HandleFileSelected"
+                   accept="@AcceptedExtensions"
+                   hidden />
+    }
+    else if (_isProcessing)
+    {
+        <div class="processing-zone">
+            <div class="processing-spinner">
+                <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" width="48" height="48">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+
+            <div class="processing-info">
+                <h3>@_processingStatus</h3>
+                @if (_detectionResult != null)
+                {
+                    <div class="detection-info">
+                        <p><strong>Format:</strong> @_detectionResult.Format (@(_detectionResult.Confidence * 100:F0)% confident)</p>
+                        @if (_detectionResult.EstimatedFeatureCount.HasValue)
+                        {
+                            <p><strong>Features:</strong> ~@_detectionResult.EstimatedFeatureCount.Value</p>
+                        }
+                        @if (!string.IsNullOrEmpty(_detectionResult.CRS))
+                        {
+                            <p><strong>CRS:</strong> @_detectionResult.CRS</p>
+                        }
+                    </div>
+                }
+
+                @if (_progress > 0)
+                {
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: @(_progress)%"></div>
+                    </div>
+                    <p class="progress-text">@(_progress.ToString("F1"))%</p>
+                }
+            </div>
+        </div>
+    }
+    else if (UploadedData != null)
+    {
+        <div class="success-zone">
+            <div class="success-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="48" height="48">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+
+            <div class="success-info">
+                <h3>Data uploaded successfully!</h3>
+                <div class="data-summary">
+                    <p><strong>Format:</strong> @UploadedData.Format</p>
+                    <p><strong>Features:</strong> @UploadedData.ValidRows of @UploadedData.TotalRows</p>
+                    @if (!string.IsNullOrEmpty(UploadedData.CRS))
+                    {
+                        <p><strong>CRS:</strong> @UploadedData.CRS</p>
+                    }
+                    @if (UploadedData.Fields.Any())
+                    {
+                        <p><strong>Fields:</strong> @UploadedData.Fields.Count</p>
+                    }
+                </div>
+
+                @if (ShowResetButton)
+                {
+                    <button @onclick="Reset" class="reset-button">Upload Another File</button>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_errorMessage != null)
+    {
+        <div class="error-message">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="24" height="24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <span>@_errorMessage</span>
+            <button @onclick="ClearError" class="close-error">×</button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public string SelectMessage { get; set; } = "Click to select or drag & drop files here";
+    [Parameter] public string DropMessage { get; set; } = "Drop file here";
+    [Parameter] public string SupportedFormatsText { get; set; } = "GeoJSON, Shapefile (ZIP), GeoPackage, KML, CSV, GPX";
+    [Parameter] public string AcceptedExtensions { get; set; } = ".geojson,.json,.zip,.gpkg,.kml,.kmz,.csv,.gpx,.gml";
+    [Parameter] public int MaxFileSizeMB { get; set; } = 500;
+    [Parameter] public bool AutoParse { get; set; } = true;
+    [Parameter] public bool AutoVisualize { get; set; } = true;
+    [Parameter] public bool ShowResetButton { get; set; } = true;
+    [Parameter] public EventCallback<ParsedData> OnDataParsed { get; set; }
+    [Parameter] public EventCallback<EnhancedFormatDetectionResult> OnFormatDetected { get; set; }
+    [Parameter] public EventCallback<StyleDefinition> OnStyleGenerated { get; set; }
+    [Parameter] public EventCallback<string> OnError { get; set; }
+    [Parameter] public ParsedData? UploadedData { get; set; }
+
+    private ElementReference _dropZoneRef;
+    private InputFile? _inputFileRef;
+    private IJSObjectReference? _jsModule;
+    private bool _isDragging;
+    private bool _isProcessing;
+    private double _progress;
+    private string? _processingStatus;
+    private string? _errorMessage;
+    private EnhancedFormatDetectionResult? _detectionResult;
+
+    private EnhancedFormatDetectionService _formatDetector = new();
+    private AutoStylingService _stylingService = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/Honua.MapSDK/js/drag-drop-upload.js");
+
+                await _jsModule.InvokeVoidAsync("initializeDragDrop", _dropZoneRef, DotNetObjectReference.Create(this));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to initialize drag-drop: {ex.Message}");
+            }
+        }
+    }
+
+    private void OpenFilePicker()
+    {
+        // Trigger file input click via JS interop if needed
+        // For now, InputFile should handle this automatically
+    }
+
+    private void HandleDragEnter() => _isDragging = true;
+    private void HandleDragOver() => _isDragging = true;
+    private void HandleDragLeave() => _isDragging = false;
+
+    private async Task HandleDrop(DragEventArgs e)
+    {
+        _isDragging = false;
+        // File handling is done by InputFile component via JS interop
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+
+        if (file == null) return;
+
+        // Validate file size
+        var maxBytes = MaxFileSizeMB * 1024L * 1024L;
+        if (file.Size > maxBytes)
+        {
+            _errorMessage = $"File size ({FormatFileSize(file.Size)}) exceeds maximum allowed ({MaxFileSizeMB} MB)";
+            await OnError.InvokeAsync(_errorMessage);
+            return;
+        }
+
+        if (!AutoParse)
+        {
+            // Just notify about selection
+            return;
+        }
+
+        await ProcessFileAsync(file);
+    }
+
+    private async Task ProcessFileAsync(IBrowserFile file)
+    {
+        _isProcessing = true;
+        _progress = 0;
+        _errorMessage = null;
+        _processingStatus = "Reading file...";
+        StateHasChanged();
+
+        try
+        {
+            // Read file content
+            using var stream = file.OpenReadStream(MaxFileSizeMB * 1024L * 1024L);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var content = ms.ToArray();
+
+            _progress = 20;
+            _processingStatus = "Detecting format...";
+            StateHasChanged();
+
+            // Detect format
+            _detectionResult = await _formatDetector.DetectFormatAsync(content, file.Name);
+            await OnFormatDetected.InvokeAsync(_detectionResult);
+
+            if (_detectionResult.Format == ImportFormat.Unknown)
+            {
+                throw new InvalidOperationException("Unable to detect file format. Please check the file and try again.");
+            }
+
+            _progress = 40;
+            _processingStatus = $"Parsing {_detectionResult.Format}...";
+            StateHasChanged();
+
+            // Parse data
+            var parser = new FileParserFactory().GetParser(_detectionResult.Format);
+            if (parser == null)
+            {
+                throw new InvalidOperationException($"No parser available for format: {_detectionResult.Format}");
+            }
+
+            UploadedData = await parser.ParseAsync(content, file.Name);
+
+            _progress = 80;
+            _processingStatus = "Generating style...";
+            StateHasChanged();
+
+            // Generate style
+            if (AutoVisualize)
+            {
+                var style = _stylingService.GenerateStyle(UploadedData, _detectionResult.GeometryType);
+                await OnStyleGenerated.InvokeAsync(style);
+            }
+
+            _progress = 100;
+            _processingStatus = "Complete!";
+
+            await OnDataParsed.InvokeAsync(UploadedData);
+
+            await Task.Delay(500); // Show completion briefly
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error processing file: {ex.Message}";
+            await OnError.InvokeAsync(_errorMessage);
+            UploadedData = null;
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    public async Task Reset()
+    {
+        UploadedData = null;
+        _detectionResult = null;
+        _errorMessage = null;
+        _progress = 0;
+        _processingStatus = null;
+        StateHasChanged();
+    }
+
+    private void ClearError()
+    {
+        _errorMessage = null;
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.DisposeAsync();
+            }
+            catch { }
+        }
+    }
+}
