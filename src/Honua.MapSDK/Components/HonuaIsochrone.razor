@@ -1,0 +1,673 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Routing
+@using Honua.MapSDK.Services
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject IsochroneService IsochroneService
+
+<div class="honua-isochrone @CssClass" style="@GetContainerStyle()">
+    <MudPaper Elevation="@Elevation" Class="isochrone-paper">
+        <div class="isochrone-header">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.TravelExplore" Size="Size.Small" />
+                Isochrone Analysis
+            </MudText>
+            @if (ShowCloseButton)
+            {
+                <MudIconButton
+                    Icon="@Icons.Material.Filled.Close"
+                    Size="Size.Small"
+                    OnClick="@OnCloseClicked"
+                    aria-label="Close isochrone" />
+            }
+        </div>
+
+        <div class="isochrone-content">
+            @* Provider selection *@
+            <div class="provider-section">
+                <MudSelect
+                    T="string"
+                    Value="@_selectedProvider"
+                    Label="Routing Provider"
+                    Variant="Variant.Outlined"
+                    Dense="true"
+                    AnchorOrigin="Origin.BottomCenter"
+                    ValueChanged="@OnProviderChanged">
+                    @foreach (var provider in _availableProviders)
+                    {
+                        <MudSelectItem Value="@provider.ProviderKey">
+                            <div class="provider-option">
+                                <MudIcon Icon="@Icons.Material.Filled.Cloud" Size="Size.Small" />
+                                <span>@provider.DisplayName</span>
+                            </div>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (_currentProvider != null && _currentProvider.RequiresApiKey)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                        API Key required for @_currentProvider.DisplayName
+                    </MudAlert>
+                }
+            </div>
+
+            @* Origin selection *@
+            <div class="origin-section mt-4">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" />
+                    Origin Point
+                </MudText>
+
+                @if (_originPoint != null)
+                {
+                    <MudChip
+                        Color="Color.Primary"
+                        Icon="@Icons.Material.Filled.CheckCircle"
+                        OnClose="@ClearOrigin"
+                        CloseIcon="@Icons.Material.Filled.Close">
+                        @FormatCoordinate(_originPoint[0], _originPoint[1])
+                    </MudChip>
+                }
+                else
+                {
+                    <MudButton
+                        Variant="Variant.Outlined"
+                        Color="Color.Primary"
+                        Size="Size.Small"
+                        StartIcon="@Icons.Material.Filled.MyLocation"
+                        OnClick="@EnableOriginSelection"
+                        FullWidth="true">
+                        Click Map to Set Origin
+                    </MudButton>
+                }
+            </div>
+
+            @* Travel mode selection *@
+            <div class="travel-mode-section mt-4">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Travel Mode</MudText>
+                <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" FullWidth="true">
+                    @foreach (var mode in _supportedModes)
+                    {
+                        <MudButton
+                            Variant="@(_travelMode == mode ? Variant.Filled : Variant.Outlined)"
+                            OnClick="@(() => _travelMode = mode)"
+                            StartIcon="@GetTravelModeIcon(mode)">
+                            @mode.ToString()
+                        </MudButton>
+                    }
+                </MudButtonGroup>
+            </div>
+
+            @* Time intervals *@
+            <div class="intervals-section mt-4">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Time Intervals (minutes)</MudText>
+                <MudChipSet T="int" MultiSelection="true" @bind-SelectedValues="_selectedIntervals" Mandatory="false">
+                    @foreach (var interval in _availableIntervals)
+                    {
+                        <MudChip
+                            T="int"
+                            Value="interval"
+                            Color="Color.Primary"
+                            Variant="Variant.Outlined"
+                            Size="Size.Small">
+                            @interval min
+                        </MudChip>
+                    }
+                </MudChipSet>
+            </div>
+
+            @* Calculate button *@
+            <MudButton
+                Variant="Variant.Filled"
+                Color="Color.Primary"
+                FullWidth="true"
+                StartIcon="@Icons.Material.Filled.Calculate"
+                OnClick="@GenerateIsochrone"
+                Disabled="@(!CanGenerate() || _isGenerating)"
+                Class="mt-4">
+                @if (_isGenerating)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <span>Generating...</span>
+                }
+                else
+                {
+                    <span>Generate Isochrone</span>
+                }
+            </MudButton>
+
+            @* Results *@
+            @if (_currentResult != null)
+            {
+                <div class="isochrone-results mt-4">
+                    <MudDivider Class="mb-2" />
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
+                        Results
+                    </MudText>
+
+                    <div class="result-stats">
+                        <MudChip Icon="@GetTravelModeIcon(_currentResult.TravelMode)" Size="Size.Small">
+                            @_currentResult.TravelMode.ToString()
+                        </MudChip>
+                        <MudChip Icon="@Icons.Material.Filled.Layers" Size="Size.Small">
+                            @_currentResult.Polygons.Count polygons
+                        </MudChip>
+                    </div>
+
+                    @* Legend *@
+                    <div class="isochrone-legend mt-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Legend</MudText>
+                        @foreach (var polygon in _currentResult.Polygons.OrderBy(p => p.Interval))
+                        {
+                            <div class="legend-item"
+                                 @onclick="@(() => HighlightInterval(polygon.Interval))"
+                                 @onmouseover="@(() => HighlightInterval(polygon.Interval))"
+                                 @onmouseout="@ClearHighlight">
+                                <div class="legend-color" style="background-color: @polygon.Color; opacity: @(polygon.Opacity + 0.3);"></div>
+                                <MudText Typo="Typo.body2">@polygon.Interval min</MudText>
+                                @if (polygon.Area > 0)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @FormatArea(polygon.Area)
+                                    </MudText>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @* Visibility toggle *@
+                    <MudSwitch
+                        T="bool"
+                        Checked="@_isVisible"
+                        CheckedChanged="@ToggleVisibility"
+                        Color="Color.Primary"
+                        Label="Show on map"
+                        Class="mt-2" />
+                </div>
+            }
+
+            @* Actions *@
+            @if (_currentResult != null)
+            {
+                <div class="isochrone-actions mt-4">
+                    <MudButton
+                        Variant="Variant.Text"
+                        Size="Size.Small"
+                        StartIcon="@Icons.Material.Filled.Download"
+                        OnClick="@(() => ExportIsochrone("geojson"))">
+                        Export GeoJSON
+                    </MudButton>
+                    <MudButton
+                        Variant="Variant.Text"
+                        Size="Size.Small"
+                        StartIcon="@Icons.Material.Filled.Clear"
+                        OnClick="@ClearIsochrone"
+                        Color="Color.Error">
+                        Clear
+                    </MudButton>
+                </div>
+            }
+
+            @* Error message *@
+            @if (_errorMessage != null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2" CloseIconClicked="@(() => _errorMessage = null)">
+                    @_errorMessage
+                </MudAlert>
+            }
+        </div>
+    </MudPaper>
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the isochrone component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"isochrone-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public required string MapId { get; set; }
+
+    /// <summary>
+    /// Default routing provider
+    /// </summary>
+    [Parameter]
+    public string? DefaultProvider { get; set; }
+
+    /// <summary>
+    /// Default travel mode
+    /// </summary>
+    [Parameter]
+    public TravelMode TravelMode { get; set; } = TravelMode.Driving;
+
+    /// <summary>
+    /// Default time intervals in minutes
+    /// </summary>
+    [Parameter]
+    public List<int> DefaultIntervals { get; set; } = new() { 5, 10, 15, 30 };
+
+    /// <summary>
+    /// Show close button
+    /// </summary>
+    [Parameter]
+    public bool ShowCloseButton { get; set; } = false;
+
+    /// <summary>
+    /// Paper elevation
+    /// </summary>
+    [Parameter]
+    public int Elevation { get; set; } = 2;
+
+    /// <summary>
+    /// Width of the component
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; } = "400px";
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Event callback when isochrone is generated
+    /// </summary>
+    [Parameter]
+    public EventCallback<IsochroneResult> OnIsochroneGenerated { get; set; }
+
+    /// <summary>
+    /// Event callback when error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    /// <summary>
+    /// Event callback when close is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private IJSObjectReference? _jsModule;
+    private bool _isGenerating = false;
+    private bool _isVisible = true;
+    private string? _errorMessage;
+
+    private List<IIsochroneProvider> _availableProviders = new();
+    private IIsochroneProvider? _currentProvider;
+    private string? _selectedProvider;
+
+    private TravelMode _travelMode;
+    private List<TravelMode> _supportedModes = new();
+    private List<int> _availableIntervals = new() { 5, 10, 15, 20, 30, 45, 60 };
+    private IReadOnlyCollection<int>? _selectedIntervals;
+
+    private double[]? _originPoint;
+    private bool _originSelectionEnabled = false;
+    private IsochroneResult? _currentResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _travelMode = TravelMode;
+        _selectedIntervals = DefaultIntervals;
+
+        // Get available providers
+        _availableProviders = IsochroneService.GetAvailableProviders().ToList();
+
+        if (_availableProviders.Count == 0)
+        {
+            _errorMessage = "No isochrone providers configured. Please configure at least one provider.";
+            return;
+        }
+
+        // Select default provider
+        _selectedProvider = DefaultProvider ?? _availableProviders.First().ProviderKey;
+        _currentProvider = IsochroneService.GetProvider(_selectedProvider);
+
+        if (_currentProvider != null)
+        {
+            _supportedModes = _currentProvider.SupportedTravelModes;
+        }
+
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-isochrone.js"
+                );
+
+                await _jsModule.InvokeVoidAsync("initializeIsochrone", MapId, new
+                {
+                    enableMapClick = false
+                });
+
+                // Register click handler
+                var dotNetRef = DotNetObjectReference.Create(this);
+                await _jsModule.InvokeVoidAsync("setIsochroneClickHandler",
+                    dotNetRef);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading isochrone JS module: {ex.Message}");
+                _errorMessage = "Failed to initialize isochrone component";
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map clicks when origin selection is enabled
+        Bus.Subscribe<FeatureClickedMessage>(async args =>
+        {
+            // Handle if needed
+        });
+    }
+
+    private Task OnProviderChanged(string providerKey)
+    {
+        _selectedProvider = providerKey;
+        _currentProvider = IsochroneService.GetProvider(providerKey);
+
+        if (_currentProvider != null)
+        {
+            _supportedModes = _currentProvider.SupportedTravelModes;
+
+            // Reset travel mode if not supported
+            if (!_supportedModes.Contains(_travelMode))
+            {
+                _travelMode = _supportedModes.First();
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void EnableOriginSelection()
+    {
+        _originSelectionEnabled = true;
+        // In a real implementation, we'd enable map clicking here
+        // For now, allow manual coordinate entry or use map center
+    }
+
+    [JSInvokable]
+    public async Task OnMapClick(double longitude, double latitude)
+    {
+        if (_originSelectionEnabled)
+        {
+            _originPoint = new[] { longitude, latitude };
+            _originSelectionEnabled = false;
+
+            if (_jsModule != null)
+            {
+                await _jsModule.InvokeVoidAsync("setOriginPoint", MapId, longitude, latitude);
+            }
+
+            await Bus.PublishAsync(new IsochroneOriginSelectedMessage
+            {
+                ComponentId = Id,
+                Longitude = longitude,
+                Latitude = latitude
+            }, Id);
+
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ClearOrigin()
+    {
+        _originPoint = null;
+        _originSelectionEnabled = false;
+        StateHasChanged();
+    }
+
+    private bool CanGenerate()
+    {
+        return _originPoint != null &&
+               _selectedIntervals != null &&
+               _selectedIntervals.Count > 0 &&
+               _currentProvider != null &&
+               _currentProvider.IsConfigured();
+    }
+
+    private async Task GenerateIsochrone()
+    {
+        if (!CanGenerate()) return;
+
+        _isGenerating = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var options = new IsochroneOptions
+            {
+                Center = _originPoint!,
+                Intervals = _selectedIntervals!.OrderBy(i => i).ToList(),
+                TravelMode = _travelMode,
+                Type = IsochroneType.Time,
+                Smoothing = 0.5,
+                Opacity = 0.3,
+                Colors = GenerateColors(_selectedIntervals!.Count)
+            };
+
+            _currentResult = await IsochroneService.CalculateAsync(
+                options,
+                _selectedProvider
+            );
+
+            // Display on map
+            if (_jsModule != null)
+            {
+                await _jsModule.InvokeVoidAsync("displayIsochrone", MapId, new
+                {
+                    center = _currentResult.Center,
+                    travelMode = _currentResult.TravelMode.ToString(),
+                    polygons = _currentResult.Polygons.Select(p => new
+                    {
+                        interval = p.Interval,
+                        geometry = p.Geometry,
+                        color = p.Color,
+                        opacity = p.Opacity,
+                        area = p.Area
+                    })
+                });
+            }
+
+            // Publish message
+            await Bus.PublishAsync(new IsochroneCalculatedMessage
+            {
+                RoutingId = Id,
+                Center = _currentResult.Center,
+                TravelMode = _currentResult.TravelMode.ToString(),
+                Intervals = _currentResult.Polygons.Select(p => p.Interval).ToList(),
+                ComponentId = Id,
+                PolygonCount = _currentResult.Polygons.Count
+            }, Id);
+
+            await OnIsochroneGenerated.InvokeAsync(_currentResult);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to generate isochrone: {ex.Message}";
+            Console.Error.WriteLine($"Isochrone generation error: {ex}");
+            await OnError.InvokeAsync(_errorMessage);
+        }
+        finally
+        {
+            _isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleVisibility(bool visible)
+    {
+        _isVisible = visible;
+
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("toggleIsochroneVisibility", MapId, visible);
+        }
+
+        await Bus.PublishAsync(new IsochroneVisibilityChangedMessage
+        {
+            ComponentId = Id,
+            Visible = visible
+        }, Id);
+    }
+
+    private async Task HighlightInterval(int interval)
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("highlightIsochroneInterval", MapId, interval);
+        }
+    }
+
+    private async Task ClearHighlight()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("clearHighlight", MapId);
+        }
+    }
+
+    private async Task ClearIsochrone()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.InvokeVoidAsync("clearIsochrone", MapId);
+        }
+
+        _currentResult = null;
+        _isVisible = true;
+
+        await Bus.PublishAsync(new IsochroneClearedMessage
+        {
+            ComponentId = Id
+        }, Id);
+
+        StateHasChanged();
+    }
+
+    private async Task ExportIsochrone(string format)
+    {
+        if (_currentResult == null || _jsModule == null) return;
+
+        try
+        {
+            string exportData;
+            string fileName;
+
+            if (format.ToLower() == "geojson")
+            {
+                exportData = IsochroneService.ExportAsGeoJson(_currentResult);
+                fileName = $"isochrone-{DateTime.Now:yyyy-MM-dd-HHmmss}.geojson";
+            }
+            else
+            {
+                _errorMessage = $"Export format not supported: {format}";
+                return;
+            }
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(exportData);
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JS.InvokeVoidAsync("eval", $@"
+                const link = document.createElement('a');
+                link.download = '{fileName}';
+                link.href = 'data:application/json;base64,{base64}';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            ");
+
+            await Bus.PublishAsync(new IsochroneExportedMessage
+            {
+                ComponentId = Id,
+                Format = format,
+                FileName = fileName,
+                PolygonCount = _currentResult.Polygons.Count
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to export isochrone: {ex.Message}";
+        }
+    }
+
+    private async Task OnCloseClicked()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    // UI Helper methods
+
+    private string GetTravelModeIcon(TravelMode mode)
+    {
+        return mode switch
+        {
+            TravelMode.Driving or TravelMode.DrivingTraffic => Icons.Material.Filled.DirectionsCar,
+            TravelMode.Walking => Icons.Material.Filled.DirectionsWalk,
+            TravelMode.Cycling => Icons.Material.Filled.DirectionsBike,
+            TravelMode.Transit => Icons.Material.Filled.DirectionsBus,
+            _ => Icons.Material.Filled.Directions
+        };
+    }
+
+    private string FormatCoordinate(double lon, double lat)
+    {
+        return $"{lat:F5}, {lon:F5}";
+    }
+
+    private string FormatArea(double areaM2)
+    {
+        if (areaM2 < 1_000_000)
+        {
+            return $"{areaM2 / 1000:F1} km²";
+        }
+        return $"{areaM2 / 1_000_000:F1} km²";
+    }
+
+    private List<string> GenerateColors(int count)
+    {
+        // Generate gradient from green to red
+        var colors = new List<string>();
+        for (int i = 0; i < count; i++)
+        {
+            var ratio = (double)i / (count - 1);
+            var r = (int)(ratio * 255);
+            var g = (int)((1 - ratio) * 255);
+            colors.Add($"#{r:X2}{g:X2}00");
+        }
+        return colors;
+    }
+
+    private string GetContainerStyle()
+    {
+        return $"width: {Width};";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            await _jsModule.DisposeAsync();
+        }
+    }
+}

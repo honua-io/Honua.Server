@@ -1,0 +1,561 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models.Esri
+@using Honua.MapSDK.Services.Esri
+@using Microsoft.JSInterop
+@using MudBlazor
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+@inject HttpClient Http
+
+<div class="honua-esri-mapserver-layer @CssClass" id="@Id">
+    @if (ShowControls && _isInitialized)
+    {
+        <div class="esri-mapserver-controls">
+            <div class="esri-header">
+                <h4>@LayerTitle</h4>
+                @if (ShowLayerSelector && _availableLayers.Count > 0)
+                {
+                    <button class="esri-toggle-btn" @onclick="ToggleLayerSelector">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Size="Size.Small" />
+                    </button>
+                }
+            </div>
+
+            @if (_showLayerSelector && _availableLayers.Count > 0)
+            {
+                <div class="esri-layer-selector">
+                    <MudText Typo="Typo.caption" Class="mb-2">Select Layers:</MudText>
+                    @foreach (var layer in _availableLayers)
+                    {
+                        <div class="layer-item">
+                            <MudCheckBox T="bool"
+                                        Checked="@_selectedLayers.Contains(layer.Id)"
+                                        CheckedChanged="@(value => ToggleLayer(layer, value))"
+                                        Label="@layer.Name"
+                                        Size="Size.Small" />
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (ShowOpacityControl)
+            {
+                <div class="esri-opacity-control">
+                    <MudText Typo="Typo.caption">Opacity: @((_currentOpacity * 100).ToString("F0"))%</MudText>
+                    <MudSlider T="double"
+                              Value="@(_currentOpacity * 100)"
+                              ValueChanged="@OnOpacityChanged"
+                              Min="0"
+                              Max="100"
+                              Step="5"
+                              Size="Size.Small"
+                              Color="Color.Primary" />
+                </div>
+            }
+
+            @if (_errorMessage != null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-2">@_errorMessage</MudAlert>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this layer component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"esri-mapserver-layer-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to sync with (required)
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// MapServer URL (e.g., https://sampleserver6.arcgisonline.com/arcgis/rest/services/World/MapServer)
+    /// </summary>
+    [Parameter]
+    public required string ServiceUrl { get; set; }
+
+    /// <summary>
+    /// Layer title for display
+    /// </summary>
+    [Parameter]
+    public string? LayerTitle { get; set; }
+
+    /// <summary>
+    /// Layer IDs to display (empty = all visible layers)
+    /// </summary>
+    [Parameter]
+    public List<int> Layers { get; set; } = new();
+
+    /// <summary>
+    /// Use tiled service (true) or dynamic service (false)
+    /// </summary>
+    [Parameter]
+    public bool UseTiles { get; set; } = true;
+
+    /// <summary>
+    /// Image format (png, png8, png24, png32, jpg, pdf, bmp, gif, svg)
+    /// </summary>
+    [Parameter]
+    public string Format { get; set; } = "png";
+
+    /// <summary>
+    /// Enable transparency
+    /// </summary>
+    [Parameter]
+    public bool Transparent { get; set; } = true;
+
+    /// <summary>
+    /// Layer opacity (0-1)
+    /// </summary>
+    [Parameter]
+    public double Opacity { get; set; } = 1.0;
+
+    /// <summary>
+    /// Authentication token
+    /// </summary>
+    [Parameter]
+    public string? Token { get; set; }
+
+    /// <summary>
+    /// Show interactive controls
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Show layer selector
+    /// </summary>
+    [Parameter]
+    public bool ShowLayerSelector { get; set; } = true;
+
+    /// <summary>
+    /// Show opacity control
+    /// </summary>
+    [Parameter]
+    public bool ShowOpacityControl { get; set; } = true;
+
+    /// <summary>
+    /// Enable identify/click queries
+    /// </summary>
+    [Parameter]
+    public bool EnableIdentify { get; set; } = true;
+
+    /// <summary>
+    /// Min zoom level
+    /// </summary>
+    [Parameter]
+    public int? MinZoom { get; set; }
+
+    /// <summary>
+    /// Max zoom level
+    /// </summary>
+    [Parameter]
+    public int? MaxZoom { get; set; }
+
+    /// <summary>
+    /// Auto-load service info on initialization
+    /// </summary>
+    [Parameter]
+    public bool AutoLoadServiceInfo { get; set; } = true;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Callback when layer is loaded
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnLayerLoaded { get; set; }
+
+    /// <summary>
+    /// Callback when feature is identified
+    /// </summary>
+    [Parameter]
+    public EventCallback<EsriFeatureSet> OnIdentify { get; set; }
+
+    private IJSObjectReference? _esriModule;
+    private IJSObjectReference? _layerInstance;
+    private DotNetObjectReference<HonuaEsriMapServerLayer>? _dotNetRef;
+    private EsriFeatureServerClient? _client;
+    private EsriServiceInfo? _serviceInfo;
+    private bool _isInitialized = false;
+    private string? _sourceId;
+    private string? _layerId;
+    private double _currentOpacity = 1.0;
+    private bool _showLayerSelector = false;
+    private List<EsriLayerInfo> _availableLayers = new();
+    private HashSet<int> _selectedLayers = new();
+    private string? _errorMessage;
+
+    protected override void OnInitialized()
+    {
+        _currentOpacity = Opacity;
+        _client = new EsriFeatureServerClient(Http);
+
+        if (!string.IsNullOrEmpty(Token))
+        {
+            _client.SetToken(Token);
+        }
+
+        if (Layers.Count > 0)
+        {
+            _selectedLayers = new HashSet<int>(Layers);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeLayerAsync();
+        }
+    }
+
+    private async Task InitializeLayerAsync()
+    {
+        try
+        {
+            _errorMessage = null;
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load JavaScript module
+            _esriModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-esri.js"
+            );
+
+            // Get service info
+            if (AutoLoadServiceInfo && _client != null)
+            {
+                await LoadServiceInfoAsync();
+            }
+
+            // Initialize MapServer layer on map
+            _sourceId = $"esri-mapserver-source-{Id}";
+            _layerId = $"esri-mapserver-layer-{Id}";
+
+            var layersParam = _selectedLayers.Count > 0
+                ? string.Join(",", _selectedLayers)
+                : "show:0,1,2,3,4,5,6,7,8,9"; // Default: show first 10 layers
+
+            var options = new
+            {
+                sourceId = _sourceId,
+                layerId = _layerId,
+                serviceUrl = ServiceUrl,
+                useTiles = UseTiles,
+                layers = layersParam,
+                format = Format,
+                transparent = Transparent,
+                opacity = _currentOpacity,
+                token = Token,
+                minZoom = MinZoom,
+                maxZoom = MaxZoom
+            };
+
+            _layerInstance = await _esriModule.InvokeAsync<IJSObjectReference>(
+                "createEsriMapServerLayer",
+                SyncWith,
+                options,
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+
+            // Publish layer added message
+            await Bus.PublishAsync(new LayerAddedMessage
+            {
+                LayerId = _layerId,
+                LayerName = LayerTitle ?? "Esri MapServer Layer"
+            }, Id);
+
+            await OnLayerLoaded.InvokeAsync(_layerId);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error initializing MapServer layer: {ex.Message}";
+            Console.Error.WriteLine(_errorMessage);
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadServiceInfoAsync()
+    {
+        if (_client == null) return;
+
+        try
+        {
+            _serviceInfo = await _client.GetServiceInfoAsync(ServiceUrl);
+
+            if (_serviceInfo.Layers != null)
+            {
+                _availableLayers = _serviceInfo.Layers;
+
+                // Auto-select visible layers if no layers specified
+                if (Layers.Count == 0)
+                {
+                    _selectedLayers = _availableLayers
+                        .Where(l => l.DefaultVisibility)
+                        .Select(l => l.Id)
+                        .ToHashSet();
+                }
+
+                // Set layer title from service info if not provided
+                if (string.IsNullOrEmpty(LayerTitle))
+                {
+                    LayerTitle = _serviceInfo.Description ?? "Esri MapServer";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading service info: {ex.Message}");
+        }
+    }
+
+    private async Task ToggleLayer(EsriLayerInfo layer, bool selected)
+    {
+        if (selected)
+        {
+            _selectedLayers.Add(layer.Id);
+        }
+        else
+        {
+            _selectedLayers.Remove(layer.Id);
+        }
+
+        await UpdateLayersAsync();
+    }
+
+    private async Task UpdateLayersAsync()
+    {
+        if (!_isInitialized || _layerInstance == null) return;
+
+        try
+        {
+            var layersParam = _selectedLayers.Count > 0
+                ? $"show:{string.Join(",", _selectedLayers)}"
+                : "show:";
+
+            await _layerInstance.InvokeVoidAsync("updateLayers", layersParam);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating layers: {ex.Message}");
+        }
+    }
+
+    private async Task OnOpacityChanged(double value)
+    {
+        _currentOpacity = value / 100.0;
+
+        if (!_isInitialized || _layerInstance == null) return;
+
+        try
+        {
+            await _layerInstance.InvokeVoidAsync("setOpacity", _currentOpacity);
+
+            await Bus.PublishAsync(new LayerOpacityChangedMessage
+            {
+                LayerId = _layerId!,
+                Opacity = _currentOpacity
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating opacity: {ex.Message}");
+        }
+    }
+
+    private void ToggleLayerSelector()
+    {
+        _showLayerSelector = !_showLayerSelector;
+    }
+
+    /// <summary>
+    /// Called from JavaScript when map is clicked (identify)
+    /// </summary>
+    [JSInvokable]
+    public async Task OnIdentifyCallback(double x, double y, int width, int height, string bbox, string mapExtent)
+    {
+        if (!EnableIdentify || _client == null) return;
+
+        try
+        {
+            // Build identify URL
+            var identifyUrl = $"{ServiceUrl}/identify";
+            var parameters = new Dictionary<string, string>
+            {
+                ["f"] = "json",
+                ["geometry"] = $"{x},{y}",
+                ["geometryType"] = "esriGeometryPoint",
+                ["sr"] = "3857",
+                ["layers"] = $"all:{string.Join(",", _selectedLayers)}",
+                ["tolerance"] = "5",
+                ["mapExtent"] = mapExtent,
+                ["imageDisplay"] = $"{width},{height},96",
+                ["returnGeometry"] = "true"
+            };
+
+            var queryString = string.Join("&", parameters.Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value)}"));
+            var url = $"{identifyUrl}?{queryString}";
+
+            if (!string.IsNullOrEmpty(Token))
+            {
+                url = EsriAuthenticationService.AppendTokenToUrl(url, Token);
+            }
+
+            var json = await Http.GetStringAsync(url);
+            var result = System.Text.Json.JsonSerializer.Deserialize<EsriIdentifyResult>(json);
+
+            if (result?.Results != null && result.Results.Count > 0)
+            {
+                // Convert to FeatureSet
+                var featureSet = new EsriFeatureSet
+                {
+                    Features = result.Results.Select(r => r.Feature).ToList()
+                };
+
+                await OnIdentify.InvokeAsync(featureSet);
+
+                // Show popup with first result
+                var firstResult = result.Results[0];
+                await Bus.PublishAsync(new OpenPopupRequestMessage
+                {
+                    MapId = SyncWith,
+                    Coordinates = new double[] { x, y },
+                    LayerId = _layerId,
+                    Properties = firstResult.Feature.Attributes.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => (object?)(kvp.Value?.ToString() ?? "")
+                    )
+                }, Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error during identify: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Public API: Refresh the layer
+    /// </summary>
+    public async Task RefreshAsync()
+    {
+        if (_layerInstance != null)
+        {
+            await _layerInstance.InvokeVoidAsync("refresh");
+        }
+    }
+
+    /// <summary>
+    /// Public API: Set visibility
+    /// </summary>
+    public async Task SetVisibilityAsync(bool visible)
+    {
+        if (_layerInstance != null)
+        {
+            await _layerInstance.InvokeVoidAsync("setVisibility", visible);
+
+            await Bus.PublishAsync(new LayerVisibilityChangedMessage
+            {
+                LayerId = _layerId!,
+                Visible = visible
+            }, Id);
+        }
+    }
+
+    /// <summary>
+    /// Public API: Get service info
+    /// </summary>
+    public EsriServiceInfo? GetServiceInfo() => _serviceInfo;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_layerInstance != null)
+        {
+            try
+            {
+                await _layerInstance.InvokeVoidAsync("dispose");
+                await _layerInstance.DisposeAsync();
+            }
+            catch { }
+        }
+
+        if (_esriModule != null)
+        {
+            try
+            {
+                await _esriModule.DisposeAsync();
+            }
+            catch { }
+        }
+
+        _dotNetRef?.Dispose();
+
+        if (!string.IsNullOrEmpty(_layerId))
+        {
+            await Bus.PublishAsync(new LayerRemovedMessage
+            {
+                LayerId = _layerId
+            }, Id);
+        }
+    }
+}
+
+/// <summary>
+/// Identify result
+/// </summary>
+internal class EsriIdentifyResult
+{
+    [System.Text.Json.Serialization.JsonPropertyName("results")]
+    public List<EsriIdentifyResultItem>? Results { get; set; }
+}
+
+/// <summary>
+/// Single identify result item
+/// </summary>
+internal class EsriIdentifyResultItem
+{
+    [System.Text.Json.Serialization.JsonPropertyName("layerId")]
+    public int LayerId { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("layerName")]
+    public string? LayerName { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("value")]
+    public string? Value { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("displayFieldName")]
+    public string? DisplayFieldName { get; set; }
+
+    [System.Text.Json.Serialization.JsonPropertyName("attributes")]
+    public Dictionary<string, object?> Attributes { get; set; } = new();
+
+    [System.Text.Json.Serialization.JsonPropertyName("geometry")]
+    public EsriGeometry? Geometry { get; set; }
+
+    /// <summary>
+    /// Convert to EsriFeature
+    /// </summary>
+    public EsriFeature Feature => new()
+    {
+        Geometry = Geometry,
+        Attributes = Attributes
+    };
+}

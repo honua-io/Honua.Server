@@ -1,0 +1,445 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.MapSDK.Models.RouteOptimization
+@inject IJSRuntime JSRuntime
+@inject ILogger<MultiStopPlanner> Logger
+
+<div class="multi-stop-planner">
+    <div class="planner-header">
+        <h3>Multi-Stop Route Planner</h3>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleSettings">
+            <i class="fas fa-cog"></i> Settings
+        </button>
+    </div>
+
+    @if (ShowSettings)
+    {
+        <div class="settings-panel">
+            <div class="setting-group">
+                <label>Optimization Goal</label>
+                <select @bind="OptimizationGoal" class="form-select">
+                    @foreach (var goal in Enum.GetValues<OptimizationGoal>())
+                    {
+                        <option value="@goal">@goal.ToString()</option>
+                    }
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label>Provider</label>
+                <select @bind="Provider" class="form-select">
+                    @foreach (var provider in Enum.GetValues<OptimizationProvider>())
+                    {
+                        <option value="@provider">@provider.ToString()</option>
+                    }
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label>
+                    <input type="checkbox" @bind="EnableTimeWindows" />
+                    Enable Time Windows
+                </label>
+            </div>
+
+            <div class="setting-group">
+                <label>
+                    <input type="checkbox" @bind="EnableVehicleConstraints" />
+                    Enable Vehicle Constraints
+                </label>
+            </div>
+
+            @if (EnableVehicleConstraints)
+            {
+                <div class="setting-group">
+                    <label>Max Capacity</label>
+                    <input type="number" @bind="MaxCapacity" class="form-control" step="0.1" />
+                </div>
+
+                <div class="setting-group">
+                    <label>Max Duration (hours)</label>
+                    <input type="number" @bind="MaxDurationHours" class="form-control" step="0.5" />
+                </div>
+            }
+        </div>
+    }
+
+    <div class="waypoints-section">
+        <div class="section-header">
+            <h4>Waypoints (@Waypoints.Count)</h4>
+            <div class="header-actions">
+                <button class="btn btn-sm btn-primary" @onclick="AddWaypoint">
+                    <i class="fas fa-plus"></i> Add Waypoint
+                </button>
+                <button class="btn btn-sm btn-secondary" @onclick="ImportWaypoints">
+                    <i class="fas fa-upload"></i> Import
+                </button>
+                @if (Waypoints.Any())
+                {
+                    <button class="btn btn-sm btn-danger" @onclick="ClearAllWaypoints">
+                        <i class="fas fa-trash"></i> Clear All
+                    </button>
+                }
+            </div>
+        </div>
+
+        @if (!Waypoints.Any())
+        {
+            <div class="empty-state">
+                <i class="fas fa-map-marker-alt fa-3x"></i>
+                <p>No waypoints added yet</p>
+                <p class="text-muted">Click "Add Waypoint" or click on the map to add stops</p>
+            </div>
+        }
+        else
+        {
+            <div class="waypoints-list" @ref="_waypointsList">
+                @foreach (var (waypoint, index) in Waypoints.Select((w, i) => (w, i)))
+                {
+                    <div class="waypoint-card @(SelectedWaypoint == waypoint ? "selected" : "")"
+                         draggable="true"
+                         @ondragstart="@(() => OnDragStart(index))"
+                         @ondragover:preventDefault
+                         @ondrop="@(() => OnDrop(index))"
+                         @onclick="@(() => SelectWaypoint(waypoint))">
+
+                        <div class="waypoint-header">
+                            <div class="drag-handle">
+                                <i class="fas fa-grip-vertical"></i>
+                            </div>
+                            <div class="waypoint-number">@(index + 1)</div>
+                            <input type="text"
+                                   class="waypoint-name-input"
+                                   @bind="waypoint.Name"
+                                   placeholder="Waypoint name"
+                                   @onclick:stopPropagation="true" />
+                            <button class="btn-icon delete-btn"
+                                    @onclick="@(() => RemoveWaypoint(waypoint))"
+                                    @onclick:stopPropagation="true">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div class="waypoint-details">
+                            <div class="detail-row">
+                                <span class="detail-label">Location:</span>
+                                <span class="detail-value">
+                                    @waypoint.Location.Latitude.ToString("F6"), @waypoint.Location.Longitude.ToString("F6")
+                                </span>
+                            </div>
+
+                            @if (ShowAdvancedOptions || waypoint == SelectedWaypoint)
+                            {
+                                <div class="advanced-options">
+                                    <div class="option-row">
+                                        <label>Service Duration (min)</label>
+                                        <input type="number"
+                                               @bind="waypoint.ServiceDurationSeconds"
+                                               class="form-control form-control-sm"
+                                               @onclick:stopPropagation="true"
+                                               @oninput="@(e => waypoint.ServiceDurationSeconds = int.Parse(e.Value?.ToString() ?? "0") * 60)" />
+                                    </div>
+
+                                    @if (EnableTimeWindows)
+                                    {
+                                        <div class="option-row">
+                                            <label>Earliest Arrival</label>
+                                            <input type="datetime-local"
+                                                   @bind="@(waypoint.TimeWindow != null ? waypoint.TimeWindow.EarliestArrival : null)"
+                                                   class="form-control form-control-sm"
+                                                   @onclick:stopPropagation="true" />
+                                        </div>
+
+                                        <div class="option-row">
+                                            <label>Latest Arrival</label>
+                                            <input type="datetime-local"
+                                                   @bind="@(waypoint.TimeWindow != null ? waypoint.TimeWindow.LatestArrival : null)"
+                                                   class="form-control form-control-sm"
+                                                   @onclick:stopPropagation="true" />
+                                        </div>
+                                    }
+
+                                    <div class="option-row">
+                                        <label>Demand/Load</label>
+                                        <input type="number"
+                                               @bind="waypoint.Demand"
+                                               class="form-control form-control-sm"
+                                               step="0.1"
+                                               @onclick:stopPropagation="true" />
+                                    </div>
+
+                                    <div class="option-row">
+                                        <label>Priority</label>
+                                        <input type="number"
+                                               @bind="waypoint.Priority"
+                                               class="form-control form-control-sm"
+                                               min="1"
+                                               max="10"
+                                               @onclick:stopPropagation="true" />
+                                    </div>
+
+                                    <div class="option-row">
+                                        <label>
+                                            <input type="checkbox"
+                                                   @bind="waypoint.IsRequired"
+                                                   @onclick:stopPropagation="true" />
+                                            Required Stop
+                                        </label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (Waypoints.Count >= 2)
+    {
+        <div class="optimize-section">
+            <button class="btn btn-lg btn-success optimize-btn"
+                    @onclick="OptimizeRoute"
+                    disabled="@IsOptimizing">
+                @if (IsOptimizing)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                    <span> Optimizing...</span>
+                }
+                else
+                {
+                    <i class="fas fa-route"></i>
+                    <span> Optimize Route</span>
+                }
+            </button>
+
+            <div class="route-info">
+                <small class="text-muted">
+                    @Waypoints.Count stops • Estimated @EstimateDistance() km
+                </small>
+            </div>
+        </div>
+    }
+
+    @if (OptimizationResult != null)
+    {
+        <HonuaRouteOptimizer
+            Waypoints="@Waypoints"
+            Goal="@OptimizationGoal"
+            Provider="@Provider"
+            EnableTimeWindows="@EnableTimeWindows"
+            VehicleCapacity="@(EnableVehicleConstraints ? MaxCapacity : null)"
+            MaxRouteDuration="@(EnableVehicleConstraints && MaxDurationHours.HasValue ? TimeSpan.FromHours(MaxDurationHours.Value) : null)"
+            OnOptimizationComplete="@OnOptimizationComplete"
+            OnApplyOptimization="@OnApplyOptimization" />
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Event fired when waypoints change
+    /// </summary>
+    [Parameter]
+    public EventCallback<List<OptimizationWaypoint>> OnWaypointsChanged { get; set; }
+
+    /// <summary>
+    /// Event fired when optimization is applied
+    /// </summary>
+    [Parameter]
+    public EventCallback<OptimizationResult> OnOptimizationApplied { get; set; }
+
+    /// <summary>
+    /// Enable map integration
+    /// </summary>
+    [Parameter]
+    public bool EnableMapIntegration { get; set; } = true;
+
+    /// <summary>
+    /// Show advanced waypoint options
+    /// </summary>
+    [Parameter]
+    public bool ShowAdvancedOptions { get; set; }
+
+    private List<OptimizationWaypoint> Waypoints { get; set; } = new();
+    private OptimizationWaypoint? SelectedWaypoint { get; set; }
+    private OptimizationResult? OptimizationResult { get; set; }
+
+    // Settings
+    private bool ShowSettings { get; set; }
+    private OptimizationGoal OptimizationGoal { get; set; } = OptimizationGoal.MinimizeDistance;
+    private OptimizationProvider Provider { get; set; } = OptimizationProvider.ClientSide;
+    private bool EnableTimeWindows { get; set; }
+    private bool EnableVehicleConstraints { get; set; }
+    private double? MaxCapacity { get; set; } = 1000;
+    private double? MaxDurationHours { get; set; } = 8;
+    private bool IsOptimizing { get; set; }
+
+    // Drag and drop
+    private int _draggedIndex = -1;
+    private ElementReference _waypointsList;
+
+    /// <summary>
+    /// Add a new waypoint
+    /// </summary>
+    public void AddWaypoint(Coordinate? location = null)
+    {
+        var waypoint = new OptimizationWaypoint
+        {
+            Location = location ?? new Coordinate(0, 0),
+            Name = $"Stop {Waypoints.Count + 1}",
+            OriginalIndex = Waypoints.Count,
+            ServiceDurationSeconds = 300, // 5 minutes default
+            Priority = 1,
+            IsRequired = true
+        };
+
+        if (EnableTimeWindows)
+        {
+            waypoint.TimeWindow = new TimeWindow
+            {
+                AllowEarlyArrival = true,
+                AllowLateArrival = false
+            };
+        }
+
+        Waypoints.Add(waypoint);
+        NotifyWaypointsChanged();
+    }
+
+    /// <summary>
+    /// Remove a waypoint
+    /// </summary>
+    private void RemoveWaypoint(OptimizationWaypoint waypoint)
+    {
+        Waypoints.Remove(waypoint);
+        if (SelectedWaypoint == waypoint)
+        {
+            SelectedWaypoint = null;
+        }
+        NotifyWaypointsChanged();
+    }
+
+    /// <summary>
+    /// Clear all waypoints
+    /// </summary>
+    private void ClearAllWaypoints()
+    {
+        Waypoints.Clear();
+        SelectedWaypoint = null;
+        OptimizationResult = null;
+        NotifyWaypointsChanged();
+    }
+
+    /// <summary>
+    /// Select a waypoint
+    /// </summary>
+    private void SelectWaypoint(OptimizationWaypoint waypoint)
+    {
+        SelectedWaypoint = SelectedWaypoint == waypoint ? null : waypoint;
+    }
+
+    /// <summary>
+    /// Toggle settings panel
+    /// </summary>
+    private void ToggleSettings()
+    {
+        ShowSettings = !ShowSettings;
+    }
+
+    /// <summary>
+    /// Drag start handler
+    /// </summary>
+    private void OnDragStart(int index)
+    {
+        _draggedIndex = index;
+    }
+
+    /// <summary>
+    /// Drop handler
+    /// </summary>
+    private void OnDrop(int targetIndex)
+    {
+        if (_draggedIndex >= 0 && _draggedIndex != targetIndex)
+        {
+            var item = Waypoints[_draggedIndex];
+            Waypoints.RemoveAt(_draggedIndex);
+            Waypoints.Insert(targetIndex, item);
+            NotifyWaypointsChanged();
+        }
+        _draggedIndex = -1;
+    }
+
+    /// <summary>
+    /// Import waypoints from file
+    /// </summary>
+    private async Task ImportWaypoints()
+    {
+        // Would integrate with file picker
+        Logger.LogInformation("Import waypoints requested");
+    }
+
+    /// <summary>
+    /// Optimize the route
+    /// </summary>
+    private async Task OptimizeRoute()
+    {
+        IsOptimizing = true;
+        try
+        {
+            // Trigger optimization in HonuaRouteOptimizer
+            StateHasChanged();
+        }
+        finally
+        {
+            IsOptimizing = false;
+        }
+    }
+
+    /// <summary>
+    /// Handle optimization complete
+    /// </summary>
+    private async Task OnOptimizationComplete(OptimizationResult result)
+    {
+        OptimizationResult = result;
+        IsOptimizing = false;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Handle apply optimization
+    /// </summary>
+    private async Task OnApplyOptimization(OptimizationResult result)
+    {
+        // Replace waypoints with optimized sequence
+        Waypoints = new List<OptimizationWaypoint>(result.OptimizedSequence);
+        await OnOptimizationApplied.InvokeAsync(result);
+        NotifyWaypointsChanged();
+    }
+
+    /// <summary>
+    /// Estimate total distance (rough calculation)
+    /// </summary>
+    private string EstimateDistance()
+    {
+        if (Waypoints.Count < 2) return "0";
+
+        double totalDistance = 0;
+        for (int i = 0; i < Waypoints.Count - 1; i++)
+        {
+            totalDistance += Services.RouteOptimization.TspSolver.HaversineDistance(
+                Waypoints[i].Location,
+                Waypoints[i + 1].Location);
+        }
+
+        return (totalDistance / 1000).ToString("F1");
+    }
+
+    /// <summary>
+    /// Notify waypoints changed
+    /// </summary>
+    private async Task NotifyWaypointsChanged()
+    {
+        await OnWaypointsChanged.InvokeAsync(Waypoints);
+    }
+}

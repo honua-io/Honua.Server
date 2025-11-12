@@ -1,0 +1,394 @@
+@using Honua.MapSDK.Models
+
+<div class="style-panel">
+    @if (VectorLayer != null)
+    {
+        <MudStack Spacing="2">
+            <!-- Radius -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Heatmap Radius: @Radius px
+                </MudText>
+                <MudSlider @bind-Value="@Radius"
+                          Min="5"
+                          Max="100"
+                          Step="5"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @Radius px
+                </MudSlider>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Radius of influence for each point
+                </MudText>
+            </div>
+
+            <!-- Intensity -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Intensity: @Intensity.ToString("F2")
+                </MudText>
+                <MudSlider @bind-Value="@Intensity"
+                          Min="0"
+                          Max="2"
+                          Step="0.1"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @Intensity.ToString("F2")
+                </MudSlider>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Controls overall heat intensity
+                </MudText>
+            </div>
+
+            <!-- Weight -->
+            <MudSwitch @bind-Value="@UseWeight"
+                      Label="Weight by Property"
+                      Color="Color.Primary"
+                      Class="mb-2" />
+
+            @if (UseWeight)
+            {
+                <MudTextField @bind-Value="@WeightProperty"
+                             Label="Weight Property"
+                             Variant="Variant.Outlined"
+                             Margin="Margin.Dense"
+                             Placeholder="population"
+                             HelperText="Property name to use for weighting" />
+            }
+
+            <MudDivider Class="my-2" />
+
+            <!-- Gradient -->
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Color Gradient</MudText>
+
+            <MudSelect @bind-Value="@GradientPreset"
+                      Label="Gradient Preset"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense">
+                <MudSelectItem Value="@("hot")">Hot (Blue → Red)</MudSelectItem>
+                <MudSelectItem Value="@("cool")">Cool (Green → Blue)</MudSelectItem>
+                <MudSelectItem Value="@("rainbow")">Rainbow</MudSelectItem>
+                <MudSelectItem Value="@("viridis")">Viridis</MudSelectItem>
+                <MudSelectItem Value="@("plasma")">Plasma</MudSelectItem>
+                <MudSelectItem Value="@("inferno")">Inferno</MudSelectItem>
+                <MudSelectItem Value="@("custom")">Custom</MudSelectItem>
+            </MudSelect>
+
+            @if (GradientPreset == "custom")
+            {
+                <MudText Typo="Typo.caption" Class="mt-2 mb-1">Custom Gradient Stops</MudText>
+
+                @foreach (var stop in ColorStops)
+                {
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-2">
+                        <MudNumericField @bind-Value="@stop.Position"
+                                        Variant="Variant.Outlined"
+                                        Margin="Margin.Dense"
+                                        Min="0"
+                                        Max="1"
+                                        Step="0.1"
+                                        Style="max-width: 100px;" />
+                        <input type="color"
+                               value="@stop.Color"
+                               @oninput="@((e) => OnColorStopChanged(stop, e))"
+                               class="color-picker" />
+                        <MudTextField @bind-Value="@stop.Color"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Class="flex-1" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                      Size="Size.Small"
+                                      OnClick="@(() => RemoveColorStop(stop))" />
+                    </MudStack>
+                }
+
+                <MudButton Size="Size.Small"
+                          StartIcon="@Icons.Material.Filled.Add"
+                          OnClick="AddColorStop"
+                          Class="mt-1">
+                    Add Color Stop
+                </MudButton>
+            }
+
+            <!-- Opacity -->
+            <MudDivider Class="my-2" />
+
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Heatmap Opacity: @Opacity.ToString("P0")
+                </MudText>
+                <MudSlider @bind-Value="@Opacity"
+                          Min="0"
+                          Max="1"
+                          Step="0.05"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @Opacity.ToString("P0")
+                </MudSlider>
+            </div>
+
+            <!-- Preview -->
+            <MudPaper Outlined="true" Class="pa-2 mt-2">
+                <MudText Typo="Typo.caption" Class="mb-1">Gradient Preview</MudText>
+                <div class="gradient-preview" style="background: linear-gradient(to right, @GetGradientCss());"></div>
+            </MudPaper>
+        </MudStack>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public LayerDefinition? Layer { get; set; }
+
+    [Parameter]
+    public EventCallback OnStyleChanged { get; set; }
+
+    private VectorLayer? VectorLayer => Layer as VectorLayer;
+
+    private double _radius = 30;
+    private double Radius
+    {
+        get => _radius;
+        set
+        {
+            _radius = value;
+            UpdatePaint("heatmap-radius", value);
+        }
+    }
+
+    private double _intensity = 1.0;
+    private double Intensity
+    {
+        get => _intensity;
+        set
+        {
+            _intensity = value;
+            UpdatePaint("heatmap-intensity", value);
+        }
+    }
+
+    private bool _useWeight = false;
+    private bool UseWeight { get; set; }
+
+    private string _weightProperty = "";
+    private string WeightProperty
+    {
+        get => _weightProperty;
+        set
+        {
+            _weightProperty = value;
+            if (UseWeight && !string.IsNullOrWhiteSpace(value))
+            {
+                UpdatePaint("heatmap-weight", new[] { "get", value });
+            }
+        }
+    }
+
+    private double _opacity = 1.0;
+    private double Opacity
+    {
+        get => _opacity;
+        set
+        {
+            _opacity = value;
+            UpdatePaint("heatmap-opacity", value);
+        }
+    }
+
+    private string _gradientPreset = "hot";
+    private string GradientPreset
+    {
+        get => _gradientPreset;
+        set
+        {
+            _gradientPreset = value;
+            ApplyGradientPreset(value);
+        }
+    }
+
+    private List<ColorStop> ColorStops { get; set; } = new();
+
+    private class ColorStop
+    {
+        public double Position { get; set; }
+        public string Color { get; set; } = "#000000";
+    }
+
+    protected override void OnInitialized()
+    {
+        InitializeDefaultGradient();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (VectorLayer != null)
+        {
+            LoadCurrentValues();
+        }
+    }
+
+    private void InitializeDefaultGradient()
+    {
+        ColorStops = new List<ColorStop>
+        {
+            new() { Position = 0.0, Color = "#0000ff" },
+            new() { Position = 0.25, Color = "#00ff00" },
+            new() { Position = 0.5, Color = "#ffff00" },
+            new() { Position = 0.75, Color = "#ffa500" },
+            new() { Position = 1.0, Color = "#ff0000" }
+        };
+    }
+
+    private void LoadCurrentValues()
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        if (VectorLayer.Paint.TryGetValue("heatmap-radius", out var radius))
+        {
+            _radius = Convert.ToDouble(radius);
+        }
+
+        if (VectorLayer.Paint.TryGetValue("heatmap-intensity", out var intensity))
+        {
+            _intensity = Convert.ToDouble(intensity);
+        }
+
+        if (VectorLayer.Paint.TryGetValue("heatmap-opacity", out var opacity))
+        {
+            _opacity = Convert.ToDouble(opacity);
+        }
+    }
+
+    private void ApplyGradientPreset(string preset)
+    {
+        ColorStops.Clear();
+
+        switch (preset)
+        {
+            case "hot":
+                ColorStops.AddRange(new[]
+                {
+                    new ColorStop { Position = 0.0, Color = "#0000ff" },
+                    new ColorStop { Position = 0.4, Color = "#00ff00" },
+                    new ColorStop { Position = 0.6, Color = "#ffff00" },
+                    new ColorStop { Position = 0.8, Color = "#ffa500" },
+                    new ColorStop { Position = 1.0, Color = "#ff0000" }
+                });
+                break;
+
+            case "cool":
+                ColorStops.AddRange(new[]
+                {
+                    new ColorStop { Position = 0.0, Color = "#00ff00" },
+                    new ColorStop { Position = 0.5, Color = "#00ffff" },
+                    new ColorStop { Position = 1.0, Color = "#0000ff" }
+                });
+                break;
+
+            case "rainbow":
+                ColorStops.AddRange(new[]
+                {
+                    new ColorStop { Position = 0.0, Color = "#ff0000" },
+                    new ColorStop { Position = 0.2, Color = "#ffa500" },
+                    new ColorStop { Position = 0.4, Color = "#ffff00" },
+                    new ColorStop { Position = 0.6, Color = "#00ff00" },
+                    new ColorStop { Position = 0.8, Color = "#0000ff" },
+                    new ColorStop { Position = 1.0, Color = "#ff00ff" }
+                });
+                break;
+
+            case "viridis":
+                ColorStops.AddRange(new[]
+                {
+                    new ColorStop { Position = 0.0, Color = "#440154" },
+                    new ColorStop { Position = 0.5, Color = "#31688e" },
+                    new ColorStop { Position = 1.0, Color = "#fde724" }
+                });
+                break;
+
+            case "plasma":
+                ColorStops.AddRange(new[]
+                {
+                    new ColorStop { Position = 0.0, Color = "#0d0887" },
+                    new ColorStop { Position = 0.5, Color = "#cc4778" },
+                    new ColorStop { Position = 1.0, Color = "#f0f921" }
+                });
+                break;
+
+            case "inferno":
+                ColorStops.AddRange(new[]
+                {
+                    new ColorStop { Position = 0.0, Color = "#000004" },
+                    new ColorStop { Position = 0.5, Color = "#bc3754" },
+                    new ColorStop { Position = 1.0, Color = "#fcffa4" }
+                });
+                break;
+
+            case "custom":
+                InitializeDefaultGradient();
+                return;
+        }
+
+        UpdateGradient();
+    }
+
+    private void AddColorStop()
+    {
+        ColorStops.Add(new ColorStop { Position = 0.5, Color = "#808080" });
+        ColorStops = ColorStops.OrderBy(s => s.Position).ToList();
+        UpdateGradient();
+    }
+
+    private void RemoveColorStop(ColorStop stop)
+    {
+        if (ColorStops.Count > 2) // Keep at least 2 stops
+        {
+            ColorStops.Remove(stop);
+            UpdateGradient();
+        }
+    }
+
+    private void OnColorStopChanged(ColorStop stop, ChangeEventArgs e)
+    {
+        stop.Color = e.Value?.ToString() ?? "#000000";
+        UpdateGradient();
+    }
+
+    private void UpdateGradient()
+    {
+        var colorExpression = new List<object> { "interpolate", new[] { "linear" }, new[] { "heatmap-density" } };
+
+        foreach (var stop in ColorStops.OrderBy(s => s.Position))
+        {
+            colorExpression.Add(stop.Position);
+            colorExpression.Add(stop.Color);
+        }
+
+        UpdatePaint("heatmap-color", colorExpression.ToArray());
+    }
+
+    private string GetGradientCss()
+    {
+        var stops = ColorStops.OrderBy(s => s.Position)
+            .Select(s => $"{s.Color} {s.Position * 100}%");
+        return string.Join(", ", stops);
+    }
+
+    private void UpdatePaint(string property, object value)
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        VectorLayer.Paint[property] = value;
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+}
+
+<style>
+    .gradient-preview {
+        height: 30px;
+        width: 100%;
+        border-radius: 4px;
+        border: 1px solid var(--mud-palette-divider);
+    }
+</style>

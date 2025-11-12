@@ -1,0 +1,338 @@
+@page "/examples/geopackage"
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Components.GeoPackage
+@using Honua.MapSDK.Models.GeoPackage
+
+@*
+    GeoPackage Example - Demonstrates GeoPackage import and display functionality
+
+    This example shows how to:
+    1. Upload and import GeoPackage files
+    2. Browse GeoPackage structure
+    3. Display GPKG layers on the map
+    4. Load GPKG from URL
+*@
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h3" Class="mb-2">GeoPackage Import & Display</MudText>
+    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+        Import and display GeoPackage (.gpkg) files on the map. GeoPackage is an OGC standard for storing
+        geospatial data in a SQLite database container.
+    </MudText>
+
+    <MudGrid>
+        @* Left Panel - Controls *@
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
+                    Import Options
+                </MudText>
+
+                <MudDivider Class="mb-3" />
+
+                @* Import from File *@
+                <MudText Typo="Typo.subtitle2" Class="mb-2">1. Import from File</MudText>
+                <GeoPackageImporter @ref="_importer"
+                                    SyncWith="gpkg-example-map"
+                                    ShowAsDialog="false"
+                                    OnImportComplete="@HandleImportComplete"
+                                    OnError="@HandleError" />
+
+                <MudDivider Class="my-4" />
+
+                @* Load from URL *@
+                <MudText Typo="Typo.subtitle2" Class="mb-2">2. Load from URL (Demo)</MudText>
+                <MudTextField @bind-Value="_gpkgUrl"
+                              Label="GeoPackage URL"
+                              Variant="Variant.Outlined"
+                              HelperText="Enter URL to a .gpkg file"
+                              Class="mb-2" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="@LoadFromUrl"
+                           Disabled="@string.IsNullOrWhiteSpace(_gpkgUrl)"
+                           FullWidth="true">
+                    Load from URL
+                </MudButton>
+
+                <MudDivider Class="my-4" />
+
+                @* Sample Data *@
+                <MudText Typo="Typo.subtitle2" Class="mb-2">3. Sample Data</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                    Load a sample GeoPackage to test the functionality
+                </MudText>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Info"
+                           StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="@LoadSampleData"
+                           FullWidth="true"
+                           Class="mb-2">
+                    Load Sample GPKG
+                </MudButton>
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    <MudText Typo="Typo.caption">
+                        Note: Sample data requires a public GPKG file URL or export from Honua.Server
+                    </MudText>
+                </MudAlert>
+            </MudPaper>
+
+            @* Features *@
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+                    Features
+                </MudText>
+                <MudList Dense="true">
+                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                        Client-side GPKG reading (sql.js)
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                        Multi-layer support
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                        Feature layer extraction
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                        GeoJSON conversion
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                        Spatial index queries (R-tree)
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                        Drag & drop file upload
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                        Layer browser UI
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check" IconColor="Color.Success">
+                        OGC GeoPackage 1.2+ compliant
+                    </MudListItem>
+                </MudList>
+            </MudPaper>
+        </MudItem>
+
+        @* Right Panel - Map and Browser *@
+        <MudItem xs="12" md="8">
+            @* Map *@
+            <MudPaper Elevation="2" Class="mb-4" Style="height: 500px;">
+                <HonuaMap Id="gpkg-example-map"
+                          Style="width: 100%; height: 100%;"
+                          Center="[0, 20]"
+                          Zoom="2"
+                          ShowZoomControl="true"
+                          ShowScaleControl="true">
+                    @* Layers loaded via GeoPackageImporter *@
+                </HonuaMap>
+            </MudPaper>
+
+            @* Browser *@
+            @if (_showBrowser && _browserData != null)
+            {
+                <MudPaper Elevation="2">
+                    <GeoPackageBrowser @ref="_browser"
+                                       SyncWith="gpkg-example-map"
+                                       GpkgData="@_browserData"
+                                       FileName="@_browserFileName"
+                                       OnLayerSelected="@HandleLayerSelected"
+                                       OnLayerAddedToMap="@HandleLayerAddedToMap"
+                                       OnError="@HandleError" />
+                </MudPaper>
+            }
+            else if (_showBrowser && !string.IsNullOrEmpty(_browserUrl))
+            {
+                <MudPaper Elevation="2">
+                    <GeoPackageBrowser @ref="_browser"
+                                       SyncWith="gpkg-example-map"
+                                       GpkgUrl="@_browserUrl"
+                                       OnLayerSelected="@HandleLayerSelected"
+                                       OnLayerAddedToMap="@HandleLayerAddedToMap"
+                                       OnError="@HandleError" />
+                </MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+
+    @* Notifications *@
+    @if (!string.IsNullOrEmpty(_successMessage))
+    {
+        <MudAlert Severity="Severity.Success"
+                  ShowCloseIcon="true"
+                  CloseIconClicked="@(() => _successMessage = null)"
+                  Class="mt-4">
+            @_successMessage
+        </MudAlert>
+    }
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error"
+                  ShowCloseIcon="true"
+                  CloseIconClicked="@(() => _errorMessage = null)"
+                  Class="mt-4">
+            @_errorMessage
+        </MudAlert>
+    }
+
+    @* Documentation *@
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h6" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+            About GeoPackage
+        </MudText>
+
+        <MudText Typo="Typo.body1" Class="mb-2">
+            <strong>GeoPackage</strong> is an open, standards-based, platform-independent, portable, self-describing,
+            compact format for transferring geospatial information. It is designed to be a lightweight container
+            for geospatial data.
+        </MudText>
+
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+            <strong>Key Features:</strong>
+        </MudText>
+        <MudList Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                SQLite database container
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                Support for vector features and tile matrix sets
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                OGC standard (OGC 12-128r18)
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                Cross-platform compatibility
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                Built-in spatial indexing (R-tree)
+            </MudListItem>
+        </MudList>
+
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-3 mb-2">
+            <strong>Use Cases:</strong>
+        </MudText>
+        <MudList Dense="true">
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                Mobile field data collection
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                Offline map data storage
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                Data exchange between GIS systems
+            </MudListItem>
+            <MudListItem Icon="@Icons.Material.Filled.Circle" IconSize="Size.Small">
+                Backup and archival of geospatial data
+            </MudListItem>
+        </MudList>
+
+        <MudDivider Class="my-3" />
+
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            <strong>Resources:</strong><br />
+            <MudLink Href="https://www.geopackage.org/" Target="_blank">OGC GeoPackage Official Site</MudLink><br />
+            <MudLink Href="https://www.ogc.org/standards/geopackage" Target="_blank">OGC GeoPackage Standard</MudLink><br />
+            <MudLink Href="https://github.com/sql-js/sql.js" Target="_blank">sql.js - SQLite in WebAssembly</MudLink>
+        </MudText>
+    </MudPaper>
+
+    @* Code Example *@
+    <MudPaper Elevation="2" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h6" Class="mb-3">
+            <MudIcon Icon="@Icons.Material.Filled.Code" Class="mr-2" />
+            Usage Example
+        </MudText>
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">Import from File:</MudText>
+        <MudPaper Outlined="true" Class="pa-3 mb-3" Style="background-color: #f5f5f5;">
+            <code style="font-family: 'Courier New', monospace; font-size: 0.875rem; white-space: pre-wrap;">
+&lt;GeoPackageImporter SyncWith="map1"
+                    ShowAsDialog="true"
+                    TriggerText="Import GeoPackage"
+                    OnImportComplete="@@HandleImport"
+                    OnError="@@HandleError" /&gt;
+            </code>
+        </MudPaper>
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">Display Layer from URL:</MudText>
+        <MudPaper Outlined="true" Class="pa-3 mb-3" Style="background-color: #f5f5f5;">
+            <code style="font-family: 'Courier New', monospace; font-size: 0.875rem; white-space: pre-wrap;">
+&lt;HonuaGeoPackageLayer GpkgUrl="data.gpkg"
+                      LayerName="cities"
+                      SyncWith="map1"
+                      MaxFeatures="10000"
+                      Visible="true" /&gt;
+            </code>
+        </MudPaper>
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">Browse GeoPackage Structure:</MudText>
+        <MudPaper Outlined="true" Class="pa-3" Style="background-color: #f5f5f5;">
+            <code style="font-family: 'Courier New', monospace; font-size: 0.875rem; white-space: pre-wrap;">
+&lt;GeoPackageBrowser GpkgUrl="data.gpkg"
+                   SyncWith="map1"
+                   ShowAddToMapButton="true"
+                   OnLayerSelected="@@HandleLayerSelect" /&gt;
+            </code>
+        </MudPaper>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private GeoPackageImporter? _importer;
+    private GeoPackageBrowser? _browser;
+
+    private string _gpkgUrl = string.Empty;
+    private byte[]? _browserData;
+    private string? _browserFileName;
+    private string? _browserUrl;
+    private bool _showBrowser = false;
+
+    private string? _successMessage;
+    private string? _errorMessage;
+
+    private void HandleImportComplete(GeoPackageInfo info)
+    {
+        _successMessage = $"Successfully imported {info.Layers.Count} layers from {info.FileName}";
+        _browserData = null; // Will be set by importer if needed
+        _browserFileName = info.FileName;
+        _showBrowser = true;
+        StateHasChanged();
+    }
+
+    private void HandleLayerSelected(GpkgLayer layer)
+    {
+        _successMessage = $"Selected layer: {layer.Identifier} ({layer.FeatureCount:N0} features)";
+        StateHasChanged();
+    }
+
+    private void HandleLayerAddedToMap(GpkgLayer layer)
+    {
+        _successMessage = $"Added layer '{layer.Identifier}' to map";
+        StateHasChanged();
+    }
+
+    private void HandleError(string error)
+    {
+        _errorMessage = error;
+        StateHasChanged();
+    }
+
+    private void LoadFromUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(_gpkgUrl))
+        {
+            _browserUrl = _gpkgUrl;
+            _browserData = null;
+            _showBrowser = true;
+            StateHasChanged();
+        }
+    }
+
+    private void LoadSampleData()
+    {
+        // Use Honua.Server export endpoint or a public GPKG URL
+        _gpkgUrl = "/api/collections/sample/items?f=geopackage";
+        LoadFromUrl();
+    }
+}

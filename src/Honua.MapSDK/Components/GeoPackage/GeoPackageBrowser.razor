@@ -1,0 +1,550 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Models.GeoPackage
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ComponentBus Bus
+
+@*
+    GeoPackageBrowser - Browse and explore GeoPackage structure
+
+    Usage:
+    <GeoPackageBrowser GpkgUrl="sample.gpkg"
+                       OnLayerSelected="HandleLayerSelect" />
+*@
+
+<div class="honua-gpkg-browser @CssClass" style="@Style">
+    <MudPaper Elevation="@Elevation" Class="pa-4">
+        @if (_gpkgInfo == null && !_isLoading)
+        {
+            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                No GeoPackage loaded
+            </MudText>
+        }
+        else if (_isLoading)
+        {
+            <div class="d-flex flex-column align-center py-8">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                <MudText Typo="Typo.body2" Class="mt-4">Loading GeoPackage...</MudText>
+            </div>
+        }
+        else if (_gpkgInfo != null)
+        {
+            <div class="gpkg-browser">
+                @* Header *@
+                <div class="mb-4">
+                    <MudText Typo="Typo.h5">
+                        <MudIcon Icon="@Icons.Material.Filled.Layers" Class="mr-2" />
+                        @_gpkgInfo.FileName
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        GeoPackage Version: @_gpkgInfo.Version
+                    </MudText>
+                </div>
+
+                @* Statistics *@
+                <MudGrid Class="mb-4">
+                    <MudItem xs="4">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.h6" Color="Color.Primary">@_gpkgInfo.Layers.Count</MudText>
+                                <MudText Typo="Typo.body2">Total Layers</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.h6" Color="Color.Success">@_gpkgInfo.TotalFeatures.ToString("N0")</MudText>
+                                <MudText Typo="Typo.body2">Total Features</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudCard>
+                            <MudCardContent>
+                                <MudText Typo="Typo.h6" Color="Color.Info">@_gpkgInfo.TotalTileLayers</MudText>
+                                <MudText Typo="Typo.body2">Tile Layers</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+
+                @* Tabs *@
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+                    @* Feature Layers Tab *@
+                    <MudTabPanel Text="Feature Layers" Icon="@Icons.Material.Filled.VectorSquare">
+                        @if (_gpkgInfo.Layers.Any(l => l.DataType == "features"))
+                        {
+                            <MudList Clickable="true">
+                                @foreach (var layer in _gpkgInfo.Layers.Where(l => l.DataType == "features"))
+                                {
+                                    <MudListItem OnClick="@(() => OnLayerClicked(layer))">
+                                        <div class="d-flex align-center">
+                                            <MudIcon Icon="@GetGeometryIcon(layer.GeometryType)" Color="Color.Primary" Class="mr-3" />
+                                            <div class="flex-grow-1">
+                                                <MudText Typo="Typo.subtitle1">
+                                                    <strong>@layer.Identifier</strong>
+                                                </MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                    @layer.GeometryType | @layer.FeatureCount.ToString("N0") features | SRID @layer.SrsId
+                                                </MudText>
+                                                @if (!string.IsNullOrEmpty(layer.Description))
+                                                {
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                        @layer.Description
+                                                    </MudText>
+                                                }
+                                            </div>
+                                            <MudIconButton Icon="@Icons.Material.Filled.ExpandMore"
+                                                           Size="Size.Small"
+                                                           OnClick="@(() => ToggleLayerDetails(layer))" />
+                                        </div>
+                                    </MudListItem>
+
+                                    @if (_expandedLayers.Contains(layer))
+                                    {
+                                        <MudListItem>
+                                            <MudCard Outlined="true" Class="ml-8">
+                                                <MudCardContent>
+                                                    <MudText Typo="Typo.subtitle2" Class="mb-2">Layer Details</MudText>
+
+                                                    <MudSimpleTable Dense="true" Hover="true" Style="font-size: 0.875rem;">
+                                                        <tbody>
+                                                            <tr>
+                                                                <td><strong>Table Name:</strong></td>
+                                                                <td>@layer.TableName</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Geometry Column:</strong></td>
+                                                                <td>@layer.GeometryColumn</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Geometry Type:</strong></td>
+                                                                <td>@layer.GeometryType</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>SRID:</strong></td>
+                                                                <td>@layer.SrsId</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Has Z:</strong></td>
+                                                                <td>@layer.HasZ</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td><strong>Has M:</strong></td>
+                                                                <td>@layer.HasM</td>
+                                                            </tr>
+                                                            @if (layer.BoundingBox != null)
+                                                            {
+                                                                <tr>
+                                                                    <td><strong>Bounding Box:</strong></td>
+                                                                    <td>[@string.Join(", ", layer.BoundingBox.Select(v => v.ToString("F6")))]</td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </MudSimpleTable>
+
+                                                    @if (layer.Fields.Count > 0)
+                                                    {
+                                                        <MudText Typo="Typo.subtitle2" Class="mt-3 mb-2">Fields (@layer.Fields.Count)</MudText>
+                                                        <MudSimpleTable Dense="true" Hover="true" Style="font-size: 0.875rem;">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Name</th>
+                                                                    <th>Type</th>
+                                                                    <th>Nullable</th>
+                                                                    <th>PK</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var field in layer.Fields.Take(ShowAllFields ? layer.Fields.Count : 5))
+                                                                {
+                                                                    <tr>
+                                                                        <td>@field.Name</td>
+                                                                        <td>@field.Type</td>
+                                                                        <td>@(field.Nullable ? "Yes" : "No")</td>
+                                                                        <td>@(field.IsPrimaryKey ? "Yes" : "No")</td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </MudSimpleTable>
+                                                        @if (!ShowAllFields && layer.Fields.Count > 5)
+                                                        {
+                                                            <MudButton Size="Size.Small" OnClick="@(() => ShowAllFields = true)" Class="mt-2">
+                                                                Show all @layer.Fields.Count fields
+                                                            </MudButton>
+                                                        }
+                                                    }
+
+                                                    @if (ShowAddToMapButton)
+                                                    {
+                                                        <MudButton Variant="Variant.Filled"
+                                                                   Color="Color.Primary"
+                                                                   StartIcon="@Icons.Material.Filled.Add"
+                                                                   Class="mt-3"
+                                                                   OnClick="@(() => AddLayerToMap(layer))">
+                                                            Add to Map
+                                                        </MudButton>
+                                                    }
+                                                </MudCardContent>
+                                            </MudCard>
+                                        </MudListItem>
+                                    }
+                                }
+                            </MudList>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">No feature layers found</MudText>
+                        }
+                    </MudTabPanel>
+
+                    @* Tile Layers Tab *@
+                    <MudTabPanel Text="Tile Layers" Icon="@Icons.Material.Filled.GridOn">
+                        @if (_gpkgInfo.Layers.Any(l => l.DataType == "tiles"))
+                        {
+                            <MudList>
+                                @foreach (var layer in _gpkgInfo.Layers.Where(l => l.DataType == "tiles"))
+                                {
+                                    <MudListItem>
+                                        <div class="d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.GridOn" Color="Color.Secondary" Class="mr-3" />
+                                            <div class="flex-grow-1">
+                                                <MudText Typo="Typo.subtitle1">
+                                                    <strong>@layer.Identifier</strong>
+                                                </MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                    Tile Matrix Set: @(layer.TileMatrixSet ?? "N/A")
+                                                </MudText>
+                                            </div>
+                                        </div>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">No tile layers found</MudText>
+                        }
+                    </MudTabPanel>
+
+                    @* Spatial References Tab *@
+                    <MudTabPanel Text="Spatial References" Icon="@Icons.Material.Filled.Public">
+                        @if (_gpkgInfo.SpatialReferences.Count > 0)
+                        {
+                            <MudSimpleTable Hover="true">
+                                <thead>
+                                    <tr>
+                                        <th>SRS ID</th>
+                                        <th>Name</th>
+                                        <th>Organization</th>
+                                        <th>Definition</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var srs in _gpkgInfo.SpatialReferences)
+                                    {
+                                        <tr>
+                                            <td>@srs.SrsId</td>
+                                            <td>@srs.SrsName</td>
+                                            <td>@srs.Organization:@srs.OrganizationCoordsysId</td>
+                                            <td>
+                                                <MudTooltip Text="@srs.Definition">
+                                                    <MudText Typo="Typo.body2" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                        @srs.Definition
+                                                    </MudText>
+                                                </MudTooltip>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">No spatial references defined</MudText>
+                        }
+                    </MudTabPanel>
+                </MudTabs>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-4" ShowCloseIcon="true" CloseIconClicked="@(() => _errorMessage = null)">
+                @_errorMessage
+            </MudAlert>
+        }
+    </MudPaper>
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"gpkg-browser-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// URL to the GeoPackage file
+    /// </summary>
+    [Parameter]
+    public string? GpkgUrl { get; set; }
+
+    /// <summary>
+    /// GeoPackage file as byte array
+    /// </summary>
+    [Parameter]
+    public byte[]? GpkgData { get; set; }
+
+    /// <summary>
+    /// File name (used when GpkgData is provided)
+    /// </summary>
+    [Parameter]
+    public string FileName { get; set; } = "data.gpkg";
+
+    /// <summary>
+    /// Show "Add to Map" button for layers
+    /// </summary>
+    [Parameter]
+    public bool ShowAddToMapButton { get; set; } = true;
+
+    /// <summary>
+    /// Paper elevation
+    /// </summary>
+    [Parameter]
+    public int Elevation { get; set; } = 1;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Callback when layer is selected
+    /// </summary>
+    [Parameter]
+    public EventCallback<GpkgLayer> OnLayerSelected { get; set; }
+
+    /// <summary>
+    /// Callback when layer is added to map
+    /// </summary>
+    [Parameter]
+    public EventCallback<GpkgLayer> OnLayerAddedToMap { get; set; }
+
+    /// <summary>
+    /// Callback when error occurs
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnError { get; set; }
+
+    private int? _readerId;
+    private GeoPackageInfo? _gpkgInfo;
+    private bool _isLoading = false;
+    private string? _errorMessage;
+    private HashSet<GpkgLayer> _expandedLayers = new();
+    private bool ShowAllFields { get; set; } = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && (GpkgUrl != null || GpkgData != null))
+        {
+            await LoadGeoPackageAsync();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload if URL or data changes
+        if (_gpkgInfo != null && (GpkgUrl != null || GpkgData != null))
+        {
+            await LoadGeoPackageAsync();
+        }
+    }
+
+    private async Task LoadGeoPackageAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // Create reader
+            _readerId = await JS.InvokeAsync<int>("HonuaGeoPackage.DotNetHelper.createReader");
+
+            // Load GPKG
+            JsonElement result;
+            if (GpkgUrl != null)
+            {
+                result = await JS.InvokeAsync<JsonElement>("HonuaGeoPackage.DotNetHelper.loadFromUrl", _readerId, GpkgUrl);
+            }
+            else if (GpkgData != null)
+            {
+                result = await JS.InvokeAsync<JsonElement>("HonuaGeoPackage.DotNetHelper.loadFromBytes", _readerId, GpkgData, FileName);
+            }
+            else
+            {
+                _errorMessage = "Either GpkgUrl or GpkgData must be provided";
+                return;
+            }
+
+            if (result.TryGetProperty("success", out var success) && !success.GetBoolean())
+            {
+                var error = result.GetProperty("error").GetString();
+                _errorMessage = $"Failed to load GeoPackage: {error}";
+                await OnError.InvokeAsync(_errorMessage);
+                return;
+            }
+
+            // Get GPKG info
+            var infoJson = await JS.InvokeAsync<JsonElement>("HonuaGeoPackage.DotNetHelper.getInfo", _readerId);
+            _gpkgInfo = JsonSerializer.Deserialize<GeoPackageInfo>(infoJson.GetRawText());
+
+            if (_gpkgInfo == null)
+            {
+                _errorMessage = "Failed to parse GeoPackage info";
+                await OnError.InvokeAsync(_errorMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error loading GeoPackage: {ex.Message}";
+            await OnError.InvokeAsync(_errorMessage);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnLayerClicked(GpkgLayer layer)
+    {
+        _ = OnLayerSelected.InvokeAsync(layer);
+    }
+
+    private void ToggleLayerDetails(GpkgLayer layer)
+    {
+        if (_expandedLayers.Contains(layer))
+        {
+            _expandedLayers.Remove(layer);
+        }
+        else
+        {
+            _expandedLayers.Add(layer);
+        }
+    }
+
+    private async Task AddLayerToMap(GpkgLayer layer)
+    {
+        if (_readerId == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Query features
+            var request = new GpkgFeatureRequest
+            {
+                LayerName = layer.TableName,
+                MaxFeatures = 10000
+            };
+
+            var response = await JS.InvokeAsync<GpkgFeatureResponse>(
+                "HonuaGeoPackage.DotNetHelper.queryFeatures",
+                _readerId,
+                request
+            );
+
+            if (!string.IsNullOrEmpty(response.Error))
+            {
+                _errorMessage = $"Failed to query features: {response.Error}";
+                await OnError.InvokeAsync(_errorMessage);
+                return;
+            }
+
+            // Add to map
+            var layerId = $"gpkg-{Id}-{layer.TableName}";
+            await Bus.PublishAsync(new AddGeoJsonLayerMessage
+            {
+                MapId = SyncWith ?? "*",
+                LayerId = layerId,
+                LayerName = layer.Identifier,
+                GeoJson = response.GeoJson,
+                Visible = true,
+                Opacity = 1.0
+            }, Id);
+
+            // Zoom to layer
+            if (response.BoundingBox != null && response.BoundingBox.Length == 4)
+            {
+                await Bus.PublishAsync(new FitBoundsRequestMessage
+                {
+                    MapId = SyncWith ?? "*",
+                    Bounds = response.BoundingBox,
+                    Padding = 50
+                }, Id);
+            }
+
+            await OnLayerAddedToMap.InvokeAsync(layer);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error adding layer to map: {ex.Message}";
+            await OnError.InvokeAsync(_errorMessage);
+        }
+    }
+
+    private string GetGeometryIcon(string? geometryType)
+    {
+        return geometryType?.ToUpperInvariant() switch
+        {
+            "POINT" or "MULTIPOINT" => Icons.Material.Filled.Place,
+            "LINESTRING" or "MULTILINESTRING" => Icons.Material.Filled.Timeline,
+            "POLYGON" or "MULTIPOLYGON" => Icons.Material.Filled.Crop,
+            _ => Icons.Material.Filled.VectorSquare
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_readerId.HasValue)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("HonuaGeoPackage.DotNetHelper.closeReader", _readerId.Value);
+            }
+            catch
+            {
+                // Ignore errors during disposal
+            }
+        }
+    }
+
+    private class AddGeoJsonLayerMessage
+    {
+        public string MapId { get; set; } = string.Empty;
+        public string LayerId { get; set; } = string.Empty;
+        public string LayerName { get; set; } = string.Empty;
+        public string GeoJson { get; set; } = string.Empty;
+        public bool Visible { get; set; } = true;
+        public double Opacity { get; set; } = 1.0;
+    }
+}

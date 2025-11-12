@@ -1,0 +1,182 @@
+@*
+Copyright (c) 2025 HonuaIO
+Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+*@
+
+<div class="comment-item @($"status-{Comment.Status}") @($"priority-{Comment.Priority}")"
+     @onclick="() => OnSelect.InvokeAsync(Comment)">
+
+    <div class="comment-header">
+        <div class="comment-author">
+            <strong>@Comment.Author</strong>
+            @if (Comment.IsGuest)
+            {
+                <span class="badge badge-guest">Guest</span>
+            }
+            @if (Comment.IsPinned)
+            {
+                <i class="icon-pin" title="Pinned"></i>
+            }
+        </div>
+        <div class="comment-meta">
+            <span class="comment-time" title="@Comment.CreatedAt">
+                @FormatRelativeTime(Comment.CreatedAt)
+            </span>
+            @if (Comment.UpdatedAt.HasValue)
+            {
+                <span class="comment-edited">(edited)</span>
+            }
+        </div>
+    </div>
+
+    <div class="comment-body">
+        <p>@Comment.CommentText</p>
+
+        @if (!string.IsNullOrEmpty(Comment.Category))
+        {
+            <span class="badge badge-category">@Comment.Category</span>
+        }
+
+        <span class="badge badge-priority badge-@Comment.Priority">
+            @Comment.Priority
+        </span>
+
+        @if (Comment.Status == "resolved")
+        {
+            <div class="comment-resolved">
+                <i class="icon-check"></i>
+                Resolved by @Comment.ResolvedBy
+                @if (Comment.ResolvedAt.HasValue)
+                {
+                    <span>@FormatRelativeTime(Comment.ResolvedAt.Value)</span>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="comment-footer">
+        <div class="comment-stats">
+            @if (Comment.ReplyCount > 0)
+            {
+                <span class="stat-item">
+                    <i class="icon-comment"></i> @Comment.ReplyCount
+                </span>
+            }
+            @if (Comment.LikeCount > 0)
+            {
+                <span class="stat-item">
+                    <i class="icon-heart"></i> @Comment.LikeCount
+                </span>
+            }
+            @if (Comment.Longitude.HasValue && Comment.Latitude.HasValue)
+            {
+                <span class="stat-item" title="Has location">
+                    <i class="icon-map-pin"></i>
+                </span>
+            }
+        </div>
+
+        <div class="comment-actions">
+            <button class="btn-action" @onclick="() => OnReply.InvokeAsync(Comment)"
+                    @onclick:stopPropagation="true">
+                <i class="icon-reply"></i> Reply
+            </button>
+
+            @if (Comment.Status == "open")
+            {
+                <button class="btn-action" @onclick="() => OnResolve.InvokeAsync(Comment)"
+                        @onclick:stopPropagation="true">
+                    <i class="icon-check"></i> Resolve
+                </button>
+            }
+
+            <button class="btn-action" @onclick="() => OnReaction.InvokeAsync((Comment, \"like\"))"
+                    @onclick:stopPropagation="true">
+                <i class="icon-heart"></i> Like
+            </button>
+
+            @if (CanDelete)
+            {
+                <button class="btn-action btn-danger" @onclick="() => HandleDeleteClick()"
+                        @onclick:stopPropagation="true">
+                    <i class="icon-trash"></i> Delete
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (ShowReplies && Comment.ReplyCount > 0)
+    {
+        <div class="comment-replies">
+            <div class="replies-indicator">
+                @Comment.ReplyCount @(Comment.ReplyCount == 1 ? "reply" : "replies")
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public MapComment Comment { get; set; } = null!;
+    [Parameter] public EventCallback<MapComment> OnReply { get; set; }
+    [Parameter] public EventCallback<MapComment> OnResolve { get; set; }
+    [Parameter] public EventCallback<MapComment> OnDelete { get; set; }
+    [Parameter] public EventCallback<(MapComment, string)> OnReaction { get; set; }
+    [Parameter] public EventCallback<MapComment> OnSelect { get; set; }
+    [Parameter] public bool ShowReplies { get; set; } = true;
+    [Parameter] public bool CanDelete { get; set; } = true;
+
+    private async Task HandleDeleteClick()
+    {
+        // Could add confirmation dialog here
+        await OnDelete.InvokeAsync(Comment);
+    }
+
+    private string FormatRelativeTime(DateTime dateTime)
+    {
+        var diff = DateTime.UtcNow - dateTime;
+
+        if (diff.TotalMinutes < 1)
+            return "just now";
+        if (diff.TotalMinutes < 60)
+            return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24)
+            return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7)
+            return $"{(int)diff.TotalDays}d ago";
+        if (diff.TotalDays < 30)
+            return $"{(int)(diff.TotalDays / 7)}w ago";
+
+        return dateTime.ToString("MMM d, yyyy");
+    }
+
+    public class MapComment
+    {
+        public string Id { get; set; } = string.Empty;
+        public string MapId { get; set; } = string.Empty;
+        public string? LayerId { get; set; }
+        public string? FeatureId { get; set; }
+        public string Author { get; set; } = string.Empty;
+        public string? AuthorUserId { get; set; }
+        public bool IsGuest { get; set; }
+        public string CommentText { get; set; } = string.Empty;
+        public string GeometryType { get; set; } = string.Empty;
+        public string? Geometry { get; set; }
+        public double? Longitude { get; set; }
+        public double? Latitude { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        public string? ParentId { get; set; }
+        public int ThreadDepth { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? ResolvedBy { get; set; }
+        public DateTime? ResolvedAt { get; set; }
+        public string? Category { get; set; }
+        public string Priority { get; set; } = string.Empty;
+        public string? Color { get; set; }
+        public bool IsApproved { get; set; }
+        public bool IsPinned { get; set; }
+        public int ReplyCount { get; set; }
+        public int LikeCount { get; set; }
+        public string? Attachments { get; set; }
+    }
+}

@@ -1,0 +1,731 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@using System.Text.Json
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-cluster @CssClass @(_isDarkMode ? "dark-mode" : "")" @ref="_containerRef" id="@Id">
+    @if (ShowControls)
+    {
+        <div class="honua-cluster-controls">
+            <div class="honua-cluster-header">
+                <h3>Cluster Controls</h3>
+                <button class="honua-cluster-close" @onclick="ToggleControls" title="Hide controls">×</button>
+            </div>
+
+            <div class="honua-cluster-control-group">
+                <label for="@($"{Id}-radius")">
+                    Cluster Radius: <span class="honua-cluster-value">@_currentRadius px</span>
+                </label>
+                <input
+                    id="@($"{Id}-radius")"
+                    type="range"
+                    min="20"
+                    max="150"
+                    step="5"
+                    value="@_currentRadius"
+                    @oninput="OnRadiusChanged"
+                    class="honua-cluster-slider" />
+            </div>
+
+            <div class="honua-cluster-control-group">
+                <label for="@($"{Id}-maxzoom")">
+                    Cluster Max Zoom: <span class="honua-cluster-value">@_currentClusterMaxZoom</span>
+                </label>
+                <input
+                    id="@($"{Id}-maxzoom")"
+                    type="range"
+                    min="0"
+                    max="22"
+                    step="1"
+                    value="@_currentClusterMaxZoom"
+                    @oninput="OnClusterMaxZoomChanged"
+                    class="honua-cluster-slider" />
+            </div>
+
+            <div class="honua-cluster-control-group">
+                <label>
+                    <input type="checkbox"
+                           checked="@_currentEnableSpiderfy"
+                           @onchange="OnSpiderfyToggled" />
+                    Enable Spider-fy
+                </label>
+            </div>
+
+            <div class="honua-cluster-control-group">
+                <label>
+                    <input type="checkbox"
+                           checked="@_currentShowExtent"
+                           @onchange="OnShowExtentToggled" />
+                    Show Cluster Extent
+                </label>
+            </div>
+
+            <div class="honua-cluster-control-group">
+                <label>
+                    <input type="checkbox"
+                           checked="@_currentZoomOnClick"
+                           @onchange="OnZoomOnClickToggled" />
+                    Zoom on Click
+                </label>
+            </div>
+
+            <div class="honua-cluster-control-group">
+                <label>
+                    <input type="checkbox"
+                           checked="@_currentAnimateTransitions"
+                           @onchange="OnAnimateTransitionsToggled" />
+                    Animate Transitions
+                </label>
+            </div>
+
+            @if (ShowStatistics && _statistics != null)
+            {
+                <div class="honua-cluster-statistics">
+                    <h4>Statistics</h4>
+                    <div class="honua-cluster-stat">
+                        <span class="label">Total Points:</span>
+                        <span class="value">@_statistics.TotalPoints.ToString("N0")</span>
+                    </div>
+                    <div class="honua-cluster-stat">
+                        <span class="label">Clusters:</span>
+                        <span class="value">@_statistics.ClusterCount.ToString("N0")</span>
+                    </div>
+                    <div class="honua-cluster-stat">
+                        <span class="label">Unclustered:</span>
+                        <span class="value">@_statistics.UnclusteredCount.ToString("N0")</span>
+                    </div>
+                    <div class="honua-cluster-stat">
+                        <span class="label">Max Cluster Size:</span>
+                        <span class="value">@_statistics.MaxClusterSize.ToString("N0")</span>
+                    </div>
+                    <div class="honua-cluster-stat">
+                        <span class="label">Avg Cluster Size:</span>
+                        <span class="value">@_statistics.AverageClusterSize.ToString("F1")</span>
+                    </div>
+                    <div class="honua-cluster-stat">
+                        <span class="label">Current Zoom:</span>
+                        <span class="value">@_statistics.ZoomLevel.ToString("F2")</span>
+                    </div>
+                </div>
+            }
+
+            <div class="honua-cluster-actions">
+                <button class="honua-cluster-button" @onclick="ToggleVisibility">
+                    @(_isVisible ? "Hide" : "Show") Clusters
+                </button>
+                <button class="honua-cluster-button" @onclick="RefreshClusters">
+                    Refresh
+                </button>
+                @if (AllowFitBounds && _statistics?.Bounds != null)
+                {
+                    <button class="honua-cluster-button" @onclick="FitToBounds">
+                        Fit to Bounds
+                    </button>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <button class="honua-cluster-toggle" @onclick="ToggleControls" title="Show cluster controls">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <circle cx="6" cy="6" r="2"></circle>
+                <circle cx="18" cy="6" r="2"></circle>
+                <circle cx="6" cy="18" r="2"></circle>
+                <circle cx="18" cy="18" r="2"></circle>
+            </svg>
+        </button>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for this cluster component
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"cluster-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to sync with (required)
+    /// </summary>
+    [Parameter]
+    public required string SyncWith { get; set; }
+
+    /// <summary>
+    /// Data source: layer ID, GeoJSON URL, or "data" for inline data
+    /// </summary>
+    [Parameter]
+    public string? DataSource { get; set; }
+
+    /// <summary>
+    /// GeoJSON data (if not using a layer source)
+    /// </summary>
+    [Parameter]
+    public object? Data { get; set; }
+
+    /// <summary>
+    /// Cluster configuration
+    /// </summary>
+    [Parameter]
+    public ClusterConfiguration Configuration { get; set; } = new();
+
+    /// <summary>
+    /// Show interactive controls
+    /// </summary>
+    [Parameter]
+    public bool ShowControls { get; set; } = true;
+
+    /// <summary>
+    /// Show statistics panel
+    /// </summary>
+    [Parameter]
+    public bool ShowStatistics { get; set; } = true;
+
+    /// <summary>
+    /// Allow fit to bounds button
+    /// </summary>
+    [Parameter]
+    public bool AllowFitBounds { get; set; } = true;
+
+    /// <summary>
+    /// Auto-sync with map extent changes
+    /// </summary>
+    [Parameter]
+    public bool AutoSync { get; set; } = true;
+
+    /// <summary>
+    /// Dark mode enabled
+    /// </summary>
+    [Parameter]
+    public bool DarkMode { get; set; } = false;
+
+    /// <summary>
+    /// Additional CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Callback when cluster is clicked
+    /// </summary>
+    [Parameter]
+    public EventCallback<ClusterClickedEventArgs> OnClusterClicked { get; set; }
+
+    /// <summary>
+    /// Callback when clusters are updated
+    /// </summary>
+    [Parameter]
+    public EventCallback<ClusterUpdatedEventArgs> OnClustersUpdated { get; set; }
+
+    private ElementReference _containerRef;
+    private IJSObjectReference? _clusterModule;
+    private IJSObjectReference? _clusterInstance;
+    private DotNetObjectReference<HonuaCluster>? _dotNetRef;
+    private bool _isInitialized = false;
+    private bool _isVisible = true;
+    private bool _isDarkMode = false;
+
+    // Current values (for two-way binding)
+    private int _currentRadius;
+    private int _currentClusterMaxZoom;
+    private bool _currentEnableSpiderfy;
+    private bool _currentShowExtent;
+    private bool _currentZoomOnClick;
+    private bool _currentAnimateTransitions;
+
+    // Data storage
+    private string? _sourceId;
+    private string? _layerId;
+    private string? _unclusteredLayerId;
+    private ClusterStatistics? _statistics;
+
+    protected override void OnInitialized()
+    {
+        _currentRadius = Configuration.ClusterRadius;
+        _currentClusterMaxZoom = Configuration.ClusterMaxZoom;
+        _currentEnableSpiderfy = Configuration.EnableSpiderfy;
+        _currentShowExtent = Configuration.ShowClusterExtent;
+        _currentZoomOnClick = Configuration.ZoomOnClick;
+        _currentAnimateTransitions = Configuration.AnimateTransitions;
+        _isDarkMode = DarkMode;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeCluster();
+            SetupSubscriptions();
+        }
+    }
+
+    private async Task InitializeCluster()
+    {
+        try
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            // Load cluster module
+            _clusterModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-cluster.js"
+            );
+
+            // Get the map instance
+            var mapModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./_content/Honua.MapSDK/js/honua-map.js"
+            );
+
+            var mapInstance = await mapModule.InvokeAsync<IJSObjectReference>("getMapInstance", SyncWith);
+
+            // Initialize cluster with map instance
+            await _clusterModule.InvokeVoidAsync("initializeCluster", SyncWith, mapInstance);
+
+            // Prepare data source
+            _sourceId = DataSource ?? $"cluster-source-{Id}";
+            _layerId = Configuration.LayerId ?? $"cluster-layer-{Id}";
+            _unclusteredLayerId = Configuration.UnclusteredLayerId ?? $"unclustered-layer-{Id}";
+
+            // Create GeoJSON source if needed
+            if (Data != null)
+            {
+                await _clusterModule.InvokeVoidAsync("updateClusterData", SyncWith, _sourceId, Data);
+            }
+            else if (!string.IsNullOrEmpty(DataSource) && DataSource != "data")
+            {
+                // Request data from layer or other source
+                await RequestDataFromSource();
+            }
+
+            // Create cluster layers
+            var options = new
+            {
+                sourceId = _sourceId,
+                layerId = _layerId,
+                unclusteredLayerId = _unclusteredLayerId,
+                clusterRadius = _currentRadius,
+                minZoom = Configuration.MinZoom,
+                maxZoom = Configuration.MaxZoom,
+                clusterMaxZoom = _currentClusterMaxZoom,
+                clusterProperties = Configuration.ClusterProperties,
+                enableSpiderfy = _currentEnableSpiderfy,
+                showClusterExtent = _currentShowExtent,
+                animateTransitions = _currentAnimateTransitions,
+                zoomOnClick = _currentZoomOnClick,
+                style = new
+                {
+                    colorScale = Configuration.Style.ColorScale,
+                    sizeScale = Configuration.Style.SizeScale,
+                    showCountLabel = Configuration.Style.ShowCountLabel,
+                    labelFontSize = Configuration.Style.LabelFontSize,
+                    labelColor = Configuration.Style.LabelColor,
+                    strokeColor = Configuration.Style.StrokeColor,
+                    strokeWidth = Configuration.Style.StrokeWidth,
+                    opacity = Configuration.Style.Opacity,
+                    unclusteredColor = Configuration.Style.UnclusteredColor,
+                    unclusteredRadius = Configuration.Style.UnclusteredRadius,
+                    unclusteredStrokeColor = Configuration.Style.UnclusteredStrokeColor,
+                    unclusteredStrokeWidth = Configuration.Style.UnclusteredStrokeWidth
+                }
+            };
+
+            _clusterInstance = await _clusterModule.InvokeAsync<IJSObjectReference>(
+                "createCluster",
+                SyncWith,
+                options,
+                _dotNetRef
+            );
+
+            _isInitialized = true;
+
+            // Calculate initial statistics
+            await UpdateStatistics();
+
+            // Publish cluster created message
+            await Bus.PublishAsync(new LayerAddedMessage
+            {
+                LayerId = _layerId,
+                LayerName = $"Cluster-{Id}"
+            }, Id);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error initializing cluster: {ex.Message}");
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map extent changes
+        if (AutoSync)
+        {
+            Bus.Subscribe<MapExtentChangedMessage>(async args =>
+            {
+                if (args.Message.MapId == SyncWith)
+                {
+                    await UpdateStatistics();
+                }
+            });
+        }
+
+        // Listen for data updates
+        Bus.Subscribe<DataLoadedMessage>(async args =>
+        {
+            if (args.Message.ComponentId == DataSource)
+            {
+                await RequestDataFromSource();
+            }
+        });
+
+        // Listen for filter changes
+        Bus.Subscribe<FilterAppliedMessage>(async args =>
+        {
+            // Could filter cluster data based on filter
+            await UpdateStatistics();
+        });
+    }
+
+    private async Task RequestDataFromSource()
+    {
+        if (string.IsNullOrEmpty(DataSource)) return;
+
+        try
+        {
+            await Bus.PublishAsync(new DataRequestMessage
+            {
+                ComponentId = Id,
+                MapId = SyncWith
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error requesting data: {ex.Message}");
+        }
+    }
+
+    private async Task OnRadiusChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _currentRadius = value;
+            await UpdateClusterProperty("radius", value);
+        }
+    }
+
+    private async Task OnClusterMaxZoomChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+        {
+            _currentClusterMaxZoom = value;
+            await UpdateClusterProperty("clusterMaxZoom", value);
+        }
+    }
+
+    private async Task OnSpiderfyToggled(ChangeEventArgs e)
+    {
+        _currentEnableSpiderfy = e.Value is bool b && b;
+        await UpdateClusterProperty("enableSpiderfy", _currentEnableSpiderfy);
+    }
+
+    private async Task OnShowExtentToggled(ChangeEventArgs e)
+    {
+        _currentShowExtent = e.Value is bool b && b;
+        await UpdateClusterProperty("showClusterExtent", _currentShowExtent);
+    }
+
+    private async Task OnZoomOnClickToggled(ChangeEventArgs e)
+    {
+        _currentZoomOnClick = e.Value is bool b && b;
+        await UpdateClusterProperty("zoomOnClick", _currentZoomOnClick);
+    }
+
+    private async Task OnAnimateTransitionsToggled(ChangeEventArgs e)
+    {
+        _currentAnimateTransitions = e.Value is bool b && b;
+        await UpdateClusterProperty("animateTransitions", _currentAnimateTransitions);
+    }
+
+    private async Task UpdateClusterProperty(string property, object value)
+    {
+        if (!_isInitialized || _clusterInstance == null) return;
+
+        try
+        {
+            await _clusterInstance.InvokeVoidAsync("updateOption", property, value);
+            await NotifyClustersUpdated();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating cluster {property}: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateStatistics()
+    {
+        if (!_isInitialized || _clusterInstance == null) return;
+
+        try
+        {
+            var stats = await _clusterInstance.InvokeAsync<JsonElement>("getStatistics");
+
+            _statistics = new ClusterStatistics
+            {
+                TotalPoints = stats.GetProperty("totalPoints").GetInt32(),
+                ClusterCount = stats.GetProperty("clusterCount").GetInt32(),
+                UnclusteredCount = stats.GetProperty("unclusteredCount").GetInt32(),
+                ZoomLevel = stats.GetProperty("zoomLevel").GetDouble(),
+                MaxClusterSize = stats.GetProperty("maxClusterSize").GetInt32(),
+                AverageClusterSize = stats.GetProperty("averageClusterSize").GetDouble()
+            };
+
+            if (stats.TryGetProperty("bounds", out var bounds) && bounds.ValueKind == JsonValueKind.Array)
+            {
+                _statistics.Bounds = JsonSerializer.Deserialize<double[]>(bounds.GetRawText());
+            }
+
+            // Publish statistics update message
+            await Bus.PublishAsync(new ClusterStatisticsUpdatedMessage
+            {
+                ComponentId = Id,
+                TotalPoints = _statistics.TotalPoints,
+                ClusterCount = _statistics.ClusterCount,
+                UnclusteredCount = _statistics.UnclusteredCount,
+                ZoomLevel = _statistics.ZoomLevel,
+                MaxClusterSize = _statistics.MaxClusterSize,
+                AverageClusterSize = _statistics.AverageClusterSize
+            }, Id);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating statistics: {ex.Message}");
+        }
+    }
+
+    private async Task NotifyClustersUpdated()
+    {
+        Configuration.ClusterRadius = _currentRadius;
+        Configuration.ClusterMaxZoom = _currentClusterMaxZoom;
+        Configuration.EnableSpiderfy = _currentEnableSpiderfy;
+        Configuration.ShowClusterExtent = _currentShowExtent;
+        Configuration.ZoomOnClick = _currentZoomOnClick;
+        Configuration.AnimateTransitions = _currentAnimateTransitions;
+
+        var args = new ClusterUpdatedEventArgs
+        {
+            LayerId = _layerId!,
+            Configuration = Configuration,
+            Statistics = _statistics
+        };
+
+        await OnClustersUpdated.InvokeAsync(args);
+    }
+
+    private async Task ToggleVisibility()
+    {
+        _isVisible = !_isVisible;
+
+        if (_clusterInstance != null)
+        {
+            await _clusterInstance.InvokeVoidAsync("setVisibility", _isVisible);
+
+            await Bus.PublishAsync(new LayerVisibilityChangedMessage
+            {
+                LayerId = _layerId!,
+                Visible = _isVisible
+            }, Id);
+        }
+    }
+
+    private void ToggleControls()
+    {
+        ShowControls = !ShowControls;
+        StateHasChanged();
+    }
+
+    private async Task RefreshClusters()
+    {
+        await UpdateStatistics();
+        await NotifyClustersUpdated();
+    }
+
+    private async Task FitToBounds()
+    {
+        if (_statistics?.Bounds == null) return;
+
+        await Bus.PublishAsync(new FitBoundsRequestMessage
+        {
+            MapId = SyncWith,
+            Bounds = _statistics.Bounds,
+            Padding = 50
+        }, Id);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a cluster is clicked
+    /// </summary>
+    [JSInvokable]
+    public async Task OnClusterClickedInternal(int clusterId, int pointCount, double[] coordinates, int expansionZoom, JsonElement properties)
+    {
+        try
+        {
+            var clusterInfo = new ClusterInfo
+            {
+                ClusterId = clusterId,
+                PointCount = pointCount,
+                Coordinates = coordinates,
+                ExpansionZoom = expansionZoom,
+                Properties = JsonSerializer.Deserialize<Dictionary<string, object>>(properties.GetRawText()) ?? new()
+            };
+
+            var args = new ClusterClickedEventArgs
+            {
+                Cluster = clusterInfo,
+                MapId = SyncWith,
+                ComponentId = Id
+            };
+
+            await OnClusterClicked.InvokeAsync(args);
+
+            // Publish cluster clicked message
+            await Bus.PublishAsync(new ClusterClickedMessage
+            {
+                MapId = SyncWith,
+                ClusterId = clusterId,
+                PointCount = pointCount,
+                Coordinates = coordinates,
+                ExpansionZoom = expansionZoom,
+                ComponentId = Id,
+                Properties = clusterInfo.Properties
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error handling cluster click: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a cluster is spiderfied
+    /// </summary>
+    [JSInvokable]
+    public async Task OnClusterSpiderfiedInternal(int clusterId, int pointCount, double[] coordinates)
+    {
+        try
+        {
+            await Bus.PublishAsync(new ClusterSpiderfiedMessage
+            {
+                MapId = SyncWith,
+                ClusterId = clusterId,
+                PointCount = pointCount,
+                Coordinates = coordinates,
+                ComponentId = Id
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error handling cluster spiderfy: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when cluster extent is shown
+    /// </summary>
+    [JSInvokable]
+    public async Task OnClusterExtentShownInternal(int clusterId, double[] bounds)
+    {
+        try
+        {
+            await Bus.PublishAsync(new ClusterExtentShownMessage
+            {
+                MapId = SyncWith,
+                ClusterId = clusterId,
+                Bounds = bounds,
+                ComponentId = Id
+            }, Id);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error handling cluster extent: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Public API: Update cluster data
+    /// </summary>
+    public async Task UpdateDataAsync(object geojsonData)
+    {
+        if (!_isInitialized || _clusterInstance == null) return;
+
+        try
+        {
+            await _clusterInstance.InvokeVoidAsync("updateData", geojsonData);
+            await UpdateStatistics();
+            await NotifyClustersUpdated();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error updating data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Public API: Set configuration programmatically
+    /// </summary>
+    public async Task SetConfigurationAsync(ClusterConfiguration config)
+    {
+        Configuration = config;
+        _currentRadius = config.ClusterRadius;
+        _currentClusterMaxZoom = config.ClusterMaxZoom;
+        _currentEnableSpiderfy = config.EnableSpiderfy;
+        _currentShowExtent = config.ShowClusterExtent;
+        _currentZoomOnClick = config.ZoomOnClick;
+        _currentAnimateTransitions = config.AnimateTransitions;
+
+        if (_isInitialized && _clusterInstance != null)
+        {
+            await _clusterInstance.InvokeVoidAsync("updateConfiguration", config);
+            await NotifyClustersUpdated();
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Public API: Get current statistics
+    /// </summary>
+    public ClusterStatistics? GetStatistics() => _statistics;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_clusterInstance != null)
+        {
+            await _clusterInstance.InvokeVoidAsync("dispose");
+            await _clusterInstance.DisposeAsync();
+        }
+
+        if (_clusterModule != null)
+        {
+            await _clusterModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+
+        if (!string.IsNullOrEmpty(_layerId))
+        {
+            await Bus.PublishAsync(new LayerRemovedMessage
+            {
+                LayerId = _layerId
+            }, Id);
+        }
+    }
+}

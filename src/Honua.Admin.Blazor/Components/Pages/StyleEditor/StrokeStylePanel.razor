@@ -1,0 +1,332 @@
+@using Honua.MapSDK.Models
+
+<div class="style-panel">
+    @if (VectorLayer != null)
+    {
+        <MudStack Spacing="2">
+            <!-- Line/Stroke Color -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">Stroke Color</MudText>
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <input type="color"
+                           value="@StrokeColor"
+                           @oninput="OnStrokeColorChanged"
+                           class="color-picker" />
+                    <MudTextField @bind-Value="@StrokeColor"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Placeholder="#000000"
+                                 Class="flex-1" />
+                </MudStack>
+            </div>
+
+            <!-- Line Width -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Stroke Width: @StrokeWidth px
+                </MudText>
+                <MudSlider @bind-Value="@StrokeWidth"
+                          Min="1"
+                          Max="20"
+                          Step="0.5"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @StrokeWidth px
+                </MudSlider>
+            </div>
+
+            <!-- Line Opacity -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Stroke Opacity: @StrokeOpacity.ToString("P0")
+                </MudText>
+                <MudSlider @bind-Value="@StrokeOpacity"
+                          Min="0"
+                          Max="1"
+                          Step="0.05"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @StrokeOpacity.ToString("P0")
+                </MudSlider>
+            </div>
+
+            <!-- Line Cap -->
+            <MudSelect @bind-Value="@LineCap"
+                      Label="Line Cap"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense">
+                <MudSelectItem Value="@("butt")">Butt</MudSelectItem>
+                <MudSelectItem Value="@("round")">Round</MudSelectItem>
+                <MudSelectItem Value="@("square")">Square</MudSelectItem>
+            </MudSelect>
+
+            <!-- Line Join -->
+            <MudSelect @bind-Value="@LineJoin"
+                      Label="Line Join"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense">
+                <MudSelectItem Value="@("miter")">Miter</MudSelectItem>
+                <MudSelectItem Value="@("round")">Round</MudSelectItem>
+                <MudSelectItem Value="@("bevel")">Bevel</MudSelectItem>
+            </MudSelect>
+
+            <!-- Dash Array -->
+            <MudSwitch @bind-Value="@UseDashArray"
+                      Label="Dashed Line"
+                      Color="Color.Primary"
+                      Class="mb-2" />
+
+            @if (UseDashArray)
+            {
+                <MudSelect @bind-Value="@DashPattern"
+                          Label="Dash Pattern"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense">
+                    <MudSelectItem Value="@("2,2")">Short Dash</MudSelectItem>
+                    <MudSelectItem Value="@("4,4")">Medium Dash</MudSelectItem>
+                    <MudSelectItem Value="@("8,4")">Long Dash</MudSelectItem>
+                    <MudSelectItem Value="@("2,4,8,4")">Dash Dot</MudSelectItem>
+                    <MudSelectItem Value="@("1,2")">Dotted</MudSelectItem>
+                    <MudSelectItem Value="@("custom")">Custom</MudSelectItem>
+                </MudSelect>
+
+                @if (DashPattern == "custom")
+                {
+                    <MudTextField @bind-Value="@CustomDashPattern"
+                                 Label="Custom Pattern"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Placeholder="e.g., 2,4,8,4"
+                                 HelperText="Comma-separated numbers" />
+                }
+            }
+
+            <!-- Offset -->
+            <MudExpansionPanels Elevation="0" Class="mt-2">
+                <MudExpansionPanel Text="Advanced">
+                    <MudNumericField @bind-Value="@LineOffset"
+                                    Label="Line Offset"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense"
+                                    HelpText="Offset line perpendicular to its direction" />
+
+                    <MudNumericField @bind-Value="@LineBlur"
+                                    Label="Line Blur"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense"
+                                    Min="0"
+                                    Max="10"
+                                    Class="mt-2" />
+
+                    <MudNumericField @bind-Value="@LineGapWidth"
+                                    Label="Gap Width"
+                                    Variant="Variant.Outlined"
+                                    Margin="Margin.Dense"
+                                    Min="0"
+                                    HelpText="Width of gap for drawing casing"
+                                    Class="mt-2" />
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudStack>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public LayerDefinition? Layer { get; set; }
+
+    [Parameter]
+    public EventCallback OnStyleChanged { get; set; }
+
+    private VectorLayer? VectorLayer => Layer as VectorLayer;
+
+    private string _strokeColor = "#3388ff";
+    private string StrokeColor
+    {
+        get => _strokeColor;
+        set
+        {
+            _strokeColor = value;
+            UpdatePaint(Layer?.Type == "line" ? "line-color" : "circle-stroke-color", value);
+        }
+    }
+
+    private double _strokeWidth = 2.0;
+    private double StrokeWidth
+    {
+        get => _strokeWidth;
+        set
+        {
+            _strokeWidth = value;
+            UpdatePaint(Layer?.Type == "line" ? "line-width" : "circle-stroke-width", value);
+        }
+    }
+
+    private double _strokeOpacity = 1.0;
+    private double StrokeOpacity
+    {
+        get => _strokeOpacity;
+        set
+        {
+            _strokeOpacity = value;
+            UpdatePaint(Layer?.Type == "line" ? "line-opacity" : "circle-stroke-opacity", value);
+        }
+    }
+
+    private string _lineCap = "round";
+    private string LineCap
+    {
+        get => _lineCap;
+        set
+        {
+            _lineCap = value;
+            UpdateLayout("line-cap", value);
+        }
+    }
+
+    private string _lineJoin = "round";
+    private string LineJoin
+    {
+        get => _lineJoin;
+        set
+        {
+            _lineJoin = value;
+            UpdateLayout("line-join", value);
+        }
+    }
+
+    private bool _useDashArray = false;
+    private bool UseDashArray
+    {
+        get => _useDashArray;
+        set
+        {
+            _useDashArray = value;
+            if (value)
+            {
+                UpdateDashArray();
+            }
+            else
+            {
+                RemovePaintProperty("line-dasharray");
+            }
+        }
+    }
+
+    private string _dashPattern = "4,4";
+    private string DashPattern
+    {
+        get => _dashPattern;
+        set
+        {
+            _dashPattern = value;
+            UpdateDashArray();
+        }
+    }
+
+    private string _customDashPattern = "2,4,8,4";
+    private string CustomDashPattern
+    {
+        get => _customDashPattern;
+        set
+        {
+            _customDashPattern = value;
+            UpdateDashArray();
+        }
+    }
+
+    private double LineOffset { get; set; } = 0;
+    private double LineBlur { get; set; } = 0;
+    private double LineGapWidth { get; set; } = 0;
+
+    protected override void OnParametersSet()
+    {
+        if (VectorLayer != null)
+        {
+            LoadCurrentValues();
+        }
+    }
+
+    private void LoadCurrentValues()
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        var colorKey = Layer?.Type == "line" ? "line-color" : "circle-stroke-color";
+        var widthKey = Layer?.Type == "line" ? "line-width" : "circle-stroke-width";
+        var opacityKey = Layer?.Type == "line" ? "line-opacity" : "circle-stroke-opacity";
+
+        if (VectorLayer.Paint.TryGetValue(colorKey, out var color))
+        {
+            _strokeColor = color?.ToString() ?? "#3388ff";
+        }
+
+        if (VectorLayer.Paint.TryGetValue(widthKey, out var width))
+        {
+            _strokeWidth = Convert.ToDouble(width);
+        }
+
+        if (VectorLayer.Paint.TryGetValue(opacityKey, out var opacity))
+        {
+            _strokeOpacity = Convert.ToDouble(opacity);
+        }
+
+        if (VectorLayer.Layout?.TryGetValue("line-cap", out var cap) == true)
+        {
+            _lineCap = cap?.ToString() ?? "round";
+        }
+
+        if (VectorLayer.Layout?.TryGetValue("line-join", out var join) == true)
+        {
+            _lineJoin = join?.ToString() ?? "round";
+        }
+
+        if (VectorLayer.Paint.TryGetValue("line-dasharray", out var dasharray))
+        {
+            _useDashArray = true;
+            // Parse dasharray if needed
+        }
+    }
+
+    private void OnStrokeColorChanged(ChangeEventArgs e)
+    {
+        StrokeColor = e.Value?.ToString() ?? "#3388ff";
+    }
+
+    private void UpdateDashArray()
+    {
+        if (!UseDashArray || VectorLayer?.Paint == null) return;
+
+        var pattern = DashPattern == "custom" ? CustomDashPattern : DashPattern;
+        var values = pattern.Split(',').Select(s => double.TryParse(s.Trim(), out var v) ? v : 0).ToArray();
+
+        UpdatePaint("line-dasharray", values);
+    }
+
+    private void UpdatePaint(string property, object value)
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        VectorLayer.Paint[property] = value;
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+
+    private void UpdateLayout(string property, object value)
+    {
+        if (VectorLayer == null) return;
+
+        VectorLayer.Layout ??= new Dictionary<string, object>();
+        VectorLayer.Layout[property] = value;
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+
+    private void RemovePaintProperty(string property)
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        VectorLayer.Paint.Remove(property);
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+}

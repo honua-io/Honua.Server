@@ -1,0 +1,337 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.MapSDK.Styling
+@using Honua.Server.Core.Metadata
+@using System.Text.Json
+
+<div class="style-editor">
+    <div class="style-editor-header">
+        <h3>@Title</h3>
+        @if (ShowTemplates)
+        {
+            <div class="template-selector">
+                <label>Start with Template:</label>
+                <select @onchange="OnTemplateSelected" class="form-select">
+                    <option value="">-- Select Template --</option>
+                    @foreach (var template in _templates)
+                    {
+                        <option value="@template.Name">@template.DisplayName</option>
+                    }
+                </select>
+            </div>
+        }
+    </div>
+
+    <div class="style-editor-body">
+        @if (CurrentStyle != null)
+        {
+            <div class="style-section">
+                <h4>Basic Properties</h4>
+
+                <div class="form-group">
+                    <label>Style Name</label>
+                    <input type="text" class="form-control" @bind="CurrentStyle.Title" />
+                </div>
+
+                <div class="form-group">
+                    <label>Geometry Type</label>
+                    <select class="form-select" @bind="CurrentStyle.GeometryType">
+                        <option value="point">Point</option>
+                        <option value="line">Line</option>
+                        <option value="polygon">Polygon</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Renderer</label>
+                    <select class="form-select" @bind="CurrentStyle.Renderer" @bind:after="OnRendererChanged">
+                        <option value="simple">Simple</option>
+                        <option value="uniqueValue">Unique Value</option>
+                        <option value="classBreaks">Class Breaks (Choropleth)</option>
+                    </select>
+                </div>
+            </div>
+
+            @if (CurrentStyle.Renderer == "simple" && CurrentStyle.Simple != null)
+            {
+                <div class="style-section">
+                    <h4>Symbol Properties</h4>
+                    <SymbolEditor Symbol="CurrentStyle.Simple" GeometryType="@CurrentStyle.GeometryType" />
+                </div>
+            }
+            else if (CurrentStyle.Renderer == "uniqueValue")
+            {
+                <div class="style-section">
+                    <h4>Unique Value Settings</h4>
+                    <div class="form-group">
+                        <label>Field</label>
+                        <input type="text" class="form-control" @bind="_classificationField" placeholder="Enter field name" />
+                    </div>
+                    <button class="btn btn-primary" @onclick="GenerateCategoricalStyle">
+                        Generate Categories
+                    </button>
+                </div>
+            }
+            else if (CurrentStyle.Renderer == "classBreaks")
+            {
+                <div class="style-section">
+                    <h4>Classification Settings</h4>
+
+                    <div class="form-group">
+                        <label>Field</label>
+                        <input type="text" class="form-control" @bind="_classificationField" placeholder="Enter field name" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Classification Method</label>
+                        <select class="form-select" @bind="_classificationMethod">
+                            <option value="@ClassificationMethod.Jenks">Natural Breaks (Jenks)</option>
+                            <option value="@ClassificationMethod.Quantile">Quantile</option>
+                            <option value="@ClassificationMethod.EqualInterval">Equal Interval</option>
+                            <option value="@ClassificationMethod.StandardDeviation">Standard Deviation</option>
+                            <option value="@ClassificationMethod.GeometricInterval">Geometric Interval</option>
+                            <option value="@ClassificationMethod.Logarithmic">Logarithmic</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Number of Classes</label>
+                        <input type="number" class="form-control" min="3" max="12" @bind="_classCount" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Color Palette</label>
+                        <select class="form-select" @bind="_colorPalette">
+                            @foreach (var palette in _paletteNames)
+                            {
+                                <option value="@palette">@palette</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="palette-preview">
+                        @foreach (var color in _previewColors)
+                        {
+                            <div class="color-box" style="background-color: @color"></div>
+                        }
+                    </div>
+
+                    <button class="btn btn-primary" @onclick="GenerateChoroplethStyle">
+                        Generate Classification
+                    </button>
+                </div>
+            }
+
+            <div class="style-section">
+                <h4>Preview</h4>
+                <div class="style-preview">
+                    @if (_previewJson != null)
+                    {
+                        <pre>@_previewJson</pre>
+                    }
+                </div>
+            </div>
+
+            <div class="style-actions">
+                <button class="btn btn-success" @onclick="OnApplyStyle">Apply Style</button>
+                <button class="btn btn-secondary" @onclick="OnCancel">Cancel</button>
+            </div>
+        }
+        else
+        {
+            <div class="text-center p-4">
+                <p>Select a template or create a new style to begin</p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "Style Editor";
+
+    [Parameter]
+    public bool ShowTemplates { get; set; } = true;
+
+    [Parameter]
+    public StyleDefinition? InitialStyle { get; set; }
+
+    [Parameter]
+    public EventCallback<StyleDefinition> OnStyleApplied { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancelled { get; set; }
+
+    private StyleDefinition? CurrentStyle { get; set; }
+    private List<StyleTemplate> _templates = new();
+    private List<string> _paletteNames = new();
+    private string[] _previewColors = Array.Empty<string>();
+    private string? _previewJson;
+
+    private string _classificationField = "value";
+    private ClassificationMethod _classificationMethod = ClassificationMethod.Jenks;
+    private int _classCount = 7;
+    private string _colorPalette = "Blues";
+
+    protected override void OnInitialized()
+    {
+        CurrentStyle = InitialStyle ?? new StyleDefinition
+        {
+            Id = $"style-{Guid.NewGuid():N}",
+            Title = "New Style",
+            Renderer = "simple",
+            GeometryType = "polygon",
+            Format = "legacy",
+            Simple = new SimpleStyleDefinition
+            {
+                FillColor = "#3B82F6",
+                StrokeColor = "#1E40AF",
+                StrokeWidth = 1.5,
+                Opacity = 0.7
+            }
+        };
+
+        _paletteNames = CartographicPalettes.GetPaletteNames().ToList();
+        _templates = StyleTemplateLibrary.GetTemplateNames()
+            .Select(name => StyleTemplateLibrary.GetTemplate(name))
+            .Where(t => t != null)
+            .Cast<StyleTemplate>()
+            .ToList();
+
+        UpdatePreview();
+        UpdatePalettePreview();
+    }
+
+    private void OnTemplateSelected(ChangeEventArgs e)
+    {
+        var templateName = e.Value?.ToString();
+        if (string.IsNullOrEmpty(templateName)) return;
+
+        var template = StyleTemplateLibrary.GetTemplate(templateName);
+        if (template == null) return;
+
+        var options = new StyleTemplateOptions
+        {
+            StyleId = CurrentStyle?.Id,
+            Title = template.DisplayName,
+            GeometryType = CurrentStyle?.GeometryType
+        };
+
+        CurrentStyle = StyleTemplateLibrary.ApplyTemplate(templateName, options);
+        UpdatePreview();
+        StateHasChanged();
+    }
+
+    private void OnRendererChanged()
+    {
+        if (CurrentStyle == null) return;
+
+        // Reset renderer-specific properties
+        CurrentStyle = CurrentStyle with
+        {
+            Simple = CurrentStyle.Renderer == "simple" ? (CurrentStyle.Simple ?? new SimpleStyleDefinition()) : null,
+            UniqueValue = null,
+            Rules = new List<StyleRuleDefinition>()
+        };
+
+        UpdatePreview();
+    }
+
+    private void GenerateCategoricalStyle()
+    {
+        // In a real implementation, this would analyze actual data
+        // For now, create a sample categorical style
+        var sampleCategories = new[] { "Category A", "Category B", "Category C", "Category D", "Category E" };
+        var colors = CartographicPalettes.GetPalette("Set1", sampleCategories.Length);
+
+        var classes = sampleCategories.Select((cat, i) => new UniqueValueStyleClassDefinition
+        {
+            Value = cat,
+            Symbol = new SimpleStyleDefinition
+            {
+                FillColor = colors[i],
+                StrokeColor = "#374151",
+                StrokeWidth = 1,
+                Opacity = 0.7
+            }
+        }).ToList();
+
+        CurrentStyle = CurrentStyle! with
+        {
+            UniqueValue = new UniqueValueStyleDefinition
+            {
+                Field = _classificationField,
+                Classes = classes,
+                DefaultSymbol = new SimpleStyleDefinition
+                {
+                    FillColor = "#CCCCCC",
+                    StrokeColor = "#9CA3AF",
+                    StrokeWidth = 1,
+                    Opacity = 0.5
+                }
+            }
+        };
+
+        UpdatePreview();
+    }
+
+    private void GenerateChoroplethStyle()
+    {
+        var colors = CartographicPalettes.GetPalette(_colorPalette, _classCount);
+
+        var rules = new List<StyleRuleDefinition>();
+        for (int i = 0; i < _classCount; i++)
+        {
+            rules.Add(new StyleRuleDefinition
+            {
+                Id = $"class-{i}",
+                Label = $"Class {i + 1}",
+                Symbolizer = new SimpleStyleDefinition
+                {
+                    FillColor = colors[i],
+                    StrokeColor = "#64748B",
+                    StrokeWidth = 0.5,
+                    Opacity = 0.75
+                }
+            });
+        }
+
+        CurrentStyle = CurrentStyle! with
+        {
+            Rules = rules
+        };
+
+        UpdatePreview();
+    }
+
+    private void UpdatePalettePreview()
+    {
+        _previewColors = CartographicPalettes.GetPalette(_colorPalette, _classCount);
+    }
+
+    private void UpdatePreview()
+    {
+        if (CurrentStyle == null) return;
+
+        _previewJson = JsonSerializer.Serialize(CurrentStyle, new JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+
+        UpdatePalettePreview();
+    }
+
+    private async Task OnApplyStyle()
+    {
+        if (CurrentStyle != null)
+        {
+            await OnStyleApplied.InvokeAsync(CurrentStyle);
+        }
+    }
+
+    private async Task OnCancel()
+    {
+        await OnCancelled.InvokeAsync();
+    }
+}

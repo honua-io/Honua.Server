@@ -1,0 +1,315 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@page "/dashboards/designer"
+@page "/dashboards/designer/{DashboardId:guid}"
+@using Honua.Server.Core.Models.Dashboard
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Dashboard Designer - Honua</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0" Style="height: 100vh;">
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Color="Color.Inherit"
+                       OnClick="@(() => Navigation.NavigateTo("/dashboards"))" />
+        <MudText Typo="Typo.h6">Dashboard Designer</MudText>
+        <MudSpacer />
+
+        <MudTextField @bind-Value="_dashboard.Name" Placeholder="Dashboard Name"
+                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Class="mr-4" Style="max-width: 300px;" />
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                   StartIcon="@Icons.Material.Filled.Visibility"
+                   OnClick="@PreviewDashboard" Class="mr-2">
+            Preview
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="@SaveDashboard" Disabled="@_isSaving">
+            @(_isSaving ? "Saving..." : "Save")
+        </MudButton>
+    </MudAppBar>
+
+    <MudGrid Class="pa-0 ma-0" Style="height: calc(100vh - 64px);">
+        <MudItem xs="2" Class="pa-0">
+            <MudPaper Class="pa-4" Elevation="0" Style="height: 100%; overflow-y: auto;">
+                <MudText Typo="Typo.h6" Class="mb-4">Widget Library</MudText>
+
+                <MudList Clickable="true">
+                    <MudListSubheader>Data Widgets</MudListSubheader>
+                    <MudListItem Icon="@Icons.Material.Filled.Map" OnClick="@(() => AddWidget("map"))">
+                        Map Widget
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.BarChart" OnClick="@(() => AddWidget("chart"))">
+                        Chart Widget
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.TableChart" OnClick="@(() => AddWidget("table"))">
+                        Table Widget
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Dashboard" OnClick="@(() => AddWidget("kpi"))">
+                        KPI Card
+                    </MudListItem>
+
+                    <MudDivider Class="my-2" />
+
+                    <MudListSubheader>Control Widgets</MudListSubheader>
+                    <MudListItem Icon="@Icons.Material.Filled.FilterAlt" OnClick="@(() => AddWidget("filter"))">
+                        Filter Panel
+                    </MudListItem>
+                </MudList>
+
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Dashboard Settings</MudText>
+
+                <MudTextField @bind-Value="_dashboard.Description" Label="Description"
+                              Variant="Variant.Outlined" Lines="3" Class="mb-3" />
+
+                <MudChipSet @bind-SelectedChips="_selectedTags" MultiSelection="true" Class="mb-3">
+                    @foreach (var tag in _commonTags)
+                    {
+                        <MudChip Text="@tag" Color="Color.Primary" Variant="Variant.Outlined" />
+                    }
+                </MudChipSet>
+
+                <MudSwitch @bind-Value="_dashboard.IsPublic" Color="Color.Primary" Class="mb-2">
+                    Public Dashboard
+                </MudSwitch>
+
+                <MudNumericField @bind-Value="_refreshInterval" Label="Refresh Interval (seconds)"
+                                 Variant="Variant.Outlined" Min="0" Class="mt-3" />
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="8" Class="pa-0">
+            <MudPaper Class="pa-4" Elevation="0" Style="height: 100%; overflow: auto; background-color: #f5f5f5;">
+                <MudText Typo="Typo.h6" Class="mb-4">Dashboard Canvas</MudText>
+
+                <div class="dashboard-canvas" style="min-height: 800px; position: relative;">
+                    @if (!_dashboard.Widgets.Any())
+                    {
+                        <MudPaper Class="pa-8 d-flex flex-column align-center justify-center" Elevation="0"
+                                  Style="height: 400px; border: 2px dashed #ccc;">
+                            <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Large" Class="mb-4" Color="Color.Default" />
+                            <MudText Typo="Typo.h6" Color="Color.Default">No widgets yet</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Click on widgets in the library to add them to your dashboard</MudText>
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        @foreach (var widget in _dashboard.Widgets)
+                        {
+                            <div class="widget-container" style="@GetWidgetStyle(widget)">
+                                <MudPaper Class="pa-0" Elevation="2" Style="height: 100%; position: relative;">
+                                    <div class="widget-header d-flex align-center pa-2" style="background-color: #f5f5f5; border-bottom: 1px solid #e0e0e0;">
+                                        <MudIcon Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" Class="mr-2" />
+                                        <MudText Typo="Typo.subtitle2" Class="flex-grow-1">@widget.Title</MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Settings" Size="Size.Small"
+                                                       OnClick="@(() => EditWidget(widget))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                       OnClick="@(() => DeleteWidget(widget))" />
+                                    </div>
+                                    <div class="widget-content pa-4" style="height: calc(100% - 48px);">
+                                        <MudText Typo="Typo.body2" Color="Color.Default">
+                                            @widget.Type.ToUpper() Widget - @widget.Title
+                                        </MudText>
+                                    </div>
+                                </MudPaper>
+                            </div>
+                        }
+                    }
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="2" Class="pa-0">
+            <MudPaper Class="pa-4" Elevation="0" Style="height: 100%; overflow-y: auto;">
+                <MudText Typo="Typo.h6" Class="mb-4">Properties</MudText>
+
+                @if (_selectedWidget != null)
+                {
+                    <MudTextField @bind-Value="_selectedWidget.Title" Label="Widget Title"
+                                  Variant="Variant.Outlined" Class="mb-3" />
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Position</MudText>
+                    <MudNumericField @bind-Value="_selectedWidget.Position.X" Label="X" Variant="Variant.Outlined" Class="mb-2" />
+                    <MudNumericField @bind-Value="_selectedWidget.Position.Y" Label="Y" Variant="Variant.Outlined" Class="mb-2" />
+                    <MudNumericField @bind-Value="_selectedWidget.Position.Width" Label="Width" Variant="Variant.Outlined" Class="mb-2" />
+                    <MudNumericField @bind-Value="_selectedWidget.Position.Height" Label="Height" Variant="Variant.Outlined" Class="mb-3" />
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Data Source</MudText>
+                    <MudSelect @bind-Value="@_dataSourceType" Label="Source Type" Variant="Variant.Outlined" Class="mb-2">
+                        <MudSelectItem Value="@("layer")">Layer</MudSelectItem>
+                        <MudSelectItem Value="@("query")">Custom Query</MudSelectItem>
+                        <MudSelectItem Value="@("api")">API Endpoint</MudSelectItem>
+                        <MudSelectItem Value="@("static")">Static Data</MudSelectItem>
+                    </MudSelect>
+
+                    <MudTextField @bind-Value="@_dataSourceValue" Label="Source" Variant="Variant.Outlined" Class="mb-3" />
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Default">
+                        Select a widget to edit its properties
+                    </MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid? DashboardId { get; set; }
+
+    private DashboardDefinition _dashboard = new()
+    {
+        Name = "New Dashboard",
+        OwnerId = "current-user", // Will be set from auth
+        Layout = new DashboardLayout()
+    };
+
+    private bool _isSaving = false;
+    private WidgetDefinition? _selectedWidget;
+    private MudChip[]? _selectedTags;
+    private string[] _commonTags = { "Sales", "Operations", "Analytics", "GIS", "Real-time" };
+    private int? _refreshInterval;
+    private string _dataSourceType = "layer";
+    private string _dataSourceValue = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (DashboardId.HasValue)
+        {
+            await LoadDashboard(DashboardId.Value);
+        }
+    }
+
+    private async Task LoadDashboard(Guid id)
+    {
+        try
+        {
+            var dashboard = await Http.GetFromJsonAsync<DashboardDefinition>($"/api/dashboards/{id}");
+            if (dashboard != null)
+            {
+                _dashboard = dashboard;
+                _refreshInterval = dashboard.RefreshInterval;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading dashboard: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void AddWidget(string type)
+    {
+        var widget = new WidgetDefinition
+        {
+            Title = $"New {type} Widget",
+            Type = type,
+            Position = new WidgetPosition
+            {
+                X = 0,
+                Y = _dashboard.Widgets.Count * 4,
+                Width = 4,
+                Height = 4
+            },
+            Config = type switch
+            {
+                "map" => new MapWidgetConfig { Zoom = 10 },
+                "chart" => new ChartWidgetConfig { ChartType = "bar" },
+                "table" => new TableWidgetConfig(),
+                "filter" => new FilterWidgetConfig(),
+                "kpi" => new KpiWidgetConfig { ValueField = "value", Aggregation = "sum" },
+                _ => throw new ArgumentException($"Unknown widget type: {type}")
+            }
+        };
+
+        _dashboard.Widgets.Add(widget);
+        _selectedWidget = widget;
+        StateHasChanged();
+    }
+
+    private void EditWidget(WidgetDefinition widget)
+    {
+        _selectedWidget = widget;
+    }
+
+    private void DeleteWidget(WidgetDefinition widget)
+    {
+        _dashboard.Widgets.Remove(widget);
+        if (_selectedWidget == widget)
+        {
+            _selectedWidget = null;
+        }
+        StateHasChanged();
+    }
+
+    private string GetWidgetStyle(WidgetDefinition widget)
+    {
+        var rowHeight = _dashboard.Layout.RowHeight;
+        var gap = _dashboard.Layout.Gap;
+
+        var left = (widget.Position.X * (100.0 / _dashboard.Layout.Columns));
+        var width = (widget.Position.Width * (100.0 / _dashboard.Layout.Columns));
+        var top = (widget.Position.Y * rowHeight) + (widget.Position.Y * gap);
+        var height = (widget.Position.Height * rowHeight) + ((widget.Position.Height - 1) * gap);
+
+        return $"position: absolute; left: {left}%; width: {width}%; top: {top}px; height: {height}px;";
+    }
+
+    private async Task SaveDashboard()
+    {
+        _isSaving = true;
+
+        try
+        {
+            _dashboard.RefreshInterval = _refreshInterval;
+
+            if (DashboardId.HasValue)
+            {
+                // Update existing dashboard
+                var response = await Http.PutAsJsonAsync($"/api/dashboards/{DashboardId.Value}", _dashboard);
+                response.EnsureSuccessStatusCode();
+                Snackbar.Add("Dashboard updated successfully", Severity.Success);
+            }
+            else
+            {
+                // Create new dashboard
+                var response = await Http.PostAsJsonAsync("/api/dashboards", _dashboard);
+                response.EnsureSuccessStatusCode();
+                var created = await response.Content.ReadFromJsonAsync<DashboardDefinition>();
+                if (created != null)
+                {
+                    Navigation.NavigateTo($"/dashboards/designer/{created.Id}");
+                }
+                Snackbar.Add("Dashboard created successfully", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving dashboard: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void PreviewDashboard()
+    {
+        if (DashboardId.HasValue)
+        {
+            Navigation.NavigateTo($"/dashboards/view/{DashboardId.Value}");
+        }
+        else
+        {
+            Snackbar.Add("Please save the dashboard first", Severity.Warning);
+        }
+    }
+}

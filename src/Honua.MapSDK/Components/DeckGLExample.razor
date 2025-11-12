@@ -1,0 +1,339 @@
+@*
+    Copyright (c) 2025 HonuaIO
+    Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+
+    Example demonstrating Deck.gl integration with Honua.MapSDK
+*@
+
+@page "/examples/deckgl"
+@using Honua.MapSDK.Components
+@using Honua.MapSDK.Components.Map
+@using Honua.MapSDK.Models
+@using Honua.MapSDK.Services
+@using Microsoft.JSInterop
+@inject DeckLayerManager DeckLayerManager
+@inject IJSRuntime JSRuntime
+
+<div class="deckgl-example-container">
+    <h1>Deck.gl Integration Examples</h1>
+    <p>Big data visualization with WebGL-powered Deck.gl layers</p>
+
+    <div class="example-controls">
+        <button class="btn btn-primary" @onclick="ShowScatterplotExample">Scatterplot Layer</button>
+        <button class="btn btn-primary" @onclick="ShowHexagonExample">Hexagon Layer</button>
+        <button class="btn btn-primary" @onclick="ShowArcExample">Arc Layer</button>
+        <button class="btn btn-primary" @onclick="ShowGridExample">Grid Layer</button>
+        <button class="btn btn-primary" @onclick="ShowScreenGridExample">Screen Grid Layer</button>
+        <button class="btn btn-danger" @onclick="ClearLayers">Clear Layers</button>
+    </div>
+
+    <div class="map-container">
+        <HonuaMapLibre @ref="_mapComponent"
+                       MapId="@_mapId"
+                       Height="600px"
+                       Width="100%"
+                       Configuration="@_mapConfig"
+                       OnMapLoad="OnMapLoaded">
+
+            @if (_mapLoaded && _mapInstance != null && _mapElement != null)
+            {
+                <HonuaDeckLayer @ref="_deckLayer"
+                               MapInstance="@_mapInstance"
+                               MapElement="@_mapElement.Value"
+                               MapId="@_mapId"
+                               OnLayerClick="OnLayerClick"
+                               OnLayerHover="OnLayerHover"
+                               Debug="true" />
+            }
+        </HonuaMapLibre>
+    </div>
+
+    @if (_hoveredObject != null)
+    {
+        <div class="info-panel">
+            <h3>Hovered Object</h3>
+            <pre>@_hoveredObjectJson</pre>
+        </div>
+    }
+
+    @if (_clickedObject != null)
+    {
+        <div class="info-panel">
+            <h3>Clicked Object</h3>
+            <pre>@_clickedObjectJson</pre>
+        </div>
+    }
+</div>
+
+<style>
+    .deckgl-example-container {
+        padding: 20px;
+    }
+
+    .example-controls {
+        margin: 20px 0;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .map-container {
+        position: relative;
+        width: 100%;
+        height: 600px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .info-panel {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .info-panel h3 {
+        margin-top: 0;
+    }
+
+    .info-panel pre {
+        background: white;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        overflow-x: auto;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        background: #007bff;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #0056b3;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+    }
+</style>
+
+@code {
+    private HonuaMapLibre? _mapComponent;
+    private HonuaDeckLayer? _deckLayer;
+    private string _mapId = "deckgl-map";
+    private bool _mapLoaded = false;
+    private object? _mapInstance;
+    private ElementReference? _mapElement;
+    private object? _hoveredObject;
+    private object? _clickedObject;
+    private string? _hoveredObjectJson;
+    private string? _clickedObjectJson;
+
+    private MapConfiguration _mapConfig = new()
+    {
+        Style = "https://demotiles.maplibre.org/style.json",
+        Center = new[] { -122.4, 37.8 }, // San Francisco
+        Zoom = 11,
+        Pitch = 45,
+        Bearing = 0
+    };
+
+    private async Task OnMapLoaded(MapLibreViewport viewport)
+    {
+        _mapLoaded = true;
+
+        // Get map instance and element from the component
+        // Note: This assumes HonuaMapLibre exposes these properties
+        // You may need to adjust based on actual implementation
+        _mapInstance = await JSRuntime.InvokeAsync<object>("eval",
+            $"window.honuaMaps?.['{_mapId}']");
+
+        StateHasChanged();
+    }
+
+    private async Task ShowScatterplotExample()
+    {
+        // Generate sample scatterplot data (random points in San Francisco)
+        var random = new Random();
+        var data = Enumerable.Range(0, 1000).Select(i => new
+        {
+            position = new[] {
+                -122.5 + random.NextDouble() * 0.2,  // longitude
+                37.7 + random.NextDouble() * 0.2      // latitude
+            },
+            radius = random.Next(10, 50),
+            color = new[] {
+                random.Next(100, 255),  // R
+                random.Next(100, 255),  // G
+                random.Next(100, 255)   // B
+            }
+        }).Cast<object>().ToList();
+
+        var layer = new ScatterplotLayerDefinition
+        {
+            Name = "San Francisco Points",
+            Data = data,
+            RadiusScale = 1,
+            RadiusMinPixels = 2,
+            RadiusMaxPixels = 50,
+            GetPosition = "position",
+            GetRadius = "radius",
+            GetFillColor = "color"
+        };
+
+        await DeckLayerManager.AddLayerAsync(layer, _mapId);
+    }
+
+    private async Task ShowHexagonExample()
+    {
+        // Generate sample hexagon data (clustered points)
+        var random = new Random();
+        var data = Enumerable.Range(0, 5000).Select(i => new
+        {
+            position = new[] {
+                -122.45 + random.NextDouble() * 0.1 - 0.05,
+                37.75 + random.NextDouble() * 0.1 - 0.05
+            }
+        }).Cast<object>().ToList();
+
+        var layer = new HexagonLayerDefinition
+        {
+            Name = "Population Density",
+            Data = data,
+            Radius = 200,
+            Extruded = true,
+            ElevationScale = 50,
+            GetPosition = "position"
+        };
+
+        await DeckLayerManager.AddLayerAsync(layer, _mapId);
+    }
+
+    private async Task ShowArcExample()
+    {
+        // Generate sample arc data (origin-destination flows)
+        var random = new Random();
+        var centerPoint = new[] { -122.4, 37.8 };
+
+        var data = Enumerable.Range(0, 50).Select(i => new
+        {
+            sourcePosition = centerPoint,
+            targetPosition = new[] {
+                centerPoint[0] + random.NextDouble() * 0.4 - 0.2,
+                centerPoint[1] + random.NextDouble() * 0.4 - 0.2
+            },
+            sourceColor = new[] { 255, 140, 0 },
+            targetColor = new[] { 0, 128, 255 }
+        }).Cast<object>().ToList();
+
+        var layer = new ArcLayerDefinition
+        {
+            Name = "Origin-Destination Flows",
+            Data = data,
+            GetWidth = 3,
+            GetSourcePosition = "sourcePosition",
+            GetTargetPosition = "targetPosition",
+            GetSourceColor = "sourceColor",
+            GetTargetColor = "targetColor"
+        };
+
+        await DeckLayerManager.AddLayerAsync(layer, _mapId);
+    }
+
+    private async Task ShowGridExample()
+    {
+        // Generate sample grid data
+        var random = new Random();
+        var data = Enumerable.Range(0, 3000).Select(i => new
+        {
+            position = new[] {
+                -122.5 + random.NextDouble() * 0.2,
+                37.7 + random.NextDouble() * 0.2
+            }
+        }).Cast<object>().ToList();
+
+        var layer = new GridLayerDefinition
+        {
+            Name = "Grid Aggregation",
+            Data = data,
+            CellSize = 500,
+            Extruded = true,
+            ElevationScale = 40,
+            GetPosition = "position"
+        };
+
+        await DeckLayerManager.AddLayerAsync(layer, _mapId);
+    }
+
+    private async Task ShowScreenGridExample()
+    {
+        // Generate sample screen grid data
+        var random = new Random();
+        var data = Enumerable.Range(0, 10000).Select(i => new
+        {
+            position = new[] {
+                -122.5 + random.NextDouble() * 0.2,
+                37.7 + random.NextDouble() * 0.2
+            }
+        }).Cast<object>().ToList();
+
+        var layer = new ScreenGridLayerDefinition
+        {
+            Name = "Heatmap",
+            Data = data,
+            CellSizePixels = 40,
+            GetPosition = "position"
+        };
+
+        await DeckLayerManager.AddLayerAsync(layer, _mapId);
+    }
+
+    private async Task ClearLayers()
+    {
+        await DeckLayerManager.ClearAllLayersAsync(_mapId);
+        _hoveredObject = null;
+        _clickedObject = null;
+        _hoveredObjectJson = null;
+        _clickedObjectJson = null;
+    }
+
+    private Task OnLayerClick(DeckLayerClickEventArgs args)
+    {
+        _clickedObject = args.ClickedObject;
+        _clickedObjectJson = System.Text.Json.JsonSerializer.Serialize(
+            args.ClickedObject,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+        );
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task OnLayerHover(DeckLayerHoverEventArgs args)
+    {
+        _hoveredObject = args.HoveredObject;
+        _hoveredObjectJson = args.HoveredObject != null
+            ? System.Text.Json.JsonSerializer.Serialize(
+                args.HoveredObject,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+            )
+            : null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+}

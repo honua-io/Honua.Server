@@ -1,0 +1,292 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@page "/dashboards"
+@using Honua.Server.Core.Models.Dashboard
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Dashboards - Honua</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-6">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-6">
+        <MudText Typo="Typo.h4" Class="flex-grow-1">Dashboards</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@CreateNewDashboard">
+            New Dashboard
+        </MudButton>
+    </MudStack>
+
+    <MudTabs Elevation="0" Rounded="true" Color="Color.Primary" Class="mb-4">
+        <MudTabPanel Text="My Dashboards" Icon="@Icons.Material.Filled.Person">
+            @if (_myDashboards == null)
+            {
+                <MudProgressCircular Indeterminate="true" Class="ma-4" />
+            }
+            else if (!_myDashboards.Any())
+            {
+                <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0">
+                    <MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Large" Class="mb-4" />
+                    <MudText Typo="Typo.h6">No dashboards yet</MudText>
+                    <MudText Typo="Typo.body2" Class="mb-4">Create your first dashboard to get started</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateNewDashboard">
+                        Create Dashboard
+                    </MudButton>
+                </MudPaper>
+            }
+            else
+            {
+                <MudGrid>
+                    @foreach (var dashboard in _myDashboards)
+                    {
+                        <MudItem xs="12" sm="6" md="4" lg="3">
+                            @RenderDashboardCard(dashboard)
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="Public Dashboards" Icon="@Icons.Material.Filled.Public">
+            @if (_publicDashboards == null)
+            {
+                <MudProgressCircular Indeterminate="true" Class="ma-4" />
+            }
+            else if (!_publicDashboards.Any())
+            {
+                <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0">
+                    <MudText Typo="Typo.body1">No public dashboards available</MudText>
+                </MudPaper>
+            }
+            else
+            {
+                <MudGrid>
+                    @foreach (var dashboard in _publicDashboards)
+                    {
+                        <MudItem xs="12" sm="6" md="4" lg="3">
+                            @RenderDashboardCard(dashboard, isPublic: true)
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="Templates" Icon="@Icons.Material.Filled.GridView">
+            @if (_templates == null)
+            {
+                <MudProgressCircular Indeterminate="true" Class="ma-4" />
+            }
+            else if (!_templates.Any())
+            {
+                <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="0">
+                    <MudText Typo="Typo.body1">No templates available</MudText>
+                </MudPaper>
+            }
+            else
+            {
+                <MudGrid>
+                    @foreach (var template in _templates)
+                    {
+                        <MudItem xs="12" sm="6" md="4" lg="3">
+                            @RenderDashboardCard(template, isTemplate: true)
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudTabPanel>
+    </MudTabs>
+</MudContainer>
+
+@code {
+    private List<DashboardDefinition>? _myDashboards;
+    private List<DashboardDefinition>? _publicDashboards;
+    private List<DashboardDefinition>? _templates;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboards();
+    }
+
+    private async Task LoadDashboards()
+    {
+        try
+        {
+            var myTask = Http.GetFromJsonAsync<List<DashboardDefinition>>("/api/dashboards/my-dashboards");
+            var publicTask = Http.GetFromJsonAsync<List<DashboardDefinition>>("/api/dashboards/public");
+            var templatesTask = Http.GetFromJsonAsync<List<DashboardDefinition>>("/api/dashboards/templates");
+
+            await Task.WhenAll(myTask, publicTask, templatesTask);
+
+            _myDashboards = await myTask ?? new List<DashboardDefinition>();
+            _publicDashboards = await publicTask ?? new List<DashboardDefinition>();
+            _templates = await templatesTask ?? new List<DashboardDefinition>();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading dashboards: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private RenderFragment RenderDashboardCard(DashboardDefinition dashboard, bool isPublic = false, bool isTemplate = false)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<MudCard>(0);
+            builder.AddAttribute(1, "Elevation", 2);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(cardBuilder =>
+            {
+                // Card Header
+                cardBuilder.OpenComponent<MudCardHeader>(0);
+                cardBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                {
+                    headerBuilder.OpenComponent<MudCardHeaderContent>(0);
+                    headerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(contentBuilder =>
+                    {
+                        contentBuilder.OpenComponent<MudText>(0);
+                        contentBuilder.AddAttribute(1, "Typo", Typo.h6);
+                        contentBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(_ => _.AddContent(0, dashboard.Name)));
+                        contentBuilder.CloseComponent();
+                    }));
+                    headerBuilder.CloseComponent();
+                }));
+                cardBuilder.CloseComponent();
+
+                // Card Content
+                cardBuilder.OpenComponent<MudCardContent>(0);
+                cardBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(contentBuilder =>
+                {
+                    contentBuilder.OpenComponent<MudText>(0);
+                    contentBuilder.AddAttribute(1, "Typo", Typo.body2);
+                    contentBuilder.AddAttribute(2, "Color", Color.Default);
+                    contentBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(_ => _.AddContent(0,
+                        dashboard.Description ?? "No description")));
+                    contentBuilder.CloseComponent();
+
+                    contentBuilder.OpenComponent<MudStack>(1);
+                    contentBuilder.AddAttribute(2, "Row", true);
+                    contentBuilder.AddAttribute(3, "Spacing", 1);
+                    contentBuilder.AddAttribute(4, "Class", "mt-3");
+                    contentBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(stackBuilder =>
+                    {
+                        stackBuilder.OpenComponent<MudChip>(0);
+                        stackBuilder.AddAttribute(1, "Size", Size.Small);
+                        stackBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(_ => _.AddContent(0,
+                            $"{dashboard.Widgets.Count} widgets")));
+                        stackBuilder.CloseComponent();
+
+                        stackBuilder.OpenComponent<MudChip>(1);
+                        stackBuilder.AddAttribute(2, "Size", Size.Small);
+                        stackBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(_ => _.AddContent(0,
+                            dashboard.UpdatedAt.ToString("MMM dd, yyyy"))));
+                        stackBuilder.CloseComponent();
+                    }));
+                    contentBuilder.CloseComponent();
+                }));
+                cardBuilder.CloseComponent();
+
+                // Card Actions
+                cardBuilder.OpenComponent<MudCardActions>(0);
+                cardBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(actionsBuilder =>
+                {
+                    actionsBuilder.OpenComponent<MudButton>(0);
+                    actionsBuilder.AddAttribute(1, "Variant", Variant.Text);
+                    actionsBuilder.AddAttribute(2, "Color", Color.Primary);
+                    actionsBuilder.AddAttribute(3, "StartIcon", Icons.Material.Filled.Visibility);
+                    actionsBuilder.AddAttribute(4, "OnClick", EventCallback.Factory.Create(this,
+                        () => Navigation.NavigateTo($"/dashboards/view/{dashboard.Id}")));
+                    actionsBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(_ => _.AddContent(0, "View")));
+                    actionsBuilder.CloseComponent();
+
+                    if (!isPublic && !isTemplate)
+                    {
+                        actionsBuilder.OpenComponent<MudButton>(1);
+                        actionsBuilder.AddAttribute(2, "Variant", Variant.Text);
+                        actionsBuilder.AddAttribute(3, "Color", Color.Default);
+                        actionsBuilder.AddAttribute(4, "StartIcon", Icons.Material.Filled.Edit);
+                        actionsBuilder.AddAttribute(5, "OnClick", EventCallback.Factory.Create(this,
+                            () => Navigation.NavigateTo($"/dashboards/designer/{dashboard.Id}")));
+                        actionsBuilder.AddAttribute(6, "ChildContent", (RenderFragment)(_ => _.AddContent(0, "Edit")));
+                        actionsBuilder.CloseComponent();
+                    }
+
+                    if (isTemplate)
+                    {
+                        actionsBuilder.OpenComponent<MudButton>(2);
+                        actionsBuilder.AddAttribute(3, "Variant", Variant.Text);
+                        actionsBuilder.AddAttribute(4, "Color", Color.Success);
+                        actionsBuilder.AddAttribute(5, "StartIcon", Icons.Material.Filled.ContentCopy);
+                        actionsBuilder.AddAttribute(6, "OnClick", EventCallback.Factory.Create(this,
+                            () => CloneDashboard(dashboard.Id)));
+                        actionsBuilder.AddAttribute(7, "ChildContent", (RenderFragment)(_ => _.AddContent(0, "Use Template")));
+                        actionsBuilder.CloseComponent();
+                    }
+                    else if (!isPublic)
+                    {
+                        actionsBuilder.OpenComponent<MudIconButton>(3);
+                        actionsBuilder.AddAttribute(4, "Icon", Icons.Material.Filled.Delete);
+                        actionsBuilder.AddAttribute(5, "Color", Color.Error);
+                        actionsBuilder.AddAttribute(6, "OnClick", EventCallback.Factory.Create(this,
+                            () => DeleteDashboard(dashboard.Id)));
+                        actionsBuilder.CloseComponent();
+                    }
+                }));
+                cardBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private void CreateNewDashboard()
+    {
+        Navigation.NavigateTo("/dashboards/designer");
+    }
+
+    private async Task CloneDashboard(Guid dashboardId)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"/api/dashboards/{dashboardId}/clone",
+                new { Name = (string?)null });
+            response.EnsureSuccessStatusCode();
+
+            var cloned = await response.Content.ReadFromJsonAsync<DashboardDefinition>();
+            if (cloned != null)
+            {
+                Snackbar.Add("Dashboard cloned successfully", Severity.Success);
+                Navigation.NavigateTo($"/dashboards/designer/{cloned.Id}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error cloning dashboard: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteDashboard(Guid dashboardId)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Delete Dashboard",
+            "Are you sure you want to delete this dashboard? This action cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (result == true)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"/api/dashboards/{dashboardId}");
+                response.EnsureSuccessStatusCode();
+
+                Snackbar.Add("Dashboard deleted successfully", Severity.Success);
+                await LoadDashboards();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting dashboard: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

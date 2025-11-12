@@ -1,0 +1,383 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@page "/route-optimization-example"
+@using Honua.MapSDK.Models.RouteOptimization
+
+<div class="route-optimization-example">
+    <h1>Route Optimization Example</h1>
+    <p class="lead">
+        Demonstrating TSP/VRP optimization with time windows, capacity constraints, and visual comparison.
+    </p>
+
+    <div class="example-tabs">
+        <button class="tab @(activeTab == "planner" ? "active" : "")"
+                @onclick='() => activeTab = "planner"'>
+            Multi-Stop Planner
+        </button>
+        <button class="tab @(activeTab == "basic" ? "active" : "")"
+                @onclick='() => activeTab = "basic"'>
+            Basic Optimization
+        </button>
+        <button class="tab @(activeTab == "advanced" ? "active" : "")"
+                @onclick='() => activeTab = "advanced"'>
+            Advanced (VRP)
+        </button>
+        <button class="tab @(activeTab == "comparison" ? "active" : "")"
+                @onclick='() => activeTab = "comparison"'>
+            Route Comparison
+        </button>
+    </div>
+
+    <div class="example-content">
+        @if (activeTab == "planner")
+        {
+            <div class="example-section">
+                <h2>Interactive Multi-Stop Planner</h2>
+                <p>Drag and drop waypoints, configure constraints, and optimize routes interactively.</p>
+
+                <MultiStopPlanner
+                    OnWaypointsChanged="@HandleWaypointsChanged"
+                    OnOptimizationApplied="@HandleOptimizationApplied"
+                    ShowAdvancedOptions="true" />
+            </div>
+        }
+        else if (activeTab == "basic")
+        {
+            <div class="example-section">
+                <h2>Basic TSP Optimization</h2>
+                <p>Simple route optimization with 5 Hawaiian locations.</p>
+
+                <div class="example-demo">
+                    <button class="btn btn-primary" @onclick="RunBasicExample">
+                        Run Basic Example
+                    </button>
+
+                    @if (basicResult != null)
+                    {
+                        <div class="results">
+                            <h3>Results</h3>
+                            <div class="result-grid">
+                                <div class="result-card">
+                                    <div class="result-label">Distance Saved</div>
+                                    <div class="result-value">
+                                        @((basicResult.Metrics.DistanceSavedMeters / 1000).ToString("F2")) km
+                                    </div>
+                                    <div class="result-percent">
+                                        @basicResult.Metrics.DistanceSavingsPercent.ToString("F1")%
+                                    </div>
+                                </div>
+
+                                <div class="result-card">
+                                    <div class="result-label">Time Saved</div>
+                                    <div class="result-value">
+                                        @(basicResult.Metrics.DurationSavedSeconds / 60) min
+                                    </div>
+                                    <div class="result-percent">
+                                        @basicResult.Metrics.DurationSavingsPercent.ToString("F1")%
+                                    </div>
+                                </div>
+
+                                <div class="result-card">
+                                    <div class="result-label">Algorithm</div>
+                                    <div class="result-value small">
+                                        @basicResult.Algorithm
+                                    </div>
+                                    <div class="result-percent">
+                                        @basicResult.ComputationTimeMs ms
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sequence-comparison">
+                                <div class="sequence-column">
+                                    <h4>Original Order</h4>
+                                    <ol>
+                                        @foreach (var waypoint in basicResult.OriginalSequence)
+                                        {
+                                            <li>@waypoint.Name</li>
+                                        }
+                                    </ol>
+                                </div>
+                                <div class="sequence-column">
+                                    <h4>Optimized Order</h4>
+                                    <ol>
+                                        @foreach (var waypoint in basicResult.OptimizedSequence)
+                                        {
+                                            <li>@waypoint.Name</li>
+                                        }
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (activeTab == "advanced")
+        {
+            <div class="example-section">
+                <h2>Advanced VRP with Constraints</h2>
+                <p>Multi-vehicle routing with capacity constraints and time windows.</p>
+
+                <div class="example-demo">
+                    <button class="btn btn-primary" @onclick="RunAdvancedExample">
+                        Run Advanced Example (VRP)
+                    </button>
+
+                    @if (advancedResult != null)
+                    {
+                        <div class="results">
+                            <h3>Vehicle Routes</h3>
+
+                            @if (advancedResult.Routes.Any())
+                            {
+                                @foreach (var route in advancedResult.Routes)
+                                {
+                                    <div class="vehicle-route-card">
+                                        <h4>Vehicle @(route.VehicleId + 1)</h4>
+                                        <div class="route-stats">
+                                            <div class="stat">
+                                                <span class="label">Distance:</span>
+                                                <span class="value">@((route.TotalDistanceMeters / 1000).ToString("F2")) km</span>
+                                            </div>
+                                            <div class="stat">
+                                                <span class="label">Duration:</span>
+                                                <span class="value">@(route.TotalDurationSeconds / 60) min</span>
+                                            </div>
+                                            <div class="stat">
+                                                <span class="label">Load:</span>
+                                                <span class="value">@route.TotalLoad kg</span>
+                                            </div>
+                                            <div class="stat">
+                                                <span class="label">Stops:</span>
+                                                <span class="value">@route.Waypoints.Count</span>
+                                            </div>
+                                        </div>
+                                        <div class="route-stops">
+                                            <h5>Stops:</h5>
+                                            <ol>
+                                                @foreach (var waypoint in route.Waypoints)
+                                                {
+                                                    <li>
+                                                        @waypoint.Name
+                                                        <small>(Load: @waypoint.Demand kg)</small>
+                                                    </li>
+                                                }
+                                            </ol>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p>Single vehicle route (no VRP needed)</p>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (activeTab == "comparison")
+        {
+            <div class="example-section">
+                <h2>Visual Route Comparison</h2>
+                <p>Compare original vs optimized routes with detailed metrics.</p>
+
+                <div class="example-demo">
+                    @if (comparisonResult == null)
+                    {
+                        <button class="btn btn-primary" @onclick="RunComparisonExample">
+                            Generate Comparison
+                        </button>
+                    }
+                    else
+                    {
+                        <RouteComparison
+                            Result="@comparisonResult"
+                            ShowActions="true"
+                            EnableExport="true"
+                            OnAcceptRoute="@HandleAcceptRoute"
+                            OnRejectRoute="@HandleRejectRoute"
+                            OnExportComparison="@HandleExportComparison" />
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string activeTab = "planner";
+    private OptimizationResult? basicResult;
+    private OptimizationResult? advancedResult;
+    private OptimizationResult? comparisonResult;
+
+    [Inject]
+    private RouteOptimizationService OptimizationService { get; set; } = default!;
+
+    [Inject]
+    private ILogger<RouteOptimizationExample> Logger { get; set; } = default!;
+
+    /// <summary>
+    /// Run basic TSP optimization example
+    /// </summary>
+    private async Task RunBasicExample()
+    {
+        var waypoints = new List<OptimizationWaypoint>
+        {
+            new() { Location = new Coordinate(21.3099, -157.8581), Name = "Honolulu", OriginalIndex = 0 },
+            new() { Location = new Coordinate(21.4389, -158.0001), Name = "Pearl Harbor", OriginalIndex = 1 },
+            new() { Location = new Coordinate(21.5944, -158.1041), Name = "Haleiwa", OriginalIndex = 2 },
+            new() { Location = new Coordinate(21.6694, -157.9473), Name = "Turtle Bay", OriginalIndex = 3 },
+            new() { Location = new Coordinate(21.5294, -157.8481), Name = "Laie", OriginalIndex = 4 }
+        };
+
+        var request = new OptimizationRequest
+        {
+            Waypoints = waypoints,
+            Goal = OptimizationGoal.MinimizeDistance
+        };
+
+        basicResult = await OptimizationService.OptimizeAsync(
+            request,
+            OptimizationProvider.ClientSide);
+
+        Logger.LogInformation("Basic optimization completed: {Savings}% saved",
+            basicResult.Metrics.DistanceSavingsPercent.ToString("F1"));
+    }
+
+    /// <summary>
+    /// Run advanced VRP example with constraints
+    /// </summary>
+    private async Task RunAdvancedExample()
+    {
+        var waypoints = new List<OptimizationWaypoint>
+        {
+            new()
+            {
+                Location = new Coordinate(21.3099, -157.8581),
+                Name = "Stop 1",
+                Demand = 100,
+                ServiceDurationSeconds = 600,
+                TimeWindow = new TimeWindow
+                {
+                    EarliestArrival = DateTime.Today.AddHours(9),
+                    LatestArrival = DateTime.Today.AddHours(12)
+                },
+                OriginalIndex = 0
+            },
+            new()
+            {
+                Location = new Coordinate(21.4389, -158.0001),
+                Name = "Stop 2",
+                Demand = 150,
+                ServiceDurationSeconds = 900,
+                TimeWindow = new TimeWindow
+                {
+                    EarliestArrival = DateTime.Today.AddHours(10),
+                    LatestArrival = DateTime.Today.AddHours(14)
+                },
+                OriginalIndex = 1
+            },
+            new()
+            {
+                Location = new Coordinate(21.5944, -158.1041),
+                Name = "Stop 3",
+                Demand = 200,
+                ServiceDurationSeconds = 1200,
+                OriginalIndex = 2
+            },
+            new()
+            {
+                Location = new Coordinate(21.6694, -157.9473),
+                Name = "Stop 4",
+                Demand = 120,
+                ServiceDurationSeconds = 600,
+                OriginalIndex = 3
+            },
+            new()
+            {
+                Location = new Coordinate(21.5294, -157.8481),
+                Name = "Stop 5",
+                Demand = 180,
+                ServiceDurationSeconds = 900,
+                OriginalIndex = 4
+            }
+        };
+
+        var request = new OptimizationRequest
+        {
+            Waypoints = waypoints,
+            Goal = OptimizationGoal.MinimizeCost,
+            EnableTimeWindows = true,
+            MultipleVehicles = true,
+            NumberOfVehicles = 2,
+            Vehicle = new VehicleConstraints
+            {
+                MaxCapacity = 350,
+                MaxDurationSeconds = 28800, // 8 hours
+                MaxDistanceMeters = 100000, // 100 km
+                CostPerMeter = 0.001,
+                CostPerSecond = 0.01
+            }
+        };
+
+        advancedResult = await OptimizationService.OptimizeAsync(
+            request,
+            OptimizationProvider.ClientSide);
+
+        Logger.LogInformation("Advanced VRP completed with {Vehicles} vehicles",
+            advancedResult.Routes.Count);
+    }
+
+    /// <summary>
+    /// Run comparison example
+    /// </summary>
+    private async Task RunComparisonExample()
+    {
+        await RunBasicExample();
+        comparisonResult = basicResult;
+    }
+
+    /// <summary>
+    /// Handle waypoints changed in planner
+    /// </summary>
+    private void HandleWaypointsChanged(List<OptimizationWaypoint> waypoints)
+    {
+        Logger.LogInformation("Waypoints updated: {Count} waypoints", waypoints.Count);
+    }
+
+    /// <summary>
+    /// Handle optimization applied
+    /// </summary>
+    private void HandleOptimizationApplied(OptimizationResult result)
+    {
+        Logger.LogInformation("Optimization applied: {Savings}% improvement",
+            result.Metrics.DistanceSavingsPercent.ToString("F1"));
+    }
+
+    /// <summary>
+    /// Handle accept route
+    /// </summary>
+    private void HandleAcceptRoute(OptimizationResult result)
+    {
+        Logger.LogInformation("Route accepted");
+    }
+
+    /// <summary>
+    /// Handle reject route
+    /// </summary>
+    private void HandleRejectRoute()
+    {
+        Logger.LogInformation("Route rejected");
+    }
+
+    /// <summary>
+    /// Handle export comparison
+    /// </summary>
+    private void HandleExportComparison(OptimizationResult result)
+    {
+        Logger.LogInformation("Export comparison requested");
+    }
+}

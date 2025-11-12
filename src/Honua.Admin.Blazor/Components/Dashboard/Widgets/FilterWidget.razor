@@ -1,0 +1,200 @@
+@* Copyright (c) 2025 HonuaIO *@
+@* Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information. *@
+
+@using Honua.Server.Core.Models.Dashboard
+
+<div class="filter-widget">
+    @if (Config != null)
+    {
+        <MudPaper Class="pa-4" Elevation="0">
+            @foreach (var filter in Config.Filters)
+            {
+                <div class="mb-3">
+                    @switch (filter.Type.ToLower())
+                    {
+                        case "text":
+                            <MudTextField @bind-Value="@_filterValues[filter.Id]"
+                                          Label="@filter.Label"
+                                          Variant="Variant.Outlined"
+                                          Immediate="@Config.AutoApply"
+                                          OnBlur="@(() => ApplyFilters())" />
+                            break;
+
+                        case "select":
+                            <MudSelect @bind-Value="@_filterValues[filter.Id]"
+                                       Label="@filter.Label"
+                                       Variant="Variant.Outlined"
+                                       OnClose="@(() => ApplyFilters())">
+                                <MudSelectItem Value="@((string?)null)">All</MudSelectItem>
+                                @foreach (var option in filter.Options)
+                                {
+                                    <MudSelectItem Value="@option">@option</MudSelectItem>
+                                }
+                            </MudSelect>
+                            break;
+
+                        case "date":
+                            <MudDatePicker @bind-Date="@_dateFilterValues[filter.Id]"
+                                           Label="@filter.Label"
+                                           Variant="Variant.Outlined"
+                                           OnClosed="@(() => ApplyFilters())" />
+                            break;
+
+                        case "daterange":
+                            <MudDateRangePicker @bind-DateRange="@_dateRangeFilterValues[filter.Id]"
+                                                Label="@filter.Label"
+                                                Variant="Variant.Outlined"
+                                                OnClosed="@(() => ApplyFilters())" />
+                            break;
+
+                        case "number":
+                            <MudNumericField @bind-Value="@_numberFilterValues[filter.Id]"
+                                             Label="@filter.Label"
+                                             Variant="Variant.Outlined"
+                                             OnBlur="@(() => ApplyFilters())" />
+                            break;
+
+                        case "range":
+                            <MudSlider @bind-Value="@_numberFilterValues[filter.Id]"
+                                       Min="0" Max="100"
+                                       Step="1">
+                                @filter.Label: @_numberFilterValues[filter.Id]
+                            </MudSlider>
+                            break;
+                    }
+                </div>
+            }
+
+            @if (Config.ShowActions)
+            {
+                <MudStack Row="true" Spacing="2" Class="mt-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               OnClick="@ApplyFilters" StartIcon="@Icons.Material.Filled.FilterAlt">
+                        Apply
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default"
+                               OnClick="@ResetFilters" StartIcon="@Icons.Material.Filled.Clear">
+                        Reset
+                    </MudButton>
+                </MudStack>
+            }
+        </MudPaper>
+    }
+    else
+    {
+        <MudText Typo="Typo.body2" Color="Color.Default">Configure filter settings</MudText>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public FilterWidgetConfig? Config { get; set; }
+
+    [Parameter]
+    public EventCallback<Dictionary<string, object>> OnFiltersChanged { get; set; }
+
+    private Dictionary<string, string?> _filterValues = new();
+    private Dictionary<string, DateTime?> _dateFilterValues = new();
+    private Dictionary<string, DateRange?> _dateRangeFilterValues = new();
+    private Dictionary<string, double?> _numberFilterValues = new();
+
+    protected override void OnParametersSet()
+    {
+        if (Config != null)
+        {
+            // Initialize filter dictionaries
+            foreach (var filter in Config.Filters)
+            {
+                if (!_filterValues.ContainsKey(filter.Id))
+                {
+                    _filterValues[filter.Id] = filter.DefaultValue?.ToString();
+                }
+                if (!_dateFilterValues.ContainsKey(filter.Id))
+                {
+                    _dateFilterValues[filter.Id] = filter.DefaultValue as DateTime?;
+                }
+                if (!_dateRangeFilterValues.ContainsKey(filter.Id))
+                {
+                    _dateRangeFilterValues[filter.Id] = null;
+                }
+                if (!_numberFilterValues.ContainsKey(filter.Id))
+                {
+                    if (filter.DefaultValue != null && double.TryParse(filter.DefaultValue.ToString(), out var numVal))
+                    {
+                        _numberFilterValues[filter.Id] = numVal;
+                    }
+                    else
+                    {
+                        _numberFilterValues[filter.Id] = null;
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        if (Config == null) return;
+
+        var filters = new Dictionary<string, object>();
+
+        foreach (var filter in Config.Filters)
+        {
+            switch (filter.Type.ToLower())
+            {
+                case "text":
+                case "select":
+                    if (!string.IsNullOrEmpty(_filterValues[filter.Id]))
+                    {
+                        filters[filter.Field] = _filterValues[filter.Id]!;
+                    }
+                    break;
+
+                case "date":
+                    if (_dateFilterValues[filter.Id].HasValue)
+                    {
+                        filters[filter.Field] = _dateFilterValues[filter.Id]!.Value;
+                    }
+                    break;
+
+                case "daterange":
+                    if (_dateRangeFilterValues[filter.Id] != null)
+                    {
+                        filters[filter.Field] = _dateRangeFilterValues[filter.Id]!;
+                    }
+                    break;
+
+                case "number":
+                case "range":
+                    if (_numberFilterValues[filter.Id].HasValue)
+                    {
+                        filters[filter.Field] = _numberFilterValues[filter.Id]!.Value;
+                    }
+                    break;
+            }
+        }
+
+        await OnFiltersChanged.InvokeAsync(filters);
+    }
+
+    private async Task ResetFilters()
+    {
+        _filterValues.Clear();
+        _dateFilterValues.Clear();
+        _dateRangeFilterValues.Clear();
+        _numberFilterValues.Clear();
+
+        if (Config != null)
+        {
+            foreach (var filter in Config.Filters)
+            {
+                _filterValues[filter.Id] = null;
+                _dateFilterValues[filter.Id] = null;
+                _dateRangeFilterValues[filter.Id] = null;
+                _numberFilterValues[filter.Id] = null;
+            }
+        }
+
+        await OnFiltersChanged.InvokeAsync(new Dictionary<string, object>());
+    }
+}

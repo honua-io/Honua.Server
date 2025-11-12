@@ -76,8 +76,45 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
 
         // SECURITY: Validate API key using constant-time comparison to prevent timing attacks
         // Timing attacks could allow attackers to determine valid API key prefixes by measuring response times
-        var validApiKey = Options.ApiKeys.FirstOrDefault(k =>
-            IsApiKeyMatch(k.Key, apiKey));
+        ApiKeyDefinition? validApiKey = null;
+
+        foreach (var configuredKey in Options.ApiKeys)
+        {
+            bool isMatch;
+
+            // Support both hashed and legacy plain-text keys
+            if (!string.IsNullOrEmpty(configuredKey.KeyHash) && !string.IsNullOrEmpty(configuredKey.KeySalt))
+            {
+                // New hashed key validation using PBKDF2
+                var providedKeyHash = HashApiKey(apiKey, configuredKey.KeySalt);
+                isMatch = string.Equals(providedKeyHash, configuredKey.KeyHash, StringComparison.Ordinal);
+
+                Logger.LogDebug("Validating hashed API key '{KeyName}'", configuredKey.Name);
+            }
+            else if (!string.IsNullOrEmpty(configuredKey.Key))
+            {
+                // Legacy plain-text key validation (deprecated)
+                isMatch = IsApiKeyMatch(configuredKey.Key, apiKey);
+
+                Logger.LogWarning(
+                    "API key '{KeyName}' is using deprecated plain-text storage. " +
+                    "Consider migrating to hashed keys for better security.",
+                    configuredKey.Name);
+            }
+            else
+            {
+                Logger.LogWarning(
+                    "API key '{KeyName}' has invalid configuration (missing Key or KeyHash/KeySalt)",
+                    configuredKey.Name);
+                continue; // Invalid key configuration
+            }
+
+            if (isMatch)
+            {
+                validApiKey = configuredKey;
+                break;
+            }
+        }
 
         if (validApiKey == null)
         {
@@ -190,6 +227,73 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
 
         return CryptographicOperations.FixedTimeEquals(configuredBytes, providedBytes);
     }
+
+    /// <summary>
+    /// Hashes an API key with a salt using PBKDF2.
+    /// </summary>
+    /// <param name="apiKey">The API key to hash.</param>
+    /// <param name="salt">The base64-encoded salt to use for hashing.</param>
+    /// <returns>Base64-encoded hash of the API key.</returns>
+    /// <remarks>
+    /// SECURITY: Uses PBKDF2 (Password-Based Key Derivation Function 2) with:
+    /// - SHA256 as the hash algorithm
+    /// - 100,000 iterations (OWASP recommended minimum as of 2023)
+    /// - 32-byte (256-bit) output hash size
+    ///
+    /// This makes brute-force attacks computationally expensive even if the configuration
+    /// file is compromised.
+    /// </remarks>
+    private static string HashApiKey(string apiKey, string salt)
+    {
+        const int iterations = 100000;
+        const int hashSize = 32;
+
+        var saltBytes = Convert.FromBase64String(salt);
+        using var pbkdf2 = new Rfc2898DeriveBytes(
+            apiKey,
+            saltBytes,
+            iterations,
+            HashAlgorithmName.SHA256);
+
+        var hash = pbkdf2.GetBytes(hashSize);
+        return Convert.ToBase64String(hash);
+    }
+
+    /// <summary>
+    /// Generates a random salt for API key hashing.
+    /// </summary>
+    /// <returns>Base64-encoded random salt (32 bytes).</returns>
+    /// <remarks>
+    /// SECURITY: Uses cryptographically secure random number generation.
+    /// Each API key should have its own unique salt.
+    /// </remarks>
+    public static string GenerateSalt()
+    {
+        var saltBytes = new byte[32];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(saltBytes);
+        return Convert.ToBase64String(saltBytes);
+    }
+
+    /// <summary>
+    /// Generates a hash for a given API key and salt.
+    /// Useful for generating configuration values.
+    /// </summary>
+    /// <param name="apiKey">The API key to hash.</param>
+    /// <returns>A tuple containing the base64-encoded hash and salt.</returns>
+    /// <example>
+    /// <code>
+    /// var (hash, salt) = ApiKeyAuthenticationHandler.GenerateApiKeyHash("my-secret-key");
+    /// Console.WriteLine($"KeyHash: {hash}");
+    /// Console.WriteLine($"KeySalt: {salt}");
+    /// </code>
+    /// </example>
+    public static (string Hash, string Salt) GenerateApiKeyHash(string apiKey)
+    {
+        var salt = GenerateSalt();
+        var hash = HashApiKey(apiKey, salt);
+        return (hash, salt);
+    }
 }
 
 /// <summary>
@@ -213,7 +317,26 @@ public sealed class ApiKeyAuthenticationOptions : AuthenticationSchemeOptions
 
 /// <summary>
 /// Defines an API key with associated metadata.
+/// Supports both legacy plain-text keys and secure hashed keys.
 /// </summary>
+/// <remarks>
+/// SECURITY: For new API keys, use KeyHash and KeySalt instead of Key for better security.
+///
+/// Example configuration with hashed keys:
+/// <code>
+/// "ApiKeys": [
+///   {
+///     "Name": "service-account",
+///     "KeyHash": "base64-encoded-hash",
+///     "KeySalt": "base64-encoded-salt",
+///     "Roles": ["User", "Admin"],
+///     "Description": "Service account for automated tasks"
+///   }
+/// ]
+/// </code>
+///
+/// To generate a hash for a new key, use the GenerateApiKeyHash static method in ApiKeyAuthenticationHandler.
+/// </remarks>
 public sealed class ApiKeyDefinition
 {
     /// <summary>
@@ -222,9 +345,24 @@ public sealed class ApiKeyDefinition
     public required string Name { get; init; }
 
     /// <summary>
-    /// The actual API key value.
+    /// The actual API key value (legacy - deprecated).
+    /// For new keys, use KeyHash and KeySalt instead.
     /// </summary>
-    public required string Key { get; init; }
+    [Obsolete("Use KeyHash and KeySalt instead for better security")]
+    public string? Key { get; init; }
+
+    /// <summary>
+    /// SHA256 hash of the API key (recommended).
+    /// Use this in combination with KeySalt for secure storage.
+    /// Generated using PBKDF2 with 100,000 iterations.
+    /// </summary>
+    public string? KeyHash { get; init; }
+
+    /// <summary>
+    /// Salt used for hashing the API key.
+    /// Required when using KeyHash. Should be a unique random value per key.
+    /// </summary>
+    public string? KeySalt { get; init; }
 
     /// <summary>
     /// Roles assigned to this API key.

@@ -1,0 +1,267 @@
+@using Honua.MapSDK.Models
+
+<div class="style-panel">
+    @if (VectorLayer != null)
+    {
+        <MudStack Spacing="2">
+            <!-- Fill Color -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">Fill Color</MudText>
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <input type="color"
+                           value="@FillColor"
+                           @oninput="OnFillColorChanged"
+                           class="color-picker" />
+                    <MudTextField @bind-Value="@FillColor"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense"
+                                 Placeholder="#000000"
+                                 Class="flex-1" />
+                </MudStack>
+            </div>
+
+            <!-- Fill Opacity -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Fill Opacity: @FillOpacity.ToString("P0")
+                </MudText>
+                <MudSlider @bind-Value="@FillOpacity"
+                          Min="0"
+                          Max="1"
+                          Step="0.05"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @FillOpacity.ToString("P0")
+                </MudSlider>
+            </div>
+
+            <!-- Fill Outline Color -->
+            <MudSwitch @bind-Value="@HasOutline"
+                      Label="Show Outline"
+                      Color="Color.Primary"
+                      Class="mb-2" />
+
+            @if (HasOutline)
+            {
+                <div class="property-group">
+                    <MudText Typo="Typo.caption" Class="property-label">Outline Color</MudText>
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <input type="color"
+                               value="@OutlineColor"
+                               @oninput="OnOutlineColorChanged"
+                               class="color-picker" />
+                        <MudTextField @bind-Value="@OutlineColor"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Placeholder="#000000"
+                                     Class="flex-1" />
+                    </MudStack>
+                </div>
+            }
+
+            <!-- Fill Pattern -->
+            <MudSwitch @bind-Value="@HasPattern"
+                      Label="Use Fill Pattern"
+                      Color="Color.Primary"
+                      Class="mb-2" />
+
+            @if (HasPattern)
+            {
+                <MudSelect @bind-Value="@FillPattern"
+                          Label="Pattern"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense">
+                    <MudSelectItem Value="@("dots")">Dots</MudSelectItem>
+                    <MudSelectItem Value="@("stripes")">Stripes</MudSelectItem>
+                    <MudSelectItem Value="@("diagonal")">Diagonal</MudSelectItem>
+                    <MudSelectItem Value="@("cross")">Cross Hatch</MudSelectItem>
+                </MudSelect>
+            }
+
+            <!-- Data-Driven Styling -->
+            <MudExpansionPanels Elevation="0" Class="mt-2">
+                <MudExpansionPanel Text="Advanced: Data-Driven">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">
+                        Style fill color based on data properties
+                    </MudText>
+                    <MudSwitch @bind-Value="@UseDataDriven"
+                              Label="Enable data-driven styling"
+                              Color="Color.Primary" />
+                    @if (UseDataDriven)
+                    {
+                        <MudTextField @bind-Value="@DataProperty"
+                                     Label="Property Name"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Class="mt-2" />
+                        <MudText Typo="Typo.caption" Color="Color.Info" Class="mt-1">
+                            Use MapLibre expressions for advanced styling
+                        </MudText>
+                    }
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudStack>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public LayerDefinition? Layer { get; set; }
+
+    [Parameter]
+    public EventCallback OnStyleChanged { get; set; }
+
+    private VectorLayer? VectorLayer => Layer as VectorLayer;
+
+    private string _fillColor = "#3388ff";
+    private string FillColor
+    {
+        get => _fillColor;
+        set
+        {
+            _fillColor = value;
+            UpdatePaint("fill-color", value);
+        }
+    }
+
+    private double _fillOpacity = 0.5;
+    private double FillOpacity
+    {
+        get => _fillOpacity;
+        set
+        {
+            _fillOpacity = value;
+            UpdatePaint("fill-opacity", value);
+        }
+    }
+
+    private bool _hasOutline = false;
+    private bool HasOutline
+    {
+        get => _hasOutline;
+        set
+        {
+            _hasOutline = value;
+            if (value)
+            {
+                UpdatePaint("fill-outline-color", OutlineColor);
+            }
+            else
+            {
+                RemovePaintProperty("fill-outline-color");
+            }
+        }
+    }
+
+    private string _outlineColor = "#000000";
+    private string OutlineColor
+    {
+        get => _outlineColor;
+        set
+        {
+            _outlineColor = value;
+            if (HasOutline)
+            {
+                UpdatePaint("fill-outline-color", value);
+            }
+        }
+    }
+
+    private bool _hasPattern = false;
+    private bool HasPattern
+    {
+        get => _hasPattern;
+        set
+        {
+            _hasPattern = value;
+            if (value)
+            {
+                UpdatePaint("fill-pattern", FillPattern);
+            }
+            else
+            {
+                RemovePaintProperty("fill-pattern");
+            }
+        }
+    }
+
+    private string _fillPattern = "dots";
+    private string FillPattern
+    {
+        get => _fillPattern;
+        set
+        {
+            _fillPattern = value;
+            if (HasPattern)
+            {
+                UpdatePaint("fill-pattern", value);
+            }
+        }
+    }
+
+    private bool UseDataDriven { get; set; } = false;
+    private string DataProperty { get; set; } = "";
+
+    protected override void OnParametersSet()
+    {
+        if (VectorLayer != null)
+        {
+            LoadCurrentValues();
+        }
+    }
+
+    private void LoadCurrentValues()
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        if (VectorLayer.Paint.TryGetValue("fill-color", out var color))
+        {
+            _fillColor = color?.ToString() ?? "#3388ff";
+        }
+
+        if (VectorLayer.Paint.TryGetValue("fill-opacity", out var opacity))
+        {
+            _fillOpacity = Convert.ToDouble(opacity);
+        }
+
+        if (VectorLayer.Paint.TryGetValue("fill-outline-color", out var outline))
+        {
+            _hasOutline = true;
+            _outlineColor = outline?.ToString() ?? "#000000";
+        }
+
+        if (VectorLayer.Paint.TryGetValue("fill-pattern", out var pattern))
+        {
+            _hasPattern = true;
+            _fillPattern = pattern?.ToString() ?? "dots";
+        }
+    }
+
+    private void OnFillColorChanged(ChangeEventArgs e)
+    {
+        FillColor = e.Value?.ToString() ?? "#3388ff";
+    }
+
+    private void OnOutlineColorChanged(ChangeEventArgs e)
+    {
+        OutlineColor = e.Value?.ToString() ?? "#000000";
+    }
+
+    private void UpdatePaint(string property, object value)
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        VectorLayer.Paint[property] = value;
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+
+    private void RemovePaintProperty(string property)
+    {
+        if (VectorLayer?.Paint == null) return;
+
+        VectorLayer.Paint.Remove(property);
+        VectorLayer.UpdatedAt = DateTime.UtcNow;
+        OnStyleChanged.InvokeAsync();
+    }
+}

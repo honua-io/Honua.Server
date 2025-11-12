@@ -1,0 +1,301 @@
+@using Honua.MapSDK.Models
+
+<div class="style-panel">
+    @if (RasterLayer != null)
+    {
+        <MudStack Spacing="2">
+            <!-- Brightness -->
+            <MudText Typo="Typo.subtitle2" Class="mb-2">Brightness</MudText>
+
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Brightness Min: @BrightnessMin.ToString("F2")
+                </MudText>
+                <MudSlider @bind-Value="@BrightnessMin"
+                          Min="-1"
+                          Max="1"
+                          Step="0.05"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @BrightnessMin.ToString("F2")
+                </MudSlider>
+            </div>
+
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Brightness Max: @BrightnessMax.ToString("F2")
+                </MudText>
+                <MudSlider @bind-Value="@BrightnessMax"
+                          Min="-1"
+                          Max="1"
+                          Step="0.05"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @BrightnessMax.ToString("F2")
+                </MudSlider>
+            </div>
+
+            <MudDivider Class="my-2" />
+
+            <!-- Contrast -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Contrast: @Contrast.ToString("F2")
+                </MudText>
+                <MudSlider @bind-Value="@Contrast"
+                          Min="-1"
+                          Max="1"
+                          Step="0.05"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @Contrast.ToString("F2")
+                </MudSlider>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    -1 = lowest, 0 = normal, 1 = highest
+                </MudText>
+            </div>
+
+            <!-- Saturation -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Saturation: @Saturation.ToString("F2")
+                </MudText>
+                <MudSlider @bind-Value="@Saturation"
+                          Min="-1"
+                          Max="1"
+                          Step="0.05"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @Saturation.ToString("F2")
+                </MudSlider>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    -1 = grayscale, 0 = normal, 1 = oversaturated
+                </MudText>
+            </div>
+
+            <!-- Hue Rotation -->
+            <div class="property-group">
+                <MudText Typo="Typo.caption" Class="property-label">
+                    Hue Rotation: @HueRotate°
+                </MudText>
+                <MudSlider @bind-Value="@HueRotate"
+                          Min="0"
+                          Max="360"
+                          Step="15"
+                          Variant="Variant.Filled"
+                          Color="Color.Primary">
+                    @HueRotate°
+                </MudSlider>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Rotate color wheel by degrees
+                </MudText>
+            </div>
+
+            <MudDivider Class="my-2" />
+
+            <!-- Resampling -->
+            <MudSelect @bind-Value="@Resampling"
+                      Label="Resampling Method"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense">
+                <MudSelectItem Value="@("linear")">Linear (Smooth)</MudSelectItem>
+                <MudSelectItem Value="@("nearest")">Nearest (Crisp)</MudSelectItem>
+            </MudSelect>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Linear = smooth transitions, Nearest = sharp pixels
+            </MudText>
+
+            <!-- Fade Duration -->
+            <MudNumericField @bind-Value="@FadeDuration"
+                            Label="Fade Duration (ms)"
+                            Variant="Variant.Outlined"
+                            Margin="Margin.Dense"
+                            Min="0"
+                            Max="5000"
+                            Step="100"
+                            Class="mt-2"
+                            HelperText="Fade duration when loading tiles" />
+
+            <!-- Quick Presets -->
+            <MudExpansionPanels Elevation="0" Class="mt-2">
+                <MudExpansionPanel Text="Quick Presets">
+                    <MudStack Row="true" Spacing="1" Class="flex-wrap">
+                        <MudChip Size="Size.Small" OnClick="@(() => ApplyPreset("normal"))">Normal</MudChip>
+                        <MudChip Size="Size.Small" OnClick="@(() => ApplyPreset("bright"))">Bright</MudChip>
+                        <MudChip Size="Size.Small" OnClick="@(() => ApplyPreset("dark"))">Dark</MudChip>
+                        <MudChip Size="Size.Small" OnClick="@(() => ApplyPreset("high-contrast"))">High Contrast</MudChip>
+                        <MudChip Size="Size.Small" OnClick="@(() => ApplyPreset("grayscale"))">Grayscale</MudChip>
+                        <MudChip Size="Size.Small" OnClick="@(() => ApplyPreset("sepia"))">Sepia</MudChip>
+                    </MudStack>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        </MudStack>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public LayerDefinition? Layer { get; set; }
+
+    [Parameter]
+    public EventCallback OnStyleChanged { get; set; }
+
+    private RasterLayer? RasterLayer => Layer as RasterLayer;
+
+    private double _brightnessMin = 0;
+    private double BrightnessMin
+    {
+        get => _brightnessMin;
+        set
+        {
+            _brightnessMin = value;
+            UpdateProperty();
+        }
+    }
+
+    private double _brightnessMax = 1;
+    private double BrightnessMax
+    {
+        get => _brightnessMax;
+        set
+        {
+            _brightnessMax = value;
+            UpdateProperty();
+        }
+    }
+
+    private double _contrast = 0;
+    private double Contrast
+    {
+        get => _contrast;
+        set
+        {
+            _contrast = value;
+            UpdateProperty();
+        }
+    }
+
+    private double _saturation = 0;
+    private double Saturation
+    {
+        get => _saturation;
+        set
+        {
+            _saturation = value;
+            UpdateProperty();
+        }
+    }
+
+    private double _hueRotate = 0;
+    private double HueRotate
+    {
+        get => _hueRotate;
+        set
+        {
+            _hueRotate = value;
+            UpdateProperty();
+        }
+    }
+
+    private string _resampling = "linear";
+    private string Resampling
+    {
+        get => _resampling;
+        set
+        {
+            _resampling = value;
+            UpdateProperty();
+        }
+    }
+
+    private int FadeDuration { get; set; } = 300;
+
+    protected override void OnParametersSet()
+    {
+        if (RasterLayer != null)
+        {
+            LoadCurrentValues();
+        }
+    }
+
+    private void LoadCurrentValues()
+    {
+        if (RasterLayer == null) return;
+
+        _brightnessMin = RasterLayer.BrightnessMin;
+        _brightnessMax = RasterLayer.BrightnessMax;
+        _contrast = RasterLayer.Contrast;
+        _saturation = RasterLayer.Saturation;
+        _hueRotate = RasterLayer.HueRotate;
+        _resampling = RasterLayer.Resampling;
+    }
+
+    private void UpdateProperty()
+    {
+        if (RasterLayer == null) return;
+
+        RasterLayer.BrightnessMin = BrightnessMin;
+        RasterLayer.BrightnessMax = BrightnessMax;
+        RasterLayer.Contrast = Contrast;
+        RasterLayer.Saturation = Saturation;
+        RasterLayer.HueRotate = HueRotate;
+        RasterLayer.Resampling = Resampling;
+        RasterLayer.UpdatedAt = DateTime.UtcNow;
+
+        OnStyleChanged.InvokeAsync();
+    }
+
+    private void ApplyPreset(string preset)
+    {
+        switch (preset)
+        {
+            case "normal":
+                BrightnessMin = 0;
+                BrightnessMax = 1;
+                Contrast = 0;
+                Saturation = 0;
+                HueRotate = 0;
+                break;
+
+            case "bright":
+                BrightnessMin = 0.2;
+                BrightnessMax = 1;
+                Contrast = 0.2;
+                Saturation = 0.1;
+                HueRotate = 0;
+                break;
+
+            case "dark":
+                BrightnessMin = -0.3;
+                BrightnessMax = 0.7;
+                Contrast = 0;
+                Saturation = 0;
+                HueRotate = 0;
+                break;
+
+            case "high-contrast":
+                BrightnessMin = 0;
+                BrightnessMax = 1;
+                Contrast = 0.8;
+                Saturation = 0.2;
+                HueRotate = 0;
+                break;
+
+            case "grayscale":
+                BrightnessMin = 0;
+                BrightnessMax = 1;
+                Contrast = 0;
+                Saturation = -1;
+                HueRotate = 0;
+                break;
+
+            case "sepia":
+                BrightnessMin = 0.1;
+                BrightnessMax = 1;
+                Contrast = 0.1;
+                Saturation = -0.3;
+                HueRotate = 30;
+                break;
+        }
+    }
+}

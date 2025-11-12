@@ -1,0 +1,171 @@
+/* Honua.MapSDK - Isochrone Component Styles */
+
+.honua-isochrone {
+    position: relative;
+    height: 100%;
+}
+
+.isochrone-paper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.isochrone-header {
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.isochrone-header .mud-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.isochrone-content {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Provider section */
+.provider-section {
+    margin-bottom: 16px;
+}
+
+.provider-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Origin section */
+.origin-section {
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 8px;
+}
+
+/* Travel mode section */
+.travel-mode-section .mud-button-group {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.travel-mode-section .mud-button {
+    flex: 1;
+    min-width: 80px;
+}
+
+/* Intervals section */
+.intervals-section .mud-chip-set {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* Results section */
+.isochrone-results {
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.result-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+/* Legend */
+.isochrone-legend {
+    background-color: white;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.legend-item:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+.legend-color {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.legend-item .mud-text {
+    flex: 1;
+}
+
+/* Actions */
+.isochrone-actions {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* Map markers */
+.isochrone-origin-marker {
+    transition: transform 0.2s;
+}
+
+.isochrone-origin-marker:hover {
+    transform: scale(1.2);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .honua-isochrone {
+        width: 100% !important;
+    }
+
+    .travel-mode-section .mud-button {
+        min-width: 60px;
+        font-size: 0.75rem;
+    }
+
+    .isochrone-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .isochrone-header {
+        border-bottom-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .origin-section,
+    .isochrone-results {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .isochrone-legend {
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+
+    .legend-item:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+}

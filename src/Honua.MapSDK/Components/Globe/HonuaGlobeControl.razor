@@ -1,0 +1,359 @@
+@using Honua.MapSDK.Core
+@using Honua.MapSDK.Core.Messages
+@using Honua.MapSDK.Models
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject ComponentBus Bus
+@inject IJSRuntime JS
+
+<div class="honua-globe-control @GetPositionClass() @CssClass" style="@Style">
+    @if (_mapReady || AlwaysShow)
+    {
+        <MudTooltip Text="@GetTooltipText()">
+            <MudIconButton
+                Icon="@GetIcon()"
+                Color="@ButtonColor"
+                Variant="@ButtonVariant"
+                Size="@ButtonSize"
+                OnClick="@ToggleProjection"
+                Disabled="@(!_isSupported || Disabled)"
+                Class="globe-control-button"
+                aria-label="@(_isGlobe ? "Switch to Mercator" : "Switch to Globe")" />
+        </MudTooltip>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Unique identifier for the globe control
+    /// </summary>
+    [Parameter]
+    public string Id { get; set; } = $"globe-control-{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Map ID to synchronize with
+    /// </summary>
+    [Parameter]
+    public string? SyncWith { get; set; }
+
+    /// <summary>
+    /// Position on the map: top-right, top-left, bottom-right, bottom-left, or null for embedded
+    /// </summary>
+    [Parameter]
+    public string? Position { get; set; } = "top-right";
+
+    /// <summary>
+    /// Button color
+    /// </summary>
+    [Parameter]
+    public Color ButtonColor { get; set; } = Color.Default;
+
+    /// <summary>
+    /// Button variant
+    /// </summary>
+    [Parameter]
+    public Variant ButtonVariant { get; set; } = Variant.Filled;
+
+    /// <summary>
+    /// Button size
+    /// </summary>
+    [Parameter]
+    public Size ButtonSize { get; set; } = Size.Medium;
+
+    /// <summary>
+    /// Custom CSS class
+    /// </summary>
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Custom inline styles
+    /// </summary>
+    [Parameter]
+    public string? Style { get; set; }
+
+    /// <summary>
+    /// Show control even if map is not ready
+    /// </summary>
+    [Parameter]
+    public bool AlwaysShow { get; set; } = false;
+
+    /// <summary>
+    /// Disable the button
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; } = false;
+
+    /// <summary>
+    /// Enable atmospheric halo effect in globe mode
+    /// </summary>
+    [Parameter]
+    public bool EnableAtmosphere { get; set; } = true;
+
+    /// <summary>
+    /// Atmosphere color (CSS color string)
+    /// </summary>
+    [Parameter]
+    public string AtmosphereColor { get; set; } = "#87CEEB";
+
+    /// <summary>
+    /// Enable space/stars background in globe mode
+    /// </summary>
+    [Parameter]
+    public bool EnableSpace { get; set; } = true;
+
+    /// <summary>
+    /// Transition duration in milliseconds
+    /// </summary>
+    [Parameter]
+    public int TransitionDuration { get; set; } = 1000;
+
+    /// <summary>
+    /// Automatically adjust camera when switching to globe
+    /// </summary>
+    [Parameter]
+    public bool AutoAdjustCamera { get; set; } = true;
+
+    /// <summary>
+    /// Default zoom level for globe view
+    /// </summary>
+    [Parameter]
+    public double GlobeDefaultZoom { get; set; } = 1.5;
+
+    /// <summary>
+    /// Icon to show in Mercator mode
+    /// </summary>
+    [Parameter]
+    public string MercatorIcon { get; set; } = Icons.Material.Filled.Public;
+
+    /// <summary>
+    /// Icon to show in Globe mode
+    /// </summary>
+    [Parameter]
+    public string GlobeIcon { get; set; } = Icons.Material.Filled.Map;
+
+    /// <summary>
+    /// Event callback when projection changes
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnProjectionChanged { get; set; }
+
+    private IJSObjectReference? _jsModule;
+    private DotNetObjectReference<HonuaGlobeControl>? _dotNetRef;
+    private bool _isGlobe = false;
+    private bool _mapReady = false;
+    private bool _isSupported = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetupSubscriptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _jsModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/Honua.MapSDK/js/honua-globe-projection.js"
+                );
+
+                _dotNetRef = DotNetObjectReference.Create(this);
+
+                // Check if globe projection is supported
+                _isSupported = await _jsModule.InvokeAsync<bool>("isGlobeSupported");
+
+                if (!_isSupported)
+                {
+                    Console.WriteLine("Globe projection is not supported. MapLibre GL JS v5.0+ required.");
+                }
+
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error loading globe projection JS module: {ex.Message}");
+                _isSupported = false;
+            }
+        }
+    }
+
+    private void SetupSubscriptions()
+    {
+        // Listen for map ready message
+        Bus.Subscribe<MapReadyMessage>(args =>
+        {
+            if (SyncWith == null || args.Message.MapId == SyncWith)
+            {
+                _mapReady = true;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for projection change requests
+        Bus.Subscribe<ChangeProjectionRequestMessage>(async args =>
+        {
+            if (args.Message.MapId == SyncWith)
+            {
+                var isGlobe = args.Message.Projection.ToLowerInvariant() == "globe";
+                _isGlobe = isGlobe;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        // Listen for projection changed messages from other components
+        Bus.Subscribe<ProjectionChangedMessage>(args =>
+        {
+            if (args.Message.MapId == SyncWith)
+            {
+                _isGlobe = args.Message.Projection.ToLowerInvariant() == "globe";
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Toggle between mercator and globe projections
+    /// </summary>
+    public async Task ToggleProjection()
+    {
+        if (!_isSupported || Disabled)
+            return;
+
+        try
+        {
+            // Request projection change via ComponentBus
+            var targetProjection = _isGlobe ? "mercator" : "globe";
+
+            await Bus.PublishAsync(new ChangeProjectionRequestMessage
+            {
+                MapId = SyncWith ?? "",
+                ComponentId = Id,
+                Projection = targetProjection,
+                EnableAtmosphere = EnableAtmosphere,
+                EnableTransition = true,
+                TransitionDuration = TransitionDuration
+            }, Id);
+
+            // Update local state
+            _isGlobe = !_isGlobe;
+
+            // Invoke callback
+            await OnProjectionChanged.InvokeAsync(targetProjection);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error toggling projection: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Switch to globe projection
+    /// </summary>
+    public async Task SwitchToGlobe()
+    {
+        if (!_isSupported || Disabled || _isGlobe)
+            return;
+
+        await Bus.PublishAsync(new ChangeProjectionRequestMessage
+        {
+            MapId = SyncWith ?? "",
+            ComponentId = Id,
+            Projection = "globe",
+            EnableAtmosphere = EnableAtmosphere,
+            EnableTransition = true,
+            TransitionDuration = TransitionDuration
+        }, Id);
+
+        _isGlobe = true;
+        await OnProjectionChanged.InvokeAsync("globe");
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Switch to mercator projection
+    /// </summary>
+    public async Task SwitchToMercator()
+    {
+        if (!_isSupported || Disabled || !_isGlobe)
+            return;
+
+        await Bus.PublishAsync(new ChangeProjectionRequestMessage
+        {
+            MapId = SyncWith ?? "",
+            ComponentId = Id,
+            Projection = "mercator",
+            EnableAtmosphere = false,
+            EnableTransition = true,
+            TransitionDuration = TransitionDuration
+        }, Id);
+
+        _isGlobe = false;
+        await OnProjectionChanged.InvokeAsync("mercator");
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// JavaScript callback when projection changes
+    /// </summary>
+    [JSInvokable]
+    public async Task OnProjectionChanged(string projection)
+    {
+        _isGlobe = projection.ToLowerInvariant() == "globe";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string GetIcon()
+    {
+        return _isGlobe ? GlobeIcon : MercatorIcon;
+    }
+
+    private string GetTooltipText()
+    {
+        if (!_isSupported)
+            return "Globe projection not supported (requires MapLibre GL JS v5.0+)";
+
+        if (Disabled)
+            return "Globe control disabled";
+
+        return _isGlobe ? "Switch to Mercator projection" : "Switch to Globe projection";
+    }
+
+    private string GetPositionClass()
+    {
+        if (string.IsNullOrEmpty(Position))
+            return "globe-control-embedded";
+
+        return Position.ToLowerInvariant() switch
+        {
+            "top-right" => "globe-control-floating globe-control-top-right",
+            "top-left" => "globe-control-floating globe-control-top-left",
+            "bottom-right" => "globe-control-floating globe-control-bottom-right",
+            "bottom-left" => "globe-control-floating globe-control-bottom-left",
+            _ => "globe-control-embedded"
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("cleanup");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error cleaning up globe projection module: {ex.Message}");
+            }
+
+            await _jsModule.DisposeAsync();
+        }
+
+        _dotNetRef?.Dispose();
+    }
+}

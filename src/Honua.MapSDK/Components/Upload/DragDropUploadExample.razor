@@ -1,0 +1,173 @@
+@*
+    Copyright (c) 2025 HonuaIO
+    Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+
+    Example usage of the DragDropUpload component with instant visualization
+*@
+@page "/upload-example"
+@using Honua.MapSDK.Services.Import
+@using Honua.MapSDK.Models.Import
+
+<PageTitle>Drag & Drop Upload Example - Honua MapSDK</PageTitle>
+
+<div class="upload-example-container">
+    <div class="header">
+        <h1>Drag & Drop Upload with Auto-Format Detection</h1>
+        <p>
+            Upload geospatial data files with instant visualization. Supports GeoJSON, Shapefile,
+            GeoPackage, KML, CSV, and more. Format detection is automatic.
+        </p>
+    </div>
+
+    <div class="example-tabs">
+        <button class="tab @(_selectedTab == "simple" ? "active" : "")"
+                @onclick='() => _selectedTab = "simple"'>
+            Simple Upload
+        </button>
+        <button class="tab @(_selectedTab == "withmap" ? "active" : "")"
+                @onclick='() => _selectedTab = "withmap"'>
+            Upload + Visualization
+        </button>
+        <button class="tab @(_selectedTab == "advanced" ? "active" : "")"
+                @onclick='() => _selectedTab = "advanced"'>
+            Advanced Options
+        </button>
+    </div>
+
+    <div class="example-content">
+        @if (_selectedTab == "simple")
+        {
+            <div class="example-section">
+                <h2>Simple File Upload</h2>
+                <p>Basic drag-and-drop file upload with format detection and parsing.</p>
+
+                <DragDropUpload OnDataParsed="HandleDataParsed"
+                               OnFormatDetected="HandleFormatDetected"
+                               OnError="HandleError" />
+
+                @if (_parsedData != null)
+                {
+                    <div class="results">
+                        <h3>Parsed Data</h3>
+                        <pre>@_parsedData.Format - @_parsedData.ValidRows features</pre>
+                    </div>
+                }
+            </div>
+        }
+        else if (_selectedTab == "withmap")
+        {
+            <div class="example-section">
+                <h2>Upload with Instant Visualization</h2>
+                <p>Upload data and see it visualized on a map immediately with auto-generated styling.</p>
+
+                <UploadAndVisualize MaxFileSizeMB="500"
+                                   ShowMap="true"
+                                   ShowDataSummary="true"
+                                   ShowLayerControls="true"
+                                   MapPosition="right"
+                                   OnDataLoaded="HandleDataLoaded"
+                                   OnStyleApplied="HandleStyleApplied" />
+            </div>
+        }
+        else if (_selectedTab == "advanced")
+        {
+            <div class="example-section">
+                <h2>Advanced Configuration</h2>
+                <p>Customize the upload behavior and visualization options.</p>
+
+                <div class="config-panel">
+                    <label>
+                        <input type="checkbox" @bind="_showMap" />
+                        Show Map
+                    </label>
+                    <label>
+                        <input type="checkbox" @bind="_autoVisualize" />
+                        Auto Visualize
+                    </label>
+                    <label>
+                        <input type="checkbox" @bind="_showDataSummary" />
+                        Show Data Summary
+                    </label>
+                    <label>
+                        Max File Size (MB):
+                        <input type="number" @bind="_maxFileSizeMB" min="1" max="1000" />
+                    </label>
+                </div>
+
+                <UploadAndVisualize MaxFileSizeMB="_maxFileSizeMB"
+                                   ShowMap="_showMap"
+                                   ShowDataSummary="_showDataSummary"
+                                   OnDataLoaded="HandleDataLoaded" />
+            </div>
+        }
+    </div>
+
+    @if (_notifications.Any())
+    {
+        <div class="notifications">
+            @foreach (var notification in _notifications.TakeLast(5))
+            {
+                <div class="notification @notification.Type">
+                    <span>@notification.Message</span>
+                    <button @onclick="() => RemoveNotification(notification)">×</button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string _selectedTab = "simple";
+    private ParsedData? _parsedData;
+    private List<Notification> _notifications = new();
+
+    // Advanced options
+    private bool _showMap = true;
+    private bool _autoVisualize = true;
+    private bool _showDataSummary = true;
+    private int _maxFileSizeMB = 500;
+
+    private void HandleDataParsed(ParsedData data)
+    {
+        _parsedData = data;
+        AddNotification($"Parsed {data.ValidRows} features from {data.Format}", "success");
+    }
+
+    private void HandleFormatDetected(EnhancedFormatDetectionResult result)
+    {
+        AddNotification($"Detected format: {result.Format} ({result.Confidence * 100:F0}% confident)", "info");
+    }
+
+    private void HandleError(string error)
+    {
+        AddNotification($"Error: {error}", "error");
+    }
+
+    private void HandleDataLoaded(ParsedData data)
+    {
+        AddNotification($"Loaded {data.ValidRows} features for visualization", "success");
+    }
+
+    private void HandleStyleApplied(StyleDefinition style)
+    {
+        AddNotification($"Applied {style.GeometryType} style", "info");
+    }
+
+    private void AddNotification(string message, string type)
+    {
+        _notifications.Add(new Notification { Message = message, Type = type, Time = DateTime.Now });
+        StateHasChanged();
+    }
+
+    private void RemoveNotification(Notification notification)
+    {
+        _notifications.Remove(notification);
+    }
+
+    private class Notification
+    {
+        public required string Message { get; set; }
+        public required string Type { get; set; }
+        public DateTime Time { get; set; }
+    }
+}

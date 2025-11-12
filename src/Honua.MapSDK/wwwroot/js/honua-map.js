@@ -1,9 +1,25 @@
 // Honua Map JavaScript Module
-// Wraps MapLibre GL JS with optimized features
+// Wraps MapLibre GL JS with optimized features and WebGPU support
 
 import maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/+esm';
+import { WebGpuRendererManager } from './webgpu-manager.js';
 
-export function createMap(container, options, dotNetRef) {
+// Global renderer manager instance
+let _rendererManager = null;
+
+export async function createMap(container, options, dotNetRef) {
+    // Initialize WebGPU renderer manager if not already done
+    if (!_rendererManager) {
+        _rendererManager = new WebGpuRendererManager();
+        const rendererInfo = await _rendererManager.initialize(options.renderingEngine || 'Auto');
+
+        console.log(`[Honua Map] Renderer initialized:`, rendererInfo);
+        console.log(`[Honua Map] Engine: ${rendererInfo.engine}, Fallback: ${rendererInfo.isFallback}`);
+
+        // Start performance monitoring
+        _rendererManager.startMonitoring();
+    }
+
     const map = new maplibregl.Map({
         container: container,
         style: options.style,
@@ -24,6 +40,7 @@ export function createMap(container, options, dotNetRef) {
     map._honuaId = options.id;
     map._filters = new Map();
     map._highlightLayer = null;
+    map._rendererManager = _rendererManager;
 
     // Setup event handlers
     setupEventHandlers(map, dotNetRef);
@@ -101,6 +118,21 @@ function setupEventHandlers(map, dotNetRef) {
 
 function createMapAPI(map) {
     return {
+        // Renderer information
+        getRendererInfo: () => {
+            if (map._rendererManager) {
+                return map._rendererManager.getRendererInfo();
+            }
+            return {
+                engine: 'WebGL',
+                isPreferred: true,
+                isFallback: false,
+                fps: 0,
+                gpuVendor: 'Unknown',
+                gpuRenderer: 'Unknown'
+            };
+        },
+
         // Navigation
         flyTo: (options) => {
             map.flyTo({
@@ -240,10 +272,71 @@ function createMapAPI(map) {
             clearHighlights(map);
         },
 
+        // Projection
+        setProjection: (projectionType, options) => {
+            try {
+                const projection = projectionType.toLowerCase();
+
+                if (!['mercator', 'globe'].includes(projection)) {
+                    console.error('Invalid projection type:', projection);
+                    return false;
+                }
+
+                const projectionConfig = {
+                    type: projection
+                };
+
+                // Add globe-specific options
+                if (projection === 'globe') {
+                    projectionConfig.atmosphere = options?.enableAtmosphere !== false;
+                    projectionConfig.atmosphereColor = options?.atmosphereColor || '#87CEEB';
+                    projectionConfig.space = options?.enableSpace !== false;
+                }
+
+                map.setProjection(projectionConfig);
+
+                // Auto-adjust camera when switching to globe
+                if (projection === 'globe' && options?.autoAdjustCamera !== false) {
+                    const currentZoom = map.getZoom();
+                    const targetZoom = options?.globeDefaultZoom !== undefined ? options.globeDefaultZoom : 1.5;
+
+                    if (currentZoom > targetZoom) {
+                        map.easeTo({
+                            zoom: targetZoom,
+                            duration: options?.transitionDuration || 1000,
+                            easing: (t) => t * (2 - t)
+                        });
+                    }
+                }
+
+                console.log('Projection changed to:', projection);
+                return true;
+            } catch (error) {
+                console.error('Error setting projection:', error);
+                return false;
+            }
+        },
+
+        getProjection: () => {
+            try {
+                const style = map.getStyle();
+                return style?.projection?.type || 'mercator';
+            } catch (error) {
+                console.error('Error getting projection:', error);
+                return 'mercator';
+            }
+        },
+
         // Cleanup
         dispose: () => {
+            if (map._rendererManager) {
+                map._rendererManager.stopMonitoring();
+            }
             map.remove();
-        }
+        },
+
+        // Direct map access (for advanced use)
+        _getMapInstance: () => map
     };
 }
 
