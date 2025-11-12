@@ -10,31 +10,91 @@ using System.Threading.Tasks;
 using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 
 namespace Honua.Server.Core.Metadata;
 
 /// <summary>
 /// Metadata provider that builds MetadataSnapshot from Configuration V2 (HonuaConfig).
 /// This is the bridge that allows Configuration V2 to work with the existing metadata registry system.
+/// Supports hot-reload via file watcher and distributed change notifications for high availability.
 /// </summary>
-public sealed class HclMetadataProvider : IMetadataProvider
+public sealed class HclMetadataProvider : IMetadataProvider, IReloadableMetadataProvider, IDisposable
 {
-    private readonly HonuaConfig config;
+    private readonly IConfigurationChangeNotifier? _changeNotifier;
+    private readonly HclConfigurationWatcher? _configWatcher;
+    private readonly ILogger<HclMetadataProvider> _logger;
+    private readonly SemaphoreSlim _reloadLock = new(1, 1);
+
+    private HonuaConfig _config;
+    private string? _configurationPath;
+    private IDisposable? _fileWatcherSubscription;
+    private IDisposable? _redisNotifierSubscription;
+    private bool _disposed;
 
     /// <inheritdoc/>
-    public bool SupportsChangeNotifications => false;
+    public bool SupportsChangeNotifications => true;
 
     /// <inheritdoc/>
     public event EventHandler<MetadataChangedEventArgs>? MetadataChanged;
 
-    public HclMetadataProvider(HonuaConfig config)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="HclMetadataProvider"/> class.
+    /// </summary>
+    /// <param name="config">The initial HonuaConfig to use.</param>
+    /// <param name="changeNotifier">Optional configuration change notifier for Redis-based HA notifications.</param>
+    /// <param name="configWatcher">Optional file system watcher for local file changes.</param>
+    /// <param name="logger">Logger for diagnostic messages.</param>
+    public HclMetadataProvider(
+        HonuaConfig config,
+        IConfigurationChangeNotifier? changeNotifier = null,
+        HclConfigurationWatcher? configWatcher = null,
+        ILogger<HclMetadataProvider>? logger = null)
     {
-        this.config = config ?? throw new ArgumentNullException(nameof(config));
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _changeNotifier = changeNotifier;
+        _configWatcher = configWatcher;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<HclMetadataProvider>.Instance;
+
+        // Wire up file watcher if available
+        if (_configWatcher != null)
+        {
+            _fileWatcherSubscription = ChangeToken.OnChange(
+                () => _configWatcher.CurrentChangeToken,
+                async () => await OnFileChangedAsync("file-watcher").ConfigureAwait(false));
+
+            _logger.LogDebug("HclMetadataProvider initialized with file watcher support");
+        }
+
+        // Subscribe to Redis change notifications if available
+        if (_changeNotifier != null)
+        {
+            // Note: We'll subscribe asynchronously in LoadAsync since SubscribeAsync is async
+            _logger.LogDebug("HclMetadataProvider initialized with Redis change notification support");
+        }
     }
 
     /// <inheritdoc/>
-    public Task<MetadataSnapshot> LoadAsync(CancellationToken cancellationToken = default)
+    public async Task<MetadataSnapshot> LoadAsync(CancellationToken cancellationToken = default)
     {
+        // Subscribe to Redis notifications on first load if available and not already subscribed
+        if (_changeNotifier != null && _redisNotifierSubscription == null)
+        {
+            try
+            {
+                _redisNotifierSubscription = await _changeNotifier.SubscribeAsync(
+                    OnRedisNotificationAsync,
+                    cancellationToken).ConfigureAwait(false);
+
+                _logger.LogInformation("Subscribed to Redis configuration change notifications");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to subscribe to Redis configuration change notifications. Will continue without Redis support.");
+            }
+        }
+
         var catalog = this.BuildCatalog();
         var folders = this.BuildFolders();
         var dataSources = this.BuildDataSources();
@@ -53,7 +113,143 @@ public sealed class HclMetadataProvider : IMetadataProvider
             layerGroups: null,
             server: this.BuildServer());
 
-        return Task.FromResult(snapshot);
+        return snapshot;
+    }
+
+    /// <inheritdoc/>
+    public async Task ReloadAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_configurationPath))
+        {
+            _logger.LogWarning("Cannot reload: configuration path not set. Call SetConfigurationPath first.");
+            return;
+        }
+
+        await ReloadInternalAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets the configuration path for later reloading.
+    /// This should be called after construction to enable hot-reload functionality.
+    /// </summary>
+    /// <param name="configurationPath">The path to the .hcl configuration file.</param>
+    public void SetConfigurationPath(string configurationPath)
+    {
+        _configurationPath = configurationPath;
+        _logger.LogDebug("Configuration path set to: {ConfigPath}", configurationPath);
+    }
+
+    /// <summary>
+    /// Internal reload logic that reloads configuration from disk and notifies subscribers.
+    /// </summary>
+    private async Task ReloadInternalAsync(CancellationToken cancellationToken)
+    {
+        await _reloadLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _logger.LogInformation("Reloading HCL configuration from: {ConfigPath}", _configurationPath);
+
+            // Reload configuration from disk
+            var newConfig = await HonuaConfigLoader.LoadAsync(_configurationPath!).ConfigureAwait(false);
+
+            // Update internal config reference
+            _config = newConfig;
+
+            _logger.LogInformation("HCL configuration reloaded successfully");
+
+            // Trigger MetadataChanged event to notify subscribers
+            MetadataChanged?.Invoke(this, new MetadataChangedEventArgs("config-reload"));
+
+            _logger.LogDebug("MetadataChanged event triggered after reload");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reload HCL configuration from: {ConfigPath}", _configurationPath);
+            throw;
+        }
+        finally
+        {
+            _reloadLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Callback invoked when the file watcher detects a configuration file change.
+    /// </summary>
+    private async Task OnFileChangedAsync(string source)
+    {
+        if (_disposed || string.IsNullOrWhiteSpace(_configurationPath))
+        {
+            return;
+        }
+
+        try
+        {
+            _logger.LogInformation("Configuration file change detected by {Source}", source);
+            await ReloadInternalAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling file change notification from {Source}", source);
+        }
+    }
+
+    /// <summary>
+    /// Callback invoked when a Redis configuration change notification is received.
+    /// </summary>
+    private async Task OnRedisNotificationAsync(string configPath)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            _logger.LogInformation("Configuration change notification received from Redis for: {ConfigPath}", configPath);
+
+            // Only reload if the notification is for our configuration file
+            if (!string.IsNullOrWhiteSpace(_configurationPath) &&
+                string.Equals(configPath, _configurationPath, StringComparison.OrdinalIgnoreCase))
+            {
+                await ReloadInternalAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            else
+            {
+                _logger.LogDebug("Ignoring Redis notification for different config path: {NotifiedPath} (current: {CurrentPath})",
+                    configPath, _configurationPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling Redis configuration change notification for: {ConfigPath}", configPath);
+        }
+    }
+
+    /// <summary>
+    /// Disposes the provider and releases all resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        // Unsubscribe from file watcher
+        _fileWatcherSubscription?.Dispose();
+        _fileWatcherSubscription = null;
+
+        // Unsubscribe from Redis notifications
+        _redisNotifierSubscription?.Dispose();
+        _redisNotifierSubscription = null;
+
+        // Dispose reload lock
+        _reloadLock.Dispose();
+
+        _logger.LogDebug("HclMetadataProvider disposed");
     }
 
     private CatalogDefinition BuildCatalog()
@@ -65,7 +261,7 @@ public sealed class HclMetadataProvider : IMetadataProvider
             Id = "honua-catalog",
             Title = "Honua Server",
             Description = "Honua Server Configuration V2",
-            Version = this.config.Honua.Version,
+            Version = _config.Honua.Version,
             Publisher = null,
             Keywords = Array.Empty<string>(),
             ThemeCategories = Array.Empty<string>(),
@@ -94,7 +290,7 @@ public sealed class HclMetadataProvider : IMetadataProvider
     {
         var dataSources = new List<DataSourceDefinition>();
 
-        foreach (var (key, dataSource) in this.config.DataSources)
+        foreach (var (key, dataSource) in _config.DataSources)
         {
             if (dataSource is null)
             {
@@ -116,7 +312,7 @@ public sealed class HclMetadataProvider : IMetadataProvider
     {
         var services = new List<ServiceDefinition>();
 
-        foreach (var (key, service) in this.config.Services)
+        foreach (var (key, service) in _config.Services)
         {
             if (service is null || !service.Enabled)
             {
@@ -151,7 +347,7 @@ public sealed class HclMetadataProvider : IMetadataProvider
     {
         var layers = new List<LayerDefinition>();
 
-        foreach (var (key, layer) in this.config.Layers)
+        foreach (var (key, layer) in _config.Layers)
         {
             if (layer is null)
             {
@@ -210,7 +406,7 @@ public sealed class HclMetadataProvider : IMetadataProvider
 
     private ServerDefinition BuildServer()
     {
-        var cors = this.config.Honua.Cors;
+        var cors = _config.Honua.Cors;
 
         return new ServerDefinition
         {
@@ -253,10 +449,10 @@ public sealed class HclMetadataProvider : IMetadataProvider
     {
         // In Configuration V2, layers reference data sources
         // We need to find a layer that uses this service and get its data source
-        var layerForService = this.config.Layers.Values
+        var layerForService = _config.Layers.Values
             .FirstOrDefault(l => l.Services.Contains(service.Id));
 
-        return layerForService?.DataSource ?? this.config.DataSources.Keys.FirstOrDefault() ?? "default";
+        return layerForService?.DataSource ?? _config.DataSources.Keys.FirstOrDefault() ?? "default";
     }
 
     private OgcServiceDefinition BuildOgcServiceDefinition(ServiceBlock service)

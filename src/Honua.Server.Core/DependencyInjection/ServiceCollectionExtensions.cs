@@ -301,8 +301,34 @@ public static class ServiceCollectionExtensions
             }
 
             var v2Config = Configuration.V2.HonuaConfigLoader.Load(v2ConfigPath);
-            return new HclMetadataProvider(v2Config);
+
+            // Resolve optional HA dependencies for hot-reload support
+            var changeNotifier = sp.GetService<Configuration.V2.IConfigurationChangeNotifier>();
+            var configWatcher = sp.GetService<Configuration.V2.HclConfigurationWatcher>();
+            var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<HclMetadataProvider>>();
+
+            var provider = new HclMetadataProvider(v2Config, changeNotifier, configWatcher, logger);
+
+            // Set the configuration path to enable hot-reload
+            provider.SetConfigurationPath(v2ConfigPath);
+
+            return provider;
         });
+
+        // Register the same instance as IReloadableMetadataProvider for manual reload operations
+        services.AddSingleton<IReloadableMetadataProvider>(sp => (IReloadableMetadataProvider)sp.GetRequiredService<IMetadataProvider>());
+
+        // HIGH AVAILABILITY AND CONFIGURATION WATCHING
+        // Register configuration change notification infrastructure (Redis for HA, local for single-instance)
+        services.AddHighAvailability(configuration);
+
+        // Register configuration file watcher if Configuration V2 is enabled
+        // This monitors the .hcl file for changes and triggers automatic reloads
+        var v2ConfigurationPath = configuration.GetValue<string>("Honua:ConfigurationV2:Path");
+        if (!string.IsNullOrWhiteSpace(v2ConfigurationPath))
+        {
+            services.AddConfigurationWatcher(v2ConfigurationPath, configuration);
+        }
 
         services.AddSingleton<IMetadataRegistry>(sp =>
         {
