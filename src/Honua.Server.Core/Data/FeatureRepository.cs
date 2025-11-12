@@ -366,183 +366,104 @@ public sealed class FeatureRepository : IFeatureRepository
         var recordCount = 0L;
         var success = false;
 
-        try
+        var context = await ResolveContextAsync(serviceId, layerId, timeoutCts.Token).ConfigureAwait(false);
+        var effectiveQuery = NormalizeQuery(context, query);
+
+        // Apply timeout to query if not already specified
+        if (!effectiveQuery.CommandTimeout.HasValue)
         {
-            var context = await ResolveContextAsync(serviceId, layerId, timeoutCts.Token).ConfigureAwait(false);
-            var effectiveQuery = NormalizeQuery(context, query);
+            effectiveQuery = effectiveQuery with { CommandTimeout = _timeoutOptions.GetTimeoutForOperation(QueryOperationType.SimpleQuery) };
+        }
 
-            // Apply timeout to query if not already specified
-            if (!effectiveQuery.CommandTimeout.HasValue)
-            {
-                effectiveQuery = effectiveQuery with { CommandTimeout = _timeoutOptions.GetTimeoutForOperation(QueryOperationType.SimpleQuery) };
-            }
+        // Stream results - exceptions will propagate to caller
+        IAsyncEnumerable<FeatureRecord> resultStream = context.Provider.QueryAsync(context.DataSource, context.Service, context.Layer, effectiveQuery, timeoutCts.Token);
 
-            await foreach (var record in context.Provider.QueryAsync(context.DataSource, context.Service, context.Layer, effectiveQuery, timeoutCts.Token).ConfigureAwait(false))
-            {
-                recordCount++;
-                yield return record;
-            }
+        await foreach (var record in resultStream.ConfigureAwait(false))
+        {
+            recordCount++;
+            yield return record;
+        }
 
-            stopwatch.Stop();
-            success = true;
+        stopwatch.Stop();
+        success = true;
 
-            var elapsed = stopwatch.Elapsed;
-            var elapsedMs = stopwatch.ElapsedMilliseconds;
+        var elapsed = stopwatch.Elapsed;
+        var elapsedMs = stopwatch.ElapsedMilliseconds;
 
-            // Record query duration and result metrics
-            _queryMetrics?.RecordQueryDuration(
+        // Record query duration and result metrics
+        _queryMetrics?.RecordQueryDuration(
+            serviceId,
+            layerId,
+            "Repository",
+            QueryOperationType.SimpleQuery.ToString(),
+            elapsed,
+            success);
+
+        _queryMetrics?.RecordQueryResults(
+            serviceId,
+            layerId,
+            "Repository",
+            recordCount);
+
+        _queryMetrics?.RecordFilterComplexity(
+            serviceId,
+            layerId,
+            "Repository",
+            hasFilter,
+            hasSpatialFilter,
+            filterComplexity);
+
+        // CRITICAL: Log slow query warning if 500ms threshold exceeded
+        if (elapsedMs >= SlowQueryThresholdMs)
+        {
+            _logger.LogWarning(
+                "SLOW QUERY: {OperationType} for {ServiceId}/{LayerId} took {ElapsedMs}ms (threshold: {ThresholdMs}ms), returned {RecordCount} records. " +
+                "Filter: {HasFilter}, Spatial: {HasSpatial}, Complexity: {Complexity}",
+                QueryOperationType.SimpleQuery,
+                serviceId,
+                layerId,
+                elapsedMs,
+                SlowQueryThresholdMs,
+                recordCount,
+                hasFilter,
+                hasSpatialFilter,
+                filterComplexity);
+
+            _queryMetrics?.RecordSlowQuery(
                 serviceId,
                 layerId,
                 "Repository",
                 QueryOperationType.SimpleQuery.ToString(),
                 elapsed,
-                success);
+                TimeSpan.FromMilliseconds(SlowQueryThresholdMs));
 
-            _queryMetrics?.RecordQueryResults(
-                serviceId,
-                layerId,
-                "Repository",
-                recordCount);
-
-            _queryMetrics?.RecordFilterComplexity(
-                serviceId,
-                layerId,
-                "Repository",
-                hasFilter,
-                hasSpatialFilter,
-                filterComplexity);
-
-            // CRITICAL: Log slow query warning if 500ms threshold exceeded
-            if (elapsedMs >= SlowQueryThresholdMs)
-            {
-                _logger.LogWarning(
-                    "SLOW QUERY: {OperationType} for {ServiceId}/{LayerId} took {ElapsedMs}ms (threshold: {ThresholdMs}ms), returned {RecordCount} records. " +
-                    "Filter: {HasFilter}, Spatial: {HasSpatial}, Complexity: {Complexity}",
-                    QueryOperationType.SimpleQuery,
-                    serviceId,
-                    layerId,
-                    elapsedMs,
-                    SlowQueryThresholdMs,
-                    recordCount,
-                    hasFilter,
-                    hasSpatialFilter,
-                    filterComplexity);
-
-                _queryMetrics?.RecordSlowQuery(
-                    serviceId,
-                    layerId,
-                    "Repository",
-                    QueryOperationType.SimpleQuery.ToString(),
-                    elapsed,
-                    TimeSpan.FromMilliseconds(SlowQueryThresholdMs));
-
-                activity?.SetTag("query.slow", true);
-            }
-            // Log timeout warning if operation approached timeout threshold
-            else if (elapsed >= warningThreshold && _timeoutOptions.EnableDetailedLogging)
-            {
-                _logger.LogWarning(
-                    "Query approaching timeout: {OperationType} for {ServiceId}/{LayerId} took {ElapsedMs}ms ({ElapsedPercent:F1}% of {TimeoutSeconds}s timeout), returned {RecordCount} records",
-                    QueryOperationType.SimpleQuery,
-                    serviceId,
-                    layerId,
-                    elapsedMs,
-                    (elapsed.TotalMilliseconds / timeout.TotalMilliseconds) * 100,
-                    timeout.TotalSeconds,
-                    recordCount);
-            }
-            else if (_timeoutOptions.EnableDetailedLogging)
-            {
-                _logger.LogDebug(
-                    "{OperationType} for {ServiceId}/{LayerId} completed in {ElapsedMs}ms, returned {RecordCount} records",
-                    QueryOperationType.SimpleQuery,
-                    serviceId,
-                    layerId,
-                    elapsedMs,
-                    recordCount);
-            }
-
-            activity?.SetTag("query.record_count", recordCount);
+            activity?.SetTag("query.slow", true);
         }
-        catch (OperationCanceledException ex) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        // Log timeout warning if operation approached timeout threshold
+        else if (elapsed >= warningThreshold && _timeoutOptions.EnableDetailedLogging)
         {
-            // Timeout occurred (internal cancellation), not external cancellation
-            stopwatch.Stop();
-
-            // Record timeout metrics
-            _queryMetrics?.RecordQueryDuration(
-                serviceId,
-                layerId,
-                "Repository",
-                QueryOperationType.SimpleQuery.ToString(),
-                stopwatch.Elapsed,
-                false);
-
-            _queryMetrics?.RecordQueryError(
-                serviceId,
-                layerId,
-                "Repository",
-                QueryOperationType.SimpleQuery.ToString(),
-                "Timeout");
-
-            _logger.LogError(
-                ex,
-                "QUERY TIMEOUT: {OperationType} for {ServiceId}/{LayerId} exceeded {TimeoutSeconds}s timeout after {ElapsedMs}ms, {RecordCount} records returned before timeout. " +
-                "Filter: {HasFilter}, Spatial: {HasSpatial}, Complexity: {Complexity}",
+            _logger.LogWarning(
+                "Query approaching timeout: {OperationType} for {ServiceId}/{LayerId} took {ElapsedMs}ms ({ElapsedPercent:F1}% of {TimeoutSeconds}s timeout), returned {RecordCount} records",
                 QueryOperationType.SimpleQuery,
                 serviceId,
                 layerId,
+                elapsedMs,
+                (elapsed.TotalMilliseconds / timeout.TotalMilliseconds) * 100,
                 timeout.TotalSeconds,
-                stopwatch.ElapsedMilliseconds,
-                recordCount,
-                hasFilter,
-                hasSpatialFilter,
-                filterComplexity);
-
-            activity?.SetStatus(ActivityStatusCode.Error, $"Query timeout after {stopwatch.ElapsedMilliseconds}ms");
-            activity?.SetTag("query.record_count", recordCount);
-
-            throw new TimeoutException(
-                $"{QueryOperationType.SimpleQuery} operation for {serviceId}/{layerId} exceeded {timeout.TotalSeconds}s timeout after returning {recordCount} records. " +
-                $"Consider adding filters, reducing the result set, or increasing the timeout in configuration.",
-                ex);
+                recordCount);
         }
-        catch (Exception ex)
+        else if (_timeoutOptions.EnableDetailedLogging)
         {
-            stopwatch.Stop();
-
-            // Record error metrics
-            _queryMetrics?.RecordQueryDuration(
-                serviceId,
-                layerId,
-                "Repository",
-                QueryOperationType.SimpleQuery.ToString(),
-                stopwatch.Elapsed,
-                false);
-
-            _queryMetrics?.RecordQueryError(
-                serviceId,
-                layerId,
-                "Repository",
-                QueryOperationType.SimpleQuery.ToString(),
-                ex.GetType().Name);
-
-            _logger.LogError(
-                ex,
-                "QUERY ERROR: {OperationType} for {ServiceId}/{LayerId} failed after {ElapsedMs}ms, {RecordCount} records returned before failure. " +
-                "Error: {ErrorType}",
+            _logger.LogDebug(
+                "{OperationType} for {ServiceId}/{LayerId} completed in {ElapsedMs}ms, returned {RecordCount} records",
                 QueryOperationType.SimpleQuery,
                 serviceId,
                 layerId,
-                stopwatch.ElapsedMilliseconds,
-                recordCount,
-                ex.GetType().Name);
-
-            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            activity?.SetTag("query.record_count", recordCount);
-
-            throw;
+                elapsedMs,
+                recordCount);
         }
+
+        activity?.SetTag("query.record_count", recordCount);
     }
 
     private FeatureQuery NormalizeQuery(FeatureContext context, FeatureQuery? query)

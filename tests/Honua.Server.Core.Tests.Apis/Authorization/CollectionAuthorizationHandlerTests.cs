@@ -1,11 +1,15 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Honua.Server.Core.Authorization;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -13,66 +17,109 @@ namespace Honua.Server.Core.Tests.Apis.Authorization;
 
 public class CollectionAuthorizationHandlerTests
 {
-    private readonly Mock<IResourceAuthorizationService> _mockAuthService;
+    private readonly Mock<IResourceAuthorizationCache> _mockCache;
+    private readonly Mock<ILogger<CollectionAuthorizationHandler>> _mockLogger;
+    private readonly Mock<IOptionsMonitor<ResourceAuthorizationOptions>> _mockOptions;
+    private readonly ResourceAuthorizationMetrics _metrics;
     private readonly CollectionAuthorizationHandler _handler;
 
     public CollectionAuthorizationHandlerTests()
     {
-        _mockAuthService = new Mock<IResourceAuthorizationService>();
-        _handler = new CollectionAuthorizationHandler(_mockAuthService.Object);
+        _mockCache = new Mock<IResourceAuthorizationCache>();
+        _mockLogger = new Mock<ILogger<CollectionAuthorizationHandler>>();
+        _mockOptions = new Mock<IOptionsMonitor<ResourceAuthorizationOptions>>();
+
+        // Create a real metrics instance with a mock meter factory
+        var mockMeterFactory = new Mock<IMeterFactory>();
+        mockMeterFactory.Setup(x => x.Create(It.IsAny<MeterOptions>())).Returns(new Meter("TestMeter"));
+        _metrics = new ResourceAuthorizationMetrics(mockMeterFactory.Object);
+
+        // Setup default options
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy>()
+        });
+
+        _handler = new CollectionAuthorizationHandler(
+            _mockCache.Object,
+            _metrics,
+            _mockLogger.Object,
+            _mockOptions.Object);
     }
 
     [Fact]
-    public async Task HandleRequirementAsync_WithReadAccess_Succeeds()
+    public async Task AuthorizeAsync_WithReadAccess_Succeeds()
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, "user-123")
+            new Claim(ClaimTypes.NameIdentifier, "user-123"),
+            new Claim(ClaimTypes.Role, "Reader")
         }, "TestAuth"));
 
-        var requirement = new ResourceAccessRequirement("Read");
-        var resource = new CollectionResource { CollectionId = "collection-1" };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+        var policy = new ResourcePolicy
+        {
+            Id = "read-policy",
+            ResourceType = "collection",
+            ResourcePattern = "collection-1",
+            AllowedOperations = new List<string> { "Read" },
+            Roles = new List<string> { "Reader" },
+            Enabled = true,
+            Priority = 100
+        };
 
-        _mockAuthService
-            .Setup(x => x.CanAccessCollectionAsync("user-123", "collection-1", "Read"))
-            .ReturnsAsync(true);
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy> { policy }
+        });
+
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "collection", "collection-1", "Read");
 
         // Assert
-        context.HasSucceeded.Should().BeTrue();
+        result.Succeeded.Should().BeTrue();
     }
 
     [Fact]
-    public async Task HandleRequirementAsync_WithWriteAccessDenied_Fails()
+    public async Task AuthorizeAsync_WithWriteAccessDenied_Fails()
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, "user-456")
+            new Claim(ClaimTypes.NameIdentifier, "user-456"),
+            new Claim(ClaimTypes.Role, "Reader") // Reader role, not allowed to write
         }, "TestAuth"));
 
-        var requirement = new ResourceAccessRequirement("Write");
-        var resource = new CollectionResource { CollectionId = "collection-2" };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+        // No write policy for Reader role
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy>()
+        });
 
-        _mockAuthService
-            .Setup(x => x.CanAccessCollectionAsync("user-456", "collection-2", "Write"))
-            .ReturnsAsync(false);
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "collection", "collection-2", "Write");
 
         // Assert
-        context.HasSucceeded.Should().BeFalse();
-        context.HasFailed.Should().BeTrue();
+        result.Succeeded.Should().BeFalse();
+        result.FailureReason.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
-    public async Task HandleRequirementAsync_WithPublicCollection_AllowsAccess()
+    public async Task AuthorizeAsync_WithPublicCollection_AllowsAccess()
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
@@ -80,26 +127,40 @@ public class CollectionAuthorizationHandlerTests
             new Claim(ClaimTypes.NameIdentifier, "user-789")
         }, "TestAuth"));
 
-        var requirement = new ResourceAccessRequirement("Read");
-        var resource = new CollectionResource { CollectionId = "public-collection", IsPublic = true };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+        var policy = new ResourcePolicy
+        {
+            Id = "public-policy",
+            ResourceType = "collection",
+            ResourcePattern = "public-collection",
+            AllowedOperations = new List<string> { "Read" },
+            Roles = new List<string>(), // No specific roles, applies to everyone
+            Enabled = true,
+            Priority = 100
+        };
 
-        _mockAuthService
-            .Setup(x => x.CanAccessCollectionAsync("user-789", "public-collection", "Read"))
-            .ReturnsAsync(true);
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy> { policy }
+        });
+
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "collection", "public-collection", "Read");
 
         // Assert
-        context.HasSucceeded.Should().BeTrue();
+        result.Succeeded.Should().BeTrue();
     }
 
     [Theory]
     [InlineData("Admin", true)]
     [InlineData("Editor", true)]
     [InlineData("Viewer", false)]
-    public async Task HandleRequirementAsync_WithDifferentRoles_ChecksPermissions(string role, bool shouldSucceed)
+    public async Task AuthorizeAsync_WithDifferentRoles_ChecksPermissions(string role, bool shouldSucceed)
     {
         // Arrange
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
@@ -108,24 +169,32 @@ public class CollectionAuthorizationHandlerTests
             new Claim(ClaimTypes.Role, role)
         }, "TestAuth"));
 
-        var requirement = new ResourceAccessRequirement("Write");
-        var resource = new CollectionResource { CollectionId = "collection-3" };
-        var context = new AuthorizationHandlerContext(new[] { requirement }, user, resource);
+        var policy = new ResourcePolicy
+        {
+            Id = "write-policy",
+            ResourceType = "collection",
+            ResourcePattern = "collection-3",
+            AllowedOperations = new List<string> { "Write" },
+            Roles = new List<string> { "Admin", "Editor" }, // Only Admin and Editor can write
+            Enabled = true,
+            Priority = 100
+        };
 
-        _mockAuthService
-            .Setup(x => x.CanAccessCollectionAsync("user-role-test", "collection-3", "Write"))
-            .ReturnsAsync(shouldSucceed);
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = true,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy> { policy }
+        });
+
+        // Setup cache to return miss
+        ResourceAuthorizationResult? cachedResult = null;
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(false);
 
         // Act
-        await _handler.HandleAsync(context);
+        var result = await _handler.AuthorizeAsync(user, "collection", "collection-3", "Write");
 
         // Assert
-        context.HasSucceeded.Should().Be(shouldSucceed);
+        result.Succeeded.Should().Be(shouldSucceed);
     }
-}
-
-public class CollectionResource
-{
-    public string CollectionId { get; set; } = string.Empty;
-    public bool IsPublic { get; set; }
 }

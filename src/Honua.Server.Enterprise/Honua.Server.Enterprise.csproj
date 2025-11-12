@@ -6,17 +6,29 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="BIConnectors/PowerBI/**" />
+    <Compile Remove="Geoprocessing/Operations/H3Service.cs" />
+    <Compile Remove="Geoprocessing/Operations/H3BinningOperation.cs" />
+    <Compile Remove="IoT/Azure/**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../Honua.Server.Core/Honua.Server.Core.csproj" />
     <ProjectReference Include="../Honua.Server.Core.Raster/Honua.Server.Core.Raster.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.Core" Version="4.0.3" />
+    <PackageReference Include="Azure.DigitalTwins.Core" Version="1.4.0" />
+    <PackageReference Include="Azure.Messaging.EventHubs" Version="5.11.5" />
+    <PackageReference Include="Azure.Messaging.EventHubs.Processor" Version="5.11.5" />
     <PackageReference Include="Cronos" Version="0.8.4" />
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Google.Cloud.BigQuery.V2" Version="3.11.0" />
     <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.48.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.10" />
+    <PackageReference Include="Microsoft.PowerBI.Api" Version="4.22.0" />
     <PackageReference Include="MongoDB.Driver" Version="3.3.0" />
     <PackageReference Include="Npgsql" Version="9.0.4" />
     <PackageReference Include="AWSSDK.Redshift" Version="4.0.2.3" />
@@ -25,6 +37,5 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.7.0" />
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
     <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="4.0.0" />
-    <PackageReference Include="H3" Version="4.1.0" />
   </ItemGroup>
 </Project>

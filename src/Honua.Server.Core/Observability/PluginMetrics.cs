@@ -84,14 +84,14 @@ public sealed class PluginMetrics : IPluginMetrics, IDisposable
 
     public void RecordPluginLoaded(string pluginName, TimeSpan loadDuration)
     {
-        _pluginsLoaded.Add(1, new("plugin.name", NormalizePluginName(pluginName)));
+        _pluginsLoaded.Add(1, new KeyValuePair<string, object?>("plugin.name", NormalizePluginName(pluginName)));
         _pluginLoadDuration.Record(loadDuration.TotalMilliseconds,
-            new("plugin.name", NormalizePluginName(pluginName)));
+            new KeyValuePair<string, object?>("plugin.name", NormalizePluginName(pluginName)));
     }
 
     public void RecordPluginUnloaded(string pluginName)
     {
-        _pluginsUnloaded.Add(1, new("plugin.name", NormalizePluginName(pluginName)));
+        _pluginsUnloaded.Add(1, new KeyValuePair<string, object?>("plugin.name", NormalizePluginName(pluginName)));
     }
 
     public void RecordPluginError(string pluginName, string errorType)

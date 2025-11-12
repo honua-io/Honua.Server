@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Honua.Server.Plugins.Storage.Azure</RootNamespace>
+    <AssemblyName>Honua.Server.Plugins.Storage.Azure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Honua.Server.Core\Honua.Server.Core.csproj" />
+    <ProjectReference Include="..\..\src\Honua.Server.Core.Cloud\Honua.Server.Core.Cloud.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.25.1" />
+  </ItemGroup>
+
+</Project>

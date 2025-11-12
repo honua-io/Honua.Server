@@ -222,7 +222,6 @@ public static class TypeMapper
     {
         var normalized = geometryType.ToLowerInvariant()
             .Replace("st_", "")
-            .Replace("multi", "Multi")
             .Trim();
 
         return normalized switch

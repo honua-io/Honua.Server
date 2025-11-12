@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Honua.Server.Plugins.Storage.S3</RootNamespace>
+    <AssemblyName>Honua.Server.Plugins.Storage.S3</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Honua.Server.Core\Honua.Server.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="4.0.7.7" />
+    <PackageReference Include="AWSSDK.Core" Version="3.7.400.57" />
+  </ItemGroup>
+
+</Project>

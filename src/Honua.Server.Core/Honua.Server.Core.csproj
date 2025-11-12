@@ -99,6 +99,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Exclude cloud observability providers that require OpenTelemetry packages not in Core -->
+    <Compile Remove="Observability/Providers/AwsObservabilityProvider.cs" />
+    <Compile Remove="Observability/Providers/AzureObservabilityProvider.cs" />
+    <Compile Remove="Observability/Providers/GcpObservabilityProvider.cs" />
+    <!-- Exclude Map AI services that require MapConfiguration from MapSDK (circular dependency) -->
+    <Compile Remove="Maps/AI/IMapGenerationAiService.cs" />
+    <Compile Remove="Maps/AI/OpenAiMapGenerationService.cs" />
+    <Compile Remove="Maps/AI/ServiceCollectionExtensions.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Honua.Server.Core.Tests.Apis" />
     <InternalsVisibleTo Include="Honua.Server.Core.Tests.Data" />
     <InternalsVisibleTo Include="Honua.Server.Core.Tests.DataOperations" />
