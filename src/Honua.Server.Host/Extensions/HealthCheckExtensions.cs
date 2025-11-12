@@ -34,7 +34,8 @@ public static class HealthCheckExtensions
             .AddCheck<CrsTransformationHealthCheck>("crs_transformation", failureStatus: HealthStatus.Degraded, tags: new[] { "ready" })
             .AddCheck<RedisStoresHealthCheck>("redisStores", failureStatus: HealthStatus.Degraded, tags: new[] { "ready", "distributed" })
             .AddCheck<OidcDiscoveryHealthCheck>("oidc", failureStatus: HealthStatus.Degraded, tags: new[] { "ready", "oidc" }, timeout: TimeSpan.FromSeconds(5))
-            .AddCheck("self", () => HealthCheckResult.Healthy("Application is running."), tags: new[] { "live" });
+            .AddCheck("self", () => HealthCheckResult.Healthy("Application is running."), tags: new[] { "live" })
+            .ForwardToPrometheus(); // Export health check results as Prometheus metrics
 
         return services;
     }

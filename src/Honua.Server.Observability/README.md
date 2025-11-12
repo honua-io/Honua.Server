@@ -24,9 +24,11 @@ export observability__tracing__otlpEndpoint=http://tempo:4317
 ## Features
 
 - **Metrics Collection**: OpenTelemetry-based metrics for all system components
-- **Health Checks**: Custom health checks for database, queue, license, and registry
+- **Cloud Provider Support**: Native integration with Azure, AWS, GCP, or self-hosted (Prometheus/Grafana)
+- **Health Checks**: Custom health checks for database, queue, license, and registry with Kubernetes-ready endpoints
+- **SLI/SLO Monitoring**: Pre-configured recording rules for tracking availability, latency, and error budgets
 - **Structured Logging**: Serilog with JSON formatting for log aggregation
-- **Prometheus Integration**: Metrics export and alert rules
+- **Prometheus Integration**: Metrics export, alert rules, and recording rules
 - **Grafana Dashboards**: Pre-built dashboards for system monitoring
 - **Distributed Tracing**: OpenTelemetry-based distributed tracing with OTLP support
 
@@ -301,6 +303,38 @@ public class MyIntakeService
 }
 ```
 
+## Cloud Provider Support
+
+Honua Server supports multiple observability backends:
+
+- **Self-Hosted (default)**: Prometheus, Grafana, Jaeger/Tempo
+- **Azure**: Application Insights for metrics, traces, and logs
+- **AWS**: CloudWatch + X-Ray via AWS Distro for OpenTelemetry (ADOT)
+- **GCP**: Cloud Monitoring + Cloud Trace via OpenTelemetry Collector
+
+### Configuration
+
+```json
+{
+  "observability": {
+    "cloudProvider": "none",  // Options: "none", "azure", "aws", "gcp"
+    "azure": {
+      "connectionString": "InstrumentationKey=xxx;..."
+    },
+    "aws": {
+      "region": "us-east-1",
+      "otlpEndpoint": "http://localhost:4317"
+    },
+    "gcp": {
+      "projectId": "my-project-123456",
+      "otlpEndpoint": "http://localhost:4317"
+    }
+  }
+}
+```
+
+See [Cloud Provider Setup Guide](../../docs/observability/cloud-provider-setup.md) for detailed configuration.
+
 ## Health Checks
 
 Health check endpoints are available at:
@@ -308,6 +342,38 @@ Health check endpoints are available at:
 - `/health` - Overall health status
 - `/health/live` - Liveness probe (always healthy if running)
 - `/health/ready` - Readiness probe (checks database and queue)
+
+### Health Check Components
+
+1. **DatabaseHealthCheck**: PostgreSQL connectivity, migrations status
+2. **QueueHealthCheck**: Build queue depth and processing status
+3. **LicenseHealthCheck**: Active licenses and quota tracking
+4. **RegistryHealthCheck**: Container registry availability
+
+### Kubernetes Configuration
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: honua-server
+spec:
+  containers:
+  - name: honua-server
+    image: honua/server:latest
+    livenessProbe:
+      httpGet:
+        path: /health/live
+        port: 5000
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      httpGet:
+        path: /health/ready
+        port: 5000
+      initialDelaySeconds: 10
+      periodSeconds: 5
+```
 
 Example response:
 
@@ -331,10 +397,79 @@ Example response:
         "pending_count": 5,
         "processing_count": 2
       }
+    },
+    "license": {
+      "status": "Healthy",
+      "description": "All licenses valid",
+      "data": {
+        "active_licenses": 10,
+        "expiring_soon": 0
+      }
+    },
+    "registry": {
+      "status": "Healthy",
+      "description": "All registries accessible",
+      "data": {
+        "active_registries": 3,
+        "credentials_expiring_soon": 0
+      }
     }
   }
 }
 ```
+
+## SLI/SLO Monitoring
+
+Honua includes pre-configured Service Level Indicators (SLIs) and Service Level Objectives (SLOs) for tracking service reliability.
+
+### Default SLO Targets
+
+- **Availability**: 99.9% (error budget: 0.1%)
+- **Latency**: 95th percentile < 5 seconds
+- **Database**: 99.95% query success rate
+- **Build Queue**: 99% build success rate
+
+### Recording Rules
+
+Recording rules pre-compute expensive queries and create SLI metrics:
+
+```promql
+# HTTP Availability (5-minute window)
+honua:availability:ratio_5m
+
+# Error Budget Remaining
+honua:error_budget:remaining_5m
+
+# Error Budget Burn Rate
+honua:error_budget:burn_rate_5m
+
+# P95 Latency (5-minute window)
+honua:latency:p95_5m
+
+# Service Health Score (composite metric)
+honua:service:health_score_5m
+```
+
+### Deployment
+
+1. Copy recording rules to Prometheus:
+   ```bash
+   cp prometheus/recording-rules.yml /etc/prometheus/
+   ```
+
+2. Update Prometheus config:
+   ```yaml
+   rule_files:
+     - "alerts.yml"
+     - "recording-rules.yml"
+   ```
+
+3. Reload Prometheus:
+   ```bash
+   curl -X POST http://localhost:9090/-/reload
+   ```
+
+See [SLI/SLO Monitoring Guide](../../docs/observability/sli-slo-monitoring.md) for detailed setup and interpretation.
 
 ## Prometheus Queries
 
@@ -384,14 +519,27 @@ histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by 
 
 ## Alerts
 
-Alert rules are defined in `prometheus/alerts.yml`. Key alerts include:
+Alert rules are defined in `prometheus/alerts.yml`. The system includes 35+ pre-configured alerts:
 
+### Critical Alerts
+- **ServiceDown**: Service unreachable for 2 minutes
+- **HighErrorBudgetBurn**: Burning error budget 10x faster than allowed (SLO violation)
+- **NoActiveRegistries**: No registries available
+- **QuotaExceeded**: Customer quota exceeded
+- **DatabaseConnectionFailures**: Database connection failures detected
+
+### Warning Alerts
 - **HighBuildQueueDepth**: Queue depth > 100 for 5 minutes
 - **HighBuildFailureRate**: Failure rate > 20% for 10 minutes
 - **LowCacheHitRate**: Hit rate < 50% for 15 minutes
 - **HighHTTPErrorRate**: 5xx rate > 5% for 5 minutes
-- **NoActiveRegistries**: No registries available
-- **QuotaExceeded**: Customer quota exceeded
+- **HighHTTPLatency**: P95 latency > 5 seconds for 10 minutes
+- **LicenseExpiringSoon**: Licenses expiring within 7 days
+
+### SLO Alerts
+- **HighErrorBudgetBurn**: Fast burn rate (10x)
+- **P95ResponseTimeHigh**: Latency SLO violation
+- **SustainedHighErrorRate**: Multi-window error rate detection
 
 Configure notification channels in `alertmanager/alertmanager.yml`.
 
@@ -501,6 +649,19 @@ If metrics collection causes high memory usage:
 2. Check dashboard JSON syntax
 3. Import dashboard manually via Grafana UI
 
+## Documentation
+
+### Guides
+- **[Cloud Provider Setup Guide](../../docs/observability/cloud-provider-setup.md)** - Configure Azure, AWS, GCP, or self-hosted
+- **[SLI/SLO Monitoring Guide](../../docs/observability/sli-slo-monitoring.md)** - Track service reliability and error budgets
+- **[Deployment Checklist](../../docs/deployment/observability-deployment-checklist.md)** - Production deployment checklist
+- **[Migration Guide](../../docs/observability/migration-guide.md)** - Migrate to new observability features
+- **[Distributed Tracing Guide](../../docs/architecture/tracing.md)** - Advanced tracing configuration
+
+### Quick References
+- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute setup guide
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Architecture and file overview
+
 ## Contributing
 
 When adding new metrics:
@@ -509,7 +670,8 @@ When adding new metrics:
 2. Register meter name in `ServiceCollectionExtensions.cs`
 3. Update Grafana dashboard JSON
 4. Add Prometheus alert rules if needed
-5. Document usage in this README
+5. Add recording rules for SLI metrics if applicable
+6. Document usage in this README
 
 ## License
 

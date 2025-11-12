@@ -256,9 +256,23 @@ public sealed class RequestResponseLoggingMiddleware
     private bool ShouldSkipLogging(PathString path)
     {
         // Skip health checks and metrics to avoid log noise
-        return path.StartsWithSegments("/healthz") ||
-               path.StartsWithSegments("/metrics") ||
-               path.StartsWithSegments("/favicon.ico");
+        if (path.StartsWithSegments("/healthz") ||
+            path.StartsWithSegments("/metrics") ||
+            path.StartsWithSegments("/favicon.ico"))
+        {
+            return true;
+        }
+
+        // Sample tile requests (only log 10% to reduce volume)
+        if (path.StartsWithSegments("/tiles") ||
+            path.StartsWithSegments("/wmts") ||
+            path.StartsWithSegments("/xyz"))
+        {
+            // Sample: only log 10% of tile requests
+            return Random.Shared.Next(100) >= 10;
+        }
+
+        return false;
     }
 }
 

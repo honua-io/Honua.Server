@@ -136,28 +136,28 @@ groups:
     rules:
       - alert: HighHTTPErrorRate
         expr: |
-          rate(http_requests_total{status_class="5xx"}[5m]) /
-          rate(http_requests_total[5m]) > 0.05
+          rate(honua.http.requests.total{http.status_class="5xx"}[5m]) /
+          rate(honua.http.requests.total[5m]) > 0.05
         for: 5m
         labels:
           severity: warning
           component: http
         annotations:
           summary: "High HTTP 5xx error rate"
-          description: "HTTP 5xx error rate is {{ $value | humanizePercentage }} for {{ $labels.method }} {{ $labels.path }}."
+          description: "HTTP 5xx error rate is {{ $value | humanizePercentage }} for {{ $labels.http.method }} {{ $labels.http.endpoint }}."
 
       - alert: HighHTTPLatency
         expr: |
           histogram_quantile(0.95,
-            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path)
-          ) > 5
+            sum(rate(honua.http.request.duration[5m])) by (le, http.endpoint)
+          ) > 5000
         for: 10m
         labels:
           severity: warning
           component: http
         annotations:
           summary: "High HTTP request latency"
-          description: "95th percentile latency for {{ $labels.path }} is {{ $value }}s (threshold: 5s)."
+          description: "95th percentile latency for {{ $labels.http.endpoint }} is {{ $value }}ms (threshold: 5000ms)."
 
   - name: honua_intake
     interval: 30s
@@ -198,7 +198,7 @@ groups:
     interval: 30s
     rules:
       - alert: HighMemoryUsage
-        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 4
+        expr: honua.infrastructure.memory_working_set / 1024 / 1024 / 1024 > 4
         for: 10m
         labels:
           severity: warning
@@ -208,17 +208,17 @@ groups:
           description: "Process is using {{ $value }}GB of memory (threshold: 4GB)."
 
       - alert: HighCPUUsage
-        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        expr: honua.infrastructure.cpu_usage_percent > 80
         for: 10m
         labels:
           severity: warning
           component: system
         annotations:
           summary: "High CPU usage detected"
-          description: "Process CPU usage is {{ $value | humanizePercentage }}."
+          description: "Process CPU usage is {{ $value }}%."
 
       - alert: CriticalMemoryUsage
-        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 6
+        expr: honua.infrastructure.memory_working_set / 1024 / 1024 / 1024 > 6
         for: 5m
         labels:
           severity: critical
@@ -231,32 +231,32 @@ groups:
     interval: 30s
     rules:
       - alert: DatabaseConnectionPoolExhausted
-        expr: db_connection_pool_available < 5
+        expr: postgres.pool.connections.idle < 5
         for: 5m
         labels:
           severity: critical
           component: database
         annotations:
           summary: "Database connection pool nearly exhausted"
-          description: "Only {{ $value }} connections available in pool. Risk of connection timeout."
+          description: "Only {{ $value }} idle connections available in pool. Risk of connection timeout."
 
       - alert: DatabaseSlowQueries
         expr: |
           histogram_quantile(0.95,
-            sum(rate(db_query_duration_seconds_bucket[5m])) by (le, database)
-          ) > 2
+            sum(rate(honua.database.query_duration[5m])) by (le, table.name)
+          ) > 2000
         for: 10m
         labels:
           severity: warning
           component: database
         annotations:
           summary: "Slow database queries detected"
-          description: "95th percentile query duration for {{ $labels.database }} is {{ $value }}s (threshold: 2s)."
+          description: "95th percentile query duration for table {{ $labels.table.name }} is {{ $value }}ms (threshold: 2000ms)."
 
       - alert: HighDatabaseErrorRate
         expr: |
-          rate(db_errors_total[5m]) /
-          (rate(db_queries_total[5m]) + rate(db_errors_total[5m])) > 0.05
+          rate(honua.database.connection_errors[5m]) /
+          (rate(honua.database.queries[5m]) + rate(honua.database.connection_errors[5m])) > 0.05
         for: 5m
         labels:
           severity: warning
@@ -271,28 +271,28 @@ groups:
       - alert: P95ResponseTimeHigh
         expr: |
           histogram_quantile(0.95,
-            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path, method)
-          ) > 5
+            sum(rate(honua.http.request.duration[5m])) by (le, http.endpoint, http.method)
+          ) > 5000
         for: 10m
         labels:
           severity: warning
           component: http
         annotations:
           summary: "High p95 response time"
-          description: "P95 response time for {{ $labels.method }} {{ $labels.path }} is {{ $value }}s (threshold: 5s)."
+          description: "P95 response time for {{ $labels.http.method }} {{ $labels.http.endpoint }} is {{ $value }}ms (threshold: 5000ms)."
 
       - alert: P99ResponseTimeHigh
         expr: |
           histogram_quantile(0.99,
-            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path, method)
-          ) > 10
+            sum(rate(honua.http.request.duration[5m])) by (le, http.endpoint, http.method)
+          ) > 10000
         for: 5m
         labels:
           severity: critical
           component: http
         annotations:
           summary: "Critical p99 response time"
-          description: "P99 response time for {{ $labels.method }} {{ $labels.path }} is {{ $value }}s (threshold: 10s)."
+          description: "P99 response time for {{ $labels.http.method }} {{ $labels.http.endpoint }} is {{ $value }}ms (threshold: 10000ms)."
 
   - name: honua_availability
     interval: 30s
@@ -310,8 +310,8 @@ groups:
       - alert: HighErrorBudgetBurn
         expr: |
           (
-            rate(http_requests_total{status_class=~"5xx"}[5m]) /
-            rate(http_requests_total[5m])
+            rate(honua.http.requests.total{http.status_class=~"5xx"}[5m]) /
+            rate(honua.http.requests.total[5m])
           ) > 0.10
         for: 5m
         labels:
@@ -320,3 +320,161 @@ groups:
         annotations:
           summary: "High error budget burn rate"
           description: "Error rate is {{ $value | humanizePercentage }} (threshold: 10%). SLO at risk."
+
+  - name: honua_infrastructure
+    interval: 30s
+    rules:
+      - alert: HighGCPauseDuration
+        expr: honua.infrastructure.gc_duration > 500
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High GC pause duration detected"
+          description: "Garbage collection pause duration is {{ $value }}ms (threshold: 500ms). This may impact request latency."
+
+      - alert: CriticalGCPauseDuration
+        expr: honua.infrastructure.gc_duration > 1000
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Critical GC pause duration detected"
+          description: "Garbage collection pause duration is {{ $value }}ms (threshold: 1000ms). Immediate investigation required."
+
+      - alert: ThreadPoolStarvation
+        expr: honua.infrastructure.threadpool_worker_threads < 10
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Thread pool starvation detected"
+          description: "Only {{ $value }} worker threads available. System may be experiencing severe performance degradation."
+
+      - alert: HighThreadPoolQueueLength
+        expr: honua.infrastructure.threadpool_queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High thread pool queue length"
+          description: "Thread pool has {{ $value }} queued work items (threshold: 100). System may be overloaded."
+
+      - alert: ExcessiveThreadCount
+        expr: honua.infrastructure.thread_count > 500
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Excessive thread count detected"
+          description: "Process has {{ $value }} threads (threshold: 500). Possible thread leak or resource exhaustion."
+
+  - name: honua_postgres
+    interval: 30s
+    rules:
+      - alert: HighConnectionPoolWaitTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(postgres.pool.wait.duration[5m])) by (le, connection.masked)
+          ) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High connection pool wait time"
+          description: "95th percentile wait time for {{ $labels.connection.masked }} is {{ $value }}ms (threshold: 1000ms)."
+
+      - alert: DatabaseConnectionFailures
+        expr: rate(postgres.pool.connections.failures[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection failures detected"
+          description: "Database is experiencing {{ $value }} connection failures per second."
+
+      - alert: LowActiveConnections
+        expr: postgres.pool.connections.active == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "No active database connections"
+          description: "No active database connections detected for 5 minutes. Check if application is idle or connection pool issue."
+
+  - name: honua_build_performance
+    interval: 30s
+    rules:
+      - alert: SlowBuildDuration
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(build_duration_seconds[5m])) by (le, tier)
+          ) > 300
+        for: 10m
+        labels:
+          severity: warning
+          component: build_queue
+        annotations:
+          summary: "Slow build duration detected"
+          description: "95th percentile build duration for tier {{ $labels.tier }} is {{ $value }}s (threshold: 300s)."
+
+      - alert: ExcessiveBuildQueueWaitTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(build_queue_wait_time_seconds[5m])) by (le, tier)
+          ) > 60
+        for: 5m
+        labels:
+          severity: warning
+          component: build_queue
+        annotations:
+          summary: "Excessive build queue wait time"
+          description: "95th percentile queue wait time for tier {{ $labels.tier }} is {{ $value }}s (threshold: 60s)."
+
+  - name: honua_rate_limiting
+    interval: 30s
+    rules:
+      - alert: HighRateLimitHitRate
+        expr: rate(honua.rate_limit.hits.total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: http
+        annotations:
+          summary: "High rate limit hit rate"
+          description: "Rate limiting is being triggered {{ $value }} times per second for endpoint {{ $labels.http.endpoint }}."
+
+  - name: honua_api_errors
+    interval: 30s
+    rules:
+      - alert: HighAPIErrorRate
+        expr: |
+          rate(honua.api.errors[5m]) /
+          rate(honua.api.requests[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API error rate"
+          description: "API error rate is {{ $value | humanizePercentage }} for protocol {{ $labels.api.protocol }}, service {{ $labels.service.id }}."
+
+      - alert: CriticalAPIErrorRate
+        expr: |
+          rate(honua.api.errors[5m]) /
+          rate(honua.api.requests[5m]) > 0.20
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Critical API error rate"
+          description: "API error rate is {{ $value | humanizePercentage }} for protocol {{ $labels.api.protocol }}, service {{ $labels.service.id }}. Immediate attention required."

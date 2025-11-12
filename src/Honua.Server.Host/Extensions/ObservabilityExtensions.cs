@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Observability;
+using Honua.Server.Core.Observability.Providers;
 using Honua.Server.Host.Observability;
 using Honua.Server.Host.Raster;
 using Microsoft.AspNetCore.Builder;
@@ -99,6 +100,17 @@ internal static class ObservabilityExtensions
         services.AddSingleton<IBusinessMetrics, BusinessMetrics>();
         services.AddSingleton<IInfrastructureMetrics, InfrastructureMetrics>();
         services.AddSingleton<IRasterTileCacheMetrics, RasterTileCacheMetrics>();
+        services.AddSingleton<IPluginMetrics, PluginMetrics>();
+
+        // Load cloud provider for observability
+        var cloudProvider = (observability.CloudProvider ?? "none").ToLowerInvariant();
+        var provider = cloudProvider switch
+        {
+            "azure" => new AzureObservabilityProvider(),
+            "aws" => new AwsObservabilityProvider(),
+            "gcp" => new GcpObservabilityProvider(),
+            _ => new SelfHostedObservabilityProvider()
+        };
 
         var otelBuilder = services.AddOpenTelemetry();
 
@@ -119,12 +131,20 @@ internal static class ObservabilityExtensions
                 metricBuilder.AddMeter("Honua.Server.Business");
                 metricBuilder.AddMeter("Honua.Server.Infrastructure");
                 metricBuilder.AddMeter("Honua.Server.RasterCache");
+                metricBuilder.AddMeter("Honua.Server.Plugins");
 
+                // Export to Prometheus if enabled (self-hosted)
                 if (metrics.UsePrometheus)
                 {
                     metricBuilder.AddPrometheusExporter();
                 }
             });
+
+            // Configure cloud provider metrics export
+            if (provider.IsEnabled(configuration))
+            {
+                provider.ConfigureMetrics(services, configuration);
+            }
         }
 
         otelBuilder.WithTracing(tracingBuilder =>
@@ -140,8 +160,16 @@ internal static class ObservabilityExtensions
             tracingBuilder.AddSource("Honua.Server.Export");
             tracingBuilder.AddSource("Honua.Server.Import");
 
+            // Configure sampling if specified (useful for high-traffic production environments)
+            var samplingRatio = observability.Tracing?.SamplingRatio ?? 1.0;
+            if (samplingRatio < 1.0)
+            {
+                tracingBuilder.SetSampler(new OpenTelemetry.Trace.TraceIdRatioBasedSampler(samplingRatio));
+            }
+
             var exporterType = observability.Tracing?.Exporter?.ToLowerInvariant() ?? "none";
 
+            // Handle legacy exporter types (for backward compatibility)
             switch (exporterType)
             {
                 case "otlp":
@@ -155,6 +183,20 @@ internal static class ObservabilityExtensions
                     });
                     break;
 
+                case "azuremonitor":
+                    // Legacy: Azure Monitor via tracing exporter setting (still supported for backward compatibility)
+                    // Recommended: Use cloudProvider="azure" instead
+                    var appInsightsConnectionString = observability.Tracing?.AppInsightsConnectionString
+                        ?? configuration.GetValue<string>("ApplicationInsights:ConnectionString");
+                    if (!appInsightsConnectionString.IsNullOrEmpty())
+                    {
+                        tracingBuilder.AddAzureMonitorTraceExporter(options =>
+                        {
+                            options.ConnectionString = appInsightsConnectionString;
+                        });
+                    }
+                    break;
+
                 case "console":
                     tracingBuilder.AddConsoleExporter();
                     break;
@@ -164,6 +206,12 @@ internal static class ObservabilityExtensions
                     break;
             }
         });
+
+        // Configure cloud provider tracing export (new provider-based approach)
+        if (provider.IsEnabled(configuration))
+        {
+            provider.ConfigureTracing(services, configuration);
+        }
 
         return services;
     }
