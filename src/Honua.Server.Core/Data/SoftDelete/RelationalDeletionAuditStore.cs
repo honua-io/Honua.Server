@@ -370,9 +370,14 @@ WHERE deleted_at < @CutoffDate";
         };
     }
 
-    protected override void DisposeCore()
+    protected override void Dispose(bool disposing)
     {
-        _initLock.Dispose();
+        if (disposing)
+        {
+            _initLock.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     private class DeletionAuditRow

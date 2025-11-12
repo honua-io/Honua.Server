@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.wmts",
+  "name": "WMTS Service Plugin",
+  "version": "1.0.0",
+  "description": "OGC Web Map Tile Service (WMTS) protocol implementation supporting version 1.0.0",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Wmts.dll",
+  "entryPoint": "Honua.Server.Services.Wmts.WmtsServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

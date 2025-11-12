@@ -1,0 +1,78 @@
+# Docker Compose Development Configuration
+# Example: Local development with Docker containers
+
+honua {
+  version     = "1.0"
+  environment = "development"
+  log_level   = "debug"
+
+  cors {
+    allow_any_origin = true  # Development only!
+  }
+}
+
+# PostgreSQL container (from docker-compose)
+data_source "postgres_dev" {
+  provider   = "postgresql"
+  connection = "Host=postgres;Port=5432;Database=honua_dev;Username=honua;Password=dev123"
+
+  pool {
+    min_size = 2
+    max_size = 10
+  }
+
+  health_check = "SELECT 1"
+}
+
+# Redis container (from docker-compose)
+cache "redis_dev" {
+  enabled    = true
+  connection = "redis:6379"
+  prefix     = "dev:"
+  ttl        = 600  # Short TTL for development
+}
+
+# Enable all services for testing
+service "odata" {
+  enabled      = true
+  allow_writes = true  # Allow writes in dev
+  max_page_size = 1000
+}
+
+service "ogc_api" {
+  enabled     = true
+  conformance = ["core", "geojson", "crs"]
+}
+
+service "wfs" {
+  enabled = true
+  version = "2.0.0"
+}
+
+# Sample test layer
+layer "test_features" {
+  title            = "Test Features"
+  description      = "Sample data for testing"
+  data_source      = data_source.postgres_dev
+  table            = "public.test_features"
+  id_field         = "id"
+  display_field    = "name"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "Point"
+    srid   = 4326
+  }
+
+  services = [
+    service.odata,
+    service.ogc_api,
+    service.wfs
+  ]
+}
+
+# Rate limiting (memory-based for dev)
+rate_limit {
+  enabled = false  # Disabled for local development
+}

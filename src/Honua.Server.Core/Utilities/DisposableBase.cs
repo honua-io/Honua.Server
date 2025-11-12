@@ -74,7 +74,9 @@ public abstract class DisposableBase : IDisposable, IAsyncDisposable
     /// Override this method to implement synchronous resource cleanup.
     /// Called by Dispose() when disposing.
     /// </summary>
-    protected abstract void DisposeCore();
+    protected virtual void DisposeCore()
+    {
+    }
 
     /// <summary>
     /// Override this method to implement asynchronous resource cleanup.
@@ -89,6 +91,14 @@ public abstract class DisposableBase : IDisposable, IAsyncDisposable
     /// <summary>
     /// Disposes the object synchronously.
     /// </summary>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            DisposeCore();
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -96,8 +106,8 @@ public abstract class DisposableBase : IDisposable, IAsyncDisposable
             return;
         }
 
+        Dispose(true);
         _disposed = true;
-        DisposeCore();
         GC.SuppressFinalize(this);
     }
 
@@ -112,26 +122,15 @@ public abstract class DisposableBase : IDisposable, IAsyncDisposable
             return;
         }
 
-        _disposed = true;
-
         try
         {
             await DisposeCoreAsync().ConfigureAwait(false);
         }
         finally
         {
-            // Always call sync disposal as well (some resources may only have sync cleanup)
-            try
-            {
-                DisposeCore();
-            }
-            catch
-            {
-                // Suppress exceptions from sync disposal to preserve async exception
-                // The async exception (if any) will be thrown after finally block
-            }
+            Dispose(true);
         }
-
+        _disposed = true;
         GC.SuppressFinalize(this);
     }
 }

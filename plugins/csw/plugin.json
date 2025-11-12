@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.csw",
+  "name": "CSW Service Plugin",
+  "version": "1.0.0",
+  "description": "OGC Catalog Service for the Web (CSW) protocol implementation supporting version 2.0.2",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Csw.dll",
+  "entryPoint": "Honua.Server.Services.Csw.CswServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

@@ -74,7 +74,8 @@ public sealed class AlertClient : IAlertClient
             var json = JsonSerializer.Serialize(alert);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync($"{alertUrl}/api/alerts", content, cancellationToken);
+            var endpoint = new Uri(new Uri(alertUrl, UriKind.Absolute), "/api/alerts");
+            var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {

@@ -1,0 +1,141 @@
+// Copyright (c) 2025 HonuaIO
+// Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+
+// Example Program.cs using Honua Configuration 2.0
+// This replaces hundreds of lines of manual service registration!
+
+using Honua.Server.Core.Configuration.V2;
+using Honua.Server.Core.Configuration.V2.Services;
+using Honua.Server.Core.Configuration.V2.Validation;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CONFIGURATION 2.0: DECLARATIVE, VALIDATED, SIMPLE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 1. Load configuration from file
+var configPath = Environment.GetEnvironmentVariable("HONUA_CONFIG")
+    ?? Path.Combine(builder.Environment.ContentRootPath, "honua.config.hcl");
+
+var config = await HonuaConfigLoader.LoadAsync(configPath);
+
+// 2. Validate configuration (fail fast!)
+var validationResult = await ConfigurationValidator.ValidateFileAsync(
+    configPath,
+    ValidationOptions.Default); // Syntax + semantic validation (fast)
+
+if (!validationResult.IsValid)
+{
+    Console.WriteLine("❌ Configuration validation failed:\n");
+    Console.WriteLine(validationResult.GetSummary());
+    Environment.Exit(1);
+}
+
+if (validationResult.Warnings.Count > 0)
+{
+    Console.WriteLine("⚠️  Configuration warnings:\n");
+    foreach (var warning in validationResult.Warnings)
+    {
+        Console.WriteLine($"  • {warning.Message}");
+    }
+    Console.WriteLine();
+}
+
+// 3. Register ALL services from configuration automatically!
+// No more manual if/else chains, no more Program.cs plumbing!
+builder.Services.AddHonuaFromConfiguration(config, options =>
+{
+    // Optional: customize discovery
+    // options.AssembliesToScan.Add(typeof(MyCustomService).Assembly);
+    // options.ThrowOnValidationErrors = true;
+});
+
+// 4. Add standard ASP.NET Core services
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var app = builder.Build();
+
+// 5. Configure middleware pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseAuthorization();
+
+// 6. Map ALL service endpoints from configuration automatically!
+// No more manual MapXxxEndpoints() calls!
+app.MapHonuaEndpoints();
+
+app.MapControllers();
+
+// 7. Display startup information
+var metadata = app.Services.GetRequiredService<HonuaServiceMetadata>();
+Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+Console.WriteLine($"🚀 Honua Server starting in {config.Honua.Environment} mode");
+Console.WriteLine($"📋 Configuration: {Path.GetFileName(configPath)}");
+Console.WriteLine($"✅ Registered {metadata.RegisteredServices.Count} services:");
+foreach (var service in metadata.RegisteredServices)
+{
+    Console.WriteLine($"   • {service}");
+}
+Console.WriteLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+app.Run();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BEFORE (OLD SYSTEM) - Hundreds of lines:
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/*
+var odataEnabled = config.GetValue<bool>("honua:services:odata:enabled");
+if (odataEnabled)
+{
+    builder.Services.AddOData(options => {
+        options.AllowWrites = config.GetValue<bool>("honua:services:odata:allowWrites");
+        options.MaxPageSize = config.GetValue<int>("honua:services:odata:maxPageSize");
+        // ... 20 more settings
+    });
+}
+
+var ogcApiEnabled = config.GetValue<bool>("honua:services:ogcapi:enabled");
+if (ogcApiEnabled)
+{
+    builder.Services.AddOgcApi(options => {
+        // ... configure
+    });
+}
+
+// ... repeat for 10+ services
+
+// Then in app configuration:
+if (odataEnabled)
+{
+    app.MapODataEndpoints();
+}
+
+if (ogcApiEnabled)
+{
+    app.MapOgcApiEndpoints();
+}
+
+// ... repeat for 10+ services
+*/
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// AFTER (NEW SYSTEM) - 7 lines total:
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/*
+var config = await HonuaConfigLoader.LoadAsync("honua.config.hcl");
+await ConfigurationValidator.ValidateFileAsync("honua.config.hcl");
+
+builder.Services.AddHonuaFromConfiguration(config);
+// ... standard ASP.NET setup
+app.MapHonuaEndpoints();
+
+// DONE! All services configured from .honua file!
+*/

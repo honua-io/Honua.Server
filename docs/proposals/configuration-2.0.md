@@ -21,6 +21,42 @@ The current Honua Server configuration system suffers from fragmentation across 
 
 ---
 
+## Implementation Checklist & Review Criteria
+
+The Configuration 2.0 rollout must survive a file-by-file audit. Every subsystem owner should validate code and docs against the following criteria before marking a component “done.”
+
+### Declarative Schema Contract
+- Provide a machine-readable schema (e.g., JSON Schema or HCL type definition) for `.honua` files, including required/optional blocks, enums, and validation rules.
+- Embed explicit versioning inside each configuration file plus a compatibility policy explaining how newer runtimes treat older schemas (and vice versa).
+- Supply canonical examples and unit tests that parse/validate them so reviewers can auto-check every configuration artifact in the repo.
+
+### CLI Experience (`honua validate` / `honua migrate`)
+- Specify the CLI UX end-to-end: command synopsis, required/optional flags, exit codes, sample diagnostics, and structured output suitable for CI ingestion.
+- Describe how the validator/migrator integrate with developer workflows (pre-commit hooks, CI gates, local Docker scripts) and document failure handling.
+- Ensure telemetry/metrics are emitted for CLI runs so support can see validation failures across environments.
+
+### Backwards Compatibility & Migration Path
+- Detail how existing environment variables, `appsettings.json`, and `metadata.json` map onto the new schema, including precedence when conflicting values exist.
+- Document the transitional boot order (legacy config → bridge layer → `.honua`) and how to toggle the new system per environment.
+- Provide rollback guidance and automated migration scripts so teams can switch back if blockers arise.
+
+### Service Registration & Dependency Injection
+- Define the conventions the runtime uses to auto-wire services (annotations, assemblies, naming) plus the middleware ordering guarantees.
+- List mandatory registration hooks (metrics, logging, security filters) that must always run, even when individual services are disabled.
+- Include tests/analyzers that fail builds if manual DI code drifts from the declarative configuration contract.
+
+### Metadata Generation Safeguards
+- Outline the database introspection process: required permissions, supported providers, type-mapping tables, and how diffs are computed before writes.
+- Require dry-run/diff modes and rollback plans so metadata changes can be reviewed before applying.
+- Mandate integration tests for each supported database provider to ensure generated metadata matches real schemas.
+
+### Observability, Security, and Testing Gates
+- Capture the logging and tracing expectations for configuration load, validation failures, and dynamic reloads.
+- State how secrets are stored, encrypted, and validated (e.g., integration with existing secret providers) and define testing requirements around secret handling.
+- Define the “quick” vs. “full” test suites and coverage thresholds that must pass before shipping configuration changes; include guidance for quarantining flaky tests.
+
+---
+
 ## Problem Statement
 
 ### Current Pain Points

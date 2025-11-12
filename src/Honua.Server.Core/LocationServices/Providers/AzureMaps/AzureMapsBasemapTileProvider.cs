@@ -151,7 +151,8 @@ public class AzureMapsBasemapTileProvider : IBasemapTileProvider
             var url = BuildTileUrl(request);
             _logger.LogDebug("Azure Maps tile request: {Url}", url);
 
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+            var tileUri = new Uri(url, UriKind.Absolute);
+            var response = await _httpClient.GetAsync(tileUri, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var data = await response.Content.ReadAsByteArrayAsync(cancellationToken);

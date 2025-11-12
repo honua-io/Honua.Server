@@ -1,0 +1,117 @@
+# Production Honua Configuration Example
+# Demonstrates environment variable usage and production settings
+
+honua {
+    version = "1.0"
+    environment = "production"
+    log_level = "warning"
+
+    cors = {
+        allow_any_origin = false
+        allowed_origins = ["https://app.example.com", "https://dashboard.example.com"]
+        allow_credentials = true
+    }
+}
+
+# PostgreSQL data source with environment variables
+data_source "postgres-primary" {
+    provider = "postgresql"
+    connection = "${env:DATABASE_URL}"
+
+    pool = {
+        min_size = 10
+        max_size = 50
+        timeout = 30
+    }
+
+    health_check = "SELECT 1"
+}
+
+# Redis cache for distributed scenarios
+cache "redis" {
+    type = "redis"
+    enabled = true
+    connection = "${env:REDIS_URL}"
+    required_in = ["production", "staging"]
+}
+
+# OData service (read-only in production)
+service "odata" {
+    type = "odata"
+    enabled = true
+    allow_writes = false
+    max_page_size = 500
+}
+
+# OGC API Features
+service "ogc_api" {
+    type = "ogc_api"
+    enabled = true
+}
+
+# WFS service
+service "wfs" {
+    type = "wfs"
+    enabled = true
+}
+
+# Buildings layer
+layer "buildings" {
+    title = "Building Footprints"
+    data_source = "postgres-primary"
+    table = "public.buildings"
+
+    geometry = {
+        column = "geom"
+        type = "Polygon"
+        srid = 3857
+    }
+
+    id_field = "building_id"
+    display_field = "name"
+    introspect_fields = true
+
+    services = ["odata", "ogc_api", "wfs"]
+}
+
+# Roads layer
+layer "roads" {
+    title = "Road Network"
+    data_source = "postgres-primary"
+    table = "public.roads"
+
+    geometry = {
+        column = "geom"
+        type = "LineString"
+        srid = 3857
+    }
+
+    id_field = "road_id"
+    display_field = "name"
+    introspect_fields = true
+
+    services = ["odata", "ogc_api"]
+}
+
+# Rate limiting with Redis backend
+rate_limit {
+    enabled = true
+    store = "redis"
+
+    rules = {
+        default = {
+            requests = 1000
+            window = "1m"
+        }
+
+        authenticated = {
+            requests = 10000
+            window = "1m"
+        }
+
+        admin = {
+            requests = 50000
+            window = "1m"
+        }
+    }
+}

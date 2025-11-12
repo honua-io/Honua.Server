@@ -316,7 +316,7 @@ public sealed class AzureKeyVaultSecretsProvider : ISecretsProvider
         try
         {
             // Try to list secrets as a health check
-            await foreach (var _ in _secretClient.GetPropertiesOfSecretsAsync(cancellationToken).Take(1))
+            await foreach (var _ in _secretClient.GetPropertiesOfSecretsAsync(cancellationToken))
             {
                 break;
             }

@@ -60,13 +60,14 @@ public class JsonHelperTests
         var json = """{"Name":"Test","Value":456}""";
 
         // Act
-        var success = JsonHelper.TryDeserialize<TestObject>(json, out var result);
+        var success = JsonHelper.TryDeserialize<TestObject>(json, out var result, out var error);
 
         // Assert
         success.Should().BeTrue();
         result.Should().NotBeNull();
         result!.Name.Should().Be("Test");
         result.Value.Should().Be(456);
+        error.Should().BeNull();
     }
 
     [Fact]
@@ -76,11 +77,12 @@ public class JsonHelperTests
         var json = "not valid json";
 
         // Act
-        var success = JsonHelper.TryDeserialize<TestObject>(json, out var result);
+        var success = JsonHelper.TryDeserialize<TestObject>(json, out var result, out var error);
 
         // Assert
         success.Should().BeFalse();
         result.Should().BeNull();
+        error.Should().NotBeNull();
     }
 
     [Fact]

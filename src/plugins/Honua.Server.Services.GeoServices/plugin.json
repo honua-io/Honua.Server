@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.geoservices",
+  "name": "GeoServices REST Plugin",
+  "version": "1.0.0",
+  "description": "Esri GeoServices REST API implementation for ArcGIS compatibility",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.GeoServices.dll",
+  "entryPoint": "Honua.Server.Services.GeoServices.GeoServicesServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

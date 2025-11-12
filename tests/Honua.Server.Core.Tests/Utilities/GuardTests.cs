@@ -11,25 +11,25 @@ namespace Honua.Server.Core.Tests.Utilities;
 public class GuardTests
 {
     [Fact]
-    public void AgainstNull_WhenValueIsNull_ThrowsArgumentNullException()
+    public void NotNull_WhenValueIsNull_ThrowsArgumentNullException()
     {
         // Arrange
         string? value = null;
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            Guard.AgainstNull(value, nameof(value)));
+            Guard.NotNull(value));
     }
 
     [Fact]
-    public void AgainstNull_WhenValueIsNotNull_DoesNotThrow()
+    public void NotNull_WhenValueIsNotNull_DoesNotThrow()
     {
         // Arrange
         var value = "test";
 
         // Act & Assert
         var exception = Record.Exception(() =>
-            Guard.AgainstNull(value, nameof(value)));
+            Guard.NotNull(value));
 
         exception.Should().BeNull();
     }
@@ -38,79 +38,84 @@ public class GuardTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void AgainstNullOrWhiteSpace_WithInvalidValue_ThrowsException(string? value)
+    public void NotNullOrWhiteSpace_WithInvalidValue_ThrowsException(string? value)
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() =>
-            Guard.AgainstNullOrWhiteSpace(value, nameof(value)));
+        Assert.Throws<ArgumentNullException>(() =>
+            Guard.NotNullOrWhiteSpace(value));
     }
 
     [Theory]
     [InlineData("valid")]
     [InlineData("test string")]
-    public void AgainstNullOrWhiteSpace_WithValidValue_DoesNotThrow(string value)
+    public void NotNullOrWhiteSpace_WithValidValue_DoesNotThrow(string value)
     {
         // Act & Assert
         var exception = Record.Exception(() =>
-            Guard.AgainstNullOrWhiteSpace(value, nameof(value)));
+            Guard.NotNullOrWhiteSpace(value));
 
         exception.Should().BeNull();
     }
 
     [Fact]
-    public void AgainstNegative_WithNegativeValue_ThrowsException()
+    public void ThrowIfNegative_WithNegativeValue_ThrowsException()
     {
         // Arrange
         var value = -1;
 
         // Act & Assert
+        // Using built-in .NET ArgumentOutOfRangeException.ThrowIfNegative
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            Guard.AgainstNegative(value, nameof(value)));
+            ArgumentOutOfRangeException.ThrowIfNegative(value, nameof(value)));
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(100)]
-    public void AgainstNegative_WithNonNegativeValue_DoesNotThrow(int value)
+    public void ThrowIfNegative_WithNonNegativeValue_DoesNotThrow(int value)
     {
         // Act & Assert
+        // Using built-in .NET ArgumentOutOfRangeException.ThrowIfNegative
         var exception = Record.Exception(() =>
-            Guard.AgainstNegative(value, nameof(value)));
+            ArgumentOutOfRangeException.ThrowIfNegative(value, nameof(value)));
 
         exception.Should().BeNull();
     }
 
     [Fact]
-    public void AgainstNegativeOrZero_WithZero_ThrowsException()
+    public void ThrowIfNegativeOrZero_WithZero_ThrowsException()
     {
         // Arrange
         var value = 0;
 
         // Act & Assert
+        // Using built-in .NET ArgumentOutOfRangeException.ThrowIfNegativeOrZero
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            Guard.AgainstNegativeOrZero(value, nameof(value)));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(value)));
     }
 
     [Fact]
-    public void AgainstNegativeOrZero_WithNegative_ThrowsException()
+    public void ThrowIfNegativeOrZero_WithNegative_ThrowsException()
     {
         // Arrange
         var value = -10;
 
         // Act & Assert
+        // Using built-in .NET ArgumentOutOfRangeException.ThrowIfNegativeOrZero
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            Guard.AgainstNegativeOrZero(value, nameof(value)));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(value)));
     }
 
     [Theory]
     [InlineData(1)]
     [InlineData(100)]
-    public void AgainstNegativeOrZero_WithPositiveValue_DoesNotThrow(int value)
+    public void ThrowIfNegativeOrZero_WithPositiveValue_DoesNotThrow(int value)
     {
         // Act & Assert
+        // Using built-in .NET ArgumentOutOfRangeException.ThrowIfNegativeOrZero
         var exception = Record.Exception(() =>
-            Guard.AgainstNegativeOrZero(value, nameof(value)));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, nameof(value)));
 
         exception.Should().BeNull();
     }

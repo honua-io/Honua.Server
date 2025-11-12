@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure;
+using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Dns;
@@ -202,16 +203,16 @@ public class DemoSignupFunction
             ?? throw new InvalidOperationException("GatewayPublicIp not configured");
 
         // Create A record for tenant subdomain
-        var aRecordSetData = new DnsARecordSetData
+        var aRecordData = new DnsARecordData
         {
             TtlInSeconds = 300,
         };
-        aRecordSetData.DnsARecords.Add(new DnsARecordInfo { IPv4Address = IPAddress.Parse(gatewayIp) });
+        aRecordData.DnsARecords.Add(new DnsARecordInfo { IPv4Address = IPAddress.Parse(gatewayIp) });
 
-        await dnsZone.Value.GetDnsARecordSets().CreateOrUpdateAsync(
+        await dnsZone.Value.GetDnsARecords().CreateOrUpdateAsync(
             WaitUntil.Completed,
             tenantId,
-            aRecordSetData);
+            aRecordData);
     }
 
     private string GenerateTenantId(string organizationName)

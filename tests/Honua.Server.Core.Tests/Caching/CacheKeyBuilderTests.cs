@@ -10,108 +10,140 @@ namespace Honua.Server.Core.Tests.Caching;
 public class CacheKeyBuilderTests
 {
     [Fact]
-    public void Build_WithSimpleValues_CreatesCorrectKey()
+    public void ForLayer_CreatesCorrectKey()
     {
-        // Arrange
-        var builder = new CacheKeyBuilder("TestPrefix");
-
-        // Act
-        var key = builder
-            .WithNamespace("DataLayer")
-            .WithEntity("Feature")
-            .WithId("123")
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForLayer("service1", "layer1")
+            .WithSuffix("metadata")
             .Build();
 
         // Assert
-        key.Should().Contain("TestPrefix");
-        key.Should().Contain("DataLayer");
-        key.Should().Contain("Feature");
-        key.Should().Contain("123");
+        key.Should().Contain("layer");
+        key.Should().Contain("service1");
+        key.Should().Contain("layer1");
+        key.Should().Contain("metadata");
     }
 
     [Fact]
-    public void Build_WithMultipleParameters_IncludesAllParams()
+    public void ForTile_CreatesCorrectKey()
     {
-        // Arrange
-        var builder = new CacheKeyBuilder("Query");
-
-        // Act
-        var key = builder
-            .WithNamespace("Spatial")
-            .WithParameter("bbox", "0,0,10,10")
-            .WithParameter("srid", "4326")
-            .WithParameter("limit", "100")
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForTile("WebMercatorQuad", 5, 10, 12, "pbf")
             .Build();
 
         // Assert
-        key.Should().Contain("bbox");
-        key.Should().Contain("srid");
-        key.Should().Contain("limit");
+        key.Should().Contain("tile");
+        key.Should().Contain("WebMercatorQuad");
+        key.Should().Contain("5");
+        key.Should().Contain("10");
+        key.Should().Contain("12");
+        key.Should().Contain("pbf");
     }
 
     [Fact]
-    public void Build_WithNullParameter_HandlesGracefully()
+    public void ForQuery_WithComponents_CreatesCorrectKey()
     {
-        // Arrange
-        var builder = new CacheKeyBuilder("Test");
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForQuery("layer1")
+            .WithComponent("filter")
+            .Build();
 
-        // Act
-        var key = builder
-            .WithParameter("value", null)
+        // Assert
+        key.Should().Contain("query");
+        key.Should().Contain("layer1");
+        key.Should().Contain("filter");
+    }
+
+    [Fact]
+    public void WithBoundingBox_AddsHashToKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForQuery("layer1")
+            .WithBoundingBox(0, 0, 10, 10)
             .Build();
 
         // Assert
         key.Should().NotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public void Build_CalledMultipleTimes_ReturnsSameKey()
-    {
-        // Arrange
-        var builder = new CacheKeyBuilder("Test")
-            .WithNamespace("NS")
-            .WithId("456");
-
-        // Act
-        var key1 = builder.Build();
-        var key2 = builder.Build();
-
-        // Assert
-        key1.Should().Be(key2);
+        key.Should().Contain("query");
     }
 
     [Fact]
     public void WithVersion_AddsVersionToKey()
     {
-        // Arrange
-        var builder = new CacheKeyBuilder("Versioned");
-
-        // Act
-        var key = builder
-            .WithVersion("v2.0")
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForLayer("service1", "layer1")
+            .WithVersion(2)
             .Build();
 
         // Assert
-        key.Should().Contain("v2.0");
+        key.Should().Contain("v2");
     }
 
-    [Theory]
-    [InlineData("special:chars")]
-    [InlineData("with/slashes")]
-    [InlineData("with spaces")]
-    public void Build_WithSpecialCharacters_NormalizesKey(string input)
+    [Fact]
+    public void ForCrsTransform_CreatesCorrectKey()
     {
-        // Arrange
-        var builder = new CacheKeyBuilder("Test");
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForCrsTransform("EPSG:4326", "EPSG:3857")
+            .Build();
 
-        // Act
-        var key = builder
-            .WithParameter("special", input)
+        // Assert
+        key.Should().Contain("crs");
+        key.Should().Contain("EPSG");
+    }
+
+    [Fact]
+    public void ForStacCollection_WithId_CreatesCorrectKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForStacCollection("collection1")
+            .Build();
+
+        // Assert
+        key.Should().Contain("stac");
+        key.Should().Contain("collection");
+        key.Should().Contain("collection1");
+    }
+
+    [Fact]
+    public void ForStacItem_CreatesCorrectKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForStacItem("collection1", "item1")
+            .Build();
+
+        // Assert
+        key.Should().Contain("stac");
+        key.Should().Contain("item");
+        key.Should().Contain("collection1");
+        key.Should().Contain("item1");
+    }
+
+    [Fact]
+    public void WithFilter_AddsHashToKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForQuery("layer1")
+            .WithFilter("name = 'test'")
             .Build();
 
         // Assert
         key.Should().NotBeNullOrEmpty();
-        // Key should not contain problematic characters
-        key.Should().NotContain(":");
+        key.Should().Contain("query");
+    }
+
+    [Fact]
+    public void WithObjectHash_AddsHashToKey()
+    {
+        // Arrange
+        var obj = new { Name = "test", Value = 123 };
+
+        // Act
+        var key = CacheKeyBuilder.ForQuery("layer1")
+            .WithObjectHash(obj)
+            .Build();
+
+        // Assert
+        key.Should().NotBeNullOrEmpty();
+        key.Should().Contain("query");
     }
 }

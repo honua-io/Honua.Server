@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.print",
+  "name": "MapFish Print Plugin",
+  "version": "1.0.0",
+  "description": "MapFish Print service for generating PDF/PNG map exports",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Print.dll",
+  "entryPoint": "Honua.Server.Services.Print.PrintServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

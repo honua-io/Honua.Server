@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.carto",
+  "name": "Carto API Plugin",
+  "version": "1.0.0",
+  "description": "Carto SQL API implementation for executing spatial SQL queries",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Carto.dll",
+  "entryPoint": "Honua.Server.Services.Carto.CartoServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

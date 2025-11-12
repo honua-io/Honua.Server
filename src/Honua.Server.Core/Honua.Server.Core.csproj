@@ -52,8 +52,8 @@
     <!-- Secrets Management -->
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.8.0" />
     <PackageReference Include="Azure.Security.KeyVault.Certificates" Version="4.8.0" />
-    <PackageReference Include="AWSSDK.SecretsManager" Version="3.7.410.11" />
-    <PackageReference Include="AWSSDK.SecurityToken" Version="3.7.405.4" />
+    <PackageReference Include="AWSSDK.SecretsManager" Version="4.0.2.2" />
+    <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.4" />
 
     <!-- Observability -->
     <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="9.0.0" />
@@ -104,5 +104,9 @@
     <InternalsVisibleTo Include="Honua.Server.Core.Tests.DataOperations" />
     <InternalsVisibleTo Include="Honua.Server.Core.Tests.OgcProtocols" />
     <InternalsVisibleTo Include="Honua.Server.Core.Tests.Security" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>

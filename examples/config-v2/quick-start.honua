@@ -1,0 +1,73 @@
+# Quick Start Configuration
+# A minimal configuration to get Honua Server running quickly
+# Perfect for local development and testing
+
+honua {
+  version     = "1.0"
+  environment = "development"
+  log_level   = "debug"
+
+  cors {
+    allow_any_origin = true  # Development only!
+  }
+}
+
+# SQLite database (no external dependencies)
+data_source "local_db" {
+  provider   = "sqlite"
+  connection = "Data Source=./data/honua.db"
+
+  pool {
+    min_size = 1
+    max_size = 5
+  }
+}
+
+# Enable the most commonly used services
+service "ogc_api" {
+  enabled     = true
+  item_limit  = 1000
+  default_crs = "EPSG:4326"
+}
+
+service "odata" {
+  enabled           = true
+  allow_writes      = true  # Development only!
+  max_page_size     = 1000
+  default_page_size = 100
+}
+
+service "wfs" {
+  enabled       = true
+  version       = "2.0.0"
+  default_count = 100
+  max_features  = 5000
+}
+
+# Example layer (you'll need to create this table)
+layer "features" {
+  title       = "Sample Features"
+  description = "Example layer for testing"
+  data_source = data_source.local_db
+  table       = "features"
+  id_field    = "id"
+  display_field = "name"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "Point"
+    srid   = 4326
+  }
+
+  services = [
+    service.ogc_api,
+    service.odata,
+    service.wfs
+  ]
+}
+
+# Disable rate limiting for development
+rate_limit {
+  enabled = false
+}

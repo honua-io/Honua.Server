@@ -119,7 +119,8 @@ public class OsmBasemapTileProvider : IBasemapTileProvider
             // OSM tile usage policy: respect rate limits
             await Task.Delay(100, cancellationToken);
 
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+            var tileUri = new Uri(url, UriKind.Absolute);
+            var response = await _httpClient.GetAsync(tileUri, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var data = await response.Content.ReadAsByteArrayAsync(cancellationToken);

@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using System.Collections.Generic;
+using Honua.Server.Core.Data;
 using Microsoft.Extensions.Options;
 
 namespace Honua.Server.Core.Configuration;

@@ -1,7 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
-using Honua.MapSDK.Models.Drone;
+using Honua.Server.Core.Models.Drone;
 using Microsoft.Extensions.Logging;
 
 namespace Honua.MapSDK.Utilities.Drone;
@@ -213,23 +213,23 @@ public static class PointCloudClassificationColors
     /// </summary>
     public static readonly Dictionary<byte, (byte R, byte G, byte B)> StandardColors = new()
     {
-        { 0, (128, 128, 128) },  // Never Classified - Gray
-        { 1, (128, 128, 128) },  // Unclassified - Gray
-        { 2, (139, 69, 19) },    // Ground - Brown
-        { 3, (34, 139, 34) },    // Low Vegetation - Green
-        { 4, (0, 128, 0) },      // Medium Vegetation - Dark Green
-        { 5, (0, 255, 0) },      // High Vegetation - Bright Green
-        { 6, (255, 0, 0) },      // Building - Red
-        { 7, (255, 255, 0) },    // Low Point (Noise) - Yellow
-        { 8, (128, 128, 128) },  // Reserved - Gray
-        { 9, (0, 0, 255) },      // Water - Blue
-        { 10, (128, 0, 128) },   // Rail - Purple
-        { 11, (64, 64, 64) },    // Road Surface - Dark Gray
-        { 13, (255, 165, 0) },   // Wire Guard - Orange
-        { 14, (255, 140, 0) },   // Wire Conductor - Dark Orange
-        { 15, (255, 20, 147) },  // Transmission Tower - Deep Pink
-        { 17, (255, 255, 0) },   // Bridge Deck - Yellow
-        { 18, (255, 0, 255) }    // High Noise - Magenta
+        { 0, ((byte)128, (byte)128, (byte)128) },  // Never Classified - Gray
+        { 1, ((byte)128, (byte)128, (byte)128) },  // Unclassified - Gray
+        { 2, ((byte)139, (byte)69, (byte)19) },    // Ground - Brown
+        { 3, ((byte)34, (byte)139, (byte)34) },    // Low Vegetation - Green
+        { 4, ((byte)0, (byte)128, (byte)0) },      // Medium Vegetation - Dark Green
+        { 5, ((byte)0, (byte)255, (byte)0) },      // High Vegetation - Bright Green
+        { 6, ((byte)255, (byte)0, (byte)0) },      // Building - Red
+        { 7, ((byte)255, (byte)255, (byte)0) },    // Low Point (Noise) - Yellow
+        { 8, ((byte)128, (byte)128, (byte)128) },  // Reserved - Gray
+        { 9, ((byte)0, (byte)0, (byte)255) },      // Water - Blue
+        { 10, ((byte)128, (byte)0, (byte)128) },   // Rail - Purple
+        { 11, ((byte)64, (byte)64, (byte)64) },    // Road Surface - Dark Gray
+        { 13, ((byte)255, (byte)165, (byte)0) },   // Wire Guard - Orange
+        { 14, ((byte)255, (byte)140, (byte)0) },   // Wire Conductor - Dark Orange
+        { 15, ((byte)255, (byte)20, (byte)147) },  // Transmission Tower - Deep Pink
+        { 17, ((byte)255, (byte)255, (byte)0) },   // Bridge Deck - Yellow
+        { 18, ((byte)255, (byte)0, (byte)255) }    // High Noise - Magenta
     };
 
     /// <summary>
@@ -239,6 +239,6 @@ public static class PointCloudClassificationColors
     {
         return StandardColors.TryGetValue(classification, out var color)
             ? color
-            : (200, 200, 200); // Default gray
+            : ((byte)200, (byte)200, (byte)200); // Default gray
     }
 }

@@ -40,7 +40,7 @@ public sealed class HonuaConfigurationService : DisposableBase, IHonuaConfigurat
 {
     private readonly object _syncRoot = new();
     private HonuaConfiguration _current;
-    private CancellationTokenSource _changeTokenSource = new();
+    private CancellationTokenSource? _changeTokenSource = new();
 
     public HonuaConfigurationService(HonuaConfiguration configuration)
     {
@@ -59,7 +59,7 @@ public sealed class HonuaConfigurationService : DisposableBase, IHonuaConfigurat
     public IChangeToken GetChangeToken()
     {
         ThrowIfDisposed();
-        var source = Volatile.Read(ref _changeTokenSource);
+        var source = Volatile.Read(ref _changeTokenSource) ?? throw new ObjectDisposedException(nameof(HonuaConfigurationService));
         return new CancellationChangeToken(source.Token);
     }
 
@@ -76,29 +76,36 @@ public sealed class HonuaConfigurationService : DisposableBase, IHonuaConfigurat
         lock (_syncRoot)
         {
             Volatile.Write(ref _current, configuration);
-            var newSource = new CancellationTokenSource();
-            previous = Interlocked.Exchange(ref _changeTokenSource, newSource);
+            previous = _changeTokenSource;
+            _changeTokenSource = new CancellationTokenSource();
         }
 
-        if (previous is null)
+        if (previous is not null)
         {
-            return;
-        }
-
-        try
-        {
-            previous.Cancel();
-        }
-        finally
-        {
-            previous.Dispose();
+            try
+            {
+                previous.Cancel();
+            }
+            finally
+            {
+                previous.Dispose();
+            }
         }
     }
 
-    protected override void DisposeCore()
+    protected override void Dispose(bool disposing)
     {
-        var source = Interlocked.Exchange(ref _changeTokenSource, new CancellationTokenSource());
-        source.Cancel();
-        source.Dispose();
+        if (disposing)
+        {
+            var source = _changeTokenSource;
+            if (source is not null)
+            {
+                _changeTokenSource = null;
+                source.Cancel();
+                source.Dispose();
+            }
+        }
+
+        base.Dispose(disposing);
     }
 }

@@ -66,7 +66,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
                 return;
             }
 
-            await _client.OpenConnectionAsync().ConfigureAwait(false);
+            await _client.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Apache AGE connection established");
 
             if (_options.EnableSchemaInitialization)
@@ -111,7 +111,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
 
         try
         {
-            await _client.CreateGraphAsync(graphName).ConfigureAwait(false);
+            await _client.CreateGraphAsync(graphName, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Created graph: {GraphName}", graphName);
         }
         catch (Exception ex)
@@ -130,7 +130,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
         {
             // Apache AGE requires a specific SQL command to drop a graph
             var sql = $"SELECT drop_graph('{graphName}', true);";
-            await using var reader = await _client.ExecuteQueryAsync(sql).ConfigureAwait(false);
+            await using var reader = await _client.ExecuteQueryAsync(sql, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Dropped graph: {GraphName}", graphName);
         }
         catch (Exception ex)
@@ -148,7 +148,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
         try
         {
             var sql = @"SELECT COUNT(*) FROM ag_catalog.ag_graph WHERE name = $1;";
-            await using var reader = await _client.ExecuteQueryAsync(sql).ConfigureAwait(false);
+            await using var reader = await _client.ExecuteQueryAsync(sql, cancellationToken).ConfigureAwait(false);
             if (await reader.ReadAsync().ConfigureAwait(false))
             {
                 var count = reader.GetValue<long>(0);
@@ -285,7 +285,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
         try
         {
             var cypherCommand = $"MATCH (n) WHERE id(n) = {nodeId} SET n += {setClause}";
-            await _client.ExecuteCypherAsync(graph, cypherCommand).ConfigureAwait(false);
+            await _client.ExecuteCypherAsync(graph, cypherCommand, cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("Updated node {NodeId}", nodeId);
         }
         catch (Exception ex)
@@ -304,7 +304,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
         try
         {
             var cypherCommand = $"MATCH (n) WHERE id(n) = {nodeId} DETACH DELETE n";
-            await _client.ExecuteCypherAsync(graph, cypherCommand).ConfigureAwait(false);
+            await _client.ExecuteCypherAsync(graph, cypherCommand, cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("Deleted node {NodeId}", nodeId);
         }
         catch (Exception ex)
@@ -434,7 +434,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
         try
         {
             var cypherCommand = $"MATCH ()-[r]->() WHERE id(r) = {edgeId} DELETE r";
-            await _client.ExecuteCypherAsync(graph, cypherCommand).ConfigureAwait(false);
+            await _client.ExecuteCypherAsync(graph, cypherCommand, cancellationToken).ConfigureAwait(false);
             _logger.LogDebug("Deleted edge {EdgeId}", edgeId);
         }
         catch (Exception ex)
@@ -528,7 +528,7 @@ public sealed class GraphDatabaseService : IGraphDatabaseService, IAsyncDisposab
                 _logger.LogDebug("Executing Cypher command: {Command}", cypherCommand);
             }
 
-            await _client.ExecuteCypherAsync(graph, cypherCommand).ConfigureAwait(false);
+            await _client.ExecuteCypherAsync(graph, cypherCommand, cancellationToken).ConfigureAwait(false);
             return 1; // Apache AGE doesn't return affected row count
         }
         catch (Exception ex)

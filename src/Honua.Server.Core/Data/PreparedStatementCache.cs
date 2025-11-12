@@ -198,9 +198,14 @@ public sealed class PreparedStatementCache : DisposableBase
     /// </summary>
     public int Count => _cache.Count;
 
-    protected override void DisposeCore()
+    protected override void Dispose(bool disposing)
     {
-        Clear();
-        _lruLock.Dispose();
+        if (disposing)
+        {
+            Clear();
+            _lruLock.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }
