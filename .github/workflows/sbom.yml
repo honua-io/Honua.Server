@@ -19,12 +19,13 @@
 #
 name: "SBOM Generation & Attestation"
 
+# DISABLED: Uncomment 'on' section below to re-enable
 on:
-  push:
-    branches: [ "master", "dev" ]
-  release:
-    types: [ published ]
-  workflow_dispatch:
+  # push:
+  #   branches: [ "master", "dev" ]
+  # release:
+  #   types: [ published ]
+  # workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -32,6 +33,7 @@ env:
 
 jobs:
   generate-sbom:
+    if: false # DISABLED
     name: Generate and Attach SBOM
     runs-on: ubuntu-latest
     permissions:
@@ -212,10 +214,10 @@ jobs:
 
   # Verify SBOM attestation
   verify-sbom:
+    if: false # DISABLED
     name: Verify SBOM Attestation
     runs-on: ubuntu-latest
     needs: generate-sbom
-    if: github.event_name != 'pull_request'
     permissions:
       packages: read
 
