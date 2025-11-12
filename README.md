@@ -415,19 +415,45 @@ See [serverless deployment guide](docs/DEPLOYMENT.md#serverless-platforms) for p
 
 ### Configuration
 
-Configuration via environment variables, appsettings.json, or command-line arguments.
+**Configuration V2 (HCL) is now mandatory**. All services, data sources, and layers must be defined in HCL configuration files.
 
-**Key settings:**
+**Example HCL configuration:**
+```hcl
+honua {
+  version     = "1.0"
+  environment = "production"
+}
+
+data_source "main_db" {
+  provider   = "postgresql"
+  connection = env("DATABASE_URL")
+}
+
+service "ogc_api" {
+  enabled = true
+}
+
+layer "features" {
+  title       = "Features"
+  data_source = data_source.main_db
+  table       = "features"
+  services    = [service.ogc_api]
+}
+```
+
+**Key environment variables:**
 ```bash
-HONUA__METADATA__PROVIDER=json|yaml|postgres
-HONUA__METADATA__PATH=/path/to/metadata
+HONUA_CONFIG=./honua.config.hcl
 HONUA__CONNECTIONSTRINGS__DEFAULT=<connection-string>
 HONUA__AUTHENTICATION__MODE=Local|OIDC|SAML
 HONUA__CACHE__REDIS__CONNECTIONSTRING=<redis-url>
 HONUA__TELEMETRY__ENDPOINT=<otlp-endpoint>
 ```
 
-Full configuration reference: [docs/configuration/](docs/configuration/)
+Full configuration reference:
+- [Configuration V2 Reference](docs/configuration-v2-reference.md)
+- [Migration Guide](docs/configuration-v2-migration.md)
+- [Legacy Configuration Guide](docs/configuration/) (for application settings only)
 
 ---
 

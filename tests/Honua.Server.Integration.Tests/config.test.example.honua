@@ -1,0 +1,109 @@
+# Honua Server - Test Configuration Example
+# Configuration V2 (HCL)
+#
+# This is an example of the minimal configuration automatically generated
+# by integration test fixtures. Tests create temporary versions of this
+# configuration dynamically.
+#
+# DO NOT USE THIS FILE DIRECTLY IN TESTS
+# This is for reference only.
+
+# Core Honua configuration
+honua {
+    version     = "2.0"
+    environment = "test"
+    log_level   = "information"
+}
+
+# Primary PostgreSQL data source
+# Connection string comes from environment variable set by TestContainers
+data_source "test_db" {
+    provider   = "postgresql"
+    connection = env("DATABASE_URL")
+
+    pool {
+        min_size = 1
+        max_size = 5
+    }
+}
+
+# MySQL data source (optional, for multi-database tests)
+data_source "test_mysql" {
+    provider   = "mysql"
+    connection = env("MYSQL_URL")
+
+    pool {
+        min_size = 1
+        max_size = 5
+    }
+}
+
+# Redis cache (disabled by default in tests)
+cache "redis_test" {
+    enabled    = false
+    connection = env("REDIS_URL")
+    prefix     = "test:"
+    ttl        = 60
+}
+
+# Example: STAC Service Configuration
+# Uncomment to enable STAC API in tests
+#
+# service "stac" {
+#     enabled     = true
+#     title       = "Honua STAC API"
+#     description = "Test STAC API"
+# }
+
+# Example: OGC API Features Configuration
+# Uncomment to enable OGC API Features in tests
+#
+# service "ogc_api" {
+#     enabled     = true
+#     item_limit  = 1000
+#     default_crs = "EPSG:4326"
+# }
+
+# Example: WFS Service Configuration
+# Uncomment to enable WFS in tests
+#
+# service "wfs" {
+#     enabled                     = true
+#     version                     = "2.0.0"
+#     capabilities_cache_duration = 3600
+#     default_count               = 100
+#     max_features                = 10000
+# }
+
+# Example: Layer Configuration
+# Uncomment to add a test layer
+#
+# layer "test_features" {
+#     title       = "Test Features"
+#     description = "Test layer for integration tests"
+#     data_source = data_source.test_db
+#     table       = "features"
+#     id_field    = "id"
+#     introspect_fields = true
+#
+#     geometry {
+#         column = "geom"
+#         type   = "Polygon"
+#         srid   = 4326
+#     }
+#
+#     # Assign to services
+#     services = [service.stac, service.ogc_api]
+# }
+
+# Environment Variables Required:
+# - DATABASE_URL: PostgreSQL connection string from TestContainers
+# - MYSQL_URL: MySQL connection string from TestContainers
+# - REDIS_URL: Redis connection string from TestContainers
+# - HONUA_CONFIG_PATH: Path to this .honua file
+# - HONUA_CONFIG_V2_ENABLED: Set to "true"
+
+# For actual test usage, see:
+# - tests/Honua.Server.Integration.Tests/Fixtures/WebApplicationFactoryFixture.cs
+# - tests/Honua.Server.Integration.Tests/Fixtures/ConfigurationV2TestFixture.cs
+# - tests/Honua.Server.Integration.Tests/CONFIGURATION_V2_MIGRATION.md

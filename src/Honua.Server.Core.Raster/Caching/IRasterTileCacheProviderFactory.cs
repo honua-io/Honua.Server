@@ -16,5 +16,5 @@ public interface IRasterTileCacheProviderFactory
     /// </summary>
     /// <param name="configuration">The raster tile cache configuration.</param>
     /// <returns>An instance of IRasterTileCacheProvider.</returns>
-    IRasterTileCacheProvider Create(RasterTileCacheConfiguration configuration);
+    IRasterTileCacheProvider Create(RasterCacheOptions configuration);
 }

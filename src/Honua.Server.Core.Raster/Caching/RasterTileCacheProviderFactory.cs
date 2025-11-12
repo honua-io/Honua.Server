@@ -31,14 +31,14 @@ public sealed class RasterTileCacheProviderFactory : ProviderFactoryBase<IRaster
         RegisterProviderInstance("null", NullRasterTileCacheProvider.Instance);
     }
 
-    public IRasterTileCacheProvider Create(RasterTileCacheConfiguration configuration)
+    public IRasterTileCacheProvider Create(RasterCacheOptions configuration)
     {
-        if (configuration is null || !configuration.Enabled)
+        if (configuration is null || !configuration.CogCacheEnabled)
         {
             return NullRasterTileCacheProvider.Instance;
         }
 
-        var providerKey = configuration.Provider?.Trim();
+        var providerKey = configuration.CogCacheProvider?.Trim();
         if (string.IsNullOrWhiteSpace(providerKey))
         {
             return NullRasterTileCacheProvider.Instance;
@@ -49,31 +49,30 @@ public sealed class RasterTileCacheProviderFactory : ProviderFactoryBase<IRaster
         var normalizedKey = NormalizeProviderName(providerKey);
         return normalizedKey switch
         {
-            "filesystem" => CreateFileSystemCacheProvider(configuration.FileSystem),
+            "filesystem" => CreateFileSystemCacheProvider(configuration),
             "s3" => CreateS3CacheProvider(configuration),
             "azure" => CreateAzureCacheProvider(configuration),
             "null" => NullRasterTileCacheProvider.Instance,
 
-            _ => throw new NotSupportedException($"Raster tile cache provider '{configuration.Provider}' is not supported. Supported providers: filesystem, s3, azure")
+            _ => throw new NotSupportedException($"Raster tile cache provider '{configuration.CogCacheProvider}' is not supported. Supported providers: filesystem, s3, azure")
         };
     }
 
-    private IRasterTileCacheProvider CreateFileSystemCacheProvider(RasterTileFileSystemConfiguration? fileSystem)
+    private IRasterTileCacheProvider CreateFileSystemCacheProvider(RasterCacheOptions config)
     {
         var logger = _loggerFactory.CreateLogger<FileSystemRasterTileCacheProvider>();
-        var rootPath = fileSystem?.RootPath;
+        var rootPath = config.CogCacheDirectory;
         if (string.IsNullOrWhiteSpace(rootPath))
         {
-            rootPath = RasterTileFileSystemConfiguration.Default.RootPath;
+            rootPath = Path.Combine("data", "raster-cog-cache");
         }
 
         return new FileSystemRasterTileCacheProvider(rootPath!, logger);
     }
 
-    private IRasterTileCacheProvider CreateS3CacheProvider(RasterTileCacheConfiguration configuration)
+    private IRasterTileCacheProvider CreateS3CacheProvider(RasterCacheOptions configuration)
     {
-        var s3 = configuration.S3 ?? RasterTileS3Configuration.Default;
-        if (string.IsNullOrWhiteSpace(s3.BucketName))
+        if (string.IsNullOrWhiteSpace(configuration.CogCacheS3Bucket))
         {
             throw new InvalidDataException("Raster tile cache provider 's3' requires a bucketName.");
         }
@@ -81,33 +80,32 @@ public sealed class RasterTileCacheProviderFactory : ProviderFactoryBase<IRaster
         var logger = _loggerFactory.CreateLogger<S3RasterTileCacheProvider>();
         var clientOptions = new S3RasterTileCacheProvider.S3ClientOptions
         {
-            Region = s3.Region,
-            ServiceUrl = s3.ServiceUrl,
-            AccessKeyId = s3.AccessKeyId,
-            SecretAccessKey = s3.SecretAccessKey,
-            ForcePathStyle = s3.ForcePathStyle
+            Region = configuration.CogCacheS3Region,
+            ServiceUrl = configuration.CogCacheS3ServiceUrl,
+            AccessKeyId = configuration.CogCacheS3AccessKeyId,
+            SecretAccessKey = configuration.CogCacheS3SecretAccessKey,
+            ForcePathStyle = configuration.CogCacheS3ForcePathStyle
         };
 
         var client = S3RasterTileCacheProvider.CreateClient(clientOptions);
         // Factory creates the client, so provider owns it
-        return new S3RasterTileCacheProvider(client, s3.BucketName!, s3.Prefix, s3.EnsureBucket, logger, _metrics, ownsClient: true);
+        return new S3RasterTileCacheProvider(client, configuration.CogCacheS3Bucket!, configuration.CogCacheS3Prefix, true, logger, _metrics, ownsClient: true);
     }
 
-    private IRasterTileCacheProvider CreateAzureCacheProvider(RasterTileCacheConfiguration configuration)
+    private IRasterTileCacheProvider CreateAzureCacheProvider(RasterCacheOptions configuration)
     {
-        var azure = configuration.Azure ?? RasterTileAzureConfiguration.Default;
-        if (string.IsNullOrWhiteSpace(azure.ConnectionString))
+        if (string.IsNullOrWhiteSpace(configuration.CogCacheAzureConnectionString))
         {
             throw new InvalidDataException("Raster tile cache provider 'azure' requires a connectionString.");
         }
 
-        var containerName = string.IsNullOrWhiteSpace(azure.ContainerName)
+        var containerName = string.IsNullOrWhiteSpace(configuration.CogCacheAzureContainer)
             ? "raster-tiles"
-            : azure.ContainerName;
+            : configuration.CogCacheAzureContainer;
 
-        var blobClient = new BlobContainerClient(azure.ConnectionString, containerName);
+        var blobClient = new BlobContainerClient(configuration.CogCacheAzureConnectionString, containerName);
         var logger = _loggerFactory.CreateLogger<AzureBlobRasterTileCacheProvider>();
         // Factory creates the client, so provider owns it
-        return new AzureBlobRasterTileCacheProvider(blobClient, azure.EnsureContainer, logger, _metrics, ownsContainer: true);
+        return new AzureBlobRasterTileCacheProvider(blobClient, configuration.CogCacheAzureEnsureContainer, logger, _metrics, ownsContainer: true);
     }
 }

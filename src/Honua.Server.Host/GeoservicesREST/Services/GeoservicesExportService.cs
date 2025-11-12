@@ -343,17 +343,15 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
     {
         var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
-        StyleDefinition? defaultStyle;
-        if (layer.DefaultStyleId.HasValue() &&
-            snapshot.TryGetStyle(layer.DefaultStyleId, out defaultStyle))
+        if (!string.IsNullOrEmpty(layer.DefaultStyleId) &&
+            snapshot.TryGetStyle(layer.DefaultStyleId, out var defaultStyle))
         {
             return defaultStyle;
         }
 
-        StyleDefinition? style;
         foreach (var candidate in layer.StyleIds)
         {
-            if (candidate.HasValue() && snapshot.TryGetStyle(candidate, out style))
+            if (!string.IsNullOrEmpty(candidate) && snapshot.TryGetStyle(candidate, out var style))
             {
                 return style;
             }

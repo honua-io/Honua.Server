@@ -12,6 +12,7 @@ using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Honua.Server.Core.Utilities;
 namespace Honua.Server.Core.Attachments;
@@ -19,7 +20,7 @@ namespace Honua.Server.Core.Attachments;
 public sealed class FeatureAttachmentOrchestrator : IFeatureAttachmentOrchestrator
 {
     private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly IOptionsMonitor<AttachmentConfigurationOptions> _attachmentOptions;
     private readonly IFeatureRepository _featureRepository;
     private readonly IFeatureAttachmentRepository _attachmentRepository;
     private readonly IAttachmentStoreSelector _storeSelector;
@@ -27,14 +28,14 @@ public sealed class FeatureAttachmentOrchestrator : IFeatureAttachmentOrchestrat
 
     public FeatureAttachmentOrchestrator(
         IMetadataRegistry metadataRegistry,
-        IHonuaConfigurationService configurationService,
+        IOptionsMonitor<AttachmentConfigurationOptions> attachmentOptions,
         IFeatureRepository featureRepository,
         IFeatureAttachmentRepository attachmentRepository,
         IAttachmentStoreSelector storeSelector,
         ILogger<FeatureAttachmentOrchestrator> logger)
     {
         _metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
-        _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
+        _attachmentOptions = attachmentOptions ?? throw new ArgumentNullException(nameof(attachmentOptions));
         _featureRepository = featureRepository ?? throw new ArgumentNullException(nameof(featureRepository));
         _attachmentRepository = attachmentRepository ?? throw new ArgumentNullException(nameof(attachmentRepository));
         _storeSelector = storeSelector ?? throw new ArgumentNullException(nameof(storeSelector));
@@ -448,7 +449,7 @@ public sealed class FeatureAttachmentOrchestrator : IFeatureAttachmentOrchestrat
 
     private AttachmentValidationSettings ResolveAttachmentSettings(LayerDefinition layer)
     {
-        var config = _configurationService.Current.Attachments;
+        var config = _attachmentOptions.CurrentValue;
         var layerSettings = layer.Attachments;
 
         if (!layerSettings.Enabled)

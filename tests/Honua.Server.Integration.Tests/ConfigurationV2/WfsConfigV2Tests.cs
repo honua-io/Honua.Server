@@ -12,25 +12,30 @@ namespace Honua.Server.Integration.Tests.ConfigurationV2;
 
 /// <summary>
 /// Integration tests demonstrating WFS (Web Feature Service) with Configuration V2.
-/// Migrated from Honua.Server.Integration.Tests.Ogc.WfsTests.
+/// Demonstrates various patterns for configuring WFS using HCL configuration.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "ConfigurationV2")]
 [Trait("Endpoint", "WFS")]
-public class WfsConfigV2Tests : IClassFixture<DatabaseFixture>
+public class WfsConfigV2Tests : ConfigurationV2IntegrationTestBase
 {
-    private readonly DatabaseFixture _databaseFixture;
-
     public WfsConfigV2Tests(DatabaseFixture databaseFixture)
+        : base(databaseFixture)
     {
-        _databaseFixture = databaseFixture;
+    }
+
+    protected override ConfigurationV2TestFixture<Program> CreateFactory()
+    {
+        // Default WFS configuration - individual tests override as needed
+        return CreateFactoryWithHcl(CreateWfsConfiguration());
     }
 
     [Fact]
     public async Task GetCapabilities_WFS20_ReturnsValidCapabilities()
     {
-        // Arrange - Configure WFS service using Configuration V2
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, builder =>
+        // Arrange - Configure WFS service using Configuration V2 builder pattern
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, builder =>
         {
             builder
                 .AddDataSource("gis_db", "postgresql", "DATABASE_URL")
@@ -70,7 +75,7 @@ public class WfsConfigV2Tests : IClassFixture<DatabaseFixture>
     [Fact]
     public async Task GetCapabilities_WFS30_WithMultipleLayers_ReturnsAllFeatures()
     {
-        // Arrange - Configure multiple layers with different geometry types
+        // Arrange - Configure multiple layers with different geometry types using inline HCL
         var hclConfig = @"
 honua {
   version = ""1.0""
@@ -151,7 +156,7 @@ layer ""poi"" {
 }
 ";
 
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, hclConfig);
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, hclConfig);
         var client = factory.CreateClient();
         HttpClientHelper.AddJsonAcceptHeader(client);
 
@@ -185,7 +190,7 @@ layer ""poi"" {
     public async Task GetFeature_WithCustomSettings_RespectsConfiguration()
     {
         // Arrange - Configure WFS with custom limits
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, builder =>
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, builder =>
         {
             builder
                 .AddDataSource("db", "postgresql")
@@ -221,8 +226,8 @@ layer ""poi"" {
     [Fact]
     public async Task WfsService_DisabledInConfig_ReturnsNotFound()
     {
-        // Arrange - Configure with WFS disabled
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, builder =>
+        // Arrange - Configure with WFS disabled using AddRaw for custom HCL
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, builder =>
         {
             builder
                 .AddDataSource("db", "postgresql")
@@ -251,7 +256,7 @@ service ""wfs"" {
     public async Task WfsService_WithTransactions_ConfiguresCorrectly()
     {
         // Arrange - Configure WFS with transaction support
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, builder =>
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, builder =>
         {
             builder
                 .AddDataSource("editable_db", "postgresql")

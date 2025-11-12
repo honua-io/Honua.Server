@@ -37,8 +37,11 @@ public sealed class MetadataSyncSchemaCommand : AsyncCommand<MetadataSyncSchemaC
                 return 1;
             }
 
-            var jsonContent = await File.ReadAllTextAsync(metadataPath);
-            var snapshot = JsonMetadataProvider.Parse(jsonContent);
+            // TODO: Update to use HclMetadataProvider with Configuration V2
+            // JsonMetadataProvider has been removed - this command needs migration
+            throw new NotSupportedException(
+                "MetadataSyncSchemaCommand requires migration to Configuration V2. " +
+                "JsonMetadataProvider has been removed. Use HclMetadataProvider instead.");
 
             AnsiConsole.MarkupLine($"[green]✓[/] Loaded metadata from {metadataPath}");
             AnsiConsole.MarkupLine($"  Catalog: {snapshot.Catalog.Id}");

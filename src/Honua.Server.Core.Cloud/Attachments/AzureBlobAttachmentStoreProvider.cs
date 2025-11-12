@@ -22,10 +22,10 @@ public sealed class AzureBlobAttachmentStoreProvider : IAttachmentStoreProvider,
 
     public string ProviderKey => AttachmentStoreProviderKeys.AzureBlob;
 
-    public IAttachmentStore Create(string profileId, AttachmentStorageProfileConfiguration profileConfiguration)
+    public IAttachmentStore Create(string profileId, AttachmentStorageProfileOptions profileConfiguration)
     {
         Guard.NotNull(profileConfiguration);
-        var azureConfig = profileConfiguration.Azure ?? AttachmentAzureBlobStorageConfiguration.Default;
+        var azureConfig = profileConfiguration.Azure ?? new AttachmentAzureBlobStorageOptions();
 
         if (string.IsNullOrWhiteSpace(azureConfig.ConnectionString))
         {

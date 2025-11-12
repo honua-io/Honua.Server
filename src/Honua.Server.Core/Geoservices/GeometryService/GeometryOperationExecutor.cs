@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Data;
+using Microsoft.Extensions.Options;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Operation.Buffer;
 using NetTopologySuite.Operation.Linemerge;
@@ -18,18 +19,18 @@ namespace Honua.Server.Core.Geoservices.GeometryService;
 
 public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
 {
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly IOptionsMonitor<GeometryServiceOptions> _geometryOptions;
 
-    public GeometryOperationExecutor(IHonuaConfigurationService configurationService)
+    public GeometryOperationExecutor(IOptionsMonitor<GeometryServiceOptions> geometryOptions)
     {
-        _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
+        _geometryOptions = geometryOptions ?? throw new ArgumentNullException(nameof(geometryOptions));
     }
 
     public IReadOnlyList<Geometry> Project(GeometryProjectOperation operation, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateSpatialReferences(operation.InputSpatialReference, operation.OutputSpatialReference, settings);
         ValidateGeometryLimits(operation.Geometries, settings);
@@ -76,7 +77,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Geometries, settings);
 
@@ -135,7 +136,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Geometries, settings);
 
@@ -176,7 +177,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Geometries, settings);
 
@@ -211,7 +212,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
 
         var allGeometries = new List<Geometry>(operation.Geometries1.Count + operation.Geometries2.Count);
@@ -257,7 +258,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
 
         var allGeometries = new List<Geometry>(operation.Geometries1.Count + operation.Geometries2.Count);
@@ -303,7 +304,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Geometries, settings);
 
@@ -341,7 +342,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
 
         var count = Math.Min(operation.Geometries1.Count, operation.Geometries2.Count);
@@ -381,7 +382,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
 
         if (operation.Polygons.Count == 0)
@@ -416,7 +417,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
 
         if (operation.Polygons.Count == 0)
@@ -475,7 +476,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Geometries, settings);
 
@@ -524,7 +525,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
 
         if (operation.Target is null)
@@ -625,7 +626,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
 
         if (operation.Target is null)
@@ -649,7 +650,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Geometries, settings);
 
@@ -692,7 +693,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Geometries, settings);
 
@@ -751,7 +752,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
         };
     }
 
-    private static void EnsureServiceEnabled(GeometryServiceConfiguration settings)
+    private static void EnsureServiceEnabled(GeometryServiceOptions settings)
     {
         if (!settings.Enabled)
         {
@@ -759,7 +760,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
         }
     }
 
-    private static void ValidateSpatialReferences(int input, int output, GeometryServiceConfiguration settings)
+    private static void ValidateSpatialReferences(int input, int output, GeometryServiceOptions settings)
     {
         if (input <= 0)
         {
@@ -793,7 +794,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
         }
     }
 
-    private static void ValidateGeometryLimits(IReadOnlyList<Geometry> geometries, GeometryServiceConfiguration settings)
+    private static void ValidateGeometryLimits(IReadOnlyList<Geometry> geometries, GeometryServiceOptions settings)
     {
         if (settings.MaxGeometries > 0 && geometries.Count > settings.MaxGeometries)
         {
@@ -848,7 +849,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Geometries, settings);
 
@@ -919,7 +920,7 @@ public sealed class GeometryOperationExecutor : IGeometryOperationExecutor
     {
         Guard.NotNull(operation);
 
-        var settings = _configurationService.Current.Services.Geometry;
+        var settings = _geometryOptions.CurrentValue;
         EnsureServiceEnabled(settings);
         ValidateGeometryLimits(operation.Polylines, settings);
 

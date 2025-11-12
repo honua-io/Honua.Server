@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -37,12 +38,52 @@ public class WebApplicationFactoryFixture<TProgram> : WebApplicationFactory<TPro
     {
         builder.ConfigureAppConfiguration((context, config) =>
         {
-            // Add test configuration
-            config.AddJsonFile("appsettings.Test.json", optional: false);
+            // Create minimal HCL configuration for Configuration V2
+            var tempConfigPath = Path.Combine(Path.GetTempPath(), $"test-{Guid.NewGuid()}.honua");
+            var minimalConfig = $$"""
+            honua {
+                version     = "2.0"
+                environment = "test"
+                log_level   = "information"
+            }
 
-            // Override connection strings with TestContainers values
+            data_source "test_db" {
+                provider   = "postgresql"
+                connection = env("DATABASE_URL")
+
+                pool {
+                    min_size = 1
+                    max_size = 5
+                }
+            }
+
+            data_source "test_mysql" {
+                provider   = "mysql"
+                connection = env("MYSQL_URL")
+
+                pool {
+                    min_size = 1
+                    max_size = 5
+                }
+            }
+
+            cache "redis_test" {
+                enabled    = false
+                connection = env("REDIS_URL")
+            }
+            """;
+
+            // Write configuration file
+            File.WriteAllText(tempConfigPath, minimalConfig);
+
+            // Override configuration with TestContainers values via environment variables
             var configOverrides = new Dictionary<string, string?>
             {
+                ["HONUA_CONFIG_PATH"] = tempConfigPath,
+                ["HONUA_CONFIG_V2_ENABLED"] = "true",
+                ["DATABASE_URL"] = _databaseFixture.PostgresConnectionString,
+                ["MYSQL_URL"] = _databaseFixture.MySqlConnectionString,
+                ["REDIS_URL"] = _databaseFixture.RedisConnectionString,
                 ["ConnectionStrings:DefaultConnection"] = _databaseFixture.PostgresConnectionString,
                 ["ConnectionStrings:MySql"] = _databaseFixture.MySqlConnectionString,
                 ["ConnectionStrings:Redis"] = _databaseFixture.RedisConnectionString,

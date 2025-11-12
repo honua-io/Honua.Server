@@ -15,10 +15,11 @@ namespace Honua.Server.Integration.Tests.GeoservicesREST;
 /// Integration tests for GeoServices REST Feature Server API endpoints.
 /// Tests feature layer operations including query, create, update, and delete.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "GeoservicesREST")]
 [Trait("Endpoint", "FeatureServer")]
-public class FeatureServerTests : IClassFixture<DatabaseFixture>
+public class FeatureServerTests
 {
     private readonly DatabaseFixture _databaseFixture;
 

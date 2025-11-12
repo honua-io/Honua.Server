@@ -28,11 +28,20 @@
 
 		<!-- Microsoft Test SDK -->
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+
+		<!-- ASP.NET Core Testing -->
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.9" />
+
+		<!-- Memory Cache for testing -->
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.10" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<!-- Reference to main project -->
 		<ProjectReference Include="..\..\src\Honua.Server.Core\Honua.Server.Core.csproj" />
+
+		<!-- Reference to integration test fixtures -->
+		<ProjectReference Include="..\Honua.Server.Integration.Tests\Honua.Server.Integration.Tests.csproj" />
 	</ItemGroup>
 
 </Project>

@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
 namespace Honua.Server.Core.Print.MapFish;
@@ -28,7 +29,7 @@ public sealed class MapFishPrintApplicationStore : IMapFishPrintApplicationStore
         AllowTrailingCommas = true
     };
 
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly IOptionsMonitor<PrintServiceOptions> _printOptions;
     private readonly ILogger<MapFishPrintApplicationStore> _logger;
     private readonly object _syncRoot = new();
     private readonly IDisposable _changeSubscription;
@@ -36,12 +37,12 @@ public sealed class MapFishPrintApplicationStore : IMapFishPrintApplicationStore
     private IReadOnlyDictionary<string, MapFishPrintApplicationDefinition>? _cache;
     private bool _disposed;
 
-    public MapFishPrintApplicationStore(IHonuaConfigurationService configurationService, ILogger<MapFishPrintApplicationStore> logger)
+    public MapFishPrintApplicationStore(IOptionsMonitor<PrintServiceOptions> printOptions, ILogger<MapFishPrintApplicationStore> logger)
     {
-        _configurationService = configurationService ?? throw new ArgumentNullException(nameof(configurationService));
+        _printOptions = printOptions ?? throw new ArgumentNullException(nameof(printOptions));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        _changeSubscription = ChangeToken.OnChange(configurationService.GetChangeToken, Invalidate);
+        _changeSubscription = _printOptions.OnChange((_, _) => Invalidate());
     }
 
     public ValueTask<IReadOnlyDictionary<string, MapFishPrintApplicationDefinition>> GetApplicationsAsync(CancellationToken cancellationToken = default)
@@ -89,7 +90,7 @@ public sealed class MapFishPrintApplicationStore : IMapFishPrintApplicationStore
 
     private IReadOnlyDictionary<string, MapFishPrintApplicationDefinition> LoadApplications()
     {
-        var config = _configurationService.Current.Services.Print;
+        var config = _printOptions.CurrentValue;
         if (!config.Enabled)
         {
             _logger.LogInformation("MapFish print service is disabled in configuration.");

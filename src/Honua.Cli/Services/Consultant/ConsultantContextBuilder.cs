@@ -277,19 +277,11 @@ public sealed class ConsultantContextBuilder : IConsultantContextBuilder
                 var extension = Path.GetExtension(candidate).ToLowerInvariant();
                 MetadataSnapshot snapshot;
 
-                if (extension == ".yaml" || extension == ".yml")
-                {
-                    // Load YAML metadata
-                    var content = await File.ReadAllTextAsync(candidate, cancellationToken).ConfigureAwait(false);
-                    snapshot = YamlMetadataProvider.Parse(content);
-                }
-                else
-                {
-                    // Load JSON metadata
-                    await using var stream = File.OpenRead(candidate);
-                    using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
-                    snapshot = JsonMetadataProvider.Parse(document.RootElement.GetRawText());
-                }
+                // TODO: Update to use HclMetadataProvider with Configuration V2
+                // JsonMetadataProvider and YamlMetadataProvider have been removed
+                throw new NotSupportedException(
+                    "ConsultantContextBuilder requires migration to Configuration V2. " +
+                    "Legacy metadata providers (JSON/YAML) have been removed. Use HclMetadataProvider instead.");
 
                 return BuildMetadataProfile(snapshot);
             }

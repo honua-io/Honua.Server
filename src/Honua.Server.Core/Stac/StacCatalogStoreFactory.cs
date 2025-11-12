@@ -20,9 +20,9 @@ public sealed class StacCatalogStoreFactory : ProviderFactoryBase<IStacCatalogSt
         RegisterProviderInstance("memory", new InMemoryStacCatalogStore(), "inmemory");
     }
 
-    public IStacCatalogStore Create(StacCatalogConfiguration? configuration)
+    public IStacCatalogStore Create(StacCatalogOptions? configuration)
     {
-        configuration ??= StacCatalogConfiguration.Default;
+        configuration ??= new StacCatalogOptions();
 
         if (!configuration.Enabled)
         {
@@ -53,7 +53,7 @@ public sealed class StacCatalogStoreFactory : ProviderFactoryBase<IStacCatalogSt
         var normalized = provider?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(normalized))
         {
-            normalized = StacCatalogConfiguration.Default.Provider;
+            normalized = "sqlite"; // Default provider
         }
 
         return normalized switch

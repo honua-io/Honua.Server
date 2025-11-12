@@ -15,10 +15,11 @@ namespace Honua.Server.Integration.Tests.Ogc;
 /// Integration tests for OGC WMS (Web Map Service) endpoints.
 /// Tests WMS 1.3.0 operations including GetCapabilities, GetMap, and GetFeatureInfo.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "OGC")]
 [Trait("Endpoint", "WMS")]
-public class WmsTests : IClassFixture<DatabaseFixture>
+public class WmsTests
 {
     private readonly DatabaseFixture _databaseFixture;
 

@@ -23,10 +23,10 @@ public sealed class GcsAttachmentStoreProvider : IAttachmentStoreProvider, IDisp
 
     public string ProviderKey => AttachmentStoreProviderKeys.Gcs;
 
-    public IAttachmentStore Create(string profileId, AttachmentStorageProfileConfiguration profileConfiguration)
+    public IAttachmentStore Create(string profileId, AttachmentStorageProfileOptions profileConfiguration)
     {
         Guard.NotNull(profileConfiguration);
-        var gcsConfig = profileConfiguration.Gcs ?? AttachmentGcsStorageConfiguration.Default;
+        var gcsConfig = profileConfiguration.Gcs ?? new AttachmentGcsStorageOptions();
 
         if (string.IsNullOrWhiteSpace(gcsConfig.BucketName))
         {
@@ -53,7 +53,7 @@ public sealed class GcsAttachmentStoreProvider : IAttachmentStoreProvider, IDisp
         _clientCache.Clear();
     }
 
-    private static StorageClient CreateClient(AttachmentGcsStorageConfiguration configuration)
+    private static StorageClient CreateClient(AttachmentGcsStorageOptions configuration)
     {
         GoogleCredential? credential = null;
 

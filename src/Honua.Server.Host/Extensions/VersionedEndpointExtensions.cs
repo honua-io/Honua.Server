@@ -1,27 +1,49 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Versioning;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Admin;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Authentication;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Carto;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Csw;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Health;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Metadata;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Ogc;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.OpenRosa;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Print;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Raster;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Records;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Security;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wcs;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wfs;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wms;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Wmts;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Builder;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Routing;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.DependencyInjection;
+using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.Extensions;
 
@@ -57,14 +79,23 @@ internal static class VersionedEndpointExtensions
         v1.MapGet("/conformance", Honua.Server.Host.Ogc.OgcLandingHandlers.GetConformance).AllowAnonymous();
 
         // Map OGC and geospatial API endpoints under /v1
-        var configService = app.Services.GetService<IHonuaConfigurationService>();
+        var honuaConfig = app.Services.GetService<HonuaConfig>();
 
-        if (configService?.Current.Services.OgcApi.Enabled ?? true)
+        bool IsServiceEnabled(string serviceId, bool defaultValue = true)
+        {
+            if (honuaConfig?.Services.TryGetValue(serviceId, out var service) == true)
+            {
+                return service.Enabled;
+            }
+            return defaultValue;
+        }
+
+        if (IsServiceEnabled("ogc-api", true))
         {
             v1.MapOgcEndpoints();
         }
 
-        if (configService?.Current.Services.Carto.Enabled ?? true)
+        if (IsServiceEnabled("carto", true))
         {
             v1.MapCartoEndpoints();
         }
@@ -72,7 +103,7 @@ internal static class VersionedEndpointExtensions
         v1.MapOpenRosaEndpoints();
 
         // Map conditional service endpoints
-        v1.MapConditionalServiceEndpoints(configService);
+        v1.MapConditionalServiceEndpoints(honuaConfig);
 
         // Map administration endpoints under /v1
         v1.MapAdministrationEndpoints();
@@ -131,39 +162,48 @@ internal static class VersionedEndpointExtensions
     /// <returns>The route group for method chaining.</returns>
     private static RouteGroupBuilder MapConditionalServiceEndpoints(
         this RouteGroupBuilder group,
-        IHonuaConfigurationService? configurationService)
+        HonuaConfig? honuaConfig)
     {
-        if (configurationService?.Current.Services.Wfs.Enabled ?? true)
+        bool IsServiceEnabled(string serviceId, bool defaultValue = true)
+        {
+            if (honuaConfig?.Services.TryGetValue(serviceId, out var service) == true)
+            {
+                return service.Enabled;
+            }
+            return defaultValue;
+        }
+
+        if (IsServiceEnabled("wfs", true))
         {
             group.MapWfs();
         }
 
-        if (configurationService?.Current.Services.Wms.Enabled ?? true)
+        if (IsServiceEnabled("wms", true))
         {
             group.MapWms();
         }
 
-        if (configurationService?.Current.Services.Print.Enabled ?? true)
+        if (IsServiceEnabled("print", true))
         {
             group.MapMapFishPrint();
         }
 
-        if (configurationService?.Current.Services.Csw.Enabled ?? true)
+        if (IsServiceEnabled("csw", true))
         {
             group.MapCswEndpoints();
         }
 
-        if (configurationService?.Current.Services.Wcs.Enabled ?? true)
+        if (IsServiceEnabled("wcs", true))
         {
             group.MapWcsEndpoints();
         }
 
-        if (configurationService?.Current.Services.Wmts.Enabled ?? true)
+        if (IsServiceEnabled("wmts", true))
         {
             group.MapWmtsEndpoints();
         }
 
-        if (configurationService?.Current.Services.Zarr.Enabled ?? true)
+        if (IsServiceEnabled("zarr", true))
         {
             group.MapZarrTimeSeriesEndpoints();
         }
@@ -180,13 +220,13 @@ internal static class VersionedEndpointExtensions
     {
         group.MapMetadataAdministration();
         group.MapDataIngestionAdministration();
-        group.MapMigrationAdministration();
+        // group.MapMigrationAdministration(); // Removed: Legacy migration endpoints deleted
         group.MapRasterTileCacheAdministration();
         group.MapRasterTileCacheStatistics();
         group.MapRasterTileCacheQuota();
         group.MapRasterMosaicEndpoints();
         group.MapRasterAnalyticsEndpoints();
-        group.MapRuntimeConfiguration();
+        // group.MapRuntimeConfiguration(); // Removed: Legacy runtime config endpoints deleted
         group.MapLoggingConfiguration();
         group.MapTokenRevocationEndpoints();
         group.MapVectorTilePreseedEndpoints();

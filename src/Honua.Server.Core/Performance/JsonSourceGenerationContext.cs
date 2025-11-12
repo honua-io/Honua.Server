@@ -32,7 +32,6 @@ namespace Honua.Server.Core.Performance;
     GenerationMode = JsonSourceGenerationMode.Metadata | JsonSourceGenerationMode.Serialization)]
 // Metadata
 [JsonSerializable(typeof(MetadataSnapshot))]
-[JsonSerializable(typeof(MetadataDocument))]
 [JsonSerializable(typeof(ServiceDefinition))]
 [JsonSerializable(typeof(LayerDefinition))]
 [JsonSerializable(typeof(FolderDefinition))]

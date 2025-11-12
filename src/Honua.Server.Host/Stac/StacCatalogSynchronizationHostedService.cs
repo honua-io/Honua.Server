@@ -2,23 +2,35 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using System;
 using System.Threading;
+using Honua.Server.Core.Configuration.V2;
 using System.Threading.Tasks;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Stac;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Extensions;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Extensions;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.Hosting;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.Logging;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.Primitives;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Utilities;
+using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.Stac;
 
 internal sealed class StacCatalogSynchronizationHostedService : IHostedService, IDisposable
 {
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly HonuaConfig? _honuaConfig;
     private readonly IMetadataRegistry _metadataRegistry;
     private readonly IRasterStacCatalogSynchronizer _rasterSynchronizer;
     private readonly IVectorStacCatalogSynchronizer? _vectorSynchronizer;
@@ -32,13 +44,13 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
     private readonly object _syncLock = new();
 
     public StacCatalogSynchronizationHostedService(
-        IHonuaConfigurationService configurationService,
         IMetadataRegistry metadataRegistry,
         IRasterStacCatalogSynchronizer rasterSynchronizer,
         ILogger<StacCatalogSynchronizationHostedService> logger,
+        HonuaConfig? honuaConfig = null,
         IVectorStacCatalogSynchronizer? vectorSynchronizer = null)
     {
-        _configurationService = Guard.NotNull(configurationService);
+        _honuaConfig = honuaConfig;
         _metadataRegistry = Guard.NotNull(metadataRegistry);
         _rasterSynchronizer = Guard.NotNull(rasterSynchronizer);
         _vectorSynchronizer = vectorSynchronizer;
@@ -53,7 +65,7 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
             return;
         }
 
-        if (!StacRequestHelpers.IsStacEnabled(_configurationService))
+        if (!StacRequestHelpers.IsStacEnabled(_honuaConfig))
         {
             return;
         }

@@ -13,25 +13,30 @@ namespace Honua.Server.Integration.Tests.ConfigurationV2;
 
 /// <summary>
 /// Integration tests demonstrating Configuration V2 usage with OGC API Features.
-/// This test class shows how to migrate existing tests to use .honua configuration files.
+/// Shows how to migrate existing tests to use .honua configuration files.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "ConfigurationV2")]
 [Trait("Endpoint", "OGC")]
-public class OgcApiConfigV2Tests : IClassFixture<DatabaseFixture>
+public class OgcApiConfigV2Tests : ConfigurationV2IntegrationTestBase
 {
-    private readonly DatabaseFixture _databaseFixture;
-
     public OgcApiConfigV2Tests(DatabaseFixture databaseFixture)
+        : base(databaseFixture)
     {
-        _databaseFixture = databaseFixture;
+    }
+
+    protected override ConfigurationV2TestFixture<Program> CreateFactory()
+    {
+        // Default OGC API configuration - individual tests override as needed
+        return CreateFactoryWithHcl(CreateOgcApiConfiguration());
     }
 
     [Fact]
     public async Task GetLandingPage_WithConfigV2_ReturnsValidResponse()
     {
         // Arrange - Create test configuration using builder pattern
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, builder =>
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, builder =>
         {
             builder
                 .AddDataSource("test_db", "postgresql", "DATABASE_URL")
@@ -118,7 +123,7 @@ layer ""test_features"" {
 }
 ";
 
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, hclConfig);
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, hclConfig);
         var client = factory.CreateClient();
         HttpClientHelper.AddJsonAcceptHeader(client);
 
@@ -139,7 +144,7 @@ layer ""test_features"" {
     public async Task GetCollections_WithMultipleLayers_ReturnsAllLayers()
     {
         // Arrange - Create multiple layers via builder
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, builder =>
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, builder =>
         {
             builder
                 .AddDataSource("gis_db", "postgresql", "DATABASE_URL")
@@ -176,7 +181,7 @@ layer ""test_features"" {
     public async Task GetItems_WithCustomService_ReturnsFeatures()
     {
         // Arrange - Configure custom service settings
-        using var factory = new ConfigurationV2TestFixture<Program>(_databaseFixture, builder =>
+        using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, builder =>
         {
             builder
                 .AddDataSource("data", "postgresql")

@@ -27,7 +27,7 @@ internal sealed class DatabaseAttachmentStore : IAttachmentStore
     private readonly string? _fileNameColumn;
 
     public DatabaseAttachmentStore(
-        AttachmentDatabaseStorageConfiguration configuration,
+        AttachmentDatabaseStorageOptions configuration,
         Func<DbConnection> connectionFactory)
     {
         Guard.NotNull(configuration);
@@ -196,10 +196,10 @@ internal sealed class DatabaseAttachmentStoreProvider : IAttachmentStoreProvider
 
     public string ProviderKey => AttachmentStoreProviderKeys.Database;
 
-    public IAttachmentStore Create(string profileId, AttachmentStorageProfileConfiguration profileConfiguration)
+    public IAttachmentStore Create(string profileId, AttachmentStorageProfileOptions profileConfiguration)
     {
         Guard.NotNull(profileConfiguration);
-        var database = profileConfiguration.Database ?? AttachmentDatabaseStorageConfiguration.Default;
+        var database = profileConfiguration.Database ?? new AttachmentDatabaseStorageOptions();
         if (database.ConnectionString.IsNullOrWhiteSpace())
         {
             throw new InvalidOperationException($"Database attachment profile '{profileId}' must specify database.connectionString.");

@@ -15,10 +15,11 @@ namespace Honua.Server.Integration.Tests.Ogc;
 /// Integration tests for OGC WMTS (Web Map Tile Service) endpoints.
 /// Tests WMTS 1.0.0 operations including GetCapabilities and GetTile.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "OGC")]
 [Trait("Endpoint", "WMTS")]
-public class WmtsTests : IClassFixture<DatabaseFixture>
+public class WmtsTests
 {
     private readonly DatabaseFixture _databaseFixture;
 

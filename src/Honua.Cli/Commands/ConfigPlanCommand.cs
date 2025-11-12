@@ -8,7 +8,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Configuration.V2;
-using Honua.Server.Core.Configuration.V2.Services;
 using Honua.Server.Core.Configuration.V2.Validation;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -78,21 +77,17 @@ public sealed class ConfigPlanCommand : AsyncCommand<ConfigPlanCommand.Settings>
             _console.WriteLine();
         }
 
-        // Discover available services
-        var discovery = new ServiceRegistrationDiscovery();
-        discovery.DiscoverAllServices();
-
         // Display plan
         DisplayGlobalSettings(config);
         DisplayDataSources(config);
-        DisplayServices(config, discovery);
+        DisplayServices(config);
         DisplayLayers(config);
         DisplayCacheConfiguration(config);
         DisplayRateLimiting(config);
 
         if (settings.ShowEndpoints)
         {
-            DisplayEndpoints(config, discovery);
+            DisplayEndpoints(config);
         }
 
         DisplaySummary(config);
@@ -194,7 +189,7 @@ public sealed class ConfigPlanCommand : AsyncCommand<ConfigPlanCommand.Settings>
         _console.WriteLine();
     }
 
-    private void DisplayServices(HonuaConfig config, ServiceRegistrationDiscovery discovery)
+    private void DisplayServices(HonuaConfig config)
     {
         var enabledServices = config.Services.Values.Where(s => s.Enabled).ToList();
 
@@ -209,22 +204,17 @@ public sealed class ConfigPlanCommand : AsyncCommand<ConfigPlanCommand.Settings>
             .Border(TableBorder.Rounded)
             .BorderColor(Color.Yellow)
             .AddColumn(new TableColumn("[bold]Service ID[/]"))
-            .AddColumn(new TableColumn("[bold]Display Name[/]"))
-            .AddColumn(new TableColumn("[bold]Status[/]"))
+            .AddColumn(new TableColumn("[bold]Type[/]"))
             .AddColumn(new TableColumn("[bold]Settings[/]"));
 
         foreach (var service in enabledServices)
         {
-            var registration = discovery.GetService(service.Type);
-            var displayName = registration?.DisplayName ?? service.Type;
-            var status = registration != null ? "[green]✓ Available[/]" : "[red]✗ Not Found[/]";
             var settingsCount = service.Settings.Count;
             var settingsDisplay = settingsCount > 0 ? $"{settingsCount} setting(s)" : "[dim]none[/]";
 
             table.AddRow(
                 $"[cyan]{service.Id}[/]",
-                displayName,
-                status,
+                service.Type,
                 settingsDisplay);
         }
 
@@ -348,7 +338,7 @@ public sealed class ConfigPlanCommand : AsyncCommand<ConfigPlanCommand.Settings>
         _console.WriteLine();
     }
 
-    private void DisplayEndpoints(HonuaConfig config, ServiceRegistrationDiscovery discovery)
+    private void DisplayEndpoints(HonuaConfig config)
     {
         var enabledServices = config.Services.Values.Where(s => s.Enabled).ToList();
 
@@ -360,11 +350,10 @@ public sealed class ConfigPlanCommand : AsyncCommand<ConfigPlanCommand.Settings>
         var table = new Table()
             .Border(TableBorder.Rounded)
             .BorderColor(Color.Green3)
-            .AddColumn(new TableColumn("[bold]Service[/]"))
-            .AddColumn(new TableColumn("[bold]Base Path[/]"))
-            .AddColumn(new TableColumn("[bold]Status[/]"));
+            .AddColumn(new TableColumn("[bold]Service Type[/]"))
+            .AddColumn(new TableColumn("[bold]Base Path[/]"));
 
-        // Common endpoint mappings (could be made more dynamic)
+        // Common endpoint mappings (based on plugin system)
         var endpointMappings = new System.Collections.Generic.Dictionary<string, string>
         {
             ["odata"] = "/odata",
@@ -382,12 +371,9 @@ public sealed class ConfigPlanCommand : AsyncCommand<ConfigPlanCommand.Settings>
 
         foreach (var service in enabledServices)
         {
-            var registration = discovery.GetService(service.Type);
-            var displayName = registration?.DisplayName ?? service.Type;
             var basePath = endpointMappings.TryGetValue(service.Type, out var path) ? path : $"/{service.Type}";
-            var status = registration != null ? "[green]Ready[/]" : "[yellow]Implementation Pending[/]";
 
-            table.AddRow(displayName, $"[cyan]{basePath}[/]", status);
+            table.AddRow(service.Type, $"[cyan]{basePath}[/]");
         }
 
         _console.Write(new Panel(table)

@@ -13,31 +13,73 @@ using Xunit;
 namespace Honua.Server.Integration.Tests.Stac;
 
 /// <summary>
-/// Integration tests for STAC Catalog API endpoints.
-/// Tests root catalog and conformance endpoints.
+/// Integration tests for STAC Catalog API endpoints using Configuration V2.
+/// Tests root catalog and conformance endpoints with HCL-based configuration.
 /// </summary>
 [Trait("Category", "Integration")]
 [Trait("API", "STAC")]
 [Trait("Endpoint", "Catalog")]
-public class StacCatalogTests : IClassFixture<DatabaseFixture>
+[Collection("DatabaseCollection")]
+public class StacCatalogTests : ConfigurationV2IntegrationTestBase
 {
-    private readonly DatabaseFixture _databaseFixture;
-
     public StacCatalogTests(DatabaseFixture databaseFixture)
+        : base(databaseFixture)
     {
-        _databaseFixture = databaseFixture;
+    }
+
+    protected override ConfigurationV2TestFixture<Program> CreateFactory()
+    {
+        var hclConfig = """
+        honua {
+            version     = "2.0"
+            environment = "test"
+            log_level   = "debug"
+        }
+
+        data_source "test_db" {
+            provider   = "postgresql"
+            connection = env("DATABASE_URL")
+
+            pool {
+                min_size = 1
+                max_size = 5
+            }
+        }
+
+        service "stac" {
+            enabled     = true
+            title       = "Honua STAC API"
+            description = "Test STAC API using Configuration V2"
+        }
+
+        layer "test_features" {
+            title       = "Test Features"
+            data_source = data_source.test_db
+            table       = "features"
+            id_field    = "id"
+            introspect_fields = true
+
+            geometry {
+                column = "geom"
+                type   = "Polygon"
+                srid   = 4326
+            }
+
+            services = [service.stac]
+        }
+        """;
+
+        return new ConfigurationV2TestFixture<Program>(DatabaseFixture, hclConfig);
     }
 
     [Fact]
     public async Task GetRootCatalog_ReturnsValidCatalog()
     {
         // Arrange
-        using var factory = new WebApplicationFactoryFixture<Program>(_databaseFixture);
-        var client = factory.CreateClient();
-        HttpClientHelper.AddJsonAcceptHeader(client);
+        HttpClientHelper.AddJsonAcceptHeader(Client);
 
         // Act
-        var response = await client.GetAsync("/v1/stac");
+        var response = await Client.GetAsync("/v1/stac");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -54,12 +96,10 @@ public class StacCatalogTests : IClassFixture<DatabaseFixture>
     public async Task GetRootCatalog_ContainsRequiredFields()
     {
         // Arrange
-        using var factory = new WebApplicationFactoryFixture<Program>(_databaseFixture);
-        var client = factory.CreateClient();
-        HttpClientHelper.AddJsonAcceptHeader(client);
+        HttpClientHelper.AddJsonAcceptHeader(Client);
 
         // Act
-        var response = await client.GetAsync("/v1/stac");
+        var response = await Client.GetAsync("/v1/stac");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -80,12 +120,10 @@ public class StacCatalogTests : IClassFixture<DatabaseFixture>
     public async Task GetRootCatalog_ContainsSelfLink()
     {
         // Arrange
-        using var factory = new WebApplicationFactoryFixture<Program>(_databaseFixture);
-        var client = factory.CreateClient();
-        HttpClientHelper.AddJsonAcceptHeader(client);
+        HttpClientHelper.AddJsonAcceptHeader(Client);
 
         // Act
-        var response = await client.GetAsync("/v1/stac");
+        var response = await Client.GetAsync("/v1/stac");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -100,12 +138,10 @@ public class StacCatalogTests : IClassFixture<DatabaseFixture>
     public async Task GetConformance_ReturnsValidConformance()
     {
         // Arrange
-        using var factory = new WebApplicationFactoryFixture<Program>(_databaseFixture);
-        var client = factory.CreateClient();
-        HttpClientHelper.AddJsonAcceptHeader(client);
+        HttpClientHelper.AddJsonAcceptHeader(Client);
 
         // Act
-        var response = await client.GetAsync("/v1/stac/conformance");
+        var response = await Client.GetAsync("/v1/stac/conformance");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -124,12 +160,10 @@ public class StacCatalogTests : IClassFixture<DatabaseFixture>
     public async Task GetConformance_ContainsStacCoreConformance()
     {
         // Arrange
-        using var factory = new WebApplicationFactoryFixture<Program>(_databaseFixture);
-        var client = factory.CreateClient();
-        HttpClientHelper.AddJsonAcceptHeader(client);
+        HttpClientHelper.AddJsonAcceptHeader(Client);
 
         // Act
-        var response = await client.GetAsync("/v1/stac/conformance");
+        var response = await Client.GetAsync("/v1/stac/conformance");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -144,12 +178,10 @@ public class StacCatalogTests : IClassFixture<DatabaseFixture>
     public async Task GetRootCatalog_HasCorrectContentType()
     {
         // Arrange
-        using var factory = new WebApplicationFactoryFixture<Program>(_databaseFixture);
-        var client = factory.CreateClient();
-        HttpClientHelper.AddJsonAcceptHeader(client);
+        HttpClientHelper.AddJsonAcceptHeader(Client);
 
         // Act
-        var response = await client.GetAsync("/v1/stac");
+        var response = await Client.GetAsync("/v1/stac");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -163,12 +195,10 @@ public class StacCatalogTests : IClassFixture<DatabaseFixture>
     public async Task GetConformance_HasCorrectContentType()
     {
         // Arrange
-        using var factory = new WebApplicationFactoryFixture<Program>(_databaseFixture);
-        var client = factory.CreateClient();
-        HttpClientHelper.AddJsonAcceptHeader(client);
+        HttpClientHelper.AddJsonAcceptHeader(Client);
 
         // Act
-        var response = await client.GetAsync("/v1/stac/conformance");
+        var response = await Client.GetAsync("/v1/stac/conformance");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -182,12 +212,10 @@ public class StacCatalogTests : IClassFixture<DatabaseFixture>
     public async Task GetRootCatalog_ContainsChildLinks()
     {
         // Arrange
-        using var factory = new WebApplicationFactoryFixture<Program>(_databaseFixture);
-        var client = factory.CreateClient();
-        HttpClientHelper.AddJsonAcceptHeader(client);
+        HttpClientHelper.AddJsonAcceptHeader(Client);
 
         // Act
-        var response = await client.GetAsync("/v1/stac");
+        var response = await Client.GetAsync("/v1/stac");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);

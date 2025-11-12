@@ -11,5 +11,5 @@ namespace Honua.Server.Core.Attachments;
 public interface IAttachmentStoreProvider
 {
     string ProviderKey { get; }
-    IAttachmentStore Create(string profileId, AttachmentStorageProfileConfiguration profileConfiguration);
+    IAttachmentStore Create(string profileId, AttachmentStorageProfileOptions profileConfiguration);
 }

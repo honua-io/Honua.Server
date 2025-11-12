@@ -2,19 +2,33 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using System;
 using System.Collections.Generic;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using System.Collections.ObjectModel;
+using Honua.Server.Core.Configuration.V2;
 using System.Linq;
+using Honua.Server.Core.Configuration.V2;
 using System.Text;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Catalog;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Configuration;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Observability;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Extensions;
+using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Extensions;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Authorization;
+using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Mvc;
+using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.GeoservicesREST;
 
@@ -27,13 +41,13 @@ public sealed class ServicesDirectoryController : ControllerBase
     private const int DefaultMaxRecordCount = 1000;
     private readonly ICatalogProjectionService _catalog;
     private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IHonuaConfigurationService _configurationService;
+    private readonly HonuaConfig? _honuaConfig;
 
-    public ServicesDirectoryController(ICatalogProjectionService catalog, IMetadataRegistry metadataRegistry, IHonuaConfigurationService configurationService)
+    public ServicesDirectoryController(ICatalogProjectionService catalog, IMetadataRegistry metadataRegistry, HonuaConfig? honuaConfig = null)
     {
         _catalog = Guard.NotNull(catalog);
         _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _configurationService = Guard.NotNull(configurationService);
+        _honuaConfig = honuaConfig;
     }
 
     [HttpGet]
@@ -53,7 +67,10 @@ public sealed class ServicesDirectoryController : ControllerBase
                     .SelectMany(group => group.Services.SelectMany(service => CreateRootEntries(service, rasterServices, urlFactory)))
                     .ToList();
 
-                if (_configurationService.Current.Services.Geometry.Enabled)
+                var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+                    ? geometryService.Enabled
+                    : true;
+                if (geometryEnabled)
                 {
                     services.Add(new ServiceDirectoryEntry
                     {

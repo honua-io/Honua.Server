@@ -284,12 +284,12 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
             cancellationToken).ConfigureAwait(false);
 
         // Convert download result to IActionResult
-        if (!downloadResult.Success)
+        if (!downloadResult.IsSuccess)
         {
             return new NotFoundResult();
         }
 
-        var stream = downloadResult.Stream!;
+        var stream = downloadResult.ReadResult!.Content;
         var contentType = descriptor.MimeType ?? "application/octet-stream";
         var fileName = descriptor.Name ?? $"attachment_{attachmentId}";
 

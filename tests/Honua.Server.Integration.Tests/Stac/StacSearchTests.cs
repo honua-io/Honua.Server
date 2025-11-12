@@ -16,10 +16,11 @@ namespace Honua.Server.Integration.Tests.Stac;
 /// Integration tests for STAC Search API endpoints.
 /// Tests search functionality including spatial, temporal, and attribute filtering.
 /// </summary>
+[Collection("DatabaseCollection")]
 [Trait("Category", "Integration")]
 [Trait("API", "STAC")]
 [Trait("Endpoint", "Search")]
-public class StacSearchTests : IClassFixture<DatabaseFixture>
+public class StacSearchTests
 {
     private readonly DatabaseFixture _databaseFixture;
 

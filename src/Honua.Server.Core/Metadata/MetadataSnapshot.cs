@@ -990,49 +990,14 @@ public sealed class MetadataSnapshot
                 continue;
             }
 
-            foreach (var layer in serviceLayers)
-            {
-                var validationResults = ProtocolMetadataValidator.ValidateLayer(layer, service, includeWarnings: true);
-
-                foreach (var result in validationResults)
-                {
-                    // Log errors as warnings since they're protocol-specific, not structural issues
-                    if (result.Errors.Count > 0)
-                    {
-                        var errorMessages = string.Join("; ", result.Errors);
-                        System.Diagnostics.Debug.WriteLine($"[{result.Protocol}] Layer '{layer.Id}' validation: {errorMessages}");
-                    }
-
-                    // Log warnings for informational purposes
-                    if (result.Warnings.Count > 0)
-                    {
-                        var warningMessages = string.Join("; ", result.Warnings);
-                        System.Diagnostics.Debug.WriteLine($"[{result.Protocol}] Layer '{layer.Id}' recommendations: {warningMessages}");
-                    }
-                }
-            }
+            // Protocol-specific validation has been removed
+            // ProtocolMetadataValidator was deleted as part of Configuration V2 migration
+            // Validation is now handled by HCL schema validation
         }
 
-        // Validate raster datasets
-        foreach (var raster in rasterDatasets)
-        {
-            var validationResults = ProtocolMetadataValidator.ValidateRasterDataset(raster, includeWarnings: true);
-
-            foreach (var result in validationResults)
-            {
-                if (result.Errors.Count > 0)
-                {
-                    var errorMessages = string.Join("; ", result.Errors);
-                    System.Diagnostics.Debug.WriteLine($"[{result.Protocol}] Raster '{raster.Id}' validation: {errorMessages}");
-                }
-
-                if (result.Warnings.Count > 0)
-                {
-                    var warningMessages = string.Join("; ", result.Warnings);
-                    System.Diagnostics.Debug.WriteLine($"[{result.Protocol}] Raster '{raster.Id}' recommendations: {warningMessages}");
-                }
-            }
-        }
+        // Raster dataset protocol-specific validation has been removed
+        // ProtocolMetadataValidator was deleted as part of Configuration V2 migration
+        // Validation is now handled by HCL schema validation
     }
 }
 
