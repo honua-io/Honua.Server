@@ -46,29 +46,21 @@ public class TerrainController : ControllerBase
         [FromQuery] double lat,
         [FromQuery] string? source = null)
     {
-        try
-        {
-            var elevation = await _elevationService.QueryElevationAsync(lon, lat, source);
+        var elevation = await _elevationService.QueryElevationAsync(lon, lat, source);
 
-            if (elevation == null)
-            {
-                return NotFound(new { message = "Elevation data not available for this location" });
-            }
-
-            return Ok(new ElevationResponse
-            {
-                Longitude = lon,
-                Latitude = lat,
-                Elevation = elevation.Value,
-                Source = source ?? "default",
-                Timestamp = DateTime.UtcNow
-            });
-        }
-        catch (Exception ex)
+        if (elevation == null)
         {
-            _logger.LogError(ex, "Error querying elevation at ({Lon}, {Lat})", lon, lat);
-            return StatusCode(500, new { message = "Internal server error" });
+            return NotFound(new { message = "Elevation data not available for this location" });
         }
+
+        return Ok(new ElevationResponse
+        {
+            Longitude = lon,
+            Latitude = lat,
+            Elevation = elevation.Value,
+            Source = source ?? "default",
+            Timestamp = DateTime.UtcNow
+        });
     }
 
     /// <summary>
@@ -81,25 +73,17 @@ public class TerrainController : ControllerBase
     public async Task<ActionResult<BatchElevationResponse>> GetElevationBatch(
         [FromBody] BatchElevationRequest request)
     {
-        try
-        {
-            var elevations = await _elevationService.QueryElevationBatchAsync(
-                request.Points,
-                request.Source);
+        var elevations = await _elevationService.QueryElevationBatchAsync(
+            request.Points,
+            request.Source);
 
-            return Ok(new BatchElevationResponse
-            {
-                Elevations = elevations,
-                Count = elevations.Length,
-                Source = request.Source ?? "default",
-                Timestamp = DateTime.UtcNow
-            });
-        }
-        catch (Exception ex)
+        return Ok(new BatchElevationResponse
         {
-            _logger.LogError(ex, "Error querying batch elevations");
-            return StatusCode(500, new { message = "Internal server error" });
-        }
+            Elevations = elevations,
+            Count = elevations.Length,
+            Source = request.Source ?? "default",
+            Timestamp = DateTime.UtcNow
+        });
     }
 
     /// <summary>
@@ -112,20 +96,12 @@ public class TerrainController : ControllerBase
     public async Task<ActionResult<ElevationProfile>> GetElevationProfile(
         [FromBody] ElevationProfileRequest request)
     {
-        try
-        {
-            var profile = await _elevationService.QueryPathElevationAsync(
-                request.Coordinates,
-                request.SamplePoints ?? 100,
-                request.Source);
+        var profile = await _elevationService.QueryPathElevationAsync(
+            request.Coordinates,
+            request.SamplePoints ?? 100,
+            request.Source);
 
-            return Ok(profile);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating elevation profile");
-            return StatusCode(500, new { message = "Internal server error" });
-        }
+        return Ok(profile);
     }
 
     /// <summary>
@@ -140,16 +116,8 @@ public class TerrainController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTerrainRGBTile(int z, int x, int y)
     {
-        try
-        {
-            var tileData = await _terrainTileService.GenerateTerrainRGBTileAsync(z, x, y);
-            return File(tileData, "image/png");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating terrain RGB tile {Z}/{X}/{Y}", z, x, y);
-            return StatusCode(500);
-        }
+        var tileData = await _terrainTileService.GenerateTerrainRGBTileAsync(z, x, y);
+        return File(tileData, "image/png");
     }
 
     /// <summary>
@@ -167,16 +135,8 @@ public class TerrainController : ControllerBase
         int z, int x, int y,
         [FromQuery] float maxError = 1.0f)
     {
-        try
-        {
-            var tile = await _terrainTileService.GenerateTerrainMeshTileAsync(z, x, y, maxError);
-            return Ok(tile);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating terrain mesh tile {Z}/{X}/{Y}", z, x, y);
-            return StatusCode(500, new { message = "Internal server error" });
-        }
+        var tile = await _terrainTileService.GenerateTerrainMeshTileAsync(z, x, y, maxError);
+        return Ok(tile);
     }
 
     /// <summary>
@@ -196,17 +156,9 @@ public class TerrainController : ControllerBase
         [FromQuery] double azimuth = 315,
         [FromQuery] double altitude = 45)
     {
-        try
-        {
-            var tileData = await _terrainTileService.GenerateHillshadeTileAsync(
-                z, x, y, azimuth, altitude);
-            return File(tileData, "image/png");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating hillshade tile {Z}/{X}/{Y}", z, x, y);
-            return StatusCode(500);
-        }
+        var tileData = await _terrainTileService.GenerateHillshadeTileAsync(
+            z, x, y, azimuth, altitude);
+        return File(tileData, "image/png");
     }
 
     /// <summary>
@@ -221,16 +173,8 @@ public class TerrainController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSlopeTile(int z, int x, int y)
     {
-        try
-        {
-            var tileData = await _terrainTileService.GenerateSlopeTileAsync(z, x, y);
-            return File(tileData, "image/png");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error generating slope tile {Z}/{X}/{Y}", z, x, y);
-            return StatusCode(500);
-        }
+        var tileData = await _terrainTileService.GenerateSlopeTileAsync(z, x, y);
+        return File(tileData, "image/png");
     }
 
     /// <summary>
@@ -244,16 +188,8 @@ public class TerrainController : ControllerBase
     [ProducesResponseType(typeof(TerrainTileMetadata), StatusCodes.Status200OK)]
     public async Task<ActionResult<TerrainTileMetadata>> GetTileMetadata(int z, int x, int y)
     {
-        try
-        {
-            var metadata = await _terrainTileService.GetTileMetadataAsync(z, x, y);
-            return Ok(metadata);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting tile metadata {Z}/{X}/{Y}", z, x, y);
-            return StatusCode(500, new { message = "Internal server error" });
-        }
+        var metadata = await _terrainTileService.GetTileMetadataAsync(z, x, y);
+        return Ok(metadata);
     }
 }
 

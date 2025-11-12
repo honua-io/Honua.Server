@@ -2,8 +2,8 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System.Threading;
 using System.Threading.Tasks;
-using Honua.Server.Core.Licensing;
-using Honua.Server.Core.Licensing.Models;
+using Honua.Server.Enterprise.Licensing;
+using Honua.Server.Enterprise.Licensing.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Features;

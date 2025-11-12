@@ -27,7 +27,7 @@ public static class DiscoveryAdminEndpoints
     {
         var group = endpoints.MapGroup("/admin/discovery")
             .WithTags("Admin - Discovery")
-            .RequireAuthorization("AdminPolicy"); // Require admin authorization
+            .RequireAuthorization("RequireAdministrator"); // Require admin authorization
 
         // GET /admin/discovery/status - Get discovery status
         group.MapGet("/status", GetDiscoveryStatus)

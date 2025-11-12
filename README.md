@@ -607,8 +607,28 @@ Honua is source-available under Elastic License 2.0. We welcome:
 - **Documentation improvements** - [Documentation issues](https://github.com/honua-io/Honua.Server/issues?q=label%3Adocumentation)
 - **Use case descriptions** - Share your use case in [Discussions](https://github.com/honua-io/Honua.Server/discussions)
 
-**For Developers:**
-See [Development Documentation](docs/development/README.md) for architecture, testing, and development processes.
+### Developer Onboarding
+
+**New to the project?** Get started in 5 minutes:
+
+1. **[Quick Start Guide](docs/development/quick-start.md)** - Set up your development environment
+2. **[CONTRIBUTING.md](CONTRIBUTING.md)** - Comprehensive contribution guidelines
+3. **[Debugging Guide](docs/development/debugging.md)** - Debug with VS Code, Visual Studio, or Rider
+
+**Quick Setup:**
+```bash
+# Linux/macOS
+./scripts/setup-dev.sh
+
+# Windows
+.\scripts\setup-dev.ps1
+```
+
+**Development Resources:**
+- [Architecture Overview](docs/development/README.md) - System design and patterns
+- [Testing Guide](docs/development/testing/QUICKSTART-TESTING.md) - Writing and running tests
+- [API Documentation](docs/api/README.md) - Complete API reference
+- [Code Style Guidelines](CONTRIBUTING.md#code-style-and-conventions) - Coding standards
 
 ---
 

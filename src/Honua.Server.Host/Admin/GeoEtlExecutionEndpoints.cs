@@ -16,7 +16,8 @@ public static class GeoEtlExecutionEndpoints
     {
         var group = endpoints.MapGroup("/admin/api/geoetl/executions")
             .WithTags("GeoETL Execution")
-            .WithOpenApi();
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // Execute a workflow
         group.MapPost("/", async (

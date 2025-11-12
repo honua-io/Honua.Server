@@ -276,12 +276,21 @@ honua auth bootstrap --mode Local
 
 ## Observability Configuration
 
+**IMPORTANT: Production Defaults**
+- Metrics are **ENABLED by default** in `appsettings.Production.json`
+- Request logging is **ENABLED by default** in production for audit trails
+- Tracing exporter is set to `none` by default (configure OTLP endpoint to enable)
+
 ### Metrics
+
+Metrics are enabled by default in production and provide Prometheus-compatible metrics for monitoring.
+
 ```json
 {
   "observability": {
     "metrics": {
       "enabled": true,
+      "_comment": "ENABLED by default in production",
       "usePrometheus": true,
       "endpoint": "/metrics"
     }
@@ -289,28 +298,77 @@ honua auth bootstrap --mode Local
 }
 ```
 
+**Access the metrics endpoint:**
+- URL: `http://your-server:port/metrics`
+- Authentication: Required (Viewer role or higher) except in QuickStart mode
+- Format: Prometheus text format
+
+**Environment variable override:**
+```bash
+export observability__metrics__enabled=false  # Disable if needed
+export observability__metrics__endpoint=/custom-metrics
+```
+
 ### Distributed Tracing
+
+Tracing is configured via the `tracing` section. Set exporter to `otlp` and configure an endpoint for production.
+
 ```json
 {
   "observability": {
     "tracing": {
       "exporter": "otlp",
-      "otlpEndpoint": "http://jaeger:4317",
-      "samplingRatio": 0.1
+      "otlpEndpoint": "http://jaeger:4317"
     }
   }
 }
 ```
 
 **Exporter options:**
-- `none` - Disabled
-- `console` - Log to stdout (development)
-- `otlp` - OpenTelemetry Protocol (Jaeger, Tempo, etc.)
+- `none` - Disabled (default, minimal overhead ~0.5%)
+- `console` - Log to stdout (development/debugging, ~1-2% overhead)
+- `otlp` - OpenTelemetry Protocol (Jaeger, Tempo, etc., ~2-5% overhead)
 
-**Sampling ratio:**
-- `1.0` - 100% (development)
-- `0.1` - 10% (staging)
-- `0.01-0.05` - 1-5% (production)
+**Production tracing setup:**
+```bash
+# Set via environment variables
+export observability__tracing__exporter=otlp
+export observability__tracing__otlpEndpoint=http://tempo:4317
+```
+
+**Common OTLP endpoints:**
+- **Jaeger (local):** `http://jaeger:4317`
+- **Tempo (local):** `http://tempo:4317`
+- **Grafana Cloud:** `https://otlp-gateway-prod-us-central-0.grafana.net/otlp`
+- **Honeycomb:** `https://api.honeycomb.io:443`
+- **New Relic:** `https://otlp.nr-data.net:4317`
+
+### Request Logging
+
+Request logging is enabled by default in production for audit trails and troubleshooting.
+
+```json
+{
+  "observability": {
+    "requestLogging": {
+      "enabled": true,
+      "logHeaders": false,
+      "slowThresholdMs": 5000
+    }
+  }
+}
+```
+
+**Settings:**
+- `enabled`: Log all HTTP requests/responses (default: true in production)
+- `logHeaders`: Include request/response headers (default: false, may expose sensitive data)
+- `slowThresholdMs`: Log requests exceeding this duration (default: 5000ms)
+
+**Environment variable override:**
+```bash
+export observability__requestLogging__enabled=false
+export observability__requestLogging__slowThresholdMs=3000
+```
 
 ### Runtime Configuration
 

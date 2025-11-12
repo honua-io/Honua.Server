@@ -1,4 +1,7 @@
-using Honua.Server.Core.Models.Drone;
+// Copyright (c) 2025 HonuaIO
+// Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+
+using Honua.MapSDK.Models.Drone;
 using Microsoft.Extensions.Logging;
 
 namespace Honua.MapSDK.Utilities.Drone;
@@ -236,6 +239,6 @@ public static class PointCloudClassificationColors
     {
         return StandardColors.TryGetValue(classification, out var color)
             ? color
-            : ((byte)200, (byte)200, (byte)200); // Default gray
+            : (200, 200, 200); // Default gray
     }
 }

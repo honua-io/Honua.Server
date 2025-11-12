@@ -1,17 +1,48 @@
 #!/bin/bash
-# Install git hooks for Honua.Server
+# Install Git pre-commit hooks for Honua Server
 
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Get the script directory and project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-HOOKS_DIR="$REPO_ROOT/.githooks"
-GIT_HOOKS_DIR="$REPO_ROOT/.git/hooks"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
-echo "Installing git hooks..."
+cd "$PROJECT_ROOT"
 
-# Configure git to use .githooks directory
-git config core.hooksPath "$HOOKS_DIR"
+echo -e "${BLUE}==>${NC} Installing Git pre-commit hooks..."
 
-echo "✅ Git hooks installed successfully!"
-echo "Pre-commit hook will run on every commit."
+# Check if .git directory exists
+if [ ! -d ".git" ]; then
+    echo -e "${YELLOW}!${NC} Not a git repository. Skipping hook installation."
+    exit 0
+fi
+
+# Create hooks directory if it doesn't exist
+mkdir -p .git/hooks
+
+# Copy pre-commit hook
+if [ -f ".githooks/pre-commit" ]; then
+    cp .githooks/pre-commit .git/hooks/pre-commit
+    chmod +x .git/hooks/pre-commit
+    echo -e "${GREEN}✓${NC} Pre-commit hook installed"
+else
+    echo -e "${YELLOW}!${NC} .githooks/pre-commit not found"
+fi
+
 echo ""
-echo "To skip hooks (not recommended), use: git commit --no-verify"
+echo "Git hooks installed successfully!"
+echo ""
+echo "The pre-commit hook will automatically:"
+echo "  • Check code formatting (dotnet format)"
+echo "  • Build the project"
+echo "  • Run unit tests"
+echo ""
+echo "To bypass the hook (not recommended):"
+echo "  git commit --no-verify"
+echo ""

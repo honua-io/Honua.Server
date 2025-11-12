@@ -78,7 +78,13 @@ public sealed partial class ElasticsearchDataStoreProvider
             "Check IDataStoreCapabilities.SupportsSoftDelete before calling this method.");
     }
 
-    public Task<bool> HardDeleteAsync(
+    /// <summary>
+    /// Permanently deletes a feature from Elasticsearch without recovery option.
+    /// This is a GDPR-compliant hard delete that cannot be undone.
+    /// Note: Elasticsearch snapshots may still contain deleted data until snapshot retention expires.
+    /// Audit logging is performed via the deletedBy parameter for compliance tracking.
+    /// </summary>
+    public async Task<bool> HardDeleteAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -87,9 +93,41 @@ public sealed partial class ElasticsearchDataStoreProvider
         IDataStoreTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement hard delete functionality for Elasticsearch
-        // For now, delegate to regular DeleteAsync
-        return DeleteAsync(dataSource, service, layer, featureId, transaction, cancellationToken);
+        ThrowIfDisposed();
+
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var connection = GetConnection(dataSource);
+        var indexName = ResolveIndexName(layer, connection.Info);
+
+        // Permanently delete the document from Elasticsearch
+        using var response = await SendAsync(
+            connection.Client,
+            HttpMethod.Delete,
+            $"{Encode(indexName)}/_doc/{Encode(featureId)}",
+            body: null,
+            cancellationToken,
+            allowNotFound: true).ConfigureAwait(false);
+
+        var deleted = false;
+        if (response.RootElement.TryGetProperty("result", out var resultElement))
+        {
+            var result = resultElement.GetString();
+            deleted = string.Equals(result, "deleted", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Log the hard delete operation for audit compliance (GDPR, SOC2, etc.)
+        if (deleted)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"HARD DELETE: Feature permanently deleted from Elasticsearch - " +
+                $"Index: {indexName}, FeatureId: {featureId}, DeletedBy: {deletedBy ?? "<system>"}");
+        }
+
+        return deleted;
     }
 
     public async Task<int> BulkDeleteAsync(

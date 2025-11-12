@@ -1,0 +1,149 @@
+# Azure-specific deployment with Azure Key Vault integration
+# Uses Azure Workload Identity for secure access to Key Vault
+
+# Prerequisites:
+# 1. Create Azure Key Vault and add secrets
+# 2. Set up Azure Workload Identity:
+#    https://azure.github.io/azure-workload-identity/docs/quick-start.html
+# 3. Create managed identity and configure federation
+# 4. Grant Key Vault access to managed identity
+
+replicaCount: 3
+
+image:
+  variant: full
+  pullPolicy: IfNotPresent
+  registry: youracr.azurecr.io
+  repository: honua-server
+
+resources:
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Azure PostgreSQL Flexible Server
+database:
+  external: true
+  host: honua-postgres.postgres.database.azure.com
+  port: 5432
+  name: honua_prod
+  username: honua_admin
+  sslMode: require
+  azure:
+    enabled: true
+    useAzureAD: false
+
+# Azure Cache for Redis
+redis:
+  external: true
+  host: honua-redis.redis.cache.windows.net
+  port: 6380
+  ssl:
+    enabled: true
+  azure:
+    enabled: true
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+# Azure Key Vault integration
+secrets:
+  provider: azure-keyvault
+  azureKeyVault:
+    enabled: true
+    name: honua-keyvault
+    tenantId: "your-tenant-id"
+    useManagedIdentity: true
+    clientId: "your-client-id"
+
+serviceAccount:
+  create: true
+  annotations:
+    azure.workload.identity/client-id: "your-client-id"
+    azure.workload.identity/tenant-id: "your-tenant-id"
+
+# Pod labels for Azure Workload Identity
+podLabels:
+  azure.workload.identity/use: "true"
+
+ingress:
+  enabled: true
+  className: azure-application-gateway
+  annotations:
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    appgw.ingress.kubernetes.io/backend-protocol: "http"
+    appgw.ingress.kubernetes.io/cookie-based-affinity: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: honua.azurewebsites.net
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: honua-azure-tls
+      hosts:
+        - honua.azurewebsites.net
+
+config:
+  aspnetcoreEnvironment: Production
+  logging:
+    level: Information
+    structuredLogging: true
+
+  openTelemetry:
+    enabled: true
+    otlpEndpoint: "http://opentelemetry-collector.observability.svc.cluster.local:4317"
+
+  rateLimiting:
+    enabled: true
+
+serviceMonitor:
+  enabled: true
+  namespace: observability
+
+networkPolicy:
+  enabled: true
+
+# Azure-specific node selector
+nodeSelector:
+  kubernetes.io/os: linux
+  agentpool: production
+
+# High availability across availability zones
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - honua-server
+        topologyKey: kubernetes.io/hostname
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: honua-server
+
+priorityClassName: high-priority

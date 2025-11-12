@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/appsettings.json",
+  "Secrets": {
+    "Provider": "Local",
+    "EnableCaching": false,
+    "Local": {
+      "SecretsFilePath": "secrets.json",
+      "EncryptFile": true,
+      "WatchForChanges": true,
+      "UseUserSecrets": true
+    }
+  }
+}

@@ -1,0 +1,199 @@
+# Multi-region deployment configuration
+# Deploy across multiple regions for disaster recovery and low latency
+
+# This example shows how to deploy Honua Server in multiple regions
+# with shared global database and region-specific caches
+
+# Region 1: US East (Primary)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: honua-us-east
+
+---
+# Install in US East region
+# helm install honua-us-east ./deploy/kubernetes/helm/honua-server \
+#   --namespace honua-us-east \
+#   -f deploy/kubernetes/examples/multi-region.yaml \
+#   --set region=us-east \
+#   --set database.host=postgres-global.example.com \
+#   --set redis.host=redis-us-east.cache.amazonaws.com
+
+replicaCount: 3
+
+image:
+  variant: full
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Shared global database (AWS Aurora Global Database or Azure Cosmos DB)
+database:
+  external: true
+  host: postgres-global.cluster-xyz.global.rds.amazonaws.com
+  port: 5432
+  name: honua_global
+  username: honua_admin
+  sslMode: require
+  pooling:
+    minPoolSize: 20
+    maxPoolSize: 200
+
+# Region-specific Redis cache
+redis:
+  external: true
+  # Will be overridden per region
+  host: redis-us-east.cache.amazonaws.com
+  port: 6379
+  ssl:
+    enabled: true
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    external-dns.alpha.kubernetes.io/hostname: api-us-east.honua.io
+  hosts:
+    - host: api-us-east.honua.io
+      paths:
+        - path: /
+          pathType: Prefix
+
+config:
+  aspnetcoreEnvironment: Production
+  logging:
+    level: Information
+    structuredLogging: true
+
+  openTelemetry:
+    enabled: true
+    otlpEndpoint: "http://opentelemetry-collector.observability.svc.cluster.local:4317"
+
+  rateLimiting:
+    enabled: true
+
+serviceMonitor:
+  enabled: true
+  namespace: observability
+
+networkPolicy:
+  enabled: true
+
+# High availability configuration
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - honua-server
+        topologyKey: kubernetes.io/hostname
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: honua-server
+
+priorityClassName: high-priority
+
+# Region-specific labels
+podLabels:
+  region: us-east
+  geo: north-america
+
+---
+# Region 2: EU West (Secondary)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: honua-eu-west
+
+# Deploy similarly in EU West:
+# helm install honua-eu-west ./deploy/kubernetes/helm/honua-server \
+#   --namespace honua-eu-west \
+#   -f deploy/kubernetes/examples/multi-region.yaml \
+#   --set region=eu-west \
+#   --set database.host=postgres-global.cluster-xyz.global.rds.amazonaws.com \
+#   --set redis.host=redis-eu-west.cache.amazonaws.com \
+#   --set ingress.hosts[0].host=api-eu-west.honua.io \
+#   --set podLabels.region=eu-west \
+#   --set podLabels.geo=europe
+
+---
+# Region 3: AP Southeast (Secondary)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: honua-ap-southeast
+
+# Deploy similarly in AP Southeast:
+# helm install honua-ap-southeast ./deploy/kubernetes/helm/honua-server \
+#   --namespace honua-ap-southeast \
+#   -f deploy/kubernetes/examples/multi-region.yaml \
+#   --set region=ap-southeast \
+#   --set database.host=postgres-global.cluster-xyz.global.rds.amazonaws.com \
+#   --set redis.host=redis-ap-southeast.cache.amazonaws.com \
+#   --set ingress.hosts[0].host=api-ap-southeast.honua.io \
+#   --set podLabels.region=ap-southeast \
+#   --set podLabels.geo=asia-pacific
+
+---
+# Global Traffic Management
+# Use AWS Route 53, Azure Traffic Manager, or Cloudflare for geo-routing
+# Example Route 53 configuration (apply separately):
+#
+# apiVersion: route53.services.k8s.aws/v1alpha1
+# kind: HostedZone
+# metadata:
+#   name: honua-io
+# spec:
+#   name: honua.io
+#   delegationSetID: "..."
+#
+# ---
+# apiVersion: route53.services.k8s.aws/v1alpha1
+# kind: RecordSet
+# metadata:
+#   name: api-honua-io
+# spec:
+#   hostedZoneID: "..."
+#   name: api.honua.io
+#   type: CNAME
+#   ttl: 60
+#   setIdentifier: us-east
+#   geolocation:
+#     continent: NA
+#   resourceRecords:
+#     - api-us-east.honua.io
+#
+# (Repeat for other regions with different geolocation values)

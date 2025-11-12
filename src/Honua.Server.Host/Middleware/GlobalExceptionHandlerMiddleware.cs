@@ -220,6 +220,10 @@ public sealed class GlobalExceptionHandlerMiddleware
             ServiceTimeoutException =>
                 (StatusCodes.Status504GatewayTimeout, "Gateway Timeout", "https://tools.ietf.org/html/rfc7231#section-6.6.5"),
 
+            // 503 Service Unavailable - Alert persistence failures
+            _ when exception.GetType().Name == "AlertPersistenceException" =>
+                (StatusCodes.Status503ServiceUnavailable, "Service Unavailable", "https://tools.ietf.org/html/rfc7231#section-6.6.4"),
+
             // 500 Internal Server Error - Everything else
             _ =>
                 (StatusCodes.Status500InternalServerError, "Internal Server Error", "https://tools.ietf.org/html/rfc7231#section-6.6.1")
@@ -243,6 +247,7 @@ public sealed class GlobalExceptionHandlerMiddleware
                 ServiceThrottledException => "Too many requests. Please slow down and try again later.",
                 CacheUnavailableException => "Cache service is temporarily unavailable.",
                 NotImplementedException => "This feature is not yet available.",
+                _ when exception.GetType().Name == "AlertPersistenceException" => "Alert persistence service is temporarily unavailable.",
                 _ => "An unexpected error occurred while processing your request."
             };
         }

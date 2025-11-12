@@ -55,6 +55,7 @@ Honua implements security controls including:
 - Security headers (HSTS, CSP, X-Frame-Options, X-Content-Type-Options)
 
 **Data Protection**
+- Comprehensive secrets management with multiple provider support
 - Secure credential storage
 - PII redaction in logs
 - Attachment security controls
@@ -119,6 +120,69 @@ HONUA__ATTACHMENTS__AZURE__CONNECTIONSTRING="..."
 
 Never commit credentials to version control. Use `.gitignore` for local configuration files.
 
+### Secrets Management
+
+Honua Server implements comprehensive secrets management with support for multiple cloud providers and local development workflows.
+
+**Supported Providers:**
+- **Azure Key Vault** - For Azure cloud deployments with Managed Identity support
+- **AWS Secrets Manager** - For AWS deployments with IAM role integration
+- **HashiCorp Vault** - For on-premises, Kubernetes, and multi-cloud deployments
+- **Local Development** - File-based with encryption for development environments
+
+**Configuration Example:**
+
+```json
+{
+  "Secrets": {
+    "Provider": "AzureKeyVault",
+    "EnableCaching": true,
+    "CacheDurationSeconds": 300,
+    "AzureKeyVault": {
+      "VaultUri": "https://your-vault.vault.azure.net/",
+      "UseManagedIdentity": true
+    }
+  }
+}
+```
+
+**Usage in Code:**
+
+```csharp
+// In Program.cs
+builder.Services.AddSecretsManagement(builder.Configuration);
+
+// In your services
+public class MyService
+{
+    private readonly ISecretsProvider _secrets;
+
+    public MyService(ISecretsProvider secrets)
+    {
+        _secrets = secrets;
+    }
+
+    public async Task DoWorkAsync()
+    {
+        var apiKey = await _secrets.GetSecretAsync("ApiKeys:OpenAI");
+        var cert = await _secrets.GetCertificateAsync("Certificates:Signing");
+    }
+}
+```
+
+**Security Best Practices:**
+- Use Managed Identity or IAM roles in production (avoid static credentials)
+- Enable secret caching to reduce provider load
+- Implement secret rotation strategies
+- Never commit secrets to source control
+- Use user secrets for local development
+- Monitor secret access through provider audit logs
+- Set appropriate permissions (least privilege)
+- Enable secret versioning where supported
+
+**Documentation:**
+See [docs/security/secrets-management.md](docs/security/secrets-management.md) for comprehensive setup guides, examples, and best practices for each provider.
+
 ## Known Security Considerations
 
 ### QuickStart Mode
@@ -142,16 +206,114 @@ The application requires database access for geospatial operations:
 - Avoid using database admin credentials
 - Enable database connection encryption (SSL/TLS)
 
+## Automated Security Scanning
+
+Honua uses multiple automated tools to detect and prevent security issues:
+
+### Dependabot - Dependency Updates
+**Status**: Enabled (weekly scans)
+
+Dependabot monitors and updates dependencies across the project:
+
+- **NuGet Packages**: .NET dependencies in the main project
+- **GitHub Actions**: CI/CD workflows and actions
+- **Docker Images**: Container base images
+- **npm Packages**: JavaScript packages (Map SDK, Power BI connector, Tableau connector)
+
+Configuration: `.github/dependabot.yml`
+
+**How it works**:
+1. Dependabot scans dependencies weekly (Mondays 09:00 UTC)
+2. Creates pull requests for new updates
+3. Groups minor and patch updates to reduce noise
+4. Limits to 10 open NuGet PRs, 5 for other ecosystems
+
+**Responding to Dependabot PRs**:
+1. Review the PR and changelog
+2. Run tests to ensure compatibility
+3. Merge after successful testing
+4. Delete the branch when merged
+
+**View Dependabot Alerts**:
+- Go to: Settings → Security & analysis → Dependabot alerts
+- Filter by severity, ecosystem, or status
+- Dismiss alerts with justification if needed
+- Receive notifications for new vulnerabilities
+
+### CodeQL - Static Application Security Testing (SAST)
+**Status**: Enabled (on push, PRs, and weekly schedule)
+
+CodeQL performs deep semantic code analysis to detect security vulnerabilities:
+
+- Scans C# code for SQL injection, path traversal, and other vulnerabilities
+- Runs automatically on:
+  - Every push to main/master/develop
+  - Pull requests to main/master
+  - Weekly schedule (Mondays 06:00 UTC)
+- Configuration: `.github/codeql/codeql-config.yml`
+- Workflow: `.github/workflows/codeql.yml`
+
+**Security Rules**:
+- Includes security-extended query pack
+- Includes security-and-quality query pack
+- Excludes unmanaged code calls (intentional exemption)
+
+**Reviewing CodeQL Results**:
+- Go to: Security → Code scanning alerts
+- Review alerts by severity and type
+- Check SARIF file for detailed information
+- Dismiss false positives with documentation
+
+### Dependency Review - Pull Request Vulnerability Check
+**Status**: Enabled (on pull requests)
+
+Dependency Review prevents vulnerable dependencies from being merged:
+
+- Blocks pull requests with critical vulnerabilities
+- Warns about license compliance issues
+- Provides vulnerability details in PR comments
+- Configuration: `.github/workflows/dependency-review.yml`
+
+**How it works**:
+1. Analyzes dependency changes in PRs
+2. Checks against known vulnerability databases
+3. Comments with vulnerability severity and guidance
+4. Fails check for critical vulnerabilities
+
+### SBOM Generation - Software Bill of Materials
+**Status**: Enabled (on release and manual trigger)
+
+SBOM provides complete transparency about all components:
+
+- Generates in multiple formats:
+  - CycloneDX (JSON) - Application dependencies
+  - SPDX (JSON) - Standard format for container/application
+  - Syft JSON - Detailed container inventory
+- Includes both application and container SBOMs
+- Signed with Cosign for integrity verification
+- Attached to releases and container images
+
+**Using SBOMs**:
+1. Download from: Releases → Assets
+2. Use for compliance (SSRF, EO 14028)
+3. Analyze with tools like Dependabot, Grype, or Syft
+4. Integrate with your supply chain security (SLSA)
+
 ## Dependency Security
 
 Dependencies are monitored using:
-- GitHub Dependabot (enabled)
+- GitHub Dependabot (enabled, weekly scans)
+- CodeQL static analysis (enabled, continuous)
+- Dependency Review on PRs (enabled)
+- SBOM generation for releases (enabled)
 - Regular manual review of security advisories
 
 When security updates are available:
 1. Dependabot creates pull requests automatically
-2. Maintainers review and test updates
-3. Critical security fixes are prioritized
+2. Dependency Review blocks vulnerable PRs
+3. Maintainers review and test updates
+4. Critical security fixes are prioritized
+5. Security advisories are published when resolved
 
 ## Contributing Security Fixes
 

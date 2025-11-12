@@ -29,6 +29,16 @@ The Honua AI Assistant is a **privacy-first, security-focused** tool that helps 
 - **Dependency Tracking** - Ensures operations execute in correct order
 - **Dry-Run Mode** - Test plans without making changes
 
+### 🔎 Infrastructure Security Scanning
+
+- **Checkov Integration** - Automatic security scanning of AI-generated Terraform code
+- **Gated Deployments** - Blocks deployment on CRITICAL/HIGH severity issues
+- **1,000+ Security Policies** - AWS, Azure, GCP compliance checks (CIS, PCI-DSS, HIPAA)
+- **Detailed Reporting** - Clear error messages with remediation guidance
+- **Zero Trust for AI** - Never deploy insecure infrastructure, even from AI suggestions
+
+> 📖 See [Checkov Integration Guide](../../docs/devsecops/CHECKOV_INTEGRATION.md) for details
+
 ### 🔐 Privacy-First Telemetry
 
 - **Opt-In Only** - Disabled by default, requires explicit user consent

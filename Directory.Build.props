@@ -1,50 +1,270 @@
 <Project>
   <PropertyGroup>
-    <!-- Enable strict code analysis -->
-    <!-- Temporarily disabled TreatWarningsAsErrors to allow critical fixes to be committed -->
-    <!-- TODO: Re-enable after addressing pre-existing analyzer warnings in separate PR -->
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         CODE QUALITY ENFORCEMENT CONFIGURATION
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+         STATUS: Warnings currently suppressed during remediation (see docs/development/analyzer-warnings-remediation.md)
+         GOAL: Re-enable TreatWarningsAsErrors and remove suppressions (phased approach)
+         TRACKING: Run ./scripts/check-warnings.sh to check for violations
+
+         WARNING CATEGORIES SUPPRESSED:
+         - Compiler Warnings (CS): 39 warnings - nullable, obsolete APIs, unused code
+         - Code Analysis (CA): 76 warnings - design, performance, reliability
+         - StyleCop (SA): 177 warnings - code style and documentation
+         - SonarAnalyzer (S): 23 warnings - code smells and maintainability
+         - Threading (VSTHRD): 2 warnings - async/await patterns
+
+         TOTAL: 317 warnings suppressed
+
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+
+    <!-- DISABLED: Temporarily disabled to allow critical fixes to be committed -->
+    <!-- TODO: Re-enable in Phase 4 of remediation plan (Week 16) -->
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         SECURITY WARNINGS - ALWAYS TREATED AS ERRORS
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+
+    <!-- These security-critical warnings are NEVER suppressed -->
+    <WarningsAsErrors>$(WarningsAsErrors);CA5404;CA2213;CA2234;CA2012;CA2016;CA2249</WarningsAsErrors>
+    <!--
+        CA5404: Weak token validation (security)
+        CA2213: Disposable fields not disposed (resource leaks)
+        CA2234: URI parameter usage (API correctness)
+        CA2012: ValueTask usage (reliability)
+        CA2016: CancellationToken forwarding (async correctness)
+        CA2249: String.Contains vs IndexOf (correctness)
+    -->
+
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+         ANALYZER CONFIGURATION
+         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+
     <AnalysisLevel>latest-all</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+  </PropertyGroup>
 
-    <!-- Suppress code style/naming analyzer warnings that are subjective or test-specific -->
-    <!-- CA1707: Test method naming with underscores is acceptable -->
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       SUPPRESSED WARNINGS BY CATEGORY
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+       Organized by category for tracking and remediation.
+       Each category has a target remediation phase documented in:
+       docs/development/analyzer-warnings-remediation.md
+
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+
+  <PropertyGroup>
+    <!-- ─────────────────────────────────────────────────────────────────────────────
+         PHASE 1: QUICK WINS - Code Analysis (Low-hanging fruit)
+         Target: Week 1-3 | Effort: 40-60 hours | Priority: HIGH
+         ───────────────────────────────────────────────────────────────────────────── -->
+
+    <!-- Performance improvements (high value, low effort) -->
+    <!-- CA1825: Avoid zero-length array allocations - use Array.Empty<T>() -->
+    <!-- CA1826: Use property instead of Linq method - use .Count instead of .Count() -->
+    <!-- CA1854: Prefer IDictionary.TryGetValue - avoid ContainsKey + indexer -->
+    <!-- CA1860: Prefer IsEmpty over Count comparison -->
+    <!-- CA1862: Use StringComparison overloads for correctness -->
+    <!-- CA1866/CA1867/CA1869: Use char overloads for better performance -->
+    <!-- CA1835: Prefer Stream.ReadAsync memory overloads -->
+    <!-- CA1844/CA1845: Memory-based and span-based overloads -->
+    <!-- CA1847: Use Contains(char) instead of Contains(string) -->
+    <!-- CA1850: Prefer static HashData method -->
+
+    <!-- Code cleanup (simple fixes) -->
+    <!-- CA1805: Do not initialize unnecessarily -->
+
+    <!-- ─────────────────────────────────────────────────────────────────────────────
+         PHASE 1: QUICK WINS - Compiler Warnings (CS)
+         Target: Week 1 | Effort: 10-15 hours | Priority: HIGH
+         ───────────────────────────────────────────────────────────────────────────── -->
+
+    <!-- CS0168: Variable declared but never used - remove or prefix with _ -->
+    <!-- CS0169: Field never used - remove dead code -->
+    <!-- CS4014: Async call not awaited - add await or document fire-and-forget -->
+    <!-- CS0618: Obsolete API usage - mainly Azure SDK, deferred to separate effort -->
+
+    <!-- ─────────────────────────────────────────────────────────────────────────────
+         PHASE 1: TEST-SPECIFIC SUPPRESSIONS (Permanent)
+         ───────────────────────────────────────────────────────────────────────────── -->
+
+    <!-- CA1707: Test method naming with underscores - acceptable pattern -->
     <!-- CA1812: Internal test classes instantiated via reflection/DI -->
     <!-- CA2000: Disposal false positives in test code and DI containers -->
     <!-- CA1304: ToLower/ToUpper in tests doesn't need culture info -->
     <!-- CA5394: Random in tests doesn't need cryptographic security -->
     <!-- CA2022, CA1835, CA2208: Test code quality suggestions -->
-    <!-- S*: SonarAnalyzer style rules (subjective code smells) -->
-    <!-- SA*: ALL StyleCop rules temporarily suppressed - pre-existing style issues to fix in separate PR -->
-    <!-- CA1724: Type name conflicts (acceptable for domain models) -->
-    <!-- CA1303, CA1711, CA1847, CA1823: Additional pre-existing analyzer findings -->
-    <!-- CA1028, CA1008, CA1844, CA1845, CA1814: Performance and design issues to fix in separate PR -->
-    <!-- CA1515, CA1851, CA1055, CA1806: API design and usage issues to fix in separate PR -->
-    <!-- CA1852, CA1019, CA1725, CA1051, CA1052, CA1063, CA1311: Code quality issues to fix in separate PR -->
-    <!-- CA1862, CA1825, CA1816: String operations and disposal patterns -->
-    <!-- CS0618: Obsolete API usage (Azure SDK) -->
-    <!-- CS4014, CS0169: Async and unused field warnings -->
-    <!-- VSTHRD003: Task context warnings -->
-    <NoWarn>$(NoWarn);CA1707;CA1812;CA2000;CA1716;CA1054;CA1000;CA1310;CA1513;CA1854;CA1826;CA1869;CA1860;CA1866;CA1867;CA1846;CA1805;CA2234;CA2012;CA1024;CA1508;CA2213;CA5404;CA1304;CA5394;CA2022;CA1835;CA2208;CA2016;CA2249;CA3003;S127;S4487;S1144;S3398;S2094;S3218;S101;S4144;S3881;S2933;S927;S2486;S6667;S1125;S2139;S3923;S1871;S1135;S3928;S6610;VSTHRD200;CA1850;CS0168;CA1724;CA1303;CA1711;CA1847;CA1823;CA1028;CA1008;CA1844;CA1845;CA1814;CA1515;CA1851;CA1055;CA1806;CA1852;CA1019;CA1725;CA1051;CA1052;CA1063;CA1311;CS0618;CA1862;CA1825;CA1816;CS4014;CS0169;VSTHRD003</NoWarn>
+
+    <!-- ─────────────────────────────────────────────────────────────────────────────
+         PHASE 2: NULLABLE REFERENCE TYPES (CS86xx)
+         Target: Week 4-6 | Effort: 40-60 hours | Priority: CRITICAL
+         ───────────────────────────────────────────────────────────────────────────── -->
+
+    <!-- All CS8600-CS8634: Nullable reference type warnings -->
+    <!-- Strategy: Enable per-project, fix systematically, add null checks -->
+    <!-- This is the highest priority after Phase 1 due to null safety -->
+
+    <!-- ─────────────────────────────────────────────────────────────────────────────
+         PHASE 2: API DESIGN & RELIABILITY
+         Target: Week 7-8 | Effort: 30-40 hours | Priority: HIGH
+         ───────────────────────────────────────────────────────────────────────────── -->
+
+    <!-- API Design -->
+    <!-- CA1024: Use properties where appropriate (may be breaking change) -->
+    <!-- CA1028: Enum storage should be Int32 -->
+    <!-- CA1051: Do not declare visible instance fields - use properties -->
+    <!-- CA1052: Static holder types should be sealed -->
+    <!-- CA1054/CA1055: URI parameters/returns should use Uri type (breaking change) -->
+    <!-- CA1063: Implement IDisposable correctly -->
+
+    <!-- Reliability & Disposal -->
+    <!-- CA1816: Call GC.SuppressFinalize correctly -->
+    <!-- VSTHRD003: Avoid awaiting foreign Tasks -->
+
+    <!-- ─────────────────────────────────────────────────────────────────────────────
+         PHASE 3: CODE QUALITY & DESIGN
+         Target: Week 9-12 | Effort: 50-70 hours | Priority: MEDIUM
+         ───────────────────────────────────────────────────────────────────────────── -->
+
+    <!-- Globalization -->
+    <!-- CA1310: Specify StringComparison for correctness -->
+    <!-- CA1311: Specify culture or use invariant -->
+
+    <!-- Design & Architecture -->
+    <!-- CA1008: Enums should have zero value -->
+    <!-- CA1019: Define accessors for attribute arguments -->
+    <!-- CA1508: Avoid dead conditional code -->
+    <!-- CA1513: Use ObjectDisposedException.ThrowIf -->
+    <!-- CA1515: Make type internal -->
+    <!-- CA1711: Rename to avoid reserved suffix (breaking change) -->
+    <!-- CA1716: Rename to avoid language keywords (breaking change) -->
+    <!-- CA1724: Type name conflicts - may keep suppressed for domain models -->
+    <!-- CA1725: Parameter names should match base -->
+    <!-- CA1806: Do not ignore method results -->
+    <!-- CA1812: Avoid uninstantiated internal classes (may be DI false positives) -->
+    <!-- CA1814: Prefer jagged arrays -->
+    <!-- CA1823: Remove unused private members -->
+    <!-- CA1851: Multiple GetEnumerator calls -->
+    <!-- CA1852: Seal internal types -->
+
+    <!-- Localization (likely to remain suppressed) -->
+    <!-- CA1303: Do not pass literals as localized parameters -->
+
+    <!-- ─────────────────────────────────────────────────────────────────────────────
+         PHASE 3: SONARANALYZER CODE SMELLS (S)
+         Target: Week 12 | Effort: 15-20 hours | Priority: MEDIUM
+         ───────────────────────────────────────────────────────────────────────────── -->
+
+    <!-- High Priority Sonar Rules -->
+    <!-- S1135: Track uses of "TODO" tags -->
+    <!-- S2139: Exceptions should be logged or rethrown, not both -->
+    <!-- S3398: Move field declarations to top -->
+    <!-- S1144: Remove unused private members -->
+    <!-- S101: Types should be named in PascalCase -->
+
+    <!-- Lower Priority Sonar Rules (code smells) -->
+    <!-- S127, S927, S1125, S1871, S2094, S2486, S2933, S3218, S3881, S3923, S3928 -->
+    <!-- S4144, S4487, S6610, S6667 -->
+
+    <!-- ─────────────────────────────────────────────────────────────────────────────
+         ADDITIONAL CODE ANALYSIS RULES
+         Target: Various phases | Priority: LOW-MEDIUM
+         ───────────────────────────────────────────────────────────────────────────── -->
+
+    <!-- CA1000, CA1513, CA1846, CA1716, CA3003: Various design rules -->
+    <!-- VSTHRD200: Threading rules -->
+
+    <NoWarn>$(NoWarn);CA1707;CA1812;CA2000;CA1716;CA1054;CA1000;CA1310;CA1513;CA1854;CA1826;CA1869;CA1860;CA1866;CA1867;CA1846;CA1805;CA1024;CA1508;CA1304;CA5394;CA2022;CA1835;CA2208;CA3003;S127;S4487;S1144;S3398;S2094;S3218;S101;S4144;S3881;S2933;S927;S2486;S6667;S1125;S2139;S3923;S1871;S1135;S3928;S6610;VSTHRD200;CA1850;CS0168;CA1724;CA1303;CA1711;CA1847;CA1823;CA1028;CA1008;CA1844;CA1845;CA1814;CA1515;CA1851;CA1055;CA1806;CA1852;CA1019;CA1725;CA1051;CA1052;CA1063;CA1311;CS0618;CA1862;CA1825;CA1816;CS4014;CS0169;VSTHRD003</NoWarn>
   </PropertyGroup>
 
-  <!-- Suppress all StyleCop analyzers temporarily for MVP release -->
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       STYLECOP ANALYZERS (SA) - 177 RULES SUPPRESSED
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+       Target: Phase 3, Week 13-14 | Effort: 30-40 hours | Priority: LOW
+
+       Strategy: DO NOT fix all 177 rules. Instead:
+       1. Create stylecop.json configuration file
+       2. Enable ~40-50 most valuable rules (documentation, access modifiers, naming)
+       3. Keep ~130 rules suppressed (ordering, layout covered by .editorconfig)
+       4. Fix violations in public API surface only
+
+       Rules to eventually enable (Phase 3):
+       - SA1600-SA1651: Documentation rules for public APIs
+       - SA1400-SA1414: Access modifier rules
+       - SA1300-SA1316: Naming convention rules
+
+       Rules to keep suppressed (subjective or covered elsewhere):
+       - SA1101: Prefix with 'this' (subjective)
+       - SA1633: File headers (already enforced via copyright headers)
+       - SA1200-SA1214: Ordering rules (too prescriptive)
+       - SA1500-SA1520: Layout rules (covered by .editorconfig)
+
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <PropertyGroup>
-    <NoWarn>$(NoWarn);SA0001;SA1000;SA1001;SA1002;SA1003;SA1004;SA1005;SA1006;SA1007;SA1008;SA1009;SA1010;SA1011;SA1012;SA1013;SA1014;SA1015;SA1016;SA1017;SA1018;SA1019;SA1020;SA1021;SA1022;SA1023;SA1024;SA1025;SA1026;SA1027;SA1028;SA1100;SA1101;SA1102;SA1103;SA1104;SA1105;SA1106;SA1107;SA1108;SA1109;SA1110;SA1111;SA1112;SA1113;SA1114;SA1115;SA1116;SA1117;SA1118;SA1119;SA1120;SA1121;SA1122;SA1123;SA1124;SA1125;SA1126;SA1127;SA1128;SA1129;SA1130;SA1131;SA1132;SA1133;SA1134;SA1135;SA1136;SA1137;SA1139;SA1200;SA1201;SA1202;SA1203;SA1204;SA1205;SA1206;SA1207;SA1208;SA1209;SA1210;SA1211;SA1212;SA1213;SA1214;SA1216;SA1217;SA1300;SA1301;SA1302;SA1303;SA1304;SA1305;SA1306;SA1307;SA1308;SA1309;SA1310;SA1311;SA1312;SA1313;SA1314;SA1316;SA1400;SA1401;SA1402;SA1403;SA1404;SA1405;SA1406;SA1407;SA1408;SA1409;SA1410;SA1411;SA1412;SA1413;SA1414;SA1500;SA1501;SA1502;SA1503;SA1504;SA1505;SA1506;SA1507;SA1508;SA1509;SA1510;SA1511;SA1512;SA1513;SA1514;SA1515;SA1516;SA1517;SA1518;SA1519;SA1520;SA1600;SA1601;SA1602;SA1603;SA1604;SA1605;SA1606;SA1607;SA1608;SA1609;SA1610;SA1611;SA1612;SA1613;SA1614;SA1615;SA1616;SA1617;SA1618;SA1619;SA1620;SA1621;SA1622;SA1623;SA1624;SA1625;SA1626;SA1627;SA1628;SA1629;SA1630;SA1631;SA1632;SA1633;SA1634;SA1635;SA1636;SA1637;SA1638;SA1639;SA1640;SA1641;SA1642;SA1643;SA1644;SA1645;SA1646;SA1647;SA1648;SA1649;SA1650;SA1651</NoWarn>
+    <NoWarn>$(NoWarn);SA0001;SA1000;SA1001;SA1002;SA1003;SA1004;SA1005;SA1006;SA1007;SA1008;SA1009;SA1010;SA1011;SA1012;SA1013;SA1014;SA1015;SA1016;SA1017;SA1018;SA1019;SA1020;SA1021;SA1022;SA1023;SA1024;SA1025;SA1026;SA1027;SA1028;SA1100;SA1101;SA1102;SA1103;SA1104;SA1105;SA1106;SA1107;SA1108;SA1109;SA1110;SA1111;SA1112;SA1113;SA1114;SA1115;SA1116;SA1117;SA1118;SA1119;SA1120;SA1121;SA1122;SA1123;SA1124;SA1125;SA1126;SA1127;SA1128;SA1129;SA1130;SA1131;SA1132;SA1133;SA1134;SA1135;SA1136;SA1137;SA1139;SA1200;SA1201;SA1202;SA1203;SA1204;SA1205;SA1206;SA1207;SA1208;SA1209;SA1210;SA1211;SA1212;SA1213;SA1214;SA1216;SA1217;SA1300;SA1301;SA1302;SA1303;SA1304;SA1305;SA1306;SA1307;SA1308;SA1309;SA1310;SA1311;SA1312;SA1313;SA1314;SA1316;SA1400;SA1401;SA1402;SA1403;SA1404;SA1405;SA1406;SA1407;SA1408;SA1409;SA1410;SA1411;SA1412;SA1413;SA1414;SA1500;SA1501;SA1502;SA1503;SA1504;SA1505;SA1506;SA1507;SA1508;SA1509;SA1510;SA1511;SA1512;SA1513;SA1514;SA1515;SA1516;SA1517;SA1518;SA1519;SA1520;SA1600;SA1601;SA1602;SA1603;SA1604;SA1605;SA1606;SA1607;SA1608;SA1609;SA1610;SA1611;SA1612;SA1613;SA1614;SA1615;SA1616;SA1617;SA1618;SA1619;SA1620;SA1621;SA1622;SA1623;SA1624;SA1625;SA1626;SA1627;SA1628;SA1629;SA1630;SA1631;SA1632;SA1634;SA1635;SA1636;SA1637;SA1638;SA1639;SA1640;SA1641;SA1642;SA1643;SA1644;SA1645;SA1646;SA1647;SA1648;SA1649;SA1650;SA1651</NoWarn>
   </PropertyGroup>
 
-  <!-- Suppress nullable reference warnings temporarily -->
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       NULLABLE REFERENCE TYPE WARNINGS (CS86xx) - 35 RULES
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+       Target: Phase 2, Week 4-6 | Effort: 40-60 hours | Priority: CRITICAL
+
+       These warnings are suppressed globally, but will be enabled per-project during
+       Phase 2 using #nullable enable directives.
+
+       Strategy:
+       1. Enable nullable per file with #nullable enable
+       2. Add proper null validation to public APIs
+       3. Use null-forgiving operator (!) only when necessary with comments
+       4. Start with core libraries, then API layer, then infrastructure
+
+       High-impact warnings to prioritize:
+       - CS8600: Converting null to non-nullable
+       - CS8602: Dereference of possibly null reference
+       - CS8604: Possible null reference argument
+       - CS8618: Non-nullable field must contain non-null value
+
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <PropertyGroup>
     <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8605;CS8606;CS8607;CS8608;CS8609;CS8610;CS8611;CS8612;CS8613;CS8614;CS8615;CS8616;CS8617;CS8618;CS8619;CS8620;CS8621;CS8622;CS8623;CS8624;CS8625;CS8626;CS8627;CS8628;CS8629;CS8630;CS8631;CS8632;CS8633;CS8634</NoWarn>
   </PropertyGroup>
 
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       ANALYZER PACKAGES
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <ItemGroup>
-    <!-- Add StyleCop.Analyzers for additional code style enforcement -->
+    <!-- StyleCop.Analyzers for code style enforcement -->
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.507">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       REMEDIATION RESOURCES
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+       Documentation:
+       - Remediation Plan: docs/development/analyzer-warnings-remediation.md
+       - Check Script: ./scripts/check-warnings.sh
+       - Issue Template: .github/ISSUE_TEMPLATE/warning-remediation.md
+
+       Usage:
+       - Check Phase 1 warnings: ./scripts/check-warnings.sh --phase 1
+       - Check specific category: ./scripts/check-warnings.sh --category nullable
+       - Generate report: ./scripts/check-warnings.sh --all --report --output report.txt
+
+       Progress Tracking:
+       - Total warnings suppressed: 317
+       - Target completion: Week 16 (Phase 4)
+       - Next milestone: Phase 1 (Week 1-3) - Quick wins
+
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
 </Project>

@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: honua-config
-  namespace: honua
-data:
-  environment: development
-  services: honua-server,postgis,redis

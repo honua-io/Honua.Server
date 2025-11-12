@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/appsettings.json",
+  "Secrets": {
+    "Provider": "AzureKeyVault",
+    "EnableCaching": true,
+    "CacheDurationSeconds": 300,
+    "AzureKeyVault": {
+      "VaultUri": "https://your-vault-name.vault.azure.net/",
+      "UseManagedIdentity": true,
+      "TimeoutSeconds": 30,
+      "MaxRetries": 3
+    }
+  }
+}

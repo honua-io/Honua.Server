@@ -17,7 +17,8 @@ public static class GeoEtlScheduleEndpoints
     {
         var group = endpoints.MapGroup("/admin/api/geoetl/schedules")
             .WithTags("GeoETL Schedules")
-            .WithOpenApi();
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // List all schedules for a tenant
         group.MapGet("/", async (

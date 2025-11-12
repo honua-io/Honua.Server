@@ -1,3 +1,6 @@
+// Copyright (c) 2025 HonuaIO
+// Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+
 using System.Globalization;
 
 namespace Honua.MapSDK.Utilities;
@@ -158,9 +161,11 @@ public static class TimeUtils
         foreach (var timestamp in timestamps)
         {
             var binStart = RoundDown(timestamp, interval);
-            if (!bins.ContainsKey(binStart))
-                bins[binStart] = 0;
-            bins[binStart]++;
+            if (!bins.TryGetValue(binStart, out var count))
+            {
+                count = 0;
+            }
+            bins[binStart] = count + 1;
         }
 
         return bins;

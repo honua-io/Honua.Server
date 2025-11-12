@@ -1,371 +1,419 @@
-# Honua Kubernetes Deployment
+# Honua Server Kubernetes Deployment
 
-Comprehensive Kubernetes deployment manifests and NetworkPolicy configuration for Honua geospatial platform.
-
-## Overview
-
-This directory contains:
-
-- **NetworkPolicy manifests** for zero-trust pod-to-pod communication security
-- **Deployment documentation** with step-by-step instructions
-- **Automated test suite** for verifying network security
-- **Production configurations** with hardening options
-
-## Quick Links
-
-### Getting Started
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md) - Comprehensive step-by-step deployment instructions
-- [Quick Start](./base/README.md) - Fast deployment for development/testing
-
-### Documentation
-- [Network Architecture](./base/NETWORK_ARCHITECTURE.md) - Detailed network security architecture
-- [Allowed Traffic Flows](./ALLOWED_TRAFFIC_FLOWS.md) - Visual traffic flow diagrams and tables
-- [Implementation Summary](./NETWORK_POLICIES_SUMMARY.md) - Complete implementation summary
-
-### Configuration
-- [Base Manifests](./base/) - NetworkPolicy YAML files
-- [Production Overlay](./overlays/production/) - Production-specific configurations
-- [HPA Configuration](./production/hpa.yaml) - Horizontal Pod Autoscaler
-
-## Quick Start
-
-### Prerequisites
-
-```bash
-# Ensure you have a Kubernetes cluster with NetworkPolicy support
-kubectl version --client
-
-# Verify CNI plugin (Calico, Cilium, Weave, etc.)
-kubectl get pods -n kube-system | grep -E "calico|cilium|weave"
-```
-
-### Deploy NetworkPolicies
-
-```bash
-# Option 1: Deploy with kustomize (recommended)
-kubectl apply -k deploy/kubernetes/base/
-
-# Option 2: Deploy manually
-cd deploy/kubernetes/base
-kubectl apply -f 00-namespace.yaml
-kubectl apply -f 05-networkpolicy-dns.yaml
-kubectl apply -f 06-networkpolicy-namespace-isolation.yaml
-kubectl apply -f 02-networkpolicy-honua-server.yaml
-kubectl apply -f 03-networkpolicy-postgresql.yaml
-kubectl apply -f 04-networkpolicy-redis.yaml
-kubectl apply -f 01-networkpolicy-default-deny.yaml
-```
-
-### Verify Deployment
-
-```bash
-# Check NetworkPolicies
-kubectl get networkpolicies -n honua
-
-# Run automated tests
-cd deploy/kubernetes/base
-./test-network-policies.sh --verbose
-```
+Complete Kubernetes deployment resources for Honua Server, including production-ready Helm charts and deployment examples.
 
 ## Directory Structure
 
 ```
 deploy/kubernetes/
-├── README.md                           # This file
-├── DEPLOYMENT_GUIDE.md                 # Comprehensive deployment guide
-├── NETWORK_POLICIES_SUMMARY.md         # Implementation summary
-├── ALLOWED_TRAFFIC_FLOWS.md            # Visual traffic flow reference
-│
-├── base/                               # Base NetworkPolicy configuration
-│   ├── 00-namespace.yaml               # Namespace with security labels
-│   ├── 01-networkpolicy-default-deny.yaml   # Default deny all traffic
-│   ├── 02-networkpolicy-honua-server.yaml   # Honua Server policies
-│   ├── 03-networkpolicy-postgresql.yaml     # PostgreSQL policies
-│   ├── 04-networkpolicy-redis.yaml          # Redis policies
-│   ├── 05-networkpolicy-dns.yaml            # DNS access
-│   ├── 06-networkpolicy-namespace-isolation.yaml  # Namespace isolation
-│   ├── kustomization.yaml              # Kustomize base config
-│   ├── README.md                       # Base configuration guide
-│   ├── NETWORK_ARCHITECTURE.md         # Detailed architecture docs
-│   └── test-network-policies.sh        # Automated test suite
-│
-├── overlays/                           # Environment-specific overlays
-│   └── production/                     # Production overlay
-│       ├── kustomization.yaml          # Production kustomize config
-│       └── namespace-patch.yaml        # Production namespace labels
-│
-└── production/                         # Production configurations
-    └── hpa.yaml                        # Horizontal Pod Autoscaler
+├── helm/
+│   └── honua-server/          # Production-ready Helm chart
+│       ├── Chart.yaml          # Chart metadata
+│       ├── values.yaml         # Default values
+│       ├── values-dev.yaml     # Development environment
+│       ├── values-staging.yaml # Staging environment
+│       ├── values-production.yaml # Production environment
+│       ├── README.md           # Chart documentation
+│       └── templates/          # Kubernetes resource templates
+├── examples/                   # Example deployment configurations
+│   ├── basic-deployment.yaml
+│   ├── external-database.yaml
+│   ├── azure-deployment.yaml
+│   ├── aws-deployment.yaml
+│   ├── gcp-deployment.yaml
+│   └── multi-region.yaml
+└── scripts/                    # Helper scripts
+    ├── preflight-check.sh      # Pre-deployment validation
+    ├── create-secrets.sh       # Secret creation helper
+    └── deploy.sh               # Deployment automation
 ```
 
-## NetworkPolicy Files
+## Quick Start
 
-| File | Purpose | Key Features |
-|------|---------|--------------|
-| `01-default-deny.yaml` | Default deny all traffic | Baseline security, zero-trust |
-| `02-honua-server.yaml` | Honua application policies | Ingress from ingress controller, egress to DB/cache/internet |
-| `03-postgresql.yaml` | Database policies | Ingress from app only, no internet egress |
-| `04-redis.yaml` | Cache policies | Ingress from app only, no internet egress |
-| `05-dns.yaml` | DNS access | All pods can resolve DNS |
-| `06-namespace-isolation.yaml` | Namespace boundaries | Cross-namespace restrictions |
+### 1. Prerequisites Check
 
-## Security Model
+Run the preflight check script to verify your cluster meets the requirements:
 
-### Zero-Trust Principles
-
-1. **Default Deny**: All traffic blocked by default
-2. **Explicit Allow**: Only permitted traffic flows allowed
-3. **Namespace Isolation**: Cross-namespace traffic restricted
-4. **Least Privilege**: Minimal network access per component
-
-### Network Segmentation
-
-```
-Internet → Ingress Controller → Honua Server → PostgreSQL/Redis
-           (TLS)              (NetworkPolicy)  (NetworkPolicy)
+```bash
+./deploy/kubernetes/scripts/preflight-check.sh --namespace honua
 ```
 
-**Trust Zones**:
-- **Zone 1**: Internet (untrusted)
-- **Zone 2**: Ingress Controller (edge/DMZ)
-- **Zone 3**: Application Layer (semi-trusted)
-- **Zone 4**: Data Layer (trusted, isolated)
+### 2. Create Secrets
 
-## Allowed Traffic Summary
+For external databases, create necessary secrets:
 
-### Honua Server
-- **Ingress**: Ingress controller, monitoring
-- **Egress**: PostgreSQL, Redis, DNS, Internet (HTTPS/HTTP)
+```bash
+# Interactive secret creation
+./deploy/kubernetes/scripts/create-secrets.sh --namespace honua
 
-### PostgreSQL
-- **Ingress**: Honua Server, backup pods, monitoring
-- **Egress**: DNS only (no internet)
+# Or manually
+kubectl create secret generic honua-db-secret \
+  --from-literal=password='your-db-password' \
+  --namespace honua
 
-### Redis
-- **Ingress**: Honua Server, monitoring
-- **Egress**: DNS only (no internet)
+kubectl create secret generic honua-redis-secret \
+  --from-literal=password='your-redis-password' \
+  --namespace honua
+```
 
-### All Pods
-- **Egress**: DNS (port 53)
+### 3. Deploy
 
-See [ALLOWED_TRAFFIC_FLOWS.md](./ALLOWED_TRAFFIC_FLOWS.md) for complete traffic flow diagrams.
+Use the deployment script for automated deployment:
+
+```bash
+# Development environment
+./deploy/kubernetes/scripts/deploy.sh \
+  --environment dev \
+  --namespace honua-dev
+
+# Staging environment
+./deploy/kubernetes/scripts/deploy.sh \
+  --environment staging \
+  --namespace honua-staging
+
+# Production environment
+./deploy/kubernetes/scripts/deploy.sh \
+  --environment production \
+  --namespace honua-prod
+```
+
+Or use Helm directly:
+
+```bash
+helm install honua-server ./deploy/kubernetes/helm/honua-server \
+  --namespace honua \
+  --create-namespace \
+  --values ./deploy/kubernetes/helm/honua-server/values-production.yaml
+```
 
 ## Deployment Options
 
-### 1. Development/Testing
+### Development Environment
+
+Minimal resources, embedded PostgreSQL and Redis, debug logging:
 
 ```bash
-# Quick deployment for testing
-kubectl apply -k deploy/kubernetes/base/
+helm install honua-server ./deploy/kubernetes/helm/honua-server \
+  --namespace honua-dev \
+  --create-namespace \
+  --values ./deploy/kubernetes/helm/honua-server/values-dev.yaml
 ```
 
-### 2. Production
+**Features:**
+- Single replica
+- Lite image variant (fast startup)
+- Embedded PostgreSQL (no persistence)
+- Embedded Redis (no persistence)
+- Debug logging
+- No network policies
+- Relaxed security context
+
+### Staging Environment
+
+Production-like configuration with verbose logging:
 
 ```bash
-# Deploy with production hardening
-kubectl apply -k deploy/kubernetes/overlays/production/
+helm install honua-server ./deploy/kubernetes/helm/honua-server \
+  --namespace honua-staging \
+  --create-namespace \
+  --values ./deploy/kubernetes/helm/honua-server/values-staging.yaml \
+  --set database.host=postgres-staging.example.com \
+  --set redis.host=redis-staging.example.com
 ```
 
-### 3. Gradual Rollout
+**Features:**
+- 2 replicas (auto-scales to 5)
+- Full image variant
+- External managed database
+- External Redis cache
+- Structured JSON logging
+- OpenTelemetry enabled
+- ServiceMonitor for Prometheus
+- Network policies enabled
+
+### Production Environment
+
+Optimized for high availability and performance:
 
 ```bash
-# Week 1: DNS and namespace isolation
-kubectl apply -f base/05-networkpolicy-dns.yaml
-kubectl apply -f base/06-networkpolicy-namespace-isolation.yaml
-
-# Week 2: Service-specific policies
-kubectl apply -f base/02-networkpolicy-honua-server.yaml
-kubectl apply -f base/03-networkpolicy-postgresql.yaml
-kubectl apply -f base/04-networkpolicy-redis.yaml
-
-# Week 3: Default deny (after verifying all works)
-kubectl apply -f base/01-networkpolicy-default-deny.yaml
+helm install honua-server ./deploy/kubernetes/helm/honua-server \
+  --namespace honua-prod \
+  --create-namespace \
+  --values ./deploy/kubernetes/helm/honua-server/values-production.yaml \
+  --set database.host=postgres-prod.example.com \
+  --set redis.host=redis-prod.example.com \
+  --set ingress.hosts[0].host=honua.io
 ```
 
-## Testing
+**Features:**
+- 3 replicas (auto-scales to 20)
+- Full image variant
+- External managed database (RDS, Cloud SQL, etc.)
+- External Redis cache (ElastiCache, Memorystore, etc.)
+- Pod Disruption Budget (min 2 available)
+- Pod anti-affinity (spread across nodes and zones)
+- Network policies
+- ServiceMonitor for monitoring
+- TLS ingress
+- Cloud secret management (AWS Secrets Manager, Azure Key Vault, GCP Secret Manager)
 
-### Automated Test Suite
+## Cloud-Specific Deployments
+
+### AWS (EKS)
 
 ```bash
-cd deploy/kubernetes/base
-./test-network-policies.sh --verbose
+helm install honua-server ./deploy/kubernetes/helm/honua-server \
+  --namespace honua \
+  --values ./deploy/kubernetes/examples/aws-deployment.yaml \
+  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::123456789012:role/honua-server
 ```
 
-**Tests**:
-- ✓ DNS access (3 tests)
-- ✓ Database access control (3 tests)
-- ✓ Redis access control (3 tests)
-- ✓ Honua Server access control (2 tests)
-- ✓ External network access (3 tests)
-- ✓ Namespace isolation (1 test)
-- ✓ Default deny enforcement (1 test)
+**Features:**
+- IRSA for secrets access
+- RDS PostgreSQL integration
+- ElastiCache Redis integration
+- ALB Ingress Controller
+- AWS Secrets Manager
 
-**Total**: 15 tests
+See: `examples/aws-deployment.yaml`
 
-### Manual Testing
+### Azure (AKS)
 
 ```bash
-# Test allowed connection
-kubectl run test-honua -n honua --image=nicolaka/netshoot \
-  --labels="app=honua-server" --rm -it -- nc -zv postgis-service 5432
+helm install honua-server ./deploy/kubernetes/helm/honua-server \
+  --namespace honua \
+  --values ./deploy/kubernetes/examples/azure-deployment.yaml \
+  --set serviceAccount.annotations."azure\.workload\.identity/client-id"=your-client-id
+```
 
-# Test blocked connection
-kubectl run test-generic -n honua --image=nicolaka/netshoot \
-  --rm -it -- nc -zv postgis-service 5432
+**Features:**
+- Workload Identity for Key Vault access
+- Azure PostgreSQL Flexible Server
+- Azure Cache for Redis
+- Application Gateway Ingress
+- Azure Key Vault integration
+
+See: `examples/azure-deployment.yaml`
+
+### GCP (GKE)
+
+```bash
+helm install honua-server ./deploy/kubernetes/helm/honua-server \
+  --namespace honua \
+  --values ./deploy/kubernetes/examples/gcp-deployment.yaml \
+  --set serviceAccount.annotations."iam\.gke\.io/gcp-service-account"=honua-server@project.iam.gserviceaccount.com
+```
+
+**Features:**
+- Workload Identity for Secret Manager
+- Cloud SQL with Cloud SQL Proxy sidecar
+- Memorystore Redis
+- GCE Ingress Controller
+- GCP Secret Manager integration
+
+See: `examples/gcp-deployment.yaml`
+
+## Configuration
+
+### Image Variants
+
+Choose between two image variants based on your workload:
+
+**Full Image** (`image.variant: full`)
+- Complete geospatial processing capabilities
+- GDAL support for raster operations
+- SkiaSharp for image rendering
+- Cloud provider SDKs
+- Size: ~500MB
+- Use for: Full-featured deployments
+
+**Lite Image** (`image.variant: lite`)
+- Vector-only operations
+- Minimal dependencies
+- Fast cold starts (<2s)
+- Size: ~60MB
+- Use for: Serverless, development, vector-only workloads
+
+### Resource Recommendations
+
+| Environment | CPU Request | CPU Limit | Memory Request | Memory Limit |
+|-------------|-------------|-----------|----------------|--------------|
+| Dev         | 100m        | 500m      | 128Mi          | 512Mi        |
+| Staging     | 500m        | 2000m     | 512Mi          | 2Gi          |
+| Production  | 1000m       | 4000m     | 1Gi            | 4Gi          |
+
+### Autoscaling
+
+HPA is enabled by default with:
+- Min replicas: 2 (dev: 1, prod: 3)
+- Max replicas: 10 (prod: 20)
+- Target CPU: 70%
+- Target Memory: 80%
+
+Customize in values:
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+```
+
+## Monitoring
+
+### Prometheus Integration
+
+Enable ServiceMonitor for Prometheus Operator:
+
+```yaml
+serviceMonitor:
+  enabled: true
+  namespace: observability
+  interval: 30s
+  labels:
+    release: prometheus-operator
+```
+
+Metrics available at `/metrics` endpoint.
+
+### Health Checks
+
+| Endpoint | Purpose | Configuration |
+|----------|---------|---------------|
+| `/healthz/live` | Liveness probe | Check if app is running |
+| `/healthz/ready` | Readiness probe | Check if app can serve traffic |
+| `/healthz/startup` | Startup probe | Check initial startup |
+
+## Security
+
+### Network Policies
+
+Enable network policies to restrict traffic:
+
+```yaml
+networkPolicy:
+  enabled: true
+```
+
+Default policies allow:
+- Ingress from ingress controller and gateway pods
+- Egress to DNS, PostgreSQL, Redis, and HTTPS
+
+### Pod Security
+
+Default security context:
+- Run as non-root user (UID 1000)
+- Read-only root filesystem
+- Drop all capabilities
+- Seccomp profile: RuntimeDefault
+
+### Secret Management
+
+Supports multiple secret providers:
+
+**Kubernetes Secrets** (default)
+```yaml
+secrets:
+  provider: kubernetes
+```
+
+**Azure Key Vault**
+```yaml
+secrets:
+  provider: azure-keyvault
+  azureKeyVault:
+    enabled: true
+    name: honua-keyvault
+    tenantId: "..."
+```
+
+**AWS Secrets Manager**
+```yaml
+secrets:
+  provider: aws-secrets-manager
+  awsSecretsManager:
+    enabled: true
+    region: us-east-1
+```
+
+**GCP Secret Manager**
+```yaml
+secrets:
+  provider: gcp-secret-manager
+  gcpSecretManager:
+    enabled: true
+    projectId: "..."
+```
+
+## Upgrading
+
+### Rolling Update
+
+```bash
+# Update image version
+helm upgrade honua-server ./deploy/kubernetes/helm/honua-server \
+  --namespace honua \
+  --set image.tag=1.1.0 \
+  --wait
+
+# Verify rollout
+kubectl rollout status deployment/honua-server -n honua
+```
+
+### Rollback
+
+```bash
+# View release history
+helm history honua-server -n honua
+
+# Rollback to previous version
+helm rollback honua-server -n honua
+
+# Rollback to specific revision
+helm rollback honua-server 3 -n honua
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Pods cannot connect to services**
-   - Check pod labels match policy selectors
-   - Verify DNS policy is deployed
-   - Ensure CNI supports NetworkPolicies
-
-2. **External API calls failing**
-   - Verify egress rules allow HTTPS (443)
-   - Check DNS resolution
-   - Test connectivity manually
-
-3. **Monitoring not working**
-   - Check monitoring namespace labels
-   - Verify ingress rules allow monitoring
-
-See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed troubleshooting.
-
-### Debug Commands
-
+**Pods not starting**
 ```bash
-# List policies
-kubectl get networkpolicies -n honua
+kubectl get pods -n honua
+kubectl describe pod <pod-name> -n honua
+kubectl logs <pod-name> -n honua
+```
 
-# Describe policy
-kubectl describe networkpolicy honua-server -n honua
-
-# Check pod labels
-kubectl get pods -n honua --show-labels
+**Database connection issues**
+```bash
+# Verify secret
+kubectl get secret honua-server-secret -n honua -o yaml
 
 # Test connectivity
-kubectl exec -it <pod> -n honua -- nc -zv <service> <port>
+kubectl run -it --rm debug --image=postgres:15 --restart=Never -- \
+  psql -h <host> -U <user> -d <db>
 ```
 
-## Rollback
-
-### Quick Rollback
+**Resource constraints**
 ```bash
-# Remove default deny (restores connectivity)
-kubectl delete networkpolicy default-deny-all -n honua
+# Check resource usage
+kubectl top nodes
+kubectl top pods -n honua
+
+# Check HPA status
+kubectl get hpa -n honua
 ```
 
-### Full Rollback
-```bash
-# Remove all NetworkPolicies
-kubectl delete networkpolicies -n honua --all
-```
+See the [Helm chart README](./helm/honua-server/README.md) for detailed troubleshooting.
 
-## Production Checklist
+## Support
 
-Before deploying to production:
-
-- [ ] Test in staging environment
-- [ ] Label all required namespaces
-- [ ] Verify pod labels are correct
-- [ ] Run automated test suite
-- [ ] Verify external API access works
-- [ ] Test ingress connectivity
-- [ ] Enable Pod Security Standards
-- [ ] Set up monitoring and alerting
-- [ ] Document any custom changes
-- [ ] Prepare rollback plan
-
-## Documentation Index
-
-### Primary Documents
-- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** (600+ lines)
-  - Step-by-step deployment instructions
-  - Prerequisites and requirements
-  - Verification procedures
-  - Troubleshooting guide
-
-- **[NETWORK_ARCHITECTURE.md](./base/NETWORK_ARCHITECTURE.md)** (650+ lines)
-  - Detailed network security architecture
-  - Traffic flow diagrams
-  - External dependencies
-  - Security principles and compliance
-
-- **[ALLOWED_TRAFFIC_FLOWS.md](./ALLOWED_TRAFFIC_FLOWS.md)** (400+ lines)
-  - Visual traffic flow diagrams
-  - Comprehensive traffic tables
-  - Security boundaries
-  - Test matrix
-
-- **[NETWORK_POLICIES_SUMMARY.md](./NETWORK_POLICIES_SUMMARY.md)** (400+ lines)
-  - Complete implementation summary
-  - Deliverables overview
-  - Files and locations
-  - Success criteria
-
-### Configuration Guides
-- **[base/README.md](./base/README.md)** (400+ lines)
-  - Quick start guide
-  - Configuration details
-  - Customization options
-  - Best practices
-
-## Support and Resources
-
-### Internal Documentation
-- [Network Architecture](./base/NETWORK_ARCHITECTURE.md)
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md)
-- [Traffic Flows](./ALLOWED_TRAFFIC_FLOWS.md)
-
-### External Resources
-- [Kubernetes NetworkPolicy Docs](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
-- [NetworkPolicy Recipes](https://github.com/ahmetb/kubernetes-network-policy-recipes)
-- [Calico NetworkPolicy Tutorial](https://docs.projectcalico.org/security/tutorials/kubernetes-policy-basic)
-
-## Features
-
-✓ **Zero-Trust Security**: Default deny with explicit allow rules
-✓ **Namespace Isolation**: Cross-namespace traffic controlled
-✓ **Data Layer Protection**: Databases/caches isolated from internet
-✓ **Comprehensive Testing**: 15 automated test cases
-✓ **Production Ready**: Tested and documented
-✓ **Multiple Deployment Options**: Kustomize, manual, gradual rollout
-✓ **Detailed Documentation**: 2,800+ lines of docs
-✓ **Troubleshooting Guides**: Common issues and solutions
-✓ **Rollback Procedures**: Quick recovery options
-✓ **Compliance Support**: PCI-DSS, NIST, CIS benchmarks
-
-## Requirements Met
-
-✓ Create NetworkPolicy manifest
-✓ Allow ingress from Ingress controller only
-✓ Allow egress to PostgreSQL, Redis, external APIs
-✓ Deny all other traffic by default
-✓ Add namespace isolation
-✓ Document network architecture
-✓ Provide NetworkPolicy YAML
-✓ Show allowed traffic flows
-✓ Test showing policy blocks unauthorized access
-
-## Status
-
-✅ **Complete and Ready for Deployment**
-
-- 7 NetworkPolicy manifests
-- 2,800+ lines of documentation
-- 600+ line automated test suite
-- Production-ready configuration
-- Comprehensive troubleshooting guides
+- Documentation: https://github.com/honua-io/Honua.Server
+- Issues: https://github.com/honua-io/Honua.Server/issues
+- Email: support@honua.io
 
 ## License
 
-This configuration is part of the Honua project. See the main project LICENSE file for details.
-
----
-
-**Last Updated**: 2025-10-18
-**Version**: 1.0.0
-**Status**: Production Ready
+Elastic License 2.0

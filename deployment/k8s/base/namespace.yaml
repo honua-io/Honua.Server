@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: honua
-  labels:
-    name: honua
-    app.kubernetes.io/name: honua
-    app.kubernetes.io/part-of: honua-platform

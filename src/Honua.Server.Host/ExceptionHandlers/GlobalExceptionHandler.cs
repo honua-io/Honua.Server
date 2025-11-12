@@ -250,6 +250,10 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             ServiceTimeoutException =>
                 (StatusCodes.Status504GatewayTimeout, "Gateway Timeout", "https://tools.ietf.org/html/rfc7231#section-6.6.5"),
 
+            // 503 Service Unavailable - Alert persistence failures
+            _ when exception.GetType().Name == "AlertPersistenceException" =>
+                (StatusCodes.Status503ServiceUnavailable, "Service Unavailable", "https://tools.ietf.org/html/rfc7231#section-6.6.4"),
+
             // 500 Internal Server Error - Everything else
             _ =>
                 (StatusCodes.Status500InternalServerError, "Internal Server Error", "https://tools.ietf.org/html/rfc7231#section-6.6.1")
@@ -286,6 +290,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 NotImplementedException => "This feature is not yet available.",
                 InvalidOperationException => "The operation is invalid in the current state.",
                 UnauthorizedAccessException => "You do not have permission to access this resource.",
+                _ when exception.GetType().Name == "AlertPersistenceException" => "Alert persistence service is temporarily unavailable.",
                 _ => "An unexpected error occurred while processing your request."
             };
         }

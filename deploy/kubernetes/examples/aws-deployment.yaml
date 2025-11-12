@@ -1,0 +1,167 @@
+# AWS-specific deployment with AWS Secrets Manager integration
+# Uses IAM Roles for Service Accounts (IRSA) for secure access
+
+# Prerequisites:
+# 1. Create AWS Secrets Manager secrets
+# 2. Set up IRSA:
+#    - Create IAM role with Secrets Manager access
+#    - Create OIDC provider for EKS cluster
+#    - Configure trust policy for service account
+# 3. Create RDS PostgreSQL instance
+# 4. Create ElastiCache Redis cluster
+
+replicaCount: 3
+
+image:
+  variant: full
+  pullPolicy: IfNotPresent
+  registry: 123456789012.dkr.ecr.us-east-1.amazonaws.com
+  repository: honua-server
+  pullSecrets:
+    - name: ecr-pull-secret
+
+resources:
+  limits:
+    cpu: 4000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# AWS RDS PostgreSQL
+database:
+  external: true
+  host: honua-postgres.cluster-xyz123.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: honua_prod
+  username: honua_admin
+  sslMode: require
+  pooling:
+    minPoolSize: 10
+    maxPoolSize: 200
+
+# AWS ElastiCache Redis
+redis:
+  external: true
+  host: honua-redis.abc123.cache.amazonaws.com
+  port: 6379
+  ssl:
+    enabled: true
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+# AWS Secrets Manager integration
+secrets:
+  provider: aws-secrets-manager
+  awsSecretsManager:
+    enabled: true
+    region: us-east-1
+    useIRSA: true
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/honua-server-prod
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/abc-123
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz/ready
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/success-codes: "200"
+  hosts:
+    - host: honua.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+config:
+  aspnetcoreEnvironment: Production
+  logging:
+    level: Information
+    structuredLogging: true
+
+  openTelemetry:
+    enabled: true
+    otlpEndpoint: "http://opentelemetry-collector.observability.svc.cluster.local:4317"
+
+  rateLimiting:
+    enabled: true
+
+serviceMonitor:
+  enabled: true
+  namespace: observability
+
+networkPolicy:
+  enabled: true
+
+# AWS-specific node selector (use spot instances for cost optimization)
+nodeSelector:
+  kubernetes.io/os: linux
+  node.kubernetes.io/instance-type: c6i.2xlarge
+
+# Tolerate spot instance interruptions
+tolerations:
+  - key: "spot"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+# High availability across AZs
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - honua-server
+        topologyKey: kubernetes.io/hostname
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - honua-server
+          topologyKey: topology.kubernetes.io/zone
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: honua-server
+
+priorityClassName: high-priority
+
+# Pod annotations for monitoring
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"

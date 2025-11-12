@@ -1,18 +1,36 @@
+// Copyright (c) 2025 HonuaIO
+// Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+
 using BenchmarkDotNet.Running;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Diagnosers;
+using BenchmarkDotNet.Exporters;
+using BenchmarkDotNet.Exporters.Json;
+using BenchmarkDotNet.Columns;
 
 namespace Honua.Benchmarks;
 
-internal class Program
+public class Program
 {
-    private static void Main(string[] args)
+    public static void Main(string[] args)
     {
-        // Print environment info
-        RasterBenchmarkHelper.PrintEnvironmentInfo();
+        var config = DefaultConfig.Instance
+            .AddDiagnoser(MemoryDiagnoser.Default)
+            .AddExporter(MarkdownExporter.GitHub)
+            .AddExporter(JsonExporter.Full)
+            .AddExporter(HtmlExporter.Default)
+            .AddColumn(StatisticColumn.P95)
+            .AddColumn(StatisticColumn.P99);
 
-        // Ensure test data directory exists
-        RasterBenchmarkHelper.EnsureTestDataDirectory();
-
-        // Run benchmarks
-        BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+        // Run all benchmarks if no specific benchmark is specified
+        if (args.Length == 0)
+        {
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
+        }
+        else
+        {
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
+        }
     }
 }

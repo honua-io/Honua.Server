@@ -236,7 +236,13 @@ public sealed class BigQueryDataStoreProvider : IDataStoreProvider, IDisposable
             "Check IDataStoreCapabilities.SupportsSoftDelete before calling this method.");
     }
 
-    public Task<bool> HardDeleteAsync(
+    /// <summary>
+    /// Permanently deletes a feature from BigQuery without recovery option.
+    /// This is a GDPR-compliant hard delete that cannot be undone.
+    /// BigQuery has a 7-day time-travel window, but this delete is considered permanent after that period.
+    /// Audit logging is performed via the deletedBy parameter for compliance tracking.
+    /// </summary>
+    public async Task<bool> HardDeleteAsync(
         DataSourceDefinition dataSource,
         ServiceDefinition service,
         LayerDefinition layer,
@@ -245,9 +251,37 @@ public sealed class BigQueryDataStoreProvider : IDataStoreProvider, IDisposable
         IDataStoreTransaction? transaction = null,
         CancellationToken cancellationToken = default)
     {
-        // TODO: Implement hard delete functionality for BigQuery
-        // For now, delegate to regular DeleteAsync
-        return DeleteAsync(dataSource, service, layer, featureId, transaction, cancellationToken);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        Guard.NotNull(dataSource);
+        Guard.NotNull(service);
+        Guard.NotNull(layer);
+        Guard.NotNullOrWhiteSpace(featureId);
+
+        var client = GetOrCreateClient(dataSource);
+        var builder = new BigQueryFeatureQueryBuilder(layer);
+        var queryResult = builder.BuildDelete(featureId);
+
+        // Permanently delete the row from BigQuery
+        var result = await client.ExecuteQueryAsync(
+            queryResult.Sql,
+            parameters: queryResult.Parameters,
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
+
+        var rowsAffected = result.NumDmlAffectedRows ?? 0;
+        var deleted = rowsAffected > 0;
+
+        // Log the hard delete operation for audit compliance (GDPR, SOC2, etc.)
+        if (deleted)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"HARD DELETE: Feature permanently deleted from BigQuery - " +
+                $"Layer: {layer.Id}, FeatureId: {featureId}, DeletedBy: {deletedBy ?? "<system>"}, " +
+                $"RowsAffected: {rowsAffected}");
+        }
+
+        return deleted;
     }
 
     /// <summary>

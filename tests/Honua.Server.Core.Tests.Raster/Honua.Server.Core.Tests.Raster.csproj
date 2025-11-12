@@ -1,48 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <Using Include="Xunit" />
-  </ItemGroup>
+	<ItemGroup>
+		<!-- xUnit Test Framework -->
+		<PackageReference Include="xunit" Version="2.9.2" />
+		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="coverlet.collector" Version="6.0.2">
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
 
-  <ItemGroup>
-    <!-- Core test packages -->
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="coverlet.collector" Version="6.0.2">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
+		<!-- Mocking Framework -->
+		<PackageReference Include="Moq" Version="4.20.72" />
 
-    <!-- Assertion libraries -->
-    <PackageReference Include="FluentAssertions" Version="8.6.0" />
+		<!-- Fluent Assertions -->
+		<PackageReference Include="FluentAssertions" Version="7.0.0" />
 
-    <!-- Raster-specific packages -->
-    <PackageReference Include="MaxRev.Gdal.Core" Version="3.11.3.339" />
-    <PackageReference Include="Testcontainers.Minio" Version="3.10.0" />
-    <PackageReference Include="Testcontainers.Azurite" Version="3.10.0" />
-    <PackageReference Include="AWSSDK.S3" Version="4.0.7.7" />
+		<!-- Microsoft Test SDK -->
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+	</ItemGroup>
 
-    <!-- Explicit reference to Apache.Arrow for .NET 9.0 compatibility -->
-    <PackageReference Include="Apache.Arrow" Version="22.1.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Honua.Server.Core.Tests.Shared\Honua.Server.Core.Tests.Shared.csproj" />
-    <ProjectReference Include="..\..\src\Honua.Server.Core\Honua.Server.Core.csproj" />
-    <ProjectReference Include="..\..\src\Honua.Server.Core.Raster\Honua.Server.Core.Raster.csproj" />
-    <ProjectReference Include="..\..\src\Honua.Server.Host\Honua.Server.Host.csproj" />
-  </ItemGroup>
+	<ItemGroup>
+		<!-- Reference to raster project -->
+		<ProjectReference Include="..\..\src\Honua.Server.Core.Raster\Honua.Server.Core.Raster.csproj" />
+	</ItemGroup>
 
 </Project>

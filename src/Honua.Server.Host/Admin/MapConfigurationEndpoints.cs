@@ -1,3 +1,6 @@
+// Copyright (c) 2025 HonuaIO
+// Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+using Honua.Server.Core.Authentication;
 using Honua.Server.Core.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +13,7 @@ public static class MapConfigurationEndpoints
     public static IEndpointRouteBuilder MapMapConfigurationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/admin/api/map-configurations")
+            .RequireAuthorization("RequireAdministrator")
             .WithTags("Map Configurations")
             .WithOpenApi();
 
@@ -65,7 +69,7 @@ public static class MapConfigurationEndpoints
         .WithSummary("Get a map configuration by ID");
 
         // Create new map configuration
-        group.MapPost("/", async ([FromServices] DbContext db, [FromBody] CreateMapConfigurationRequest request) =>
+        group.MapPost("/", async ([FromServices] DbContext db, [FromServices] IUserContext userContext, [FromBody] CreateMapConfigurationRequest request) =>
         {
             var config = new MapConfigurationEntity
             {
@@ -73,7 +77,7 @@ public static class MapConfigurationEndpoints
                 Name = request.Name,
                 Description = request.Description,
                 Configuration = request.Configuration,
-                CreatedBy = request.CreatedBy ?? "system",
+                CreatedBy = userContext.UserId,
                 IsPublic = request.IsPublic,
                 IsTemplate = request.IsTemplate,
                 Tags = request.Tags,
@@ -277,7 +281,6 @@ public record CreateMapConfigurationRequest(
     string Name,
     string? Description,
     string Configuration,
-    string? CreatedBy,
     bool IsPublic = false,
     bool IsTemplate = false,
     string? Tags = null

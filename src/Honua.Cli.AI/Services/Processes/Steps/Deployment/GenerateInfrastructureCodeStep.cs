@@ -61,51 +61,108 @@ public partial class GenerateInfrastructureCodeStep : KernelProcessStep<Deployme
                         envelope.Id,
                         envelope.WorkloadProfile);
 
-                    // Generate Terraform code based on cloud provider
-                    var terraformCode = _state.CloudProvider.ToLower() switch
+                    // ITERATIVE GENERATION: Retry up to 3 times with Checkov feedback
+                    const int maxSecurityAttempts = 3;
+                    string? terraformCode = null;
+                    string? workspacePath = null;
+                    string? securityFeedback = null;
+
+                    for (int attempt = 1; attempt <= maxSecurityAttempts; attempt++)
                     {
-                        "aws" => GenerateAwsTerraform(envelope),
-                        "azure" => GenerateAzureTerraform(envelope),
-                        "gcp" => GenerateGcpTerraform(envelope),
-                        _ => throw new InvalidOperationException($"Unsupported provider: {_state.CloudProvider}")
-                    };
+                        _logger.LogInformation(
+                            "Infrastructure generation attempt {Attempt}/{MaxAttempts}{Feedback}",
+                            attempt,
+                            maxSecurityAttempts,
+                            securityFeedback != null ? " (with security feedback)" : "");
 
-                    _state.InfrastructureCode = terraformCode;
-                    _state.EstimatedMonthlyCost = CalculateEstimatedCost(_state.CloudProvider, _state.Tier);
-
-                    // Write Terraform files to secure temporary directory with restricted permissions
-                    var workspacePath = CreateSecureTempDirectory(_state.DeploymentId);
-                    _state.TerraformWorkspacePath = workspacePath;
-
-                    try
-                    {
-                        // Write main.tf
-                        var mainTfPath = Path.Combine(workspacePath, "main.tf");
-                        await File.WriteAllTextAsync(mainTfPath, terraformCode);
-                        _logger.LogInformation("Wrote main.tf to {Path}", mainTfPath);
-
-                        // Write variables.tf with required variables
-                        var variablesTf = GenerateVariablesTf(_state.CloudProvider);
-                        var variablesTfPath = Path.Combine(workspacePath, "variables.tf");
-                        await File.WriteAllTextAsync(variablesTfPath, variablesTf);
-                        _logger.LogInformation("Wrote variables.tf to {Path}", variablesTfPath);
-
-                        // Generate secure passwords and configuration
-                        var tfvars = GenerateTfVars(_state.CloudProvider);
-                        if (!string.IsNullOrEmpty(tfvars))
+                        // Generate Terraform code based on cloud provider (with optional security feedback)
+                        terraformCode = _state.CloudProvider.ToLower() switch
                         {
-                            var tfvarsPath = Path.Combine(workspacePath, "terraform.tfvars");
-                            await File.WriteAllTextAsync(tfvarsPath, tfvars);
-                            // Set restrictive permissions on tfvars file containing sensitive data
-                            SetRestrictiveFilePermissions(tfvarsPath);
-                            _logger.LogInformation("Wrote terraform.tfvars to {Path} with secure permissions", tfvarsPath);
+                            "aws" => GenerateAwsTerraform(envelope, securityFeedback),
+                            "azure" => GenerateAzureTerraform(envelope, securityFeedback),
+                            "gcp" => GenerateGcpTerraform(envelope, securityFeedback),
+                            _ => throw new InvalidOperationException($"Unsupported provider: {_state.CloudProvider}")
+                        };
+
+                        _state.InfrastructureCode = terraformCode;
+                        _state.EstimatedMonthlyCost = CalculateEstimatedCost(_state.CloudProvider, _state.Tier);
+
+                        // Clean up previous workspace if this is a retry
+                        if (workspacePath != null && Directory.Exists(workspacePath))
+                        {
+                            CleanupSecureTempDirectory(workspacePath);
                         }
-                    }
-                    catch
-                    {
-                        // Clean up secure temp directory on failure
-                        CleanupSecureTempDirectory(workspacePath);
-                        throw;
+
+                        // Write Terraform files to secure temporary directory with restricted permissions
+                        workspacePath = CreateSecureTempDirectory($"{_state.DeploymentId}-attempt{attempt}");
+                        _state.TerraformWorkspacePath = workspacePath;
+
+                        try
+                        {
+                            // Write main.tf
+                            var mainTfPath = Path.Combine(workspacePath, "main.tf");
+                            await File.WriteAllTextAsync(mainTfPath, terraformCode);
+                            _logger.LogInformation("Wrote main.tf to {Path}", mainTfPath);
+
+                            // Write variables.tf with required variables
+                            var variablesTf = GenerateVariablesTf(_state.CloudProvider);
+                            var variablesTfPath = Path.Combine(workspacePath, "variables.tf");
+                            await File.WriteAllTextAsync(variablesTfPath, variablesTf);
+                            _logger.LogInformation("Wrote variables.tf to {Path}", variablesTfPath);
+
+                            // Generate secure passwords and configuration
+                            var tfvars = GenerateTfVars(_state.CloudProvider);
+                            if (!string.IsNullOrEmpty(tfvars))
+                            {
+                                var tfvarsPath = Path.Combine(workspacePath, "terraform.tfvars");
+                                await File.WriteAllTextAsync(tfvarsPath, tfvars);
+                                // Set restrictive permissions on tfvars file containing sensitive data
+                                SetRestrictiveFilePermissions(tfvarsPath);
+                                _logger.LogInformation("Wrote terraform.tfvars to {Path} with secure permissions", tfvarsPath);
+                            }
+
+                            // SECURITY: Run Checkov security scan on generated Terraform code
+                            var scanResults = await ValidateWithCheckovAsync(workspacePath, throwOnFailure: false);
+
+                            // If no blocking issues, break out of retry loop
+                            if (scanResults == null || !ShouldBlockDeployment(scanResults))
+                            {
+                                _logger.LogInformation(
+                                    "Checkov validation passed on attempt {Attempt}/{MaxAttempts}",
+                                    attempt,
+                                    maxSecurityAttempts);
+                                break; // Success!
+                            }
+
+                            // If this was the last attempt, throw
+                            if (attempt >= maxSecurityAttempts)
+                            {
+                                var errorMessage = FormatBlockingMessage(scanResults);
+                                _logger.LogError(
+                                    "Checkov validation failed after {MaxAttempts} attempts. Blocking deployment.",
+                                    maxSecurityAttempts);
+                                throw new InvalidOperationException(
+                                    $"Failed to generate secure Terraform after {maxSecurityAttempts} attempts.\n\n{errorMessage}");
+                            }
+
+                            // Prepare security feedback for next iteration
+                            securityFeedback = FormatSecurityFeedbackForAI(scanResults);
+                            _logger.LogWarning(
+                                "Attempt {Attempt}/{MaxAttempts}: Found {Critical} CRITICAL and {High} HIGH issues. Regenerating with security fixes...",
+                                attempt,
+                                maxSecurityAttempts,
+                                scanResults.CriticalCount,
+                                scanResults.HighCount);
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            // Clean up on failure
+                            if (workspacePath != null)
+                            {
+                                CleanupSecureTempDirectory(workspacePath);
+                            }
+                            throw;
+                        }
                     }
 
                     _logger.LogInformation("Generated infrastructure code for deployment {DeploymentId}. Estimated cost: ${Cost}/month",

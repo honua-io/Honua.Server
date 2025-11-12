@@ -47,16 +47,8 @@ public class GraphController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateGraph([FromRoute] string graphName)
     {
-        try
-        {
-            await _graphService.CreateGraphAsync(graphName);
-            return Created($"/api/graph/graphs/{graphName}", new { graphName, message = "Graph created successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating graph: {GraphName}", graphName);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        await _graphService.CreateGraphAsync(graphName);
+        return Created($"/api/graph/graphs/{graphName}", new { graphName, message = "Graph created successfully" });
     }
 
     /// <summary>
@@ -68,16 +60,8 @@ public class GraphController : ControllerBase
     [ProducesResponseType(typeof(GraphExistsResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<GraphExistsResponse>> GraphExists([FromRoute] string graphName)
     {
-        try
-        {
-            var exists = await _graphService.GraphExistsAsync(graphName);
-            return Ok(new GraphExistsResponse { GraphName = graphName, Exists = exists });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error checking graph existence: {GraphName}", graphName);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        var exists = await _graphService.GraphExistsAsync(graphName);
+        return Ok(new GraphExistsResponse { GraphName = graphName, Exists = exists });
     }
 
     /// <summary>
@@ -91,22 +75,14 @@ public class GraphController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteGraph([FromRoute] string graphName)
     {
-        try
+        var exists = await _graphService.GraphExistsAsync(graphName);
+        if (!exists)
         {
-            var exists = await _graphService.GraphExistsAsync(graphName);
-            if (!exists)
-            {
-                return NotFound(new { message = $"Graph '{graphName}' not found" });
-            }
+            return NotFound(new { message = $"Graph '{graphName}' not found" });
+        }
 
-            await _graphService.DropGraphAsync(graphName);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting graph: {GraphName}", graphName);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        await _graphService.DropGraphAsync(graphName);
+        return NoContent();
     }
 
     // ==================== Node Operations ====================
@@ -125,21 +101,13 @@ public class GraphController : ControllerBase
         [FromBody] GraphNode node,
         [FromQuery] string? graphName = null)
     {
-        try
+        if (string.IsNullOrEmpty(node.Label))
         {
-            if (string.IsNullOrEmpty(node.Label))
-            {
-                return BadRequest(new { message = "Node label is required" });
-            }
+            return BadRequest(new { message = "Node label is required" });
+        }
 
-            var createdNode = await _graphService.CreateNodeAsync(node, graphName);
-            return CreatedAtAction(nameof(GetNode), new { id = createdNode.Id, graphName }, createdNode);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating node with label: {Label}", node.Label);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        var createdNode = await _graphService.CreateNodeAsync(node, graphName);
+        return CreatedAtAction(nameof(GetNode), new { id = createdNode.Id, graphName }, createdNode);
     }
 
     /// <summary>
@@ -156,21 +124,13 @@ public class GraphController : ControllerBase
         [FromRoute] long id,
         [FromQuery] string? graphName = null)
     {
-        try
+        var node = await _graphService.GetNodeByIdAsync(id, graphName);
+        if (node == null)
         {
-            var node = await _graphService.GetNodeByIdAsync(id, graphName);
-            if (node == null)
-            {
-                return NotFound(new { message = $"Node with ID {id} not found" });
-            }
+            return NotFound(new { message = $"Node with ID {id} not found" });
+        }
 
-            return Ok(node);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting node: {NodeId}", id);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        return Ok(node);
     }
 
     /// <summary>
@@ -187,17 +147,9 @@ public class GraphController : ControllerBase
         [FromQuery] string? graphName = null,
         [FromQuery] int limit = 100)
     {
-        try
-        {
-            limit = Math.Min(limit, 1000);
-            var nodes = await _graphService.FindNodesAsync(label, null, graphName, limit);
-            return Ok(nodes);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error finding nodes with label: {Label}", label);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        limit = Math.Min(limit, 1000);
+        var nodes = await _graphService.FindNodesAsync(label, null, graphName, limit);
+        return Ok(nodes);
     }
 
     /// <summary>
@@ -216,16 +168,8 @@ public class GraphController : ControllerBase
         [FromBody] Dictionary<string, object> properties,
         [FromQuery] string? graphName = null)
     {
-        try
-        {
-            await _graphService.UpdateNodeAsync(id, properties, graphName);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating node: {NodeId}", id);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        await _graphService.UpdateNodeAsync(id, properties, graphName);
+        return NoContent();
     }
 
     /// <summary>
@@ -240,16 +184,8 @@ public class GraphController : ControllerBase
         [FromRoute] long id,
         [FromQuery] string? graphName = null)
     {
-        try
-        {
-            await _graphService.DeleteNodeAsync(id, graphName);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting node: {NodeId}", id);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        await _graphService.DeleteNodeAsync(id, graphName);
+        return NoContent();
     }
 
     /// <summary>
@@ -264,16 +200,8 @@ public class GraphController : ControllerBase
         [FromBody] List<GraphNode> nodes,
         [FromQuery] string? graphName = null)
     {
-        try
-        {
-            var createdNodes = await _graphService.CreateNodesAsync(nodes, graphName);
-            return CreatedAtAction(nameof(CreateNodesBatch), new { graphName }, createdNodes);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating batch of {Count} nodes", nodes.Count);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        var createdNodes = await _graphService.CreateNodesAsync(nodes, graphName);
+        return CreatedAtAction(nameof(CreateNodesBatch), new { graphName }, createdNodes);
     }
 
     // ==================== Edge Operations ====================
@@ -289,29 +217,21 @@ public class GraphController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GraphEdge>> CreateRelationship([FromBody] CreateRelationshipRequest request)
     {
-        try
+        if (string.IsNullOrEmpty(request.RelationshipType))
         {
-            if (string.IsNullOrEmpty(request.RelationshipType))
-            {
-                return BadRequest(new { message = "Relationship type is required" });
-            }
-
-            var edge = new GraphEdge
-            {
-                Type = request.RelationshipType,
-                StartNodeId = request.SourceNodeId,
-                EndNodeId = request.TargetNodeId,
-                Properties = request.Properties ?? new Dictionary<string, object>()
-            };
-
-            var createdEdge = await _graphService.CreateEdgeAsync(edge, request.GraphName);
-            return CreatedAtAction(nameof(GetRelationship), new { id = createdEdge.Id, graphName = request.GraphName }, createdEdge);
+            return BadRequest(new { message = "Relationship type is required" });
         }
-        catch (Exception ex)
+
+        var edge = new GraphEdge
         {
-            _logger.LogError(ex, "Error creating relationship: {Type}", request.RelationshipType);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+            Type = request.RelationshipType,
+            StartNodeId = request.SourceNodeId,
+            EndNodeId = request.TargetNodeId,
+            Properties = request.Properties ?? new Dictionary<string, object>()
+        };
+
+        var createdEdge = await _graphService.CreateEdgeAsync(edge, request.GraphName);
+        return CreatedAtAction(nameof(GetRelationship), new { id = createdEdge.Id, graphName = request.GraphName }, createdEdge);
     }
 
     /// <summary>
@@ -328,21 +248,13 @@ public class GraphController : ControllerBase
         [FromRoute] long id,
         [FromQuery] string? graphName = null)
     {
-        try
+        var edge = await _graphService.GetEdgeByIdAsync(id, graphName);
+        if (edge == null)
         {
-            var edge = await _graphService.GetEdgeByIdAsync(id, graphName);
-            if (edge == null)
-            {
-                return NotFound(new { message = $"Relationship with ID {id} not found" });
-            }
+            return NotFound(new { message = $"Relationship with ID {id} not found" });
+        }
 
-            return Ok(edge);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting relationship: {EdgeId}", id);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        return Ok(edge);
     }
 
     /// <summary>
@@ -361,16 +273,8 @@ public class GraphController : ControllerBase
         [FromQuery] TraversalDirection direction = TraversalDirection.Both,
         [FromQuery] string? graphName = null)
     {
-        try
-        {
-            var edges = await _graphService.GetNodeRelationshipsAsync(nodeId, relationshipType, direction, graphName);
-            return Ok(edges);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting relationships for node: {NodeId}", nodeId);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        var edges = await _graphService.GetNodeRelationshipsAsync(nodeId, relationshipType, direction, graphName);
+        return Ok(edges);
     }
 
     /// <summary>
@@ -385,16 +289,8 @@ public class GraphController : ControllerBase
         [FromRoute] long id,
         [FromQuery] string? graphName = null)
     {
-        try
-        {
-            await _graphService.DeleteEdgeAsync(id, graphName);
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting relationship: {EdgeId}", id);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        await _graphService.DeleteEdgeAsync(id, graphName);
+        return NoContent();
     }
 
     // ==================== Cypher Queries ====================
@@ -410,25 +306,17 @@ public class GraphController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GraphQueryResult>> ExecuteCypherQuery([FromBody] CypherQueryRequest request)
     {
-        try
+        if (string.IsNullOrEmpty(request.Query))
         {
-            if (string.IsNullOrEmpty(request.Query))
-            {
-                return BadRequest(new { message = "Query is required" });
-            }
-
-            var result = await _graphService.ExecuteCypherQueryAsync(
-                request.Query,
-                request.Parameters,
-                request.GraphName);
-
-            return Ok(result);
+            return BadRequest(new { message = "Query is required" });
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error executing Cypher query");
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+
+        var result = await _graphService.ExecuteCypherQueryAsync(
+            request.Query,
+            request.Parameters,
+            request.GraphName);
+
+        return Ok(result);
     }
 
     // ==================== Graph Traversal ====================
@@ -444,23 +332,15 @@ public class GraphController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GraphQueryResult>> TraverseGraph([FromBody] GraphTraversalRequest request)
     {
-        try
-        {
-            var result = await _graphService.TraverseGraphAsync(
-                request.StartNodeId,
-                request.RelationshipTypes,
-                request.Direction,
-                request.MaxDepth,
-                request.NodeFilter,
-                request.GraphName);
+        var result = await _graphService.TraverseGraphAsync(
+            request.StartNodeId,
+            request.RelationshipTypes,
+            request.Direction,
+            request.MaxDepth,
+            request.NodeFilter,
+            request.GraphName);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error traversing graph from node: {NodeId}", request.StartNodeId);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        return Ok(result);
     }
 
     /// <summary>
@@ -481,22 +361,14 @@ public class GraphController : ControllerBase
         [FromQuery] int maxDepth = 10,
         [FromQuery] string? graphName = null)
     {
-        try
-        {
-            var result = await _graphService.FindShortestPathAsync(
-                startNodeId,
-                endNodeId,
-                relationshipTypes,
-                maxDepth,
-                graphName);
+        var result = await _graphService.FindShortestPathAsync(
+            startNodeId,
+            endNodeId,
+            relationshipTypes,
+            maxDepth,
+            graphName);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error finding shortest path between {Start} and {End}", startNodeId, endNodeId);
-            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
-        }
+        return Ok(result);
     }
 }
 

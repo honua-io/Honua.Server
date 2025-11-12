@@ -21,7 +21,8 @@ public static class GeoEtlResilienceEndpoints
     {
         var group = endpoints.MapGroup("/admin/api/geoetl")
             .WithTags("GeoETL Resilience")
-            .WithOpenApi();
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // Failed Workflows
         group.MapGet("/failed-workflows", GetFailedWorkflows)

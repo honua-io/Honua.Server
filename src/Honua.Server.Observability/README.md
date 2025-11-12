@@ -2,6 +2,25 @@
 
 Comprehensive monitoring and observability infrastructure for the Honua Build Orchestrator system using OpenTelemetry, Prometheus, and Grafana.
 
+## Production Defaults
+
+**Important:** As of the latest version, observability is **enabled by default in production** configurations:
+
+- **Metrics:** ENABLED in `appsettings.Production.json` (Prometheus format at `/metrics`)
+- **Request Logging:** ENABLED in production for audit trails and performance monitoring
+- **Distributed Tracing:** Set to `none` by default (configure OTLP endpoint to enable)
+
+To disable metrics in production:
+```bash
+export observability__metrics__enabled=false
+```
+
+To enable distributed tracing in production:
+```bash
+export observability__tracing__exporter=otlp
+export observability__tracing__otlpEndpoint=http://tempo:4317
+```
+
 ## Features
 
 - **Metrics Collection**: OpenTelemetry-based metrics for all system components
@@ -9,7 +28,7 @@ Comprehensive monitoring and observability infrastructure for the Honua Build Or
 - **Structured Logging**: Serilog with JSON formatting for log aggregation
 - **Prometheus Integration**: Metrics export and alert rules
 - **Grafana Dashboards**: Pre-built dashboards for system monitoring
-- **Distributed Tracing**: Correlation IDs for request tracing
+- **Distributed Tracing**: OpenTelemetry-based distributed tracing with OTLP support
 
 ## Quick Start
 

@@ -3,7 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Honua.Server.Core\Honua.Server.Core.csproj" />
     <ProjectReference Include="..\Honua.Server.Core.Raster\Honua.Server.Core.Raster.csproj" />
-    <ProjectReference Include="..\Honua.Cli.AI.Secrets\Honua.Cli.AI.Secrets.csproj" />
   </ItemGroup>
 
   <ItemGroup>

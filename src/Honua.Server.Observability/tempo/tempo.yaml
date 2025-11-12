@@ -1,0 +1,81 @@
+# Tempo configuration for cloud-native distributed tracing
+# For production deployments or when scaling beyond single machine
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 4317
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    jaeger:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:14250
+        thrift_http:
+          endpoint: 0.0.0.0:14268
+
+ingester:
+  trace_idle_period: 10s
+  max_block_bytes: 1_000_000
+  max_block_duration: 5m
+
+metrics_generator:
+  registry:
+    external_labels:
+      cluster: 'honua-production'
+  storage:
+    path: /var/tempo/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal
+    cache: memcached
+    memcached:
+      consistent_hash: true
+      host: memcached
+      port: 11211
+  metrics:
+    backend: local
+    local:
+      path: /var/tempo/metrics
+
+querier:
+  max_concurrent_queries: 20
+  search:
+    prefer_self: 10
+    max_result_limit: 20
+    external:
+      hedge_requests_at: 8s
+      hedge_requests_up_to: 2
+  frontend_search_worker_concurrency: 100
+
+query_frontend:
+  max_cache_freshness_skew: 10m
+  align_queries_with_step: true
+  cache_control_header: "public, max-age=600"
+  compression: gzip
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+    max_traces_per_user: 10000
+    max_bytes_per_trace: 5000000
+  metrics_generator_processors:
+    - service-graphs
+    - span-metrics

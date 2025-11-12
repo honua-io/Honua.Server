@@ -16,7 +16,8 @@ public static class GeoEtlWorkflowEndpoints
     {
         var group = endpoints.MapGroup("/admin/api/geoetl/workflows")
             .WithTags("GeoETL Workflows")
-            .WithOpenApi();
+            .WithOpenApi()
+            .RequireAuthorization("RequireAdministrator");
 
         // List all workflows for a tenant
         group.MapGet("/", async (

@@ -1,0 +1,105 @@
+█▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█
+█  Honua Server has been deployed!                                      █
+█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█
+
+Release Name:    {{ .Release.Name }}
+Namespace:      {{ .Release.Namespace }}
+Chart Version:  {{ .Chart.Version }}
+App Version:    {{ .Chart.AppVersion }}
+Image Variant:  {{ .Values.image.variant }}
+
+────────────────────────────────────────────────────────────────────────
+
+{{- if .Values.ingress.enabled }}
+🌐 Your application is accessible at:
+
+{{- range .Values.ingress.hosts }}
+  {{- if $.Values.ingress.tls }}
+  https://{{ .host }}
+  {{- else }}
+  http://{{ .host }}
+  {{- end }}
+{{- end }}
+
+{{- else }}
+
+To access your application, follow these steps:
+
+1. Get the application URL by running:
+{{- if eq .Values.service.type "NodePort" }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "honua-server.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if eq .Values.service.type "LoadBalancer" }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        You can watch the status by running:
+        kubectl get svc --namespace {{ .Release.Namespace }} -w {{ include "honua-server.fullname" . }}
+
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "honua-server.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+{{- else if eq .Values.service.type "ClusterIP" }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "honua-server.fullname" . }} 8080:{{ .Values.service.port }}
+  echo "Visit http://127.0.0.1:8080 to use your application"
+{{- end }}
+{{- end }}
+
+────────────────────────────────────────────────────────────────────────
+
+📊 Monitoring & Health Checks:
+
+- Health endpoint:    /healthz/live
+- Readiness endpoint: /healthz/ready
+{{- if .Values.serviceMonitor.enabled }}
+- Metrics endpoint:   /metrics (scraped by Prometheus)
+{{- end }}
+
+────────────────────────────────────────────────────────────────────────
+
+🔍 Useful Commands:
+
+# View logs
+kubectl logs -f -l app.kubernetes.io/name={{ include "honua-server.name" . }} -n {{ .Release.Namespace }}
+
+# Check pod status
+kubectl get pods -l app.kubernetes.io/name={{ include "honua-server.name" . }} -n {{ .Release.Namespace }}
+
+# Get deployment info
+kubectl describe deployment {{ include "honua-server.fullname" . }} -n {{ .Release.Namespace }}
+
+{{- if .Values.autoscaling.enabled }}
+# Check HPA status
+kubectl get hpa {{ include "honua-server.fullname" . }} -n {{ .Release.Namespace }}
+{{- end }}
+
+# Restart deployment (rolling restart)
+kubectl rollout restart deployment/{{ include "honua-server.fullname" . }} -n {{ .Release.Namespace }}
+
+────────────────────────────────────────────────────────────────────────
+
+{{- if or .Values.postgresql.enabled .Values.redis.enabled }}
+📦 Dependencies Deployed:
+
+{{- if .Values.postgresql.enabled }}
+  ✓ PostgreSQL (embedded)
+{{- else if .Values.database.external }}
+  ✓ PostgreSQL (external): {{ include "honua-server.databaseHost" . }}:{{ include "honua-server.databasePort" . }}
+{{- end }}
+
+{{- if .Values.redis.enabled }}
+  ✓ Redis (embedded)
+{{- else if .Values.redis.external }}
+  ✓ Redis (external): {{ include "honua-server.redisHost" . }}:{{ include "honua-server.redisPort" . }}
+{{- end }}
+
+{{- end }}
+
+────────────────────────────────────────────────────────────────────────
+
+📚 Documentation:
+
+For more information about configuration options, visit:
+  https://github.com/honua-io/Honua.Server
+
+Need help? Contact: support@honua.io
+
+────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,16 @@
+# BenchmarkDotNet Artifacts
+BenchmarkDotNet.Artifacts/
+!BenchmarkDotNet.Artifacts/results/
+
+# Keep baseline results but ignore everything else
+BenchmarkDotNet.Artifacts/*
+!BenchmarkDotNet.Artifacts/results/
+BenchmarkDotNet.Artifacts/results/*
+!BenchmarkDotNet.Artifacts/results/*.md
+
+# Benchmark logs
+*.log
+
+# Build outputs
+bin/
+obj/

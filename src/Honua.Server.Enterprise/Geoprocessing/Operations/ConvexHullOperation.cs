@@ -128,25 +128,6 @@ public class ConvexHullOperation : GeoprocessingOperationBase
 
     private async Task<List<Geometry>> LoadGeometriesAsync(GeoprocessingInput input, CancellationToken cancellationToken)
     {
-        await Task.CompletedTask;
-
-        var factory = GeometryFactory.Default;
-        var reader = new WKTReader();
-
-        if (input.Type == "wkt")
-        {
-            return new List<Geometry> { reader.Read(input.Source) };
-        }
-
-        if (input.Type == "geojson")
-        {
-            var geoJsonReader = new GeoJsonReader();
-            var geometry = geoJsonReader.Read<Geometry>(input.Source);
-            return geometry is GeometryCollection collection
-                ? collection.Geometries.ToList()
-                : new List<Geometry> { geometry };
-        }
-
-        throw new NotImplementedException($"Input type '{input.Type}' not yet implemented");
+        return await GeometryLoader.LoadGeometriesAsync(input, cancellationToken);
     }
 }
