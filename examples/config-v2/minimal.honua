@@ -1,0 +1,77 @@
+# Minimal Honua Configuration Example
+# This is a simple configuration file for development
+
+honua {
+    version = "1.0"
+    environment = "development"
+    log_level = "information"
+
+    cors = {
+        allow_any_origin = false
+        allowed_origins = ["http://localhost:3000"]
+    }
+}
+
+# Define a SQLite data source
+data_source "local-db" {
+    provider = "sqlite"
+    connection = "Data Source=./data/dev.db"
+    health_check = "SELECT 1"
+}
+
+# Enable OData service
+service "odata" {
+    type = "odata"
+    enabled = true
+    allow_writes = true
+    max_page_size = 1000
+}
+
+# Enable OGC API Features
+service "ogc_api" {
+    type = "ogc_api"
+    enabled = true
+}
+
+# Define a layer
+layer "sample-roads" {
+    title = "Sample Road Network"
+    data_source = "local-db"
+    table = "roads"
+
+    geometry = {
+        column = "geom"
+        type = "LineString"
+        srid = 4326
+    }
+
+    id_field = "road_id"
+    display_field = "name"
+    introspect_fields = true
+
+    services = ["odata", "ogc_api"]
+}
+
+# Configure in-memory cache
+cache "memory" {
+    type = "memory"
+    enabled = true
+}
+
+# Configure rate limiting
+rate_limit {
+    enabled = true
+    store = "memory"
+
+    rules = {
+        default = {
+            requests = 1000
+            window = "1m"
+        }
+
+        authenticated = {
+            requests = 5000
+            window = "1m"
+        }
+    }
+}

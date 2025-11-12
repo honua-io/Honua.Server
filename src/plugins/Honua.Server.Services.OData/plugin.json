@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.odata",
+  "name": "OData Service Plugin",
+  "version": "1.0.0",
+  "description": "OData v4 protocol implementation for querying geospatial data",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.OData.dll",
+  "entryPoint": "Honua.Server.Services.OData.ODataServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

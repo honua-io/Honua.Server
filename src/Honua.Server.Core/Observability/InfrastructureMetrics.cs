@@ -163,6 +163,7 @@ public sealed class InfrastructureMetrics : IInfrastructureMetrics, IDisposable
     public void Dispose()
     {
         _meter.Dispose();
+        _currentProcess.Dispose();
     }
 
     private static long GetAvailableWorkerThreads()

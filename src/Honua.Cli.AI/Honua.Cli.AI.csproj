@@ -7,7 +7,7 @@
 
   <ItemGroup>
     <PackageReference Include="Anthropic.SDK" Version="5.6.0" />
-    <PackageReference Include="AWSSDK.Route53" Version="4.0.4.7" />
+    <PackageReference Include="AWSSDK.Route53" Version="4.0.5.5" />
     <PackageReference Include="Azure.AI.OpenAI" Version="2.5.0-beta.1" />
     <PackageReference Include="Azure.Search.Documents" Version="11.6.0" />
     <PackageReference Include="Dapper" Version="2.1.66" />
@@ -43,13 +43,13 @@
     <PackageReference Include="DnsClient" Version="1.7.0" />
 
     <!-- Explicit AWSSDK.Core to resolve version conflicts -->
-    <PackageReference Include="AWSSDK.Core" Version="4.0.1" />
+    <PackageReference Include="AWSSDK.Core" Version="4.0.3" />
 
     <!-- YARP Reverse Proxy -->
     <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
 
     <!-- Certificate Storage -->
-    <PackageReference Include="Azure.Security.KeyVault.Certificates" Version="4.5.0" />
+    <PackageReference Include="Azure.Security.KeyVault.Certificates" Version="4.8.0" />
 
     <!-- YAML Parsing -->
     <PackageReference Include="YamlDotNet" Version="16.3.0" />

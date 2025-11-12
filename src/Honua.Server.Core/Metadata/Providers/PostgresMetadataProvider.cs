@@ -31,7 +31,7 @@ namespace Honua.Server.Core.Metadata.Providers;
 /// - PostgreSQL 10+ (for JSONB and improved pub/sub)
 /// - PostGIS extension (optional, for spatial metadata queries)
 /// </summary>
-public sealed class PostgresMetadataProvider : IMutableMetadataProvider, IReloadableMetadataProvider, IAsyncDisposable
+public sealed class PostgresMetadataProvider : IMutableMetadataProvider, IReloadableMetadataProvider, IAsyncDisposable, IDisposable
 {
     private const string MetadataSnapshotsTableName = "metadata_snapshots";
     private const string MetadataChangeLogTableName = "metadata_change_log";
@@ -718,6 +718,11 @@ public sealed class PostgresMetadataProvider : IMutableMetadataProvider, IReload
         return Convert.ToBase64String(hash);
     }
 
+    public void Dispose()
+    {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
@@ -742,6 +747,8 @@ public sealed class PostgresMetadataProvider : IMutableMetadataProvider, IReload
         }
 
         _notificationLoopCts?.Dispose();
+        _notificationConnection?.Dispose();
+        _initializationLock.Dispose();
     }
 
     private static string QuoteIdentifier(string identifier)

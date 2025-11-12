@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.wms",
+  "name": "WMS Service Plugin",
+  "version": "1.0.0",
+  "description": "OGC Web Map Service (WMS) protocol implementation supporting versions 1.1.1 and 1.3.0",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Wms.dll",
+  "entryPoint": "Honua.Server.Services.Wms.WmsServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

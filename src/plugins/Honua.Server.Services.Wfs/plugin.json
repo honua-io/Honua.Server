@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.wfs",
+  "name": "WFS Service Plugin",
+  "version": "1.0.0",
+  "description": "OGC Web Feature Service (WFS) protocol implementation supporting versions 1.0.0, 1.1.0, and 2.0.0",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Wfs.dll",
+  "entryPoint": "Honua.Server.Services.Wfs.WfsServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

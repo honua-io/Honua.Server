@@ -1,8 +1,9 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using Honua.Server.Core.Configuration;
-using Honua.Server.Enterprise.Sensors.Extensions;
-using Honua.Server.Enterprise.Sensors.Models;
+// Enterprise features disabled
+// using Honua.Server.Enterprise.Sensors.Extensions;
+// using Honua.Server.Enterprise.Sensors.Models;
 using Honua.Server.Host.Admin;
 using Honua.Server.Host.Authentication;
 using Honua.Server.Host.Carto;
@@ -163,11 +164,12 @@ internal static class EndpointExtensions
         }
 
         // OGC SensorThings API v1.1 (conditional on configuration)
-        var sensorThingsConfig = app.Services.GetService<SensorThingsServiceDefinition>();
-        if (sensorThingsConfig?.Enabled ?? false)
-        {
-            app.MapSensorThingsEndpoints(sensorThingsConfig);
-        }
+        // Enterprise features disabled
+        // var sensorThingsConfig = app.Services.GetService<SensorThingsServiceDefinition>();
+        // if (sensorThingsConfig?.Enabled ?? false)
+        // {
+        //     app.MapSensorThingsEndpoints(sensorThingsConfig);
+        // }
 
         return app;
     }
@@ -229,27 +231,29 @@ internal static class EndpointExtensions
         app.MapMapConfigurationEndpoints();
 
         // Map GeoETL endpoints (Enterprise feature)
-        app.MapGeoEtlWorkflowEndpoints();
-        app.MapGeoEtlExecutionEndpoints();
-        app.MapGeoEtlAiEndpoints();
-        app.MapGeoEtlTemplateEndpoints();
-        app.MapGeoEtlScheduleEndpoints();
+        // Enterprise features disabled
+        // app.MapGeoEtlWorkflowEndpoints();
+        // app.MapGeoEtlExecutionEndpoints();
+        // app.MapGeoEtlAiEndpoints();
+        // app.MapGeoEtlTemplateEndpoints();
+        // app.MapGeoEtlScheduleEndpoints();
 
         // Map Admin UI SignalR hub for real-time updates
         app.MapHub<Honua.Server.Host.Admin.Hubs.MetadataChangeNotificationHub>("/admin/hub/metadata");
 
         // Map GeoEvent SignalR hub for real-time geofence event streaming
-        app.MapHub<Honua.Server.Host.GeoEvent.GeoEventHub>("/hubs/geoevent");
+        // Enterprise features disabled
+        // app.MapHub<Honua.Server.Host.GeoEvent.GeoEventHub>("/hubs/geoevent");
 
         // Map GeoETL Progress SignalR hub for real-time workflow execution tracking
-        app.MapHub<Honua.Server.Host.GeoEvent.GeoEtlProgressHub>("/hubs/geoetl-progress");
+        // app.MapHub<Honua.Server.Host.GeoEvent.GeoEtlProgressHub>("/hubs/geoetl-progress");
 
         // Map SensorThings SignalR hub for real-time sensor observation streaming
-        var sensorThingsConfig = app.Services.GetService<Honua.Server.Enterprise.Sensors.Models.SensorThingsServiceDefinition>();
-        if (sensorThingsConfig?.WebSocketStreamingEnabled == true)
-        {
-            app.MapHub<Honua.Server.Host.SensorThings.SensorObservationHub>("/hubs/sensor-observations");
-        }
+        // var sensorThingsConfig = app.Services.GetService<Honua.Server.Enterprise.Sensors.Models.SensorThingsServiceDefinition>();
+        // if (sensorThingsConfig?.WebSocketStreamingEnabled == true)
+        // {
+        //     app.MapHub<Honua.Server.Host.SensorThings.SensorObservationHub>("/hubs/sensor-observations");
+        // }
 
         return app;
     }

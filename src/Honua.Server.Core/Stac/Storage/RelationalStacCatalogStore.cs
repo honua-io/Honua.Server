@@ -478,9 +478,14 @@ values (
 
     #region Disposal
 
-    protected override void DisposeCore()
+    protected override void Dispose(bool disposing)
     {
-        _initializationLock.Dispose();
+        if (disposing)
+        {
+            _initializationLock.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     #endregion

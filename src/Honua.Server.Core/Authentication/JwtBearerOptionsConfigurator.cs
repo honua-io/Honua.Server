@@ -91,19 +91,12 @@ public sealed class JwtBearerOptionsConfigurator : IConfigureNamedOptions<JwtBea
             "To disable: Set HonuaAuthentication:Mode to 'Local' or 'Oidc' in configuration",
             _environment.EnvironmentName);
 
-        options.Authority = null;
-        options.Audience = null;
-        options.RequireHttpsMetadata = false;
-        options.MapInboundClaims = false;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = false,
-            ValidateAudience = false,
-            ValidateIssuerSigningKey = false,
-            NameClaimType = JwtRegisteredClaimNames.Sub
-        };
+        // QuickStart reuses the secure local authentication configuration but relaxes enforcement.
+        // This keeps token validation enabled while allowing anonymous access through authorization policies.
+        ConfigureLocalMode(options);
 
-        options.Events = BuildJwtBearerEvents(options.Events);
+        // QuickStart is intended for local development, so HTTPS metadata is not required.
+        options.RequireHttpsMetadata = false;
     }
 
     private void ConfigureLocalMode(JwtBearerOptions options)

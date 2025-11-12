@@ -81,6 +81,7 @@ public sealed class AttachmentStoreSelector : DisposableBase, IAttachmentStoreSe
 
     private void RegisterForConfigurationChanges()
     {
+        _changeRegistration?.Dispose();
         _changeRegistration = ChangeToken.OnChange(
             () => _configurationService.GetChangeToken(),
             OnConfigurationChanged);
@@ -92,9 +93,15 @@ public sealed class AttachmentStoreSelector : DisposableBase, IAttachmentStoreSe
         _cache.Clear();
     }
 
-    protected override void DisposeCore()
+    protected override void Dispose(bool disposing)
     {
-        _changeRegistration?.Dispose();
-        _cache.Clear();
+        if (disposing)
+        {
+            _changeRegistration?.Dispose();
+            _changeRegistration = null;
+            _cache.Clear();
+        }
+
+        base.Dispose(disposing);
     }
 }

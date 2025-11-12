@@ -322,8 +322,13 @@ public sealed class RasterStacCatalogSynchronizer : DisposableBase, IRasterStacC
         return _configurationService.Current.Services.Stac.Enabled;
     }
 
-    protected override void DisposeCore()
+    protected override void Dispose(bool disposing)
     {
-        _syncLock.Dispose();
+        if (disposing)
+        {
+            _syncLock.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }

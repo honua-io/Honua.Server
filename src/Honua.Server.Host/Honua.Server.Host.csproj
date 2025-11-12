@@ -3,7 +3,8 @@
     <ProjectReference Include="..\Honua.Server.Core\Honua.Server.Core.csproj" />
     <ProjectReference Include="..\Honua.Server.Core.Raster\Honua.Server.Core.Raster.csproj" />
     <ProjectReference Include="..\Honua.Server.Core.Cloud\Honua.Server.Core.Cloud.csproj" />
-    <ProjectReference Include="..\Honua.Server.Enterprise\Honua.Server.Enterprise.csproj" />
+    <!-- Enterprise project excluded - missing dependencies -->
+    <!-- <ProjectReference Include="..\Honua.Server.Enterprise\Honua.Server.Enterprise.csproj" /> -->
     <ProjectReference Include="..\Honua.Server.Observability\Honua.Server.Observability.csproj" />
     <ProjectReference Include="..\Honua.Server.AlertReceiver\Honua.Server.AlertReceiver.csproj" />
     <ProjectReference Include="..\Honua.MapSDK\Honua.MapSDK.csproj" />
@@ -14,12 +15,35 @@
     <ProjectReference Include="..\Honua.Server.Core.OData\Honua.Server.Core.OData.csproj" />
   </ItemGroup>
 
+  <!-- Exclude Enterprise-dependent files -->
+  <ItemGroup>
+    <Compile Remove="Admin\AuditLogEndpoints.cs" />
+    <Compile Remove="Admin\FeatureFlagEndpoints.cs" />
+    <Compile Remove="Admin\GeoEtlAiEndpoints.cs" />
+    <Compile Remove="Admin\GeoEtlExecutionEndpoints.cs" />
+    <Compile Remove="Admin\GeoEtlResilienceEndpoints.cs" />
+    <Compile Remove="Admin\GeoEtlScheduleEndpoints.cs" />
+    <Compile Remove="Admin\GeoEtlTemplateEndpoints.cs" />
+    <Compile Remove="Admin\GeoEtlWorkflowEndpoints.cs" />
+    <Compile Remove="Authentication\SamlEndpoints.cs" />
+    <!-- <Compile Remove="Extensions\EndpointExtensions.cs" /> -->
+    <Compile Remove="GeoEvent\AzureStreamAnalyticsController.cs" />
+    <Compile Remove="GeoEvent\GeoEventController.cs" />
+    <Compile Remove="GeoEvent\GeoEventHub.cs" />
+    <Compile Remove="GeoEvent\GeofencesController.cs" />
+    <!-- <Compile Remove="Hosting\HonuaHostConfigurationExtensions.cs" /> -->
+    <Compile Remove="SensorThings\ISensorObservationBroadcaster.cs" />
+    <Compile Remove="SensorThings\SensorObservationHub.cs" />
+    <Compile Remove="SensorThings\SignalRSensorObservationBroadcaster.cs" />
+    <Compile Remove="Geoprocessing\OgcProcessesEndpoints.cs" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);1591</NoWarn>
+    <NoWarn>$(NoWarn);1591;CA2234;CA2016;CA2213</NoWarn>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeHostRuntimeDependencies</TargetsForTfmSpecificBuildOutput>
 

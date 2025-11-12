@@ -2,8 +2,10 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
+using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
 using Azure.ResourceManager.Dns;
@@ -151,6 +153,7 @@ public class TrialCleanupFunction
     {
         try
         {
+            var cancellationToken = CancellationToken.None;
             var credential = new DefaultAzureCredential();
             var armClient = new ArmClient(credential);
 
@@ -160,12 +163,11 @@ public class TrialCleanupFunction
             var dnsZone = await resourceGroup.Value.GetDnsZoneAsync(_dnsZoneName);
 
             // Delete A record
-            var aRecords = dnsZone.Value.GetDnsARecordSets();
-            var recordSet = await aRecords.GetIfExistsAsync(tenantId);
-
-            if (recordSet.Value != null)
+            var aRecords = dnsZone.Value.GetDnsARecords();
+            if (await aRecords.ExistsAsync(tenantId, cancellationToken).ConfigureAwait(false))
             {
-                await recordSet.Value.DeleteAsync(WaitUntil.Completed);
+                var record = await aRecords.GetAsync(tenantId, cancellationToken).ConfigureAwait(false);
+                await record.Value.DeleteAsync(WaitUntil.Completed, cancellationToken: cancellationToken).ConfigureAwait(false);
                 _logger.LogInformation("Deleted DNS record for {TenantId}.{DnsZone}", tenantId, _dnsZoneName);
             }
             else

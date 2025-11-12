@@ -1,0 +1,278 @@
+# Real-World GIS Server Configuration
+# Example: Municipal GIS data publishing
+
+honua {
+  version     = "1.0"
+  environment = "production"
+  log_level   = "warning"
+
+  cors {
+    allow_any_origin = false
+    allowed_origins  = [
+      "https://maps.city.gov",
+      "https://gis-portal.city.gov",
+      "https://planning.city.gov"
+    ]
+    allow_credentials = true
+    max_age           = 7200
+  }
+}
+
+# Primary PostgreSQL/PostGIS database
+data_source "city_gis" {
+  provider   = "postgresql"
+  connection = env("GIS_DATABASE_URL")
+
+  pool {
+    min_size = 15
+    max_size = 60
+    timeout  = 30
+  }
+
+  health_check = "SELECT PostGIS_Version()"
+}
+
+# Read-only replica for heavy queries
+data_source "city_gis_readonly" {
+  provider   = "postgresql"
+  connection = env("GIS_DATABASE_READONLY_URL")
+
+  pool {
+    min_size = 10
+    max_size = 40
+  }
+}
+
+# Redis for caching and rate limiting
+cache "redis_cluster" {
+  enabled    = true
+  connection = env("REDIS_URL")
+  prefix     = "city_gis:"
+  ttl        = 3600
+}
+
+# OData for developer API access
+service "odata" {
+  enabled       = true
+  allow_writes  = false  # Read-only in production
+  max_page_size = 500
+  default_page_size = 100
+  emit_wkt_shadow_properties = true
+  enable_case_insensitive    = true
+}
+
+# OGC API Features for modern web apps
+service "ogc_api" {
+  enabled     = true
+  item_limit  = 5000
+  default_crs = "EPSG:4326"
+  additional_crs = [
+    "EPSG:3857",  # Web Mercator
+    "EPSG:2249"   # Massachusetts State Plane
+  ]
+  conformance = [
+    "core",
+    "geojson",
+    "html",
+    "crs",
+    "filter",
+    "simple-cql"
+  ]
+}
+
+# WFS for legacy GIS clients
+service "wfs" {
+  enabled = true
+  version = "2.0.0"
+}
+
+# WMS for map rendering
+service "wms" {
+  enabled = true
+  version = "1.3.0"
+}
+
+# ============================================================
+# LAYERS - Municipal GIS Data
+# ============================================================
+
+# Parcels - Property boundaries
+layer "parcels" {
+  title         = "Property Parcels"
+  description   = "Official property boundaries from Assessor's office"
+  data_source   = data_source.city_gis
+  table         = "public.parcels"
+  id_field      = "parcel_id"
+  display_field = "parcel_number"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "MultiPolygon"
+    srid   = 2249
+  }
+
+  services = [
+    service.odata,
+    service.ogc_api,
+    service.wfs,
+    service.wms
+  ]
+
+  permissions {
+    allow_anonymous_read = true
+    require_auth_write   = true
+  }
+}
+
+# Buildings - Building footprints
+layer "buildings" {
+  title         = "Building Footprints"
+  description   = "Building outlines from aerial imagery"
+  data_source   = data_source.city_gis
+  table         = "public.buildings"
+  id_field      = "building_id"
+  display_field = "address"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "Polygon"
+    srid   = 2249
+  }
+
+  services = [
+    service.odata,
+    service.ogc_api,
+    service.wfs,
+    service.wms
+  ]
+}
+
+# Roads - Street centerlines
+layer "roads" {
+  title         = "Street Centerlines"
+  description   = "Road network with attributes"
+  data_source   = data_source.city_gis
+  table         = "public.roads"
+  id_field      = "road_id"
+  display_field = "street_name"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "MultiLineString"
+    srid   = 2249
+  }
+
+  services = [
+    service.odata,
+    service.ogc_api,
+    service.wfs,
+    service.wms
+  ]
+}
+
+# Zoning - Land use zones
+layer "zoning" {
+  title         = "Zoning Districts"
+  description   = "Official zoning designations"
+  data_source   = data_source.city_gis
+  table         = "public.zoning"
+  id_field      = "zone_id"
+  display_field = "zone_code"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "MultiPolygon"
+    srid   = 2249
+  }
+
+  services = [
+    service.odata,
+    service.ogc_api,
+    service.wfs,
+    service.wms
+  ]
+}
+
+# Utilities - Water mains
+layer "water_mains" {
+  title         = "Water Distribution Mains"
+  description   = "Water infrastructure network"
+  data_source   = data_source.city_gis
+  table         = "utilities.water_mains"
+  id_field      = "main_id"
+  display_field = "pipe_diameter"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "LineString"
+    srid   = 2249
+  }
+
+  services = [
+    service.odata,
+    service.ogc_api,
+    service.wfs
+  ]
+
+  permissions {
+    allow_anonymous_read = false  # Sensitive infrastructure
+    require_auth_write   = true
+  }
+}
+
+# Points of Interest
+layer "poi" {
+  title         = "Points of Interest"
+  description   = "Parks, schools, libraries, and other public facilities"
+  data_source   = data_source.city_gis
+  table         = "public.points_of_interest"
+  id_field      = "poi_id"
+  display_field = "name"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "Point"
+    srid   = 4326
+  }
+
+  services = [
+    service.odata,
+    service.ogc_api,
+    service.wfs
+  ]
+}
+
+# ============================================================
+# RATE LIMITING
+# ============================================================
+
+rate_limit {
+  enabled = true
+  store   = "redis"
+
+  rules {
+    # Public anonymous access
+    default = {
+      requests = 1000
+      window   = "1m"
+    }
+
+    # Authenticated users (developers with API keys)
+    authenticated = {
+      requests = 10000
+      window   = "1m"
+    }
+
+    # Internal city departments (unlimited)
+    admin = {
+      requests = 100000
+      window   = "1m"
+    }
+  }
+}

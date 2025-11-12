@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.zarr",
+  "name": "Zarr Time-Series Plugin",
+  "version": "1.0.0",
+  "description": "Zarr API for serving multidimensional time-series and gridded data",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Zarr.dll",
+  "entryPoint": "Honua.Server.Services.Zarr.ZarrServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

@@ -121,7 +121,8 @@ public class GoogleMapsBasemapTileProvider : IBasemapTileProvider
             var url = BuildTileUrl(request);
             _logger.LogDebug("Google Maps tile request: {Url}", url);
 
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+            var tileUri = new Uri(url, UriKind.Absolute);
+            var response = await _httpClient.GetAsync(tileUri, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var data = await response.Content.ReadAsByteArrayAsync(cancellationToken);

@@ -383,7 +383,7 @@ public sealed class HashiCorpVaultProvider : ISecretsProvider
     {
         try
         {
-            var response = await _httpClient.GetAsync("/v1/sys/health", cancellationToken);
+            var response = await _httpClient.GetAsync(new Uri("/v1/sys/health", UriKind.Relative), cancellationToken);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)

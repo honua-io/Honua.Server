@@ -3,6 +3,7 @@
 
 using FluentAssertions;
 using Honua.Server.Core.Caching;
+using Honua.Server.Core.Configuration;
 using Xunit;
 
 namespace Honua.Server.Core.Tests.Configuration;

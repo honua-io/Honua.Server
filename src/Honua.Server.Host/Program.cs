@@ -102,6 +102,10 @@ else if (validationErrors.Any() && isTestEnvironment)
         string.Join(Environment.NewLine, validationErrors.Select(e => $"  - {e}")));
 }
 
+// Try to load Configuration V2 (.honua files) if available
+// Falls back to legacy configuration if not found
+builder.Services.AddHonuaConfigurationV2(builder.Configuration, builder.Environment);
+
 builder.ConfigureHonuaServices();
 
 var app = builder.Build();
@@ -131,6 +135,10 @@ app.ConfigureHonuaRequestPipeline();
 
 // Register conditional service endpoints (OData, OpenRosa, etc.)
 app.MapConditionalServiceEndpoints();
+
+// Map Configuration V2 endpoints if Configuration V2 is active
+// This allows Configuration V2 to override legacy endpoint registrations
+app.MapHonuaConfigurationV2Endpoints();
 
 app.Run();
 

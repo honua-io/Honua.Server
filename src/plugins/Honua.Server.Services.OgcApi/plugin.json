@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.ogc_api",
+  "name": "OGC API Features Plugin",
+  "version": "1.0.0",
+  "description": "OGC API - Features (Part 1 Core, Part 2 CRS) implementation",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.OgcApi.dll",
+  "entryPoint": "Honua.Server.Services.OgcApi.OgcApiServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

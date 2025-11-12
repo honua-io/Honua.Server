@@ -120,7 +120,7 @@ public sealed class FeatureDegradationMetrics : IHostedService, IDisposable
     {
         try
         {
-            var statuses = await _featureManagement.GetAllFeatureStatusesAsync();
+            var statuses = await _featureManagement.GetAllFeatureStatusesAsync(cancellationToken).ConfigureAwait(false);
 
             var degradedCount = statuses.Count(kvp => kvp.Value.IsDegraded);
             var unavailableCount = statuses.Count(kvp => !kvp.Value.IsAvailable);

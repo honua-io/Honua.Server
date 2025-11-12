@@ -331,8 +331,13 @@ public sealed class VectorStacCatalogSynchronizer : DisposableBase, IVectorStacC
         return null;
     }
 
-    protected override void DisposeCore()
+    protected override void Dispose(bool disposing)
     {
-        _syncLock.Dispose();
+        if (disposing)
+        {
+            _syncLock.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }

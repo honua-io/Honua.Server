@@ -3,9 +3,10 @@
 ﻿// using Honua.Server.Core.GitOps; // TODO: GitOps feature not yet implemented
 using Honua.Server.Core.Extensions;
 
-using Honua.Server.Enterprise.ETL;
-using Honua.Server.Enterprise.Events;
-using Honua.Server.Enterprise.Sensors.Extensions;
+// Enterprise features disabled
+// using Honua.Server.Enterprise.ETL;
+// using Honua.Server.Enterprise.Events;
+// using Honua.Server.Enterprise.Sensors.Extensions;
 using Honua.Server.Host.Extensions;
 using Honua.Server.Host.GeoEvent;
 using Microsoft.AspNetCore.Builder;
@@ -54,13 +55,14 @@ internal static class HonuaHostConfigurationExtensions
         builder.Services.AddSensorThings(builder.Configuration); // OGC SensorThings API v1.1
 
         // Register SensorThings SignalR broadcaster (if WebSocket streaming enabled)
-        var sensorThingsConfig = builder.Configuration.GetSection("SensorThings")
-            .Get<Honua.Server.Enterprise.Sensors.Models.SensorThingsServiceDefinition>();
-        if (sensorThingsConfig?.WebSocketStreamingEnabled == true)
-        {
-            builder.Services.AddSingleton<Honua.Server.Host.SensorThings.ISensorObservationBroadcaster,
-                Honua.Server.Host.SensorThings.SignalRSensorObservationBroadcaster>();
-        }
+        // Enterprise features disabled
+        // var sensorThingsConfig = builder.Configuration.GetSection("SensorThings")
+        //     .Get<Honua.Server.Enterprise.Sensors.Models.SensorThingsServiceDefinition>();
+        // if (sensorThingsConfig?.WebSocketStreamingEnabled == true)
+        // {
+        //     builder.Services.AddSingleton<Honua.Server.Host.SensorThings.ISensorObservationBroadcaster,
+        //         Honua.Server.Host.SensorThings.SignalRSensorObservationBroadcaster>();
+        // }
 
         // GeoEvent services (conditional - requires Postgres connection)
         var connectionString = builder.Configuration.GetConnectionString("Postgres")
@@ -73,14 +75,15 @@ internal static class HonuaHostConfigurationExtensions
             builder.Services.AddSingleton<IGeoEventBroadcaster, SignalRGeoEventBroadcaster>();
 
             // Register GeoETL services (Enterprise feature)
-            builder.Services.AddGeoEtl(connectionString, usePostgresStore: true);
+            // Enterprise features disabled
+            // builder.Services.AddGeoEtl(connectionString, usePostgresStore: true);
 
             // Register AI-powered workflow generation (optional, requires OpenAI configuration)
-            builder.Services.AddGeoEtlAi(builder.Configuration);
+            // builder.Services.AddGeoEtlAi(builder.Configuration);
 
             // Register GeoETL progress broadcaster for real-time workflow execution tracking
-            builder.Services.AddSingleton<Honua.Server.Enterprise.ETL.Progress.IWorkflowProgressBroadcaster,
-                Honua.Server.Enterprise.ETL.Progress.SignalRWorkflowProgressBroadcaster>();
+            // builder.Services.AddSingleton<Honua.Server.Enterprise.ETL.Progress.IWorkflowProgressBroadcaster,
+            //     Honua.Server.Enterprise.ETL.Progress.SignalRWorkflowProgressBroadcaster>();
         }
         else
         {

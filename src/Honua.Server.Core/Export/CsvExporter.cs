@@ -148,7 +148,7 @@ public sealed class CsvExporter : ICsvExporter
                 await writer.WriteLineAsync().ConfigureAwait(false);
             }
 
-            await writer.FlushAsync().ConfigureAwait(false);
+            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
             _logger.LogInformation("CSV export completed: {Count} features", count);
         }

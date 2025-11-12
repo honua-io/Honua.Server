@@ -17,8 +17,9 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
     private readonly IMetadataProvider _provider;
     private readonly ILogger<MetadataRegistry>? _logger;
     private readonly SemaphoreSlim _reloadLock = new(1, 1);
+    private readonly object _changeTokenSync = new();
     private Task<MetadataSnapshot>? _snapshotTask;
-    private CancellationTokenSource _changeTokenSource = new();
+    private CancellationTokenSource? _changeTokenSource = new();
     private bool _disposed;
 
     public MetadataRegistry(IMetadataProvider provider, ILogger<MetadataRegistry>? logger = null)
@@ -288,26 +289,29 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
 
     public IChangeToken GetChangeToken()
     {
-        var source = Volatile.Read(ref _changeTokenSource);
+        var source = Volatile.Read(ref _changeTokenSource) ?? throw new ObjectDisposedException(nameof(MetadataRegistry));
         return new CancellationChangeToken(source.Token);
     }
 
     private void SignalSnapshotChanged()
     {
-        var newSource = new CancellationTokenSource();
-        var previous = Interlocked.Exchange(ref _changeTokenSource, newSource);
-        if (previous is null)
+        CancellationTokenSource? previous;
+        lock (_changeTokenSync)
         {
-            return;
+            previous = _changeTokenSource;
+            _changeTokenSource = new CancellationTokenSource();
         }
 
-        try
+        if (previous is not null)
         {
-            previous.Cancel();
-        }
-        finally
-        {
-            previous.Dispose();
+            try
+            {
+                previous.Cancel();
+            }
+            finally
+            {
+                previous.Dispose();
+            }
         }
     }
 
@@ -320,8 +324,13 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
 
         _disposed = true;
 
-        // Cancel and dispose the current change token source
-        var currentSource = Interlocked.Exchange(ref _changeTokenSource, null!);
+        CancellationTokenSource? currentSource;
+        lock (_changeTokenSync)
+        {
+            currentSource = _changeTokenSource;
+            _changeTokenSource = null;
+        }
+
         if (currentSource is not null)
         {
             try
@@ -338,7 +347,6 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
             }
         }
 
-        // Dispose the reload lock
-        _reloadLock?.Dispose();
+        _reloadLock.Dispose();
     }
 }

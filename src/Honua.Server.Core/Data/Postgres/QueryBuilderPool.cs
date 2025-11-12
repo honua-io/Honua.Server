@@ -276,11 +276,16 @@ public sealed class QueryBuilderPool : DisposableBase
         return $"{serviceId}:{layerId}:{storageSrid}:{targetSrid}";
     }
 
-    protected override void DisposeCore()
+    protected override void Dispose(bool disposing)
     {
-        _lruLock.Dispose();
-        _metrics.Dispose();
-        _pools.Clear();
+        if (disposing)
+        {
+            _lruLock.Dispose();
+            _metrics.Dispose();
+            _pools.Clear();
+        }
+
+        base.Dispose(disposing);
     }
 
     private sealed class PoolEntry

@@ -18,14 +18,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
-using Honua.Server.Core.Utilities;
 namespace Honua.Server.Core.Metadata;
 
 /// <summary>
 /// Metadata registry with Redis caching layer.
 /// Wraps an existing IMetadataRegistry and adds distributed caching for performance.
 /// </summary>
-public sealed class CachedMetadataRegistry : DisposableBase, IMetadataRegistry
+public sealed class CachedMetadataRegistry : IMetadataRegistry, IDisposable, IAsyncDisposable
 {
     private readonly IMetadataRegistry _innerRegistry;
     private readonly IDistributedCache? _distributedCache;
@@ -37,6 +36,7 @@ public sealed class CachedMetadataRegistry : DisposableBase, IMetadataRegistry
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
     private readonly SemaphoreSlim _cacheMissLock = new(1, 1);
     private readonly IDisposable? _optionsChangeToken;
+    private bool _disposed;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -583,30 +583,44 @@ public sealed class CachedMetadataRegistry : DisposableBase, IMetadataRegistry
         return snapshot;
     }
 
-    protected override void DisposeCore()
+    private void Dispose(bool disposing)
     {
-        // Dispose options change token
+        if (!disposing || _disposed)
+        {
+            return;
+        }
+
         _optionsChangeToken?.Dispose();
+        _cacheLock.Dispose();
+        _cacheMissLock.Dispose();
 
-        // Dispose semaphore locks
-        _cacheLock?.Dispose();
-        _cacheMissLock?.Dispose();
-
-        // Dispose inner registry if disposable (sync path)
         if (_innerRegistry is IDisposable disposable)
         {
             disposable.Dispose();
         }
+
+        _disposed = true;
     }
 
-    protected override async ValueTask DisposeCoreAsync()
+    public void Dispose()
     {
-        // Dispose inner registry if async disposable
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (_innerRegistry is IAsyncDisposable asyncDisposable)
         {
             await asyncDisposable.DisposeAsync().ConfigureAwait(false);
         }
 
-        await base.DisposeCoreAsync().ConfigureAwait(false);
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }

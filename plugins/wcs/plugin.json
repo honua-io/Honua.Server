@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.wcs",
+  "name": "WCS Service Plugin",
+  "version": "1.0.0",
+  "description": "OGC Web Coverage Service (WCS) protocol implementation supporting version 2.0.1",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Wcs.dll",
+  "entryPoint": "Honua.Server.Services.Wcs.WcsServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using FluentAssertions;
+using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Data;
 using Xunit;
 

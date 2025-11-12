@@ -1,0 +1,12 @@
+{
+  "id": "honua.services.stac",
+  "name": "STAC Service Plugin",
+  "version": "1.0.0",
+  "description": "SpatioTemporal Asset Catalog (STAC) API implementation supporting version 1.0.0",
+  "author": "HonuaIO",
+  "pluginType": "service",
+  "assembly": "Honua.Server.Services.Stac.dll",
+  "entryPoint": "Honua.Server.Services.Stac.StacServicePlugin",
+  "dependencies": [],
+  "minimumHonuaVersion": "1.0.0"
+}

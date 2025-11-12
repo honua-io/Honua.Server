@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System.Net;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -92,23 +93,27 @@ try
     // Add Rate Limiting
     builder.Services.AddRateLimiter(options =>
     {
-        options.GlobalLimiter = RateLimitPartition.GetFixedWindowLimiter("global", _ => new()
-        {
-            PermitLimit = builder.Configuration.GetValue<int>("RateLimiting:GlobalPermitLimit", 1000),
-            Window = TimeSpan.FromSeconds(builder.Configuration.GetValue<int>("RateLimiting:GlobalWindowSeconds", 60)),
-            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 10
-        });
+        var globalPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:GlobalPermitLimit", 1000);
+        var globalWindowSeconds = builder.Configuration.GetValue<int>("RateLimiting:GlobalWindowSeconds", 60);
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(_ =>
+            RateLimitPartition.GetFixedWindowLimiter("global", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = globalPermitLimit,
+                Window = TimeSpan.FromSeconds(globalWindowSeconds),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 10
+            }));
 
-        // Add per-IP rate limiting
-        options.AddPolicy("per-ip", httpContext =>
+        var perIpPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:PerIpPermitLimit", 100);
+        var perIpWindowSeconds = builder.Configuration.GetValue<int>("RateLimiting:PerIpWindowSeconds", 60);
+        options.AddPolicy<string>("per-ip", httpContext =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-            return RateLimitPartition.GetFixedWindowLimiter(ipAddress, _ => new()
+            return RateLimitPartition.GetFixedWindowLimiter(ipAddress, _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = builder.Configuration.GetValue<int>("RateLimiting:PerIpPermitLimit", 100),
-                Window = TimeSpan.FromSeconds(builder.Configuration.GetValue<int>("RateLimiting:PerIpWindowSeconds", 60)),
+                PermitLimit = perIpPermitLimit,
+                Window = TimeSpan.FromSeconds(perIpWindowSeconds),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 5
             });
