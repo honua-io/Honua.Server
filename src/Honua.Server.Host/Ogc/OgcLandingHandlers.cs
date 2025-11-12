@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Performance;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -133,13 +134,43 @@ internal static class OgcLandingHandlers
     }
 
     /// <summary>
-    /// OGC API collections handler.
+    /// OGC API collections handler with response caching.
     /// </summary>
-    public static async Task<IResult> GetCollections(HttpRequest request, IMetadataRegistry registry, OgcCacheHeaderService cacheHeaderService, Services.IOgcFeaturesRenderingHandler renderingHandler, CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// Implements caching strategy from PERFORMANCE_OPTIMIZATION_OPPORTUNITIES.md:
+    /// - Cache key: ogc:collections:{service_id}:{format}:{accept_language}
+    /// - TTL: 10 minutes (configurable)
+    /// - Invalidated on metadata updates
+    /// - Separate caching for JSON and HTML formats
+    /// - Language-aware for i18n support
+    /// </remarks>
+    public static async Task<IResult> GetCollections(
+        HttpRequest request,
+        IMetadataRegistry registry,
+        OgcCacheHeaderService cacheHeaderService,
+        Services.IOgcFeaturesRenderingHandler renderingHandler,
+        IOgcCollectionsCache collectionsCache,
+        CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
         Guard.NotNull(registry);
+        Guard.NotNull(collectionsCache);
 
+        // Extract Accept-Language for i18n support
+        var acceptLanguage = request.Headers.AcceptLanguage.ToString();
+
+        // Determine response format
+        var wantsHtml = renderingHandler.WantsHtml(request);
+        var format = wantsHtml ? "html" : "json";
+
+        // Try to get from cache
+        if (collectionsCache.TryGetCollections(null, format, acceptLanguage, out var cachedEntry) && cachedEntry != null)
+        {
+            return Results.Content(cachedEntry.Content, cachedEntry.ContentType)
+                .WithMetadataCacheHeaders(cacheHeaderService, cachedEntry.ETag);
+        }
+
+        // Cache miss - generate response
         var snapshot = await registry.GetInitializedSnapshotAsync(cancellationToken).ConfigureAwait(false);
         var collections = new List<object>();
         var summaries = new List<OgcSharedHandlers.CollectionSummary>();
@@ -239,16 +270,42 @@ internal static class OgcLandingHandlers
             OgcSharedHandlers.BuildLink(request, "/ogc", "alternate", "application/json", "Landing")
         };
 
-        if (renderingHandler.WantsHtml(request))
+        // Generate and cache response based on format
+        if (wantsHtml)
         {
             var html = renderingHandler.RenderCollectionsHtml(request, snapshot, summaries);
             var htmlEtag = cacheHeaderService.GenerateETag(html);
+
+            // Cache the HTML response
+            await collectionsCache.SetCollectionsAsync(
+                null,
+                "html",
+                acceptLanguage,
+                html,
+                OgcSharedHandlers.HtmlContentType,
+                htmlEtag,
+                cancellationToken).ConfigureAwait(false);
+
             return Results.Content(html, OgcSharedHandlers.HtmlContentType)
                 .WithMetadataCacheHeaders(cacheHeaderService, htmlEtag);
         }
 
         var response = new { collections, links = responseLinks };
         var etag = cacheHeaderService.GenerateETagForObject(response);
+
+        // Serialize to JSON for caching
+        var jsonContent = System.Text.Json.JsonSerializer.Serialize(response, JsonSerializerOptionsRegistry.Web);
+
+        // Cache the JSON response
+        await collectionsCache.SetCollectionsAsync(
+            null,
+            "json",
+            acceptLanguage,
+            jsonContent,
+            "application/json",
+            etag,
+            cancellationToken).ConfigureAwait(false);
+
         return Results.Ok(response).WithMetadataCacheHeaders(cacheHeaderService, etag);
     }
 
