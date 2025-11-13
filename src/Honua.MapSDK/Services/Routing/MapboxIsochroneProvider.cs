@@ -124,7 +124,10 @@ public class MapboxIsochroneProvider : IIsochroneProvider
         catch (HttpRequestException ex)
         {
             _logger?.LogError(ex, "Mapbox isochrone API request failed");
-            throw new RoutingException("Failed to calculate isochrone from Mapbox", "Mapbox", ex);
+            throw new RoutingException("Failed to calculate isochrone from Mapbox", ex)
+            {
+                RoutingEngine = "Mapbox"
+            };
         }
         catch (Exception ex)
         {

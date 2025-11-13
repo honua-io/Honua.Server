@@ -129,7 +129,10 @@ public class GraphHopperIsochroneProvider : IIsochroneProvider
         catch (HttpRequestException ex)
         {
             _logger?.LogError(ex, "GraphHopper isochrone API request failed");
-            throw new RoutingException("Failed to calculate isochrone from GraphHopper", "GraphHopper", ex);
+            throw new RoutingException("Failed to calculate isochrone from GraphHopper", ex)
+            {
+                RoutingEngine = "GraphHopper"
+            };
         }
         catch (Exception ex)
         {

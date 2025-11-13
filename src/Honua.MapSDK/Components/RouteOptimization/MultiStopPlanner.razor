@@ -70,10 +70,10 @@
         <div class="section-header">
             <h4>Waypoints (@Waypoints.Count)</h4>
             <div class="header-actions">
-                <button class="btn btn-sm btn-primary" @onclick="AddWaypoint">
+                <button class="btn btn-sm btn-primary" @onclick="@(() => AddWaypoint())">
                     <i class="fas fa-plus"></i> Add Waypoint
                 </button>
-                <button class="btn btn-sm btn-secondary" @onclick="ImportWaypoints">
+                <button class="btn btn-sm btn-secondary" @onclick="@(async () => await ImportWaypoints())">
                     <i class="fas fa-upload"></i> Import
                 </button>
                 @if (Waypoints.Any())
@@ -112,7 +112,7 @@
                             <div class="waypoint-number">@(index + 1)</div>
                             <input type="text"
                                    class="waypoint-name-input"
-                                   @bind="waypoint.Name"
+                                   @bind="Waypoints[index].Name"
                                    placeholder="Waypoint name"
                                    @onclick:stopPropagation="true" />
                             <button class="btn-icon delete-btn"
@@ -136,18 +136,23 @@
                                     <div class="option-row">
                                         <label>Service Duration (min)</label>
                                         <input type="number"
-                                               @bind="waypoint.ServiceDurationSeconds"
+                                               @bind="Waypoints[index].ServiceDurationSeconds"
                                                class="form-control form-control-sm"
                                                @onclick:stopPropagation="true"
-                                               @oninput="@(e => waypoint.ServiceDurationSeconds = int.Parse(e.Value?.ToString() ?? "0") * 60)" />
+                                               @oninput="@(e => Waypoints[index].ServiceDurationSeconds = int.Parse(e.Value?.ToString() ?? "0") * 60)" />
                                     </div>
 
                                     @if (EnableTimeWindows)
                                     {
+                                        @if (Waypoints[index].TimeWindow == null)
+                                        {
+                                            Waypoints[index].TimeWindow = new TimeWindow();
+                                        }
                                         <div class="option-row">
                                             <label>Earliest Arrival</label>
                                             <input type="datetime-local"
-                                                   @bind="@(waypoint.TimeWindow != null ? waypoint.TimeWindow.EarliestArrival : null)"
+                                                   value="@(Waypoints[index].TimeWindow?.EarliestArrival?.ToString("yyyy-MM-ddTHH:mm"))"
+                                                   @onchange="@(e => { if (Waypoints[index].TimeWindow != null && DateTime.TryParse(e.Value?.ToString(), out var dt)) Waypoints[index].TimeWindow.EarliestArrival = dt; })"
                                                    class="form-control form-control-sm"
                                                    @onclick:stopPropagation="true" />
                                         </div>
@@ -155,7 +160,8 @@
                                         <div class="option-row">
                                             <label>Latest Arrival</label>
                                             <input type="datetime-local"
-                                                   @bind="@(waypoint.TimeWindow != null ? waypoint.TimeWindow.LatestArrival : null)"
+                                                   value="@(Waypoints[index].TimeWindow?.LatestArrival?.ToString("yyyy-MM-ddTHH:mm"))"
+                                                   @onchange="@(e => { if (Waypoints[index].TimeWindow != null && DateTime.TryParse(e.Value?.ToString(), out var dt)) Waypoints[index].TimeWindow.LatestArrival = dt; })"
                                                    class="form-control form-control-sm"
                                                    @onclick:stopPropagation="true" />
                                         </div>
@@ -164,7 +170,7 @@
                                     <div class="option-row">
                                         <label>Demand/Load</label>
                                         <input type="number"
-                                               @bind="waypoint.Demand"
+                                               @bind="Waypoints[index].Demand"
                                                class="form-control form-control-sm"
                                                step="0.1"
                                                @onclick:stopPropagation="true" />
@@ -173,7 +179,7 @@
                                     <div class="option-row">
                                         <label>Priority</label>
                                         <input type="number"
-                                               @bind="waypoint.Priority"
+                                               @bind="Waypoints[index].Priority"
                                                class="form-control form-control-sm"
                                                min="1"
                                                max="10"
@@ -183,7 +189,7 @@
                                     <div class="option-row">
                                         <label>
                                             <input type="checkbox"
-                                                   @bind="waypoint.IsRequired"
+                                                   @bind="Waypoints[index].IsRequired"
                                                    @onclick:stopPropagation="true" />
                                             Required Stop
                                         </label>

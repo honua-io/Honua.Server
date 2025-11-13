@@ -8,7 +8,7 @@
     {
         <div class="form-group">
             <label>Fill Color</label>
-            <input type="color" class="form-control" @bind="Symbol.FillColor" @bind:after="OnSymbolChanged" />
+            <input type="color" class="form-control" value="@Symbol.FillColor" @onchange="@((e) => OnFillColorChanged(e))" />
         </div>
     }
 
@@ -16,7 +16,7 @@
     {
         <div class="form-group">
             <label>Stroke Color</label>
-            <input type="color" class="form-control" @bind="Symbol.StrokeColor" @bind:after="OnSymbolChanged" />
+            <input type="color" class="form-control" value="@Symbol.StrokeColor" @onchange="@((e) => OnStrokeColorChanged(e))" />
         </div>
 
         <div class="form-group">
@@ -46,7 +46,7 @@
     {
         <div class="form-group">
             <label>Line Style</label>
-            <select class="form-select" @bind="Symbol.StrokeStyle" @bind:after="OnSymbolChanged">
+            <select class="form-select" value="@Symbol.StrokeStyle" @onchange="@((e) => OnStrokeStyleChanged(e))">
                 <option value="solid">Solid</option>
                 <option value="dashed">Dashed</option>
                 <option value="dotted">Dotted</option>
@@ -103,6 +103,36 @@
     private void OnSymbolChanged()
     {
         OnSymbolChange.InvokeAsync(Symbol);
+    }
+
+    private void OnFillColorChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(value))
+        {
+            Symbol = Symbol with { FillColor = value };
+            OnSymbolChanged();
+        }
+    }
+
+    private void OnStrokeColorChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(value))
+        {
+            Symbol = Symbol with { StrokeColor = value };
+            OnSymbolChanged();
+        }
+    }
+
+    private void OnStrokeStyleChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(value))
+        {
+            Symbol = Symbol with { StrokeStyle = value };
+            OnSymbolChanged();
+        }
     }
 
     private void OnStrokeWidthChanged(ChangeEventArgs e)

@@ -73,7 +73,7 @@ public class PasswordHasherTests
     public void HashPassword_WithInvalidPassword_ThrowsException(string? password)
     {
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => _hasher.HashPassword(password!));
+        Assert.Throws<ArgumentNullException>(() => _hasher.HashPassword(password!));
     }
 
     [Fact]

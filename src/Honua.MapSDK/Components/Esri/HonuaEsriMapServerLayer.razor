@@ -32,7 +32,7 @@
                         <div class="layer-item">
                             <MudCheckBox T="bool"
                                         Checked="@_selectedLayers.Contains(layer.Id)"
-                                        CheckedChanged="@(value => ToggleLayer(layer, value))"
+                                        CheckedChanged="@(async (bool value) => await ToggleLayer(layer, value))"
                                         Label="@layer.Name"
                                         Size="Size.Small" />
                         </div>
@@ -516,46 +516,46 @@
             }, Id);
         }
     }
-}
-
-/// <summary>
-/// Identify result
-/// </summary>
-internal class EsriIdentifyResult
-{
-    [System.Text.Json.Serialization.JsonPropertyName("results")]
-    public List<EsriIdentifyResultItem>? Results { get; set; }
-}
-
-/// <summary>
-/// Single identify result item
-/// </summary>
-internal class EsriIdentifyResultItem
-{
-    [System.Text.Json.Serialization.JsonPropertyName("layerId")]
-    public int LayerId { get; set; }
-
-    [System.Text.Json.Serialization.JsonPropertyName("layerName")]
-    public string? LayerName { get; set; }
-
-    [System.Text.Json.Serialization.JsonPropertyName("value")]
-    public string? Value { get; set; }
-
-    [System.Text.Json.Serialization.JsonPropertyName("displayFieldName")]
-    public string? DisplayFieldName { get; set; }
-
-    [System.Text.Json.Serialization.JsonPropertyName("attributes")]
-    public Dictionary<string, object?> Attributes { get; set; } = new();
-
-    [System.Text.Json.Serialization.JsonPropertyName("geometry")]
-    public EsriGeometry? Geometry { get; set; }
 
     /// <summary>
-    /// Convert to EsriFeature
+    /// Identify result
     /// </summary>
-    public EsriFeature Feature => new()
+    internal class EsriIdentifyResult
     {
-        Geometry = Geometry,
-        Attributes = Attributes
-    };
+        [System.Text.Json.Serialization.JsonPropertyName("results")]
+        public List<EsriIdentifyResultItem>? Results { get; set; }
+    }
+
+    /// <summary>
+    /// Single identify result item
+    /// </summary>
+    internal class EsriIdentifyResultItem
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("layerId")]
+        public int LayerId { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("layerName")]
+        public string? LayerName { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("value")]
+        public string? Value { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("displayFieldName")]
+        public string? DisplayFieldName { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("attributes")]
+        public Dictionary<string, object?> Attributes { get; set; } = new();
+
+        [System.Text.Json.Serialization.JsonPropertyName("geometry")]
+        public EsriGeometry? Geometry { get; set; }
+
+        /// <summary>
+        /// Convert to EsriFeature
+        /// </summary>
+        public EsriFeature Feature => new()
+        {
+            Geometry = Geometry,
+            Attributes = Attributes
+        };
+    }
 }

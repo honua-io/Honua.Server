@@ -214,7 +214,8 @@ public class PasswordComplexityValidatorTests
     {
         // Arrange
         var validator = new PasswordComplexityValidator(minimumLength: 8, requireSpecialCharacter: true);
-        var password = $"Password123{specialChar}";
+        // Use a non-common password base (not "Password123" which is similar to common passwords)
+        var password = $"SecurePass789{specialChar}";
 
         // Act
         var result = validator.Validate(password);
