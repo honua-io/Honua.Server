@@ -24,15 +24,15 @@ namespace Honua.Server.Host.GeoEvent;
 [Tags("GeoFencing")]
 public class GeofencesController : ControllerBase
 {
-    private readonly IGeofenceManagementService _managementService;
-    private readonly ILogger<GeofencesController> _logger;
+    private readonly IGeofenceManagementService managementService;
+    private readonly ILogger<GeofencesController> logger;
 
     public GeofencesController(
         IGeofenceManagementService managementService,
         ILogger<GeofencesController> logger)
     {
-        _managementService = managementService;
-        _logger = logger;
+        this.managementService = managementService;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -83,9 +83,9 @@ public class GeofencesController : ControllerBase
         try
         {
             var tenantId = GetTenantId();
-            var createdBy = User.Identity?.Name;
+            var createdBy = this.User.Identity?.Name;
 
-            var geofence = await _managementService.CreateGeofenceAsync(
+            var geofence = await this.managementService.CreateGeofenceAsync(
                 request,
                 createdBy,
                 tenantId,
@@ -93,15 +93,15 @@ public class GeofencesController : ControllerBase
 
             var response = MapToResponse(geofence);
 
-            return CreatedAtAction(
+            return this.CreatedAtAction(
                 nameof(GetGeofence),
                 new { id = geofence.Id },
                 response);
         }
         catch (ArgumentException ex)
         {
-            _logger.LogWarning(ex, "Invalid geofence request");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogWarning(ex, "Invalid geofence request");
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -121,17 +121,17 @@ public class GeofencesController : ControllerBase
     {
         var tenantId = GetTenantId();
 
-        var geofence = await _managementService.GetGeofenceAsync(
+        var geofence = await this.managementService.GetGeofenceAsync(
             id,
             tenantId,
             cancellationToken);
 
         if (geofence == null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
-        return Ok(MapToResponse(geofence));
+        return this.Ok(MapToResponse(geofence));
     }
 
     /// <summary>
@@ -166,15 +166,15 @@ public class GeofencesController : ControllerBase
         // Validate pagination parameters
         if (limit < 1 || limit > 1000)
         {
-            return BadRequest(new { error = "Limit must be between 1 and 1000" });
+            return this.BadRequest(new { error = "Limit must be between 1 and 1000" });
         }
 
         if (offset < 0)
         {
-            return BadRequest(new { error = "Offset must be >= 0" });
+            return this.BadRequest(new { error = "Offset must be >= 0" });
         }
 
-        var result = await _managementService.ListGeofencesAsync(
+        var result = await this.managementService.ListGeofencesAsync(
             isActive,
             tenantId,
             limit,
@@ -189,7 +189,7 @@ public class GeofencesController : ControllerBase
             Offset = result.Offset
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     /// <summary>
@@ -212,9 +212,9 @@ public class GeofencesController : ControllerBase
         try
         {
             var tenantId = GetTenantId();
-            var updatedBy = User.Identity?.Name;
+            var updatedBy = this.User.Identity?.Name;
 
-            var updated = await _managementService.UpdateGeofenceAsync(
+            var updated = await this.managementService.UpdateGeofenceAsync(
                 id,
                 request,
                 updatedBy,
@@ -223,15 +223,15 @@ public class GeofencesController : ControllerBase
 
             if (!updated)
             {
-                return NotFound();
+                return this.NotFound();
             }
 
-            return NoContent();
+            return this.NoContent();
         }
         catch (ArgumentException ex)
         {
-            _logger.LogWarning(ex, "Invalid geofence update request");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogWarning(ex, "Invalid geofence update request");
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -251,17 +251,17 @@ public class GeofencesController : ControllerBase
     {
         var tenantId = GetTenantId();
 
-        var deleted = await _managementService.DeleteGeofenceAsync(
+        var deleted = await this.managementService.DeleteGeofenceAsync(
             id,
             tenantId,
             cancellationToken);
 
         if (!deleted)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
-        return NoContent();
+        return this.NoContent();
     }
 
     /// <summary>
@@ -278,12 +278,12 @@ public class GeofencesController : ControllerBase
 
         if (tenantContext != null)
         {
-            _logger.LogDebug("Request executing for tenant: {TenantId}", tenantContext.TenantId);
+            this.logger.LogDebug("Request executing for tenant: {TenantId}", tenantContext.TenantId);
             return tenantContext.TenantId;
         }
 
         // No tenant context - single-tenant mode or TenantMiddleware not active
-        _logger.LogDebug("No tenant context found - operating in single-tenant mode");
+        this.logger.LogDebug("No tenant context found - operating in single-tenant mode");
         return null;
     }
 

@@ -53,26 +53,26 @@ public sealed class GracefulShutdownOptions
 /// </summary>
 internal sealed class GracefulShutdownService : IHostedService
 {
-    private readonly IHostApplicationLifetime _applicationLifetime;
-    private readonly ILogger<GracefulShutdownService> _logger;
-    private readonly GracefulShutdownOptions _options;
+    private readonly IHostApplicationLifetime applicationLifetime;
+    private readonly ILogger<GracefulShutdownService> logger;
+    private readonly GracefulShutdownOptions options;
 
     public GracefulShutdownService(
         IHostApplicationLifetime applicationLifetime,
         ILogger<GracefulShutdownService> logger,
         IOptions<GracefulShutdownOptions> options)
     {
-        _applicationLifetime = Guard.NotNull(applicationLifetime);
-        _logger = Guard.NotNull(logger);
-        _options = options?.Value ?? new GracefulShutdownOptions();
+        this.applicationLifetime = Guard.NotNull(applicationLifetime);
+        this.logger = Guard.NotNull(logger);
+        this.options = options?.Value ?? new GracefulShutdownOptions();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
         // Register callbacks for application lifecycle events
-        _applicationLifetime.ApplicationStarted.Register(OnStarted);
-        _applicationLifetime.ApplicationStopping.Register(OnStopping);
-        _applicationLifetime.ApplicationStopped.Register(OnStopped);
+        this.applicationLifetime.ApplicationStarted.Register(OnStarted);
+        this.applicationLifetime.ApplicationStopping.Register(OnStopping);
+        this.applicationLifetime.ApplicationStopped.Register(OnStopped);
 
         return Task.CompletedTask;
     }
@@ -86,44 +86,44 @@ internal sealed class GracefulShutdownService : IHostedService
 
     private void OnStarted()
     {
-        if (_options.EnableDetailedLogging)
+        if (this.options.EnableDetailedLogging)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Honua Server started successfully. " +
                 "Graceful shutdown configured with timeout: {ShutdownTimeout}s, pre-shutdown delay: {PreShutdownDelay}s",
-                _options.ShutdownTimeout.TotalSeconds,
-                _options.PreShutdownDelay.TotalSeconds);
+                this.options.ShutdownTimeout.TotalSeconds,
+                this.options.PreShutdownDelay.TotalSeconds);
         }
     }
 
     private void OnStopping()
     {
-        if (_options.EnableDetailedLogging)
+        if (this.options.EnableDetailedLogging)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Honua Server is shutting down. " +
                 "Waiting {PreShutdownDelay}s to allow load balancers to drain connections...",
-                _options.PreShutdownDelay.TotalSeconds);
+                this.options.PreShutdownDelay.TotalSeconds);
         }
 
         // Wait for pre-shutdown delay to allow load balancers to remove this instance from rotation
         // This prevents new connections while we drain existing ones
-        if (_options.PreShutdownDelay > TimeSpan.Zero)
+        if (this.options.PreShutdownDelay > TimeSpan.Zero)
         {
             try
             {
-                Thread.Sleep(_options.PreShutdownDelay);
+                Thread.Sleep(this.options.PreShutdownDelay);
 
-                if (_options.EnableDetailedLogging)
+                if (this.options.EnableDetailedLogging)
                 {
-                    _logger.LogInformation(
+                    this.logger.LogInformation(
                         "Pre-shutdown delay completed. Now draining in-flight requests (timeout: {ShutdownTimeout}s)...",
-                        _options.ShutdownTimeout.TotalSeconds);
+                        this.options.ShutdownTimeout.TotalSeconds);
                 }
             }
             catch (ThreadInterruptedException)
             {
-                _logger.LogWarning("Pre-shutdown delay was interrupted. Proceeding with shutdown.");
+                this.logger.LogWarning("Pre-shutdown delay was interrupted. Proceeding with shutdown.");
             }
         }
 
@@ -134,9 +134,9 @@ internal sealed class GracefulShutdownService : IHostedService
 
     private void OnStopped()
     {
-        if (_options.EnableDetailedLogging)
+        if (this.options.EnableDetailedLogging)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Honua Server has stopped. All requests have been drained or timed out.");
         }
     }

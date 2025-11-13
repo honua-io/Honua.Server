@@ -17,15 +17,15 @@ namespace Honua.Server.Host.HealthChecks;
 /// </summary>
 public class CircuitBreakerHealthCheck : IHealthCheck
 {
-    private readonly ICircuitBreakerService _circuitBreakerService;
-    private readonly ILogger<CircuitBreakerHealthCheck> _logger;
+    private readonly ICircuitBreakerService circuitBreakerService;
+    private readonly ILogger<CircuitBreakerHealthCheck> logger;
 
     public CircuitBreakerHealthCheck(
         ICircuitBreakerService circuitBreakerService,
         ILogger<CircuitBreakerHealthCheck> logger)
     {
-        _circuitBreakerService = circuitBreakerService ?? throw new ArgumentNullException(nameof(circuitBreakerService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.circuitBreakerService = circuitBreakerService ?? throw new ArgumentNullException(nameof(circuitBreakerService));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public Task<HealthCheckResult> CheckHealthAsync(
@@ -43,7 +43,7 @@ public class CircuitBreakerHealthCheck : IHealthCheck
 
             foreach (var service in services)
             {
-                var state = _circuitBreakerService.GetCircuitState(service);
+                var state = this.circuitBreakerService.GetCircuitState(service);
                 data[$"{service}_circuit_state"] = state.ToString();
 
                 if (state == CircuitState.Open)
@@ -62,7 +62,7 @@ public class CircuitBreakerHealthCheck : IHealthCheck
                 data["open_circuits"] = openCircuits;
                 data["open_circuit_count"] = openCircuits.Count;
 
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Circuit breakers are open for: {OpenCircuits}. This indicates service degradation.",
                     string.Join(", ", openCircuits));
 
@@ -76,7 +76,7 @@ public class CircuitBreakerHealthCheck : IHealthCheck
                 data["half_open_circuits"] = halfOpenCircuits;
                 data["half_open_circuit_count"] = halfOpenCircuits.Count;
 
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Circuit breakers are testing recovery for: {HalfOpenCircuits}",
                     string.Join(", ", halfOpenCircuits));
 
@@ -92,7 +92,7 @@ public class CircuitBreakerHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Circuit breaker health check failed");
+            this.logger.LogError(ex, "Circuit breaker health check failed");
             return Task.FromResult(HealthCheckResult.Unhealthy(
                 "Circuit breaker health check failed: " + ex.Message,
                 exception: ex));

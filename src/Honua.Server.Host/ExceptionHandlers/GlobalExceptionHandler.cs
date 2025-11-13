@@ -26,15 +26,15 @@ namespace Honua.Server.Host.ExceptionHandlers;
 /// </summary>
 public sealed class GlobalExceptionHandler : IExceptionHandler
 {
-    private readonly ILogger<GlobalExceptionHandler> _logger;
-    private readonly IHostEnvironment _environment;
+    private readonly ILogger<GlobalExceptionHandler> logger;
+    private readonly IHostEnvironment environment;
 
     public GlobalExceptionHandler(
         ILogger<GlobalExceptionHandler> _logger,
         IHostEnvironment environment)
     {
         this._logger = Guard.NotNull(_logger);
-        _environment = Guard.NotNull(environment);
+        this.environment = Guard.NotNull(environment);
     }
 
     public async ValueTask<bool> TryHandleAsync(
@@ -103,12 +103,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         }
 
         // Log with structured data including correlation ID
-        using (_logger.BeginScope(scopeData))
+        using (this.logger.BeginScope(scopeData))
         {
             // Transient errors are warnings (expected, will retry)
             if (isTransient)
             {
-                _logger.LogWarning(exception,
+                this.logger.LogWarning(exception,
                     "Transient exception occurred: {ExceptionType} - {Message} | CorrelationId: {CorrelationId}",
                     exception.GetType().Name,
                     exception.Message,
@@ -117,7 +117,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             // Application exceptions are errors (handled, but unexpected)
             else if (exception is HonuaException)
             {
-                _logger.LogError(exception,
+                this.logger.LogError(exception,
                     "Application exception occurred: {ExceptionType} - {Message} | CorrelationId: {CorrelationId}",
                     exception.GetType().Name,
                     exception.Message,
@@ -126,7 +126,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             // Validation and argument exceptions are warnings (client error)
             else if (exception is ArgumentException or InvalidOperationException)
             {
-                _logger.LogWarning(exception,
+                this.logger.LogWarning(exception,
                     "Validation exception occurred: {ExceptionType} - {Message} | CorrelationId: {CorrelationId}",
                     exception.GetType().Name,
                     exception.Message,
@@ -135,7 +135,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             // Unexpected system exceptions are critical
             else
             {
-                _logger.LogCritical(exception,
+                this.logger.LogCritical(exception,
                     "CRITICAL: Unhandled system exception: {ExceptionType} - {Message} | CorrelationId: {CorrelationId}",
                     exception.GetType().Name,
                     exception.Message,
@@ -146,7 +146,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
 
     private ProblemDetails CreateProblemDetails(Exception exception, HttpContext context)
     {
-        var isDevelopment = _environment.IsDevelopment();
+        var isDevelopment = this.environment.IsDevelopment();
 
         // Get correlation ID from context
         var correlationId = CorrelationIdUtilities.GetCorrelationId(context) ?? context.TraceIdentifier;
@@ -353,7 +353,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         {
             // If we can't read the body, don't fail the exception handler
             // Log at Debug level to avoid noise in production logs
-            _logger.LogDebug(ex, "Failed to read request body for error logging");
+            this.logger.LogDebug(ex, "Failed to read request body for error logging");
             return null;
         }
     }

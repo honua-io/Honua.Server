@@ -53,10 +53,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
 {
     private const int OperationTimeoutSeconds = 30;
 
-    private readonly HonuaConfig? _honuaConfig;
-    private readonly IGeometrySerializer _serializer;
-    private readonly IGeometryOperationExecutor _executor;
-    private readonly ILogger<GeoservicesRESTGeometryServerController> _logger;
+    private readonly HonuaConfig? honuaConfig;
+    private readonly IGeometrySerializer serializer;
+    private readonly IGeometryOperationExecutor executor;
+    private readonly ILogger<GeoservicesRESTGeometryServerController> logger;
 
     public GeoservicesRESTGeometryServerController(
         IGeometrySerializer serializer,
@@ -64,10 +64,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
         ILogger<GeoservicesRESTGeometryServerController> logger,
         HonuaConfig? honuaConfig = null)
     {
-        _honuaConfig = honuaConfig;
-        _serializer = Guard.NotNull(serializer);
-        _executor = Guard.NotNull(executor);
-        _logger = Guard.NotNull(logger);
+        this.honuaConfig = honuaConfig;
+        this.serializer = Guard.NotNull(serializer);
+        this.executor = Guard.NotNull(executor);
+        this.logger = Guard.NotNull(logger);
     }
 
     [HttpGet]
@@ -78,7 +78,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var response = new
@@ -106,7 +106,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             }
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpPost("project")]
@@ -117,20 +117,20 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         // For now, assume GDAL operations are enabled by default in Configuration V2
         var enableGdalOperations = true;
         if (!enableGdalOperations)
         {
-            return StatusCode(StatusCodes.Status501NotImplemented, new { error = "Projection operation is disabled in this environment." });
+            return this.StatusCode(StatusCodes.Status501NotImplemented, new { error = "Projection operation is disabled in this environment." });
         }
 
         var format = ResolveFormat(request.Format);
         if (!format.EqualsIgnoreCase("json"))
         {
-            return BadRequest(new { error = $"Format '{format}' is not supported." });
+            return this.BadRequest(new { error = $"Format '{format}' is not supported." });
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -150,40 +150,40 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     activity.AddTag("arcgis.input_srid", inputSrid);
                     activity.AddTag("arcgis.output_srid", outputSrid);
 
-                    var geometries = _serializer.DeserializeGeometries(geometriesPayload, geometryType, inputSrid, cts.Token);
+                    var geometries = this.serializer.DeserializeGeometries(geometriesPayload, geometryType, inputSrid, cts.Token);
 
                     // Validate geometry complexity to prevent DoS attacks
                     GeometryComplexityValidator.ValidateCollection(geometries);
 
-                    var result = _executor.Project(new GeometryProjectOperation(geometryType, inputSrid, outputSrid, geometries), cts.Token);
-                    var response = _serializer.SerializeGeometries(result, geometryType, outputSrid, cts.Token);
+                    var result = this.executor.Project(new GeometryProjectOperation(geometryType, inputSrid, outputSrid, geometries), cts.Token);
+                    var response = this.serializer.SerializeGeometries(result, geometryType, outputSrid, cts.Token);
                     return await Task.FromResult(Ok(response));
                 });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for project operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for project operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("Project operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("Project operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "project operation");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "project operation");
+            return this.BadRequest(new { error = ex.Message });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "project operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "project operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Project operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Project operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -194,7 +194,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             return format;
         }
 
-        if (Request.Query.TryGetValue("f", out var values) && values.Count > 0)
+        if (this.Request.Query.TryGetValue("f", out var values) && values.Count > 0)
         {
             var candidate = values[^1];
             if (candidate.HasValue())
@@ -227,7 +227,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
 
     private int ResolveInputSpatialReference(GeometryProjectRequest request)
     {
-        if (TryResolveSpatialReference(request.InSpatialReference, request.InSr, Request.Query["inSR"], request.Geometries, out var srid))
+        if (TryResolveSpatialReference(request.InSpatialReference, request.InSr, this.Request.Query["inSR"], request.Geometries, out var srid))
         {
             return srid;
         }
@@ -237,7 +237,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
 
     private int ResolveOutputSpatialReference(GeometryProjectRequest request)
     {
-        if (TryResolveSpatialReference(request.OutSpatialReference, request.OutSr, Request.Query["outSR"], request.Geometries, out var srid))
+        if (TryResolveSpatialReference(request.OutSpatialReference, request.OutSr, this.Request.Query["outSR"], request.Geometries, out var srid))
         {
             return srid;
         }
@@ -339,7 +339,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             return request.Geometries;
         }
 
-        if (Request.Query.TryGetValue("geometries", out var values) && values.Count > 0)
+        if (this.Request.Query.TryGetValue("geometries", out var values) && values.Count > 0)
         {
             var candidate = values[^1];
             if (candidate.HasValue())
@@ -366,7 +366,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -381,7 +381,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var geometryType = ResolveGeometryType(request.GeometryType, request.Geometries);
                     var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Geometries);
                     var geometriesPayload = request.Geometries ?? throw new GeometrySerializationException("geometries payload is required.");
-                    var geometries = _serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
+                    var geometries = this.serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
 
                     // Validate geometry complexity to prevent DoS attacks
                     GeometryComplexityValidator.ValidateCollection(geometries);
@@ -397,35 +397,35 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                         request.Unit ?? "meter",
                         request.UnionResults ?? false);
 
-                    var result = _executor.Buffer(operation, cts.Token);
-                    var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+                    var result = this.executor.Buffer(operation, cts.Token);
+                    var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
                     return await Task.FromResult(Ok(response));
                 });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for buffer operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for buffer operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("Buffer operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("Buffer operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "buffer operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "buffer operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "buffer operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "buffer operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Buffer operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Buffer operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -437,7 +437,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -448,40 +448,40 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var geometryType = ResolveGeometryType(request.GeometryType, request.Geometries);
             var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Geometries);
             var geometriesPayload = request.Geometries ?? throw new GeometrySerializationException("geometries payload is required.");
-            var geometries = _serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
+            var geometries = this.serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
 
             // Validate geometry complexity to prevent DoS attacks
             GeometryComplexityValidator.ValidateCollection(geometries);
 
             var operation = new GeometrySimplifyOperation(geometryType, srid, geometries);
-            var result = _executor.Simplify(operation, cts.Token);
-            var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
-            return Ok(response);
+            var result = this.executor.Simplify(operation, cts.Token);
+            var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+            return this.Ok(response);
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for simplify operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for simplify operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("Simplify operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("Simplify operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "simplify operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "simplify operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "simplify operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "simplify operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Simplify operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Simplify operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -493,7 +493,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -508,48 +508,48 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var geometryType = ResolveGeometryType(request.GeometryType, request.Geometries);
                     var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Geometries);
                     var geometriesPayload = request.Geometries ?? throw new GeometrySerializationException("geometries payload is required.");
-                    var geometries = _serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
+                    var geometries = this.serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
 
                     // Validate geometry complexity to prevent DoS attacks
                     GeometryComplexityValidator.ValidateCollection(geometries);
 
                     if (!request.MaxSegmentLength.HasValue || request.MaxSegmentLength.Value <= 0)
                     {
-                        return BadRequest(new { error = "maxSegmentLength must be a positive value." });
+                        return this.BadRequest(new { error = "maxSegmentLength must be a positive value." });
                     }
 
                     activity.AddTag("arcgis.maxSegmentLength", request.MaxSegmentLength.Value);
 
                     var operation = new GeometryDensifyOperation(geometryType, srid, geometries, request.MaxSegmentLength.Value);
-                    var result = _executor.Densify(operation, cts.Token);
-                    var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+                    var result = this.executor.Densify(operation, cts.Token);
+                    var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
                     return await Task.FromResult(Ok(response));
                 });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for densify operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for densify operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("Densify operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("Densify operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "densify operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "densify operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "densify operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "densify operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Densify operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Densify operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -561,7 +561,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -576,48 +576,48 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var geometryType = ResolveGeometryType(request.GeometryType, request.Geometries);
                     var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Geometries);
                     var geometriesPayload = request.Geometries ?? throw new GeometrySerializationException("geometries payload is required.");
-                    var geometries = _serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
+                    var geometries = this.serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
 
                     // Validate geometry complexity to prevent DoS attacks
                     GeometryComplexityValidator.ValidateCollection(geometries);
 
                     if (!request.MaxDeviation.HasValue || request.MaxDeviation.Value <= 0)
                     {
-                        return BadRequest(new { error = "maxDeviation must be a positive value." });
+                        return this.BadRequest(new { error = "maxDeviation must be a positive value." });
                     }
 
                     activity.AddTag("arcgis.maxDeviation", request.MaxDeviation.Value);
 
                     var operation = new GeometryGeneralizeOperation(geometryType, srid, geometries, request.MaxDeviation.Value);
-                    var result = _executor.Generalize(operation, cts.Token);
-                    var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+                    var result = this.executor.Generalize(operation, cts.Token);
+                    var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
                     return await Task.FromResult(Ok(response));
                 });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for generalize operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for generalize operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("Generalize operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("Generalize operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "generalize operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "generalize operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "generalize operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "generalize operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Generalize operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Generalize operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -629,7 +629,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -640,46 +640,46 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var geometryType = ResolveGeometryType(request.GeometryType, request.Geometries);
             var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Geometries);
             var geometriesPayload = request.Geometries ?? throw new GeometrySerializationException("geometries payload is required.");
-            var geometries = _serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
+            var geometries = this.serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
 
             // Validate geometry complexity to prevent DoS attacks
             GeometryComplexityValidator.ValidateCollection(geometries);
 
             var operation = new GeometrySetOperation(geometryType, srid, geometries);
-            var result = _executor.Union(operation, cts.Token);
+            var result = this.executor.Union(operation, cts.Token);
 
             if (result is null)
             {
-                return Ok(new { geometry = (object?)null });
+                return this.Ok(new { geometry = (object?)null });
             }
 
-            var response = _serializer.SerializeGeometry(result, geometryType, srid);
-            return Ok(new { geometry = response });
+            var response = this.serializer.SerializeGeometry(result, geometryType, srid);
+            return this.Ok(new { geometry = response });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for union operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for union operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("Union operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("Union operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "union operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "union operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "union operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "union operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Union operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Union operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -691,7 +691,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -704,42 +704,42 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var geometries1Payload = request.Geometries1 ?? throw new GeometrySerializationException("geometries1 payload is required.");
             var geometries2Payload = request.Geometries2 ?? throw new GeometrySerializationException("geometries2 payload is required.");
 
-            var geometries1 = _serializer.DeserializeGeometries(geometries1Payload, geometryType, srid, cts.Token);
-            var geometries2 = _serializer.DeserializeGeometries(geometries2Payload, geometryType, srid, cts.Token);
+            var geometries1 = this.serializer.DeserializeGeometries(geometries1Payload, geometryType, srid, cts.Token);
+            var geometries2 = this.serializer.DeserializeGeometries(geometries2Payload, geometryType, srid, cts.Token);
 
             // Validate geometry complexity to prevent DoS attacks
             GeometryComplexityValidator.ValidateCollection(geometries1);
             GeometryComplexityValidator.ValidateCollection(geometries2);
 
             var operation = new GeometryPairwiseOperation(geometryType, srid, geometries1, geometries2);
-            var result = _executor.Intersect(operation, cts.Token);
-            var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
-            return Ok(response);
+            var result = this.executor.Intersect(operation, cts.Token);
+            var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+            return this.Ok(response);
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for intersect operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for intersect operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("Intersect operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("Intersect operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "intersect operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "intersect operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "intersect operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "intersect operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Intersect operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Intersect operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -751,7 +751,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -764,42 +764,42 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var geometries1Payload = request.Geometries1 ?? throw new GeometrySerializationException("geometries1 payload is required.");
             var geometries2Payload = request.Geometries2 ?? throw new GeometrySerializationException("geometries2 payload is required.");
 
-            var geometries1 = _serializer.DeserializeGeometries(geometries1Payload, geometryType, srid, cts.Token);
-            var geometries2 = _serializer.DeserializeGeometries(geometries2Payload, geometryType, srid, cts.Token);
+            var geometries1 = this.serializer.DeserializeGeometries(geometries1Payload, geometryType, srid, cts.Token);
+            var geometries2 = this.serializer.DeserializeGeometries(geometries2Payload, geometryType, srid, cts.Token);
 
             // Validate geometry complexity to prevent DoS attacks
             GeometryComplexityValidator.ValidateCollection(geometries1);
             GeometryComplexityValidator.ValidateCollection(geometries2);
 
             var operation = new GeometryPairwiseOperation(geometryType, srid, geometries1, geometries2);
-            var result = _executor.Difference(operation, cts.Token);
-            var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
-            return Ok(response);
+            var result = this.executor.Difference(operation, cts.Token);
+            var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+            return this.Ok(response);
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for difference operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for difference operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("Difference operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("Difference operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "difference operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "difference operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "difference operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "difference operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Difference operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Difference operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -811,7 +811,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -822,40 +822,40 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var geometryType = ResolveGeometryType(request.GeometryType, request.Geometries);
             var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Geometries);
             var geometriesPayload = request.Geometries ?? throw new GeometrySerializationException("geometries payload is required.");
-            var geometries = _serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
+            var geometries = this.serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
 
             // Validate geometry complexity to prevent DoS attacks
             GeometryComplexityValidator.ValidateCollection(geometries);
 
             var operation = new GeometrySetOperation(geometryType, srid, geometries);
-            var result = _executor.ConvexHull(operation, cts.Token);
-            var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
-            return Ok(response);
+            var result = this.executor.ConvexHull(operation, cts.Token);
+            var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+            return this.Ok(response);
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for convexHull operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for convexHull operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogOperationTimeout("ConvexHull operation", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogOperationTimeout("ConvexHull operation", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry serialization", "convexHull operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry serialization", "convexHull operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogOperationFailure(ex, "Geometry service operation", "convexHull operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogOperationFailure(ex, "Geometry service operation", "convexHull operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("ConvexHull operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("ConvexHull operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -867,7 +867,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -880,8 +880,8 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var geometry1Payload = request.Geometry1 ?? throw new GeometrySerializationException("geometry1 payload is required.");
             var geometry2Payload = request.Geometry2 ?? throw new GeometrySerializationException("geometry2 payload is required.");
 
-            var geometries1 = _serializer.DeserializeGeometries(geometry1Payload, geometryType, srid, cts.Token);
-            var geometries2 = _serializer.DeserializeGeometries(geometry2Payload, geometryType, srid, cts.Token);
+            var geometries1 = this.serializer.DeserializeGeometries(geometry1Payload, geometryType, srid, cts.Token);
+            var geometries2 = this.serializer.DeserializeGeometries(geometry2Payload, geometryType, srid, cts.Token);
 
             // Validate geometry complexity to prevent DoS attacks
             GeometryComplexityValidator.ValidateCollection(geometries1);
@@ -895,33 +895,33 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                 request.DistanceUnit,
                 request.Geodesic ?? false);
 
-            var result = _executor.Distance(operation, cts.Token);
-            return Ok(new { distances = result });
+            var result = this.executor.Distance(operation, cts.Token);
+            return this.Ok(new { distances = result });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for distance operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for distance operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("Distance operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogWarning("Distance operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogError(ex, "Geometry serialization failed for distance operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry serialization failed for distance operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogError(ex, "Geometry service operation failed for distance operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry service operation failed for distance operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Distance operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Distance operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -933,7 +933,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -943,42 +943,42 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
         {
             var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Polygons);
             var polygonsPayload = request.Polygons ?? throw new GeometrySerializationException("polygons payload is required.");
-            var geometries = _serializer.DeserializeGeometries(polygonsPayload, "esriGeometryPolygon", srid, cts.Token);
+            var geometries = this.serializer.DeserializeGeometries(polygonsPayload, "esriGeometryPolygon", srid, cts.Token);
             var polygons = geometries.Cast<Polygon>().ToList();
 
             // Validate geometry complexity to prevent DoS attacks
             GeometryComplexityValidator.ValidateCollection(polygons);
 
             var operation = new GeometryMeasurementOperation("esriGeometryPolygon", srid, polygons, request.AreaUnit, request.LengthUnit);
-            var areas = _executor.Areas(operation, cts.Token);
-            var lengths = _executor.Lengths(operation, cts.Token);
+            var areas = this.executor.Areas(operation, cts.Token);
+            var lengths = this.executor.Lengths(operation, cts.Token);
 
-            return Ok(new { areas, lengths });
+            return this.Ok(new { areas, lengths });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for areasAndLengths operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for areasAndLengths operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("AreasAndLengths operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogWarning("AreasAndLengths operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogError(ex, "Geometry serialization failed for areasAndLengths operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry serialization failed for areasAndLengths operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogError(ex, "Geometry service operation failed for areasAndLengths operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry service operation failed for areasAndLengths operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("AreasAndLengths operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("AreasAndLengths operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -990,7 +990,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -1005,7 +1005,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var geometryType = ResolveGeometryType(request.GeometryType, request.Geometries);
                     var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Geometries);
                     var geometriesPayload = request.Geometries ?? throw new GeometrySerializationException("geometries payload is required.");
-                    var geometries = _serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
+                    var geometries = this.serializer.DeserializeGeometries(geometriesPayload, geometryType, srid, cts.Token);
 
                     // Validate geometry complexity to prevent DoS attacks
                     GeometryComplexityValidator.ValidateCollection(geometries);
@@ -1021,35 +1021,35 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                         request.OffsetHow ?? "esriGeometryOffsetRounded",
                         request.BevelRatio ?? 10.0);
 
-                    var result = _executor.Offset(operation, cts.Token);
-                    var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+                    var result = this.executor.Offset(operation, cts.Token);
+                    var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
                     return await Task.FromResult(Ok(response));
                 });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for offset operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for offset operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("Offset operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogWarning("Offset operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogError(ex, "Geometry serialization failed for offset operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry serialization failed for offset operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogError(ex, "Geometry service operation failed for offset operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry service operation failed for offset operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Offset operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Offset operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -1061,7 +1061,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -1076,10 +1076,10 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var geometryType = ResolveGeometryType(request.GeometryType, request.Polylines);
                     var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Polylines);
                     var polylinesPayload = request.Polylines ?? throw new GeometrySerializationException("polylines payload is required.");
-                    var polylines = _serializer.DeserializeGeometries(polylinesPayload, geometryType, srid, cts.Token);
+                    var polylines = this.serializer.DeserializeGeometries(polylinesPayload, geometryType, srid, cts.Token);
 
                     var trimExtendToPayload = request.TrimExtendTo ?? throw new GeometrySerializationException("trimExtendTo payload is required.");
-                    var trimExtendToGeometries = _serializer.DeserializeGeometries(trimExtendToPayload, geometryType, srid, cts.Token);
+                    var trimExtendToGeometries = this.serializer.DeserializeGeometries(trimExtendToPayload, geometryType, srid, cts.Token);
 
                     if (trimExtendToGeometries.Count == 0)
                     {
@@ -1097,35 +1097,35 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                         trimExtendToGeometries[0],
                         request.ExtendHow ?? 0);
 
-                    var result = _executor.TrimExtend(operation, cts.Token);
-                    var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+                    var result = this.executor.TrimExtend(operation, cts.Token);
+                    var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
                     return await Task.FromResult(Ok(response));
                 });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for trimExtend operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for trimExtend operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("TrimExtend operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogWarning("TrimExtend operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogError(ex, "Geometry serialization failed for trimExtend operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry serialization failed for trimExtend operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogError(ex, "Geometry service operation failed for trimExtend operation");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogError(ex, "Geometry service operation failed for trimExtend operation");
+            return this.BadRequest(new { error = ex.Message });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("TrimExtend operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("TrimExtend operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -1138,7 +1138,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -1149,43 +1149,43 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var geometryType = "esriGeometryPolygon"; // Input type must be polygon
             var srid = ResolveSpatialReference(request.SpatialReference, request.Sr, request.Polygons);
             var polygonsPayload = request.Polygons ?? throw new GeometrySerializationException("polygons payload is required.");
-            var polygons = _serializer.DeserializeGeometries(polygonsPayload, geometryType, srid, cts.Token);
+            var polygons = this.serializer.DeserializeGeometries(polygonsPayload, geometryType, srid, cts.Token);
 
             // Validate geometry complexity to prevent DoS attacks
             GeometryComplexityValidator.ValidateCollection(polygons);
 
             var operation = new GeometryLabelPointsOperation(geometryType, srid, polygons);
-            var result = _executor.LabelPoints(operation, cts.Token);
+            var result = this.executor.LabelPoints(operation, cts.Token);
 
             // Serialize as points (output type is different from input type)
-            var response = _serializer.SerializeGeometries(result, "esriGeometryPoint", srid, cts.Token);
-            return Ok(response);
+            var response = this.serializer.SerializeGeometries(result, "esriGeometryPoint", srid, cts.Token);
+            return this.Ok(response);
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for labelPoints operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for labelPoints operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("LabelPoints operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout,
+            this.logger.LogWarning("LabelPoints operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout,
                 new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogError(ex, "Geometry serialization failed for labelPoints operation");
-            return BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry serialization failed for labelPoints operation");
+            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogError(ex, "Geometry service operation failed for labelPoints operation");
-            return BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
+            this.logger.LogError(ex, "Geometry service operation failed for labelPoints operation");
+            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("LabelPoints operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("LabelPoints operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -1197,7 +1197,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -1214,8 +1214,8 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var targetPayload = request.Target ?? throw new GeometrySerializationException("target geometry is required.");
                     var cutterPayload = request.Cutter ?? throw new GeometrySerializationException("cutter geometry is required.");
 
-                    var targets = _serializer.DeserializeGeometries(targetPayload, geometryType, srid, cts.Token);
-                    var cutters = _serializer.DeserializeGeometries(cutterPayload, "esriGeometryPolyline", srid, cts.Token);
+                    var targets = this.serializer.DeserializeGeometries(targetPayload, geometryType, srid, cts.Token);
+                    var cutters = this.serializer.DeserializeGeometries(cutterPayload, "esriGeometryPolyline", srid, cts.Token);
 
                     if (targets.Count == 0)
                     {
@@ -1235,35 +1235,35 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var cutter = cutters[0];
 
                     var operation = new GeometryCutOperation(geometryType, srid, target, cutter);
-                    var result = _executor.Cut(operation, cts.Token);
-                    var response = _serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
+                    var result = this.executor.Cut(operation, cts.Token);
+                    var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
                     return await Task.FromResult(Ok(response));
                 });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for cut operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for cut operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("Cut operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogWarning("Cut operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogError(ex, "Geometry serialization failed for cut operation");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogError(ex, "Geometry serialization failed for cut operation");
+            return this.BadRequest(new { error = ex.Message });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogError(ex, "Geometry service operation failed for cut operation");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogError(ex, "Geometry service operation failed for cut operation");
+            return this.BadRequest(new { error = ex.Message });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Cut operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Cut operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 
@@ -1275,7 +1275,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             : true;
         if (!geometryEnabled)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(OperationTimeoutSeconds));
@@ -1292,8 +1292,8 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var targetPayload = request.Target ?? throw new GeometrySerializationException("target geometry is required.");
                     var reshaperPayload = request.Reshaper ?? throw new GeometrySerializationException("reshaper geometry is required.");
 
-                    var targets = _serializer.DeserializeGeometries(targetPayload, geometryType, srid, cts.Token);
-                    var reshapers = _serializer.DeserializeGeometries(reshaperPayload, "esriGeometryPolyline", srid, cts.Token);
+                    var targets = this.serializer.DeserializeGeometries(targetPayload, geometryType, srid, cts.Token);
+                    var reshapers = this.serializer.DeserializeGeometries(reshaperPayload, "esriGeometryPolyline", srid, cts.Token);
 
                     if (targets.Count == 0)
                     {
@@ -1313,35 +1313,35 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
                     var reshaper = reshapers[0];
 
                     var operation = new GeometryReshapeOperation(geometryType, srid, target, reshaper);
-                    var result = _executor.Reshape(operation, cts.Token);
-                    var response = _serializer.SerializeGeometry(result, geometryType, srid);
+                    var result = this.executor.Reshape(operation, cts.Token);
+                    var response = this.serializer.SerializeGeometry(result, geometryType, srid);
                     return await Task.FromResult(Ok(new { geometry = response }));
                 });
         }
         catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
         {
-            _logger.LogWarning(ex, "Geometry complexity validation failed for reshape operation");
-            return BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
+            this.logger.LogWarning(ex, "Geometry complexity validation failed for reshape operation");
+            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("Reshape operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
-            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
+            this.logger.LogWarning("Reshape operation timed out after {Timeout} seconds", OperationTimeoutSeconds);
+            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
         }
         catch (GeometrySerializationException ex)
         {
-            _logger.LogError(ex, "Geometry serialization failed for reshape operation");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogError(ex, "Geometry serialization failed for reshape operation");
+            return this.BadRequest(new { error = ex.Message });
         }
         catch (GeometryServiceException ex)
         {
-            _logger.LogError(ex, "Geometry service operation failed for reshape operation");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogError(ex, "Geometry service operation failed for reshape operation");
+            return this.BadRequest(new { error = ex.Message });
         }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
-            _logger.LogInformation("Reshape operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
+            this.logger.LogInformation("Reshape operation completed in {ElapsedMs}ms", elapsed.TotalMilliseconds);
         }
     }
 

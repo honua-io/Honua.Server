@@ -12,11 +12,11 @@ namespace Honua.Server.Host.Pages.Catalog;
 
 public sealed class IndexModel : PageModel
 {
-    private readonly ICatalogProjectionService _catalog;
+    private readonly ICatalogProjectionService catalog;
 
     public IndexModel(ICatalogProjectionService catalog)
     {
-        _catalog = Guard.NotNull(catalog);
+        this.catalog = Guard.NotNull(catalog);
     }
 
     public IReadOnlyList<CatalogGroupView> Groups { get; private set; } = Array.Empty<CatalogGroupView>();
@@ -29,7 +29,7 @@ public sealed class IndexModel : PageModel
         Query = q.IsNullOrWhiteSpace() ? null : q;
         GroupId = group.IsNullOrWhiteSpace() ? null : group;
 
-        Groups = _catalog.GetGroups();
-        Records = _catalog.Search(Query, GroupId);
+        Groups = this.catalog.GetGroups();
+        Records = this.catalog.Search(Query, GroupId);
     }
 }

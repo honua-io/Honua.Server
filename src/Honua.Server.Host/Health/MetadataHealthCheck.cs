@@ -18,20 +18,20 @@ namespace Honua.Server.Host.Health;
 /// </summary>
 public sealed class MetadataHealthCheck : HealthCheckBase
 {
-    private readonly IMetadataRegistry _registry;
+    private readonly IMetadataRegistry registry;
 
     public MetadataHealthCheck(IMetadataRegistry registry, ILogger<MetadataHealthCheck> logger)
         : base(logger)
     {
-        _registry = Guard.NotNull(registry);
+        this.registry = Guard.NotNull(registry);
     }
 
     protected override async Task<HealthCheckResult> ExecuteHealthCheckAsync(
         Dictionary<string, object> data,
         CancellationToken cancellationToken)
     {
-        await _registry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-        var snapshot = await _registry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        await this.registry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.registry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
         data["catalogId"] = snapshot.Catalog.Id;
         data["services"] = snapshot.Services.Count;

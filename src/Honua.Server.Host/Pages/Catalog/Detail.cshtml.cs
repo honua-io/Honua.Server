@@ -13,11 +13,11 @@ namespace Honua.Server.Host.Pages.Catalog;
 
 public sealed class DetailModel : PageModel
 {
-    private readonly ICatalogProjectionService _catalog;
+    private readonly ICatalogProjectionService catalog;
 
     public DetailModel(ICatalogProjectionService catalog)
     {
-        _catalog = Guard.NotNull(catalog);
+        this.catalog = Guard.NotNull(catalog);
     }
 
     public CatalogDiscoveryRecord Record { get; private set; } = null!;
@@ -28,17 +28,17 @@ public sealed class DetailModel : PageModel
     {
         if (serviceId.IsNullOrWhiteSpace() || layerId.IsNullOrWhiteSpace())
         {
-            return NotFound();
+            return this.NotFound();
         }
 
-        var record = _catalog.GetRecord($"{serviceId}:{layerId}");
+        var record = this.catalog.GetRecord($"{serviceId}:{layerId}");
         if (record is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         Record = record;
-        Service = _catalog.GetService(serviceId);
+        Service = this.catalog.GetService(serviceId);
         Layer = Service?.Layers.FirstOrDefault(l => string.Equals(l.Layer.Id, layerId, StringComparison.OrdinalIgnoreCase));
 
         return Page();

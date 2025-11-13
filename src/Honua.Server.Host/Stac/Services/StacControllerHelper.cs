@@ -25,11 +25,11 @@ namespace Honua.Server.Host.Stac.Services;
 /// </summary>
 public sealed class StacControllerHelper
 {
-    private readonly HonuaConfig? _honuaConfig;
+    private readonly HonuaConfig? honuaConfig;
 
     public StacControllerHelper(HonuaConfig? honuaConfig = null)
     {
-        _honuaConfig = honuaConfig;
+        this.honuaConfig = honuaConfig;
     }
 
     /// <summary>

@@ -47,14 +47,14 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
     private const int QueueCapacity = 32;
     private const int MaxParallelTiles = 4;
 
-    private readonly Channel<VectorTilePreseedJob> _queue;
+    private readonly Channel<VectorTilePreseedJob> queue;
     private readonly ActiveVectorPreseedJobStore _activeJobs = new();
     private readonly CompletedVectorPreseedJobStore _completedJobs = new();
-    private readonly IMemoryCache _userRateLimits;
-    private readonly IFeatureRepository _featureRepository;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly ILogger<VectorTilePreseedService> _logger;
-    private readonly VectorTilePreseedLimits _limits;
+    private readonly IMemoryCache userRateLimits;
+    private readonly IFeatureRepository featureRepository;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly ILogger<VectorTilePreseedService> logger;
+    private readonly VectorTilePreseedLimits limits;
 
     public VectorTilePreseedService(
         IFeatureRepository featureRepository,
@@ -62,12 +62,12 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         ILogger<VectorTilePreseedService> logger,
         IOptions<VectorTilePreseedLimits> limits)
     {
-        _featureRepository = Guard.NotNull(featureRepository);
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _logger = Guard.NotNull(logger);
-        _limits = Guard.NotNull(limits?.Value);
+        this.featureRepository = Guard.NotNull(featureRepository);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.logger = Guard.NotNull(logger);
+        this.limits = Guard.NotNull(limits?.Value);
 
-        _queue = Channel.CreateBounded<VectorTilePreseedJob>(new BoundedChannelOptions(QueueCapacity)
+        this.queue = Channel.CreateBounded<VectorTilePreseedJob>(new BoundedChannelOptions(QueueCapacity)
         {
             AllowSynchronousContinuations = false,
             SingleReader = true,
@@ -76,7 +76,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         });
 
         // Initialize MemoryCache with automatic expiration for rate limits
-        _userRateLimits = new MemoryCache(new MemoryCacheOptions
+        this.userRateLimits = new MemoryCache(new MemoryCacheOptions
         {
             SizeLimit = 10000 // Limit to 10,000 rate limit entries
         });
@@ -89,10 +89,10 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         request.EnsureValid();
 
         // Enforce max zoom level
-        if (request.MaxZoom > _limits.MaxZoomLevel)
+        if (request.MaxZoom > this.limits.MaxZoomLevel)
         {
             throw new InvalidOperationException(
-                $"Maximum zoom level ({request.MaxZoom}) exceeds allowed limit ({_limits.MaxZoomLevel}). " +
+                $"Maximum zoom level ({request.MaxZoom}) exceeds allowed limit ({this.limits.MaxZoomLevel}). " +
                 $"Higher zoom levels generate exponentially more tiles and can cause resource exhaustion.");
         }
 
@@ -100,36 +100,36 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         var totalTiles = CalculateTotalTilesWithLimit(request.MinZoom, request.MaxZoom);
 
         // Check concurrent job limit
-        var activeJobCount = await _activeJobs.CountAsync(cancellationToken).ConfigureAwait(false);
-        if (activeJobCount >= _limits.MaxConcurrentJobs)
+        var activeJobCount = await this.activeJobs.CountAsync(cancellationToken).ConfigureAwait(false);
+        if (activeJobCount >= this.limits.MaxConcurrentJobs)
         {
             throw new InvalidOperationException(
-                $"Maximum concurrent jobs ({_limits.MaxConcurrentJobs}) reached. " +
+                $"Maximum concurrent jobs ({this.limits.MaxConcurrentJobs}) reached. " +
                 $"Please wait for existing jobs to complete or cancel them.");
         }
 
         // Check per-user job limit
         var userKey = $"{request.ServiceId}/{request.LayerId}";
-        var allActiveJobs = await _activeJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var allActiveJobs = await this.activeJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
         var userJobCount = allActiveJobs.Count(j =>
             j.Request.ServiceId == request.ServiceId &&
             j.Request.LayerId == request.LayerId);
 
-        if (userJobCount >= _limits.MaxJobsPerUser)
+        if (userJobCount >= this.limits.MaxJobsPerUser)
         {
             throw new InvalidOperationException(
-                $"Maximum jobs per service/layer ({_limits.MaxJobsPerUser}) reached for {userKey}. " +
+                $"Maximum jobs per service/layer ({this.limits.MaxJobsPerUser}) reached for {userKey}. " +
                 $"Please wait for existing jobs to complete or cancel them.");
         }
 
         // Rate limiting check with auto-expiring cache entries
         var now = DateTimeOffset.UtcNow;
-        if (_userRateLimits.TryGetValue(userKey, out DateTimeOffset lastSubmission))
+        if (this.userRateLimits.TryGetValue(userKey, out DateTimeOffset lastSubmission))
         {
             var timeSinceLastSubmission = now - lastSubmission;
-            if (timeSinceLastSubmission < _limits.RateLimitWindow)
+            if (timeSinceLastSubmission < this.limits.RateLimitWindow)
             {
-                var waitTime = _limits.RateLimitWindow - timeSinceLastSubmission;
+                var waitTime = this.limits.RateLimitWindow - timeSinceLastSubmission;
                 throw new InvalidOperationException(
                     $"Rate limit exceeded for {userKey}. " +
                     $"Please wait {waitTime.TotalSeconds:F0} seconds before submitting another job.");
@@ -137,18 +137,18 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         }
 
         // Set rate limit with automatic expiration after the rate limit window
-        _userRateLimits.Set(userKey, now, new MemoryCacheEntryOptions
+        this.userRateLimits.Set(userKey, now, new MemoryCacheEntryOptions
         {
-            AbsoluteExpirationRelativeToNow = _limits.RateLimitWindow,
+            AbsoluteExpirationRelativeToNow = this.limits.RateLimitWindow,
             Size = 1
         });
 
         var job = new VectorTilePreseedJob(Guid.NewGuid(), request);
-        await _activeJobs.PutAsync(job, cancellationToken).ConfigureAwait(false);
+        await this.activeJobs.PutAsync(job, cancellationToken).ConfigureAwait(false);
 
-        await _queue.Writer.WriteAsync(job, cancellationToken).ConfigureAwait(false);
+        await this.queue.Writer.WriteAsync(job, cancellationToken).ConfigureAwait(false);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Enqueued vector tile preseed job {JobId} for {ServiceId}/{LayerId} z{MinZoom}-{MaxZoom} ({TotalTiles:N0} tiles)",
             job.JobId, request.ServiceId, request.LayerId, request.MinZoom, request.MaxZoom, totalTiles);
 
@@ -157,13 +157,13 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
     public async Task<VectorTilePreseedJobSnapshot?> TryGetJobAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
-        var activeJob = await _activeJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var activeJob = await this.activeJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
         if (activeJob is not null)
         {
             return VectorTilePreseedJobSnapshot.FromJob(activeJob);
         }
 
-        var completedJob = await _completedJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var completedJob = await this.completedJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
         if (completedJob is not null)
         {
             return completedJob;
@@ -174,8 +174,8 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
     public async Task<IReadOnlyList<VectorTilePreseedJobSnapshot>> ListJobsAsync(CancellationToken cancellationToken = default)
     {
-        var activeJobs = await _activeJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        var completedJobs = await _completedJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var activeJobs = await this.activeJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var completedJobs = await this.completedJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         return activeJobs.Select(VectorTilePreseedJobSnapshot.FromJob)
             .Concat(completedJobs)
@@ -185,28 +185,28 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
     public async Task<VectorTilePreseedJobSnapshot?> CancelAsync(Guid jobId, string? reason = null)
     {
-        var job = await _activeJobs.GetAsync(jobId).ConfigureAwait(false);
+        var job = await this.activeJobs.GetAsync(jobId).ConfigureAwait(false);
         if (job is not null)
         {
             if (job.TryCancel())
             {
-                _logger.LogInformation("Cancelled vector tile preseed job {JobId}: {Reason}", jobId, reason ?? "User requested");
+                this.logger.LogInformation("Cancelled vector tile preseed job {JobId}: {Reason}", jobId, reason ?? "User requested");
             }
 
             return VectorTilePreseedJobSnapshot.FromJob(job);
         }
 
         // If job already completed/cancelled, return the completed snapshot (if any)
-        return await _completedJobs.GetAsync(jobId).ConfigureAwait(false);
+        return await this.completedJobs.GetAsync(jobId).ConfigureAwait(false);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Vector tile preseed service started. MaxParallelTiles={MaxParallelTiles}, QueueCapacity={QueueCapacity}",
+        this.logger.LogInformation("Vector tile preseed service started. MaxParallelTiles={MaxParallelTiles}, QueueCapacity={QueueCapacity}",
             MaxParallelTiles,
             QueueCapacity);
 
-        await foreach (var job in _queue.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
+        await foreach (var job in this.queue.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
         {
             try
             {
@@ -214,12 +214,12 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                _logger.LogInformation("Vector tile preseed service stopping gracefully");
+                this.logger.LogInformation("Vector tile preseed service stopping gracefully");
                 break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(
+                this.logger.LogError(
                     ex,
                     "Unexpected error processing preseed job. JobId={JobId}, ServiceId={ServiceId}, LayerId={LayerId}",
                     job.JobId,
@@ -230,9 +230,9 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
             }
         }
 
-        var activeJobsCount = await _activeJobs.CountAsync(stoppingToken).ConfigureAwait(false);
-        var completedJobsCount = await _completedJobs.CountAsync(stoppingToken).ConfigureAwait(false);
-        _logger.LogInformation("Vector tile preseed service stopped. ActiveJobs={ActiveJobs}, CompletedJobs={CompletedJobs}",
+        var activeJobsCount = await this.activeJobs.CountAsync(stoppingToken).ConfigureAwait(false);
+        var completedJobsCount = await this.completedJobs.CountAsync(stoppingToken).ConfigureAwait(false);
+        this.logger.LogInformation("Vector tile preseed service stopped. ActiveJobs={ActiveJobs}, CompletedJobs={CompletedJobs}",
             activeJobsCount,
             completedJobsCount);
     }
@@ -243,7 +243,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
         try
         {
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Processing preseed job. JobId={JobId}, ServiceId={ServiceId}, LayerId={LayerId}, ZoomRange={MinZoom}-{MaxZoom}",
                 job.JobId,
                 request.ServiceId,
@@ -252,15 +252,15 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
                 request.MaxZoom);
 
             // Ensure metadata is loaded
-            await _metadataRegistry.EnsureInitializedAsync(stoppingToken).ConfigureAwait(false);
+            await this.metadataRegistry.EnsureInitializedAsync(stoppingToken).ConfigureAwait(false);
 
             // Get layer metadata to determine extent
-            var snapshot = await _metadataRegistry.GetSnapshotAsync(stoppingToken).ConfigureAwait(false);
+            var snapshot = await this.metadataRegistry.GetSnapshotAsync(stoppingToken).ConfigureAwait(false);
             if (snapshot is null || !snapshot.TryGetLayer(request.ServiceId, request.LayerId, out var layer))
             {
                 var errorMsg = $"Layer {request.ServiceId}/{request.LayerId} not found in metadata";
                 job.MarkFailed(errorMsg);
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Preseed job failed: Layer not found. JobId={JobId}, ServiceId={ServiceId}, LayerId={LayerId}",
                     job.JobId,
                     request.ServiceId,
@@ -276,7 +276,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
             // NOW create the linked cancellation token AFTER job.MarkStarted()
             // so it includes the job's CancellationTokenSource
-            using var timeoutCts = new CancellationTokenSource(_limits.JobTimeout);
+            using var timeoutCts = new CancellationTokenSource(this.limits.JobTimeout);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
                 stoppingToken,
                 timeoutCts.Token,
@@ -284,9 +284,9 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
             var cancellationToken = linkedCts.Token;
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Starting preseed job {JobId}: {TotalTiles:N0} tiles for {ServiceId}/{LayerId} (timeout: {Timeout})",
-                job.JobId, totalTiles, request.ServiceId, request.LayerId, _limits.JobTimeout);
+                job.JobId, totalTiles, request.ServiceId, request.LayerId, this.limits.JobTimeout);
 
             // Generate tiles for each zoom level within the layer's extent
             for (var zoom = request.MinZoom; zoom <= request.MaxZoom; zoom++)
@@ -301,7 +301,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
                 if (minRow > maxRow || minColumn > maxColumn)
                 {
                     // No tiles in this extent at this zoom
-                    _logger.LogDebug("No tiles in extent for {ServiceId}/{LayerId} at zoom {Zoom}",
+                    this.logger.LogDebug("No tiles in extent for {ServiceId}/{LayerId} at zoom {Zoom}",
                         request.ServiceId, request.LayerId, zoom);
                     continue;
                 }
@@ -334,13 +334,13 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
             }
 
             job.MarkCompleted();
-            _logger.LogInformation("Completed preseed job {JobId}: {TilesProcessed}/{TilesTotal} tiles",
+            this.logger.LogInformation("Completed preseed job {JobId}: {TilesProcessed}/{TilesTotal} tiles",
                 job.JobId, job.TilesProcessed, job.TilesTotal);
         }
         catch (OperationCanceledException)
         {
             job.MarkCancelled();
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Preseed job cancelled. JobId={JobId}, ServiceId={ServiceId}, LayerId={LayerId}, Progress={Progress}/{Total}",
                 job.JobId,
                 request.ServiceId,
@@ -351,7 +351,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         catch (Exception ex)
         {
             job.MarkFailed(ex.Message);
-            _logger.LogError(
+            this.logger.LogError(
                 ex,
                 "Preseed job failed. JobId={JobId}, ServiceId={ServiceId}, LayerId={LayerId}, Progress={Progress}/{Total}",
                 job.JobId,
@@ -371,7 +371,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         try
         {
             // Generate tile via FeatureRepository (which will cache it)
-            await _featureRepository.GenerateMvtTileAsync(
+            await this.featureRepository.GenerateMvtTileAsync(
                 job.Request.ServiceId,
                 job.Request.LayerId,
                 zoom,
@@ -389,7 +389,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 ex,
                 "Failed to generate tile. ServiceId={ServiceId}, LayerId={LayerId}, Zoom={Zoom}, X={X}, Y={Y}. Continuing with remaining tiles.",
                 job.Request.ServiceId,
@@ -415,10 +415,10 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
             total += tilesAtThisZoom;
 
             // Check if we've exceeded the limit
-            if (total > _limits.MaxTilesPerJob)
+            if (total > this.limits.MaxTilesPerJob)
             {
                 throw new InvalidOperationException(
-                    $"Requested tile count exceeds maximum allowed ({_limits.MaxTilesPerJob:N0} tiles). " +
+                    $"Requested tile count exceeds maximum allowed ({this.limits.MaxTilesPerJob:N0} tiles). " +
                     $"At zoom {zoom}, the total would be {total:N0} tiles. " +
                     $"Please reduce the zoom range or use a smaller area.");
             }
@@ -504,10 +504,10 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
     private async Task MoveToCompletedAsync(VectorTilePreseedJob job, CancellationToken cancellationToken = default)
     {
-        await _activeJobs.DeleteAsync(job.JobId, cancellationToken).ConfigureAwait(false);
+        await this.activeJobs.DeleteAsync(job.JobId, cancellationToken).ConfigureAwait(false);
 
         var snapshot = VectorTilePreseedJobSnapshot.FromJob(job);
-        await _completedJobs.RecordCompletionAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        await this.completedJobs.RecordCompletionAsync(snapshot, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -519,7 +519,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         try
         {
             // Signal no more writes to the channel to allow graceful drain
-            _queue.Writer.Complete();
+            this.queue.Writer.Complete();
         }
         catch (Exception)
         {

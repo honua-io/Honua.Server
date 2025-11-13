@@ -132,13 +132,13 @@ public sealed class ZoomLevelAttribute : RangeAttribute
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
 public sealed class TileSizeAttribute : ValidationAttribute
 {
-    private readonly int _minSize;
-    private readonly int _maxSize;
+    private readonly int minSize;
+    private readonly int maxSize;
 
     public TileSizeAttribute(int minSize = 64, int maxSize = 4096)
     {
-        _minSize = minSize;
-        _maxSize = maxSize;
+        this.minSize = minSize;
+        this.maxSize = maxSize;
     }
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
@@ -175,11 +175,11 @@ public sealed class TileSizeAttribute : ValidationAttribute
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
 public sealed class FileSizeAttribute : ValidationAttribute
 {
-    private readonly long _maxBytes;
+    private readonly long maxBytes;
 
     public FileSizeAttribute(long maxBytes)
     {
-        _maxBytes = maxBytes;
+        this.maxBytes = maxBytes;
     }
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
@@ -255,11 +255,11 @@ public sealed class Iso8601DateTimeAttribute : ValidationAttribute
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
 public sealed class AllowedMimeTypesAttribute : ValidationAttribute
 {
-    private readonly string[] _allowedTypes;
+    private readonly string[] allowedTypes;
 
     public AllowedMimeTypesAttribute(params string[] allowedTypes)
     {
-        _allowedTypes = allowedTypes;
+        this.allowedTypes = allowedTypes;
     }
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
@@ -274,7 +274,7 @@ public sealed class AllowedMimeTypesAttribute : ValidationAttribute
             return new ValidationResult("MIME type must be a string.");
         }
 
-        if (_allowedTypes.Contains(stringValue, StringComparer.OrdinalIgnoreCase))
+        if (this.allowedTypes.Contains(stringValue, StringComparer.OrdinalIgnoreCase))
         {
             return ValidationResult.Success;
         }
@@ -323,11 +323,11 @@ public sealed class NoPathTraversalAttribute : ValidationAttribute
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
 public sealed class SafeStringAttribute : ValidationAttribute
 {
-    private readonly int _maxLength;
+    private readonly int maxLength;
 
     public SafeStringAttribute(int maxLength = 1000)
     {
-        _maxLength = maxLength;
+        this.maxLength = maxLength;
     }
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)

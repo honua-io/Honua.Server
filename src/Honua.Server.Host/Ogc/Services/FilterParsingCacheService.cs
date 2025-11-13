@@ -21,31 +21,31 @@ namespace Honua.Server.Host.Ogc.Services;
 /// </summary>
 public sealed class FilterParsingCacheService : IDisposable
 {
-    private readonly IMemoryCache _cache;
-    private readonly FilterParsingCacheOptions _options;
-    private readonly FilterParsingCacheMetrics _metrics;
-    private readonly ILogger<FilterParsingCacheService> _logger;
+    private readonly IMemoryCache cache;
+    private readonly FilterParsingCacheOptions options;
+    private readonly FilterParsingCacheMetrics metrics;
+    private readonly ILogger<FilterParsingCacheService> logger;
 
     public FilterParsingCacheService(
         IOptions<FilterParsingCacheOptions> options,
         FilterParsingCacheMetrics metrics,
         ILogger<FilterParsingCacheService> logger)
     {
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Create dedicated memory cache for filter parsing
-        _cache = new MemoryCache(new MemoryCacheOptions
+        this.cache = new MemoryCache(new MemoryCacheOptions
         {
-            SizeLimit = _options.MaxEntries,
+            SizeLimit = this.options.MaxEntries,
             CompactionPercentage = 0.25 // Remove 25% of entries when limit reached
         });
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "FilterParsingCache initialized with maxEntries={MaxEntries}, maxSizeBytes={MaxSizeBytes}",
-            _options.MaxEntries,
-            _options.MaxSizeBytes);
+            this.options.MaxEntries,
+            this.options.MaxSizeBytes);
     }
 
     /// <summary>
@@ -83,10 +83,10 @@ public sealed class FilterParsingCacheService : IDisposable
         var cacheKey = GenerateCacheKey(filterText, filterLanguage, layer, filterCrs);
 
         // Try to get from cache
-        if (_cache.TryGetValue<CachedFilterEntry>(cacheKey, out var cachedEntry))
+        if (this.cache.TryGetValue<CachedFilterEntry>(cacheKey, out var cachedEntry))
         {
-            _metrics.RecordCacheHit(layer.ServiceId, layer.Id, filterLanguage);
-            _logger.LogDebug(
+            this.metrics.RecordCacheHit(layer.ServiceId, layer.Id, filterLanguage);
+            this.logger.LogDebug(
                 "Filter cache HIT for service={ServiceId}, layer={LayerId}, language={Language}, key={CacheKey}",
                 layer.ServiceId, layer.Id, filterLanguage, cacheKey);
             return cachedEntry.Filter;
@@ -102,7 +102,7 @@ public sealed class FilterParsingCacheService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex,
+            this.logger.LogWarning(ex,
                 "Filter parsing failed for service={ServiceId}, layer={LayerId}, language={Language}. Not caching error.",
                 layer.ServiceId, layer.Id, filterLanguage);
             throw;
@@ -115,28 +115,28 @@ public sealed class FilterParsingCacheService : IDisposable
         var estimatedSize = EstimateFilterSize(filterText, parsedFilter);
 
         // Only cache if within size limit
-        if (estimatedSize <= _options.MaxSizeBytes)
+        if (estimatedSize <= this.options.MaxSizeBytes)
         {
             var entry = new CachedFilterEntry(parsedFilter, estimatedSize);
 
             var cacheEntryOptions = new MemoryCacheEntryOptions()
                 .SetSize(1) // Each entry counts as 1 toward the SizeLimit
-                .SetSlidingExpiration(TimeSpan.FromMinutes(_options.SlidingExpirationMinutes))
+                .SetSlidingExpiration(TimeSpan.FromMinutes(this.options.SlidingExpirationMinutes))
                 .RegisterPostEvictionCallback(OnEviction, this);
 
-            _cache.Set(cacheKey, entry, cacheEntryOptions);
+            this.cache.Set(cacheKey, entry, cacheEntryOptions);
 
-            _metrics.RecordCacheMiss(layer.ServiceId, layer.Id, filterLanguage, parseTimeMs);
-            _logger.LogDebug(
+            this.metrics.RecordCacheMiss(layer.ServiceId, layer.Id, filterLanguage, parseTimeMs);
+            this.logger.LogDebug(
                 "Filter cache MISS for service={ServiceId}, layer={LayerId}, language={Language}, parseTimeMs={ParseTimeMs}, estimatedSize={EstimatedSize}, key={CacheKey}",
                 layer.ServiceId, layer.Id, filterLanguage, parseTimeMs, estimatedSize, cacheKey);
         }
         else
         {
-            _metrics.RecordCacheMiss(layer.ServiceId, layer.Id, filterLanguage, parseTimeMs);
-            _logger.LogWarning(
+            this.metrics.RecordCacheMiss(layer.ServiceId, layer.Id, filterLanguage, parseTimeMs);
+            this.logger.LogWarning(
                 "Filter too large to cache: service={ServiceId}, layer={LayerId}, estimatedSize={EstimatedSize}, maxSize={MaxSize}",
-                layer.ServiceId, layer.Id, estimatedSize, _options.MaxSizeBytes);
+                layer.ServiceId, layer.Id, estimatedSize, this.options.MaxSizeBytes);
         }
 
         return parsedFilter;
@@ -150,7 +150,7 @@ public sealed class FilterParsingCacheService : IDisposable
         if (_cache is MemoryCache memCache)
         {
             memCache.Compact(1.0); // Remove 100% of entries
-            _logger.LogInformation("Filter parsing cache cleared");
+            this.logger.LogInformation("Filter parsing cache cleared");
         }
     }
 
@@ -301,11 +301,11 @@ public sealed class FilterParsingCacheService : IDisposable
     {
         if (value is CachedFilterEntry entry)
         {
-            _metrics.RecordEviction(reason.ToString(), entry.EstimatedSizeBytes);
+            this.metrics.RecordEviction(reason.ToString(), entry.EstimatedSizeBytes);
 
             if (reason == EvictionReason.Capacity)
             {
-                _logger.LogDebug(
+                this.logger.LogDebug(
                     "Filter cache entry evicted due to capacity: key={Key}, size={Size}",
                     key, entry.EstimatedSizeBytes);
             }
@@ -314,7 +314,7 @@ public sealed class FilterParsingCacheService : IDisposable
 
     public void Dispose()
     {
-        _cache.Dispose();
+        this.cache.Dispose();
     }
 
     /// <summary>

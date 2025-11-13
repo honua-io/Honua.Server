@@ -20,8 +20,8 @@ namespace Honua.Server.Host.Health;
 /// </summary>
 public sealed class GcsHealthCheck : HealthCheckBase
 {
-    private readonly StorageClient? _storageClient;
-    private readonly string? _testBucket;
+    private readonly StorageClient? storageClient;
+    private readonly string? testBucket;
 
     public GcsHealthCheck(
         ILogger<GcsHealthCheck> logger,
@@ -29,8 +29,8 @@ public sealed class GcsHealthCheck : HealthCheckBase
         string? testBucket = null)
         : base(logger)
     {
-        _storageClient = storageClient;
-        _testBucket = testBucket;
+        this.storageClient = storageClient;
+        this.testBucket = testBucket;
     }
 
     protected override async Task<HealthCheckResult> ExecuteHealthCheckAsync(
@@ -54,11 +54,11 @@ public sealed class GcsHealthCheck : HealthCheckBase
             // Note: GCS doesn't have a direct "ping" endpoint, so we test with bucket operations
 
             // If a test bucket is specified, verify access to it
-            if (_testBucket.HasValue())
+            if (this.testBucket.HasValue())
             {
                 try
                 {
-                    var bucket = await _storageClient.GetBucketAsync(
+                    var bucket = await this.storageClient.GetBucketAsync(
                         _testBucket,
                         cancellationToken: cancellationToken);
 

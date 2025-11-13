@@ -19,15 +19,15 @@ namespace Honua.Server.Host.API;
 [Authorize]
 public class DashboardController : ControllerBase
 {
-    private readonly ILogger<DashboardController> _logger;
-    private readonly IDashboardRepository _repository;
+    private readonly ILogger<DashboardController> logger;
+    private readonly IDashboardRepository repository;
 
     public DashboardController(
         ILogger<DashboardController> logger,
         IDashboardRepository repository)
     {
-        _logger = logger;
-        _repository = repository;
+        this.logger = logger;
+        this.repository = repository;
     }
 
     /// <summary>
@@ -41,10 +41,10 @@ public class DashboardController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetDashboard(Guid id)
     {
-        var dashboard = await _repository.GetByIdAsync(id);
+        var dashboard = await this.repository.GetByIdAsync(id);
         if (dashboard == null)
         {
-            return NotFound(new { message = "Dashboard not found" });
+            return this.NotFound(new { message = "Dashboard not found" });
         }
 
         var userId = GetUserId();
@@ -59,11 +59,11 @@ public class DashboardController : ControllerBase
         // Return different DTO based on ownership
         if (isOwner)
         {
-            return Ok(ToOwnerDto(dashboard));
+            return this.Ok(ToOwnerDto(dashboard));
         }
         else
         {
-            return Ok(ToPublicDto(dashboard));
+            return this.Ok(ToPublicDto(dashboard));
         }
     }
 
@@ -76,8 +76,8 @@ public class DashboardController : ControllerBase
     public async Task<ActionResult<List<DashboardDefinition>>> GetMyDashboards()
     {
         var userId = GetUserId();
-        var dashboards = await _repository.GetByOwnerAsync(userId);
-        return Ok(dashboards);
+        var dashboards = await this.repository.GetByOwnerAsync(userId);
+        return this.Ok(dashboards);
     }
 
     /// <summary>
@@ -89,9 +89,9 @@ public class DashboardController : ControllerBase
     [ProducesResponseType(typeof(List<PublicDashboardDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<PublicDashboardDto>>> GetPublicDashboards()
     {
-        var dashboards = await _repository.GetPublicDashboardsAsync();
+        var dashboards = await this.repository.GetPublicDashboardsAsync();
         var dtos = dashboards.Select(d => ToPublicDto(d)).ToList();
-        return Ok(dtos);
+        return this.Ok(dtos);
     }
 
     /// <summary>
@@ -102,8 +102,8 @@ public class DashboardController : ControllerBase
     [ProducesResponseType(typeof(List<DashboardDefinition>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<DashboardDefinition>>> GetTemplates()
     {
-        var templates = await _repository.GetTemplatesAsync();
-        return Ok(templates);
+        var templates = await this.repository.GetTemplatesAsync();
+        return this.Ok(templates);
     }
 
     /// <summary>
@@ -117,10 +117,10 @@ public class DashboardController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(q))
         {
-            return BadRequest(new { message = "Search query cannot be empty" });
+            return this.BadRequest(new { message = "Search query cannot be empty" });
         }
 
-        var dashboards = await _repository.SearchAsync(q);
+        var dashboards = await this.repository.SearchAsync(q);
 
         // Filter by access permissions and return appropriate DTOs
         var userId = GetUserId();
@@ -129,7 +129,7 @@ public class DashboardController : ControllerBase
             .Select(d => d.OwnerId == userId ? (PublicDashboardDto)ToOwnerDto(d) : ToPublicDto(d))
             .ToList();
 
-        return Ok(accessible);
+        return this.Ok(accessible);
     }
 
     /// <summary>
@@ -160,12 +160,12 @@ public class DashboardController : ControllerBase
             Theme = request.Theme
         };
 
-        var id = await _repository.CreateAsync(dashboard);
+        var id = await this.repository.CreateAsync(dashboard);
         dashboard.Id = id;
 
-        _logger.LogInformation("User {UserId} created dashboard {DashboardId}", userId, id);
+        this.logger.LogInformation("User {UserId} created dashboard {DashboardId}", userId, id);
 
-        return CreatedAtAction(nameof(GetDashboard), new { id }, dashboard);
+        return this.CreatedAtAction(nameof(GetDashboard), new { id }, dashboard);
     }
 
     /// <summary>
@@ -182,10 +182,10 @@ public class DashboardController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<DashboardDefinition>> UpdateDashboard(Guid id, [FromBody] UpdateDashboardRequest request)
     {
-        var existing = await _repository.GetByIdAsync(id);
+        var existing = await this.repository.GetByIdAsync(id);
         if (existing == null)
         {
-            return NotFound(new { message = "Dashboard not found" });
+            return this.NotFound(new { message = "Dashboard not found" });
         }
 
         var userId = GetUserId();
@@ -209,15 +209,15 @@ public class DashboardController : ControllerBase
             existing.IsPublic = request.IsPublic.Value;
         }
 
-        var success = await _repository.UpdateAsync(existing);
+        var success = await this.repository.UpdateAsync(existing);
         if (!success)
         {
-            return StatusCode(500, new { message = "Failed to update dashboard" });
+            return this.StatusCode(500, new { message = "Failed to update dashboard" });
         }
 
-        _logger.LogInformation("User {UserId} updated dashboard {DashboardId}", userId, id);
+        this.logger.LogInformation("User {UserId} updated dashboard {DashboardId}", userId, id);
 
-        return Ok(existing);
+        return this.Ok(existing);
     }
 
     /// <summary>
@@ -233,10 +233,10 @@ public class DashboardController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteDashboard(Guid id)
     {
-        var existing = await _repository.GetByIdAsync(id);
+        var existing = await this.repository.GetByIdAsync(id);
         if (existing == null)
         {
-            return NotFound(new { message = "Dashboard not found" });
+            return this.NotFound(new { message = "Dashboard not found" });
         }
 
         var userId = GetUserId();
@@ -245,15 +245,15 @@ public class DashboardController : ControllerBase
             return Forbid();
         }
 
-        var success = await _repository.DeleteAsync(id);
+        var success = await this.repository.DeleteAsync(id);
         if (!success)
         {
-            return StatusCode(500, new { message = "Failed to delete dashboard" });
+            return this.StatusCode(500, new { message = "Failed to delete dashboard" });
         }
 
-        _logger.LogInformation("User {UserId} deleted dashboard {DashboardId}", userId, id);
+        this.logger.LogInformation("User {UserId} deleted dashboard {DashboardId}", userId, id);
 
-        return NoContent();
+        return this.NoContent();
     }
 
     /// <summary>
@@ -270,10 +270,10 @@ public class DashboardController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ShareDashboard(Guid id, [FromBody] ShareDashboardRequest request)
     {
-        var existing = await _repository.GetByIdAsync(id);
+        var existing = await this.repository.GetByIdAsync(id);
         if (existing == null)
         {
-            return NotFound(new { message = "Dashboard not found" });
+            return this.NotFound(new { message = "Dashboard not found" });
         }
 
         var userId = GetUserId();
@@ -282,16 +282,16 @@ public class DashboardController : ControllerBase
             return Forbid();
         }
 
-        var success = await _repository.ShareAsync(id, request.IsPublic);
+        var success = await this.repository.ShareAsync(id, request.IsPublic);
         if (!success)
         {
-            return StatusCode(500, new { message = "Failed to update sharing settings" });
+            return this.StatusCode(500, new { message = "Failed to update sharing settings" });
         }
 
-        _logger.LogInformation("User {UserId} changed dashboard {DashboardId} sharing to {IsPublic}",
+        this.logger.LogInformation("User {UserId} changed dashboard {DashboardId} sharing to {IsPublic}",
             userId, id, request.IsPublic);
 
-        return Ok(new { message = $"Dashboard is now {(request.IsPublic ? "public" : "private")}" });
+        return this.Ok(new { message = $"Dashboard is now {(request.IsPublic ? "public" : "private")}" });
     }
 
     /// <summary>
@@ -307,17 +307,17 @@ public class DashboardController : ControllerBase
     public async Task<ActionResult<DashboardDefinition>> CloneDashboard(Guid id, [FromBody] CloneDashboardRequest request)
     {
         var userId = GetUserId();
-        var cloned = await _repository.CloneAsync(id, userId, request.Name);
+        var cloned = await this.repository.CloneAsync(id, userId, request.Name);
 
         if (cloned == null)
         {
-            return NotFound(new { message = "Source dashboard not found" });
+            return this.NotFound(new { message = "Source dashboard not found" });
         }
 
-        _logger.LogInformation("User {UserId} cloned dashboard {SourceId} to {ClonedId}",
+        this.logger.LogInformation("User {UserId} cloned dashboard {SourceId} to {ClonedId}",
             userId, id, cloned.Id);
 
-        return CreatedAtAction(nameof(GetDashboard), new { id = cloned.Id }, cloned);
+        return this.CreatedAtAction(nameof(GetDashboard), new { id = cloned.Id }, cloned);
     }
 
     /// <summary>
@@ -332,10 +332,10 @@ public class DashboardController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<DashboardDefinition>> ExportDashboard(Guid id)
     {
-        var dashboard = await _repository.GetByIdAsync(id);
+        var dashboard = await this.repository.GetByIdAsync(id);
         if (dashboard == null)
         {
-            return NotFound(new { message = "Dashboard not found" });
+            return this.NotFound(new { message = "Dashboard not found" });
         }
 
         var userId = GetUserId();
@@ -344,7 +344,7 @@ public class DashboardController : ControllerBase
             return Forbid();
         }
 
-        return Ok(dashboard);
+        return this.Ok(dashboard);
     }
 
     /// <summary>
@@ -365,12 +365,12 @@ public class DashboardController : ControllerBase
         dashboard.OwnerId = userId;
         dashboard.IsPublic = false; // Imported dashboards are private by default
 
-        var id = await _repository.CreateAsync(dashboard);
+        var id = await this.repository.CreateAsync(dashboard);
         dashboard.Id = id;
 
-        _logger.LogInformation("User {UserId} imported dashboard {DashboardId}", userId, id);
+        this.logger.LogInformation("User {UserId} imported dashboard {DashboardId}", userId, id);
 
-        return CreatedAtAction(nameof(GetDashboard), new { id }, dashboard);
+        return this.CreatedAtAction(nameof(GetDashboard), new { id }, dashboard);
     }
 
     private PublicDashboardDto ToPublicDto(DashboardDefinition dashboard)

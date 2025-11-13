@@ -11,23 +11,23 @@ namespace Honua.Server.Host.Middleware;
 /// </summary>
 public class SlowQueryLoggingMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<SlowQueryLoggingMiddleware> _logger;
-    private readonly SlowQueryOptions _options;
+    private readonly RequestDelegate next;
+    private readonly ILogger<SlowQueryLoggingMiddleware> logger;
+    private readonly SlowQueryOptions options;
 
     public SlowQueryLoggingMiddleware(
         RequestDelegate next,
         ILogger<SlowQueryLoggingMiddleware> logger,
         IConfiguration configuration)
     {
-        _next = next;
-        _logger = logger;
-        _options = new SlowQueryOptions(configuration);
+        this.next = next;
+        this.logger = logger;
+        this.options = new SlowQueryOptions(configuration);
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!_options.Enabled)
+        if (!this.options.Enabled)
         {
             await _next(context);
             return;
@@ -46,27 +46,27 @@ public class SlowQueryLoggingMiddleware
             stopwatch.Stop();
             var elapsed = stopwatch.ElapsedMilliseconds;
 
-            if (elapsed >= _options.SlowRequestThresholdMs)
+            if (elapsed >= this.options.SlowRequestThresholdMs)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Slow request detected: {Method} {Path} completed in {ElapsedMs}ms (threshold: {ThresholdMs}ms). Status: {StatusCode}",
                     method,
                     requestPath,
                     elapsed,
-                    _options.SlowRequestThresholdMs,
+                    this.options.SlowRequestThresholdMs,
                     context.Response.StatusCode);
 
                 // Log query string parameters if configured
-                if (_options.LogQueryParameters && context.Request.QueryString.HasValue)
+                if (this.options.LogQueryParameters && context.Request.QueryString.HasValue)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "Slow request query parameters: {QueryString}",
                         context.Request.QueryString.Value);
                 }
             }
-            else if (elapsed >= _options.WarnRequestThresholdMs)
+            else if (elapsed >= this.options.WarnRequestThresholdMs)
             {
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Request completed in {ElapsedMs}ms: {Method} {Path} (Status: {StatusCode})",
                     elapsed,
                     method,

@@ -14,13 +14,17 @@ namespace Honua.Server.Core.Raster.Compression;
 /// </summary>
 public sealed class CompressionCodecRegistry
 {
-    private readonly Dictionary<string, ICompressionCodec> _codecs;
-    private readonly ILogger<CompressionCodecRegistry> _logger;
+    private readonly Dictionary<string, ICompressionCodec> codecs;
+    private readonly ILogger<CompressionCodecRegistry> logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CompressionCodecRegistry"/> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
     public CompressionCodecRegistry(ILogger<CompressionCodecRegistry> logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _codecs = new Dictionary<string, ICompressionCodec>(StringComparer.OrdinalIgnoreCase);
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.codecs = new Dictionary<string, ICompressionCodec>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -35,13 +39,13 @@ public sealed class CompressionCodecRegistry
 
         var codecName = codec.CodecName.ToLowerInvariant();
 
-        if (_codecs.ContainsKey(codecName))
+        if (this.codecs.ContainsKey(codecName))
         {
             throw new InvalidOperationException($"Codec '{codecName}' is already registered");
         }
 
-        _codecs[codecName] = codec;
-        _logger.LogInformation("Registered compression codec: {CodecName} (Support: {SupportLevel})",
+        this.codecs[codecName] = codec;
+        this.logger.LogInformation("Registered compression codec: {CodecName} (Support: {SupportLevel})",
             codec.CodecName, codec.GetSupportLevel());
     }
 
@@ -60,9 +64,9 @@ public sealed class CompressionCodecRegistry
 
         var key = codecName.ToLowerInvariant();
 
-        if (!_codecs.TryGetValue(key, out var codec))
+        if (!this.codecs.TryGetValue(key, out var codec))
         {
-            var availableCodecs = string.Join(", ", _codecs.Keys);
+            var availableCodecs = string.Join(", ", this.codecs.Keys);
             throw new NotSupportedException(
                 $"Compression codec '{codecName}' is not supported. Available codecs: {availableCodecs}");
         }
@@ -82,7 +86,7 @@ public sealed class CompressionCodecRegistry
             return true; // No compression
         }
 
-        return _codecs.ContainsKey(codecName.ToLowerInvariant());
+        return this.codecs.ContainsKey(codecName.ToLowerInvariant());
     }
 
     /// <summary>
@@ -90,7 +94,7 @@ public sealed class CompressionCodecRegistry
     /// </summary>
     public IReadOnlyCollection<string> GetRegisteredCodecs()
     {
-        return _codecs.Keys.ToList().AsReadOnly();
+        return this.codecs.Keys.ToList().AsReadOnly();
     }
 
     /// <summary>
@@ -98,7 +102,7 @@ public sealed class CompressionCodecRegistry
     /// </summary>
     public IReadOnlyDictionary<string, string> GetCodecSupportLevels()
     {
-        return _codecs.ToDictionary(
+        return this.codecs.ToDictionary(
             kvp => kvp.Key,
             kvp => kvp.Value.GetSupportLevel(),
             StringComparer.OrdinalIgnoreCase);

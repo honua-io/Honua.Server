@@ -13,12 +13,12 @@ namespace Honua.Server.Host.Ogc.Services;
 /// </summary>
 public sealed class FilterParsingCacheMetrics : IDisposable
 {
-    private readonly Meter _meter;
-    private readonly Counter<long> _cacheHitsCounter;
-    private readonly Counter<long> _cacheMissesCounter;
-    private readonly Counter<long> _evictionsCounter;
-    private readonly Histogram<double> _parseTimeHistogram;
-    private readonly Histogram<long> _cacheEntrySizeHistogram;
+    private readonly Meter meter;
+    private readonly Counter<long> cacheHitsCounter;
+    private readonly Counter<long> cacheMissesCounter;
+    private readonly Counter<long> evictionsCounter;
+    private readonly Histogram<double> parseTimeHistogram;
+    private readonly Histogram<long> cacheEntrySizeHistogram;
 
     // In-memory counters for summary statistics
     private long _totalHits;
@@ -30,47 +30,47 @@ public sealed class FilterParsingCacheMetrics : IDisposable
     public FilterParsingCacheMetrics()
     {
         // Create a meter for filter parsing cache metrics
-        _meter = new Meter("Honua.Server.FilterParsingCache", "1.0");
+        this.meter = new Meter("Honua.Server.FilterParsingCache", "1.0");
 
         // Counter for cache hits
-        _cacheHitsCounter = _meter.CreateCounter<long>(
+        this.cacheHitsCounter = this.meter.CreateCounter<long>(
             "honua.filter_cache.hits",
             unit: "{hit}",
             description: "Number of filter parsing cache hits");
 
         // Counter for cache misses
-        _cacheMissesCounter = _meter.CreateCounter<long>(
+        this.cacheMissesCounter = this.meter.CreateCounter<long>(
             "honua.filter_cache.misses",
             unit: "{miss}",
             description: "Number of filter parsing cache misses");
 
         // Counter for cache evictions
-        _evictionsCounter = _meter.CreateCounter<long>(
+        this.evictionsCounter = this.meter.CreateCounter<long>(
             "honua.filter_cache.evictions",
             unit: "{eviction}",
             description: "Number of filter cache evictions");
 
         // Histogram for parse time (milliseconds)
-        _parseTimeHistogram = _meter.CreateHistogram<double>(
+        this.parseTimeHistogram = this.meter.CreateHistogram<double>(
             "honua.filter_cache.parse_time",
             unit: "ms",
             description: "Time spent parsing filters (cache misses only)");
 
         // Histogram for cache entry size (bytes)
-        _cacheEntrySizeHistogram = _meter.CreateHistogram<long>(
+        this.cacheEntrySizeHistogram = this.meter.CreateHistogram<long>(
             "honua.filter_cache.entry_size",
             unit: "bytes",
             description: "Estimated size of cached filter entries");
 
         // Observable gauge for cache hit rate
-        _meter.CreateObservableGauge(
+        this.meter.CreateObservableGauge(
             "honua.filter_cache.hit_rate",
             () => ComputeHitRate(),
             unit: "{ratio}",
             description: "Filter cache hit rate (hits / total requests)");
 
         // Observable gauge for total parse time saved
-        _meter.CreateObservableGauge(
+        this.meter.CreateObservableGauge(
             "honua.filter_cache.time_saved_ms",
             () => _totalParseTimeMs,
             unit: "ms",
@@ -92,7 +92,7 @@ public sealed class FilterParsingCacheMetrics : IDisposable
             { "result", "hit" }
         };
 
-        _cacheHitsCounter.Add(1, tags);
+        this.cacheHitsCounter.Add(1, tags);
     }
 
     /// <summary>
@@ -111,8 +111,8 @@ public sealed class FilterParsingCacheMetrics : IDisposable
             { "result", "miss" }
         };
 
-        _cacheMissesCounter.Add(1, tags);
-        _parseTimeHistogram.Record(parseTimeMs, tags);
+        this.cacheMissesCounter.Add(1, tags);
+        this.parseTimeHistogram.Record(parseTimeMs, tags);
     }
 
     /// <summary>
@@ -128,8 +128,8 @@ public sealed class FilterParsingCacheMetrics : IDisposable
             { "reason", reason }
         };
 
-        _evictionsCounter.Add(1, tags);
-        _cacheEntrySizeHistogram.Record(sizeBytes, tags);
+        this.evictionsCounter.Add(1, tags);
+        this.cacheEntrySizeHistogram.Record(sizeBytes, tags);
     }
 
     /// <summary>
@@ -168,7 +168,7 @@ public sealed class FilterParsingCacheMetrics : IDisposable
 
     public void Dispose()
     {
-        _meter.Dispose();
+        this.meter.Dispose();
     }
 }
 

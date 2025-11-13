@@ -27,13 +27,13 @@ namespace Honua.Server.Host.Wfs;
 /// </summary>
 internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
 {
-    private readonly IConnectionMultiplexer _redis;
-    private readonly IDatabase _database;
-    private readonly ILogger<RedisWfsLockManager> _logger;
-    private readonly IWfsLockManagerMetrics _metrics;
-    private readonly string _keyPrefix;
-    private readonly JsonSerializerOptions _jsonOptions;
-    private readonly ResiliencePipeline _resiliencePipeline;
+    private readonly IConnectionMultiplexer redis;
+    private readonly IDatabase database;
+    private readonly ILogger<RedisWfsLockManager> logger;
+    private readonly IWfsLockManagerMetrics metrics;
+    private readonly string keyPrefix;
+    private readonly JsonSerializerOptions jsonOptions;
+    private readonly ResiliencePipeline resiliencePipeline;
 
     public RedisWfsLockManager(
         IConnectionMultiplexer redis,
@@ -41,17 +41,17 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
         IWfsLockManagerMetrics? metrics = null,
         string keyPrefix = "honua:wfs:lock:")
     {
-        _redis = Guard.NotNull(redis);
-        _logger = Guard.NotNull(logger);
-        _metrics = metrics ?? new WfsLockManagerMetrics();
-        _keyPrefix = keyPrefix;
-        _database = _redis.GetDatabase();
-        _jsonOptions = JsonSerializerOptionsRegistry.Web;
+        this.redis = Guard.NotNull(redis);
+        this.logger = Guard.NotNull(logger);
+        this.metrics = metrics ?? new WfsLockManagerMetrics();
+        this.keyPrefix = keyPrefix;
+        this.database = this.redis.GetDatabase();
+        this.jsonOptions = JsonSerializerOptionsRegistry.Web;
 
         // Create circuit breaker for Redis operations
-        _resiliencePipeline = CreateCircuitBreakerPipeline();
+        this.resiliencePipeline = CreateCircuitBreakerPipeline();
 
-        _logger.LogInformation("RedisWfsLockManager initialized with prefix: {KeyPrefix}", _keyPrefix);
+        this.logger.LogInformation("RedisWfsLockManager initialized with prefix: {KeyPrefix}", _keyPrefix);
     }
 
     private ResiliencePipeline CreateCircuitBreakerPipeline()
@@ -72,22 +72,22 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                 OnOpened = args =>
                 {
                     var outcome = args.Outcome.Exception?.GetType().Name ?? "Unknown";
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "Circuit breaker OPENED for Redis WFS Lock Manager. Outcome: {Outcome}",
                         outcome);
-                    _metrics.RecordCircuitOpened(outcome);
+                    this.metrics.RecordCircuitOpened(outcome);
                     return default;
                 },
                 OnClosed = args =>
                 {
-                    _logger.LogInformation("Circuit breaker CLOSED for Redis WFS Lock Manager");
-                    _metrics.RecordCircuitClosed();
+                    this.logger.LogInformation("Circuit breaker CLOSED for Redis WFS Lock Manager");
+                    this.metrics.RecordCircuitClosed();
                     return default;
                 },
                 OnHalfOpened = args =>
                 {
-                    _logger.LogInformation("Circuit breaker HALF-OPEN for Redis WFS Lock Manager");
-                    _metrics.RecordCircuitHalfOpened();
+                    this.logger.LogInformation("Circuit breaker HALF-OPEN for Redis WFS Lock Manager");
+                    this.metrics.RecordCircuitHalfOpened();
                     return default;
                 }
             })
@@ -125,19 +125,19 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
             {
                 try
                 {
-                    var result = await _resiliencePipeline.ExecuteAsync(async ct =>
+                    var result = await this.resiliencePipeline.ExecuteAsync(async ct =>
                     {
                         // Check if any target is already locked
                         foreach (var target in targets)
                         {
                             var targetKey = GetTargetKey(target);
-                            var existingLockId = await _database.StringGetAsync(targetKey);
+                            var existingLockId = await this.database.StringGetAsync(targetKey);
 
                             if (!existingLockId.IsNullOrEmpty)
                             {
                                 // Check if the lock still exists
                                 var existingLockKey = GetLockKey(existingLockId.ToString());
-                                var lockJson = await _database.StringGetAsync(existingLockKey);
+                                var lockJson = await this.database.StringGetAsync(existingLockKey);
 
                                 if (!lockJson.IsNullOrEmpty)
                                 {
@@ -145,15 +145,15 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                                     if (existingLock != null)
                                     {
                                         var message = $"Feature '{FormatTarget(target)}' is locked until {existingLock.ExpiresAt:O}.";
-                                        _logger.LogWarning("Lock acquisition failed: {Message}", message);
-                                        _metrics.RecordLockAcquisitionFailed(serviceId, "conflict");
+                                        this.logger.LogWarning("Lock acquisition failed: {Message}", message);
+                                        this.metrics.RecordLockAcquisitionFailed(serviceId, "conflict");
                                         return new WfsLockAcquisitionResult(false, null, message);
                                     }
                                 }
                                 else
                                 {
                                     // Stale target index entry, clean it up
-                                    await _database.KeyDeleteAsync(targetKey);
+                                    await this.database.KeyDeleteAsync(targetKey);
                                 }
                             }
                         }
@@ -168,7 +168,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                         var json = JsonSerializer.Serialize(lockInfo, _jsonOptions);
                         var lockKey = GetLockKey(lockId);
 
-                        var transaction = _database.CreateTransaction();
+                        var transaction = this.database.CreateTransaction();
                         transaction.AddCondition(Condition.KeyNotExists(lockKey));
                         foreach (var entry in targetEntries)
                         {
@@ -184,10 +184,10 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                         var committed = await transaction.ExecuteAsync().ConfigureAwait(false);
                         if (!committed)
                         {
-                            _logger.LogWarning(
+                            this.logger.LogWarning(
                                 "Lock acquisition conflict detected for service {ServiceId}. Targets are already locked.",
                                 serviceId);
-                            _metrics.RecordLockAcquisitionFailed(serviceId, "conflict");
+                            this.metrics.RecordLockAcquisitionFailed(serviceId, "conflict");
                             return new WfsLockAcquisitionResult(
                                 false,
                                 null,
@@ -198,23 +198,23 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                         activity?.SetTag("wfs.lock_id", lockId);
                         activity?.SetTag("wfs.success", true);
 
-                        _metrics.RecordLockAcquired(serviceId, targets.Count, duration);
+                        this.metrics.RecordLockAcquired(serviceId, targets.Count, duration);
                         return new WfsLockAcquisitionResult(true, acquisition, null);
                     }, cancellationToken);
 
-                    _metrics.RecordOperationLatency("acquire", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordOperationLatency("acquire", Activity.Current?.Duration ?? TimeSpan.Zero);
                     return result;
                 }
                 catch (BrokenCircuitException ex)
                 {
-                    _metrics.RecordLockAcquisitionFailed(serviceId, "circuit_open");
-                    _metrics.RecordOperationLatency("acquire", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordLockAcquisitionFailed(serviceId, "circuit_open");
+                    this.metrics.RecordOperationLatency("acquire", Activity.Current?.Duration ?? TimeSpan.Zero);
                     throw new InvalidOperationException("WFS lock service is temporarily unavailable", ex);
                 }
                 catch (Exception ex) when (ex is not InvalidOperationException)
                 {
-                    _metrics.RecordLockAcquisitionFailed(serviceId, "error");
-                    _metrics.RecordOperationLatency("acquire", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordLockAcquisitionFailed(serviceId, "error");
+                    this.metrics.RecordOperationLatency("acquire", Activity.Current?.Duration ?? TimeSpan.Zero);
                     throw;
                 }
             });
@@ -238,19 +238,19 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
             {
                 try
                 {
-                    var result = await _resiliencePipeline.ExecuteAsync(async ct =>
+                    var result = await this.resiliencePipeline.ExecuteAsync(async ct =>
                     {
                         // If lockId is provided, verify it exists
                         if (lockId.HasValue())
                         {
                             var lockKey = GetLockKey(lockId);
-                            var exists = await _database.KeyExistsAsync(lockKey);
+                            var exists = await this.database.KeyExistsAsync(lockKey);
 
                             if (!exists)
                             {
                                 var message = $"Lock '{lockId}' is not active.";
-                                _logger.LogWarning("Lock validation failed: {Message}", message);
-                                _metrics.RecordLockValidated(serviceId, false);
+                                this.logger.LogWarning("Lock validation failed: {Message}", message);
+                                this.metrics.RecordLockValidated(serviceId, false);
                                 return new WfsLockValidationResult(false, message);
                             }
                         }
@@ -259,7 +259,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                         foreach (var target in targets)
                         {
                             var targetKey = GetTargetKey(target);
-                            var existingLockId = await _database.StringGetAsync(targetKey);
+                            var existingLockId = await this.database.StringGetAsync(targetKey);
 
                             if (existingLockId.IsNullOrEmpty)
                             {
@@ -269,28 +269,28 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                             if (!existingLockId.ToString().EqualsIgnoreCase(lockId))
                             {
                                 var message = $"Feature '{FormatTarget(target)}' is locked by another session.";
-                                _logger.LogWarning("Lock validation failed: {Message}", message);
-                                _metrics.RecordLockValidated(serviceId, false);
+                                this.logger.LogWarning("Lock validation failed: {Message}", message);
+                                this.metrics.RecordLockValidated(serviceId, false);
                                 return new WfsLockValidationResult(false, message);
                             }
                         }
 
                         activity?.SetTag("wfs.validation_passed", true);
-                        _metrics.RecordLockValidated(serviceId, true);
+                        this.metrics.RecordLockValidated(serviceId, true);
                         return new WfsLockValidationResult(true, null);
                     }, cancellationToken);
 
-                    _metrics.RecordOperationLatency("validate", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordOperationLatency("validate", Activity.Current?.Duration ?? TimeSpan.Zero);
                     return result;
                 }
                 catch (BrokenCircuitException ex)
                 {
-                    _metrics.RecordOperationLatency("validate", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordOperationLatency("validate", Activity.Current?.Duration ?? TimeSpan.Zero);
                     throw new InvalidOperationException("WFS lock service is temporarily unavailable", ex);
                 }
                 catch (Exception ex) when (ex is not InvalidOperationException)
                 {
-                    _metrics.RecordOperationLatency("validate", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordOperationLatency("validate", Activity.Current?.Duration ?? TimeSpan.Zero);
                     throw;
                 }
             });
@@ -316,21 +316,21 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
             {
                 try
                 {
-                    await _resiliencePipeline.ExecuteAsync(async ct =>
+                    await this.resiliencePipeline.ExecuteAsync(async ct =>
                     {
                         var lockKey = GetLockKey(lockId);
-                        var lockJson = await _database.StringGetAsync(lockKey);
+                        var lockJson = await this.database.StringGetAsync(lockKey);
 
                         if (lockJson.IsNullOrEmpty)
                         {
-                            _logger.LogDebug("Lock {LockId} not found for release", lockId);
+                            this.logger.LogDebug("Lock {LockId} not found for release", lockId);
                             return;
                         }
 
                         var lockInfo = JsonSerializer.Deserialize<LockInfo>(lockJson!, _jsonOptions);
                         if (lockInfo == null)
                         {
-                            _logger.LogWarning("Failed to deserialize lock info for {LockId}", lockId);
+                            this.logger.LogWarning("Failed to deserialize lock info for {LockId}", lockId);
                             return;
                         }
 
@@ -358,12 +358,12 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                             foreach (var target in lockInfo.Targets)
                             {
                                 var targetKey = GetTargetKey(target);
-                                await _database.KeyDeleteAsync(targetKey);
+                                await this.database.KeyDeleteAsync(targetKey);
                             }
 
-                            await _database.KeyDeleteAsync(lockKey);
+                            await this.database.KeyDeleteAsync(lockKey);
                             activity?.SetTag("wfs.targets_released", lockInfo.Targets.Count);
-                            _metrics.RecordLockReleased(serviceId, lockInfo.Targets.Count);
+                            this.metrics.RecordLockReleased(serviceId, lockInfo.Targets.Count);
                         }
                         else
                         {
@@ -375,42 +375,42 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                                 if (lockInfo.Targets.Contains(target))
                                 {
                                     var targetKey = GetTargetKey(target);
-                                    await _database.KeyDeleteAsync(targetKey);
+                                    await this.database.KeyDeleteAsync(targetKey);
                                 }
                             }
 
                             if (remainingTargets.Count == 0)
                             {
                                 // No targets left, delete the lock
-                                await _database.KeyDeleteAsync(lockKey);
+                                await this.database.KeyDeleteAsync(lockKey);
                                 activity?.SetTag("wfs.targets_released", lockInfo.Targets.Count);
-                                _metrics.RecordLockReleased(serviceId, lockInfo.Targets.Count);
+                                this.metrics.RecordLockReleased(serviceId, lockInfo.Targets.Count);
                             }
                             else
                             {
                                 // Update the lock with remaining targets
                                 var updatedLockInfo = lockInfo with { Targets = remainingTargets };
                                 var updatedJson = JsonSerializer.Serialize(updatedLockInfo, _jsonOptions);
-                                var ttl = await _database.KeyTimeToLiveAsync(lockKey);
-                                await _database.StringSetAsync(lockKey, updatedJson, ttl);
+                                var ttl = await this.database.KeyTimeToLiveAsync(lockKey);
+                                await this.database.StringSetAsync(lockKey, updatedJson, ttl);
                                 activity?.SetTag("wfs.targets_released", targets.Count);
                                 activity?.SetTag("wfs.targets_remaining", remainingTargets.Count);
-                                _metrics.RecordLockReleased(serviceId, targets.Count);
+                                this.metrics.RecordLockReleased(serviceId, targets.Count);
                             }
                         }
                     }, cancellationToken);
 
-                    _metrics.RecordOperationLatency("release", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordOperationLatency("release", Activity.Current?.Duration ?? TimeSpan.Zero);
                     return 0;
                 }
                 catch (BrokenCircuitException ex)
                 {
-                    _metrics.RecordOperationLatency("release", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordOperationLatency("release", Activity.Current?.Duration ?? TimeSpan.Zero);
                     throw new InvalidOperationException("WFS lock service is temporarily unavailable", ex);
                 }
                 catch (Exception ex) when (ex is not InvalidOperationException and not UnauthorizedAccessException)
                 {
-                    _metrics.RecordOperationLatency("release", Activity.Current?.Duration ?? TimeSpan.Zero);
+                    this.metrics.RecordOperationLatency("release", Activity.Current?.Duration ?? TimeSpan.Zero);
                     throw;
                 }
             });
@@ -420,19 +420,19 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
     {
         try
         {
-            var server = _redis.GetServer(_redis.GetEndPoints().First());
+            var server = this.redis.GetServer(this.redis.GetEndPoints().First());
             var keys = server.Keys(pattern: $"{_keyPrefix}*");
 
             foreach (var key in keys)
             {
-                await _database.KeyDeleteAsync(key);
+                await this.database.KeyDeleteAsync(key);
             }
 
-            _logger.LogInformation("Reset all WFS locks in Redis");
+            this.logger.LogInformation("Reset all WFS locks in Redis");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error resetting WFS locks");
+            this.logger.LogError(ex, "Error resetting WFS locks");
             throw;
         }
     }

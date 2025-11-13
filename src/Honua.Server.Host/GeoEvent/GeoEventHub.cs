@@ -39,11 +39,11 @@ namespace Honua.Server.Host.GeoEvent;
 [Authorize]
 public class GeoEventHub : Hub
 {
-    private readonly ILogger<GeoEventHub> _logger;
+    private readonly ILogger<GeoEventHub> logger;
 
     public GeoEventHub(ILogger<GeoEventHub> logger)
     {
-        _logger = logger;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -55,7 +55,7 @@ public class GeoEventHub : Hub
         var groupName = $"entity:{entityId}";
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to entity {EntityId}",
             Context.ConnectionId,
             entityId);
@@ -76,7 +76,7 @@ public class GeoEventHub : Hub
         var groupName = $"entity:{entityId}";
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} unsubscribed from entity {EntityId}",
             Context.ConnectionId,
             entityId);
@@ -90,7 +90,7 @@ public class GeoEventHub : Hub
         var groupName = $"geofence:{geofenceId}";
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to geofence {GeofenceId}",
             Context.ConnectionId,
             geofenceId);
@@ -111,7 +111,7 @@ public class GeoEventHub : Hub
         var groupName = $"geofence:{geofenceId}";
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} unsubscribed from geofence {GeofenceId}",
             Context.ConnectionId,
             geofenceId);
@@ -125,7 +125,7 @@ public class GeoEventHub : Hub
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, "all-events");
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to all events",
             Context.ConnectionId);
 
@@ -138,13 +138,13 @@ public class GeoEventHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        _logger.LogInformation("Client {ConnectionId} connected to GeoEvent hub", Context.ConnectionId);
+        this.logger.LogInformation("Client {ConnectionId} connected to GeoEvent hub", Context.ConnectionId);
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} disconnected from GeoEvent hub. Exception: {Exception}",
             Context.ConnectionId,
             exception?.Message);
@@ -174,15 +174,15 @@ public interface IGeoEventBroadcaster
 /// </summary>
 public class SignalRGeoEventBroadcaster : IGeoEventBroadcaster
 {
-    private readonly IHubContext<GeoEventHub> _hubContext;
-    private readonly ILogger<SignalRGeoEventBroadcaster> _logger;
+    private readonly IHubContext<GeoEventHub> hubContext;
+    private readonly ILogger<SignalRGeoEventBroadcaster> logger;
 
     public SignalRGeoEventBroadcaster(
         IHubContext<GeoEventHub> hubContext,
         ILogger<SignalRGeoEventBroadcaster> logger)
     {
-        _hubContext = hubContext;
-        _logger = logger;
+        this.hubContext = hubContext;
+        this.logger = logger;
     }
 
     public async Task BroadcastEventAsync(GeofenceEvent geofenceEvent, Geofence geofence)
@@ -193,16 +193,16 @@ public class SignalRGeoEventBroadcaster : IGeoEventBroadcaster
         {
             // Broadcast to entity-specific subscribers
             var entityGroup = $"entity:{geofenceEvent.EntityId}";
-            await _hubContext.Clients.Group(entityGroup).SendAsync("GeofenceEvent", payload);
+            await this.hubContext.Clients.Group(entityGroup).SendAsync("GeofenceEvent", payload);
 
             // Broadcast to geofence-specific subscribers
             var geofenceGroup = $"geofence:{geofence.Id}";
-            await _hubContext.Clients.Group(geofenceGroup).SendAsync("GeofenceEvent", payload);
+            await this.hubContext.Clients.Group(geofenceGroup).SendAsync("GeofenceEvent", payload);
 
             // Broadcast to all-events subscribers
-            await _hubContext.Clients.Group("all-events").SendAsync("GeofenceEvent", payload);
+            await this.hubContext.Clients.Group("all-events").SendAsync("GeofenceEvent", payload);
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Broadcasted geofence event {EventId} ({EventType}) for entity {EntityId}",
                 geofenceEvent.Id,
                 geofenceEvent.EventType,
@@ -210,7 +210,7 @@ public class SignalRGeoEventBroadcaster : IGeoEventBroadcaster
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error broadcasting geofence event {EventId}", geofenceEvent.Id);
+            this.logger.LogError(ex, "Error broadcasting geofence event {EventId}", geofenceEvent.Id);
         }
     }
 

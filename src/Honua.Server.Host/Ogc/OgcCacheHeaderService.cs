@@ -21,12 +21,12 @@ namespace Honua.Server.Host.Ogc;
 /// </summary>
 public sealed class OgcCacheHeaderService
 {
-    private readonly CacheHeaderOptions _options;
+    private readonly CacheHeaderOptions options;
 
     public OgcCacheHeaderService(IOptions<CacheHeaderOptions> options)
     {
         Guard.NotNull(options);
-        _options = options.Value;
+        this.options = options.Value;
     }
 
     /// <summary>
@@ -36,7 +36,7 @@ public sealed class OgcCacheHeaderService
     {
         Guard.NotNull(context);
 
-        if (!_options.EnableCaching)
+        if (!this.options.EnableCaching)
         {
             context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
             context.Response.Headers.Pragma = "no-cache";
@@ -48,21 +48,21 @@ public sealed class OgcCacheHeaderService
         context.Response.Headers.CacheControl = cacheControl;
 
         // Add ETag if provided and enabled
-        if (_options.EnableETagGeneration && etag.HasValue())
+        if (this.options.EnableETagGeneration && etag.HasValue())
         {
             context.Response.Headers.ETag = etag;
         }
 
         // Add Last-Modified if provided and enabled
-        if (_options.EnableLastModifiedHeaders && lastModified.HasValue)
+        if (this.options.EnableLastModifiedHeaders && lastModified.HasValue)
         {
             context.Response.Headers.LastModified = lastModified.Value.ToString("R");
         }
 
         // Add Vary headers for content negotiation
-        if (_options.VaryHeaders?.Length > 0)
+        if (this.options.VaryHeaders?.Length > 0)
         {
-            context.Response.Headers.Vary = string.Join(", ", _options.VaryHeaders);
+            context.Response.Headers.Vary = string.Join(", ", this.options.VaryHeaders);
         }
     }
 
@@ -73,7 +73,7 @@ public sealed class OgcCacheHeaderService
     {
         Guard.NotNull(context);
 
-        if (!_options.EnableConditionalRequests)
+        if (!this.options.EnableConditionalRequests)
         {
             return false;
         }
@@ -81,7 +81,7 @@ public sealed class OgcCacheHeaderService
         var request = context.Request;
 
         // Check If-None-Match (ETag validation)
-        if (_options.EnableETagGeneration && etag.HasValue())
+        if (this.options.EnableETagGeneration && etag.HasValue())
         {
             if (request.Headers.TryGetValue(HeaderNames.IfNoneMatch, out var ifNoneMatchValues))
             {
@@ -112,7 +112,7 @@ public sealed class OgcCacheHeaderService
         }
 
         // Check If-Modified-Since (Last-Modified validation)
-        if (_options.EnableLastModifiedHeaders && lastModified.HasValue)
+        if (this.options.EnableLastModifiedHeaders && lastModified.HasValue)
         {
             if (request.Headers.TryGetValue(HeaderNames.IfModifiedSince, out var ifModifiedSinceValues))
             {
@@ -206,7 +206,7 @@ public sealed class OgcCacheHeaderService
         var parts = new System.Collections.Generic.List<string>();
 
         // Public or private
-        if (_options.UsePublicCacheDirective)
+        if (this.options.UsePublicCacheDirective)
         {
             parts.Add("public");
         }
@@ -219,33 +219,33 @@ public sealed class OgcCacheHeaderService
         switch (resourceType)
         {
             case OgcResourceType.Tile:
-                parts.Add($"max-age={_options.TileCacheDurationSeconds}");
-                if (_options.MarkTilesAsImmutable)
+                parts.Add($"max-age={this.options.TileCacheDurationSeconds}");
+                if (this.options.MarkTilesAsImmutable)
                 {
                     parts.Add("immutable");
                 }
                 break;
 
             case OgcResourceType.Metadata:
-                parts.Add($"max-age={_options.MetadataCacheDurationSeconds}");
+                parts.Add($"max-age={this.options.MetadataCacheDurationSeconds}");
                 break;
 
             case OgcResourceType.Feature:
-                parts.Add($"max-age={_options.FeatureCacheDurationSeconds}");
+                parts.Add($"max-age={this.options.FeatureCacheDurationSeconds}");
                 break;
 
             case OgcResourceType.Style:
-                parts.Add($"max-age={_options.StyleCacheDurationSeconds}");
+                parts.Add($"max-age={this.options.StyleCacheDurationSeconds}");
                 break;
 
             case OgcResourceType.TileMatrixSet:
             case OgcResourceType.ApiDefinition:
             case OgcResourceType.Queryables:
-                parts.Add($"max-age={_options.TileMatrixSetCacheDurationSeconds}");
+                parts.Add($"max-age={this.options.TileMatrixSetCacheDurationSeconds}");
                 break;
 
             default:
-                parts.Add($"max-age={_options.MetadataCacheDurationSeconds}");
+                parts.Add($"max-age={this.options.MetadataCacheDurationSeconds}");
                 break;
         }
 

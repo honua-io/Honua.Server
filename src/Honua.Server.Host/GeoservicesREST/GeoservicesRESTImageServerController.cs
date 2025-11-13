@@ -35,12 +35,12 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
 {
     private const double GeoServicesVersion = 10.81;
 
-    private readonly ICatalogProjectionService _catalog;
-    private readonly IRasterDatasetRegistry _rasterRegistry;
-    private readonly IRasterRenderer _rasterRenderer;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IRasterAnalyticsService _analytics;
-    private readonly ILogger<GeoservicesRESTImageServerController> _logger;
+    private readonly ICatalogProjectionService catalog;
+    private readonly IRasterDatasetRegistry rasterRegistry;
+    private readonly IRasterRenderer rasterRenderer;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly IRasterAnalyticsService analytics;
+    private readonly ILogger<GeoservicesRESTImageServerController> logger;
 
     public GeoservicesRESTImageServerController(
         ICatalogProjectionService catalog,
@@ -50,12 +50,12 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         IRasterAnalyticsService analytics,
         ILogger<GeoservicesRESTImageServerController> logger)
     {
-        _catalog = Guard.NotNull(catalog);
-        _rasterRegistry = Guard.NotNull(rasterRegistry);
-        _rasterRenderer = Guard.NotNull(rasterRenderer);
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _analytics = Guard.NotNull(analytics);
-        _logger = Guard.NotNull(logger);
+        this.catalog = Guard.NotNull(catalog);
+        this.rasterRegistry = Guard.NotNull(rasterRegistry);
+        this.rasterRenderer = Guard.NotNull(rasterRenderer);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.analytics = Guard.NotNull(analytics);
+        this.logger = Guard.NotNull(logger);
     }
 
     [HttpGet]
@@ -67,18 +67,18 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
-        var datasets = await _rasterRegistry.GetByServiceAsync(serviceView.Service.Id, cancellationToken).ConfigureAwait(false);
+        var datasets = await this.rasterRegistry.GetByServiceAsync(serviceView.Service.Id, cancellationToken).ConfigureAwait(false);
         var rasterDatasets = datasets.Where(IsRenderableDataset).ToArray();
         if (rasterDatasets.Length == 0)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var summary = GeoservicesRESTMetadataMapper.CreateImageServiceSummary(serviceView, rasterDatasets, GeoServicesVersion);
-        return Ok(summary);
+        return this.Ok(summary);
     }
 
     [HttpGet("exportImage")]
@@ -99,7 +99,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 var serviceView = ResolveService(folderId, serviceId);
                 if (serviceView is null)
                 {
-                    return NotFound();
+                    return this.NotFound();
                 }
 
                 // Parse export parameters using shared helper
@@ -135,16 +135,16 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                     style,
                     null);
 
-                var result = await _rasterRenderer.RenderAsync(renderRequest, cancellationToken).ConfigureAwait(false);
+                var result = await this.rasterRenderer.RenderAsync(renderRequest, cancellationToken).ConfigureAwait(false);
                 if (result.Content.CanSeek)
                 {
                     result.Content.Seek(0, SeekOrigin.Begin);
                 }
 
-                Response.Headers["X-Rendered-Dataset"] = parameters.Dataset.Id;
-                Response.Headers["X-Target-CRS"] = parameters.TargetCrs;
+                this.Response.Headers["X-Rendered-Dataset"] = parameters.Dataset.Id;
+                this.Response.Headers["X-Target-CRS"] = parameters.TargetCrs;
 
-                return File(result.Content, result.ContentType);
+                return this.File(result.Content, result.ContentType);
             }).ConfigureAwait(false);
     }
 
@@ -157,14 +157,14 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
-        var datasets = await _rasterRegistry.GetByServiceAsync(serviceView.Service.Id, cancellationToken).ConfigureAwait(false);
+        var datasets = await this.rasterRegistry.GetByServiceAsync(serviceView.Service.Id, cancellationToken).ConfigureAwait(false);
         var rasterDatasets = datasets.Where(IsRenderableDataset).ToArray();
         if (rasterDatasets.Length == 0)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var layers = rasterDatasets.Select(dataset => new
@@ -174,7 +174,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
             legend = BuildLegendEntries(dataset)
         }).ToArray();
 
-        return Ok(new
+        return this.Ok(new
         {
             currentVersion = GeoServicesVersion,
             layers
@@ -187,29 +187,29 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         string serviceId,
         CancellationToken cancellationToken)
     {
-        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
+        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, this.Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
         if (problem is not null)
         {
             return problem;
         }
 
-        var styleIdRaw = Request.Query.TryGetValue("styleId", out var styleValues) ? styleValues.ToString() : null;
+        var styleIdRaw = this.Request.Query.TryGetValue("styleId", out var styleValues) ? styleValues.ToString() : null;
         if (!GeoservicesRESTRasterRequestParser.TryResolveStyle(dataset!, styleIdRaw, out var resolvedStyle, out var unresolvedStyle))
         {
-            return BadRequest(new { error = $"Style '{unresolvedStyle}' is not defined for raster dataset '{dataset!.Id}'." });
+            return this.BadRequest(new { error = $"Style '{unresolvedStyle}' is not defined for raster dataset '{dataset!.Id}'." });
         }
 
-        var geometryText = Request.Query.TryGetValue("geometry", out var geometryValues) ? geometryValues.ToString() : null;
+        var geometryText = this.Request.Query.TryGetValue("geometry", out var geometryValues) ? geometryValues.ToString() : null;
         if (!TryParsePoint(geometryText, out var x, out var y, out var geometryWkid))
         {
-            return BadRequest(new { error = "Parameter 'geometry' must be a JSON point with x and y coordinates." });
+            return this.BadRequest(new { error = "Parameter 'geometry' must be a JSON point with x and y coordinates." });
         }
 
-        var sr = ResolveSpatialReference(Request.Query.TryGetValue("sr", out var srValues) ? srValues.ToString() : null, geometryWkid, dataset!);
+        var sr = ResolveSpatialReference(this.Request.Query.TryGetValue("sr", out var srValues) ? srValues.ToString() : null, geometryWkid, dataset!);
 
         try
         {
-            var extraction = await _analytics.ExtractValuesAsync(
+            var extraction = await this.analytics.ExtractValuesAsync(
                 new RasterValueExtractionRequest(
                     dataset!,
                     new[] { new RasterPoint(x, y) }),
@@ -218,7 +218,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
             var sample = extraction.Values.FirstOrDefault();
             if (sample is null)
             {
-                return NotFound(new { error = "No sample is available at the requested location." });
+                return this.NotFound(new { error = "No sample is available at the requested location." });
             }
 
             var values = sample.Value.HasValue
@@ -244,7 +244,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 value = values
             };
 
-            return Ok(new { samples = new[] { payload } });
+            return this.Ok(new { samples = new[] { payload } });
         }
         catch (OperationCanceledException)
         {
@@ -252,8 +252,8 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to extract raster sample for dataset {DatasetId}", dataset!.Id);
-            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
+            this.logger.LogError(ex, "Failed to extract raster sample for dataset {DatasetId}", dataset!.Id);
+            return this.StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
         }
     }
 
@@ -263,23 +263,23 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         string serviceId,
         CancellationToken cancellationToken)
     {
-        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
+        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, this.Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
         if (problem is not null)
         {
             return problem;
         }
 
-        var geometryText = Request.Query.TryGetValue("geometry", out var geometryValues) ? geometryValues.ToString() : null;
+        var geometryText = this.Request.Query.TryGetValue("geometry", out var geometryValues) ? geometryValues.ToString() : null;
         if (!TryParsePoint(geometryText, out var x, out var y, out _))
         {
-            return BadRequest(new { error = "Parameter 'geometry' must be a JSON point with x and y coordinates." });
+            return this.BadRequest(new { error = "Parameter 'geometry' must be a JSON point with x and y coordinates." });
         }
 
-        var sr = ResolveSpatialReference(Request.Query.TryGetValue("sr", out var srValues) ? srValues.ToString() : null, null, dataset!);
+        var sr = ResolveSpatialReference(this.Request.Query.TryGetValue("sr", out var srValues) ? srValues.ToString() : null, null, dataset!);
 
         try
         {
-            var extraction = await _analytics.ExtractValuesAsync(
+            var extraction = await this.analytics.ExtractValuesAsync(
                 new RasterValueExtractionRequest(
                     dataset!,
                     new[] { new RasterPoint(x, y) }),
@@ -288,7 +288,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
             var sample = extraction.Values.FirstOrDefault();
             if (sample is null)
             {
-                return NotFound(new { error = "No pixel values are available at the requested location." });
+                return this.NotFound(new { error = "No pixel values are available at the requested location." });
             }
 
             var value = sample.Value.HasValue
@@ -314,7 +314,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 }
             };
 
-            return Ok(new { catalogItems });
+            return this.Ok(new { catalogItems });
         }
         catch (OperationCanceledException)
         {
@@ -322,8 +322,8 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to identify raster sample for dataset {DatasetId}", dataset!.Id);
-            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
+            this.logger.LogError(ex, "Failed to identify raster sample for dataset {DatasetId}", dataset!.Id);
+            return this.StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
         }
     }
 
@@ -333,12 +333,12 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         string serviceId,
         CancellationToken cancellationToken)
     {
-        if (!ResolveBins(Request.Query.TryGetValue("bins", out var binValues) ? binValues.ToString() : null, out var bins, out var validationError))
+        if (!ResolveBins(this.Request.Query.TryGetValue("bins", out var binValues) ? binValues.ToString() : null, out var bins, out var validationError))
         {
-            return BadRequest(new { error = validationError });
+            return this.BadRequest(new { error = validationError });
         }
 
-        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
+        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, this.Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
         if (problem is not null)
         {
             return problem;
@@ -346,11 +346,11 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
 
         try
         {
-            var histogram = await _analytics.CalculateHistogramAsync(
+            var histogram = await this.analytics.CalculateHistogramAsync(
                 new RasterHistogramRequest(dataset!, bins),
                 cancellationToken).ConfigureAwait(false);
 
-            var statistics = await _analytics.CalculateStatisticsAsync(
+            var statistics = await this.analytics.CalculateStatisticsAsync(
                 new RasterStatisticsRequest(dataset!),
                 cancellationToken).ConfigureAwait(false);
 
@@ -379,7 +379,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 }
             };
 
-            return Ok(new { histograms });
+            return this.Ok(new { histograms });
         }
         catch (OperationCanceledException)
         {
@@ -387,8 +387,8 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to compute histogram for dataset {DatasetId}", dataset!.Id);
-            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
+            this.logger.LogError(ex, "Failed to compute histogram for dataset {DatasetId}", dataset!.Id);
+            return this.StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
         }
     }
 
@@ -398,7 +398,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         string serviceId,
         CancellationToken cancellationToken)
     {
-        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
+        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, this.Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
         if (problem is not null)
         {
             return problem;
@@ -406,7 +406,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
 
         try
         {
-            var statistics = await _analytics.CalculateStatisticsAsync(
+            var statistics = await this.analytics.CalculateStatisticsAsync(
                 new RasterStatisticsRequest(dataset!),
                 cancellationToken).ConfigureAwait(false);
 
@@ -443,7 +443,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 })
                 .ToArray();
 
-            return Ok(new { fields, features });
+            return this.Ok(new { fields, features });
         }
         catch (OperationCanceledException)
         {
@@ -451,8 +451,8 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve raster attributes for dataset {DatasetId}", dataset!.Id);
-            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
+            this.logger.LogError(ex, "Failed to retrieve raster attributes for dataset {DatasetId}", dataset!.Id);
+            return this.StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
         }
     }
 
@@ -462,7 +462,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         string serviceId,
         CancellationToken cancellationToken)
     {
-        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
+        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, this.Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
         if (problem is not null)
         {
             return problem;
@@ -470,7 +470,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
 
         try
         {
-            var statistics = await _analytics.CalculateStatisticsAsync(
+            var statistics = await this.analytics.CalculateStatisticsAsync(
                 new RasterStatisticsRequest(dataset!),
                 cancellationToken).ConfigureAwait(false);
 
@@ -509,7 +509,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 bands
             };
 
-            return Ok(info);
+            return this.Ok(info);
         }
         catch (OperationCanceledException)
         {
@@ -517,8 +517,8 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve raster info for dataset {DatasetId}", dataset!.Id);
-            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
+            this.logger.LogError(ex, "Failed to retrieve raster info for dataset {DatasetId}", dataset!.Id);
+            return this.StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
         }
     }
 
@@ -528,12 +528,12 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         string serviceId,
         CancellationToken cancellationToken)
     {
-        if (!ResolveBins(Request.Query.TryGetValue("bins", out var binValues) ? binValues.ToString() : null, out var bins, out var validationError))
+        if (!ResolveBins(this.Request.Query.TryGetValue("bins", out var binValues) ? binValues.ToString() : null, out var bins, out var validationError))
         {
-            return BadRequest(new { error = validationError });
+            return this.BadRequest(new { error = validationError });
         }
 
-        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
+        var (_, dataset, problem) = await ResolveDatasetAsync(folderId, serviceId, this.Request.Query["rasterId"], cancellationToken).ConfigureAwait(false);
         if (problem is not null)
         {
             return problem;
@@ -541,7 +541,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
 
         try
         {
-            var histogram = await _analytics.CalculateHistogramAsync(
+            var histogram = await this.analytics.CalculateHistogramAsync(
                 new RasterHistogramRequest(dataset!, bins),
                 cancellationToken).ConfigureAwait(false);
 
@@ -564,7 +564,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 }
             };
 
-            return Ok(new { histograms });
+            return this.Ok(new { histograms });
         }
         catch (OperationCanceledException)
         {
@@ -572,8 +572,8 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to compute pixel histogram for dataset {DatasetId}", dataset!.Id);
-            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
+            this.logger.LogError(ex, "Failed to compute pixel histogram for dataset {DatasetId}", dataset!.Id);
+            return this.StatusCode(StatusCodes.Status502BadGateway, new { error = "Raster analytics service is unavailable." });
         }
     }
 
@@ -592,7 +592,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
         RasterDatasetDefinition? dataset = null;
         if (rasterId.HasValue())
         {
-            dataset = await _rasterRegistry.FindAsync(rasterId, cancellationToken).ConfigureAwait(false);
+            dataset = await this.rasterRegistry.FindAsync(rasterId, cancellationToken).ConfigureAwait(false);
         }
 
         if (dataset is not null && !IsRenderableDataset(dataset))
@@ -602,7 +602,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
 
         if (dataset is null)
         {
-            var datasets = await _rasterRegistry.GetByServiceAsync(serviceView.Service.Id, cancellationToken).ConfigureAwait(false);
+            var datasets = await this.rasterRegistry.GetByServiceAsync(serviceView.Service.Id, cancellationToken).ConfigureAwait(false);
             dataset = datasets.FirstOrDefault(IsRenderableDataset);
         }
 
@@ -621,7 +621,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
             return null;
         }
 
-        var service = _catalog.GetService(serviceId);
+        var service = this.catalog.GetService(serviceId);
         if (service is null)
         {
             return null;

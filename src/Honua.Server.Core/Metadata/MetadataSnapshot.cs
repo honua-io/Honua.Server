@@ -15,9 +15,9 @@ namespace Honua.Server.Core.Metadata;
 
 public sealed class MetadataSnapshot
 {
-    private readonly IReadOnlyDictionary<string, ServiceDefinition> _serviceIndex;
-    private readonly IReadOnlyDictionary<string, StyleDefinition> _styleIndex;
-    private readonly IReadOnlyDictionary<string, LayerGroupDefinition> _layerGroupIndex;
+    private readonly IReadOnlyDictionary<string, ServiceDefinition> serviceIndex;
+    private readonly IReadOnlyDictionary<string, StyleDefinition> styleIndex;
+    private readonly IReadOnlyDictionary<string, LayerGroupDefinition> layerGroupIndex;
 
     public MetadataSnapshot(
         CatalogDefinition catalog,
@@ -30,21 +30,21 @@ public sealed class MetadataSnapshot
         IReadOnlyList<LayerGroupDefinition>? layerGroups = null,
         ServerDefinition? server = null)
     {
-        Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
-        Folders = folders ?? throw new ArgumentNullException(nameof(folders));
-        DataSources = dataSources ?? throw new ArgumentNullException(nameof(dataSources));
-        Layers = layers ?? throw new ArgumentNullException(nameof(layers));
-        RasterDatasets = rasterDatasets ?? Array.Empty<RasterDatasetDefinition>();
-        Styles = styles ?? Array.Empty<StyleDefinition>();
-        LayerGroups = layerGroups ?? Array.Empty<LayerGroupDefinition>();
-        Server = server ?? ServerDefinition.Default;
+        this.Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+        this.Folders = folders ?? throw new ArgumentNullException(nameof(folders));
+        this.DataSources = dataSources ?? throw new ArgumentNullException(nameof(dataSources));
+        this.Layers = layers ?? throw new ArgumentNullException(nameof(layers));
+        this.RasterDatasets = rasterDatasets ?? Array.Empty<RasterDatasetDefinition>();
+        this.Styles = styles ?? Array.Empty<StyleDefinition>();
+        this.LayerGroups = layerGroups ?? Array.Empty<LayerGroupDefinition>();
+        this.Server = server ?? ServerDefinition.Default;
 
         if (services is null)
         {
             throw new ArgumentNullException(nameof(services));
         }
 
-        ValidateMetadata(Catalog, Server, Folders, DataSources, services, Layers, RasterDatasets, Styles, LayerGroups);
+        ValidateMetadata(this.Catalog, this.Server, this.Folders, this.DataSources, services, this.Layers, this.RasterDatasets, this.Styles, this.LayerGroups);
 
         var serviceMap = new Dictionary<string, ServiceDefinition>(StringComparer.OrdinalIgnoreCase);
         foreach (var service in services)
@@ -66,11 +66,11 @@ public sealed class MetadataSnapshot
             serviceMap[serviceWithLayers.Id] = serviceWithLayers;
         }
 
-        Services = new ReadOnlyCollection<ServiceDefinition>(serviceMap.Values.ToList());
-        _serviceIndex = serviceMap;
+        this.Services = new ReadOnlyCollection<ServiceDefinition>(serviceMap.Values.ToList());
+        this.serviceIndex = serviceMap;
 
         var styleMap = new Dictionary<string, StyleDefinition>(StringComparer.OrdinalIgnoreCase);
-        foreach (var style in Styles)
+        foreach (var style in this.Styles)
         {
             if (style is null)
             {
@@ -80,10 +80,10 @@ public sealed class MetadataSnapshot
             styleMap[style.Id] = style;
         }
 
-        _styleIndex = styleMap;
+        this.styleIndex = styleMap;
 
         var layerGroupMap = new Dictionary<string, LayerGroupDefinition>(StringComparer.OrdinalIgnoreCase);
-        foreach (var layerGroup in LayerGroups)
+        foreach (var layerGroup in this.LayerGroups)
         {
             if (layerGroup is null)
             {
@@ -93,7 +93,7 @@ public sealed class MetadataSnapshot
             layerGroupMap[layerGroup.Id] = layerGroup;
         }
 
-        _layerGroupIndex = layerGroupMap;
+        this.layerGroupIndex = layerGroupMap;
     }
 
     public CatalogDefinition Catalog { get; }
@@ -892,7 +892,7 @@ public sealed class MetadataSnapshot
             throw new ArgumentNullException(nameof(id));
         }
 
-        if (!_serviceIndex.TryGetValue(id, out var service))
+        if (!this.serviceIndex.TryGetValue(id, out var service))
         {
             throw new ServiceNotFoundException(id);
         }
@@ -908,13 +908,13 @@ public sealed class MetadataSnapshot
             return false;
         }
 
-        return _serviceIndex.TryGetValue(id, out service!);
+        return this.serviceIndex.TryGetValue(id, out service!);
     }
 
     public bool TryGetLayer(string serviceId, string layerId, out LayerDefinition layer)
     {
         layer = null!;
-        if (!TryGetService(serviceId, out var service))
+        if (!this.TryGetService(serviceId, out var service))
         {
             return false;
         }
@@ -933,12 +933,12 @@ public sealed class MetadataSnapshot
 
     public bool TryGetStyle(string styleId, out StyleDefinition style)
     {
-        return _styleIndex.TryGetValue(styleId, out style!);
+        return this.styleIndex.TryGetValue(styleId, out style!);
     }
 
     public StyleDefinition GetStyle(string styleId)
     {
-        if (TryGetStyle(styleId, out var style))
+        if (this.TryGetStyle(styleId, out var style))
         {
             return style;
         }
@@ -949,7 +949,7 @@ public sealed class MetadataSnapshot
     public bool TryGetLayerGroup(string serviceId, string layerGroupId, out LayerGroupDefinition layerGroup)
     {
         layerGroup = null!;
-        if (!_layerGroupIndex.TryGetValue(layerGroupId, out var group))
+        if (!this.layerGroupIndex.TryGetValue(layerGroupId, out var group))
         {
             return false;
         }
@@ -966,7 +966,7 @@ public sealed class MetadataSnapshot
 
     public LayerGroupDefinition GetLayerGroup(string serviceId, string layerGroupId)
     {
-        if (TryGetLayerGroup(serviceId, layerGroupId, out var layerGroup))
+        if (this.TryGetLayerGroup(serviceId, layerGroupId, out var layerGroup))
         {
             return layerGroup;
         }

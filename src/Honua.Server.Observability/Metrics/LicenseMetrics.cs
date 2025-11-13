@@ -9,39 +9,43 @@ namespace Honua.Server.Observability.Metrics;
 /// </summary>
 public class LicenseMetrics
 {
-    private readonly ObservableGauge<int> _activeLicenses;
-    private readonly ObservableGauge<double> _licenseQuotaUsage;
-    private readonly Counter<long> _licenseRevocations;
-    private readonly Counter<long> _licenseValidations;
-    private readonly Counter<long> _quotaExceeded;
+    private readonly ObservableGauge<int> activeLicenses;
+    private readonly ObservableGauge<double> licenseQuotaUsage;
+    private readonly Counter<long> licenseRevocations;
+    private readonly Counter<long> licenseValidations;
+    private readonly Counter<long> quotaExceeded;
 
-    private readonly Dictionary<string, int> _activeLicensesByTier = new();
-    private readonly Dictionary<(string CustomerId, string QuotaType), double> _quotaUsageByCustomer = new();
-    private readonly object _lock = new();
+    private readonly Dictionary<string, int> activeLicensesByTier = new();
+    private readonly Dictionary<(string CustomerId, string QuotaType), double> quotaUsageByCustomer = new();
+    private readonly object lockObject = new();
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LicenseMetrics"/> class.
+    /// </summary>
+    /// <param name="meterFactory">The meter factory.</param>
     public LicenseMetrics(IMeterFactory meterFactory)
     {
         var meter = meterFactory.Create("Honua.License");
 
-        _activeLicenses = meter.CreateObservableGauge(
+        this.activeLicenses = meter.CreateObservableGauge(
             "active_licenses_total",
-            observeValues: ObserveActiveLicenses,
+            observeValues: this.ObserveActiveLicenses,
             description: "Current number of active licenses by tier");
 
-        _licenseQuotaUsage = meter.CreateObservableGauge(
+        this.licenseQuotaUsage = meter.CreateObservableGauge(
             "license_quota_usage_percent",
-            observeValues: ObserveLicenseQuotaUsage,
+            observeValues: this.ObserveLicenseQuotaUsage,
             description: "License quota usage percentage by customer and quota type");
 
-        _licenseRevocations = meter.CreateCounter<long>(
+        this.licenseRevocations = meter.CreateCounter<long>(
             "license_revocations_total",
             description: "Total number of license revocations");
 
-        _licenseValidations = meter.CreateCounter<long>(
+        this.licenseValidations = meter.CreateCounter<long>(
             "license_validations_total",
             description: "Total number of license validations");
 
-        _quotaExceeded = meter.CreateCounter<long>(
+        this.quotaExceeded = meter.CreateCounter<long>(
             "quota_exceeded_total",
             description: "Total number of quota exceeded events");
     }
@@ -49,31 +53,38 @@ public class LicenseMetrics
     /// <summary>
     /// Updates active license count for a tier.
     /// </summary>
+    /// <param name="tier">The license tier.</param>
+    /// <param name="count">The license count.</param>
     public void UpdateActiveLicenses(string tier, int count)
     {
-        lock (_lock)
+        lock (this.lockObject)
         {
-            _activeLicensesByTier[tier] = count;
+            this.activeLicensesByTier[tier] = count;
         }
     }
 
     /// <summary>
     /// Updates quota usage for a customer.
     /// </summary>
+    /// <param name="customerId">The customer ID.</param>
+    /// <param name="quotaType">The quota type.</param>
+    /// <param name="usagePercent">The usage percentage.</param>
     public void UpdateQuotaUsage(string customerId, string quotaType, double usagePercent)
     {
-        lock (_lock)
+        lock (this.lockObject)
         {
-            _quotaUsageByCustomer[(customerId, quotaType)] = usagePercent;
+            this.quotaUsageByCustomer[(customerId, quotaType)] = usagePercent;
         }
     }
 
     /// <summary>
     /// Records a license revocation.
     /// </summary>
+    /// <param name="reason">The revocation reason.</param>
+    /// <param name="tier">The license tier.</param>
     public void RecordRevocation(string reason, string tier)
     {
-        _licenseRevocations.Add(1,
+        this.licenseRevocations.Add(1,
             new KeyValuePair<string, object?>("reason", reason),
             new KeyValuePair<string, object?>("tier", tier));
     }
@@ -81,9 +92,11 @@ public class LicenseMetrics
     /// <summary>
     /// Records a license validation attempt.
     /// </summary>
+    /// <param name="success">Whether validation succeeded.</param>
+    /// <param name="tier">The license tier.</param>
     public void RecordValidation(bool success, string tier)
     {
-        _licenseValidations.Add(1,
+        this.licenseValidations.Add(1,
             new KeyValuePair<string, object?>("success", success.ToString()),
             new KeyValuePair<string, object?>("tier", tier));
     }
@@ -91,18 +104,20 @@ public class LicenseMetrics
     /// <summary>
     /// Records a quota exceeded event.
     /// </summary>
+    /// <param name="customerId">The customer ID.</param>
+    /// <param name="quotaType">The quota type.</param>
     public void RecordQuotaExceeded(string customerId, string quotaType)
     {
-        _quotaExceeded.Add(1,
+        this.quotaExceeded.Add(1,
             new KeyValuePair<string, object?>("customer_id", customerId),
             new KeyValuePair<string, object?>("quota_type", quotaType));
     }
 
     private IEnumerable<Measurement<int>> ObserveActiveLicenses()
     {
-        lock (_lock)
+        lock (this.lockObject)
         {
-            foreach (var kvp in _activeLicensesByTier)
+            foreach (var kvp in this.activeLicensesByTier)
             {
                 yield return new Measurement<int>(
                     kvp.Value,
@@ -113,9 +128,9 @@ public class LicenseMetrics
 
     private IEnumerable<Measurement<double>> ObserveLicenseQuotaUsage()
     {
-        lock (_lock)
+        lock (this.lockObject)
         {
-            foreach (var kvp in _quotaUsageByCustomer)
+            foreach (var kvp in this.quotaUsageByCustomer)
             {
                 yield return new Measurement<double>(
                     kvp.Value,

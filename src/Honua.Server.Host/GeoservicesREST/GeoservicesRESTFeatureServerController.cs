@@ -58,18 +58,18 @@ public sealed partial class GeoservicesRESTFeatureServerController : ControllerB
     private static readonly string[] UpdateFeaturesPropertyNames = { "features", "updates" };
     private static readonly string[] DeleteFeaturesPropertyNames = { "objectIds", "deletes" };
 
-    private readonly ICatalogProjectionService _catalog;
-    private readonly IFeatureRepository _repository;
-    private readonly IFeatureAttachmentOrchestrator _attachmentOrchestrator;
-    private readonly IAttachmentStoreSelector _attachmentStoreSelector;
-    private readonly IShapefileExporter _shapefileExporter;
-    private readonly ICsvExporter _csvExporter;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IGeoservicesAuditLogger _auditLogger;
-    private readonly IGeoservicesEditingService _editingService;
-    private readonly IGeoservicesQueryService _queryService;
-    private readonly StreamingKmlWriter _streamingKmlWriter;
-    private readonly ILogger<GeoservicesRESTFeatureServerController> _logger;
+    private readonly ICatalogProjectionService catalog;
+    private readonly IFeatureRepository repository;
+    private readonly IFeatureAttachmentOrchestrator attachmentOrchestrator;
+    private readonly IAttachmentStoreSelector attachmentStoreSelector;
+    private readonly IShapefileExporter shapefileExporter;
+    private readonly ICsvExporter csvExporter;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly IGeoservicesAuditLogger auditLogger;
+    private readonly IGeoservicesEditingService editingService;
+    private readonly IGeoservicesQueryService queryService;
+    private readonly StreamingKmlWriter streamingKmlWriter;
+    private readonly ILogger<GeoservicesRESTFeatureServerController> logger;
 
     public GeoservicesRESTFeatureServerController(
         ICatalogProjectionService catalog,
@@ -85,17 +85,17 @@ public sealed partial class GeoservicesRESTFeatureServerController : ControllerB
         StreamingKmlWriter streamingKmlWriter,
         ILogger<GeoservicesRESTFeatureServerController> logger)
     {
-        _catalog = Guard.NotNull(catalog);
-        _repository = Guard.NotNull(repository);
-        _attachmentOrchestrator = Guard.NotNull(attachmentOrchestrator);
-        _attachmentStoreSelector = Guard.NotNull(attachmentStoreSelector);
-        _shapefileExporter = Guard.NotNull(shapefileExporter);
-        _csvExporter = Guard.NotNull(csvExporter);
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _auditLogger = Guard.NotNull(auditLogger);
-        _queryService = Guard.NotNull(queryService);
-        _editingService = Guard.NotNull(editingService);
-        _streamingKmlWriter = Guard.NotNull(streamingKmlWriter);
-        _logger = Guard.NotNull(logger);
+        this.catalog = Guard.NotNull(catalog);
+        this.repository = Guard.NotNull(repository);
+        this.attachmentOrchestrator = Guard.NotNull(attachmentOrchestrator);
+        this.attachmentStoreSelector = Guard.NotNull(attachmentStoreSelector);
+        this.shapefileExporter = Guard.NotNull(shapefileExporter);
+        this.csvExporter = Guard.NotNull(csvExporter);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.auditLogger = Guard.NotNull(auditLogger);
+        this.queryService = Guard.NotNull(queryService);
+        this.editingService = Guard.NotNull(editingService);
+        this.streamingKmlWriter = Guard.NotNull(streamingKmlWriter);
+        this.logger = Guard.NotNull(logger);
     }
 }

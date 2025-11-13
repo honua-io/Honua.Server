@@ -31,9 +31,9 @@ public static class LocalBasicAuthenticationDefaults
 /// </summary>
 internal sealed class LocalBasicAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
-    private readonly ILocalAuthenticationService _authenticationService;
-    private readonly IOptionsMonitor<HonuaAuthenticationOptions> _options;
-    private readonly ISecurityAuditLogger _auditLogger;
+    private readonly ILocalAuthenticationService authenticationService;
+    private readonly IOptionsMonitor<HonuaAuthenticationOptions> options;
+    private readonly ISecurityAuditLogger auditLogger;
 
     public LocalBasicAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> schemeOptions,
@@ -45,14 +45,14 @@ internal sealed class LocalBasicAuthenticationHandler : AuthenticationHandler<Au
         ISecurityAuditLogger auditLogger)
         : base(schemeOptions, loggerFactory, encoder, clock)
     {
-        _authenticationService = Guard.NotNull(authenticationService);
-        _options = Guard.NotNull(options);
-        _auditLogger = Guard.NotNull(auditLogger);
+        this.authenticationService = Guard.NotNull(authenticationService);
+        this.options = Guard.NotNull(options);
+        this.auditLogger = Guard.NotNull(auditLogger);
     }
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var authorizationHeader = Request.Headers.Authorization.ToString();
+        var authorizationHeader = this.Request.Headers.Authorization.ToString();
         if (authorizationHeader.IsNullOrWhiteSpace() ||
             !authorizationHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
         {
@@ -66,7 +66,7 @@ internal sealed class LocalBasicAuthenticationHandler : AuthenticationHandler<Au
             return AuthenticateResult.Fail("Basic authentication requires HTTPS.");
         }
 
-        var options = _options.CurrentValue;
+        var options = this.options.CurrentValue;
         if (options.Mode != HonuaAuthenticationOptions.AuthenticationMode.Local)
         {
             Logger.LogWarning("Basic authentication attempted while local mode is disabled from {RemoteIp}", Context.Connection.RemoteIpAddress);
@@ -80,45 +80,45 @@ internal sealed class LocalBasicAuthenticationHandler : AuthenticationHandler<Au
         }
 
         var ipAddress = Context.Connection.RemoteIpAddress?.ToString();
-        var userAgent = Request.Headers.UserAgent.ToString();
+        var userAgent = this.Request.Headers.UserAgent.ToString();
 
         Logger.LogDebug("Attempting Basic authentication for user '{Username}' from {RemoteIp}", username, ipAddress);
 
-        var result = await _authenticationService.AuthenticateAsync(username, password, Context.RequestAborted).ConfigureAwait(false);
+        var result = await this.authenticationService.AuthenticateAsync(username, password, Context.RequestAborted).ConfigureAwait(false);
 
         switch (result.Status)
         {
             case LocalAuthenticationStatus.Success:
                 Logger.LogInformation("Successful Basic authentication for user '{Username}' from {RemoteIp}", username, ipAddress);
-                _auditLogger.LogLoginSuccess(username, ipAddress, userAgent);
+                this.auditLogger.LogLoginSuccess(username, ipAddress, userAgent);
                 return AuthenticateResult.Success(CreateTicket(result, username));
 
             case LocalAuthenticationStatus.PasswordExpiresSoon:
                 Logger.LogWarning("Basic authentication successful for user '{Username}' from {RemoteIp} but password expires soon",
                     username, ipAddress);
-                _auditLogger.LogLoginSuccess(username, ipAddress, userAgent);
+                this.auditLogger.LogLoginSuccess(username, ipAddress, userAgent);
                 return AuthenticateResult.Success(CreateTicket(result, username));
 
             case LocalAuthenticationStatus.InvalidCredentials:
                 Logger.LogWarning("Invalid credentials for user '{Username}' from {RemoteIp}", username, ipAddress);
-                _auditLogger.LogLoginFailure(username, ipAddress, userAgent, "invalid_credentials");
+                this.auditLogger.LogLoginFailure(username, ipAddress, userAgent, "invalid_credentials");
                 return AuthenticateResult.Fail("Invalid username or password.");
 
             case LocalAuthenticationStatus.LockedOut:
                 Logger.LogWarning("Account locked for user '{Username}' from {RemoteIp}, locked until {LockedUntil}",
                     username, ipAddress, result.LockedUntil ?? DateTimeOffset.UtcNow);
-                _auditLogger.LogAccountLockout(username, ipAddress, result.LockedUntil ?? DateTimeOffset.UtcNow);
+                this.auditLogger.LogAccountLockout(username, ipAddress, result.LockedUntil ?? DateTimeOffset.UtcNow);
                 return AuthenticateResult.Fail("Account locked.");
 
             case LocalAuthenticationStatus.Disabled:
                 Logger.LogWarning("Disabled account '{Username}' attempted authentication from {RemoteIp}", username, ipAddress);
-                _auditLogger.LogLoginFailure(username, ipAddress, userAgent, "account_disabled");
+                this.auditLogger.LogLoginFailure(username, ipAddress, userAgent, "account_disabled");
                 return AuthenticateResult.Fail("Account disabled.");
 
             case LocalAuthenticationStatus.PasswordExpired:
                 Logger.LogWarning("Expired password for user '{Username}' attempted authentication from {RemoteIp}",
                     username, ipAddress);
-                _auditLogger.LogLoginFailure(username, ipAddress, userAgent, "password_expired");
+                this.auditLogger.LogLoginFailure(username, ipAddress, userAgent, "password_expired");
                 return AuthenticateResult.Fail("Password expired.");
 
             case LocalAuthenticationStatus.NotConfigured:
@@ -134,7 +134,7 @@ internal sealed class LocalBasicAuthenticationHandler : AuthenticationHandler<Au
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
-        Response.Headers["WWW-Authenticate"] = $"Basic realm=\"Honua\", charset=\"UTF-8\"";
+        this.Response.Headers["WWW-Authenticate"] = $"Basic realm=\"Honua\", charset=\"UTF-8\"";
         return base.HandleChallengeAsync(properties);
     }
 

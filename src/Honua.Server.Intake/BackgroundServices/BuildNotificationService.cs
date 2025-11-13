@@ -46,22 +46,22 @@ public interface IBuildNotificationService
 /// </summary>
 public sealed class BuildNotificationService : IBuildNotificationService
 {
-    private readonly BuildQueueOptions _queueOptions;
-    private readonly EmailOptions _emailOptions;
-    private readonly ILogger<BuildNotificationService> _logger;
-    private readonly ResiliencePipeline _retryPipeline;
+    private readonly BuildQueueOptions queueOptions;
+    private readonly EmailOptions emailOptions;
+    private readonly ILogger<BuildNotificationService> logger;
+    private readonly ResiliencePipeline retryPipeline;
 
     public BuildNotificationService(
         IOptions<BuildQueueOptions> queueOptions,
         IOptions<EmailOptions> emailOptions,
         ILogger<BuildNotificationService> logger)
     {
-        _queueOptions = queueOptions?.Value ?? throw new ArgumentNullException(nameof(queueOptions));
-        _emailOptions = emailOptions?.Value ?? throw new ArgumentNullException(nameof(emailOptions));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.queueOptions = queueOptions?.Value ?? throw new ArgumentNullException(nameof(queueOptions));
+        this.emailOptions = emailOptions?.Value ?? throw new ArgumentNullException(nameof(emailOptions));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Configure retry policy with exponential backoff
-        _retryPipeline = new ResiliencePipelineBuilder()
+        this.retryPipeline = new ResiliencePipelineBuilder()
             .AddRetry(new RetryStrategyOptions
             {
                 MaxRetryAttempts = 3,
@@ -76,9 +76,9 @@ public sealed class BuildNotificationService : IBuildNotificationService
     /// <inheritdoc/>
     public async Task SendBuildQueuedAsync(BuildJob job, CancellationToken cancellationToken = default)
     {
-        if (!_queueOptions.EnableNotifications)
+        if (!this.queueOptions.EnableNotifications)
         {
-            _logger.LogDebug("Notifications disabled, skipping queued notification for job {JobId}", job.Id);
+            this.logger.LogDebug("Notifications disabled, skipping queued notification for job {JobId}", job.Id);
             return;
         }
 
@@ -89,20 +89,20 @@ public sealed class BuildNotificationService : IBuildNotificationService
 
             await SendEmailAsync(job.CustomerEmail, subject, body, cancellationToken);
 
-            _logger.LogInformation("Sent queued notification for build job {JobId}", job.Id);
+            this.logger.LogInformation("Sent queued notification for build job {JobId}", job.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to send queued notification for build job {JobId}", job.Id);
+            this.logger.LogWarning(ex, "Failed to send queued notification for build job {JobId}", job.Id);
         }
     }
 
     /// <inheritdoc/>
     public async Task SendBuildStartedAsync(BuildJob job, CancellationToken cancellationToken = default)
     {
-        if (!_queueOptions.EnableNotifications)
+        if (!this.queueOptions.EnableNotifications)
         {
-            _logger.LogDebug("Notifications disabled, skipping started notification for job {JobId}", job.Id);
+            this.logger.LogDebug("Notifications disabled, skipping started notification for job {JobId}", job.Id);
             return;
         }
 
@@ -113,11 +113,11 @@ public sealed class BuildNotificationService : IBuildNotificationService
 
             await SendEmailAsync(job.CustomerEmail, subject, body, cancellationToken);
 
-            _logger.LogInformation("Sent started notification for build job {JobId}", job.Id);
+            this.logger.LogInformation("Sent started notification for build job {JobId}", job.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to send started notification for build job {JobId}", job.Id);
+            this.logger.LogWarning(ex, "Failed to send started notification for build job {JobId}", job.Id);
         }
     }
 
@@ -127,9 +127,9 @@ public sealed class BuildNotificationService : IBuildNotificationService
         BuildResult result,
         CancellationToken cancellationToken = default)
     {
-        if (!_queueOptions.EnableNotifications)
+        if (!this.queueOptions.EnableNotifications)
         {
-            _logger.LogDebug("Notifications disabled, skipping completed notification for job {JobId}", job.Id);
+            this.logger.LogDebug("Notifications disabled, skipping completed notification for job {JobId}", job.Id);
             return;
         }
 
@@ -140,11 +140,11 @@ public sealed class BuildNotificationService : IBuildNotificationService
 
             await SendEmailAsync(job.CustomerEmail, subject, body, cancellationToken);
 
-            _logger.LogInformation("Sent completed notification for build job {JobId}", job.Id);
+            this.logger.LogInformation("Sent completed notification for build job {JobId}", job.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to send completed notification for build job {JobId}", job.Id);
+            this.logger.LogWarning(ex, "Failed to send completed notification for build job {JobId}", job.Id);
         }
     }
 
@@ -154,9 +154,9 @@ public sealed class BuildNotificationService : IBuildNotificationService
         string error,
         CancellationToken cancellationToken = default)
     {
-        if (!_queueOptions.EnableNotifications)
+        if (!this.queueOptions.EnableNotifications)
         {
-            _logger.LogDebug("Notifications disabled, skipping failed notification for job {JobId}", job.Id);
+            this.logger.LogDebug("Notifications disabled, skipping failed notification for job {JobId}", job.Id);
             return;
         }
 
@@ -167,11 +167,11 @@ public sealed class BuildNotificationService : IBuildNotificationService
 
             await SendEmailAsync(job.CustomerEmail, subject, body, cancellationToken);
 
-            _logger.LogInformation("Sent failed notification for build job {JobId}", job.Id);
+            this.logger.LogInformation("Sent failed notification for build job {JobId}", job.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to send failed notification for build job {JobId}", job.Id);
+            this.logger.LogWarning(ex, "Failed to send failed notification for build job {JobId}", job.Id);
         }
     }
 
@@ -185,21 +185,21 @@ public sealed class BuildNotificationService : IBuildNotificationService
     {
         if (string.IsNullOrWhiteSpace(recipientEmail))
         {
-            _logger.LogWarning("Cannot send email: recipient email is empty");
+            this.logger.LogWarning("Cannot send email: recipient email is empty");
             return;
         }
 
-        if (!_emailOptions.Enabled)
+        if (!this.emailOptions.Enabled)
         {
-            _logger.LogDebug("Email notifications disabled, skipping email to {Email}", recipientEmail);
+            this.logger.LogDebug("Email notifications disabled, skipping email to {Email}", recipientEmail);
             return;
         }
 
-        await _retryPipeline.ExecuteAsync(async ct =>
+        await this.retryPipeline.ExecuteAsync(async ct =>
         {
             using var message = new MailMessage
             {
-                From = new MailAddress(_emailOptions.FromAddress, _emailOptions.FromName),
+                From = new MailAddress(this.emailOptions.FromAddress, this.emailOptions.FromName),
                 Subject = subject,
                 Body = htmlBody,
                 IsBodyHtml = true
@@ -207,18 +207,18 @@ public sealed class BuildNotificationService : IBuildNotificationService
 
             message.To.Add(recipientEmail);
 
-            using var client = new SmtpClient(_emailOptions.SmtpServer, _emailOptions.SmtpPort)
+            using var client = new SmtpClient(this.emailOptions.SmtpServer, this.emailOptions.SmtpPort)
             {
-                EnableSsl = _emailOptions.UseSsl,
-                Timeout = _emailOptions.TimeoutSeconds * 1000
+                EnableSsl = this.emailOptions.UseSsl,
+                Timeout = this.emailOptions.TimeoutSeconds * 1000
             };
 
-            if (!string.IsNullOrWhiteSpace(_emailOptions.SmtpUsername) &&
-                !string.IsNullOrWhiteSpace(_emailOptions.SmtpPassword))
+            if (!string.IsNullOrWhiteSpace(this.emailOptions.SmtpUsername) &&
+                !string.IsNullOrWhiteSpace(this.emailOptions.SmtpPassword))
             {
                 client.Credentials = new NetworkCredential(
-                    _emailOptions.SmtpUsername,
-                    _emailOptions.SmtpPassword);
+                    this.emailOptions.SmtpUsername,
+                    this.emailOptions.SmtpPassword);
             }
 
             await client.SendMailAsync(message, ct);
@@ -310,7 +310,7 @@ public sealed class BuildNotificationService : IBuildNotificationService
     private string BuildCompletedEmailTemplate(BuildJob job, BuildResult result)
     {
         var durationMinutes = (int)Math.Ceiling(result.Duration.TotalMinutes);
-        var downloadUrl = result.DownloadUrl ?? _queueOptions.DownloadBaseUrl + "/" + job.Id;
+        var downloadUrl = result.DownloadUrl ?? this.queueOptions.DownloadBaseUrl + "/" + job.Id;
 
         return BuildEmailTemplate(
             "Build Ready",

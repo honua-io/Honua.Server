@@ -30,10 +30,10 @@ namespace Honua.Server.Host.Stac.Services;
 /// </summary>
 public sealed class StacReadService
 {
-    private readonly IStacCatalogStore _store;
-    private readonly HonuaConfig? _honuaConfig;
-    private readonly StacMetrics _metrics;
-    private readonly ILogger<StacReadService> _logger;
+    private readonly IStacCatalogStore store;
+    private readonly HonuaConfig? honuaConfig;
+    private readonly StacMetrics metrics;
+    private readonly ILogger<StacReadService> logger;
 
     public StacReadService(
         IStacCatalogStore store,
@@ -41,10 +41,10 @@ public sealed class StacReadService
         ILogger<StacReadService> logger,
         HonuaConfig? honuaConfig = null)
     {
-        _store = Guard.NotNull(store);
-        _honuaConfig = honuaConfig;
-        _metrics = Guard.NotNull(metrics);
-        _logger = Guard.NotNull(logger);
+        this.store = Guard.NotNull(store);
+        this.honuaConfig = honuaConfig;
+        this.metrics = Guard.NotNull(metrics);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -60,13 +60,13 @@ public sealed class StacReadService
         return await OperationInstrumentation.Create<StacCollectionsResponse>("STAC ListCollections")
             .WithActivitySource(HonuaTelemetry.Stac)
             .WithLogger(_logger)
-            .WithMetrics(_metrics.ReadOperationsCounter, _metrics.ReadOperationsCounter, _metrics.ReadOperationDuration)
+            .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "list_collections")
             .WithTag("resource", "collection")
             .ExecuteAsync(async activity =>
             {
-                await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-                var collections = await _store.ListCollectionsAsync(cancellationToken).ConfigureAwait(false);
+                await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                var collections = await this.store.ListCollectionsAsync(cancellationToken).ConfigureAwait(false);
                 var response = StacApiMapper.BuildCollections(collections, new Uri(baseUri));
 
                 activity?.SetTag("collection_count", response.Collections.Count);
@@ -82,16 +82,16 @@ public sealed class StacReadService
         return await OperationInstrumentation.Create<StacCollectionsResponse>("STAC ListCollections")
             .WithActivitySource(HonuaTelemetry.Stac)
             .WithLogger(_logger)
-            .WithMetrics(_metrics.ReadOperationsCounter, _metrics.ReadOperationsCounter, _metrics.ReadOperationDuration)
+            .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "list_collections")
             .WithTag("resource", "collection")
             .WithTag("has_pagination", true)
             .WithTag("limit", NormalizeLimit(limit))
             .ExecuteAsync(async activity =>
             {
-                await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
                 var pageSize = NormalizeLimit(limit);
-                var result = await _store.ListCollectionsAsync(pageSize, token, cancellationToken).ConfigureAwait(false);
+                var result = await this.store.ListCollectionsAsync(pageSize, token, cancellationToken).ConfigureAwait(false);
                 var response = StacApiMapper.BuildCollections(result.Collections, new Uri(baseUri), result.TotalCount, result.NextToken, pageSize);
 
                 activity?.SetTag("collection_count", response.Collections.Count);
@@ -110,14 +110,14 @@ public sealed class StacReadService
         return await OperationInstrumentation.Create<StacCollectionRecord?>("STAC GetCollection")
             .WithActivitySource(HonuaTelemetry.Stac)
             .WithLogger(_logger)
-            .WithMetrics(_metrics.ReadOperationsCounter, _metrics.ReadOperationsCounter, _metrics.ReadOperationDuration)
+            .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "get_collection")
             .WithTag("resource", "collection")
             .WithTag("collection_id", collectionId)
             .ExecuteAsync(async activity =>
             {
-                await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-                var collection = await _store.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
+                await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                var collection = await this.store.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
 
                 activity?.SetTag("found", collection is not null);
                 return collection;
@@ -137,15 +137,15 @@ public sealed class StacReadService
         return await OperationInstrumentation.Create<StacItemCollectionResponse>("STAC ListCollectionItems")
             .WithActivitySource(HonuaTelemetry.Stac)
             .WithLogger(_logger)
-            .WithMetrics(_metrics.ReadOperationsCounter, _metrics.ReadOperationsCounter, _metrics.ReadOperationDuration)
+            .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "list_items")
             .WithTag("resource", "item")
             .WithTag("collection_id", collectionId)
             .ExecuteAsync(async activity =>
             {
-                await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
-                var collection = await _store.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
+                var collection = await this.store.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
                 if (collection is null)
                 {
                     throw new InvalidOperationException($"Collection '{collectionId}' not found.");
@@ -153,7 +153,7 @@ public sealed class StacReadService
 
                 var pageSize = NormalizeLimit(limit);
                 var batchSize = checked(pageSize + 1);
-                var items = await _store.ListItemsAsync(collectionId, batchSize, pageToken, cancellationToken).ConfigureAwait(false);
+                var items = await this.store.ListItemsAsync(collectionId, batchSize, pageToken, cancellationToken).ConfigureAwait(false);
                 var itemsList = items.ToList();
 
                 string? nextToken = null;
@@ -183,15 +183,15 @@ public sealed class StacReadService
         return await OperationInstrumentation.Create<StacItemRecord?>("STAC GetCollectionItem")
             .WithActivitySource(HonuaTelemetry.Stac)
             .WithLogger(_logger)
-            .WithMetrics(_metrics.ReadOperationsCounter, _metrics.ReadOperationsCounter, _metrics.ReadOperationDuration)
+            .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "get_item")
             .WithTag("resource", "item")
             .WithTag("collection_id", collectionId)
             .WithTag("item_id", itemId)
             .ExecuteAsync(async activity =>
             {
-                await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-                var item = await _store.GetItemAsync(collectionId, itemId, cancellationToken).ConfigureAwait(false);
+                await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                var item = await this.store.GetItemAsync(collectionId, itemId, cancellationToken).ConfigureAwait(false);
 
                 activity?.SetTag("found", item is not null);
                 return item;

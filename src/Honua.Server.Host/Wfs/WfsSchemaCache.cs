@@ -51,14 +51,14 @@ namespace Honua.Server.Host.Wfs;
 /// </remarks>
 public sealed class WfsSchemaCache : IWfsSchemaCache
 {
-    private readonly IMemoryCache _cache;
-    private readonly ILogger<WfsSchemaCache> _logger;
-    private readonly WfsOptions _options;
+    private readonly IMemoryCache cache;
+    private readonly ILogger<WfsSchemaCache> logger;
+    private readonly WfsOptions options;
     private readonly ConcurrentDictionary<string, byte> _cacheKeys;
-    private readonly Counter<long> _hitCounter;
-    private readonly Counter<long> _missCounter;
-    private readonly Counter<long> _evictionsCounter;
-    private readonly ObservableGauge<int> _entriesGauge;
+    private readonly Counter<long> hitCounter;
+    private readonly Counter<long> missCounter;
+    private readonly Counter<long> evictionsCounter;
+    private readonly ObservableGauge<int> entriesGauge;
     private long _hits;
     private long _misses;
     private long _evictions;
@@ -73,23 +73,23 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
         ILogger<WfsSchemaCache> logger,
         IOptionsMonitor<WfsOptions> options)
     {
-        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.CurrentValue ?? throw new ArgumentNullException(nameof(options));
-        _cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.CurrentValue ?? throw new ArgumentNullException(nameof(options));
+        this.cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         // Initialize metrics
-        _hitCounter = WfsMetrics.SchemaCacheHits;
+        this.hitCounter = WfsMetrics.SchemaCacheHits;
 
-        _missCounter = WfsMetrics.SchemaCacheMisses;
+        this.missCounter = WfsMetrics.SchemaCacheMisses;
 
-        _evictionsCounter = WfsMetrics.Meter.CreateCounter<long>(
+        this.evictionsCounter = WfsMetrics.Meter.CreateCounter<long>(
             "honua.wfs.schema_cache.evictions",
             description: "Number of WFS schema cache evictions");
 
-        _entriesGauge = WfsMetrics.Meter.CreateObservableGauge<int>(
+        this.entriesGauge = WfsMetrics.Meter.CreateObservableGauge<int>(
             "honua.wfs.schema_cache.entries",
-            () => _cacheKeys.Count,
+            () => this.cacheKeys.Count,
             description: "Number of cached WFS schemas");
     }
 
@@ -102,7 +102,7 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
             return false;
         }
 
-        if (!_options.EnableSchemaCaching || _options.DescribeFeatureTypeCacheDuration <= 0)
+        if (!this.options.EnableSchemaCaching || this.options.DescribeFeatureTypeCacheDuration <= 0)
         {
             schema = null;
             return false;
@@ -110,17 +110,17 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
 
         var cacheKey = BuildCacheKey(collectionId);
 
-        if (_cache.TryGetValue(cacheKey, out schema))
+        if (this.cache.TryGetValue(cacheKey, out schema))
         {
             Interlocked.Increment(ref _hits);
-            _hitCounter.Add(1, new KeyValuePair<string, object?>("collection_id", collectionId));
-            _logger.LogDebug("WFS schema cache hit for collection: {CollectionId}", collectionId);
+            this.hitCounter.Add(1, new KeyValuePair<string, object?>("collection_id", collectionId));
+            this.logger.LogDebug("WFS schema cache hit for collection: {CollectionId}", collectionId);
             return true;
         }
 
         Interlocked.Increment(ref _misses);
-        _missCounter.Add(1, new KeyValuePair<string, object?>("collection_id", collectionId));
-        _logger.LogDebug("WFS schema cache miss for collection: {CollectionId}", collectionId);
+        this.missCounter.Add(1, new KeyValuePair<string, object?>("collection_id", collectionId));
+        this.logger.LogDebug("WFS schema cache miss for collection: {CollectionId}", collectionId);
         return false;
     }
 
@@ -137,21 +137,21 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
             throw new ArgumentNullException(nameof(schema));
         }
 
-        if (!_options.EnableSchemaCaching || _options.DescribeFeatureTypeCacheDuration <= 0)
+        if (!this.options.EnableSchemaCaching || this.options.DescribeFeatureTypeCacheDuration <= 0)
         {
-            _logger.LogTrace("WFS schema caching is disabled, skipping cache storage");
+            this.logger.LogTrace("WFS schema caching is disabled, skipping cache storage");
             return Task.CompletedTask;
         }
 
         var cacheKey = BuildCacheKey(collectionId);
 
         // Check if we're at the cache size limit
-        if (_options.MaxCachedSchemas > 0 && _cacheKeys.Count >= _options.MaxCachedSchemas)
+        if (this.options.MaxCachedSchemas > 0 && this.cacheKeys.Count >= this.options.MaxCachedSchemas)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "WFS schema cache has reached maximum size limit of {MaxSchemas}. " +
                 "Entry will be cached but may be evicted immediately. Consider increasing MaxCachedSchemas.",
-                _options.MaxCachedSchemas);
+                this.options.MaxCachedSchemas);
         }
 
         // Estimate schema size for cache accounting
@@ -160,7 +160,7 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
 
         // Build cache options with configurable TTL and size
         var cacheOptions = new CacheOptionsBuilder()
-            .WithAbsoluteExpiration(TimeSpan.FromSeconds(_options.DescribeFeatureTypeCacheDuration))
+            .WithAbsoluteExpiration(TimeSpan.FromSeconds(this.options.DescribeFeatureTypeCacheDuration))
             .WithPriority(CacheItemPriority.Normal)
             .WithSize(1) // Each schema counts as 1 entry toward global limit
             .BuildMemory();
@@ -168,13 +168,13 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
         // Register eviction callback to track cache keys and metrics
         cacheOptions.RegisterPostEvictionCallback((key, value, reason, state) =>
         {
-            _cacheKeys.TryRemove(key.ToString()!, out _);
+            this.cacheKeys.TryRemove(key.ToString()!, out _);
             Interlocked.Increment(ref _evictions);
-            _evictionsCounter.Add(1,
+            this.evictionsCounter.Add(1,
                 new KeyValuePair<string, object?>("collection_id", collectionId),
                 new KeyValuePair<string, object?>("reason", reason.ToString()));
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "WFS schema cache entry evicted for collection {CollectionId}, reason: {Reason}. " +
                 "Total evictions: {TotalEvictions}",
                 collectionId,
@@ -184,22 +184,22 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
             // Warn if eviction is due to capacity limits
             if (reason == EvictionReason.Capacity)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "WFS schema cache evicted entry for {CollectionId} due to capacity limit. " +
                     "Current entries: {CurrentEntries}, Max: {MaxSchemas}. Consider increasing cache limits.",
                     collectionId,
-                    _cacheKeys.Count,
-                    _options.MaxCachedSchemas);
+                    this.cacheKeys.Count,
+                    this.options.MaxCachedSchemas);
             }
         });
 
-        _cache.Set(cacheKey, schema, cacheOptions);
-        _cacheKeys.TryAdd(cacheKey, 0);
+        this.cache.Set(cacheKey, schema, cacheOptions);
+        this.cacheKeys.TryAdd(cacheKey, 0);
 
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "WFS schema cached for collection {CollectionId} with TTL of {TtlSeconds} seconds",
             collectionId,
-            _options.DescribeFeatureTypeCacheDuration);
+            this.options.DescribeFeatureTypeCacheDuration);
 
         return Task.CompletedTask;
     }
@@ -213,10 +213,10 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
         }
 
         var cacheKey = BuildCacheKey(collectionId);
-        _cache.Remove(cacheKey);
-        _cacheKeys.TryRemove(cacheKey, out _);
+        this.cache.Remove(cacheKey);
+        this.cacheKeys.TryRemove(cacheKey, out _);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Invalidated WFS schema cache for collection: {CollectionId}",
             collectionId);
     }
@@ -224,16 +224,16 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
     /// <inheritdoc />
     public void InvalidateAll()
     {
-        var count = _cacheKeys.Count;
-        var keysToRemove = _cacheKeys.Keys.ToList();
+        var count = this.cacheKeys.Count;
+        var keysToRemove = this.cacheKeys.Keys.ToList();
 
         foreach (var key in keysToRemove)
         {
-            _cache.Remove(key);
-            _cacheKeys.TryRemove(key, out _);
+            this.cache.Remove(key);
+            this.cacheKeys.TryRemove(key, out _);
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Invalidated all {Count} WFS schema cache entries",
             count);
     }
@@ -249,8 +249,8 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
             Hits = hits,
             Misses = misses,
             Evictions = Interlocked.Read(ref _evictions),
-            EntryCount = _cacheKeys.Count,
-            MaxEntries = _options.MaxCachedSchemas,
+            EntryCount = this.cacheKeys.Count,
+            MaxEntries = this.options.MaxCachedSchemas,
             HitRate = (hits + misses) > 0 ? (double)hits / (hits + misses) : 0
         };
     }

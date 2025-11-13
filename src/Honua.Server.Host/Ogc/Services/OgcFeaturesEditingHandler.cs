@@ -32,7 +32,7 @@ namespace Honua.Server.Host.Ogc.Services;
 /// </summary>
 internal sealed class OgcFeaturesEditingHandler : IOgcFeaturesEditingHandler
 {
-    private readonly IOgcFeaturesGeoJsonHandler _geoJsonHandler;
+    private readonly IOgcFeaturesGeoJsonHandler geoJsonHandler;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OgcFeaturesEditingHandler"/> class.
@@ -40,7 +40,7 @@ internal sealed class OgcFeaturesEditingHandler : IOgcFeaturesEditingHandler
     /// <param name="geoJsonHandler">GeoJSON handler for feature serialization</param>
     public OgcFeaturesEditingHandler(IOgcFeaturesGeoJsonHandler geoJsonHandler)
     {
-        _geoJsonHandler = Guard.NotNull(geoJsonHandler);
+        this.geoJsonHandler = Guard.NotNull(geoJsonHandler);
     }
 
     /// <inheritdoc />
@@ -110,7 +110,7 @@ internal sealed class OgcFeaturesEditingHandler : IOgcFeaturesEditingHandler
                 continue;
             }
 
-            var payload = _geoJsonHandler.ToFeature(request, collectionId, layer, record, featureQuery);
+            var payload = this.geoJsonHandler.ToFeature(request, collectionId, layer, record, featureQuery);
             var etag = ComputeFeatureEtag(layer, record);
             created.Add((featureId, payload, etag));
         }

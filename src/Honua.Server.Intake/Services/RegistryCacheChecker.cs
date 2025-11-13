@@ -39,29 +39,29 @@ public interface IRegistryCacheChecker
 /// </summary>
 public sealed class RegistryCacheChecker : IRegistryCacheChecker
 {
-    private readonly ILogger<RegistryCacheChecker> _logger;
-    private readonly RegistryProvisioningOptions _options;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly AsyncRetryPolicy _retryPolicy;
+    private readonly ILogger<RegistryCacheChecker> logger;
+    private readonly RegistryProvisioningOptions options;
+    private readonly IHttpClientFactory httpClientFactory;
+    private readonly AsyncRetryPolicy retryPolicy;
 
     public RegistryCacheChecker(
         ILogger<RegistryCacheChecker> logger,
         IOptions<RegistryProvisioningOptions> options,
         IHttpClientFactory httpClientFactory)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
         // Configure retry policy with exponential backoff
-        _retryPolicy = Policy
+        this.retryPolicy = Policy
             .Handle<Exception>(ex => IsTransientError(ex))
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                 onRetry: (exception, timeSpan, retryCount, context) =>
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         exception,
                         "Retry {RetryCount} after {Delay}ms due to transient error",
                         retryCount,
@@ -80,7 +80,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
             throw new ArgumentNullException(nameof(cacheKey));
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Checking cache for build {BuildName}:{Version} in {RegistryType}",
             cacheKey.BuildName,
             cacheKey.Version,
@@ -99,7 +99,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to check cache for build {BuildName}", cacheKey.BuildName);
+            this.logger.LogError(ex, "Failed to check cache for build {BuildName}", cacheKey.BuildName);
             return new CacheCheckResult
             {
                 Exists = false,
@@ -118,33 +118,33 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
         BuildCacheKey cacheKey,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.GitHubToken))
+        if (string.IsNullOrWhiteSpace(this.options.GitHubToken))
         {
             throw new InvalidOperationException("GitHub token is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.GitHubOrganization))
+        if (string.IsNullOrWhiteSpace(this.options.GitHubOrganization))
         {
             throw new InvalidOperationException("GitHub organization is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var tag = cacheKey.GenerateTag();
             var imageReference = cacheKey.GenerateImageReference(
                 "ghcr.io",
-                _options.GitHubOrganization);
+                this.options.GitHubOrganization);
 
             // GitHub Container Registry uses OCI Distribution API
             // Format: https://ghcr.io/v2/{org}/{image}/manifests/{tag}
-            var manifestUrl = $"https://ghcr.io/v2/{_options.GitHubOrganization}/customers/{cacheKey.CustomerId}/{cacheKey.BuildName}/manifests/{tag}";
+            var manifestUrl = $"https://ghcr.io/v2/{this.options.GitHubOrganization}/customers/{cacheKey.CustomerId}/{cacheKey.BuildName}/manifests/{tag}";
 
-            using var client = _httpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.GitHubToken);
+            using var client = this.httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", this.options.GitHubToken);
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.oci.image.manifest.v1+json"));
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.docker.distribution.manifest.v2+json"));
 
-            _logger.LogDebug("Checking GHCR manifest at {Url}", manifestUrl);
+            this.logger.LogDebug("Checking GHCR manifest at {Url}", manifestUrl);
 
             using var request = new HttpRequestMessage(HttpMethod.Head, manifestUrl);
             var response = await client.SendAsync(request, cancellationToken);
@@ -153,7 +153,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
             {
                 var digest = response.Headers.GetValues("Docker-Content-Digest").FirstOrDefault();
 
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Found cached image in GHCR: {ImageReference} with digest {Digest}",
                     imageReference,
                     digest);
@@ -170,7 +170,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                _logger.LogInformation("Image not found in GHCR: {ImageReference}", imageReference);
+                this.logger.LogInformation("Image not found in GHCR: {ImageReference}", imageReference);
 
                 return new CacheCheckResult
                 {
@@ -193,26 +193,26 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
         BuildCacheKey cacheKey,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.AwsRegion))
+        if (string.IsNullOrWhiteSpace(this.options.AwsRegion))
         {
             throw new InvalidOperationException("AWS region is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.AwsAccountId))
+        if (string.IsNullOrWhiteSpace(this.options.AwsAccountId))
         {
             throw new InvalidOperationException("AWS account ID is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
-            var ecrClient = new AmazonECRClient(Amazon.RegionEndpoint.GetBySystemName(_options.AwsRegion));
+            var ecrClient = new AmazonECRClient(Amazon.RegionEndpoint.GetBySystemName(this.options.AwsRegion));
 
             var repositoryName = $"honua/{cacheKey.CustomerId}";
             var tag = cacheKey.GenerateTag();
-            var registryUrl = $"{_options.AwsAccountId}.dkr.ecr.{_options.AwsRegion}.amazonaws.com";
+            var registryUrl = $"{this.options.AwsAccountId}.dkr.ecr.{this.options.AwsRegion}.amazonaws.com";
             var imageReference = $"{registryUrl}/{repositoryName}/{cacheKey.BuildName}:{tag}";
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Checking ECR for image {Repository}:{Tag}",
                 repositoryName,
                 tag);
@@ -234,7 +234,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
                     var digest = imageDetail.ImageDigest;
                     var lastUpdated = imageDetail.ImagePushedAt;
 
-                    _logger.LogInformation(
+                    this.logger.LogInformation(
                         "Found cached image in ECR: {ImageReference} with digest {Digest}",
                         imageReference,
                         digest);
@@ -252,11 +252,11 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
             }
             catch (ImageNotFoundException)
             {
-                _logger.LogInformation("Image not found in ECR: {ImageReference}", imageReference);
+                this.logger.LogInformation("Image not found in ECR: {ImageReference}", imageReference);
             }
             catch (RepositoryNotFoundException)
             {
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Repository not found in ECR: {Repository}",
                     $"{repositoryName}/{cacheKey.BuildName}");
             }
@@ -278,32 +278,32 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
         BuildCacheKey cacheKey,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.AzureSubscriptionId))
+        if (string.IsNullOrWhiteSpace(this.options.AzureSubscriptionId))
         {
             throw new InvalidOperationException("Azure subscription ID is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.AzureResourceGroup))
+        if (string.IsNullOrWhiteSpace(this.options.AzureResourceGroup))
         {
             throw new InvalidOperationException("Azure resource group is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.AzureRegistryName))
+        if (string.IsNullOrWhiteSpace(this.options.AzureRegistryName))
         {
             throw new InvalidOperationException("Azure registry name is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var credential = new DefaultAzureCredential();
             var armClient = new ArmClient(credential);
 
             var tag = cacheKey.GenerateTag();
             var repositoryPath = $"customers/{cacheKey.CustomerId}/{cacheKey.BuildName}";
-            var registryUrl = $"{_options.AzureRegistryName}.azurecr.io";
+            var registryUrl = $"{this.options.AzureRegistryName}.azurecr.io";
             var imageReference = $"{registryUrl}/{repositoryPath}:{tag}";
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Checking ACR for artifact {Repository}:{Tag}",
                 repositoryPath,
                 tag);
@@ -312,7 +312,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
             // For now, we'll use HTTP client with ACR authentication
             var manifestUrl = $"https://{registryUrl}/v2/{repositoryPath}/manifests/{tag}";
 
-            using var client = _httpClientFactory.CreateClient();
+            using var client = this.httpClientFactory.CreateClient();
 
             // Note: In production, you would need to authenticate properly with ACR
             // This might involve getting an access token from Azure AD
@@ -328,7 +328,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
                 {
                     var digest = response.Headers.GetValues("Docker-Content-Digest").FirstOrDefault();
 
-                    _logger.LogInformation(
+                    this.logger.LogInformation(
                         "Found cached image in ACR: {ImageReference} with digest {Digest}",
                         imageReference,
                         digest);
@@ -345,7 +345,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    _logger.LogInformation("Image not found in ACR: {ImageReference}", imageReference);
+                    this.logger.LogInformation("Image not found in ACR: {ImageReference}", imageReference);
 
                     return new CacheCheckResult
                     {
@@ -358,7 +358,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogWarning(ex, "Failed to check ACR manifest, assuming not found");
+                this.logger.LogWarning(ex, "Failed to check ACR manifest, assuming not found");
             }
 
             return new CacheCheckResult
@@ -378,29 +378,29 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
         BuildCacheKey cacheKey,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.GcpProjectId))
+        if (string.IsNullOrWhiteSpace(this.options.GcpProjectId))
         {
             throw new InvalidOperationException("GCP project ID is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.GcpRegion))
+        if (string.IsNullOrWhiteSpace(this.options.GcpRegion))
         {
             throw new InvalidOperationException("GCP region is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.GcpRepositoryName))
+        if (string.IsNullOrWhiteSpace(this.options.GcpRepositoryName))
         {
             throw new InvalidOperationException("GCP repository name is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var tag = cacheKey.GenerateTag();
             var packagePath = $"customers/{cacheKey.CustomerId}/{cacheKey.BuildName}";
-            var registryUrl = $"{_options.GcpRegion}-docker.pkg.dev";
-            var imageReference = $"{registryUrl}/{_options.GcpProjectId}/{_options.GcpRepositoryName}/{packagePath}:{tag}";
+            var registryUrl = $"{this.options.GcpRegion}-docker.pkg.dev";
+            var imageReference = $"{registryUrl}/{this.options.GcpProjectId}/{this.options.GcpRepositoryName}/{packagePath}:{tag}";
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Checking GCP Artifact Registry for package {Package}:{Tag}",
                 packagePath,
                 tag);
@@ -410,13 +410,13 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
 
             try
             {
-                var versionName = $"projects/{_options.GcpProjectId}/locations/{_options.GcpRegion}/repositories/{_options.GcpRepositoryName}/packages/{packagePath.Replace("/", "%2F")}/versions/{tag}";
+                var versionName = $"projects/{this.options.GcpProjectId}/locations/{this.options.GcpRegion}/repositories/{this.options.GcpRepositoryName}/packages/{packagePath.Replace("/", "%2F")}/versions/{tag}";
 
                 var version = await client.GetVersionAsync(versionName, cancellationToken);
 
                 if (version != null)
                 {
-                    _logger.LogInformation(
+                    this.logger.LogInformation(
                         "Found cached image in GCP Artifact Registry: {ImageReference}",
                         imageReference);
 
@@ -432,7 +432,7 @@ public sealed class RegistryCacheChecker : IRegistryCacheChecker
             }
             catch (Grpc.Core.RpcException ex) when (ex.StatusCode == Grpc.Core.StatusCode.NotFound)
             {
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Image not found in GCP Artifact Registry: {ImageReference}",
                     imageReference);
             }

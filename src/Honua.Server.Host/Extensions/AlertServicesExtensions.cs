@@ -66,11 +66,11 @@ public static class AlertServicesExtensions
 /// </summary>
 public sealed class PostgresAlertConfigurationDbConnectionFactory : IAlertConfigurationDbConnectionFactory
 {
-    private readonly string _connectionString;
+    private readonly string connectionString;
 
     public PostgresAlertConfigurationDbConnectionFactory(string connectionString)
     {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        this.connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
     }
 
     public IDbConnection CreateConnection()

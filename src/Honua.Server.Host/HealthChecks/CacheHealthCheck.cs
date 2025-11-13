@@ -15,10 +15,10 @@ namespace Honua.Server.Host.HealthChecks;
 /// </summary>
 public class CacheHealthCheck : IHealthCheck
 {
-    private readonly IDistributedCache? _distributedCache;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<CacheHealthCheck> _logger;
-    private readonly IHostEnvironment _environment;
+    private readonly IDistributedCache? distributedCache;
+    private readonly IServiceProvider serviceProvider;
+    private readonly ILogger<CacheHealthCheck> logger;
+    private readonly IHostEnvironment environment;
 
     public CacheHealthCheck(
         IDistributedCache? distributedCache,
@@ -26,10 +26,10 @@ public class CacheHealthCheck : IHealthCheck
         ILogger<CacheHealthCheck> logger,
         IHostEnvironment environment)
     {
-        _distributedCache = distributedCache;
-        _serviceProvider = serviceProvider;
-        _logger = logger;
-        _environment = environment;
+        this.distributedCache = distributedCache;
+        this.serviceProvider = serviceProvider;
+        this.logger = logger;
+        this.environment = environment;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -41,7 +41,7 @@ public class CacheHealthCheck : IHealthCheck
         try
         {
             // Try to resolve IConnectionMultiplexer optionally
-            var redisConnection = _serviceProvider.GetService<IConnectionMultiplexer>();
+            var redisConnection = this.serviceProvider.GetService<IConnectionMultiplexer>();
 
             // Check if Redis is configured
             if (redisConnection != null)
@@ -49,10 +49,10 @@ public class CacheHealthCheck : IHealthCheck
                 // Redis is configured - check connection
                 if (!redisConnection.IsConnected)
                 {
-                    _logger.LogWarning("Redis connection is not connected");
+                    this.logger.LogWarning("Redis connection is not connected");
 
                     // In production, Redis unavailability is unhealthy
-                    if (_environment.IsProduction())
+                    if (this.environment.IsProduction())
                     {
                         data["cacheType"] = "Redis";
                         data["status"] = "Disconnected";
@@ -89,7 +89,7 @@ public class CacheHealthCheck : IHealthCheck
 
                     if (retrievedValue != testValue)
                     {
-                        _logger.LogWarning("Redis set/get test failed - value mismatch");
+                        this.logger.LogWarning("Redis set/get test failed - value mismatch");
                         data["cacheType"] = "Redis";
                         data["status"] = "ValueMismatch";
                         return HealthCheckResult.Degraded(
@@ -117,7 +117,7 @@ public class CacheHealthCheck : IHealthCheck
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Redis operation test failed");
+                    this.logger.LogError(ex, "Redis operation test failed");
                     data["cacheType"] = "Redis";
                     data["status"] = "OperationFailed";
                     data["error"] = ex.Message;
@@ -137,20 +137,20 @@ public class CacheHealthCheck : IHealthCheck
                 try
                 {
                     // Set a test value
-                    await _distributedCache.SetAsync(testKey, testValue, new DistributedCacheEntryOptions
+                    await this.distributedCache.SetAsync(testKey, testValue, new DistributedCacheEntryOptions
                     {
                         AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(10)
                     }, cancellationToken);
 
                     // Get the test value
-                    var retrievedValue = await _distributedCache.GetAsync(testKey, cancellationToken);
+                    var retrievedValue = await this.distributedCache.GetAsync(testKey, cancellationToken);
 
                     // Remove the test key
-                    await _distributedCache.RemoveAsync(testKey, cancellationToken);
+                    await this.distributedCache.RemoveAsync(testKey, cancellationToken);
 
                     if (retrievedValue == null || !testValue.SequenceEqual(retrievedValue))
                     {
-                        _logger.LogWarning("Distributed cache set/get test failed");
+                        this.logger.LogWarning("Distributed cache set/get test failed");
                         data["cacheType"] = "DistributedCache";
                         data["status"] = "ValueMismatch";
                         return HealthCheckResult.Degraded(
@@ -167,7 +167,7 @@ public class CacheHealthCheck : IHealthCheck
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Distributed cache operation test failed");
+                    this.logger.LogError(ex, "Distributed cache operation test failed");
                     data["cacheType"] = "DistributedCache";
                     data["status"] = "OperationFailed";
                     data["error"] = ex.Message;
@@ -181,9 +181,9 @@ public class CacheHealthCheck : IHealthCheck
             else
             {
                 // No cache configured
-                _logger.LogWarning("No distributed cache configured");
+                this.logger.LogWarning("No distributed cache configured");
 
-                if (_environment.IsProduction())
+                if (this.environment.IsProduction())
                 {
                     // In production, lack of cache is degraded
                     data["cacheType"] = "None";
@@ -205,7 +205,7 @@ public class CacheHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Cache health check failed");
+            this.logger.LogError(ex, "Cache health check failed");
             return HealthCheckResult.Unhealthy(
                 "Cache health check failed: " + ex.Message,
                 exception: ex,

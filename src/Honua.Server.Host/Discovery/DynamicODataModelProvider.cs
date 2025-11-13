@@ -23,11 +23,11 @@ public sealed class DynamicODataModelProvider
 {
     private const string ModelNamespace = "Honua.Discovery";
 
-    private readonly ITableDiscoveryService _discoveryService;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IODataFieldTypeMapper _typeMapper;
-    private readonly AutoDiscoveryOptions _options;
-    private readonly ILogger<DynamicODataModelProvider> _logger;
+    private readonly ITableDiscoveryService discoveryService;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly IODataFieldTypeMapper typeMapper;
+    private readonly AutoDiscoveryOptions options;
+    private readonly ILogger<DynamicODataModelProvider> logger;
 
     public DynamicODataModelProvider(
         ITableDiscoveryService discoveryService,
@@ -36,11 +36,11 @@ public sealed class DynamicODataModelProvider
         IOptions<AutoDiscoveryOptions> options,
         ILogger<DynamicODataModelProvider> logger)
     {
-        _discoveryService = discoveryService ?? throw new ArgumentNullException(nameof(discoveryService));
-        _metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
-        _typeMapper = typeMapper ?? throw new ArgumentNullException(nameof(typeMapper));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.discoveryService = discoveryService ?? throw new ArgumentNullException(nameof(discoveryService));
+        this.metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
+        this.typeMapper = typeMapper ?? throw new ArgumentNullException(nameof(typeMapper));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -52,20 +52,20 @@ public sealed class DynamicODataModelProvider
             string dataSourceId,
             CancellationToken cancellationToken = default)
     {
-        if (!_options.Enabled || !_options.DiscoverPostGISTablesAsODataCollections)
+        if (!this.options.Enabled || !this.options.DiscoverPostGISTablesAsODataCollections)
         {
             return (Array.Empty<ServiceDefinition>(), Array.Empty<LayerDefinition>());
         }
 
-        var tables = await _discoveryService.DiscoverTablesAsync(dataSourceId, cancellationToken);
+        var tables = await this.discoveryService.DiscoverTablesAsync(dataSourceId, cancellationToken);
 
         var services = new List<ServiceDefinition>();
         var layers = new List<LayerDefinition>();
 
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken);
 
         // Get or create the discovery folder
-        var folderId = _options.DefaultFolderId ?? "discovered";
+        var folderId = this.options.DefaultFolderId ?? "discovered";
 
         // Group tables by schema to create services
         var tablesBySchema = tables.GroupBy(t => t.Schema);
@@ -74,7 +74,7 @@ public sealed class DynamicODataModelProvider
         {
             var schema = schemaGroup.Key;
             var serviceId = $"discovered_{schema}";
-            var friendlyName = _options.UseFriendlyNames
+            var friendlyName = this.options.UseFriendlyNames
                 ? ToFriendlyName(schema)
                 : schema;
 
@@ -91,7 +91,7 @@ public sealed class DynamicODataModelProvider
                 Keywords = new[] { "auto-discovered", schema }.ToArray(),
                 Ogc = new OgcServiceDefinition
                 {
-                    CollectionsEnabled = _options.DiscoverPostGISTablesAsOgcCollections,
+                    CollectionsEnabled = this.options.DiscoverPostGISTablesAsOgcCollections,
                     ItemLimit = 1000
                 }
             };
@@ -106,7 +106,7 @@ public sealed class DynamicODataModelProvider
             }
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Generated {ServiceCount} services and {LayerCount} layers from discovery",
             services.Count, layers.Count);
 
@@ -155,7 +155,7 @@ public sealed class DynamicODataModelProvider
                     entityType,
                     geometryShadow));
 
-                _logger.LogDebug(
+                this.logger.LogDebug(
                     "Created OData entity set {EntitySet} for discovered table {Schema}.{Table}",
                     entitySetName,
                     layer.Storage?.Table?.Split('.')[0],
@@ -169,7 +169,7 @@ public sealed class DynamicODataModelProvider
     private LayerDefinition CreateLayerFromTable(string serviceId, DiscoveredTable table)
     {
         var layerId = $"{table.Schema}_{table.TableName}";
-        var friendlyName = _options.UseFriendlyNames
+        var friendlyName = this.options.UseFriendlyNames
             ? ToFriendlyName(table.TableName)
             : table.TableName;
 
@@ -239,7 +239,7 @@ public sealed class DynamicODataModelProvider
         var entityType = new EdmEntityType(ModelNamespace, entityTypeName, baseType: null, isAbstract: false, isOpen: true);
 
         // Add primary key
-        var keyType = _typeMapper.GetKeyType(layer);
+        var keyType = this.typeMapper.GetKeyType(layer);
         var keyProperty = entityType.AddStructuralProperty(layer.IdField, keyType);
         entityType.AddKeys(keyProperty);
 
@@ -249,7 +249,7 @@ public sealed class DynamicODataModelProvider
         string? geometryShadow = null;
         if (!string.IsNullOrWhiteSpace(layer.GeometryField))
         {
-            var geometryType = _typeMapper.GetGeometryType(layer);
+            var geometryType = this.typeMapper.GetGeometryType(layer);
             entityType.AddStructuralProperty(layer.GeometryField, geometryType);
             seen.Add(layer.GeometryField);
 
@@ -270,7 +270,7 @@ public sealed class DynamicODataModelProvider
                 continue;
             }
 
-            if (_typeMapper.TryGetPrimitiveType(field, out var typeReference))
+            if (this.typeMapper.TryGetPrimitiveType(field, out var typeReference))
             {
                 entityType.AddStructuralProperty(field.Name, typeReference);
             }

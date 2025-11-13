@@ -10,71 +10,71 @@ namespace Honua.Server.Host.Stac;
 /// </summary>
 public sealed class StacMetrics
 {
-    private readonly Counter<long> _writeOperationsCounter;
-    private readonly Counter<long> _writeOperationErrorsCounter;
-    private readonly Histogram<double> _writeOperationDuration;
+    private readonly Counter<long> writeOperationsCounter;
+    private readonly Counter<long> writeOperationErrorsCounter;
+    private readonly Histogram<double> writeOperationDuration;
 
     // Read operation metrics
-    private readonly Counter<long> _readOperationsCounter;
-    private readonly Histogram<double> _readOperationDuration;
-    private readonly Counter<long> _searchOperationsCounter;
-    private readonly Histogram<double> _searchDuration;
-    private readonly Histogram<long> _searchResultCount;
-    private readonly Counter<long> _cacheHits;
-    private readonly Counter<long> _cacheMisses;
+    private readonly Counter<long> readOperationsCounter;
+    private readonly Histogram<double> readOperationDuration;
+    private readonly Counter<long> searchOperationsCounter;
+    private readonly Histogram<double> searchDuration;
+    private readonly Histogram<long> searchResultCount;
+    private readonly Counter<long> cacheHits;
+    private readonly Counter<long> cacheMisses;
 
     public StacMetrics(IMeterFactory meterFactory)
     {
         var meter = meterFactory.Create("Honua.Server.Stac");
 
         // Write operation metrics
-        _writeOperationsCounter = meter.CreateCounter<long>(
+        this.writeOperationsCounter = meter.CreateCounter<long>(
             "stac.write_operations.total",
             unit: "{operation}",
             description: "Total number of STAC write operations");
 
-        _writeOperationErrorsCounter = meter.CreateCounter<long>(
+        this.writeOperationErrorsCounter = meter.CreateCounter<long>(
             "stac.write_operations.errors.total",
             unit: "{error}",
             description: "Total number of STAC write operation errors");
 
-        _writeOperationDuration = meter.CreateHistogram<double>(
+        this.writeOperationDuration = meter.CreateHistogram<double>(
             "stac.write_operations.duration",
             unit: "ms",
             description: "Duration of STAC write operations in milliseconds");
 
         // Read operation metrics
-        _readOperationsCounter = meter.CreateCounter<long>(
+        this.readOperationsCounter = meter.CreateCounter<long>(
             "stac.read_operations.total",
             unit: "{operation}",
             description: "Total number of STAC read operations");
 
-        _readOperationDuration = meter.CreateHistogram<double>(
+        this.readOperationDuration = meter.CreateHistogram<double>(
             "stac.read_operations.duration",
             unit: "ms",
             description: "Duration of STAC read operations in milliseconds");
 
-        _searchOperationsCounter = meter.CreateCounter<long>(
+        this.searchOperationsCounter = meter.CreateCounter<long>(
             "stac.search_operations.total",
             unit: "{search}",
             description: "Total number of STAC search operations");
 
-        _searchDuration = meter.CreateHistogram<double>(
+        this.searchDuration = meter.CreateHistogram<double>(
             "stac.search.duration",
             unit: "ms",
             description: "Duration of STAC search operations in milliseconds");
 
-        _searchResultCount = meter.CreateHistogram<long>(
+        this.searchResultCount = meter.CreateHistogram<long>(
             "stac.search.result_count",
             unit: "{item}",
             description: "Number of items returned by search operations");
 
-        _cacheHits = meter.CreateCounter<long>(
+        this.cacheHits = meter.CreateCounter<long>(
             "stac.cache.hits",
             unit: "{hit}",
             description: "STAC cache hits (ETag/output cache matches)");
 
-        _cacheMisses = meter.CreateCounter<long>(
+        this.cacheMisses = meter.CreateCounter<long>(
             "stac.cache.misses",
             unit: "{miss}",
             description: "STAC cache misses");
@@ -107,7 +107,7 @@ public sealed class StacMetrics
 
     public void RecordWriteOperation(string operationType, string resourceType, bool success)
     {
-        _writeOperationsCounter.Add(1,
+        this.writeOperationsCounter.Add(1,
             new("operation", operationType),
             new("resource", resourceType),
             new("success", success.ToString().ToLowerInvariant()));
@@ -115,7 +115,7 @@ public sealed class StacMetrics
 
     public void RecordWriteError(string operationType, string resourceType, string errorType)
     {
-        _writeOperationErrorsCounter.Add(1,
+        this.writeOperationErrorsCounter.Add(1,
             new("operation", operationType),
             new("resource", resourceType),
             new("error_type", errorType));
@@ -123,7 +123,7 @@ public sealed class StacMetrics
 
     public void RecordWriteDuration(string operationType, string resourceType, double durationMs)
     {
-        _writeOperationDuration.Record(durationMs,
+        this.writeOperationDuration.Record(durationMs,
             new("operation", operationType),
             new("resource", resourceType));
     }
@@ -150,12 +150,12 @@ public sealed class StacMetrics
     /// <param name="success">Whether the operation succeeded (found resource vs. not found).</param>
     public void RecordReadOperation(string operation, string resource, double durationMs, bool success)
     {
-        _readOperationsCounter.Add(1,
+        this.readOperationsCounter.Add(1,
             new("operation", operation),
             new("resource", resource),
             new("success", success.ToString().ToLowerInvariant()));
 
-        _readOperationDuration.Record(durationMs,
+        this.readOperationDuration.Record(durationMs,
             new("operation", operation),
             new("resource", resource),
             new("success", success.ToString().ToLowerInvariant()));
@@ -178,9 +178,9 @@ public sealed class StacMetrics
             new("has_datetime", hasDatetime.ToString().ToLowerInvariant())
         };
 
-        _searchOperationsCounter.Add(1, tags);
-        _searchDuration.Record(durationMs, tags);
-        _searchResultCount.Record(resultCount, tags);
+        this.searchOperationsCounter.Add(1, tags);
+        this.searchDuration.Record(durationMs, tags);
+        this.searchResultCount.Record(resultCount, tags);
     }
 
     /// <summary>
@@ -189,7 +189,7 @@ public sealed class StacMetrics
     /// <param name="resource">The resource type (e.g., "collection", "item").</param>
     public void RecordCacheHit(string resource)
     {
-        _cacheHits.Add(1, new KeyValuePair<string, object?>("resource", resource));
+        this.cacheHits.Add(1, new KeyValuePair<string, object?>("resource", resource));
     }
 
     /// <summary>
@@ -198,6 +198,6 @@ public sealed class StacMetrics
     /// <param name="resource">The resource type (e.g., "collection", "item").</param>
     public void RecordCacheMiss(string resource)
     {
-        _cacheMisses.Add(1, new KeyValuePair<string, object?>("resource", resource));
+        this.cacheMisses.Add(1, new KeyValuePair<string, object?>("resource", resource));
     }
 }

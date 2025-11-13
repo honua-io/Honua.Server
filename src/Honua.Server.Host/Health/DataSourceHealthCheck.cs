@@ -16,25 +16,25 @@ namespace Honua.Server.Host.Health;
 
 public sealed class DataSourceHealthCheck : IHealthCheck
 {
-    private readonly IMetadataRegistry _registry;
+    private readonly IMetadataRegistry registry;
     private readonly IReadOnlyDictionary<string, IDataSourceHealthContributor> _contributors;
-    private readonly ILogger<DataSourceHealthCheck> _logger;
+    private readonly ILogger<DataSourceHealthCheck> logger;
 
     public DataSourceHealthCheck(
         IMetadataRegistry registry,
         IEnumerable<IDataSourceHealthContributor> contributors,
         ILogger<DataSourceHealthCheck> logger)
     {
-        _registry = Guard.NotNull(registry);
-        _logger = Guard.NotNull(logger);
-        _contributors = Guard.NotNull(contributors)
+        this.registry = Guard.NotNull(registry);
+        this.logger = Guard.NotNull(logger);
+        this.contributors = Guard.NotNull(contributors)
             .ToDictionary(c => c.Provider, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        await _registry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-        var snapshot = await _registry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        await this.registry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.registry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
         if (snapshot.DataSources.Count == 0)
         {
@@ -47,7 +47,7 @@ public sealed class DataSourceHealthCheck : IHealthCheck
         foreach (var dataSource in snapshot.DataSources)
         {
             var providerId = dataSource.Provider ?? string.Empty;
-            if (!_contributors.TryGetValue(providerId, out var contributor))
+            if (!this.contributors.TryGetValue(providerId, out var contributor))
             {
                 details[dataSource.Id] = new Dictionary<string, object?>
                 {
@@ -67,7 +67,7 @@ public sealed class DataSourceHealthCheck : IHealthCheck
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Data source health check failed for {DataSourceId}.", dataSource.Id);
+                this.logger.LogError(ex, "Data source health check failed for {DataSourceId}.", dataSource.Id);
                 result = HealthCheckResult.Unhealthy($"Data source '{dataSource.Id}' health check failed.", ex);
             }
 

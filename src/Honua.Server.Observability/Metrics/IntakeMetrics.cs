@@ -9,95 +9,106 @@ namespace Honua.Server.Observability.Metrics;
 /// </summary>
 public class IntakeMetrics
 {
-    private readonly Counter<long> _conversationsStarted;
-    private readonly Counter<long> _conversationsCompleted;
-    private readonly Histogram<double> _conversationDuration;
-    private readonly Counter<long> _aiTokensUsed;
-    private readonly Counter<double> _aiCostUsd;
-    private readonly Counter<long> _conversationErrors;
-    private readonly ObservableGauge<int> _activeConversations;
+    private readonly Counter<long> conversationsStarted;
+    private readonly Counter<long> conversationsCompleted;
+    private readonly Histogram<double> conversationDuration;
+    private readonly Counter<long> aiTokensUsed;
+    private readonly Counter<double> aiCostUsd;
+    private readonly Counter<long> conversationErrors;
+    private readonly ObservableGauge<int> activeConversations;
 
-    private int _currentActiveConversations;
+    private int currentActiveConversations;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="IntakeMetrics"/> class.
+    /// </summary>
+    /// <param name="meterFactory">The meter factory.</param>
     public IntakeMetrics(IMeterFactory meterFactory)
     {
         var meter = meterFactory.Create("Honua.Intake");
 
-        _conversationsStarted = meter.CreateCounter<long>(
+        this.conversationsStarted = meter.CreateCounter<long>(
             "conversations_started_total",
             description: "Total number of AI intake conversations started");
 
-        _conversationsCompleted = meter.CreateCounter<long>(
+        this.conversationsCompleted = meter.CreateCounter<long>(
             "conversations_completed_total",
             description: "Total number of AI intake conversations completed");
 
-        _conversationDuration = meter.CreateHistogram<double>(
+        this.conversationDuration = meter.CreateHistogram<double>(
             "conversation_duration_seconds",
             unit: "s",
             description: "AI conversation duration in seconds");
 
-        _aiTokensUsed = meter.CreateCounter<long>(
+        this.aiTokensUsed = meter.CreateCounter<long>(
             "ai_tokens_used_total",
             description: "Total number of AI tokens consumed");
 
-        _aiCostUsd = meter.CreateCounter<double>(
+        this.aiCostUsd = meter.CreateCounter<double>(
             "ai_cost_usd_total",
             unit: "USD",
             description: "Total AI cost in USD");
 
-        _conversationErrors = meter.CreateCounter<long>(
+        this.conversationErrors = meter.CreateCounter<long>(
             "conversation_errors_total",
             description: "Total number of conversation errors");
 
-        _activeConversations = meter.CreateObservableGauge(
+        this.activeConversations = meter.CreateObservableGauge(
             "active_conversations",
-            observeValue: () => _currentActiveConversations,
+            observeValue: () => this.currentActiveConversations,
             description: "Current number of active conversations");
     }
 
     /// <summary>
     /// Records a conversation start event.
     /// </summary>
+    /// <param name="model">The AI model.</param>
     public void RecordConversationStarted(string model)
     {
-        _conversationsStarted.Add(1,
+        this.conversationsStarted.Add(1,
             new KeyValuePair<string, object?>("model", model));
 
-        Interlocked.Increment(ref _currentActiveConversations);
+        Interlocked.Increment(ref this.currentActiveConversations);
     }
 
     /// <summary>
     /// Records a conversation completion event.
     /// </summary>
+    /// <param name="model">The AI model.</param>
+    /// <param name="success">Whether the conversation succeeded.</param>
+    /// <param name="duration">The conversation duration.</param>
     public void RecordConversationCompleted(string model, bool success, TimeSpan duration)
     {
-        _conversationsCompleted.Add(1,
+        this.conversationsCompleted.Add(1,
             new KeyValuePair<string, object?>("model", model),
             new KeyValuePair<string, object?>("success", success.ToString()));
 
-        _conversationDuration.Record(duration.TotalSeconds,
+        this.conversationDuration.Record(duration.TotalSeconds,
             new KeyValuePair<string, object?>("model", model),
             new KeyValuePair<string, object?>("success", success.ToString()));
 
-        Interlocked.Decrement(ref _currentActiveConversations);
+        Interlocked.Decrement(ref this.currentActiveConversations);
     }
 
     /// <summary>
     /// Records AI token usage.
     /// </summary>
+    /// <param name="model">The AI model.</param>
+    /// <param name="promptTokens">The prompt tokens.</param>
+    /// <param name="completionTokens">The completion tokens.</param>
     public void RecordTokenUsage(string model, long promptTokens, long completionTokens)
     {
         var totalTokens = promptTokens + completionTokens;
 
-        _aiTokensUsed.Add(totalTokens,
+        this.aiTokensUsed.Add(totalTokens,
             new KeyValuePair<string, object?>("model", model),
             new KeyValuePair<string, object?>("token_type", "total"));
 
-        _aiTokensUsed.Add(promptTokens,
+        this.aiTokensUsed.Add(promptTokens,
             new KeyValuePair<string, object?>("model", model),
             new KeyValuePair<string, object?>("token_type", "prompt"));
 
-        _aiTokensUsed.Add(completionTokens,
+        this.aiTokensUsed.Add(completionTokens,
             new KeyValuePair<string, object?>("model", model),
             new KeyValuePair<string, object?>("token_type", "completion"));
     }
@@ -105,18 +116,22 @@ public class IntakeMetrics
     /// <summary>
     /// Records AI cost in USD.
     /// </summary>
+    /// <param name="model">The AI model.</param>
+    /// <param name="costUsd">The cost in USD.</param>
     public void RecordCost(string model, double costUsd)
     {
-        _aiCostUsd.Add(costUsd,
+        this.aiCostUsd.Add(costUsd,
             new KeyValuePair<string, object?>("model", model));
     }
 
     /// <summary>
     /// Records a conversation error.
     /// </summary>
+    /// <param name="model">The AI model.</param>
+    /// <param name="errorType">The error type.</param>
     public void RecordError(string model, string errorType)
     {
-        _conversationErrors.Add(1,
+        this.conversationErrors.Add(1,
             new KeyValuePair<string, object?>("model", model),
             new KeyValuePair<string, object?>("error_type", errorType));
     }

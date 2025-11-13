@@ -31,9 +31,9 @@ namespace Honua.Server.Host.Ogc;
 /// </remarks>
 public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDisposable
 {
-    private readonly IMetadataProvider _metadataProvider;
-    private readonly IOgcCollectionsCache _collectionsCache;
-    private readonly ILogger<OgcCollectionsCacheInvalidationService> _logger;
+    private readonly IMetadataProvider metadataProvider;
+    private readonly IOgcCollectionsCache collectionsCache;
+    private readonly ILogger<OgcCollectionsCacheInvalidationService> logger;
     private IMetadataChangeNotifier? _changeNotifier;
 
     public OgcCollectionsCacheInvalidationService(
@@ -41,27 +41,27 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
         IOgcCollectionsCache collectionsCache,
         ILogger<OgcCollectionsCacheInvalidationService> logger)
     {
-        _metadataProvider = metadataProvider ?? throw new ArgumentNullException(nameof(metadataProvider));
-        _collectionsCache = collectionsCache ?? throw new ArgumentNullException(nameof(collectionsCache));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.metadataProvider = metadataProvider ?? throw new ArgumentNullException(nameof(metadataProvider));
+        this.collectionsCache = collectionsCache ?? throw new ArgumentNullException(nameof(collectionsCache));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Starting OGC Collections Cache Invalidation Service");
+        this.logger.LogInformation("Starting OGC Collections Cache Invalidation Service");
 
         // Check if the provider supports change notifications
         if (_metadataProvider is IMutableMetadataProvider mutable &&
             mutable is IMetadataChangeNotifier notifier &&
             notifier.SupportsChangeNotifications)
         {
-            _changeNotifier = notifier;
-            _changeNotifier.MetadataChanged += OnMetadataChanged;
-            _logger.LogInformation("Subscribed to metadata change notifications for OGC collections cache invalidation");
+            this.changeNotifier = notifier;
+            this.changeNotifier.MetadataChanged += OnMetadataChanged;
+            this.logger.LogInformation("Subscribed to metadata change notifications for OGC collections cache invalidation");
         }
         else
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Metadata provider does not support real-time change notifications. " +
                 "OGC collections cache will rely on TTL-based expiration.");
         }
@@ -71,12 +71,12 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Stopping OGC Collections Cache Invalidation Service");
+        this.logger.LogInformation("Stopping OGC Collections Cache Invalidation Service");
 
         if (_changeNotifier != null)
         {
-            _changeNotifier.MetadataChanged -= OnMetadataChanged;
-            _logger.LogInformation("Unsubscribed from metadata change notifications");
+            this.changeNotifier.MetadataChanged -= OnMetadataChanged;
+            this.logger.LogInformation("Unsubscribed from metadata change notifications");
         }
 
         return Task.CompletedTask;
@@ -86,7 +86,7 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
     {
         try
         {
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Metadata change detected: {ChangeType} {EntityType} {EntityId}",
                 e.ChangeType,
                 e.EntityType,
@@ -97,8 +97,8 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
             {
                 case "service":
                     // Service metadata changed - invalidate all collections for this service
-                    _collectionsCache.InvalidateService(e.EntityId);
-                    _logger.LogInformation(
+                    this.collectionsCache.InvalidateService(e.EntityId);
+                    this.logger.LogInformation(
                         "Invalidated OGC collections cache for service {ServiceId} due to {ChangeType}",
                         e.EntityId,
                         e.ChangeType);
@@ -110,8 +110,8 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
                     var serviceId = ExtractServiceIdFromLayerId(e.EntityId);
                     if (!string.IsNullOrWhiteSpace(serviceId))
                     {
-                        _collectionsCache.InvalidateService(serviceId);
-                        _logger.LogInformation(
+                        this.collectionsCache.InvalidateService(serviceId);
+                        this.logger.LogInformation(
                             "Invalidated OGC collections cache for service {ServiceId} due to layer {ChangeType}",
                             serviceId,
                             e.ChangeType);
@@ -119,8 +119,8 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
                     else
                     {
                         // If we can't determine service, invalidate all to be safe
-                        _collectionsCache.InvalidateAll();
-                        _logger.LogWarning(
+                        this.collectionsCache.InvalidateAll();
+                        this.logger.LogWarning(
                             "Could not determine service for layer {LayerId}, invalidating all OGC collections cache entries",
                             e.EntityId);
                     }
@@ -128,15 +128,15 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
 
                 case "catalog":
                     // Catalog-level change - invalidate everything
-                    _collectionsCache.InvalidateAll();
-                    _logger.LogInformation(
+                    this.collectionsCache.InvalidateAll();
+                    this.logger.LogInformation(
                         "Invalidated all OGC collections cache entries due to catalog {ChangeType}",
                         e.ChangeType);
                     break;
 
                 case "folder":
                     // Folder changes don't affect collections list
-                    _logger.LogDebug(
+                    this.logger.LogDebug(
                         "Folder {ChangeType} does not affect collections cache, no invalidation needed",
                         e.ChangeType);
                     break;
@@ -146,16 +146,16 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
                     var groupServiceId = ExtractServiceIdFromLayerId(e.EntityId);
                     if (!string.IsNullOrWhiteSpace(groupServiceId))
                     {
-                        _collectionsCache.InvalidateService(groupServiceId);
-                        _logger.LogInformation(
+                        this.collectionsCache.InvalidateService(groupServiceId);
+                        this.logger.LogInformation(
                             "Invalidated OGC collections cache for service {ServiceId} due to layer group {ChangeType}",
                             groupServiceId,
                             e.ChangeType);
                     }
                     else
                     {
-                        _collectionsCache.InvalidateAll();
-                        _logger.LogWarning(
+                        this.collectionsCache.InvalidateAll();
+                        this.logger.LogWarning(
                             "Could not determine service for layer group {GroupId}, invalidating all OGC collections cache entries",
                             e.EntityId);
                     }
@@ -163,7 +163,7 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
 
                 default:
                     // Unknown entity type - log and skip
-                    _logger.LogDebug(
+                    this.logger.LogDebug(
                         "Unknown entity type {EntityType}, no cache invalidation performed",
                         e.EntityType);
                     break;
@@ -171,7 +171,7 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
         }
         catch (Exception ex)
         {
-            _logger.LogError(
+            this.logger.LogError(
                 ex,
                 "Error invalidating OGC collections cache for metadata change: {ChangeType} {EntityType} {EntityId}",
                 e.ChangeType,
@@ -207,7 +207,7 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
     {
         if (_changeNotifier != null)
         {
-            _changeNotifier.MetadataChanged -= OnMetadataChanged;
+            this.changeNotifier.MetadataChanged -= OnMetadataChanged;
         }
     }
 }

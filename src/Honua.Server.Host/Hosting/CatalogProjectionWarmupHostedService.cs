@@ -17,15 +17,15 @@ namespace Honua.Server.Host.Hosting;
 /// </summary>
 public sealed class CatalogProjectionWarmupHostedService : IHostedService
 {
-    private readonly ICatalogProjectionService _catalog;
-    private readonly ILogger<CatalogProjectionWarmupHostedService> _logger;
+    private readonly ICatalogProjectionService catalog;
+    private readonly ILogger<CatalogProjectionWarmupHostedService> logger;
 
     public CatalogProjectionWarmupHostedService(
         ICatalogProjectionService catalog,
         ILogger<CatalogProjectionWarmupHostedService> logger)
     {
-        _catalog = Guard.NotNull(catalog);
-        _logger = Guard.NotNull(logger);
+        this.catalog = Guard.NotNull(catalog);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -37,17 +37,17 @@ public sealed class CatalogProjectionWarmupHostedService : IHostedService
     {
         try
         {
-            _logger.LogInformation("Warming catalog projection snapshot.");
-            await _catalog.WarmupAsync(cancellationToken).ConfigureAwait(false);
-            _logger.LogInformation("Catalog projection warm-up completed.");
+            this.logger.LogInformation("Warming catalog projection snapshot.");
+            await this.catalog.WarmupAsync(cancellationToken).ConfigureAwait(false);
+            this.logger.LogInformation("Catalog projection warm-up completed.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogDebug("Catalog projection warm-up canceled.");
+            this.logger.LogDebug("Catalog projection warm-up canceled.");
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Catalog projection warm-up failed; using last known snapshot until refresh completes.");
+            this.logger.LogWarning(ex, "Catalog projection warm-up failed; using last known snapshot until refresh completes.");
         }
     }
 

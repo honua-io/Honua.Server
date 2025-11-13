@@ -14,13 +14,13 @@ namespace Honua.Server.Host.Validation;
 /// </summary>
 public sealed class ValidationMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ValidationMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly ILogger<ValidationMiddleware> logger;
 
     public ValidationMiddleware(RequestDelegate next, ILogger<ValidationMiddleware> logger)
     {
-        _next = Guard.NotNull(next);
-        _logger = Guard.NotNull(logger);
+        this.next = Guard.NotNull(next);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -45,7 +45,7 @@ public sealed class ValidationMiddleware
 
     private async Task HandleValidationExceptionAsync(HttpContext context, ValidationException exception)
     {
-        _logger.LogWarning(
+        this.logger.LogWarning(
             exception,
             "Validation failed for request {Method} {Path}: {Message}",
             context.Request.Method,
@@ -68,7 +68,7 @@ public sealed class ValidationMiddleware
 
     private async Task HandleArgumentExceptionAsync(HttpContext context, ArgumentException exception)
     {
-        _logger.LogWarning(
+        this.logger.LogWarning(
             exception,
             "Invalid argument in request {Method} {Path}: {Message}",
             context.Request.Method,
@@ -97,7 +97,7 @@ public sealed class ValidationMiddleware
 
     private async Task HandleInvalidOperationExceptionAsync(HttpContext context, InvalidOperationException exception)
     {
-        _logger.LogWarning(
+        this.logger.LogWarning(
             exception,
             "Invalid operation in request {Method} {Path}: {Message}",
             context.Request.Method,

@@ -22,17 +22,17 @@ namespace Honua.Server.Host.Stac.Services;
 /// </summary>
 public sealed class StacItemService
 {
-    private readonly IStacCatalogStore _store;
-    private readonly IStacValidationService _validationService;
-    private readonly ISecurityAuditLogger _auditLogger;
-    private readonly StacMetrics _metrics;
-    private readonly IOutputCacheInvalidationService _cacheInvalidation;
-    private readonly StacParsingService _parsingService;
+    private readonly IStacCatalogStore store;
+    private readonly IStacValidationService validationService;
+    private readonly ISecurityAuditLogger auditLogger;
+    private readonly StacMetrics metrics;
+    private readonly IOutputCacheInvalidationService cacheInvalidation;
+    private readonly StacParsingService parsingService;
 
     // Metrics for OperationInstrumentation
-    private readonly Counter<long> _writeSuccessCounter;
-    private readonly Counter<long> _writeErrorCounter;
-    private readonly Histogram<double> _writeDurationHistogram;
+    private readonly Counter<long> writeSuccessCounter;
+    private readonly Counter<long> writeErrorCounter;
+    private readonly Histogram<double> writeDurationHistogram;
 
     public StacItemService(
         IStacCatalogStore store,
@@ -43,18 +43,18 @@ public sealed class StacItemService
         StacParsingService parsingService,
         IMeterFactory meterFactory)
     {
-        _store = Guard.NotNull(store);
-        _validationService = Guard.NotNull(validationService);
-        _auditLogger = Guard.NotNull(auditLogger);
-        _metrics = Guard.NotNull(metrics);
-        _cacheInvalidation = Guard.NotNull(cacheInvalidation);
-        _parsingService = Guard.NotNull(parsingService);
+        this.store = Guard.NotNull(store);
+        this.validationService = Guard.NotNull(validationService);
+        this.auditLogger = Guard.NotNull(auditLogger);
+        this.metrics = Guard.NotNull(metrics);
+        this.cacheInvalidation = Guard.NotNull(cacheInvalidation);
+        this.parsingService = Guard.NotNull(parsingService);
 
         // Initialize metrics for OperationInstrumentation
         var meter = meterFactory.Create("Honua.Server.Stac.Items");
-        _writeSuccessCounter = meter.CreateCounter<long>("stac.item.write.success", unit: "{operation}");
-        _writeErrorCounter = meter.CreateCounter<long>("stac.item.write.error", unit: "{error}");
-        _writeDurationHistogram = meter.CreateHistogram<double>("stac.item.write.duration", unit: "ms");
+        this.writeSuccessCounter = meter.CreateCounter<long>("stac.item.write.success", unit: "{operation}");
+        this.writeErrorCounter = meter.CreateCounter<long>("stac.item.write.error", unit: "{error}");
+        this.writeDurationHistogram = meter.CreateHistogram<double>("stac.item.write.duration", unit: "ms");
     }
 
     /// <summary>
@@ -77,38 +77,38 @@ public sealed class StacItemService
             .ExecuteAsync(async activity =>
             {
                 // Validate the item JSON
-                var validationResult = _validationService.ValidateItem(itemJson);
+                var validationResult = this.validationService.ValidateItem(itemJson);
                 if (!validationResult.IsValid)
                 {
-                    _metrics.RecordWriteError("post", "item", "validation_error");
+                    this.metrics.RecordWriteError("post", "item", "validation_error");
                     var errorMessage = StacRequestHelpers.FormatValidationErrors(validationResult.Errors);
                     return ItemOperationResult.ValidationError(errorMessage);
                 }
 
-                await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
                 // Verify collection exists
-                var collection = await _store.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
+                var collection = await this.store.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
                 if (collection is null)
                 {
-                    _metrics.RecordWriteError("post", "item", "collection_not_found");
+                    this.metrics.RecordWriteError("post", "item", "collection_not_found");
                     return ItemOperationResult.NotFound($"Collection '{collectionId}' not found.");
                 }
 
                 // Parse and validate the item
                 if (!StacRequestHelpers.TryGetId(itemJson, out var id))
                 {
-                    _metrics.RecordWriteError("post", "item", "missing_id");
+                    this.metrics.RecordWriteError("post", "item", "missing_id");
                     return ItemOperationResult.ValidationError("Item 'id' is required and must be a string.");
                 }
 
                 activity?.SetTag("stac.item_id", id);
 
                 // Check if item already exists
-                var existing = await _store.GetItemAsync(collectionId, id, cancellationToken).ConfigureAwait(false);
+                var existing = await this.store.GetItemAsync(collectionId, id, cancellationToken).ConfigureAwait(false);
                 if (existing is not null)
                 {
-                    _metrics.RecordWriteError("post", "item", "conflict");
+                    this.metrics.RecordWriteError("post", "item", "conflict");
                     return ItemOperationResult.Conflict($"Item '{id}' already exists in collection '{collectionId}'. Use PUT or PATCH to update.");
                 }
 
@@ -116,25 +116,25 @@ public sealed class StacItemService
                 StacItemRecord record;
                 try
                 {
-                    record = _parsingService.ParseItemFromJson(itemJson, collectionId);
+                    record = this.parsingService.ParseItemFromJson(itemJson, collectionId);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _metrics.RecordWriteError("post", "item", "parse_error");
+                    this.metrics.RecordWriteError("post", "item", "parse_error");
                     return ItemOperationResult.ValidationError(ex.Message);
                 }
 
                 // Store the item
-                await _store.UpsertItemAsync(record, expectedETag: null, cancellationToken).ConfigureAwait(false);
+                await this.store.UpsertItemAsync(record, expectedETag: null, cancellationToken).ConfigureAwait(false);
 
                 // Log audit event
-                _auditLogger.LogDataAccess(username, "CREATE", "STAC_Item", $"{collectionId}/{id}", ipAddress);
+                this.auditLogger.LogDataAccess(username, "CREATE", "STAC_Item", $"{collectionId}/{id}", ipAddress);
 
                 // Record legacy metrics for backward compatibility
-                _metrics.RecordWriteSuccess("post", "item", 0); // Duration tracked by OperationInstrumentation
+                this.metrics.RecordWriteSuccess("post", "item", 0); // Duration tracked by OperationInstrumentation
 
                 // Invalidate cache for items in this collection
-                await _cacheInvalidation.InvalidateStacItemsCacheAsync(collectionId, cancellationToken).ConfigureAwait(false);
+                await this.cacheInvalidation.InvalidateStacItemsCacheAsync(collectionId, cancellationToken).ConfigureAwait(false);
 
                 return ItemOperationResult.Success(record);
             }).ConfigureAwait(false);
@@ -163,34 +163,34 @@ public sealed class StacItemService
             .ExecuteAsync(async activity =>
             {
                 // Validate the item JSON
-                var validationResult = _validationService.ValidateItem(itemJson);
+                var validationResult = this.validationService.ValidateItem(itemJson);
                 if (!validationResult.IsValid)
                 {
-                    _metrics.RecordWriteError("put", "item", "validation_error");
+                    this.metrics.RecordWriteError("put", "item", "validation_error");
                     var errorMessage = StacRequestHelpers.FormatValidationErrors(validationResult.Errors);
                     return ItemOperationResult.ValidationError(errorMessage);
                 }
 
-                await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
                 // Verify collection exists
-                var collection = await _store.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
+                var collection = await this.store.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
                 if (collection is null)
                 {
-                    _metrics.RecordWriteError("put", "item", "collection_not_found");
+                    this.metrics.RecordWriteError("put", "item", "collection_not_found");
                     return ItemOperationResult.NotFound($"Collection '{collectionId}' not found.");
                 }
 
                 // Verify the ID in the path matches the ID in the body
                 if (!StacRequestHelpers.TryGetId(itemJson, out var id))
                 {
-                    _metrics.RecordWriteError("put", "item", "missing_id");
+                    this.metrics.RecordWriteError("put", "item", "missing_id");
                     return ItemOperationResult.ValidationError("Item 'id' in body is required and must be a string.");
                 }
 
                 if (!id.EqualsIgnoreCase(itemId))
                 {
-                    _metrics.RecordWriteError("put", "item", "id_mismatch");
+                    this.metrics.RecordWriteError("put", "item", "id_mismatch");
                     return ItemOperationResult.ValidationError("Item 'id' in body must match the path parameter.");
                 }
 
@@ -198,24 +198,24 @@ public sealed class StacItemService
                 StacItemRecord record;
                 try
                 {
-                    record = _parsingService.ParseItemFromJson(itemJson, collectionId);
+                    record = this.parsingService.ParseItemFromJson(itemJson, collectionId);
                 }
                 catch (InvalidOperationException ex)
                 {
-                    _metrics.RecordWriteError("put", "item", "parse_error");
+                    this.metrics.RecordWriteError("put", "item", "parse_error");
                     return ItemOperationResult.ValidationError(ex.Message);
                 }
 
-                await _store.UpsertItemAsync(record, expectedETag: ifMatch, cancellationToken).ConfigureAwait(false);
+                await this.store.UpsertItemAsync(record, expectedETag: ifMatch, cancellationToken).ConfigureAwait(false);
 
                 // Log audit event
-                _auditLogger.LogDataAccess(username, "UPDATE", "STAC_Item", $"{collectionId}/{itemId}", ipAddress);
+                this.auditLogger.LogDataAccess(username, "UPDATE", "STAC_Item", $"{collectionId}/{itemId}", ipAddress);
 
                 // Record legacy metrics for backward compatibility
-                _metrics.RecordWriteSuccess("put", "item", 0); // Duration tracked by OperationInstrumentation
+                this.metrics.RecordWriteSuccess("put", "item", 0); // Duration tracked by OperationInstrumentation
 
                 // Invalidate cache for items in this collection
-                await _cacheInvalidation.InvalidateStacItemsCacheAsync(collectionId, cancellationToken).ConfigureAwait(false);
+                await this.cacheInvalidation.InvalidateStacItemsCacheAsync(collectionId, cancellationToken).ConfigureAwait(false);
 
                 return ItemOperationResult.Success(record);
             }).ConfigureAwait(false);
@@ -230,10 +230,10 @@ public sealed class StacItemService
         System.Text.Json.Nodes.JsonObject patchJson,
         CancellationToken cancellationToken)
     {
-        await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
         // Get existing item
-        var existing = await _store.GetItemAsync(collectionId, itemId, cancellationToken).ConfigureAwait(false);
+        var existing = await this.store.GetItemAsync(collectionId, itemId, cancellationToken).ConfigureAwait(false);
         if (existing is null)
         {
             return ItemOperationResult.NotFound($"Item '{itemId}' not found in collection '{collectionId}'.");
@@ -243,17 +243,17 @@ public sealed class StacItemService
         StacItemRecord merged;
         try
         {
-            merged = _parsingService.MergeItemPatch(existing, patchJson);
+            merged = this.parsingService.MergeItemPatch(existing, patchJson);
         }
         catch (InvalidOperationException ex)
         {
             return ItemOperationResult.ValidationError(ex.Message);
         }
 
-        await _store.UpsertItemAsync(merged, expectedETag: null, cancellationToken).ConfigureAwait(false);
+        await this.store.UpsertItemAsync(merged, expectedETag: null, cancellationToken).ConfigureAwait(false);
 
         // Invalidate cache for items in this collection
-        await _cacheInvalidation.InvalidateStacItemsCacheAsync(collectionId, cancellationToken).ConfigureAwait(false);
+        await this.cacheInvalidation.InvalidateStacItemsCacheAsync(collectionId, cancellationToken).ConfigureAwait(false);
 
         return ItemOperationResult.Success(merged);
     }
@@ -278,23 +278,23 @@ public sealed class StacItemService
             .WithTag("resource", "item")
             .ExecuteAsync(async activity =>
             {
-                await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
-                var deleted = await _store.DeleteItemAsync(collectionId, itemId, cancellationToken).ConfigureAwait(false);
+                var deleted = await this.store.DeleteItemAsync(collectionId, itemId, cancellationToken).ConfigureAwait(false);
                 if (!deleted)
                 {
-                    _metrics.RecordWriteError("delete", "item", "not_found");
+                    this.metrics.RecordWriteError("delete", "item", "not_found");
                     return false;
                 }
 
                 // Log audit event
-                _auditLogger.LogDataAccess(username, "DELETE", "STAC_Item", $"{collectionId}/{itemId}", ipAddress);
+                this.auditLogger.LogDataAccess(username, "DELETE", "STAC_Item", $"{collectionId}/{itemId}", ipAddress);
 
                 // Record legacy metrics for backward compatibility
-                _metrics.RecordWriteSuccess("delete", "item", 0); // Duration tracked by OperationInstrumentation
+                this.metrics.RecordWriteSuccess("delete", "item", 0); // Duration tracked by OperationInstrumentation
 
                 // Invalidate cache for items in this collection
-                await _cacheInvalidation.InvalidateStacItemsCacheAsync(collectionId, cancellationToken).ConfigureAwait(false);
+                await this.cacheInvalidation.InvalidateStacItemsCacheAsync(collectionId, cancellationToken).ConfigureAwait(false);
 
                 return true;
             }).ConfigureAwait(false);

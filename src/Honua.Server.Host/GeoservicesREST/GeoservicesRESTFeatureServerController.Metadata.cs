@@ -39,11 +39,11 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var summary = GeoservicesRESTMetadataMapper.CreateFeatureServiceSummary(serviceView, GeoServicesVersion);
-        return Ok(summary);
+        return this.Ok(summary);
     }
 
     /// <summary>
@@ -64,7 +64,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
         var style = await ResolveDefaultStyleAsync(layerView.Layer, cancellationToken).ConfigureAwait(false);
         var detail = GeoservicesRESTMetadataMapper.CreateLayerDetailResponse(serviceView, layerView, layerIndex, GeoServicesVersion, style);
-        return Ok(detail);
+        return this.Ok(detail);
     }
 
     /// <summary>
@@ -141,7 +141,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             ["authoringInfo"] = new JsonObject()
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     private Task<IActionResult> ReturnUpdatesAsync(
@@ -155,7 +155,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             return Task.FromResult<IActionResult>(error);
         }
 
-        var layersRaw = Request.Query.TryGetValue("layers", out var layerValues) ? layerValues.ToString() : null;
+        var layersRaw = this.Request.Query.TryGetValue("layers", out var layerValues) ? layerValues.ToString() : null;
         var layerIndexes = ResolveRequestedLayerIndexes(layersRaw, serviceView!, out var parseError);
         if (parseError is not null)
         {

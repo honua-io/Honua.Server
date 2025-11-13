@@ -94,12 +94,12 @@ public sealed class BuildDeliveryOptions
 /// </summary>
 public sealed class BuildDeliveryService : IBuildDeliveryService
 {
-    private readonly ILogger<BuildDeliveryService> _logger;
-    private readonly BuildDeliveryOptions _options;
-    private readonly IRegistryCacheChecker _cacheChecker;
-    private readonly IRegistryAccessManager _accessManager;
-    private readonly RegistryProvisioningOptions _registryOptions;
-    private readonly AsyncRetryPolicy _retryPolicy;
+    private readonly ILogger<BuildDeliveryService> logger;
+    private readonly BuildDeliveryOptions options;
+    private readonly IRegistryCacheChecker cacheChecker;
+    private readonly IRegistryAccessManager accessManager;
+    private readonly RegistryProvisioningOptions registryOptions;
+    private readonly AsyncRetryPolicy retryPolicy;
 
     public BuildDeliveryService(
         ILogger<BuildDeliveryService> logger,
@@ -108,21 +108,21 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
         IRegistryAccessManager accessManager,
         IOptions<RegistryProvisioningOptions> registryOptions)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? new BuildDeliveryOptions();
-        _cacheChecker = cacheChecker ?? throw new ArgumentNullException(nameof(cacheChecker));
-        _accessManager = accessManager ?? throw new ArgumentNullException(nameof(accessManager));
-        _registryOptions = registryOptions?.Value ?? throw new ArgumentNullException(nameof(registryOptions));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? new BuildDeliveryOptions();
+        this.cacheChecker = cacheChecker ?? throw new ArgumentNullException(nameof(cacheChecker));
+        this.accessManager = accessManager ?? throw new ArgumentNullException(nameof(accessManager));
+        this.registryOptions = registryOptions?.Value ?? throw new ArgumentNullException(nameof(registryOptions));
 
         // Configure retry policy with exponential backoff
-        _retryPolicy = Policy
+        this.retryPolicy = Policy
             .Handle<Exception>(ex => IsTransientError(ex))
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                 onRetry: (exception, timeSpan, retryCount, context) =>
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         exception,
                         "Retry {RetryCount} after {Delay}ms due to transient error",
                         retryCount,
@@ -142,21 +142,21 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
             throw new ArgumentNullException(nameof(cacheKey));
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Starting build delivery for {BuildName}:{Version} to {RegistryType}",
             cacheKey.BuildName,
             cacheKey.Version,
             targetRegistry);
 
         // 1. Validate access
-        var accessResult = await _accessManager.ValidateAccessAsync(
+        var accessResult = await this.accessManager.ValidateAccessAsync(
             cacheKey.CustomerId,
             targetRegistry,
             cancellationToken);
 
         if (!accessResult.AccessGranted)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Access denied for customer {CustomerId}: {Reason}",
                 cacheKey.CustomerId,
                 accessResult.DenialReason);
@@ -172,14 +172,14 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
         }
 
         // 2. Check if build exists in cache
-        var cacheResult = await _cacheChecker.CheckCacheAsync(
+        var cacheResult = await this.cacheChecker.CheckCacheAsync(
             cacheKey,
             targetRegistry,
             cancellationToken);
 
         if (cacheResult.Exists)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Build {BuildName}:{Version} found in cache: {ImageReference}",
                 cacheKey.BuildName,
                 cacheKey.Version,
@@ -198,7 +198,7 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
         }
 
         // 3. Build is not cached, need to build or copy
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Build {BuildName}:{Version} not in cache, preparing to build/copy",
             cacheKey.BuildName,
             cacheKey.Version);
@@ -216,7 +216,7 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
             string? sourceImage = null;
             if (!string.IsNullOrWhiteSpace(sourceBuildPath))
             {
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Building image from {SourcePath}",
                     sourceBuildPath);
 
@@ -251,12 +251,12 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
 
             // 4. Create additional tags
             var additionalTags = new List<string>();
-            if (_options.AutoTagLatest)
+            if (this.options.AutoTagLatest)
             {
                 additionalTags.Add("latest");
             }
 
-            if (_options.AutoTagArchitecture && !string.IsNullOrWhiteSpace(cacheKey.Architecture))
+            if (this.options.AutoTagArchitecture && !string.IsNullOrWhiteSpace(cacheKey.Architecture))
             {
                 additionalTags.Add($"{cacheKey.Version}-{cacheKey.Architecture}");
             }
@@ -267,7 +267,7 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
                 null, // Credential would be obtained from access manager
                 cancellationToken);
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Successfully delivered build {BuildName}:{Version} to {ImageReference}",
                 cacheKey.BuildName,
                 cacheKey.Version,
@@ -286,7 +286,7 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deliver build {BuildName}", cacheKey.BuildName);
+            this.logger.LogError(ex, "Failed to deliver build {BuildName}", cacheKey.BuildName);
             return new BuildDeliveryResult
             {
                 Success = false,
@@ -316,14 +316,14 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
             throw new ArgumentException("Target image cannot be null or empty", nameof(targetImage));
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Copying image from {SourceImage} to {TargetImage}",
             sourceImage,
             targetImage);
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
-            if (_options.PreferredTool.Equals("crane", StringComparison.OrdinalIgnoreCase))
+            if (this.options.PreferredTool.Equals("crane", StringComparison.OrdinalIgnoreCase))
             {
                 return await CopyWithCraneAsync(
                     sourceImage,
@@ -361,7 +361,7 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
             return Array.Empty<string>();
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Tagging image {ImageReference} with {TagCount} additional tags",
             imageReference,
             additionalTags.Count());
@@ -380,7 +380,7 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
 
                 var newReference = $"{baseReference}:{tag}";
 
-                if (_options.PreferredTool.Equals("crane", StringComparison.OrdinalIgnoreCase))
+                if (this.options.PreferredTool.Equals("crane", StringComparison.OrdinalIgnoreCase))
                 {
                     await TagWithCraneAsync(imageReference, newReference, credential, cancellationToken);
                 }
@@ -390,11 +390,11 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
                 }
 
                 appliedTags.Add(tag);
-                _logger.LogInformation("Applied tag {Tag} to image", tag);
+                this.logger.LogInformation("Applied tag {Tag} to image", tag);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to apply tag {Tag}", tag);
+                this.logger.LogWarning(ex, "Failed to apply tag {Tag}", tag);
             }
         }
 
@@ -429,22 +429,22 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
             envVars["CRANE_TARGET_PASSWORD"] = targetCredential.Password;
         }
 
-        _logger.LogDebug("Executing crane copy: {Args}", args.ToString());
+        this.logger.LogDebug("Executing crane copy: {Args}", args.ToString());
 
         var result = await ExecuteProcessAsync(
-            _options.CranePath,
+            this.options.CranePath,
             args.ToString(),
             envVars,
-            _options.CopyTimeoutSeconds,
+            this.options.CopyTimeoutSeconds,
             cancellationToken);
 
         if (result.ExitCode == 0)
         {
-            _logger.LogInformation("Successfully copied image with crane");
+            this.logger.LogInformation("Successfully copied image with crane");
             return true;
         }
 
-        _logger.LogError(
+        this.logger.LogError(
             "Crane copy failed with exit code {ExitCode}: {Error}",
             result.ExitCode,
             result.StandardError);
@@ -486,22 +486,22 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
             args.Append($" docker://{targetImage}");
 
             // Log sanitized command (credentials are not in args)
-            _logger.LogDebug("Executing skopeo copy: {Args}", args.ToString());
+            this.logger.LogDebug("Executing skopeo copy: {Args}", args.ToString());
 
             var result = await ExecuteProcessAsync(
-                _options.SkopeoPath,
+                this.options.SkopeoPath,
                 args.ToString(),
                 envVars.Count > 0 ? envVars : null,
-                _options.CopyTimeoutSeconds,
+                this.options.CopyTimeoutSeconds,
                 cancellationToken);
 
             if (result.ExitCode == 0)
             {
-                _logger.LogInformation("Successfully copied image with skopeo");
+                this.logger.LogInformation("Successfully copied image with skopeo");
                 return true;
             }
 
-            _logger.LogError(
+            this.logger.LogError(
                 "Skopeo copy failed with exit code {ExitCode}: {Error}",
                 result.ExitCode,
                 result.StandardError);
@@ -536,10 +536,10 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
             envVars["CRANE_PASSWORD"] = credential.Password;
         }
 
-        _logger.LogDebug("Executing crane tag: {Args}", args);
+        this.logger.LogDebug("Executing crane tag: {Args}", args);
 
         var result = await ExecuteProcessAsync(
-            _options.CranePath,
+            this.options.CranePath,
             args,
             envVars,
             30, // Tagging is quick
@@ -698,18 +698,18 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
 
                     if (chmodProcess.ExitCode != 0)
                     {
-                        _logger.LogWarning(
+                        this.logger.LogWarning(
                             "Failed to set secure permissions on auth file: {ExitCode}",
                             chmodProcess.ExitCode);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to set secure permissions on auth file");
+                    this.logger.LogWarning(ex, "Failed to set secure permissions on auth file");
                 }
             }
 
-            _logger.LogDebug("Created secure auth file at {Path}", authFilePath);
+            this.logger.LogDebug("Created secure auth file at {Path}", authFilePath);
             return authFilePath;
         }
         catch (Exception ex)
@@ -727,7 +727,7 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
                 // Ignore cleanup errors
             }
 
-            _logger.LogError(ex, "Failed to create secure auth file");
+            this.logger.LogError(ex, "Failed to create secure auth file");
             throw;
         }
     }
@@ -775,12 +775,12 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
                 }
 
                 File.Delete(authFilePath);
-                _logger.LogDebug("Cleaned up auth file at {Path}", authFilePath);
+                this.logger.LogDebug("Cleaned up auth file at {Path}", authFilePath);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to clean up auth file at {Path}", authFilePath);
+            this.logger.LogWarning(ex, "Failed to clean up auth file at {Path}", authFilePath);
         }
     }
 
@@ -791,10 +791,10 @@ public sealed class BuildDeliveryService : IBuildDeliveryService
     {
         var (registryUrl, organization) = registryType switch
         {
-            RegistryType.GitHubContainerRegistry => ("ghcr.io", _registryOptions.GitHubOrganization ?? "honua"),
-            RegistryType.AwsEcr => ($"{_registryOptions.AwsAccountId}.dkr.ecr.{_registryOptions.AwsRegion}.amazonaws.com", "honua"),
-            RegistryType.AzureAcr => ($"{_registryOptions.AzureRegistryName}.azurecr.io", "customers"),
-            RegistryType.GcpArtifactRegistry => ($"{_registryOptions.GcpRegion}-docker.pkg.dev", $"{_registryOptions.GcpProjectId}/{_registryOptions.GcpRepositoryName}"),
+            RegistryType.GitHubContainerRegistry => ("ghcr.io", this.registryOptions.GitHubOrganization ?? "honua"),
+            RegistryType.AwsEcr => ($"{this.registryOptions.AwsAccountId}.dkr.ecr.{this.registryOptions.AwsRegion}.amazonaws.com", "honua"),
+            RegistryType.AzureAcr => ($"{this.registryOptions.AzureRegistryName}.azurecr.io", "customers"),
+            RegistryType.GcpArtifactRegistry => ($"{this.registryOptions.GcpRegion}-docker.pkg.dev", $"{this.registryOptions.GcpProjectId}/{this.registryOptions.GcpRepositoryName}"),
             _ => throw new NotSupportedException($"Registry type {registryType} is not supported")
         };
 

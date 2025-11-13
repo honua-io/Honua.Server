@@ -13,10 +13,10 @@ namespace Honua.Server.Host.Configuration;
 /// </summary>
 public sealed class RuntimeSecurityValidationHostedService : IHostedService
 {
-    private readonly IConfiguration _configuration;
-    private readonly IRuntimeSecurityConfigurationValidator _validator;
-    private readonly IHostEnvironment _environment;
-    private readonly ILogger<RuntimeSecurityValidationHostedService> _logger;
+    private readonly IConfiguration configuration;
+    private readonly IRuntimeSecurityConfigurationValidator validator;
+    private readonly IHostEnvironment environment;
+    private readonly ILogger<RuntimeSecurityValidationHostedService> logger;
 
     public RuntimeSecurityValidationHostedService(
         IConfiguration configuration,
@@ -24,25 +24,25 @@ public sealed class RuntimeSecurityValidationHostedService : IHostedService
         IHostEnvironment environment,
         ILogger<RuntimeSecurityValidationHostedService> logger)
     {
-        _configuration = Guard.NotNull(configuration);
-        _validator = Guard.NotNull(validator);
-        _environment = Guard.NotNull(environment);
-        _logger = Guard.NotNull(logger);
+        this.configuration = Guard.NotNull(configuration);
+        this.validator = Guard.NotNull(validator);
+        this.environment = Guard.NotNull(environment);
+        this.logger = Guard.NotNull(logger);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Validating runtime security configuration...");
+        this.logger.LogInformation("Validating runtime security configuration...");
 
-        var isProduction = _environment.IsProduction();
-        var result = _validator.Validate(_configuration, isProduction);
+        var isProduction = this.environment.IsProduction();
+        var result = this.validator.Validate(_configuration, isProduction);
 
         if (result.Errors.Any())
         {
-            _logger.LogError("Runtime security configuration validation FAILED with {ErrorCount} error(s):", result.Errors.Count);
+            this.logger.LogError("Runtime security configuration validation FAILED with {ErrorCount} error(s):", result.Errors.Count);
             foreach (var error in result.Errors)
             {
-                _logger.LogError("  [{Category}] {Message}", error.Category, error.Message);
+                this.logger.LogError("  [{Category}] {Message}", error.Category, error.Message);
             }
 
             if (isProduction)
@@ -54,20 +54,20 @@ public sealed class RuntimeSecurityValidationHostedService : IHostedService
             }
             else
             {
-                _logger.LogWarning("Continuing startup despite errors (not production environment).");
+                this.logger.LogWarning("Continuing startup despite errors (not production environment).");
             }
         }
         else if (result.Warnings.Any())
         {
-            _logger.LogWarning("Runtime security configuration validation completed with {WarningCount} warning(s):", result.Warnings.Count);
+            this.logger.LogWarning("Runtime security configuration validation completed with {WarningCount} warning(s):", result.Warnings.Count);
             foreach (var warning in result.Warnings)
             {
-                _logger.LogWarning("  [{Category}] {Message}", warning.Category, warning.Message);
+                this.logger.LogWarning("  [{Category}] {Message}", warning.Category, warning.Message);
             }
         }
         else
         {
-            _logger.LogInformation("Runtime security configuration validation PASSED with no issues.");
+            this.logger.LogInformation("Runtime security configuration validation PASSED with no issues.");
         }
 
         return Task.CompletedTask;

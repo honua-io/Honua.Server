@@ -21,15 +21,15 @@ namespace Honua.Server.Host.API;
 [Produces("application/json")]
 public class GraphController : ControllerBase
 {
-    private readonly ILogger<GraphController> _logger;
-    private readonly IGraphDatabaseService _graphService;
+    private readonly ILogger<GraphController> logger;
+    private readonly IGraphDatabaseService graphService;
 
     public GraphController(
         ILogger<GraphController> logger,
         IGraphDatabaseService graphService)
     {
-        _logger = logger;
-        _graphService = graphService;
+        this.logger = logger;
+        this.graphService = graphService;
     }
 
     // ==================== Graph Management ====================
@@ -47,8 +47,8 @@ public class GraphController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateGraph([FromRoute] string graphName)
     {
-        await _graphService.CreateGraphAsync(graphName);
-        return Created($"/api/graph/graphs/{graphName}", new { graphName, message = "Graph created successfully" });
+        await this.graphService.CreateGraphAsync(graphName);
+        return this.Created($"/api/graph/graphs/{graphName}", new { graphName, message = "Graph created successfully" });
     }
 
     /// <summary>
@@ -60,8 +60,8 @@ public class GraphController : ControllerBase
     [ProducesResponseType(typeof(GraphExistsResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<GraphExistsResponse>> GraphExists([FromRoute] string graphName)
     {
-        var exists = await _graphService.GraphExistsAsync(graphName);
-        return Ok(new GraphExistsResponse { GraphName = graphName, Exists = exists });
+        var exists = await this.graphService.GraphExistsAsync(graphName);
+        return this.Ok(new GraphExistsResponse { GraphName = graphName, Exists = exists });
     }
 
     /// <summary>
@@ -75,14 +75,14 @@ public class GraphController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteGraph([FromRoute] string graphName)
     {
-        var exists = await _graphService.GraphExistsAsync(graphName);
+        var exists = await this.graphService.GraphExistsAsync(graphName);
         if (!exists)
         {
-            return NotFound(new { message = $"Graph '{graphName}' not found" });
+            return this.NotFound(new { message = $"Graph '{graphName}' not found" });
         }
 
-        await _graphService.DropGraphAsync(graphName);
-        return NoContent();
+        await this.graphService.DropGraphAsync(graphName);
+        return this.NoContent();
     }
 
     // ==================== Node Operations ====================
@@ -103,11 +103,11 @@ public class GraphController : ControllerBase
     {
         if (string.IsNullOrEmpty(node.Label))
         {
-            return BadRequest(new { message = "Node label is required" });
+            return this.BadRequest(new { message = "Node label is required" });
         }
 
-        var createdNode = await _graphService.CreateNodeAsync(node, graphName);
-        return CreatedAtAction(nameof(GetNode), new { id = createdNode.Id, graphName }, createdNode);
+        var createdNode = await this.graphService.CreateNodeAsync(node, graphName);
+        return this.CreatedAtAction(nameof(GetNode), new { id = createdNode.Id, graphName }, createdNode);
     }
 
     /// <summary>
@@ -124,13 +124,13 @@ public class GraphController : ControllerBase
         [FromRoute] long id,
         [FromQuery] string? graphName = null)
     {
-        var node = await _graphService.GetNodeByIdAsync(id, graphName);
+        var node = await this.graphService.GetNodeByIdAsync(id, graphName);
         if (node == null)
         {
-            return NotFound(new { message = $"Node with ID {id} not found" });
+            return this.NotFound(new { message = $"Node with ID {id} not found" });
         }
 
-        return Ok(node);
+        return this.Ok(node);
     }
 
     /// <summary>
@@ -148,8 +148,8 @@ public class GraphController : ControllerBase
         [FromQuery] int limit = 100)
     {
         limit = Math.Min(limit, 1000);
-        var nodes = await _graphService.FindNodesAsync(label, null, graphName, limit);
-        return Ok(nodes);
+        var nodes = await this.graphService.FindNodesAsync(label, null, graphName, limit);
+        return this.Ok(nodes);
     }
 
     /// <summary>
@@ -168,8 +168,8 @@ public class GraphController : ControllerBase
         [FromBody] Dictionary<string, object> properties,
         [FromQuery] string? graphName = null)
     {
-        await _graphService.UpdateNodeAsync(id, properties, graphName);
-        return NoContent();
+        await this.graphService.UpdateNodeAsync(id, properties, graphName);
+        return this.NoContent();
     }
 
     /// <summary>
@@ -184,8 +184,8 @@ public class GraphController : ControllerBase
         [FromRoute] long id,
         [FromQuery] string? graphName = null)
     {
-        await _graphService.DeleteNodeAsync(id, graphName);
-        return NoContent();
+        await this.graphService.DeleteNodeAsync(id, graphName);
+        return this.NoContent();
     }
 
     /// <summary>
@@ -200,8 +200,8 @@ public class GraphController : ControllerBase
         [FromBody] List<GraphNode> nodes,
         [FromQuery] string? graphName = null)
     {
-        var createdNodes = await _graphService.CreateNodesAsync(nodes, graphName);
-        return CreatedAtAction(nameof(CreateNodesBatch), new { graphName }, createdNodes);
+        var createdNodes = await this.graphService.CreateNodesAsync(nodes, graphName);
+        return this.CreatedAtAction(nameof(CreateNodesBatch), new { graphName }, createdNodes);
     }
 
     // ==================== Edge Operations ====================
@@ -219,7 +219,7 @@ public class GraphController : ControllerBase
     {
         if (string.IsNullOrEmpty(request.RelationshipType))
         {
-            return BadRequest(new { message = "Relationship type is required" });
+            return this.BadRequest(new { message = "Relationship type is required" });
         }
 
         var edge = new GraphEdge
@@ -230,8 +230,8 @@ public class GraphController : ControllerBase
             Properties = request.Properties ?? new Dictionary<string, object>()
         };
 
-        var createdEdge = await _graphService.CreateEdgeAsync(edge, request.GraphName);
-        return CreatedAtAction(nameof(GetRelationship), new { id = createdEdge.Id, graphName = request.GraphName }, createdEdge);
+        var createdEdge = await this.graphService.CreateEdgeAsync(edge, request.GraphName);
+        return this.CreatedAtAction(nameof(GetRelationship), new { id = createdEdge.Id, graphName = request.GraphName }, createdEdge);
     }
 
     /// <summary>
@@ -248,13 +248,13 @@ public class GraphController : ControllerBase
         [FromRoute] long id,
         [FromQuery] string? graphName = null)
     {
-        var edge = await _graphService.GetEdgeByIdAsync(id, graphName);
+        var edge = await this.graphService.GetEdgeByIdAsync(id, graphName);
         if (edge == null)
         {
-            return NotFound(new { message = $"Relationship with ID {id} not found" });
+            return this.NotFound(new { message = $"Relationship with ID {id} not found" });
         }
 
-        return Ok(edge);
+        return this.Ok(edge);
     }
 
     /// <summary>
@@ -273,8 +273,8 @@ public class GraphController : ControllerBase
         [FromQuery] TraversalDirection direction = TraversalDirection.Both,
         [FromQuery] string? graphName = null)
     {
-        var edges = await _graphService.GetNodeRelationshipsAsync(nodeId, relationshipType, direction, graphName);
-        return Ok(edges);
+        var edges = await this.graphService.GetNodeRelationshipsAsync(nodeId, relationshipType, direction, graphName);
+        return this.Ok(edges);
     }
 
     /// <summary>
@@ -289,8 +289,8 @@ public class GraphController : ControllerBase
         [FromRoute] long id,
         [FromQuery] string? graphName = null)
     {
-        await _graphService.DeleteEdgeAsync(id, graphName);
-        return NoContent();
+        await this.graphService.DeleteEdgeAsync(id, graphName);
+        return this.NoContent();
     }
 
     // ==================== Cypher Queries ====================
@@ -308,15 +308,15 @@ public class GraphController : ControllerBase
     {
         if (string.IsNullOrEmpty(request.Query))
         {
-            return BadRequest(new { message = "Query is required" });
+            return this.BadRequest(new { message = "Query is required" });
         }
 
-        var result = await _graphService.ExecuteCypherQueryAsync(
+        var result = await this.graphService.ExecuteCypherQueryAsync(
             request.Query,
             request.Parameters,
             request.GraphName);
 
-        return Ok(result);
+        return this.Ok(result);
     }
 
     // ==================== Graph Traversal ====================
@@ -332,7 +332,7 @@ public class GraphController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GraphQueryResult>> TraverseGraph([FromBody] GraphTraversalRequest request)
     {
-        var result = await _graphService.TraverseGraphAsync(
+        var result = await this.graphService.TraverseGraphAsync(
             request.StartNodeId,
             request.RelationshipTypes,
             request.Direction,
@@ -340,7 +340,7 @@ public class GraphController : ControllerBase
             request.NodeFilter,
             request.GraphName);
 
-        return Ok(result);
+        return this.Ok(result);
     }
 
     /// <summary>
@@ -361,14 +361,14 @@ public class GraphController : ControllerBase
         [FromQuery] int maxDepth = 10,
         [FromQuery] string? graphName = null)
     {
-        var result = await _graphService.FindShortestPathAsync(
+        var result = await this.graphService.FindShortestPathAsync(
             startNodeId,
             endNodeId,
             relationshipTypes,
             maxDepth,
             graphName);
 
-        return Ok(result);
+        return this.Ok(result);
     }
 }
 

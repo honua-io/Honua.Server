@@ -49,7 +49,7 @@ public static class ServiceCollectionExtensions
                         Environment.MachineName),
                     new KeyValuePair<string, object>("service.namespace", "Honua"),
                     new KeyValuePair<string, object>("service.instance.id",
-                        Environment.GetEnvironmentVariable("HOSTNAME") ?? Environment.MachineName)
+                        Environment.GetEnvironmentVariable("HOSTNAME") ?? Environment.MachineName),
                 }))
             .WithMetrics(builder =>
             {
@@ -180,19 +180,19 @@ public static class ServiceCollectionExtensions
                 .AddCheck("database",
                     new DatabaseHealthCheck(connectionString),
                     HealthStatus.Unhealthy,
-                    tags: new[] { "database", "postgres" })
+                    tags: new[] { "database", "postgres", })
                 .AddCheck("license",
                     new LicenseHealthCheck(connectionString),
                     HealthStatus.Degraded,
-                    tags: new[] { "license" })
+                    tags: new[] { "license", })
                 .AddCheck("queue",
                     new QueueHealthCheck(connectionString),
                     HealthStatus.Degraded,
-                    tags: new[] { "queue", "build" })
+                    tags: new[] { "queue", "build", })
                 .AddCheck("registry",
                     new RegistryHealthCheck(connectionString),
                     HealthStatus.Degraded,
-                    tags: new[] { "registry", "docker" });
+                    tags: new[] { "registry", "docker", });
         }
         else
         {
@@ -205,6 +205,10 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Configures Serilog structured logging for Honua services.
     /// </summary>
+    /// <param name="loggingBuilder">The logging builder.</param>
+    /// <param name="serviceName">The service name.</param>
+    /// <param name="minimumLevel">The minimum log level.</param>
+    /// <returns>The logging builder for chaining.</returns>
     public static ILoggingBuilder AddHonuaSerilog(
         this ILoggingBuilder loggingBuilder,
         string serviceName = "Honua.Server",
@@ -239,6 +243,8 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Adds the correlation ID and metrics middleware to the application pipeline.
     /// </summary>
+    /// <param name="app">The application builder.</param>
+    /// <returns>The application builder for chaining.</returns>
     public static IApplicationBuilder UseHonuaMetrics(this IApplicationBuilder app)
     {
         app.UseMiddleware<CorrelationIdMiddleware>();
@@ -249,6 +255,8 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Maps health check endpoints.
     /// </summary>
+    /// <param name="app">The application builder.</param>
+    /// <returns>The application builder for chaining.</returns>
     public static IApplicationBuilder UseHonuaHealthChecks(this IApplicationBuilder app)
     {
         app.UseHealthChecks("/health");
@@ -267,6 +275,8 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Maps Prometheus metrics endpoint.
     /// </summary>
+    /// <param name="app">The application builder.</param>
+    /// <returns>The application builder for chaining.</returns>
     public static IApplicationBuilder UsePrometheusMetrics(this IApplicationBuilder app)
     {
         app.UseOpenTelemetryPrometheusScrapingEndpoint();

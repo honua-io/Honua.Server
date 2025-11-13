@@ -24,9 +24,9 @@ namespace Honua.Server.Host.Health;
 /// </summary>
 public sealed class OidcDiscoveryHealthCheck : HealthCheckBase
 {
-    private readonly IOptionsMonitor<HonuaAuthenticationOptions> _authOptions;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IMemoryCache _cache;
+    private readonly IOptionsMonitor<HonuaAuthenticationOptions> authOptions;
+    private readonly IHttpClientFactory httpClientFactory;
+    private readonly IMemoryCache cache;
 
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(5);
@@ -39,16 +39,16 @@ public sealed class OidcDiscoveryHealthCheck : HealthCheckBase
         IMemoryCache cache)
         : base(logger, RequestTimeout)
     {
-        _authOptions = Guard.NotNull(authOptions);
-        _httpClientFactory = Guard.NotNull(httpClientFactory);
-        _cache = Guard.NotNull(cache);
+        this.authOptions = Guard.NotNull(authOptions);
+        this.httpClientFactory = Guard.NotNull(httpClientFactory);
+        this.cache = Guard.NotNull(cache);
     }
 
     protected override async Task<HealthCheckResult> ExecuteHealthCheckAsync(
         Dictionary<string, object> data,
         CancellationToken cancellationToken)
     {
-        var options = _authOptions.CurrentValue;
+        var options = this.authOptions.CurrentValue;
 
         // Only check when OIDC mode is enabled
         if (options.Mode != HonuaAuthenticationOptions.AuthenticationMode.Oidc)
@@ -64,7 +64,7 @@ public sealed class OidcDiscoveryHealthCheck : HealthCheckBase
         var cacheKey = CacheKeyPrefix + options.Jwt.Authority;
 
         // Try to get cached result
-        if (_cache.TryGetValue<HealthCheckResult>(cacheKey, out var cachedResult))
+        if (this.cache.TryGetValue<HealthCheckResult>(cacheKey, out var cachedResult))
         {
             Logger.LogDebug("Returning cached OIDC health check result for {Authority}", options.Jwt.Authority);
             return cachedResult;
@@ -74,7 +74,7 @@ public sealed class OidcDiscoveryHealthCheck : HealthCheckBase
 
         try
         {
-            using var httpClient = _httpClientFactory.CreateClient();
+            using var httpClient = this.httpClientFactory.CreateClient();
             httpClient.Timeout = RequestTimeout;
 
             var response = await httpClient.GetAsync(discoveryUrl, cancellationToken);
@@ -111,7 +111,7 @@ public sealed class OidcDiscoveryHealthCheck : HealthCheckBase
             }
 
             // Cache the result
-            _cache.Set(cacheKey, result, CacheDuration);
+            this.cache.Set(cacheKey, result, CacheDuration);
             return result;
         }
         catch (HttpRequestException ex)
@@ -128,14 +128,14 @@ public sealed class OidcDiscoveryHealthCheck : HealthCheckBase
                 data: data);
 
             // Cache degraded results for a shorter duration (1 minute)
-            _cache.Set(cacheKey, result, TimeSpan.FromMinutes(1));
+            this.cache.Set(cacheKey, result, TimeSpan.FromMinutes(1));
             return result;
         }
     }
 
     protected override HealthCheckResult CreateUnhealthyResult(Exception ex, Dictionary<string, object> data)
     {
-        var options = _authOptions.CurrentValue;
+        var options = this.authOptions.CurrentValue;
 
         data["authority"] = options.Jwt.Authority;
         data["error"] = ex.Message;

@@ -16,18 +16,18 @@ namespace Honua.Server.Host.API;
 [Produces("application/json")]
 public class TerrainController : ControllerBase
 {
-    private readonly ILogger<TerrainController> _logger;
-    private readonly IElevationService _elevationService;
-    private readonly ITerrainTileService _terrainTileService;
+    private readonly ILogger<TerrainController> logger;
+    private readonly IElevationService elevationService;
+    private readonly ITerrainTileService terrainTileService;
 
     public TerrainController(
         ILogger<TerrainController> logger,
         IElevationService elevationService,
         ITerrainTileService terrainTileService)
     {
-        _logger = logger;
-        _elevationService = elevationService;
-        _terrainTileService = terrainTileService;
+        this.logger = logger;
+        this.elevationService = elevationService;
+        this.terrainTileService = terrainTileService;
     }
 
     /// <summary>
@@ -46,14 +46,14 @@ public class TerrainController : ControllerBase
         [FromQuery] double lat,
         [FromQuery] string? source = null)
     {
-        var elevation = await _elevationService.QueryElevationAsync(lon, lat, source);
+        var elevation = await this.elevationService.QueryElevationAsync(lon, lat, source);
 
         if (elevation == null)
         {
-            return NotFound(new { message = "Elevation data not available for this location" });
+            return this.NotFound(new { message = "Elevation data not available for this location" });
         }
 
-        return Ok(new ElevationResponse
+        return this.Ok(new ElevationResponse
         {
             Longitude = lon,
             Latitude = lat,
@@ -73,11 +73,11 @@ public class TerrainController : ControllerBase
     public async Task<ActionResult<BatchElevationResponse>> GetElevationBatch(
         [FromBody] BatchElevationRequest request)
     {
-        var elevations = await _elevationService.QueryElevationBatchAsync(
+        var elevations = await this.elevationService.QueryElevationBatchAsync(
             request.Points,
             request.Source);
 
-        return Ok(new BatchElevationResponse
+        return this.Ok(new BatchElevationResponse
         {
             Elevations = elevations,
             Count = elevations.Length,
@@ -96,12 +96,12 @@ public class TerrainController : ControllerBase
     public async Task<ActionResult<ElevationProfile>> GetElevationProfile(
         [FromBody] ElevationProfileRequest request)
     {
-        var profile = await _elevationService.QueryPathElevationAsync(
+        var profile = await this.elevationService.QueryPathElevationAsync(
             request.Coordinates,
             request.SamplePoints ?? 100,
             request.Source);
 
-        return Ok(profile);
+        return this.Ok(profile);
     }
 
     /// <summary>
@@ -116,8 +116,8 @@ public class TerrainController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTerrainRGBTile(int z, int x, int y)
     {
-        var tileData = await _terrainTileService.GenerateTerrainRGBTileAsync(z, x, y);
-        return File(tileData, "image/png");
+        var tileData = await this.terrainTileService.GenerateTerrainRGBTileAsync(z, x, y);
+        return this.File(tileData, "image/png");
     }
 
     /// <summary>
@@ -135,8 +135,8 @@ public class TerrainController : ControllerBase
         int z, int x, int y,
         [FromQuery] float maxError = 1.0f)
     {
-        var tile = await _terrainTileService.GenerateTerrainMeshTileAsync(z, x, y, maxError);
-        return Ok(tile);
+        var tile = await this.terrainTileService.GenerateTerrainMeshTileAsync(z, x, y, maxError);
+        return this.Ok(tile);
     }
 
     /// <summary>
@@ -156,9 +156,9 @@ public class TerrainController : ControllerBase
         [FromQuery] double azimuth = 315,
         [FromQuery] double altitude = 45)
     {
-        var tileData = await _terrainTileService.GenerateHillshadeTileAsync(
+        var tileData = await this.terrainTileService.GenerateHillshadeTileAsync(
             z, x, y, azimuth, altitude);
-        return File(tileData, "image/png");
+        return this.File(tileData, "image/png");
     }
 
     /// <summary>
@@ -173,8 +173,8 @@ public class TerrainController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSlopeTile(int z, int x, int y)
     {
-        var tileData = await _terrainTileService.GenerateSlopeTileAsync(z, x, y);
-        return File(tileData, "image/png");
+        var tileData = await this.terrainTileService.GenerateSlopeTileAsync(z, x, y);
+        return this.File(tileData, "image/png");
     }
 
     /// <summary>
@@ -188,8 +188,8 @@ public class TerrainController : ControllerBase
     [ProducesResponseType(typeof(TerrainTileMetadata), StatusCodes.Status200OK)]
     public async Task<ActionResult<TerrainTileMetadata>> GetTileMetadata(int z, int x, int y)
     {
-        var metadata = await _terrainTileService.GetTileMetadataAsync(z, x, y);
-        return Ok(metadata);
+        var metadata = await this.terrainTileService.GetTileMetadataAsync(z, x, y);
+        return this.Ok(metadata);
     }
 }
 

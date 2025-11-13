@@ -12,15 +12,15 @@ namespace Honua.Server.Services.Services.Drone;
 /// </summary>
 public class OrthomosaicService
 {
-    private readonly IDroneDataRepository _repository;
-    private readonly ILogger<OrthomosaicService> _logger;
+    private readonly IDroneDataRepository repository;
+    private readonly ILogger<OrthomosaicService> logger;
 
     public OrthomosaicService(
         IDroneDataRepository repository,
         ILogger<OrthomosaicService> logger)
     {
-        _repository = repository;
-        _logger = logger;
+        this.repository = repository;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -30,10 +30,10 @@ public class OrthomosaicService
         CreateOrthomosaicDto dto,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Creating orthomosaic {Name} for survey {SurveyId}",
+        this.logger.LogInformation("Creating orthomosaic {Name} for survey {SurveyId}",
             dto.Name, dto.SurveyId);
 
-        return await _repository.CreateOrthomosaicAsync(dto, cancellationToken);
+        return await this.repository.CreateOrthomosaicAsync(dto, cancellationToken);
     }
 
     /// <summary>
@@ -43,7 +43,7 @@ public class OrthomosaicService
         Guid orthomosaicId,
         CancellationToken cancellationToken = default)
     {
-        return await _repository.GetOrthomosaicAsync(orthomosaicId, cancellationToken);
+        return await this.repository.GetOrthomosaicAsync(orthomosaicId, cancellationToken);
     }
 
     /// <summary>
@@ -53,7 +53,7 @@ public class OrthomosaicService
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        return await _repository.ListOrthomosaicsAsync(surveyId, cancellationToken);
+        return await this.repository.ListOrthomosaicsAsync(surveyId, cancellationToken);
     }
 
     /// <summary>
@@ -65,7 +65,7 @@ public class OrthomosaicService
         string outputPath,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Importing GeoTIFF {FilePath} for survey {SurveyId}",
+        this.logger.LogInformation("Importing GeoTIFF {FilePath} for survey {SurveyId}",
             geoTiffPath, surveyId);
 
         var startTime = DateTime.UtcNow;
@@ -84,10 +84,10 @@ public class OrthomosaicService
                 SurveyId = surveyId,
                 Name = Path.GetFileNameWithoutExtension(geoTiffPath),
                 RasterPath = outputPath,
-                ResolutionCm = 2.5 // Example value
+                ResolutionCm = 2.5, // Example value
             };
 
-            var orthomosaic = await _repository.CreateOrthomosaicAsync(dto, cancellationToken);
+            var orthomosaic = await this.repository.CreateOrthomosaicAsync(dto, cancellationToken);
 
             var duration = DateTime.UtcNow - startTime;
 
@@ -96,18 +96,18 @@ public class OrthomosaicService
                 Success = true,
                 OrthomosaicId = orthomosaic.Id,
                 DurationSeconds = duration.TotalSeconds,
-                Message = "Orthomosaic imported successfully"
+                Message = "Orthomosaic imported successfully",
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to import GeoTIFF {FilePath}", geoTiffPath);
+            this.logger.LogError(ex, "Failed to import GeoTIFF {FilePath}", geoTiffPath);
 
             return new OrthomosaicImportResult
             {
                 Success = false,
                 DurationSeconds = (DateTime.UtcNow - startTime).TotalSeconds,
-                Message = $"Import failed: {ex.Message}"
+                Message = $"Import failed: {ex.Message}",
             };
         }
     }
@@ -121,11 +121,11 @@ public class OrthomosaicService
         int maxZoom = 20,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Generating tiles for orthomosaic {OrthomosaicId}", orthomosaicId);
+        this.logger.LogInformation("Generating tiles for orthomosaic {OrthomosaicId}", orthomosaicId);
 
         try
         {
-            var orthomosaic = await _repository.GetOrthomosaicAsync(orthomosaicId, cancellationToken);
+            var orthomosaic = await this.repository.GetOrthomosaicAsync(orthomosaicId, cancellationToken);
             if (orthomosaic == null)
             {
                 throw new KeyNotFoundException($"Orthomosaic {orthomosaicId} not found");
@@ -139,19 +139,19 @@ public class OrthomosaicService
                 Success = true,
                 ZoomLevels = Enumerable.Range(minZoom, maxZoom - minZoom + 1).ToArray(),
                 TilesGenerated = 1000, // Example value
-                Message = "Tiles generated successfully"
+                Message = "Tiles generated successfully",
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to generate tiles for orthomosaic {OrthomosaicId}", orthomosaicId);
+            this.logger.LogError(ex, "Failed to generate tiles for orthomosaic {OrthomosaicId}", orthomosaicId);
 
             return new TileGenerationResult
             {
                 Success = false,
                 ZoomLevels = Array.Empty<int>(),
                 TilesGenerated = 0,
-                Message = $"Tile generation failed: {ex.Message}"
+                Message = $"Tile generation failed: {ex.Message}",
             };
         }
     }
@@ -163,7 +163,7 @@ public class OrthomosaicService
         Guid orthomosaicId,
         CancellationToken cancellationToken = default)
     {
-        var orthomosaic = await _repository.GetOrthomosaicAsync(orthomosaicId, cancellationToken);
+        var orthomosaic = await this.repository.GetOrthomosaicAsync(orthomosaicId, cancellationToken);
         if (orthomosaic == null)
         {
             throw new KeyNotFoundException($"Orthomosaic {orthomosaicId} not found");
@@ -175,7 +175,7 @@ public class OrthomosaicService
             Format = "image/png",
             Bounds = orthomosaic.Bounds,
             MinZoom = 10,
-            MaxZoom = 20
+            MaxZoom = 20,
         };
     }
 }

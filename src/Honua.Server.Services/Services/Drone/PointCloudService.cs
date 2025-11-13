@@ -13,17 +13,17 @@ namespace Honua.Server.Services.Services.Drone;
 /// </summary>
 public class PointCloudService
 {
-    private readonly IDroneDataRepository _repository;
-    private readonly ILogger<PointCloudService> _logger;
-    private readonly PointCloudLodSelector _lodSelector;
+    private readonly IDroneDataRepository repository;
+    private readonly ILogger<PointCloudService> logger;
+    private readonly PointCloudLodSelector lodSelector;
 
     public PointCloudService(
         IDroneDataRepository repository,
         ILogger<PointCloudService> logger)
     {
-        _repository = repository;
-        _logger = logger;
-        _lodSelector = new PointCloudLodSelector();
+        this.repository = repository;
+        this.logger = logger;
+        this.lodSelector = new PointCloudLodSelector();
     }
 
     /// <summary>
@@ -38,9 +38,9 @@ public class PointCloudService
         CancellationToken cancellationToken = default)
     {
         // Automatically select appropriate LOD based on zoom level and bbox
-        var lodLevel = _lodSelector.SelectLod(zoomLevel, boundingBox);
+        var lodLevel = this.lodSelector.SelectLod(zoomLevel, boundingBox);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Querying point cloud for survey {SurveyId} with LOD {LOD}",
             surveyId, lodLevel);
 
@@ -49,10 +49,10 @@ public class PointCloudService
             BoundingBox = boundingBox,
             LodLevel = lodLevel,
             ClassificationFilter = classificationFilter,
-            Limit = limit
+            Limit = limit,
         };
 
-        return _repository.QueryPointCloudAsync(surveyId, options, cancellationToken);
+        return this.repository.QueryPointCloudAsync(surveyId, options, cancellationToken);
     }
 
     /// <summary>
@@ -63,11 +63,11 @@ public class PointCloudService
         PointCloudQueryOptions options,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Querying point cloud for survey {SurveyId} with explicit LOD {LOD}",
             surveyId, options.LodLevel);
 
-        return _repository.QueryPointCloudAsync(surveyId, options, cancellationToken);
+        return this.repository.QueryPointCloudAsync(surveyId, options, cancellationToken);
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public class PointCloudService
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        return await _repository.GetPointCloudStatisticsAsync(surveyId, cancellationToken);
+        return await this.repository.GetPointCloudStatisticsAsync(surveyId, cancellationToken);
     }
 
     /// <summary>
@@ -89,7 +89,7 @@ public class PointCloudService
         string lazFilePath,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Importing LAZ file {FilePath} for survey {SurveyId}",
+        this.logger.LogInformation("Importing LAZ file {FilePath} for survey {SurveyId}",
             lazFilePath, surveyId);
 
         var startTime = DateTime.UtcNow;
@@ -112,31 +112,33 @@ public class PointCloudService
             // _logger.LogInformation("LAZ file contains {PointCount} points", metadata.PointCount);
 
             // Update survey statistics
-            await _repository.UpdateSurveyStatisticsAsync(surveyId, cancellationToken);
+            await this.repository.UpdateSurveyStatisticsAsync(surveyId, cancellationToken);
 
             var duration = DateTime.UtcNow - startTime;
 
             return new PointCloudImportResult
             {
                 Success = true,
+
             // TODO: LazReader not implemented yet
             // PointsImported = metadata.PointCount,
                 DurationSeconds = duration.TotalSeconds,
-                Message = "Successfully imported point cloud (stub - LazReader not implemented)"
+                Message = "Successfully imported point cloud (stub - LazReader not implemented)",
+
             // TODO: LazReader not implemented yet
             // Message = $"Successfully imported {metadata.PointCount} points"
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to import LAZ file {FilePath}", lazFilePath);
+            this.logger.LogError(ex, "Failed to import LAZ file {FilePath}", lazFilePath);
 
             return new PointCloudImportResult
             {
                 Success = false,
                 PointsImported = 0,
                 DurationSeconds = (DateTime.UtcNow - startTime).TotalSeconds,
-                Message = $"Import failed: {ex.Message}"
+                Message = $"Import failed: {ex.Message}",
             };
         }
     }
@@ -148,7 +150,7 @@ public class PointCloudService
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Generating LOD levels for survey {SurveyId}", surveyId);
+        this.logger.LogInformation("Generating LOD levels for survey {SurveyId}", surveyId);
 
         try
         {
@@ -157,19 +159,19 @@ public class PointCloudService
             return new LodGenerationResult
             {
                 Success = true,
-                LevelsGenerated = new[] { 1, 2 },
-                Message = "LOD levels generated successfully"
+                LevelsGenerated = new[] { 1, 2, },
+                Message = "LOD levels generated successfully",
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to generate LOD levels for survey {SurveyId}", surveyId);
+            this.logger.LogError(ex, "Failed to generate LOD levels for survey {SurveyId}", surveyId);
 
             return new LodGenerationResult
             {
                 Success = false,
                 LevelsGenerated = Array.Empty<int>(),
-                Message = $"LOD generation failed: {ex.Message}"
+                Message = $"LOD generation failed: {ex.Message}",
             };
         }
     }
@@ -187,11 +189,11 @@ public class PointCloudService
         {
             ClassificationFilter = classificationCodes.Select(c => (int)c).ToArray(),
             Limit = limit,
-            LodLevel = PointCloudLodLevel.Coarse // Use coarse for previews
+            LodLevel = PointCloudLodLevel.Coarse, // Use coarse for previews
         };
 
         var points = new List<PointCloudPoint>();
-        await foreach (var point in _repository.QueryPointCloudAsync(surveyId, options, cancellationToken))
+        await foreach (var point in this.repository.QueryPointCloudAsync(surveyId, options, cancellationToken))
         {
             points.Add(point);
         }

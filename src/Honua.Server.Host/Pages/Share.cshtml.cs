@@ -10,13 +10,13 @@ namespace Honua.Server.Host.Pages;
 
 public class ShareModel : PageModel
 {
-    private readonly ShareService _shareService;
-    private readonly ILogger<ShareModel> _logger;
+    private readonly ShareService shareService;
+    private readonly ILogger<ShareModel> logger;
 
     public ShareModel(ShareService shareService, ILogger<ShareModel> logger)
     {
-        _shareService = shareService;
-        _logger = logger;
+        this.shareService = shareService;
+        this.logger = logger;
     }
 
     public string Token { get; set; } = string.Empty;
@@ -29,7 +29,7 @@ public class ShareModel : PageModel
     {
         Token = token;
 
-        var (isValid, shareToken, error) = await _shareService.ValidateShareAsync(token, password);
+        var (isValid, shareToken, error) = await this.shareService.ValidateShareAsync(token, password);
 
         if (!isValid)
         {
@@ -41,7 +41,7 @@ public class ShareModel : PageModel
             }
 
             ErrorMessage = error ?? "This share link is invalid or has expired.";
-            _logger.LogWarning("Invalid share token access attempt: {Token}, Error: {Error}", token, error);
+            this.logger.LogWarning("Invalid share token access attempt: {Token}, Error: {Error}", token, error);
             return Page();
         }
 
@@ -49,7 +49,7 @@ public class ShareModel : PageModel
         CanComment = shareToken?.Permission == SharePermission.Comment ||
                      shareToken?.Permission == SharePermission.Edit;
 
-        _logger.LogInformation("Share token {Token} accessed for map {MapId}", token, shareToken?.MapId);
+        this.logger.LogInformation("Share token {Token} accessed for map {MapId}", token, shareToken?.MapId);
 
         return Page();
     }

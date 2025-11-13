@@ -48,7 +48,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
         if (!layerView!.Layer.Attachments.Enabled)
         {
-            return BadRequest(new { error = "Attachments are not enabled for this layer." });
+            return this.BadRequest(new { error = "Attachments are not enabled for this layer." });
         }
 
         return null;
@@ -79,7 +79,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         CancellationToken cancellationToken)
     {
         var form = Request.HasFormContentType ? await Request.ReadFormAsync(cancellationToken).ConfigureAwait(false) : null;
-        var objectIdRaw = form?["objectId"].FirstOrDefault() ?? Request.Query["objectId"].FirstOrDefault();
+        var objectIdRaw = form?["objectId"].FirstOrDefault() ?? this.Request.Query["objectId"].FirstOrDefault();
 
         if (!TryParseObjectId(objectIdRaw, out var objectId))
         {
@@ -114,7 +114,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         int? attachmentId = null;
         if (requireAttachmentId)
         {
-            var attachmentIdRaw = form!["attachmentId"].FirstOrDefault() ?? Request.Query["attachmentId"].FirstOrDefault();
+            var attachmentIdRaw = form!["attachmentId"].FirstOrDefault() ?? this.Request.Query["attachmentId"].FirstOrDefault();
             if (!TryParseObjectId(attachmentIdRaw, out var attachmentObjectId))
             {
                 return (null, 0, null, null, BadRequest(new { error = "A valid attachmentId must be supplied." }));
@@ -203,7 +203,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         int attachmentObjectId,
         CancellationToken cancellationToken)
     {
-        var descriptors = await _attachmentOrchestrator.ListAsync(serviceId, layerId, featureId, cancellationToken).ConfigureAwait(false);
+        var descriptors = await this.attachmentOrchestrator.ListAsync(serviceId, layerId, featureId, cancellationToken).ConfigureAwait(false);
         return descriptors.FirstOrDefault(item => item.AttachmentObjectId == attachmentObjectId);
     }
 
@@ -216,27 +216,27 @@ public sealed partial class GeoservicesRESTFeatureServerController
             return error;
         }
 
-        var objectIdsRaw = Request.Query.TryGetValue("objectIds", out var objectIdsValues) ? objectIdsValues.ToString() : null;
+        var objectIdsRaw = this.Request.Query.TryGetValue("objectIds", out var objectIdsValues) ? objectIdsValues.ToString() : null;
         if (string.IsNullOrWhiteSpace(objectIdsRaw))
         {
-            return BadRequest(new { error = "objectIds parameter is required." });
+            return this.BadRequest(new { error = "objectIds parameter is required." });
         }
 
         var objectIds = ParseIntList(objectIdsRaw);
         if (objectIds.Count == 0)
         {
-            return BadRequest(new { error = "objectIds parameter did not contain any valid identifiers." });
+            return this.BadRequest(new { error = "objectIds parameter did not contain any valid identifiers." });
         }
 
         // Limit objectIds to prevent fan-out DoS attacks on attachment storage
         const int MaxObjectIds = 100;
         if (objectIds.Count > MaxObjectIds)
         {
-            return BadRequest(new { error = $"objectIds parameter exceeds maximum limit of {MaxObjectIds} identifiers." });
+            return this.BadRequest(new { error = $"objectIds parameter exceeds maximum limit of {MaxObjectIds} identifiers." });
         }
 
         var attachmentGroups = new List<GeoservicesAttachmentGroup>();
-        var attachmentIdsFilter = Request.Query.TryGetValue("attachmentIds", out var attachmentIdsValues)
+        var attachmentIdsFilter = this.Request.Query.TryGetValue("attachmentIds", out var attachmentIdsValues)
             ? ParseIntList(attachmentIdsValues.ToString())
             : Array.Empty<int>();
 
@@ -246,7 +246,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         foreach (var objectId in objectIds)
         {
             var featureId = objectId.ToString(CultureInfo.InvariantCulture);
-            var descriptors = await _attachmentOrchestrator.ListAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, cancellationToken).ConfigureAwait(false);
+            var descriptors = await this.attachmentOrchestrator.ListAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, cancellationToken).ConfigureAwait(false);
             if (attachmentIdsFilter.Count > 0)
             {
                 descriptors = descriptors.Where(descriptor => attachmentIdsFilter.Contains(descriptor.AttachmentObjectId)).ToList();
@@ -256,7 +256,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             var totalAttachments = descriptors.Count;
             if (totalAttachments > MaxAttachmentsPerObjectId)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Feature {FeatureId} in layer {LayerId} has {AttachmentCount} attachments, limiting to {MaxAttachments}.",
                     featureId,
                     layerView.Layer.Id,
@@ -291,7 +291,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             HasAttachments = attachmentGroups.Any(group => group.AttachmentInfos.Count > 0)
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpPost("{layerIndex:int}/queryAttachments")]
@@ -329,7 +329,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             uploadRequest.GlobalId,
             UserIdentityHelper.GetUserIdentifierOrNull(User));
 
-        var result = await _attachmentOrchestrator.AddAsync(addRequest, cancellationToken).ConfigureAwait(false);
+        var result = await this.attachmentOrchestrator.AddAsync(addRequest, cancellationToken).ConfigureAwait(false);
         var response = new GeoservicesAddAttachmentResponse
         {
             Result = result.Success && result.Attachment is not null
@@ -337,7 +337,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 : CreateMutationFailure(uploadRequest.ObjectId, result.Error)
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpPost("{layerIndex:int}/updateAttachment")]
@@ -361,7 +361,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var descriptor = await GetDescriptorAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, updateRequest.AttachmentObjectId, cancellationToken).ConfigureAwait(false);
         if (descriptor is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var request = new UpdateFeatureAttachmentRequest(
@@ -373,7 +373,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             updateRequest.GlobalId,
             UserIdentityHelper.GetUserIdentifierOrNull(User));
 
-        var result = await _attachmentOrchestrator.UpdateAsync(request, cancellationToken).ConfigureAwait(false);
+        var result = await this.attachmentOrchestrator.UpdateAsync(request, cancellationToken).ConfigureAwait(false);
         var response = new GeoservicesUpdateAttachmentResponse
         {
             Result = result.Success && result.Attachment is not null
@@ -381,7 +381,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 : CreateMutationFailure(updateRequest.ObjectId, result.Error)
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpPost("{layerIndex:int}/deleteAttachments")]
@@ -400,28 +400,28 @@ public sealed partial class GeoservicesRESTFeatureServerController
             return parseError;
         }
 
-        var attachmentIdsRaw = form?["attachmentIds"].FirstOrDefault() ?? Request.Query["attachmentIds"].FirstOrDefault();
+        var attachmentIdsRaw = form?["attachmentIds"].FirstOrDefault() ?? this.Request.Query["attachmentIds"].FirstOrDefault();
 
         if (string.IsNullOrWhiteSpace(attachmentIdsRaw))
         {
-            return BadRequest(new { error = "attachmentIds parameter is required." });
+            return this.BadRequest(new { error = "attachmentIds parameter is required." });
         }
 
         var attachmentIds = ParseIntList(attachmentIdsRaw);
         if (attachmentIds.Count == 0)
         {
-            return BadRequest(new { error = "attachmentIds parameter did not contain any valid identifiers." });
+            return this.BadRequest(new { error = "attachmentIds parameter did not contain any valid identifiers." });
         }
 
         // Limit attachmentIds to prevent fan-out DoS attacks on attachment storage
         const int MaxAttachmentIds = 100;
         if (attachmentIds.Count > MaxAttachmentIds)
         {
-            return BadRequest(new { error = $"attachmentIds parameter exceeds maximum limit of {MaxAttachmentIds} identifiers." });
+            return this.BadRequest(new { error = $"attachmentIds parameter exceeds maximum limit of {MaxAttachmentIds} identifiers." });
         }
 
         var featureId = objectId.ToString(CultureInfo.InvariantCulture);
-        var descriptors = await _attachmentOrchestrator.ListAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, cancellationToken).ConfigureAwait(false);
+        var descriptors = await this.attachmentOrchestrator.ListAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, cancellationToken).ConfigureAwait(false);
         var descriptorLookup = descriptors.ToDictionary(descriptor => descriptor.AttachmentObjectId);
 
         var results = new List<GeoservicesAttachmentDeleteResult>();
@@ -447,7 +447,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 descriptor.AttachmentId,
                 UserIdentityHelper.GetUserIdentifierOrNull(User));
 
-            var success = await _attachmentOrchestrator.DeleteAsync(deleteRequest, cancellationToken).ConfigureAwait(false);
+            var success = await this.attachmentOrchestrator.DeleteAsync(deleteRequest, cancellationToken).ConfigureAwait(false);
             results.Add(new GeoservicesAttachmentDeleteResult
             {
                 ObjectId = objectId,
@@ -463,7 +463,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             Results = results
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpGet("{layerIndex:int}/{objectId}/attachments/{attachmentId}")]
@@ -479,7 +479,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var descriptor = await GetDescriptorAsync(serviceView.Service.Id, layerView.Layer.Id, objectId, attachmentId, cancellationToken).ConfigureAwait(false);
         if (descriptor is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var downloadResult = await AttachmentDownloadHelper.TryDownloadAsync(

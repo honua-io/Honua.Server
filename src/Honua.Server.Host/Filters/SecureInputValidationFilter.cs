@@ -29,7 +29,7 @@ namespace Honua.Server.Host.Filters;
 /// </remarks>
 public sealed class SecureInputValidationFilter : IAsyncActionFilter
 {
-    private readonly ILogger<SecureInputValidationFilter> _logger;
+    private readonly ILogger<SecureInputValidationFilter> logger;
 
     /// <summary>
     /// Maximum allowed request payload size in bytes (100 MB).
@@ -44,7 +44,7 @@ public sealed class SecureInputValidationFilter : IAsyncActionFilter
     /// <exception cref="ArgumentNullException">Thrown when logger is null.</exception>
     public SecureInputValidationFilter(ILogger<SecureInputValidationFilter> logger)
     {
-        _logger = Guard.NotNull(logger);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -67,7 +67,7 @@ public sealed class SecureInputValidationFilter : IAsyncActionFilter
         if (context.HttpContext.Request.ContentLength.HasValue &&
             context.HttpContext.Request.ContentLength.Value > MaxRequestSize)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Request size limit exceeded. Size: {RequestSize} bytes, Limit: {MaxSize} bytes [RequestId: {RequestId}]",
                 context.HttpContext.Request.ContentLength.Value,
                 MaxRequestSize,
@@ -82,7 +82,7 @@ public sealed class SecureInputValidationFilter : IAsyncActionFilter
         {
             var validationErrors = BuildValidationErrors(context.ModelState);
 
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Model validation failed in {Controller}.{Action}. Errors: {ErrorCount} [RequestId: {RequestId}]",
                 context.RouteData.Values["controller"],
                 context.RouteData.Values["action"],

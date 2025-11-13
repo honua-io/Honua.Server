@@ -19,6 +19,11 @@ public static class ActivityExtensions
     /// <summary>
     /// Creates a new activity (span) for build operations.
     /// </summary>
+    /// <param name="operationName">The operation name.</param>
+    /// <param name="buildId">The build ID.</param>
+    /// <param name="tier">The build tier.</param>
+    /// <param name="kind">The activity kind.</param>
+    /// <returns>The created activity.</returns>
     public static Activity? StartBuildActivity(
         string operationName,
         string? buildId = null,
@@ -42,6 +47,10 @@ public static class ActivityExtensions
     /// <summary>
     /// Creates a new activity (span) for cache operations.
     /// </summary>
+    /// <param name="operationName">The operation name.</param>
+    /// <param name="cacheKey">The cache key.</param>
+    /// <param name="kind">The activity kind.</param>
+    /// <returns>The created activity.</returns>
     public static Activity? StartCacheActivity(
         string operationName,
         string? cacheKey = null,
@@ -61,6 +70,11 @@ public static class ActivityExtensions
     /// <summary>
     /// Creates a new activity (span) for registry operations.
     /// </summary>
+    /// <param name="operationName">The operation name.</param>
+    /// <param name="provider">The registry provider.</param>
+    /// <param name="registryId">The registry ID.</param>
+    /// <param name="kind">The activity kind.</param>
+    /// <returns>The created activity.</returns>
     public static Activity? StartRegistryActivity(
         string operationName,
         string? provider = null,
@@ -84,6 +98,11 @@ public static class ActivityExtensions
     /// <summary>
     /// Creates a new activity (span) for AI intake operations.
     /// </summary>
+    /// <param name="operationName">The operation name.</param>
+    /// <param name="conversationId">The conversation ID.</param>
+    /// <param name="model">The AI model.</param>
+    /// <param name="kind">The activity kind.</param>
+    /// <returns>The created activity.</returns>
     public static Activity? StartIntakeActivity(
         string operationName,
         string? conversationId = null,
@@ -107,6 +126,9 @@ public static class ActivityExtensions
     /// <summary>
     /// Records an exception on the current activity.
     /// </summary>
+    /// <param name="activity">The activity.</param>
+    /// <param name="exception">The exception to record.</param>
+    /// <returns>The activity.</returns>
     public static Activity? RecordException(this Activity? activity, Exception exception)
     {
         if (activity == null)
@@ -123,6 +145,8 @@ public static class ActivityExtensions
     /// <summary>
     /// Marks the activity as successful.
     /// </summary>
+    /// <param name="activity">The activity.</param>
+    /// <returns>The activity.</returns>
     public static Activity? SetSuccess(this Activity? activity)
     {
         activity?.SetStatus(ActivityStatusCode.Ok);
@@ -132,6 +156,10 @@ public static class ActivityExtensions
     /// <summary>
     /// Adds a custom tag to the activity.
     /// </summary>
+    /// <param name="activity">The activity.</param>
+    /// <param name="key">The tag key.</param>
+    /// <param name="value">The tag value.</param>
+    /// <returns>The activity.</returns>
     public static Activity? AddTag(this Activity? activity, string key, object? value)
     {
         activity?.SetTag(key, value);
@@ -141,6 +169,9 @@ public static class ActivityExtensions
     /// <summary>
     /// Adds multiple custom tags to the activity.
     /// </summary>
+    /// <param name="activity">The activity.</param>
+    /// <param name="tags">The tags to add.</param>
+    /// <returns>The activity.</returns>
     public static Activity? AddTags(this Activity? activity, params (string Key, object? Value)[] tags)
     {
         if (activity == null)
@@ -157,6 +188,10 @@ public static class ActivityExtensions
     /// <summary>
     /// Adds an event to the activity.
     /// </summary>
+    /// <param name="activity">The activity.</param>
+    /// <param name="eventName">The event name.</param>
+    /// <param name="tags">The event tags.</param>
+    /// <returns>The activity.</returns>
     public static Activity? AddEvent(this Activity? activity, string eventName, params (string Key, object? Value)[] tags)
     {
         if (activity == null)

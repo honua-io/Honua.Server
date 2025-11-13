@@ -14,13 +14,13 @@ namespace Honua.Server.Host.Hubs;
 [Authorize]
 public sealed class CommentHub : Hub
 {
-    private readonly ILogger<CommentHub> _logger;
+    private readonly ILogger<CommentHub> logger;
     private static readonly Dictionary<string, HashSet<string>> _mapViewers = new();
     private static readonly object _viewersLock = new();
 
     public CommentHub(ILogger<CommentHub> logger)
     {
-        _logger = logger;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -29,7 +29,7 @@ public sealed class CommentHub : Hub
     public override async Task OnConnectedAsync()
     {
         var userId = Context.User?.Identity?.Name ?? Context.ConnectionId;
-        _logger.LogInformation("Comment hub client connected: {ConnectionId}, User: {UserId}",
+        this.logger.LogInformation("Comment hub client connected: {ConnectionId}, User: {UserId}",
             Context.ConnectionId, userId);
         await base.OnConnectedAsync();
     }
@@ -44,7 +44,7 @@ public sealed class CommentHub : Hub
         // Remove from all map viewer groups
         lock (_viewersLock)
         {
-            foreach (var (mapId, viewers) in _mapViewers.ToList())
+            foreach (var (mapId, viewers) in this.mapViewers.ToList())
             {
                 if (viewers.Remove(Context.ConnectionId))
                 {
@@ -59,19 +59,19 @@ public sealed class CommentHub : Hub
 
                 if (viewers.Count == 0)
                 {
-                    _mapViewers.Remove(mapId);
+                    this.mapViewers.Remove(mapId);
                 }
             }
         }
 
         if (exception != null)
         {
-            _logger.LogWarning(exception, "Comment hub client disconnected with error: {ConnectionId}",
+            this.logger.LogWarning(exception, "Comment hub client disconnected with error: {ConnectionId}",
                 Context.ConnectionId);
         }
         else
         {
-            _logger.LogInformation("Comment hub client disconnected: {ConnectionId}", Context.ConnectionId);
+            this.logger.LogInformation("Comment hub client disconnected: {ConnectionId}", Context.ConnectionId);
         }
 
         await base.OnDisconnectedAsync(exception);
@@ -90,14 +90,14 @@ public sealed class CommentHub : Hub
 
         lock (_viewersLock)
         {
-            if (!_mapViewers.ContainsKey(mapId))
+            if (!this.mapViewers.ContainsKey(mapId))
             {
                 _mapViewers[mapId] = new HashSet<string>();
             }
             _mapViewers[mapId].Add(Context.ConnectionId);
         }
 
-        _logger.LogInformation("User {UserId} joined map {MapId} comment group", userId, mapId);
+        this.logger.LogInformation("User {UserId} joined map {MapId} comment group", userId, mapId);
 
         // Notify others in the group
         await Clients.OthersInGroup(groupName).SendAsync("UserJoinedMap", new
@@ -130,17 +130,17 @@ public sealed class CommentHub : Hub
 
         lock (_viewersLock)
         {
-            if (_mapViewers.TryGetValue(mapId, out var viewers))
+            if (this.mapViewers.TryGetValue(mapId, out var viewers))
             {
                 viewers.Remove(Context.ConnectionId);
                 if (viewers.Count == 0)
                 {
-                    _mapViewers.Remove(mapId);
+                    this.mapViewers.Remove(mapId);
                 }
             }
         }
 
-        _logger.LogInformation("User {UserId} left map {MapId} comment group", userId, mapId);
+        this.logger.LogInformation("User {UserId} left map {MapId} comment group", userId, mapId);
 
         // Notify others in the group
         await Clients.OthersInGroup(groupName).SendAsync("UserLeftMap", new
@@ -188,7 +188,7 @@ public sealed class CommentHub : Hub
     {
         var groupName = $"map_{comment.MapId}";
 
-        _logger.LogInformation("Broadcasting new comment {CommentId} to map {MapId}",
+        this.logger.LogInformation("Broadcasting new comment {CommentId} to map {MapId}",
             comment.Id, comment.MapId);
 
         await Clients.Group(groupName).SendAsync("CommentCreated", comment);
@@ -202,7 +202,7 @@ public sealed class CommentHub : Hub
     {
         var groupName = $"map_{comment.MapId}";
 
-        _logger.LogInformation("Broadcasting comment update {CommentId} to map {MapId}",
+        this.logger.LogInformation("Broadcasting comment update {CommentId} to map {MapId}",
             comment.Id, comment.MapId);
 
         await Clients.Group(groupName).SendAsync("CommentUpdated", comment);
@@ -217,7 +217,7 @@ public sealed class CommentHub : Hub
     {
         var groupName = $"map_{mapId}";
 
-        _logger.LogInformation("Broadcasting comment deletion {CommentId} from map {MapId}",
+        this.logger.LogInformation("Broadcasting comment deletion {CommentId} from map {MapId}",
             commentId, mapId);
 
         await Clients.Group(groupName).SendAsync("CommentDeleted", new
@@ -295,7 +295,7 @@ public sealed class CommentHub : Hub
     {
         lock (_viewersLock)
         {
-            return _mapViewers.TryGetValue(mapId, out var viewers) ? viewers.Count : 0;
+            return this.mapViewers.TryGetValue(mapId, out var viewers) ? viewers.Count : 0;
         }
     }
 }

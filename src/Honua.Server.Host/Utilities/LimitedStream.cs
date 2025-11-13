@@ -28,8 +28,8 @@ namespace Honua.Server.Host.Utilities;
 /// </remarks>
 public sealed class LimitedStream : Stream
 {
-    private readonly Stream _innerStream;
-    private readonly long _maxSize;
+    private readonly Stream innerStream;
+    private readonly long maxSize;
     private long _bytesRead;
     private bool _disposed;
 
@@ -47,7 +47,7 @@ public sealed class LimitedStream : Stream
     /// <exception cref="ArgumentOutOfRangeException">Thrown when maxSizeBytes is less than or equal to zero.</exception>
     public LimitedStream(Stream innerStream, long maxSizeBytes = DefaultMaxSizeBytes)
     {
-        _innerStream = Guard.NotNull(innerStream);
+        this.innerStream = Guard.NotNull(innerStream);
 
         if (maxSizeBytes <= 0)
         {
@@ -57,8 +57,8 @@ public sealed class LimitedStream : Stream
                 "Maximum size must be greater than zero.");
         }
 
-        _maxSize = maxSizeBytes;
-        _bytesRead = 0;
+        this.maxSize = maxSizeBytes;
+        this.bytesRead = 0;
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public sealed class LimitedStream : Stream
     /// </summary>
     public long BytesRemaining => Math.Max(0, _maxSize - _bytesRead);
 
-    public override bool CanRead => _innerStream.CanRead;
+    public override bool CanRead => this.innerStream.CanRead;
     public override bool CanSeek => false; // Disable seeking to prevent bypassing the limit
     public override bool CanWrite => false;
     public override long Length => throw new NotSupportedException("Length is not supported on LimitedStream.");
@@ -91,7 +91,7 @@ public sealed class LimitedStream : Stream
         ThrowIfDisposed();
         ThrowIfMaxSizeExceeded(count);
 
-        var bytesRead = _innerStream.Read(buffer, offset, count);
+        var bytesRead = this.innerStream.Read(buffer, offset, count);
         _bytesRead += bytesRead;
 
         // Check again after reading in case we exceeded the limit
@@ -105,7 +105,7 @@ public sealed class LimitedStream : Stream
         ThrowIfDisposed();
         ThrowIfMaxSizeExceeded(count);
 
-        var bytesRead = await _innerStream.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+        var bytesRead = await this.innerStream.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         _bytesRead += bytesRead;
 
         // Check again after reading in case we exceeded the limit
@@ -119,7 +119,7 @@ public sealed class LimitedStream : Stream
         ThrowIfDisposed();
         ThrowIfMaxSizeExceeded(buffer.Length);
 
-        var bytesRead = await _innerStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        var bytesRead = await this.innerStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         _bytesRead += bytesRead;
 
         // Check again after reading in case we exceeded the limit
@@ -131,13 +131,13 @@ public sealed class LimitedStream : Stream
     public override void Flush()
     {
         ThrowIfDisposed();
-        _innerStream.Flush();
+        this.innerStream.Flush();
     }
 
     public override Task FlushAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        return _innerStream.FlushAsync(cancellationToken);
+        return this.innerStream.FlushAsync(cancellationToken);
     }
 
     public override long Seek(long offset, SeekOrigin origin)
@@ -165,7 +165,7 @@ public sealed class LimitedStream : Stream
                 // We only wrap it for read operations
             }
 
-            _disposed = true;
+            this.disposed = true;
         }
 
         base.Dispose(disposing);

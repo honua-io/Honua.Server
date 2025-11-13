@@ -25,12 +25,12 @@ public sealed class ODataModelDescriptor
         // Allow empty entity sets for scenarios like testing or before data is loaded
         if (metadata.Length > 0)
         {
-            _entitySetLookup = new ReadOnlyDictionary<string, ODataEntityMetadata>(
+            this.entitySetLookup = new ReadOnlyDictionary<string, ODataEntityMetadata>(
                 metadata.ToDictionary(m => m.EntitySetName, StringComparer.OrdinalIgnoreCase));
         }
         else
         {
-            _entitySetLookup = new ReadOnlyDictionary<string, ODataEntityMetadata>(
+            this.entitySetLookup = new ReadOnlyDictionary<string, ODataEntityMetadata>(
                 new Dictionary<string, ODataEntityMetadata>(StringComparer.OrdinalIgnoreCase));
         }
 
@@ -44,7 +44,7 @@ public sealed class ODataModelDescriptor
     public bool TryGetByEntitySet(string entitySetName, out ODataEntityMetadata metadata)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(entitySetName);
-        return _entitySetLookup.TryGetValue(entitySetName, out metadata!);
+        return this.entitySetLookup.TryGetValue(entitySetName, out metadata!);
     }
 
     public ODataEntityMetadata GetByEntitySet(string entitySetName)

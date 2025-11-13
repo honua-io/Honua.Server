@@ -483,7 +483,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
     private async Task<bool> IsRelationalServiceAsync(ServiceDefinition service, CancellationToken cancellationToken)
     {
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
         var dataSource = snapshot.DataSources.FirstOrDefault(ds =>
             ds.Id.EqualsIgnoreCase(service.DataSourceId));
 
@@ -567,7 +567,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
     private async Task<StyleDefinition?> ResolveDefaultStyleAsync(LayerDefinition layer, CancellationToken cancellationToken)
     {
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
         if (layer.DefaultStyleId.HasValue() &&
             snapshot.TryGetStyle(layer.DefaultStyleId, out var defaultStyle))
@@ -593,7 +593,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             return null;
         }
 
-        var service = _catalog.GetService(serviceId);
+        var service = this.catalog.GetService(serviceId);
         if (service is null)
         {
             return null;

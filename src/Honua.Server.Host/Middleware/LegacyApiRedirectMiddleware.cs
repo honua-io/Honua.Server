@@ -30,10 +30,10 @@ namespace Honua.Server.Host.Middleware;
 /// </remarks>
 public sealed class LegacyApiRedirectMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<LegacyApiRedirectMiddleware> _logger;
-    private readonly bool _enabled;
-    private readonly string _targetVersion;
+    private readonly RequestDelegate next;
+    private readonly ILogger<LegacyApiRedirectMiddleware> logger;
+    private readonly bool enabled;
+    private readonly string targetVersion;
 
     // Regex to check if a path already has a version: /v1/, /v2/, etc.
     private static readonly Regex HasVersionPattern = new(@"^/v\d+(/|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -68,8 +68,8 @@ public sealed class LegacyApiRedirectMiddleware
         IConfiguration configuration,
         ILogger<LegacyApiRedirectMiddleware> logger)
     {
-        _next = next ?? throw new ArgumentNullException(nameof(next));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.next = next ?? throw new ArgumentNullException(nameof(next));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         if (configuration == null)
         {
@@ -77,21 +77,21 @@ public sealed class LegacyApiRedirectMiddleware
         }
 
         // Check if legacy URL support is enabled (default: true for backward compatibility)
-        _enabled = configuration.GetValue("ApiVersioning:AllowLegacyUrls", true);
+        this.enabled = configuration.GetValue("ApiVersioning:AllowLegacyUrls", true);
 
         // Get the target version for redirects (default: v1)
-        _targetVersion = configuration.GetValue("ApiVersioning:LegacyRedirectVersion", ApiVersioning.DefaultVersion)
+        this.targetVersion = configuration.GetValue("ApiVersioning:LegacyRedirectVersion", ApiVersioning.DefaultVersion)
             ?? ApiVersioning.DefaultVersion;
 
         if (_enabled)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Legacy API redirect middleware enabled. Non-versioned URLs will redirect to {Version}",
                 _targetVersion);
         }
         else
         {
-            _logger.LogInformation("Legacy API redirect middleware disabled. Non-versioned URLs will return 404.");
+            this.logger.LogInformation("Legacy API redirect middleware disabled. Non-versioned URLs will return 404.");
         }
     }
 
@@ -134,7 +134,7 @@ public sealed class LegacyApiRedirectMiddleware
         var queryString = context.Request.QueryString.ToUriComponent();
         var newLocation = newPath + queryString;
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Redirecting legacy API URL {OriginalPath} to versioned URL {NewPath}",
             path,
             newPath);

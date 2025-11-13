@@ -13,7 +13,7 @@ namespace Honua.Server.Host.OpenApi.Filters;
 /// </summary>
 public sealed class DeprecationInfoDocumentFilter : IDocumentFilter
 {
-    private readonly DeprecationInfoOptions _options;
+    private readonly DeprecationInfoOptions options;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeprecationInfoDocumentFilter"/> class.
@@ -21,7 +21,7 @@ public sealed class DeprecationInfoDocumentFilter : IDocumentFilter
     /// <param name="options">Configuration options for deprecation information.</param>
     public DeprecationInfoDocumentFilter(DeprecationInfoOptions? options = null)
     {
-        _options = options ?? new DeprecationInfoOptions();
+        this.options = options ?? new DeprecationInfoOptions();
     }
 
     /// <summary>
@@ -37,7 +37,7 @@ public sealed class DeprecationInfoDocumentFilter : IDocumentFilter
         }
 
         // Add deprecation notice if this version is deprecated
-        if (_options.IsDeprecated)
+        if (this.options.IsDeprecated)
         {
             var deprecationInfo = new List<string>
             {
@@ -45,24 +45,24 @@ public sealed class DeprecationInfoDocumentFilter : IDocumentFilter
                 $"This API version is deprecated and will be removed in a future release."
             };
 
-            if (_options.SunsetDate.HasValue)
+            if (this.options.SunsetDate.HasValue)
             {
-                deprecationInfo.Add($"**Sunset Date:** {_options.SunsetDate.Value:yyyy-MM-dd}");
+                deprecationInfo.Add($"**Sunset Date:** {this.options.SunsetDate.Value:yyyy-MM-dd}");
             }
 
-            if (!_options.ReplacementVersion.IsNullOrEmpty())
+            if (!this.options.ReplacementVersion.IsNullOrEmpty())
             {
-                deprecationInfo.Add($"**Replacement Version:** {_options.ReplacementVersion}");
+                deprecationInfo.Add($"**Replacement Version:** {this.options.ReplacementVersion}");
             }
 
-            if (!_options.MigrationGuideUrl.IsNullOrEmpty())
+            if (!this.options.MigrationGuideUrl.IsNullOrEmpty())
             {
-                deprecationInfo.Add($"**Migration Guide:** [{_options.MigrationGuideUrl}]({_options.MigrationGuideUrl})");
+                deprecationInfo.Add($"**Migration Guide:** [{this.options.MigrationGuideUrl}]({this.options.MigrationGuideUrl})");
             }
 
-            if (!_options.DeprecationReason.IsNullOrEmpty())
+            if (!this.options.DeprecationReason.IsNullOrEmpty())
             {
-                deprecationInfo.Add($"**Reason:** {_options.DeprecationReason}");
+                deprecationInfo.Add($"**Reason:** {this.options.DeprecationReason}");
             }
 
             var deprecationBlock = $"\n\n{string.Join("\n\n", deprecationInfo)}";
@@ -73,35 +73,35 @@ public sealed class DeprecationInfoDocumentFilter : IDocumentFilter
             // Add deprecation extensions
             swaggerDoc.Extensions["x-deprecated"] = new Microsoft.OpenApi.Any.OpenApiBoolean(true);
 
-            if (_options.SunsetDate.HasValue)
+            if (this.options.SunsetDate.HasValue)
             {
                 swaggerDoc.Extensions["x-sunset-date"] = new Microsoft.OpenApi.Any.OpenApiString(
-                    _options.SunsetDate.Value.ToString("yyyy-MM-dd"));
+                    this.options.SunsetDate.Value.ToString("yyyy-MM-dd"));
             }
 
-            if (!_options.ReplacementVersion.IsNullOrEmpty())
+            if (!this.options.ReplacementVersion.IsNullOrEmpty())
             {
                 swaggerDoc.Extensions["x-replacement-version"] = new Microsoft.OpenApi.Any.OpenApiString(
-                    _options.ReplacementVersion);
+                    this.options.ReplacementVersion);
             }
         }
-        else if (!_options.Stability.IsNullOrEmpty())
+        else if (!this.options.Stability.IsNullOrEmpty())
         {
             // Add stability information for non-deprecated versions
-            swaggerDoc.Extensions["x-stability"] = new Microsoft.OpenApi.Any.OpenApiString(_options.Stability);
+            swaggerDoc.Extensions["x-stability"] = new Microsoft.OpenApi.Any.OpenApiString(this.options.Stability);
 
-            var stabilityInfo = $"\n\n**API Stability:** {_options.Stability}";
+            var stabilityInfo = $"\n\n**API Stability:** {this.options.Stability}";
             swaggerDoc.Info.Description = swaggerDoc.Info.Description.IsNullOrEmpty()
                 ? stabilityInfo.TrimStart()
                 : $"{swaggerDoc.Info.Description}{stabilityInfo}";
         }
 
         // Add changelog information if provided
-        if (!_options.ChangelogUrl.IsNullOrEmpty())
+        if (!this.options.ChangelogUrl.IsNullOrEmpty())
         {
-            swaggerDoc.Extensions["x-changelog"] = new Microsoft.OpenApi.Any.OpenApiString(_options.ChangelogUrl);
+            swaggerDoc.Extensions["x-changelog"] = new Microsoft.OpenApi.Any.OpenApiString(this.options.ChangelogUrl);
 
-            var changelogInfo = $"\n\n**Changelog:** [{_options.ChangelogUrl}]({_options.ChangelogUrl})";
+            var changelogInfo = $"\n\n**Changelog:** [{this.options.ChangelogUrl}]({this.options.ChangelogUrl})";
             swaggerDoc.Info.Description = swaggerDoc.Info.Description.IsNullOrEmpty()
                 ? changelogInfo.TrimStart()
                 : $"{swaggerDoc.Info.Description}{changelogInfo}";

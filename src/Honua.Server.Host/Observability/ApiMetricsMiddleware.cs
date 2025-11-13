@@ -20,18 +20,18 @@ namespace Honua.Server.Host.Observability;
 public sealed class ApiMetricsMiddleware
 {
     private const string CollectionIdSeparator = "::";
-    private readonly RequestDelegate _next;
-    private readonly IApiMetrics _metrics;
-    private readonly ILogger<ApiMetricsMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly IApiMetrics metrics;
+    private readonly ILogger<ApiMetricsMiddleware> logger;
 
     public ApiMetricsMiddleware(
         RequestDelegate next,
         IApiMetrics metrics,
         ILogger<ApiMetricsMiddleware> logger)
     {
-        _next = Guard.NotNull(next);
-        _metrics = Guard.NotNull(metrics);
-        _logger = Guard.NotNull(logger);
+        this.next = Guard.NotNull(next);
+        this.metrics = Guard.NotNull(metrics);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -55,7 +55,7 @@ public sealed class ApiMetricsMiddleware
                 var (serviceId, layerId) = ExtractServiceContext(context);
 
                 // Record request
-                _metrics.RecordRequest(apiProtocol, serviceId, layerId);
+                this.metrics.RecordRequest(apiProtocol, serviceId, layerId);
 
                 await _next(context);
 
@@ -63,7 +63,7 @@ public sealed class ApiMetricsMiddleware
                 statusCode = context.Response.StatusCode;
 
                 // Record API-level metrics
-                _metrics.RecordRequestDuration(
+                this.metrics.RecordRequestDuration(
                     apiProtocol,
                     serviceId,
                     layerId,
@@ -72,13 +72,13 @@ public sealed class ApiMetricsMiddleware
 
                 // Record HTTP-level metrics for all requests (including non-errors)
                 var normalizedPath = NormalizePath(context);
-                _metrics.RecordHttpRequest(method, normalizedPath, statusCode, stopwatch.Elapsed);
+                this.metrics.RecordHttpRequest(method, normalizedPath, statusCode, stopwatch.Elapsed);
 
                 // Record error if status code indicates failure
                 if (statusCode >= 400)
                 {
                     errorType = DetermineErrorType(statusCode, null);
-                    _metrics.RecordError(apiProtocol, serviceId, layerId, errorType);
+                    this.metrics.RecordError(apiProtocol, serviceId, layerId, errorType);
                 }
             }
             else
@@ -90,7 +90,7 @@ public sealed class ApiMetricsMiddleware
 
                 // Record HTTP-level metrics for non-API requests too
                 var normalizedPath = NormalizePath(context);
-                _metrics.RecordHttpRequest(method, normalizedPath, statusCode, stopwatch.Elapsed);
+                this.metrics.RecordHttpRequest(method, normalizedPath, statusCode, stopwatch.Elapsed);
             }
         }
         catch (Exception ex)
@@ -106,13 +106,13 @@ public sealed class ApiMetricsMiddleware
             {
                 var (serviceId, layerId) = ExtractServiceContext(context);
 
-                _metrics.RecordError(
+                this.metrics.RecordError(
                     apiProtocol,
                     serviceId,
                     layerId,
                     ex.GetType().Name);
 
-                _metrics.RecordRequestDuration(
+                this.metrics.RecordRequestDuration(
                     apiProtocol,
                     serviceId,
                     layerId,
@@ -122,8 +122,8 @@ public sealed class ApiMetricsMiddleware
 
             // Always record HTTP-level metrics
             var normalizedPath = NormalizePath(context);
-            _metrics.RecordHttpRequest(method, normalizedPath, statusCode, stopwatch.Elapsed);
-            _metrics.RecordHttpError(method, normalizedPath, statusCode, errorType);
+            this.metrics.RecordHttpRequest(method, normalizedPath, statusCode, stopwatch.Elapsed);
+            this.metrics.RecordHttpError(method, normalizedPath, statusCode, errorType);
 
             throw;
         }

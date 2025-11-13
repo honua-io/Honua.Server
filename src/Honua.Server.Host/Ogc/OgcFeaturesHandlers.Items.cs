@@ -989,17 +989,17 @@ internal static partial class OgcFeaturesHandlers
     /// </summary>
     private sealed class StreamingFeatureCollectionResult : IResult
     {
-        private readonly IAsyncEnumerable<FeatureRecord> _features;
-        private readonly ServiceDefinition _service;
-        private readonly LayerDefinition _layer;
-        private readonly long? _numberMatched;
-        private readonly IReadOnlyList<OgcLink> _links;
-        private readonly string? _defaultStyle;
-        private readonly IReadOnlyList<string>? _styleIds;
-        private readonly double? _minScale;
-        private readonly double? _maxScale;
-        private readonly string _contentType;
-        private readonly IApiMetrics _apiMetrics;
+        private readonly IAsyncEnumerable<FeatureRecord> features;
+        private readonly ServiceDefinition service;
+        private readonly LayerDefinition layer;
+        private readonly long? numberMatched;
+        private readonly IReadOnlyList<OgcLink> links;
+        private readonly string? defaultStyle;
+        private readonly IReadOnlyList<string>? styleIds;
+        private readonly double? minScale;
+        private readonly double? maxScale;
+        private readonly string contentType;
+        private readonly IApiMetrics apiMetrics;
 
         public StreamingFeatureCollectionResult(
             IAsyncEnumerable<FeatureRecord> features,
@@ -1014,17 +1014,17 @@ internal static partial class OgcFeaturesHandlers
             string contentType,
             IApiMetrics apiMetrics)
         {
-            _features = features;
-            _service = service;
-            _layer = layer;
-            _numberMatched = numberMatched;
-            _links = links;
-            _defaultStyle = defaultStyle;
-            _styleIds = styleIds;
-            _minScale = minScale;
-            _maxScale = maxScale;
-            _contentType = contentType;
-            _apiMetrics = apiMetrics;
+            this.features = features;
+            this.service = service;
+            this.layer = layer;
+            this.numberMatched = numberMatched;
+            this.links = links;
+            this.defaultStyle = defaultStyle;
+            this.styleIds = styleIds;
+            this.minScale = minScale;
+            this.maxScale = maxScale;
+            this.contentType = contentType;
+            this.apiMetrics = apiMetrics;
         }
 
         public async Task ExecuteAsync(HttpContext httpContext)
@@ -1047,7 +1047,7 @@ internal static partial class OgcFeaturesHandlers
 
             if (count > 0)
             {
-                _apiMetrics.RecordFeaturesReturned("ogc-api-features", _service.Id, _layer.Id, count);
+                this.apiMetrics.RecordFeaturesReturned("ogc-api-features", this.service.Id, this.layer.Id, count);
             }
         }
     }
@@ -1057,15 +1057,15 @@ internal static partial class OgcFeaturesHandlers
     /// </summary>
     private sealed class StreamingHtmlFeatureCollectionResult : IResult
     {
-        private readonly IAsyncEnumerable<FeatureRecord> _features;
-        private readonly ServiceDefinition _service;
-        private readonly LayerDefinition _layer;
-        private readonly FeatureQuery _query;
-        private readonly string _collectionId;
-        private readonly long? _numberMatched;
-        private readonly IReadOnlyList<OgcLink> _links;
-        private readonly string? _contentCrs;
-        private readonly IApiMetrics _apiMetrics;
+        private readonly IAsyncEnumerable<FeatureRecord> features;
+        private readonly ServiceDefinition service;
+        private readonly LayerDefinition layer;
+        private readonly FeatureQuery query;
+        private readonly string collectionId;
+        private readonly long? numberMatched;
+        private readonly IReadOnlyList<OgcLink> links;
+        private readonly string? contentCrs;
+        private readonly IApiMetrics apiMetrics;
 
         public StreamingHtmlFeatureCollectionResult(
             IAsyncEnumerable<FeatureRecord> features,
@@ -1078,15 +1078,15 @@ internal static partial class OgcFeaturesHandlers
             string? contentCrs,
             IApiMetrics apiMetrics)
         {
-            _features = features;
-            _service = service;
-            _layer = layer;
-            _query = query;
-            _collectionId = collectionId;
-            _numberMatched = numberMatched;
-            _links = links;
-            _contentCrs = contentCrs;
-            _apiMetrics = apiMetrics;
+            this.features = features;
+            this.service = service;
+            this.layer = layer;
+            this.query = query;
+            this.collectionId = collectionId;
+            this.numberMatched = numberMatched;
+            this.links = links;
+            this.contentCrs = contentCrs;
+            this.apiMetrics = apiMetrics;
         }
 
         public async Task ExecuteAsync(HttpContext httpContext)
@@ -1101,7 +1101,7 @@ internal static partial class OgcFeaturesHandlers
             var returned = 0L;
             var hasFeatures = false;
 
-            await foreach (var record in _features.WithCancellation(cancellationToken))
+            await foreach (var record in this.features.WithCancellation(cancellationToken))
             {
                 var components = FeatureComponentBuilder.BuildComponents(_layer, record, _query);
                 await WriteFeatureAsync(writer, components).ConfigureAwait(false);
@@ -1119,13 +1119,13 @@ internal static partial class OgcFeaturesHandlers
 
             if (returned > 0)
             {
-                _apiMetrics.RecordFeaturesReturned("ogc-api-features", _service.Id, _layer.Id, returned);
+                this.apiMetrics.RecordFeaturesReturned("ogc-api-features", this.service.Id, this.layer.Id, returned);
             }
         }
 
         private Task WriteHeaderAsync(TextWriter writer)
         {
-            var title = _layer.Title ?? _collectionId;
+            var title = this.layer.Title ?? _collectionId;
             var builder = new StringBuilder();
 
             builder.AppendLine("<!DOCTYPE html>")
@@ -1137,12 +1137,12 @@ internal static partial class OgcFeaturesHandlers
 
             builder.Append("<h1>").Append(HtmlEncode(title)).AppendLine("</h1>");
 
-            if (_layer.Description.HasValue())
+            if (this.layer.Description.HasValue())
             {
-                builder.Append("<p>").Append(HtmlEncode(_layer.Description)).AppendLine("</p>");
+                builder.Append("<p>").Append(HtmlEncode(this.layer.Description)).AppendLine("</p>");
             }
 
-            if (_contentCrs.HasValue())
+            if (this.contentCrs.HasValue())
             {
                 builder.Append("<p><strong>Content CRS:</strong> ")
                     .Append(HtmlEncode(_contentCrs))
@@ -1189,8 +1189,8 @@ internal static partial class OgcFeaturesHandlers
                 builder.AppendLine("<p>No features found.</p>");
             }
 
-            var matchedDisplay = _numberMatched.HasValue
-                ? _numberMatched.Value.ToString(CultureInfo.InvariantCulture)
+            var matchedDisplay = this.numberMatched.HasValue
+                ? this.numberMatched.Value.ToString(CultureInfo.InvariantCulture)
                 : "unknown";
 
             builder.Append("</section>")

@@ -18,8 +18,8 @@ namespace Honua.Server.Host.Middleware;
 /// </summary>
 public sealed class MetricsMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<MetricsMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly ILogger<MetricsMiddleware> logger;
 
     // PERFORMANCE FIX: Use Interlocked operations for atomic counter updates (no locks needed)
     private long _totalRequests;
@@ -35,8 +35,8 @@ public sealed class MetricsMiddleware
 
     public MetricsMiddleware(RequestDelegate next, ILogger<MetricsMiddleware> logger)
     {
-        _next = Guard.NotNull(next);
-        _logger = Guard.NotNull(logger);
+        this.next = Guard.NotNull(next);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -67,7 +67,7 @@ public sealed class MetricsMiddleware
 
             // Track per-endpoint metrics
             var endpoint = $"{context.Request.Method} {context.Request.Path}";
-            var metrics = _endpointMetrics.GetOrAdd(endpoint, _ => new EndpointMetrics());
+            var metrics = this.endpointMetrics.GetOrAdd(endpoint, _ => new EndpointMetrics());
 
             // PERFORMANCE FIX: Update endpoint metrics using Interlocked operations
             Interlocked.Increment(ref metrics.RequestCount);
@@ -104,7 +104,7 @@ public sealed class MetricsMiddleware
             var avgDuration = totalReqs > 0 ? totalDuration / (double)totalReqs : 0;
             var errorRate = totalReqs > 0 ? (totalErrs / (double)totalReqs) * 100 : 0;
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Metrics Batch: {TotalRequests} requests, {AvgDuration:F2}ms avg, {ErrorRate:F2}% error rate",
                 totalReqs,
                 avgDuration,
@@ -113,7 +113,7 @@ public sealed class MetricsMiddleware
         catch (Exception ex)
         {
             // Don't let metrics logging failures break the application
-            _logger.LogWarning(ex, "Failed to log batch metrics");
+            this.logger.LogWarning(ex, "Failed to log batch metrics");
         }
     }
 
@@ -133,7 +133,7 @@ public sealed class MetricsMiddleware
             TotalDurationMs = totalDuration,
             AverageDurationMs = totalReqs > 0 ? totalDuration / (double)totalReqs : 0,
             ErrorRate = totalReqs > 0 ? (totalErrs / (double)totalReqs) * 100 : 0,
-            EndpointCount = _endpointMetrics.Count
+            EndpointCount = this.endpointMetrics.Count
         };
     }
 
@@ -142,7 +142,7 @@ public sealed class MetricsMiddleware
     /// </summary>
     public EndpointMetricsSnapshot? GetEndpointMetrics(string endpoint)
     {
-        if (_endpointMetrics.TryGetValue(endpoint, out var metrics))
+        if (this.endpointMetrics.TryGetValue(endpoint, out var metrics))
         {
             var count = Interlocked.Read(ref metrics.RequestCount);
             var duration = Interlocked.Read(ref metrics.TotalDurationMs);

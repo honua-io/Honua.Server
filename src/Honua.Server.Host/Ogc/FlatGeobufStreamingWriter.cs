@@ -107,7 +107,7 @@ public sealed class FlatGeobufStreamingWriter : StreamingFeatureCollectionWriter
         }
 
         // BUG FIX #46: Cache header template for feature encoding to avoid rebuilding for each feature
-        _cachedHeaderTemplate = header;
+        this.cachedHeaderTemplate = header;
 
         // Serialize header to FlatBuffers
         var builder = new FlatBufferBuilder(1024);

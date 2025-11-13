@@ -20,18 +20,18 @@ namespace Honua.Server.Host.API;
 [Produces("application/json")]
 public class AutoGeocodingController : ControllerBase
 {
-    private readonly ILogger<AutoGeocodingController> _logger;
-    private readonly AutoGeocodingService _autoGeocodingService;
-    private readonly AddressDetectionService _addressDetectionService;
+    private readonly ILogger<AutoGeocodingController> logger;
+    private readonly AutoGeocodingService autoGeocodingService;
+    private readonly AddressDetectionService addressDetectionService;
 
     public AutoGeocodingController(
         ILogger<AutoGeocodingController> logger,
         AutoGeocodingService autoGeocodingService,
         AddressDetectionService addressDetectionService)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _autoGeocodingService = autoGeocodingService ?? throw new ArgumentNullException(nameof(autoGeocodingService));
-        _addressDetectionService = addressDetectionService ?? throw new ArgumentNullException(nameof(addressDetectionService));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.autoGeocodingService = autoGeocodingService ?? throw new ArgumentNullException(nameof(autoGeocodingService));
+        this.addressDetectionService = addressDetectionService ?? throw new ArgumentNullException(nameof(addressDetectionService));
     }
 
     // ==================== Address Detection ====================
@@ -55,20 +55,20 @@ public class AutoGeocodingController : ControllerBase
         {
             if (request.ParsedData == null || request.ParsedData.Features.Count == 0)
             {
-                return BadRequest(new { error = "No data provided or data is empty" });
+                return this.BadRequest(new { error = "No data provided or data is empty" });
             }
 
-            var response = await _autoGeocodingService.DetectAddressColumnsAsync(
+            var response = await this.autoGeocodingService.DetectAddressColumnsAsync(
                 request.DatasetId,
                 request.ParsedData,
-                HttpContext.RequestAborted);
+                this.HttpContext.RequestAborted);
 
-            return Ok(response);
+            return this.Ok(response);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to detect address columns for dataset {DatasetId}", request.DatasetId);
-            return StatusCode(StatusCodes.Status500InternalServerError,
+            this.logger.LogError(ex, "Failed to detect address columns for dataset {DatasetId}", request.DatasetId);
+            return this.StatusCode(StatusCodes.Status500InternalServerError,
                 new { error = "Failed to detect address columns", details = ex.Message });
         }
     }
@@ -89,7 +89,7 @@ public class AutoGeocodingController : ControllerBase
         {
             // This would use the AddressDetectionService to analyze specific fields
             // For now, return a simple response
-            return Ok(new FieldAnalysisResponse
+            return this.Ok(new FieldAnalysisResponse
             {
                 FieldName = request.FieldName,
                 IsLikelyAddress = true,
@@ -99,8 +99,8 @@ public class AutoGeocodingController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to analyze field {FieldName}", request.FieldName);
-            return BadRequest(new { error = "Failed to analyze field", details = ex.Message });
+            this.logger.LogError(ex, "Failed to analyze field {FieldName}", request.FieldName);
+            return this.BadRequest(new { error = "Failed to analyze field", details = ex.Message });
         }
     }
 
@@ -125,21 +125,21 @@ public class AutoGeocodingController : ControllerBase
         {
             if (request.ParsedData == null || request.AddressConfiguration == null)
             {
-                return BadRequest(new { error = "Missing required data or configuration" });
+                return this.BadRequest(new { error = "Missing required data or configuration" });
             }
 
             // Start geocoding (this could be made async with background processing)
-            var result = await _autoGeocodingService.StartGeocodingAsync(
+            var result = await this.autoGeocodingService.StartGeocodingAsync(
                 request,
                 progress: null, // TODO: Implement SignalR for real-time progress
-                HttpContext.RequestAborted);
+                this.HttpContext.RequestAborted);
 
-            return Accepted(result);
+            return this.Accepted(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to start geocoding for dataset {DatasetId}", request.DatasetId);
-            return StatusCode(StatusCodes.Status500InternalServerError,
+            this.logger.LogError(ex, "Failed to start geocoding for dataset {DatasetId}", request.DatasetId);
+            return this.StatusCode(StatusCodes.Status500InternalServerError,
                 new { error = "Failed to start geocoding", details = ex.Message });
         }
     }
@@ -157,19 +157,19 @@ public class AutoGeocodingController : ControllerBase
     {
         try
         {
-            var session = _autoGeocodingService.GetSession(sessionId);
+            var session = this.autoGeocodingService.GetSession(sessionId);
 
             if (session == null)
             {
-                return NotFound(new { error = $"Session {sessionId} not found" });
+                return this.NotFound(new { error = $"Session {sessionId} not found" });
             }
 
-            return Ok(session);
+            return this.Ok(session);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get session status for {SessionId}", sessionId);
-            return StatusCode(StatusCodes.Status500InternalServerError,
+            this.logger.LogError(ex, "Failed to get session status for {SessionId}", sessionId);
+            return this.StatusCode(StatusCodes.Status500InternalServerError,
                 new { error = "Failed to get session status", details = ex.Message });
         }
     }
@@ -192,21 +192,21 @@ public class AutoGeocodingController : ControllerBase
     {
         try
         {
-            var result = await _autoGeocodingService.RetryFailedGeocodingAsync(
+            var result = await this.autoGeocodingService.RetryFailedGeocodingAsync(
                 request,
-                HttpContext.RequestAborted);
+                this.HttpContext.RequestAborted);
 
-            return Accepted(result);
+            return this.Accepted(result);
         }
         catch (NotImplementedException)
         {
-            return StatusCode(StatusCodes.Status501NotImplemented,
+            return this.StatusCode(StatusCodes.Status501NotImplemented,
                 new { error = "Retry functionality is not yet implemented" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retry geocoding for session {SessionId}", request.SessionId);
-            return StatusCode(StatusCodes.Status500InternalServerError,
+            this.logger.LogError(ex, "Failed to retry geocoding for session {SessionId}", request.SessionId);
+            return this.StatusCode(StatusCodes.Status500InternalServerError,
                 new { error = "Failed to retry geocoding", details = ex.Message });
         }
     }
@@ -252,7 +252,7 @@ public class AutoGeocodingController : ControllerBase
             }
         };
 
-        return Ok(providers);
+        return this.Ok(providers);
     }
 
     /// <summary>
@@ -292,7 +292,7 @@ public class AutoGeocodingController : ControllerBase
             }
         };
 
-        return Ok(examples);
+        return this.Ok(examples);
     }
 }
 

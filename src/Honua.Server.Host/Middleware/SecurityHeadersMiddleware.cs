@@ -18,10 +18,10 @@ namespace Honua.Server.Host.Middleware;
 /// </summary>
 public class SecurityHeadersMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly IWebHostEnvironment _environment;
-    private readonly ILogger<SecurityHeadersMiddleware> _logger;
-    private readonly SecurityHeadersOptions _options;
+    private readonly RequestDelegate next;
+    private readonly IWebHostEnvironment environment;
+    private readonly ILogger<SecurityHeadersMiddleware> logger;
+    private readonly SecurityHeadersOptions options;
 
     /// <summary>
     /// HttpContext item key for CSP nonce value.
@@ -35,10 +35,10 @@ public class SecurityHeadersMiddleware
         ILogger<SecurityHeadersMiddleware> logger,
         IOptions<SecurityHeadersOptions> options)
     {
-        _next = Guard.NotNull(next);
-        _environment = Guard.NotNull(environment);
-        _logger = Guard.NotNull(logger);
-        _options = Guard.NotNull(options).Value;
+        this.next = Guard.NotNull(next);
+        this.environment = Guard.NotNull(environment);
+        this.logger = Guard.NotNull(logger);
+        this.options = Guard.NotNull(options).Value;
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -46,7 +46,7 @@ public class SecurityHeadersMiddleware
         Guard.NotNull(context);
 
         // Skip if middleware is disabled
-        if (!_options.Enabled)
+        if (!this.options.Enabled)
         {
             await _next(context).ConfigureAwait(false);
             return;
@@ -65,7 +65,7 @@ public class SecurityHeadersMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(
+            this.logger.LogError(
                 ex,
                 "Error in SecurityHeadersMiddleware for {Path} from {RemoteIp}",
                 context.Request.Path,

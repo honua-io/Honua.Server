@@ -45,38 +45,38 @@ public interface IPluginMetrics
 /// </summary>
 public sealed class PluginMetrics : IPluginMetrics, IDisposable
 {
-    private readonly Meter _meter;
-    private readonly Counter<long> _pluginsLoaded;
-    private readonly Counter<long> _pluginsUnloaded;
-    private readonly Counter<long> _pluginErrors;
-    private readonly Histogram<double> _pluginLoadDuration;
-    private readonly Histogram<double> _pluginOperationDuration;
+    private readonly Meter meter;
+    private readonly Counter<long> pluginsLoaded;
+    private readonly Counter<long> pluginsUnloaded;
+    private readonly Counter<long> pluginErrors;
+    private readonly Histogram<double> pluginLoadDuration;
+    private readonly Histogram<double> pluginOperationDuration;
 
     public PluginMetrics()
     {
-        _meter = new Meter("Honua.Server.Plugins", "1.0.0");
+        this.meter = new Meter("Honua.Server.Plugins", "1.0.0");
 
-        _pluginsLoaded = _meter.CreateCounter<long>(
+        this.pluginsLoaded = this.meter.CreateCounter<long>(
             "honua.plugins.loaded",
             unit: "{plugin}",
             description: "Number of plugins loaded");
 
-        _pluginsUnloaded = _meter.CreateCounter<long>(
+        this.pluginsUnloaded = this.meter.CreateCounter<long>(
             "honua.plugins.unloaded",
             unit: "{plugin}",
             description: "Number of plugins unloaded");
 
-        _pluginErrors = _meter.CreateCounter<long>(
+        this.pluginErrors = this.meter.CreateCounter<long>(
             "honua.plugins.errors",
             unit: "{error}",
             description: "Number of plugin errors");
 
-        _pluginLoadDuration = _meter.CreateHistogram<double>(
+        this.pluginLoadDuration = this.meter.CreateHistogram<double>(
             "honua.plugins.load_duration",
             unit: "ms",
             description: "Plugin load duration");
 
-        _pluginOperationDuration = _meter.CreateHistogram<double>(
+        this.pluginOperationDuration = this.meter.CreateHistogram<double>(
             "honua.plugins.operation_duration",
             unit: "ms",
             description: "Plugin operation duration");
@@ -84,26 +84,29 @@ public sealed class PluginMetrics : IPluginMetrics, IDisposable
 
     public void RecordPluginLoaded(string pluginName, TimeSpan loadDuration)
     {
-        _pluginsLoaded.Add(1, new KeyValuePair<string, object?>("plugin.name", NormalizePluginName(pluginName)));
-        _pluginLoadDuration.Record(loadDuration.TotalMilliseconds,
+        this.pluginsLoaded.Add(1, new KeyValuePair<string, object?>("plugin.name", NormalizePluginName(pluginName)));
+        this.pluginLoadDuration.Record(
+            loadDuration.TotalMilliseconds,
             new KeyValuePair<string, object?>("plugin.name", NormalizePluginName(pluginName)));
     }
 
     public void RecordPluginUnloaded(string pluginName)
     {
-        _pluginsUnloaded.Add(1, new KeyValuePair<string, object?>("plugin.name", NormalizePluginName(pluginName)));
+        this.pluginsUnloaded.Add(1, new KeyValuePair<string, object?>("plugin.name", NormalizePluginName(pluginName)));
     }
 
     public void RecordPluginError(string pluginName, string errorType)
     {
-        _pluginErrors.Add(1,
+        this.pluginErrors.Add(
+            1,
             new("plugin.name", NormalizePluginName(pluginName)),
             new("error.type", NormalizeErrorType(errorType)));
     }
 
     public void RecordPluginOperation(string pluginName, string operation, TimeSpan duration, bool success)
     {
-        _pluginOperationDuration.Record(duration.TotalMilliseconds,
+        this.pluginOperationDuration.Record(
+            duration.TotalMilliseconds,
             new("plugin.name", NormalizePluginName(pluginName)),
             new("operation", NormalizeOperation(operation)),
             new("success", success.ToString().ToLowerInvariant()));
@@ -111,7 +114,7 @@ public sealed class PluginMetrics : IPluginMetrics, IDisposable
 
     public void Dispose()
     {
-        _meter.Dispose();
+        this.meter.Dispose();
     }
 
     private static string NormalizePluginName(string? pluginName)

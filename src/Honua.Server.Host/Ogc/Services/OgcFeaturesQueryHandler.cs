@@ -34,11 +34,11 @@ namespace Honua.Server.Host.Ogc.Services;
 /// </summary>
 internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
 {
-    private readonly IOgcCollectionResolver _collectionResolver;
-    private readonly IOgcFeaturesGeoJsonHandler _geoJsonHandler;
-    private readonly FilterParsingCacheService _filterCache;
-    private readonly FilterParsingCacheOptions _cacheOptions;
-    private readonly ILogger<OgcFeaturesQueryHandler> _logger;
+    private readonly IOgcCollectionResolver collectionResolver;
+    private readonly IOgcFeaturesGeoJsonHandler geoJsonHandler;
+    private readonly FilterParsingCacheService filterCache;
+    private readonly FilterParsingCacheOptions cacheOptions;
+    private readonly ILogger<OgcFeaturesQueryHandler> logger;
 
     public OgcFeaturesQueryHandler(
         IOgcCollectionResolver collectionResolver,
@@ -47,11 +47,11 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
         Microsoft.Extensions.Options.IOptions<FilterParsingCacheOptions> cacheOptions,
         ILogger<OgcFeaturesQueryHandler> logger)
     {
-        _collectionResolver = collectionResolver ?? throw new ArgumentNullException(nameof(collectionResolver));
-        _geoJsonHandler = geoJsonHandler ?? throw new ArgumentNullException(nameof(geoJsonHandler));
-        _filterCache = filterCache ?? throw new ArgumentNullException(nameof(filterCache));
-        _cacheOptions = cacheOptions?.Value ?? throw new ArgumentNullException(nameof(cacheOptions));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.collectionResolver = collectionResolver ?? throw new ArgumentNullException(nameof(collectionResolver));
+        this.geoJsonHandler = geoJsonHandler ?? throw new ArgumentNullException(nameof(geoJsonHandler));
+        this.filterCache = filterCache ?? throw new ArgumentNullException(nameof(filterCache));
+        this.cacheOptions = cacheOptions?.Value ?? throw new ArgumentNullException(nameof(cacheOptions));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <inheritdoc />
@@ -194,9 +194,9 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
             try
             {
                 // Use cache if enabled, otherwise parse directly
-                if (_cacheOptions.Enabled)
+                if (this.cacheOptions.Enabled)
                 {
-                    combinedFilter = _filterCache.GetOrParse(
+                    combinedFilter = this.filterCache.GetOrParse(
                         rawFilter,
                         effectiveFilterLanguage,
                         layer,
@@ -344,7 +344,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
         IOgcFeaturesAttachmentHandler attachmentHandler,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Executing OGC search across {CollectionCount} collections: {Collections}",
+        this.logger.LogInformation("Executing OGC search across {CollectionCount} collections: {Collections}",
             collections.Count, string.Join(", ", collections));
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -374,10 +374,10 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
         var resolutions = new List<SearchCollectionContext>(collections.Count);
         foreach (var collectionId in collections)
         {
-            var resolution = await _collectionResolver.ResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);
+            var resolution = await this.collectionResolver.ResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);
             if (resolution.IsFailure)
             {
-                return _collectionResolver.MapCollectionResolutionError(resolution.Error!, collectionId);
+                return this.collectionResolver.MapCollectionResolutionError(resolution.Error!, collectionId);
             }
 
             resolutions.Add(new SearchCollectionContext(collectionId, resolution.Value!));
@@ -530,7 +530,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
         }, contentType);
 
         stopwatch.Stop();
-        _logger.LogInformation("OGC search completed for {Collections} in {ElapsedMs}ms",
+        this.logger.LogInformation("OGC search completed for {Collections} in {ElapsedMs}ms",
             string.Join(", ", collections), stopwatch.ElapsedMilliseconds);
 
         return OgcSharedHandlers.WithContentCrsHeader(geoJsonResult, globalContentCrs);
@@ -538,7 +538,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
         catch (Exception ex)
         {
             stopwatch.Stop();
-            _logger.LogError(ex, "OGC search failed for collections {Collections} after {ElapsedMs}ms",
+            this.logger.LogError(ex, "OGC search failed for collections {Collections} after {ElapsedMs}ms",
                 string.Join(", ", collections), stopwatch.ElapsedMilliseconds);
             throw;
         }
@@ -887,7 +887,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
             repository,
             async (context, layer, query, record, components) =>
             {
-                var feature = _geoJsonHandler.ToFeature(request, context.CollectionId, layer, record, query, components);
+                var feature = this.geoJsonHandler.ToFeature(request, context.CollectionId, layer, record, query, components);
                 JsonSerializer.Serialize(writer, feature, OgcSharedHandlers.GeoJsonSerializerOptions);
 
                 if (writer.BytesPending > 8192)

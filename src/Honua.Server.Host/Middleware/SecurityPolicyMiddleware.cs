@@ -37,8 +37,8 @@ namespace Honua.Server.Host.Middleware;
 /// </example>
 public class SecurityPolicyMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<SecurityPolicyMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly ILogger<SecurityPolicyMiddleware> logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SecurityPolicyMiddleware"/> class.
@@ -50,8 +50,8 @@ public class SecurityPolicyMiddleware
     /// </exception>
     public SecurityPolicyMiddleware(RequestDelegate next, ILogger<SecurityPolicyMiddleware> logger)
     {
-        _next = Guard.NotNull(next);
-        _logger = Guard.NotNull(logger);
+        this.next = Guard.NotNull(next);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public class SecurityPolicyMiddleware
 
         if (RequiresAuthorization(request))
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Security Policy Violation: Endpoint {Path} (Method: {Method}) appears to be a protected route but lacks [Authorize] or [AllowAnonymous] attributes. " +
                 "Denying access as a security fail-safe. DisplayName: {DisplayName}",
                 request.Path,
@@ -117,7 +117,7 @@ public class SecurityPolicyMiddleware
 
         if (ShouldWarnMissingAuthorization(request))
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Security policy warning: endpoint {Path} (Method: {Method}) has no explicit authorization metadata. " +
                 "The request is permitted because the operation is read-only; annotate intent explicitly.",
                 request.Path,

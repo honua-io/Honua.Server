@@ -16,20 +16,20 @@ namespace Honua.Server.Core.Plugins;
 /// </summary>
 public sealed class PluginLoader : IDisposable
 {
-    private readonly ILogger<PluginLoader> _logger;
-    private readonly IConfiguration _configuration;
-    private readonly IHostEnvironment _environment;
-    private readonly Dictionary<string, LoadedPlugin> _loadedPlugins = new();
-    private readonly Dictionary<string, PluginLoadContext> _loadContexts = new();
+    private readonly ILogger<PluginLoader> logger;
+    private readonly IConfiguration configuration;
+    private readonly IHostEnvironment environment;
+    private readonly Dictionary<string, LoadedPlugin> loadedPlugins = new();
+    private readonly Dictionary<string, PluginLoadContext> loadContexts = new();
 
     public PluginLoader(
         ILogger<PluginLoader> logger,
         IConfiguration configuration,
         IHostEnvironment environment)
     {
-        _logger = logger;
-        _configuration = configuration;
-        _environment = environment;
+        this.logger = logger;
+        this.configuration = configuration;
+        this.environment = environment;
     }
 
     /// <summary>
@@ -38,32 +38,32 @@ public sealed class PluginLoader : IDisposable
     public async Task<PluginLoadResult> LoadPluginsAsync(CancellationToken cancellationToken = default)
     {
         var result = new PluginLoadResult();
-        var pluginPaths = GetPluginDiscoveryPaths();
+        var pluginPaths = this.GetPluginDiscoveryPaths();
 
-        _logger.LogInformation("Discovering plugins from {Count} paths", pluginPaths.Count);
+        this.logger.LogInformation("Discovering plugins from {Count} paths", pluginPaths.Count);
 
         foreach (var basePath in pluginPaths)
         {
             if (!Directory.Exists(basePath))
             {
-                _logger.LogWarning("Plugin path does not exist: {Path}", basePath);
+                this.logger.LogWarning("Plugin path does not exist: {Path}", basePath);
                 continue;
             }
 
             // Each subdirectory is a plugin
             var pluginDirs = Directory.GetDirectories(basePath);
-            _logger.LogInformation("Found {Count} potential plugins in {Path}", pluginDirs.Length, basePath);
+            this.logger.LogInformation("Found {Count} potential plugins in {Path}", pluginDirs.Length, basePath);
 
             foreach (var pluginDir in pluginDirs)
             {
                 try
                 {
-                    var loadedPlugin = await LoadPluginFromDirectoryAsync(pluginDir, cancellationToken);
+                    var loadedPlugin = await this.LoadPluginFromDirectoryAsync(pluginDir, cancellationToken);
                     if (loadedPlugin != null)
                     {
-                        _loadedPlugins[loadedPlugin.Metadata.Id] = loadedPlugin;
+                        this.loadedPlugins[loadedPlugin.Metadata.Id] = loadedPlugin;
                         result.LoadedPlugins.Add(loadedPlugin.Metadata);
-                        _logger.LogInformation(
+                        this.logger.LogInformation(
                             "Loaded plugin: {PluginId} v{Version} ({Type})",
                             loadedPlugin.Metadata.Id,
                             loadedPlugin.Metadata.Version,
@@ -73,13 +73,13 @@ public sealed class PluginLoader : IDisposable
                 catch (Exception ex)
                 {
                     var pluginId = Path.GetFileName(pluginDir);
-                    _logger.LogError(ex, "Failed to load plugin from {Path}", pluginDir);
+                    this.logger.LogError(ex, "Failed to load plugin from {Path}", pluginDir);
                     result.FailedPlugins.Add((pluginId, ex.Message));
                 }
             }
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Plugin loading complete: {Loaded} loaded, {Failed} failed",
             result.LoadedPlugins.Count,
             result.FailedPlugins.Count);
@@ -98,7 +98,7 @@ public sealed class PluginLoader : IDisposable
         var manifestPath = Path.Combine(pluginDir, "plugin.json");
         if (!File.Exists(manifestPath))
         {
-            _logger.LogWarning("No plugin.json found in {Path}, skipping", pluginDir);
+            this.logger.LogWarning("No plugin.json found in {Path}, skipping", pluginDir);
             return null;
         }
 
@@ -106,7 +106,7 @@ public sealed class PluginLoader : IDisposable
         var manifestJson = await File.ReadAllTextAsync(manifestPath, cancellationToken);
         var manifest = JsonSerializer.Deserialize<PluginManifest>(manifestJson, new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
         });
 
         if (manifest == null)
@@ -115,9 +115,9 @@ public sealed class PluginLoader : IDisposable
         }
 
         // Check if plugin should be loaded
-        if (!ShouldLoadPlugin(manifest.Id))
+        if (!this.ShouldLoadPlugin(manifest.Id))
         {
-            _logger.LogInformation("Plugin {PluginId} excluded by configuration", manifest.Id);
+            this.logger.LogInformation("Plugin {PluginId} excluded by configuration", manifest.Id);
             return null;
         }
 
@@ -129,8 +129,8 @@ public sealed class PluginLoader : IDisposable
         }
 
         // Create isolated load context for the plugin
-        var loadContext = new PluginLoadContext(assemblyPath, isCollectible: _environment.IsDevelopment());
-        _loadContexts[manifest.Id] = loadContext;
+        var loadContext = new PluginLoadContext(assemblyPath, isCollectible: this.environment.IsDevelopment());
+        this.loadContexts[manifest.Id] = loadContext;
 
         var assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
 
@@ -156,10 +156,10 @@ public sealed class PluginLoader : IDisposable
         var context = new PluginContext
         {
             PluginPath = pluginDir,
-            Configuration = _configuration,
-            Environment = _environment,
+            Configuration = this.configuration,
+            Environment = this.environment,
             Logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger(manifest.Id),
-            LoadedPlugins = _loadedPlugins.Values.Select(p => p.Metadata).ToDictionary(m => m.Id)
+            LoadedPlugins = this.loadedPlugins.Values.Select(p => p.Metadata).ToDictionary(m => m.Id),
         };
 
         // Initialize the plugin
@@ -187,14 +187,14 @@ public sealed class PluginLoader : IDisposable
         paths.Add(Path.Combine(AppContext.BaseDirectory, "plugins"));
 
         // Configuration V2 paths
-        var configPaths = _configuration.GetSection("honua:plugins:paths").Get<string[]>();
+        var configPaths = this.configuration.GetSection("honua:plugins:paths").Get<string[]>();
         if (configPaths != null)
         {
             paths.AddRange(configPaths);
         }
 
         // Legacy configuration paths
-        var legacyPaths = _configuration.GetSection("Plugins:Paths").Get<string[]>();
+        var legacyPaths = this.configuration.GetSection("Plugins:Paths").Get<string[]>();
         if (legacyPaths != null)
         {
             paths.AddRange(legacyPaths);
@@ -209,14 +209,14 @@ public sealed class PluginLoader : IDisposable
     private bool ShouldLoadPlugin(string pluginId)
     {
         // Check explicit exclusions
-        var excluded = _configuration.GetSection("honua:plugins:exclude").Get<string[]>();
+        var excluded = this.configuration.GetSection("honua:plugins:exclude").Get<string[]>();
         if (excluded?.Contains(pluginId) == true)
         {
             return false;
         }
 
         // Check explicit inclusions (if specified, only load these)
-        var included = _configuration.GetSection("honua:plugins:load").Get<string[]>();
+        var included = this.configuration.GetSection("honua:plugins:load").Get<string[]>();
         if (included != null && included.Length > 0)
         {
             return included.Contains(pluginId);
@@ -231,7 +231,7 @@ public sealed class PluginLoader : IDisposable
     /// </summary>
     public IHonuaPlugin? GetPlugin(string pluginId)
     {
-        return _loadedPlugins.TryGetValue(pluginId, out var loaded) ? loaded.Plugin : null;
+        return this.loadedPlugins.TryGetValue(pluginId, out var loaded) ? loaded.Plugin : null;
     }
 
     /// <summary>
@@ -239,7 +239,7 @@ public sealed class PluginLoader : IDisposable
     /// </summary>
     public IReadOnlyList<LoadedPlugin> GetAllPlugins()
     {
-        return _loadedPlugins.Values.ToList();
+        return this.loadedPlugins.Values.ToList();
     }
 
     /// <summary>
@@ -247,7 +247,7 @@ public sealed class PluginLoader : IDisposable
     /// </summary>
     public IReadOnlyList<IServicePlugin> GetServicePlugins()
     {
-        return _loadedPlugins.Values
+        return this.loadedPlugins.Values
             .Where(p => p.Plugin is IServicePlugin)
             .Select(p => (IServicePlugin)p.Plugin)
             .ToList();
@@ -258,7 +258,7 @@ public sealed class PluginLoader : IDisposable
     /// </summary>
     public async Task<bool> UnloadPluginAsync(string pluginId)
     {
-        if (!_loadedPlugins.TryGetValue(pluginId, out var loaded))
+        if (!this.loadedPlugins.TryGetValue(pluginId, out var loaded))
         {
             return false;
         }
@@ -267,20 +267,20 @@ public sealed class PluginLoader : IDisposable
         {
             await loaded.Plugin.OnUnloadAsync();
 
-            if (_loadContexts.TryGetValue(pluginId, out var context))
+            if (this.loadContexts.TryGetValue(pluginId, out var context))
             {
                 context.Unload();
-                _loadContexts.Remove(pluginId);
+                this.loadContexts.Remove(pluginId);
             }
 
-            _loadedPlugins.Remove(pluginId);
+            this.loadedPlugins.Remove(pluginId);
 
-            _logger.LogInformation("Unloaded plugin: {PluginId}", pluginId);
+            this.logger.LogInformation("Unloaded plugin: {PluginId}", pluginId);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to unload plugin: {PluginId}", pluginId);
+            this.logger.LogError(ex, "Failed to unload plugin: {PluginId}", pluginId);
             return false;
         }
     }
@@ -294,18 +294,19 @@ public sealed class PluginLoader : IDisposable
             "exporter" => PluginType.Exporter,
             "authprovider" => PluginType.AuthProvider,
             "extension" => PluginType.Extension,
-            _ => PluginType.Extension
+            _ => PluginType.Extension,
         };
     }
 
     public void Dispose()
     {
-        foreach (var context in _loadContexts.Values)
+        foreach (var context in this.loadContexts.Values)
         {
             context.Unload();
         }
-        _loadContexts.Clear();
-        _loadedPlugins.Clear();
+
+        this.loadContexts.Clear();
+        this.loadedPlugins.Clear();
     }
 }
 
@@ -314,21 +315,21 @@ public sealed class PluginLoader : IDisposable
 /// </summary>
 public sealed class PluginLoadContext : AssemblyLoadContext
 {
-    private readonly AssemblyDependencyResolver _resolver;
+    private readonly AssemblyDependencyResolver resolver;
 
     public PluginLoadContext(string pluginPath, bool isCollectible = false)
         : base(name: Path.GetFileNameWithoutExtension(pluginPath), isCollectible: isCollectible)
     {
-        _resolver = new AssemblyDependencyResolver(pluginPath);
+        this.resolver = new AssemblyDependencyResolver(pluginPath);
     }
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         // Try to resolve from plugin directory first
-        var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
+        var assemblyPath = this.resolver.ResolveAssemblyToPath(assemblyName);
         if (assemblyPath != null)
         {
-            return LoadFromAssemblyPath(assemblyPath);
+            return this.LoadFromAssemblyPath(assemblyPath);
         }
 
         // Fall back to default context (allows sharing Honua.Server.Core)
@@ -337,10 +338,10 @@ public sealed class PluginLoadContext : AssemblyLoadContext
 
     protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
     {
-        var libraryPath = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
+        var libraryPath = this.resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
         if (libraryPath != null)
         {
-            return LoadUnmanagedDllFromPath(libraryPath);
+            return this.LoadUnmanagedDllFromPath(libraryPath);
         }
 
         return IntPtr.Zero;

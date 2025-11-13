@@ -50,15 +50,15 @@ namespace Honua.Server.Host.Ogc;
 /// </remarks>
 public sealed class OgcCollectionsCache : IOgcCollectionsCache
 {
-    private readonly IMemoryCache _cache;
-    private readonly ILogger<OgcCollectionsCache> _logger;
-    private readonly OgcApiOptions _options;
+    private readonly IMemoryCache cache;
+    private readonly ILogger<OgcCollectionsCache> logger;
+    private readonly OgcApiOptions options;
     private readonly ConcurrentDictionary<string, byte> _cacheKeys;
-    private readonly Counter<long> _hitCounter;
-    private readonly Counter<long> _missCounter;
-    private readonly Counter<long> _invalidationsCounter;
-    private readonly Counter<long> _evictionsCounter;
-    private readonly ObservableGauge<int> _entriesGauge;
+    private readonly Counter<long> hitCounter;
+    private readonly Counter<long> missCounter;
+    private readonly Counter<long> invalidationsCounter;
+    private readonly Counter<long> evictionsCounter;
+    private readonly ObservableGauge<int> entriesGauge;
     private long _hits;
     private long _misses;
     private long _invalidations;
@@ -84,23 +84,23 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
         ILogger<OgcCollectionsCache> logger,
         IOptionsMonitor<OgcApiOptions> options)
     {
-        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.CurrentValue ?? throw new ArgumentNullException(nameof(options));
-        _cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.CurrentValue ?? throw new ArgumentNullException(nameof(options));
+        this.cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         // Initialize metrics
-        _hitCounter = OgcMetrics.CollectionsCacheHits;
-        _missCounter = OgcMetrics.CollectionsCacheMisses;
-        _invalidationsCounter = OgcMetrics.CollectionsCacheInvalidations;
+        this.hitCounter = OgcMetrics.CollectionsCacheHits;
+        this.missCounter = OgcMetrics.CollectionsCacheMisses;
+        this.invalidationsCounter = OgcMetrics.CollectionsCacheInvalidations;
 
-        _evictionsCounter = OgcMetrics.Meter.CreateCounter<long>(
+        this.evictionsCounter = OgcMetrics.Meter.CreateCounter<long>(
             "honua.ogc.collections_cache.evictions",
             description: "Number of OGC API collections cache evictions");
 
-        _entriesGauge = OgcMetrics.Meter.CreateObservableGauge<int>(
+        this.entriesGauge = OgcMetrics.Meter.CreateObservableGauge<int>(
             "honua.ogc.collections_cache.entries",
-            () => _cacheKeys.Count,
+            () => this.cacheKeys.Count,
             description: "Number of cached OGC API collections entries");
     }
 
@@ -119,15 +119,15 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
 
         var cacheKey = BuildCacheKey(serviceId, format, acceptLanguage);
 
-        if (_cache.TryGetValue(cacheKey, out response))
+        if (this.cache.TryGetValue(cacheKey, out response))
         {
             Interlocked.Increment(ref _hits);
-            _hitCounter.Add(1,
+            this.hitCounter.Add(1,
                 new KeyValuePair<string, object?>("service_id", serviceId ?? "all"),
                 new KeyValuePair<string, object?>("format", format),
                 new KeyValuePair<string, object?>("language", acceptLanguage ?? "default"));
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "OGC collections cache hit for service: {ServiceId}, format: {Format}, language: {Language}",
                 serviceId ?? "all",
                 format,
@@ -137,12 +137,12 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
         }
 
         Interlocked.Increment(ref _misses);
-        _missCounter.Add(1,
+        this.missCounter.Add(1,
             new KeyValuePair<string, object?>("service_id", serviceId ?? "all"),
             new KeyValuePair<string, object?>("format", format),
             new KeyValuePair<string, object?>("language", acceptLanguage ?? "default"));
 
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "OGC collections cache miss for service: {ServiceId}, format: {Format}, language: {Language}",
             serviceId ?? "all",
             format,
@@ -178,7 +178,7 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
 
         if (!IsEnabled())
         {
-            _logger.LogTrace("OGC collections caching is disabled, skipping cache storage");
+            this.logger.LogTrace("OGC collections caching is disabled, skipping cache storage");
             return Task.CompletedTask;
         }
 
@@ -186,9 +186,9 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
         var maxEntries = GetMaxCachedCollections();
 
         // Check if we're at the cache size limit
-        if (maxEntries > 0 && _cacheKeys.Count >= maxEntries)
+        if (maxEntries > 0 && this.cacheKeys.Count >= maxEntries)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "OGC collections cache has reached maximum size limit of {MaxEntries}. " +
                 "Entry will be cached but may be evicted immediately. Consider increasing the cache limit.",
                 maxEntries);
@@ -213,14 +213,14 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
         // Register eviction callback to track cache keys and metrics
         cacheOptions.RegisterPostEvictionCallback((key, value, reason, state) =>
         {
-            _cacheKeys.TryRemove(key.ToString()!, out _);
+            this.cacheKeys.TryRemove(key.ToString()!, out _);
             Interlocked.Increment(ref _evictions);
-            _evictionsCounter.Add(1,
+            this.evictionsCounter.Add(1,
                 new KeyValuePair<string, object?>("service_id", serviceId ?? "all"),
                 new KeyValuePair<string, object?>("format", format),
                 new KeyValuePair<string, object?>("reason", reason.ToString()));
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "OGC collections cache entry evicted for service {ServiceId}, format {Format}, reason: {Reason}. " +
                 "Total evictions: {TotalEvictions}",
                 serviceId ?? "all",
@@ -231,19 +231,19 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
             // Warn if eviction is due to capacity limits
             if (reason == EvictionReason.Capacity)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "OGC collections cache evicted entry for {ServiceId} due to capacity limit. " +
                     "Current entries: {CurrentEntries}, Max: {MaxEntries}. Consider increasing cache limits.",
                     serviceId ?? "all",
-                    _cacheKeys.Count,
+                    this.cacheKeys.Count,
                     maxEntries);
             }
         });
 
-        _cache.Set(cacheKey, entry, cacheOptions);
-        _cacheKeys.TryAdd(cacheKey, 0);
+        this.cache.Set(cacheKey, entry, cacheOptions);
+        this.cacheKeys.TryAdd(cacheKey, 0);
 
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "OGC collections cached for service {ServiceId}, format {Format}, language {Language} with TTL of {TtlSeconds} seconds",
             serviceId ?? "all",
             format,
@@ -263,15 +263,15 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
 
         // Remove all cache entries that match the service ID prefix
         var servicePrefix = BuildServicePrefix(serviceId);
-        var keysToRemove = _cacheKeys.Keys
+        var keysToRemove = this.cacheKeys.Keys
             .Where(key => key.StartsWith(servicePrefix, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         var removedCount = 0;
         foreach (var key in keysToRemove)
         {
-            _cache.Remove(key);
-            if (_cacheKeys.TryRemove(key, out _))
+            this.cache.Remove(key);
+            if (this.cacheKeys.TryRemove(key, out _))
             {
                 removedCount++;
             }
@@ -280,11 +280,11 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
         if (removedCount > 0)
         {
             Interlocked.Add(ref _invalidations, removedCount);
-            _invalidationsCounter.Add(removedCount,
+            this.invalidationsCounter.Add(removedCount,
                 new KeyValuePair<string, object?>("service_id", serviceId),
                 new KeyValuePair<string, object?>("scope", "service"));
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Invalidated {Count} OGC collections cache entries for service: {ServiceId}",
                 removedCount,
                 serviceId);
@@ -294,20 +294,20 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
     /// <inheritdoc />
     public void InvalidateAll()
     {
-        var count = _cacheKeys.Count;
-        var keysToRemove = _cacheKeys.Keys.ToList();
+        var count = this.cacheKeys.Count;
+        var keysToRemove = this.cacheKeys.Keys.ToList();
 
         foreach (var key in keysToRemove)
         {
-            _cache.Remove(key);
-            _cacheKeys.TryRemove(key, out _);
+            this.cache.Remove(key);
+            this.cacheKeys.TryRemove(key, out _);
         }
 
         Interlocked.Add(ref _invalidations, count);
-        _invalidationsCounter.Add(count,
+        this.invalidationsCounter.Add(count,
             new KeyValuePair<string, object?>("scope", "all"));
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Invalidated all {Count} OGC collections cache entries",
             count);
     }
@@ -324,7 +324,7 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
             Misses = misses,
             Invalidations = Interlocked.Read(ref _invalidations),
             Evictions = Interlocked.Read(ref _evictions),
-            EntryCount = _cacheKeys.Count,
+            EntryCount = this.cacheKeys.Count,
             MaxEntries = GetMaxCachedCollections(),
             HitRate = (hits + misses) > 0 ? (double)hits / (hits + misses) : 0
         };
@@ -375,7 +375,7 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
     private int GetCacheDurationSeconds()
     {
         // Use configured value or default
-        return _options.CollectionsCacheDurationSeconds ?? DefaultCacheDurationSeconds;
+        return this.options.CollectionsCacheDurationSeconds ?? DefaultCacheDurationSeconds;
     }
 
     /// <summary>
@@ -385,6 +385,6 @@ public sealed class OgcCollectionsCache : IOgcCollectionsCache
     private int GetMaxCachedCollections()
     {
         // Use configured value or default
-        return _options.MaxCachedCollections ?? DefaultMaxCachedCollections;
+        return this.options.MaxCachedCollections ?? DefaultMaxCachedCollections;
     }
 }

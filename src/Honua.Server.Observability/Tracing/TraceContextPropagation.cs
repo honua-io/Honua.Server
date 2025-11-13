@@ -69,8 +69,8 @@ public static class TraceContextPropagation
     /// Correlates the current activity with a correlation ID.
     /// Adds both to activity tags and baggage for cross-service propagation.
     /// </summary>
-    /// <param name="correlationId">The correlation ID to propagate</param>
-    /// <param name="activity">The activity to correlate (optional, uses Current if null)</param>
+    /// <param name="correlationId">The correlation ID to propagate.</param>
+    /// <param name="activity">The activity to correlate (optional, uses Current if null).</param>
     public static void CorrelateActivity(string correlationId, Activity? activity = null)
     {
         activity ??= Activity.Current;
@@ -88,8 +88,8 @@ public static class TraceContextPropagation
     /// <summary>
     /// Gets the correlation ID from the current activity's baggage or tags.
     /// </summary>
-    /// <param name="activity">The activity to get correlation ID from (optional)</param>
-    /// <returns>The correlation ID, or null if not found</returns>
+    /// <param name="activity">The activity to get correlation ID from (optional).</param>
+    /// <returns>The correlation ID, or null if not found.</returns>
     public static string? GetCorrelationId(Activity? activity = null)
     {
         activity ??= Activity.Current;
@@ -111,12 +111,12 @@ public static class TraceContextPropagation
     /// Creates a new activity as a child of the specified parent context.
     /// Useful for starting new operations from extracted trace context.
     /// </summary>
-    /// <param name="activitySource">The activity source</param>
-    /// <param name="activityName">The activity name</param>
-    /// <param name="parentContext">The parent activity context</param>
-    /// <param name="kind">The activity kind</param>
-    /// <param name="tags">Optional initial tags</param>
-    /// <returns>The created activity</returns>
+    /// <param name="activitySource">The activity source.</param>
+    /// <param name="activityName">The activity name.</param>
+    /// <param name="parentContext">The parent activity context.</param>
+    /// <param name="kind">The activity kind.</param>
+    /// <param name="tags">Optional initial tags.</param>
+    /// <returns>The created activity.</returns>
     public static Activity? StartActivityFromContext(
         ActivitySource activitySource,
         string activityName,
@@ -141,8 +141,8 @@ public static class TraceContextPropagation
     /// Propagates baggage from one activity to another.
     /// Useful when creating child activities or propagating context.
     /// </summary>
-    /// <param name="source">The source activity</param>
-    /// <param name="target">The target activity</param>
+    /// <param name="source">The source activity.</param>
+    /// <param name="target">The target activity.</param>
     public static void PropagateBaggage(Activity? source, Activity? target)
     {
         if (source == null || target == null)
@@ -158,9 +158,9 @@ public static class TraceContextPropagation
     /// Adds business context to the current activity as baggage.
     /// Baggage is propagated across service boundaries and can be used for filtering/correlation.
     /// </summary>
-    /// <param name="key">The baggage key</param>
-    /// <param name="value">The baggage value</param>
-    /// <param name="activity">The activity to add baggage to (optional)</param>
+    /// <param name="key">The baggage key.</param>
+    /// <param name="value">The baggage value.</param>
+    /// <param name="activity">The activity to add baggage to (optional).</param>
     public static void AddBaggage(string key, string value, Activity? activity = null)
     {
         activity ??= Activity.Current;
@@ -174,9 +174,9 @@ public static class TraceContextPropagation
     /// <summary>
     /// Gets baggage value from the current activity.
     /// </summary>
-    /// <param name="key">The baggage key</param>
-    /// <param name="activity">The activity to get baggage from (optional)</param>
-    /// <returns>The baggage value, or null if not found</returns>
+    /// <param name="key">The baggage key.</param>
+    /// <param name="activity">The activity to get baggage from (optional).</param>
+    /// <returns>The baggage value, or null if not found.</returns>
     public static string? GetBaggage(string key, Activity? activity = null)
     {
         activity ??= Activity.Current;
@@ -191,9 +191,9 @@ public static class TraceContextPropagation
     /// Records a trace event with optional attributes.
     /// Events are timestamped annotations on a span.
     /// </summary>
-    /// <param name="eventName">The event name</param>
-    /// <param name="attributes">Optional event attributes</param>
-    /// <param name="activity">The activity to add event to (optional)</param>
+    /// <param name="eventName">The event name.</param>
+    /// <param name="attributes">Optional event attributes.</param>
+    /// <param name="activity">The activity to add event to (optional).</param>
     public static void RecordEvent(
         string eventName,
         IEnumerable<KeyValuePair<string, object?>>? attributes = null,
@@ -223,9 +223,9 @@ public static class TraceContextPropagation
     /// Links the current activity to another trace context.
     /// Useful for correlating related but independent operations.
     /// </summary>
-    /// <param name="linkedContext">The context to link to</param>
-    /// <param name="attributes">Optional link attributes</param>
-    /// <param name="activity">The activity to add link to (optional)</param>
+    /// <param name="linkedContext">The context to link to.</param>
+    /// <param name="attributes">Optional link attributes.</param>
+    /// <param name="activity">The activity to add link to (optional).</param>
     public static void AddLink(
         ActivityContext linkedContext,
         IEnumerable<KeyValuePair<string, object?>>? attributes = null,

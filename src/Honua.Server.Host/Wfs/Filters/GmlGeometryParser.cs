@@ -27,7 +27,7 @@ internal static class GmlGeometryParser
     /// </summary>
     public static void SetComplexityValidator(GeometryComplexityValidator? validator)
     {
-        _complexityValidator = validator;
+        this.complexityValidator = validator;
     }
 
     /// <summary>

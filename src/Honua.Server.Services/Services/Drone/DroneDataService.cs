@@ -12,15 +12,15 @@ namespace Honua.Server.Services.Services.Drone;
 /// </summary>
 public class DroneDataService
 {
-    private readonly IDroneDataRepository _repository;
-    private readonly ILogger<DroneDataService> _logger;
+    private readonly IDroneDataRepository repository;
+    private readonly ILogger<DroneDataService> logger;
 
     public DroneDataService(
         IDroneDataRepository repository,
         ILogger<DroneDataService> logger)
     {
-        _repository = repository;
-        _logger = logger;
+        this.repository = repository;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -30,17 +30,17 @@ public class DroneDataService
         CreateDroneSurveyDto dto,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Creating new drone survey: {Name}", dto.Name);
+        this.logger.LogInformation("Creating new drone survey: {Name}", dto.Name);
 
         try
         {
-            var survey = await _repository.CreateSurveyAsync(dto, cancellationToken);
-            _logger.LogInformation("Created survey {SurveyId} successfully", survey.Id);
+            var survey = await this.repository.CreateSurveyAsync(dto, cancellationToken);
+            this.logger.LogInformation("Created survey {SurveyId} successfully", survey.Id);
             return survey;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create survey {Name}", dto.Name);
+            this.logger.LogError(ex, "Failed to create survey {Name}", dto.Name);
             throw;
         }
     }
@@ -52,7 +52,7 @@ public class DroneDataService
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        return await _repository.GetSurveyAsync(surveyId, cancellationToken);
+        return await this.repository.GetSurveyAsync(surveyId, cancellationToken);
     }
 
     /// <summary>
@@ -63,7 +63,7 @@ public class DroneDataService
         int offset = 0,
         CancellationToken cancellationToken = default)
     {
-        return await _repository.ListSurveysAsync(limit, offset, cancellationToken);
+        return await this.repository.ListSurveysAsync(limit, offset, cancellationToken);
     }
 
     /// <summary>
@@ -73,24 +73,25 @@ public class DroneDataService
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Deleting survey {SurveyId}", surveyId);
+        this.logger.LogInformation("Deleting survey {SurveyId}", surveyId);
 
         try
         {
-            var deleted = await _repository.DeleteSurveyAsync(surveyId, cancellationToken);
+            var deleted = await this.repository.DeleteSurveyAsync(surveyId, cancellationToken);
             if (deleted)
             {
-                _logger.LogInformation("Survey {SurveyId} deleted successfully", surveyId);
+                this.logger.LogInformation("Survey {SurveyId} deleted successfully", surveyId);
             }
             else
             {
-                _logger.LogWarning("Survey {SurveyId} not found", surveyId);
+                this.logger.LogWarning("Survey {SurveyId} not found", surveyId);
             }
+
             return deleted;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete survey {SurveyId}", surveyId);
+            this.logger.LogError(ex, "Failed to delete survey {SurveyId}", surveyId);
             throw;
         }
     }
@@ -102,22 +103,22 @@ public class DroneDataService
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        var survey = await _repository.GetSurveyAsync(surveyId, cancellationToken);
+        var survey = await this.repository.GetSurveyAsync(surveyId, cancellationToken);
         if (survey == null)
         {
             throw new KeyNotFoundException($"Survey {surveyId} not found");
         }
 
-        var pcStats = await _repository.GetPointCloudStatisticsAsync(surveyId, cancellationToken);
-        var orthomosaics = await _repository.ListOrthomosaicsAsync(surveyId, cancellationToken);
-        var models = await _repository.List3DModelsAsync(surveyId, cancellationToken);
+        var pcStats = await this.repository.GetPointCloudStatisticsAsync(surveyId, cancellationToken);
+        var orthomosaics = await this.repository.ListOrthomosaicsAsync(surveyId, cancellationToken);
+        var models = await this.repository.List3DModelsAsync(surveyId, cancellationToken);
 
         return new DroneSurveyStatistics
         {
             Survey = survey,
             PointCloudStats = pcStats,
             OrthomosaicCount = orthomosaics.Count(),
-            Model3DCount = models.Count()
+            Model3DCount = models.Count(),
         };
     }
 
@@ -128,7 +129,7 @@ public class DroneDataService
         ImportDroneSurveyRequest request,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Importing survey: {Name}", request.Name);
+        this.logger.LogInformation("Importing survey: {Name}", request.Name);
 
         // Create the survey record
         var surveyDto = new CreateDroneSurveyDto
@@ -139,15 +140,15 @@ public class DroneDataService
             FlightAltitudeM = request.FlightAltitudeM,
             GroundResolutionCm = request.GroundResolutionCm,
             CoverageArea = request.CoverageArea,
-            Metadata = request.Metadata
+            Metadata = request.Metadata,
         };
 
-        var survey = await _repository.CreateSurveyAsync(surveyDto, cancellationToken);
+        var survey = await this.repository.CreateSurveyAsync(surveyDto, cancellationToken);
 
         // Note: Actual file import (LAZ, COG) would be handled by specialized services
         // This is demonstrated in PointCloudService and OrthomosaicService
 
-        _logger.LogInformation("Survey {SurveyId} imported successfully", survey.Id);
+        this.logger.LogInformation("Survey {SurveyId} imported successfully", survey.Id);
         return survey.Id;
     }
 }

@@ -45,10 +45,10 @@ public sealed partial class GeoservicesRESTFeatureServerController
     {
         const int MaxExportFeatures = 50_000;
 
-        Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
-        Response.ContentType = "application/geo+json";
+        this.Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
+        this.Response.ContentType = "application/geo+json";
 
-        var stream = Response.Body;
+        var stream = this.Response.Body;
         await using var writer = new StreamWriter(stream, Encoding.UTF8, bufferSize: 4096, leaveOpen: true);
 
         await writer.WriteAsync("{\"type\":\"FeatureCollection\",");
@@ -60,7 +60,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var exceededTransferLimit = false;
         var numberMatched = 0;
 
-        await foreach (var record in _repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken).ConfigureAwait(false))
+        await foreach (var record in this.repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken).ConfigureAwait(false))
         {
             if (numberReturned >= MaxExportFeatures)
             {
@@ -94,7 +94,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         if (exceededTransferLimit)
         {
             await writer.WriteAsync("\"exceededTransferLimit\":true,");
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "GeoJSON export exceeded 50K feature limit and was truncated. Service={ServiceId}, Layer={LayerId}, NumberMatched={NumberMatched}, NumberReturned={NumberReturned}",
                 service.Id,
                 layer.Id,
@@ -121,7 +121,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         const int MaxExportFeatures = 10_000; // Lower cap due to topology computation overhead
 
         var features = new List<TopoJsonFeatureContent>(Math.Min(context.Query.Limit ?? 1000, MaxExportFeatures));
-        await foreach (var record in _repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken).ConfigureAwait(false))
+        await foreach (var record in this.repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken).ConfigureAwait(false))
         {
             if (features.Count >= MaxExportFeatures)
             {
@@ -138,7 +138,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             features.Count, // numberMatched = numberReturned (no separate count query)
             features.Count);
 
-        Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
+        this.Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
         return Content(payload, "application/topo+json");
     }
 
@@ -151,10 +151,10 @@ public sealed partial class GeoservicesRESTFeatureServerController
         GeoservicesRESTQueryContext context,
         CancellationToken cancellationToken)
     {
-        Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
-        Response.ContentType = "text/wkt; charset=utf-8";
+        this.Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
+        this.Response.ContentType = "text/wkt; charset=utf-8";
 
-        var features = _repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken);
+        var features = this.repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken);
         var writerContext = new StreamingWriterContext
         {
             ReturnGeometry = context.ReturnGeometry,
@@ -162,10 +162,10 @@ public sealed partial class GeoservicesRESTFeatureServerController
         };
 
         // Create logger instance for WktStreamingWriter
-        var loggerFactory = HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
+        var loggerFactory = this.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
         var writerLogger = loggerFactory.CreateLogger<WktStreamingWriter>();
         var writer = new WktStreamingWriter(writerLogger);
-        await writer.WriteCollectionAsync(Response.Body, features, layer, writerContext, cancellationToken).ConfigureAwait(false);
+        await writer.WriteCollectionAsync(this.Response.Body, features, layer, writerContext, cancellationToken).ConfigureAwait(false);
 
         return new EmptyResult();
     }
@@ -179,8 +179,8 @@ public sealed partial class GeoservicesRESTFeatureServerController
         GeoservicesRESTQueryContext context,
         CancellationToken cancellationToken)
     {
-        Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
-        Response.ContentType = "application/wkb";
+        this.Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
+        this.Response.ContentType = "application/wkb";
 
         // SECURITY FIX: Use ContentDispositionHeaderValue with proper filename encoding to prevent header injection attacks.
         // This properly escapes special characters, handles RFC 5987 encoding for international characters via
@@ -191,9 +191,9 @@ public sealed partial class GeoservicesRESTFeatureServerController
         {
             FileNameStar = $"{sanitizedFileName}.wkb"
         };
-        Response.Headers["Content-Disposition"] = contentDisposition.ToString();
+        this.Response.Headers["Content-Disposition"] = contentDisposition.ToString();
 
-        var features = _repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken);
+        var features = this.repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken);
         var writerContext = new StreamingWriterContext
         {
             ReturnGeometry = context.ReturnGeometry,
@@ -201,10 +201,10 @@ public sealed partial class GeoservicesRESTFeatureServerController
         };
 
         // Create logger instance for WkbStreamingWriter
-        var loggerFactory = HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
+        var loggerFactory = this.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
         var writerLogger = loggerFactory.CreateLogger<WkbStreamingWriter>();
         var writer = new WkbStreamingWriter(writerLogger);
-        await writer.WriteCollectionAsync(Response.Body, features, layer, writerContext, cancellationToken).ConfigureAwait(false);
+        await writer.WriteCollectionAsync(this.Response.Body, features, layer, writerContext, cancellationToken).ConfigureAwait(false);
 
         return new EmptyResult();
     }
@@ -226,7 +226,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
         if (!context.ReturnGeometry)
         {
-            return BadRequest(new { error = "KML export requires returnGeometry=true." });
+            return this.BadRequest(new { error = "KML export requires returnGeometry=true." });
         }
 
         var collectionId = BuildCollectionIdentifier(service, layer);
@@ -236,7 +236,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         {
             if (kmz)
             {
-                await _streamingKmlWriter.WriteKmzAsync(
+                await this.streamingKmlWriter.WriteKmzAsync(
                     Response,
                     _repository,
                     service.Id,
@@ -248,7 +248,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             }
             else
             {
-                await _streamingKmlWriter.WriteKmlAsync(
+                await this.streamingKmlWriter.WriteKmlAsync(
                     Response,
                     _repository,
                     service.Id,
@@ -264,7 +264,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogError(ex, "KML export failed for {ServiceId}/{LayerId}.", service.Id, layer.Id);
+            this.logger.LogError(ex, "KML export failed for {ServiceId}/{LayerId}.", service.Id, layer.Id);
             return Problem("KML conversion failed.", statusCode: StatusCodes.Status500InternalServerError);
         }
     }
@@ -282,16 +282,16 @@ public sealed partial class GeoservicesRESTFeatureServerController
         };
 
         var contentCrs = shapefileQuery.Crs ?? $"EPSG:{context.TargetWkid}";
-        var records = _repository.QueryAsync(service.Id, layer.Id, shapefileQuery, cancellationToken);
-        var export = await _shapefileExporter.ExportAsync(layer, shapefileQuery, contentCrs, records, cancellationToken).ConfigureAwait(false);
+        var records = this.repository.QueryAsync(service.Id, layer.Id, shapefileQuery, cancellationToken);
+        var export = await this.shapefileExporter.ExportAsync(layer, shapefileQuery, contentCrs, records, cancellationToken).ConfigureAwait(false);
 
         if (export.Content.CanSeek)
         {
             export.Content.Seek(0, SeekOrigin.Begin);
         }
 
-        Response.Headers["X-Feature-Count"] = export.FeatureCount.ToString(CultureInfo.InvariantCulture);
-        return File(export.Content, "application/zip", export.FileName);
+        this.Response.Headers["X-Feature-Count"] = export.FeatureCount.ToString(CultureInfo.InvariantCulture);
+        return this.File(export.Content, "application/zip", export.FileName);
     }
 
     private async Task<IActionResult> ExportKmlAsync(
@@ -310,8 +310,8 @@ public sealed partial class GeoservicesRESTFeatureServerController
             ? "application/vnd.google-earth.kmz"
             : "application/vnd.google-earth.kml+xml; charset=utf-8";
 
-        Response.ContentType = contentType;
-        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        this.Response.ContentType = contentType;
+        this.Response.Headers["X-Content-Type-Options"] = "nosniff";
 
         // SECURITY FIX: Use ContentDispositionHeaderValue with proper filename encoding to prevent header injection attacks.
         // This properly escapes special characters, handles RFC 5987 encoding for international characters via
@@ -320,7 +320,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         {
             FileNameStar = downloadFileName
         };
-        Response.Headers["Content-Disposition"] = contentDisposition.ToString();
+        this.Response.Headers["Content-Disposition"] = contentDisposition.ToString();
 
         // BUG FIX #39: KML exports now emit layer symbology when a default style is available.
 
@@ -336,7 +336,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
             if (isKmz)
             {
-                await _streamingKmlWriter.WriteKmzAsync(
+                await this.streamingKmlWriter.WriteKmzAsync(
                     Response,
                     _repository,
                     service.Id,
@@ -348,7 +348,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             }
             else
             {
-                await _streamingKmlWriter.WriteKmlAsync(
+                await this.streamingKmlWriter.WriteKmlAsync(
                     Response,
                     _repository,
                     service.Id,
@@ -364,7 +364,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogError(ex, "KML export failed for {ServiceId}/{LayerId}.", service.Id, layer.Id);
+            this.logger.LogError(ex, "KML export failed for {ServiceId}/{LayerId}.", service.Id, layer.Id);
             return Problem("KML conversion failed.", statusCode: StatusCodes.Status500InternalServerError);
         }
     }
@@ -390,21 +390,21 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 };
 
                 // Count features first to enforce limit
-                var featureCount = await _repository.CountAsync(service.Id, layer.Id, csvQuery, cancellationToken).ConfigureAwait(false);
+                var featureCount = await this.repository.CountAsync(service.Id, layer.Id, csvQuery, cancellationToken).ConfigureAwait(false);
 
                 // Check maximum feature count limit
                 if (featureCount > 10000)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "CSV export exceeded maximum feature count limit. Service={ServiceId}, Layer={LayerId}, RequestedCount={RequestedCount}, Limit=10000",
                         service.Id,
                         layer.Id,
                         featureCount);
-                    return BadRequest(new { error = "CSV export is limited to 10,000 features. Please refine your query to return fewer features." });
+                    return this.BadRequest(new { error = "CSV export is limited to 10,000 features. Please refine your query to return fewer features." });
                 }
 
-                var records = _repository.QueryAsync(service.Id, layer.Id, csvQuery, cancellationToken);
-                var export = await _csvExporter.ExportAsync(layer, csvQuery, records, cancellationToken).ConfigureAwait(false);
+                var records = this.repository.QueryAsync(service.Id, layer.Id, csvQuery, cancellationToken);
+                var export = await this.csvExporter.ExportAsync(layer, csvQuery, records, cancellationToken).ConfigureAwait(false);
 
                 if (export.Content.CanSeek)
                 {
@@ -425,7 +425,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 // Log slow exports
                 if (startTime.ElapsedMilliseconds > 5000)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "Slow CSV export detected. Service={ServiceId}, Layer={LayerId}, FeatureCount={FeatureCount}, Duration={DurationMs}ms, Size={SizeBytes} bytes",
                         service.Id,
                         layer.Id,
@@ -434,8 +434,8 @@ public sealed partial class GeoservicesRESTFeatureServerController
                         exportSizeBytes);
                 }
 
-                Response.Headers["X-Feature-Count"] = export.FeatureCount.ToString(CultureInfo.InvariantCulture);
-                return File(export.Content, "text/csv", export.FileName);
+                this.Response.Headers["X-Feature-Count"] = export.FeatureCount.ToString(CultureInfo.InvariantCulture);
+                return this.File(export.Content, "text/csv", export.FileName);
             });
     }
 
@@ -451,15 +451,15 @@ public sealed partial class GeoservicesRESTFeatureServerController
         };
 
         var contentCrs = shapefileQuery.Crs ?? $"EPSG:{context.TargetWkid}";
-        var export = await _shapefileExporter.ExportAsync(layer, shapefileQuery, contentCrs, EmptyFeatureRecords(), cancellationToken).ConfigureAwait(false);
+        var export = await this.shapefileExporter.ExportAsync(layer, shapefileQuery, contentCrs, EmptyFeatureRecords(), cancellationToken).ConfigureAwait(false);
 
         if (export.Content.CanSeek)
         {
             export.Content.Seek(0, SeekOrigin.Begin);
         }
 
-        Response.Headers["X-Feature-Count"] = "0";
-        return File(export.Content, "application/zip", export.FileName);
+        this.Response.Headers["X-Feature-Count"] = "0";
+        return this.File(export.Content, "application/zip", export.FileName);
     }
 
     private Task<IActionResult> ExportEmptyKmlAsync(
@@ -480,7 +480,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             0,
             style);
 
-        Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
+        this.Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
 
         if (context.Format == GeoservicesResponseFormat.Kmz)
         {
@@ -505,15 +505,15 @@ public sealed partial class GeoservicesRESTFeatureServerController
             ResultType = FeatureResultType.Results
         };
 
-        var export = await _csvExporter.ExportAsync(layer, csvQuery, EmptyFeatureRecords(), cancellationToken).ConfigureAwait(false);
+        var export = await this.csvExporter.ExportAsync(layer, csvQuery, EmptyFeatureRecords(), cancellationToken).ConfigureAwait(false);
 
         if (export.Content.CanSeek)
         {
             export.Content.Seek(0, SeekOrigin.Begin);
         }
 
-        Response.Headers["X-Feature-Count"] = "0";
-        return File(export.Content, "text/csv", export.FileName);
+        this.Response.Headers["X-Feature-Count"] = "0";
+        return this.File(export.Content, "text/csv", export.FileName);
     }
 
     private static IAsyncEnumerable<FeatureRecord> EmptyFeatureRecords()

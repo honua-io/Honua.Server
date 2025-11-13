@@ -10,64 +10,88 @@ using Honua.Server.Core.Metadata;
 
 namespace Honua.Server.Core.Raster;
 
+/// <summary>
+/// Provides a registry for raster dataset definitions with efficient lookup by ID or service.
+/// </summary>
 public sealed class RasterDatasetRegistry : IRasterDatasetRegistry
 {
     private static readonly IReadOnlyList<RasterDatasetDefinition> EmptyDatasets = Array.Empty<RasterDatasetDefinition>();
 
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly object _sync = new();
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly object sync = new();
 
-    private MetadataSnapshot? _snapshot;
-    private IReadOnlyList<RasterDatasetDefinition> _datasets = EmptyDatasets;
-    private IReadOnlyDictionary<string, RasterDatasetDefinition> _datasetIndex = new Dictionary<string, RasterDatasetDefinition>(StringComparer.OrdinalIgnoreCase);
-    private IReadOnlyDictionary<string, IReadOnlyList<RasterDatasetDefinition>> _serviceIndex = new Dictionary<string, IReadOnlyList<RasterDatasetDefinition>>(StringComparer.OrdinalIgnoreCase);
+    private MetadataSnapshot? snapshot;
+    private IReadOnlyList<RasterDatasetDefinition> datasets = EmptyDatasets;
+    private IReadOnlyDictionary<string, RasterDatasetDefinition> datasetIndex = new Dictionary<string, RasterDatasetDefinition>(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, IReadOnlyList<RasterDatasetDefinition>> serviceIndex = new Dictionary<string, IReadOnlyList<RasterDatasetDefinition>>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RasterDatasetRegistry"/> class.
+    /// </summary>
+    /// <param name="metadataRegistry">The metadata registry.</param>
     public RasterDatasetRegistry(IMetadataRegistry metadataRegistry)
     {
-        _metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
+        this.metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
     }
 
+    /// <summary>
+    /// Gets all raster datasets.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>All raster datasets.</returns>
     public async ValueTask<IReadOnlyList<RasterDatasetDefinition>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
-        return EnsureIndexes(snapshot).Datasets;
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        return this.EnsureIndexes(snapshot).Datasets;
     }
 
+    /// <summary>
+    /// Gets all raster datasets for a specific service.
+    /// </summary>
+    /// <param name="serviceId">The service identifier.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>All datasets for the service.</returns>
     public async ValueTask<IReadOnlyList<RasterDatasetDefinition>> GetByServiceAsync(string serviceId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceId);
 
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
-        var (_, _, serviceIndex) = EnsureIndexes(snapshot);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var (_, _, serviceIndex) = this.EnsureIndexes(snapshot);
 
         return serviceIndex.TryGetValue(serviceId, out var datasets) ? datasets : EmptyDatasets;
     }
 
+    /// <summary>
+    /// Finds a raster dataset by identifier.
+    /// </summary>
+    /// <param name="datasetId">The dataset identifier.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The dataset if found; otherwise null.</returns>
     public async ValueTask<RasterDatasetDefinition?> FindAsync(string datasetId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(datasetId);
 
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
-        var (index, _, _) = EnsureIndexes(snapshot);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var (index, _, _) = this.EnsureIndexes(snapshot);
 
         return index.TryGetValue(datasetId, out var dataset) ? dataset : null;
     }
 
     private (IReadOnlyDictionary<string, RasterDatasetDefinition> Index, IReadOnlyList<RasterDatasetDefinition> Datasets, IReadOnlyDictionary<string, IReadOnlyList<RasterDatasetDefinition>> Services) EnsureIndexes(MetadataSnapshot snapshot)
     {
-        if (!ReferenceEquals(snapshot, Volatile.Read(ref _snapshot)))
+        if (!ReferenceEquals(snapshot, Volatile.Read(ref this.snapshot)))
         {
-            lock (_sync)
+            lock (this.sync)
             {
-                if (!ReferenceEquals(snapshot, _snapshot))
+                if (!ReferenceEquals(snapshot, this.snapshot))
                 {
-                    BuildIndexes(snapshot);
-                    _snapshot = snapshot;
+                    this.BuildIndexes(snapshot);
+                    this.snapshot = snapshot;
                 }
             }
         }
 
-        return (_datasetIndex, _datasets, _serviceIndex);
+        return (this.datasetIndex, this.datasets, this.serviceIndex);
     }
 
     private void BuildIndexes(MetadataSnapshot snapshot)
@@ -75,14 +99,14 @@ public sealed class RasterDatasetRegistry : IRasterDatasetRegistry
         var datasets = snapshot.RasterDatasets;
         if (datasets.Count == 0)
         {
-            _datasets = EmptyDatasets;
-            _datasetIndex = new Dictionary<string, RasterDatasetDefinition>(StringComparer.OrdinalIgnoreCase);
-            _serviceIndex = new Dictionary<string, IReadOnlyList<RasterDatasetDefinition>>(StringComparer.OrdinalIgnoreCase);
+            this.datasets = EmptyDatasets;
+            this.datasetIndex = new Dictionary<string, RasterDatasetDefinition>(StringComparer.OrdinalIgnoreCase);
+            this.serviceIndex = new Dictionary<string, IReadOnlyList<RasterDatasetDefinition>>(StringComparer.OrdinalIgnoreCase);
             return;
         }
 
         var datasetArray = datasets.Where(d => d is not null).ToArray();
-        _datasets = new ReadOnlyCollection<RasterDatasetDefinition>(datasetArray);
+        this.datasets = new ReadOnlyCollection<RasterDatasetDefinition>(datasetArray);
 
         var datasetIndex = new Dictionary<string, RasterDatasetDefinition>(StringComparer.OrdinalIgnoreCase);
         var serviceBuckets = new Dictionary<string, List<RasterDatasetDefinition>>(StringComparer.OrdinalIgnoreCase);
@@ -109,7 +133,7 @@ public sealed class RasterDatasetRegistry : IRasterDatasetRegistry
             serviceIndex[serviceId] = new ReadOnlyCollection<RasterDatasetDefinition>(list);
         }
 
-        _datasetIndex = datasetIndex;
-        _serviceIndex = serviceIndex;
+        this.datasetIndex = datasetIndex;
+        this.serviceIndex = serviceIndex;
     }
 }

@@ -17,15 +17,15 @@ namespace Honua.Server.Core.Processes;
 /// </summary>
 public sealed class ProcessPreviewExecutor
 {
-    private readonly IProcessRegistry _processRegistry;
-    private readonly PreviewExecutionOptions _defaultOptions;
+    private readonly IProcessRegistry processRegistry;
+    private readonly PreviewExecutionOptions defaultOptions;
 
     public ProcessPreviewExecutor(
         IProcessRegistry processRegistry,
         PreviewExecutionOptions? defaultOptions = null)
     {
-        _processRegistry = processRegistry ?? throw new ArgumentNullException(nameof(processRegistry));
-        _defaultOptions = defaultOptions ?? new PreviewExecutionOptions();
+        this.processRegistry = processRegistry ?? throw new ArgumentNullException(nameof(processRegistry));
+        this.defaultOptions = defaultOptions ?? new PreviewExecutionOptions();
     }
 
     /// <summary>
@@ -37,21 +37,21 @@ public sealed class ProcessPreviewExecutor
     {
         Guard.NotNull(request);
 
-        var process = _processRegistry.GetProcess(request.ProcessId);
+        var process = this.processRegistry.GetProcess(request.ProcessId);
         if (process is null)
         {
             throw new InvalidOperationException($"Process '{request.ProcessId}' not found.");
         }
 
-        var options = request.Options ?? _defaultOptions;
+        var options = request.Options ?? this.defaultOptions;
         var stopwatch = Stopwatch.StartNew();
         var warnings = new List<string>();
 
         // Apply preview optimizations to inputs
-        var previewInputs = ApplyPreviewOptimizations(request.Inputs, options, warnings);
+        var previewInputs = this.ApplyPreviewOptimizations(request.Inputs, options, warnings);
 
         // Validate inputs
-        var validationErrors = ValidateInputs(process, previewInputs);
+        var validationErrors = this.ValidateInputs(process, previewInputs);
         if (validationErrors.Any())
         {
             return new PreviewExecutionResult
@@ -62,8 +62,8 @@ public sealed class ProcessPreviewExecutor
                     IsPreview = true,
                     PreviewFeatures = 0,
                     ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-                    Warnings = validationErrors.ToList()
-                }
+                    Warnings = validationErrors.ToList(),
+                },
             };
         }
 
@@ -86,7 +86,7 @@ public sealed class ProcessPreviewExecutor
             stopwatch.Stop();
 
             // Extract feature count and apply post-processing
-            var (processedResults, featureCount) = PostProcessResults(results, options);
+            var (processedResults, featureCount) = this.PostProcessResults(results, options);
 
             return new PreviewExecutionResult
             {
@@ -100,8 +100,8 @@ public sealed class ProcessPreviewExecutor
                     Simplified = options.SimplifyGeometries,
                     ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
                     Message = $"Preview showing {featureCount} features. Use full execution for complete results.",
-                    Warnings = warnings.Any() ? warnings : null
-                }
+                    Warnings = warnings.Any() ? warnings : null,
+                },
             };
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
@@ -115,8 +115,8 @@ public sealed class ProcessPreviewExecutor
                     IsPreview = true,
                     PreviewFeatures = 0,
                     ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-                    Warnings = new List<string> { "Preview operation timed out. Try reducing the input size or use full execution." }
-                }
+                    Warnings = new List<string> { "Preview operation timed out. Try reducing the input size or use full execution." },
+                },
             };
         }
         catch (Exception ex)
@@ -130,8 +130,8 @@ public sealed class ProcessPreviewExecutor
                     IsPreview = true,
                     PreviewFeatures = 0,
                     ExecutionTimeMs = stopwatch.ElapsedMilliseconds,
-                    Warnings = new List<string> { $"Preview execution failed: {ex.Message}" }
-                }
+                    Warnings = new List<string> { $"Preview execution failed: {ex.Message}" },
+                },
             };
         }
         finally
@@ -159,7 +159,7 @@ public sealed class ProcessPreviewExecutor
                 if (geometryList.Count > options.MaxPreviewFeatures)
                 {
                     var sampled = options.UseSpatialSampling
-                        ? SpatialSample(geometryList, options.MaxPreviewFeatures)
+                        ? this.SpatialSample(geometryList, options.MaxPreviewFeatures)
                         : geometryList.Take(options.MaxPreviewFeatures).ToList();
 
                     optimizedInputs[key] = sampled;
@@ -167,7 +167,7 @@ public sealed class ProcessPreviewExecutor
                 }
                 else if (options.SimplifyGeometries)
                 {
-                    optimizedInputs[key] = SimplifyGeometries(geometryList, options.SimplificationTolerance);
+                    optimizedInputs[key] = this.SimplifyGeometries(geometryList, options.SimplificationTolerance);
                 }
             }
             // Limit string arrays (like feature IDs)
@@ -296,7 +296,7 @@ public sealed class ProcessPreviewExecutor
                 // Apply simplification if not already done
                 if (options.SimplifyGeometries)
                 {
-                    processed[key] = SimplifyGeometries(geometryList, options.SimplificationTolerance);
+                    processed[key] = this.SimplifyGeometries(geometryList, options.SimplificationTolerance);
                 }
             }
             else if (value is Geometry)

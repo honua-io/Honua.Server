@@ -68,7 +68,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 {
                     if (context.Format != GeoservicesResponseFormat.Json)
                     {
-                        return BadRequest(new { error = "outStatistics is only supported for f=json requests." });
+                        return this.BadRequest(new { error = "outStatistics is only supported for f=json requests." });
                     }
 
                     // FIX (Bug 38): Reject statistics requests at scale suppression to avoid
@@ -76,17 +76,17 @@ public sealed partial class GeoservicesRESTFeatureServerController
                     // waste and provides clearer feedback to the client.
                     if (scaleSuppressed)
                     {
-                        return BadRequest(new { error = "Layer is not visible at the specified map scale. Statistics cannot be computed." });
+                        return this.BadRequest(new { error = "Layer is not visible at the specified map scale. Statistics cannot be computed." });
                     }
 
-                    return await _queryService.ExecuteQueryAsync(serviceView, layerView, context, cancellationToken).ConfigureAwait(false);
+                    return await this.queryService.ExecuteQueryAsync(serviceView, layerView, context, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (context.ReturnDistinctValues)
                 {
                     if (context.Format != GeoservicesResponseFormat.Json)
                     {
-                        return BadRequest(new { error = "returnDistinctValues is only supported for f=json requests." });
+                        return this.BadRequest(new { error = "returnDistinctValues is only supported for f=json requests." });
                     }
 
                     if (scaleSuppressed)
@@ -95,19 +95,19 @@ public sealed partial class GeoservicesRESTFeatureServerController
                         return WriteJson(emptyDistinct, context);
                     }
 
-                    return await _queryService.ExecuteQueryAsync(serviceView, layerView, context, cancellationToken).ConfigureAwait(false);
+                    return await this.queryService.ExecuteQueryAsync(serviceView, layerView, context, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (context.Format == GeoservicesResponseFormat.Shapefile)
                 {
                     if (!context.ReturnGeometry)
                     {
-                        return BadRequest(new { error = "Shapefile export requires returnGeometry=true." });
+                        return this.BadRequest(new { error = "Shapefile export requires returnGeometry=true." });
                     }
 
                     if (context.ReturnCountOnly || context.ReturnIdsOnly)
                     {
-                        return BadRequest(new { error = "Shapefile export is not available for count or ID-only queries." });
+                        return this.BadRequest(new { error = "Shapefile export is not available for count or ID-only queries." });
                     }
 
                     if (scaleSuppressed)
@@ -124,12 +124,12 @@ public sealed partial class GeoservicesRESTFeatureServerController
                     // Previously only checked ReturnCountOnly, causing confusing error for returnIdsOnly=true
                     if (context.ReturnCountOnly)
                     {
-                        return BadRequest(new { error = "CSV export is not available for count-only queries. Remove returnCountOnly parameter." });
+                        return this.BadRequest(new { error = "CSV export is not available for count-only queries. Remove returnCountOnly parameter." });
                     }
 
                     if (context.ReturnIdsOnly)
                     {
-                        return BadRequest(new { error = "CSV export is not available for ID-only queries. Remove returnIdsOnly parameter." });
+                        return this.BadRequest(new { error = "CSV export is not available for ID-only queries. Remove returnIdsOnly parameter." });
                     }
 
                     if (scaleSuppressed)
@@ -144,12 +144,12 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 {
                     if (!context.ReturnGeometry)
                     {
-                        return BadRequest(new { error = "KML export requires returnGeometry=true." });
+                        return this.BadRequest(new { error = "KML export requires returnGeometry=true." });
                     }
 
                     if (context.ReturnCountOnly || context.ReturnIdsOnly)
                     {
-                        return BadRequest(new { error = "KML export is not available for count or ID-only queries." });
+                        return this.BadRequest(new { error = "KML export is not available for count or ID-only queries." });
                     }
 
                     // FIX (Bug 40): Retrieve default style for KML export to preserve layer styling
@@ -165,7 +165,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
                 if (context.ReturnExtentOnly && context.Format != GeoservicesResponseFormat.Json)
                 {
-                    return BadRequest(new { error = "returnExtentOnly is only supported for f=json requests." });
+                    return this.BadRequest(new { error = "returnExtentOnly is only supported for f=json requests." });
                 }
 
                 if (scaleSuppressed)
@@ -191,7 +191,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
                         return await WriteWkbStreamingAsync(serviceView.Service, layerView.Layer, context, cancellationToken);
                     default:
                         // Delegate JSON format queries to the query service
-                        return await _queryService.ExecuteQueryAsync(serviceView, layerView, context, cancellationToken);
+                        return await this.queryService.ExecuteQueryAsync(serviceView, layerView, context, cancellationToken);
                 }
             });
     }
@@ -235,17 +235,17 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var layerView = ResolveLayer(serviceView, layerIndex);
         if (layerView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         // Delegate to the query service for the actual implementation
-        return await _queryService.ExecuteRelatedRecordsQueryAsync(serviceView, layerView, Request, cancellationToken).ConfigureAwait(false);
+        return await this.queryService.ExecuteRelatedRecordsQueryAsync(serviceView, layerView, Request, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<GeoservicesRESTFeatureSetResponse> FetchDistinctAsync(
@@ -272,7 +272,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         };
 
         // Delegate to repository which uses SELECT DISTINCT at database level
-        var distinctResults = await _repository.QueryDistinctAsync(
+        var distinctResults = await this.repository.QueryDistinctAsync(
             service.Id,
             layer.Id,
             distinctFields,
@@ -510,7 +510,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
     {
         // PERFORMANCE FIX: Delegate to query service which uses database-level ST_Extent
         // instead of loading all geometries into memory.
-        return await _queryService.CalculateExtentAsync(
+        return await this.queryService.CalculateExtentAsync(
             service.Id,
             layer,
             context,
@@ -630,7 +630,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
     private IActionResult CreateEmptyGeoJsonResponse(LayerDefinition layer, GeoservicesRESTQueryContext context)
     {
-        Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
+        this.Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
 
         var response = new
         {
@@ -647,7 +647,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
     private IActionResult CreateEmptyTopoJsonResponse(ServiceDefinition service, LayerDefinition layer, GeoservicesRESTQueryContext context)
     {
-        Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
+        this.Response.Headers["Content-Crs"] = $"EPSG:{context.TargetWkid}";
 
         var collectionId = BuildCollectionIdentifier(service, layer);
         var payload = TopoJsonFeatureFormatter.WriteFeatureCollection(
@@ -673,7 +673,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var geometryType = GeoservicesRESTMetadataMapper.MapGeometryType(layer.GeometryType);
         var features = new List<GeoservicesRESTFeature>();
 
-        await foreach (var record in _repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken).ConfigureAwait(false))
+        await foreach (var record in this.repository.QueryAsync(service.Id, layer.Id, context.Query, cancellationToken).ConfigureAwait(false))
         {
             var restFeature = CreateRestFeature(layer, record, context, geometryType);
             features.Add(restFeature);

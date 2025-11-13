@@ -29,10 +29,10 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
 {
     private const string GlobalIdFieldName = "globalId";
 
-    private readonly IFeatureAttachmentOrchestrator _attachmentOrchestrator;
-    private readonly IAttachmentStoreSelector _attachmentStoreSelector;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<GeoservicesAttachmentService> _logger;
+    private readonly IFeatureAttachmentOrchestrator attachmentOrchestrator;
+    private readonly IAttachmentStoreSelector attachmentStoreSelector;
+    private readonly IHttpContextAccessor httpContextAccessor;
+    private readonly ILogger<GeoservicesAttachmentService> logger;
 
     public GeoservicesAttachmentService(
         IFeatureAttachmentOrchestrator attachmentOrchestrator,
@@ -40,10 +40,10 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
         IHttpContextAccessor httpContextAccessor,
         ILogger<GeoservicesAttachmentService> logger)
     {
-        _attachmentOrchestrator = Core.Utilities.Guard.NotNull(attachmentOrchestrator);
-        _attachmentStoreSelector = Core.Utilities.Guard.NotNull(attachmentStoreSelector);
-        _httpContextAccessor = Core.Utilities.Guard.NotNull(httpContextAccessor);
-        _logger = Core.Utilities.Guard.NotNull(logger);
+        this.attachmentOrchestrator = Core.Utilities.Guard.NotNull(attachmentOrchestrator);
+        this.attachmentStoreSelector = Core.Utilities.Guard.NotNull(attachmentStoreSelector);
+        this.httpContextAccessor = Core.Utilities.Guard.NotNull(httpContextAccessor);
+        this.logger = Core.Utilities.Guard.NotNull(logger);
     }
 
     public async Task<IActionResult> QueryAttachmentsAsync(
@@ -64,7 +64,7 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
         foreach (var objectId in objectIds)
         {
             var featureId = objectId.ToString(CultureInfo.InvariantCulture);
-            var descriptors = await _attachmentOrchestrator.ListAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, cancellationToken).ConfigureAwait(false);
+            var descriptors = await this.attachmentOrchestrator.ListAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, cancellationToken).ConfigureAwait(false);
             if (attachmentIdsFilter.Count > 0)
             {
                 descriptors = descriptors.Where(descriptor => attachmentIdsFilter.Contains(descriptor.AttachmentObjectId)).ToList();
@@ -74,7 +74,7 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
             var totalAttachments = descriptors.Count;
             if (totalAttachments > MaxAttachmentsPerObjectId)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Feature {FeatureId} in layer {LayerId} has {AttachmentCount} attachments, limiting to {MaxAttachments}.",
                     featureId,
                     layerView.Layer.Id,
@@ -133,7 +133,7 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
             uploadRequest.GlobalId,
             UserIdentityHelper.GetUserIdentifierOrNull(GetHttpContext().User));
 
-        var result = await _attachmentOrchestrator.AddAsync(addRequest, cancellationToken).ConfigureAwait(false);
+        var result = await this.attachmentOrchestrator.AddAsync(addRequest, cancellationToken).ConfigureAwait(false);
         var response = new GeoservicesAddAttachmentResponse
         {
             Result = result.Success && result.Attachment is not null
@@ -172,7 +172,7 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
             updateRequest.GlobalId,
             UserIdentityHelper.GetUserIdentifierOrNull(GetHttpContext().User));
 
-        var result = await _attachmentOrchestrator.UpdateAsync(updateAttachmentRequest, cancellationToken).ConfigureAwait(false);
+        var result = await this.attachmentOrchestrator.UpdateAsync(updateAttachmentRequest, cancellationToken).ConfigureAwait(false);
         var response = new GeoservicesUpdateAttachmentResponse
         {
             Result = result.Success && result.Attachment is not null
@@ -216,7 +216,7 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
         }
 
         var featureId = objectId.ToString(CultureInfo.InvariantCulture);
-        var descriptors = await _attachmentOrchestrator.ListAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, cancellationToken).ConfigureAwait(false);
+        var descriptors = await this.attachmentOrchestrator.ListAsync(serviceView.Service.Id, layerView.Layer.Id, featureId, cancellationToken).ConfigureAwait(false);
         var descriptorLookup = descriptors.ToDictionary(descriptor => descriptor.AttachmentObjectId);
 
         var results = new List<GeoservicesAttachmentDeleteResult>();
@@ -242,7 +242,7 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
                 descriptor.AttachmentId,
                 UserIdentityHelper.GetUserIdentifierOrNull(GetHttpContext().User));
 
-            var success = await _attachmentOrchestrator.DeleteAsync(deleteRequest, cancellationToken).ConfigureAwait(false);
+            var success = await this.attachmentOrchestrator.DeleteAsync(deleteRequest, cancellationToken).ConfigureAwait(false);
             results.Add(new GeoservicesAttachmentDeleteResult
             {
                 ObjectId = objectId,
@@ -418,7 +418,7 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
         int attachmentObjectId,
         CancellationToken cancellationToken)
     {
-        var descriptors = await _attachmentOrchestrator.ListAsync(serviceId, layerId, featureId, cancellationToken).ConfigureAwait(false);
+        var descriptors = await this.attachmentOrchestrator.ListAsync(serviceId, layerId, featureId, cancellationToken).ConfigureAwait(false);
         return descriptors.FirstOrDefault(item => item.AttachmentObjectId == attachmentObjectId);
     }
 
@@ -478,7 +478,7 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
 
     private HttpContext GetHttpContext()
     {
-        return _httpContextAccessor.HttpContext ?? throw new InvalidOperationException("HttpContext is not available.");
+        return this.httpContextAccessor.HttpContext ?? throw new InvalidOperationException("HttpContext is not available.");
     }
 
     private sealed record AttachmentUploadRequest(int ObjectId, FeatureAttachmentUpload Upload, string? GlobalId);

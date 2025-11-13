@@ -24,11 +24,11 @@ public sealed class WmsCapabilitiesBuilder : OgcCapabilitiesBuilder
 {
     private static readonly XNamespace Wms = "http://www.opengis.net/wms";
 
-    private readonly IRasterDatasetRegistry _rasterRegistry;
+    private readonly IRasterDatasetRegistry rasterRegistry;
 
     public WmsCapabilitiesBuilder(IRasterDatasetRegistry rasterRegistry)
     {
-        _rasterRegistry = rasterRegistry ?? throw new ArgumentNullException(nameof(rasterRegistry));
+        this.rasterRegistry = rasterRegistry ?? throw new ArgumentNullException(nameof(rasterRegistry));
     }
 
     protected override XName GetRootElementName() => Wms + "WMS_Capabilities";
@@ -153,7 +153,7 @@ public sealed class WmsCapabilitiesBuilder : OgcCapabilitiesBuilder
     private async Task<XElement> BuildWmsCapabilityAsync(MetadataSnapshot metadata, HttpRequest request, CancellationToken cancellationToken)
     {
         var endpoint = BuildEndpointUrl(request);
-        var datasets = await _rasterRegistry.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var datasets = await this.rasterRegistry.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         var requestElement = new XElement(Wms + "Request",
             BuildWmsOperationElement("GetCapabilities", endpoint, "application/xml"),

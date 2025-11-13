@@ -16,15 +16,15 @@ namespace Honua.Server.Host.Middleware;
 /// </summary>
 public sealed class DegradationStatusMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<DegradationStatusMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly ILogger<DegradationStatusMiddleware> logger;
 
     public DegradationStatusMiddleware(
         RequestDelegate next,
         ILogger<DegradationStatusMiddleware> logger)
     {
-        _next = Guard.NotNull(next);
-        _logger = Guard.NotNull(logger);
+        this.next = Guard.NotNull(next);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task InvokeAsync(HttpContext context, IFeatureManagementService featureManagement)
@@ -53,7 +53,7 @@ public sealed class DegradationStatusMiddleware
 
             context.Response.Headers["X-Feature-Status"] = string.Join(",", featureStatusParts);
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Service operating in degraded mode. Degraded features: {Count}",
                 degradedFeatures.Count);
         }

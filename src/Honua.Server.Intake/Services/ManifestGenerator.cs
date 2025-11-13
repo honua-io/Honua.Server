@@ -30,7 +30,7 @@ public interface IManifestGenerator
 /// </summary>
 public sealed class ManifestGenerator : IManifestGenerator
 {
-    private readonly ILogger<ManifestGenerator> _logger;
+    private readonly ILogger<ManifestGenerator> logger;
 
     // Protocol to module mapping
     private static readonly Dictionary<string, string> ProtocolModuleMap = new(StringComparer.OrdinalIgnoreCase)
@@ -81,7 +81,7 @@ public sealed class ManifestGenerator : IManifestGenerator
 
     public ManifestGenerator(ILogger<ManifestGenerator> logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <inheritdoc/>
@@ -90,7 +90,7 @@ public sealed class ManifestGenerator : IManifestGenerator
         string? buildName = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Generating build manifest for tier {Tier}, architecture {Architecture}",
+        this.logger.LogInformation("Generating build manifest for tier {Tier}, architecture {Architecture}",
             requirements.Tier, requirements.Architecture);
 
         // Map protocols to modules
@@ -126,7 +126,7 @@ public sealed class ManifestGenerator : IManifestGenerator
             GeneratedAt = DateTimeOffset.UtcNow
         };
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Generated manifest: Name={Name}, Modules={ModuleCount}, Connectors={ConnectorCount}, CloudTargets={CloudTargetCount}",
             manifest.Name, manifest.Modules.Count, manifest.DatabaseConnectors.Count, manifest.CloudTargets?.Count ?? 0);
 
@@ -148,11 +148,11 @@ public sealed class ManifestGenerator : IManifestGenerator
             if (ProtocolModuleMap.TryGetValue(protocol, out var module))
             {
                 modules.Add(module);
-                _logger.LogDebug("Mapped protocol {Protocol} to module {Module}", protocol, module);
+                this.logger.LogDebug("Mapped protocol {Protocol} to module {Module}", protocol, module);
             }
             else
             {
-                _logger.LogWarning("Unknown protocol {Protocol}, skipping", protocol);
+                this.logger.LogWarning("Unknown protocol {Protocol}, skipping", protocol);
             }
         }
 
@@ -168,11 +168,11 @@ public sealed class ManifestGenerator : IManifestGenerator
             if (DatabaseConnectorMap.TryGetValue(database, out var connector))
             {
                 connectors.Add(connector);
-                _logger.LogDebug("Mapped database {Database} to connector {Connector}", database, connector);
+                this.logger.LogDebug("Mapped database {Database} to connector {Connector}", database, connector);
             }
             else
             {
-                _logger.LogWarning("Unknown database {Database}, skipping", database);
+                this.logger.LogWarning("Unknown database {Database}, skipping", database);
             }
         }
 
@@ -188,7 +188,7 @@ public sealed class ManifestGenerator : IManifestGenerator
         if (provider == "on-premises" || provider == "multi-cloud")
         {
             // For on-premises or multi-cloud, we don't generate specific targets
-            _logger.LogDebug("Skipping cloud target generation for provider {Provider}", provider);
+            this.logger.LogDebug("Skipping cloud target generation for provider {Provider}", provider);
             return targets;
         }
 
@@ -203,7 +203,7 @@ public sealed class ManifestGenerator : IManifestGenerator
 
         targets.Add(target);
 
-        _logger.LogInformation("Generated cloud target for {Provider} in {Region} with instance type {InstanceType}",
+        this.logger.LogInformation("Generated cloud target for {Provider} in {Region} with instance type {InstanceType}",
             target.Provider, target.Region, target.InstanceType);
 
         return targets;

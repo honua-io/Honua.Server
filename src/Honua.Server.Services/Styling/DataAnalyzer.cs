@@ -27,12 +27,12 @@ public class DataAnalyzer
             {
                 FieldName = fieldName,
                 DataType = DataType.Unknown,
-                Classification = DataClassification.Categorical
+                Classification = DataClassification.Categorical,
             };
         }
 
         // Detect data type
-        var dataType = DetectDataType(valuesList);
+        var dataType = this.DetectDataType(valuesList);
         var uniqueValues = valuesList.Distinct().ToList();
         var uniqueCount = uniqueValues.Count;
         var uniqueRatio = (double)uniqueCount / totalCount;
@@ -43,22 +43,22 @@ public class DataAnalyzer
             DataType = dataType,
             TotalCount = totalCount,
             UniqueCount = uniqueCount,
-            UniqueRatio = uniqueRatio
+            UniqueRatio = uniqueRatio,
         };
 
         // Determine classification and calculate statistics based on data type
         switch (dataType)
         {
             case DataType.Numeric:
-                AnalyzeNumericField(valuesList, result);
+                this.AnalyzeNumericField(valuesList, result);
                 break;
 
             case DataType.DateTime:
-                AnalyzeDateTimeField(valuesList, result);
+                this.AnalyzeDateTimeField(valuesList, result);
                 break;
 
             case DataType.String:
-                AnalyzeStringField(valuesList, result);
+                this.AnalyzeStringField(valuesList, result);
                 break;
 
             case DataType.Boolean:
@@ -80,8 +80,8 @@ public class DataAnalyzer
         result.MinValue = numbers.First();
         result.MaxValue = numbers.Last();
         result.Mean = numbers.Average();
-        result.Median = CalculateMedian(numbers);
-        result.StdDev = CalculateStdDev(numbers, result.Mean);
+        result.Median = this.CalculateMedian(numbers);
+        result.StdDev = this.CalculateStdDev(numbers, result.Mean);
 
         // Determine if data is diverging (has meaningful zero or midpoint)
         var range = result.MaxValue - result.MinValue;
@@ -105,11 +105,11 @@ public class DataAnalyzer
         }
 
         // Calculate distribution characteristics
-        result.Skewness = CalculateSkewness(numbers, result.Mean, result.StdDev);
+        result.Skewness = this.CalculateSkewness(numbers, result.Mean, result.StdDev);
         result.IsUniformDistribution = Math.Abs(result.Skewness) < 0.5;
 
         // Suggest number of classes for classification
-        result.SuggestedClasses = SuggestClassCount(result.UniqueCount, numbers.Count);
+        result.SuggestedClasses = this.SuggestClassCount(result.UniqueCount, numbers.Count);
     }
 
     /// <summary>
@@ -182,7 +182,7 @@ public class DataAnalyzer
         }
 
         // Detect potential land use or demographic categories
-        result.SemanticCategory = DetectSemanticCategory(strings);
+        result.SemanticCategory = this.DetectSemanticCategory(strings);
     }
 
     /// <summary>
@@ -360,16 +360,16 @@ public class DataAnalyzer
         // Calculate average nearest neighbor distance (sample for large datasets)
         var sampleSize = Math.Min(count, 1000);
         var sample = points.Take(sampleSize).ToList();
-        var avgNearestDistance = CalculateAverageNearestNeighbor(sample);
+        var avgNearestDistance = this.CalculateAverageNearestNeighbor(sample);
 
         var result = new GeometryAnalysisResult
         {
             FeatureCount = count,
-            BoundingBox = new[] { minX, minY, maxX, maxY },
+            BoundingBox = new[] { minX, minY, maxX, maxY, },
             Density = density,
             AverageNearestNeighborDistance = avgNearestDistance,
             ShouldCluster = count > 100 && density > 0.001,
-            ShouldUseHeatmap = count > 1000 && density > 0.01
+            ShouldUseHeatmap = count > 1000 && density > 0.01,
         };
 
         return result;

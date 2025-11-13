@@ -20,15 +20,15 @@ namespace Honua.Server.Host.HealthChecks;
 /// </summary>
 public sealed class RedisStoresHealthCheck : IHealthCheck
 {
-    private readonly IConnectionMultiplexer? _redis;
-    private readonly ILogger<RedisStoresHealthCheck> _logger;
+    private readonly IConnectionMultiplexer? redis;
+    private readonly ILogger<RedisStoresHealthCheck> logger;
 
     public RedisStoresHealthCheck(
         ILogger<RedisStoresHealthCheck> logger,
         IConnectionMultiplexer? redis = null)
     {
-        _logger = Guard.NotNull(logger);
-        _redis = redis;
+        this.logger = Guard.NotNull(logger);
+        this.redis = redis;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -46,28 +46,28 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
                 healthData["stores.mode"] = "in-memory";
                 healthData["stores.distributed"] = false;
 
-                _logger.LogDebug("Redis not configured - using in-memory stores");
+                this.logger.LogDebug("Redis not configured - using in-memory stores");
                 return HealthCheckResult.Healthy(
                     "Using in-memory stores (Redis not configured)",
                     healthData);
             }
 
             // Check Redis connectivity
-            if (!_redis.IsConnected)
+            if (!this.redis.IsConnected)
             {
                 healthData["redis.configured"] = true;
                 healthData["redis.connected"] = false;
                 healthData["stores.mode"] = "in-memory (fallback)";
                 healthData["stores.distributed"] = false;
 
-                _logger.LogWarning("Redis configured but not connected - falling back to in-memory stores");
+                this.logger.LogWarning("Redis configured but not connected - falling back to in-memory stores");
                 return HealthCheckResult.Degraded(
                     "Redis not connected - using in-memory stores as fallback",
                     data: healthData);
             }
 
             // Test Redis with ping
-            var db = _redis.GetDatabase();
+            var db = this.redis.GetDatabase();
             var pong = await db.PingAsync();
 
             healthData["redis.configured"] = true;
@@ -79,7 +79,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
             var allowAdmin = GetAllowAdminFlag(_redis);
             healthData["redis.allow_admin"] = allowAdmin;
 
-            var endpoints = _redis.GetEndPoints();
+            var endpoints = this.redis.GetEndPoints();
             healthData["redis.endpoints"] = endpoints.Length;
 
             if (allowAdmin)
@@ -89,7 +89,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
                 {
                     try
                     {
-                        var server = _redis.GetServer(endpoint);
+                        var server = this.redis.GetServer(endpoint);
                         if (server.IsConnected)
                         {
                             connectedEndpoints++;
@@ -97,7 +97,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
                     }
                     catch (RedisServerException ex)
                     {
-                        _logger.LogDebug(ex, "Failed to query Redis server information for endpoint {Endpoint}", endpoint);
+                        this.logger.LogDebug(ex, "Failed to query Redis server information for endpoint {Endpoint}", endpoint);
                     }
                 }
 
@@ -105,7 +105,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
 
                 if (connectedEndpoints < endpoints.Length)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "Not all Redis endpoints are connected: {Connected}/{Total}",
                         connectedEndpoints,
                         endpoints.Length);
@@ -118,7 +118,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
             // Check latency
             if (pong.TotalMilliseconds > ApiLimitsAndConstants.RedisHealthCheckThresholdMilliseconds)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Redis latency is high: {Latency}ms - distributed stores may experience performance degradation",
                     pong.TotalMilliseconds);
                 return HealthCheckResult.Degraded(
@@ -126,7 +126,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
                     data: healthData);
             }
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Redis stores health check passed. Latency: {Latency}ms, Endpoints: {Endpoints}",
                 pong.TotalMilliseconds,
                 endpoints.Length);
@@ -143,7 +143,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
             healthData["stores.mode"] = "in-memory (fallback)";
             healthData["stores.distributed"] = false;
 
-            _logger.LogError(ex, "Redis connection failed - using in-memory stores as fallback");
+            this.logger.LogError(ex, "Redis connection failed - using in-memory stores as fallback");
             return HealthCheckResult.Degraded(
                 $"Redis connection failed: {ex.Message} - using in-memory stores",
                 ex,
@@ -155,7 +155,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
             healthData["redis.error"] = ex.Message;
             healthData["stores.mode"] = "unknown";
 
-            _logger.LogError(ex, "Redis stores health check failed with exception");
+            this.logger.LogError(ex, "Redis stores health check failed with exception");
             return HealthCheckResult.Unhealthy(
                 "Redis stores health check failed",
                 ex,

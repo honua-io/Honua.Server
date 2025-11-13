@@ -34,13 +34,13 @@ namespace Honua.Server.Host.GeoservicesREST.Services;
 /// </summary>
 public sealed class StreamingKmlWriter
 {
-    private readonly ILogger<StreamingKmlWriter> _logger;
+    private readonly ILogger<StreamingKmlWriter> logger;
     private const int MaxExportRecords = 10000; // Strict limit for KML exports
     private const string KmlNamespace = "http://www.opengis.net/kml/2.2";
 
     public StreamingKmlWriter(ILogger<StreamingKmlWriter> logger)
     {
-        _logger = Guard.NotNull(logger);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -144,7 +144,7 @@ public sealed class StreamingKmlWriter
                         // Enforce hard limit
                         if (featuresWritten >= MaxExportRecords)
                         {
-                            _logger.LogWarning("KML export hit maximum record limit of {Limit} for {ServiceId}/{LayerId}",
+                            this.logger.LogWarning("KML export hit maximum record limit of {Limit} for {ServiceId}/{LayerId}",
                                 MaxExportRecords, serviceId, layer.Id);
                             break;
                         }
@@ -190,13 +190,13 @@ public sealed class StreamingKmlWriter
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.LogInformation("Streaming KML write cancelled after {Features} features", featuresWritten);
+                    this.logger.LogInformation("Streaming KML write cancelled after {Features} features", featuresWritten);
                     throw;
                 }
                 catch (Exception ex) when (featuresWritten > 0 && response.HasStarted)
                 {
                     // Response already started - log error but can't send proper error response
-                    _logger.LogWarning(ex,
+                    this.logger.LogWarning(ex,
                         "Cannot send error response - already wrote {Features} features to stream. Client will receive truncated KML.",
                         featuresWritten);
                     throw;
@@ -314,7 +314,7 @@ public sealed class StreamingKmlWriter
                         // Enforce hard limit
                         if (featuresWritten >= MaxExportRecords)
                         {
-                            _logger.LogWarning("KMZ export hit maximum record limit of {Limit} for {ServiceId}/{LayerId}",
+                            this.logger.LogWarning("KMZ export hit maximum record limit of {Limit} for {ServiceId}/{LayerId}",
                                 MaxExportRecords, serviceId, layer.Id);
                             break;
                         }
@@ -351,12 +351,12 @@ public sealed class StreamingKmlWriter
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.LogInformation("Streaming KMZ write cancelled after {Features} features", featuresWritten);
+                    this.logger.LogInformation("Streaming KMZ write cancelled after {Features} features", featuresWritten);
                     throw;
                 }
                 catch (Exception ex) when (featuresWritten > 0 && response.HasStarted)
                 {
-                    _logger.LogWarning(ex,
+                    this.logger.LogWarning(ex,
                         "Cannot send error response - already wrote {Features} features to stream. Client will receive truncated KMZ.",
                         featuresWritten);
                     throw;

@@ -1253,40 +1253,40 @@ internal static class WcsHandlers
 
     private sealed class CoverageStreamResult : IResult
     {
-        private readonly CoverageData _coverage;
-        private readonly string? _cacheControl;
+        private readonly CoverageData coverage;
+        private readonly string? cacheControl;
 
         public CoverageStreamResult(CoverageData coverage, string? cacheControl)
         {
-            _coverage = coverage;
-            _cacheControl = cacheControl;
+            this.coverage = coverage;
+            this.cacheControl = cacheControl;
         }
 
         public async Task ExecuteAsync(HttpContext httpContext)
         {
-            httpContext.Response.ContentType = _coverage.ContentType;
+            httpContext.Response.ContentType = this.coverage.ContentType;
 
-            if (!_cacheControl.IsNullOrEmpty())
+            if (!this.cacheControl.IsNullOrEmpty())
             {
                 httpContext.Response.Headers.CacheControl = _cacheControl;
             }
 
             httpContext.Response.Headers.Vary = "Accept-Encoding";
 
-            if (_coverage.LastModified.HasValue)
+            if (this.coverage.LastModified.HasValue)
             {
-                httpContext.Response.Headers.LastModified = _coverage.LastModified.Value.ToString("R", CultureInfo.InvariantCulture);
+                httpContext.Response.Headers.LastModified = this.coverage.LastModified.Value.ToString("R", CultureInfo.InvariantCulture);
             }
 
-            if (_coverage.ContentLength.HasValue)
+            if (this.coverage.ContentLength.HasValue)
             {
-                httpContext.Response.ContentLength = _coverage.ContentLength.Value;
+                httpContext.Response.ContentLength = this.coverage.ContentLength.Value;
             }
 
             Stream? stream = null;
             try
             {
-                stream = await _coverage.StreamFactory(httpContext.RequestAborted).ConfigureAwait(false);
+                stream = await this.coverage.StreamFactory(httpContext.RequestAborted).ConfigureAwait(false);
                 await using (stream)
                 {
                     await stream.CopyToAsync(httpContext.Response.Body, 64 * 1024, httpContext.RequestAborted).ConfigureAwait(false);
@@ -1294,7 +1294,7 @@ internal static class WcsHandlers
             }
             finally
             {
-                _coverage.OnCompleted?.Invoke();
+                this.coverage.OnCompleted?.Invoke();
             }
         }
     }

@@ -35,18 +35,18 @@ namespace Honua.Server.Host.Ogc;
 [Obsolete("Implementation incomplete - returns stubbed responses. Do not register in DI until Phase 2 migration is complete.")]
 internal sealed class WmsHandlers : IWmsHandler
 {
-    private readonly IFeatureRepository _repository;
-    private readonly IRasterDatasetRegistry _rasterRegistry;
-    private readonly ILogger<WmsHandlers> _logger;
+    private readonly IFeatureRepository repository;
+    private readonly IRasterDatasetRegistry rasterRegistry;
+    private readonly ILogger<WmsHandlers> logger;
 
     public WmsHandlers(
         IFeatureRepository repository,
         IRasterDatasetRegistry rasterRegistry,
         ILogger<WmsHandlers> logger)
     {
-        _repository = Guard.NotNull(repository);
-        _rasterRegistry = Guard.NotNull(rasterRegistry);
-        _logger = Guard.NotNull(logger);
+        this.repository = Guard.NotNull(repository);
+        this.rasterRegistry = Guard.NotNull(rasterRegistry);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <inheritdoc />

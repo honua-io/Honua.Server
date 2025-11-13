@@ -63,15 +63,25 @@ namespace Honua.Server.Observability.Middleware;
 /// </remarks>
 public class CorrelationIdMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<CorrelationIdMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly ILogger<CorrelationIdMiddleware> logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CorrelationIdMiddleware"/> class.
+    /// </summary>
+    /// <param name="next">The next request delegate.</param>
+    /// <param name="logger">The logger.</param>
     public CorrelationIdMiddleware(RequestDelegate next, ILogger<CorrelationIdMiddleware> logger)
     {
-        _next = next;
-        _logger = logger;
+        this.next = next;
+        this.logger = logger;
     }
 
+    /// <summary>
+    /// Invokes the middleware.
+    /// </summary>
+    /// <param name="context">The HTTP context.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task InvokeAsync(HttpContext context)
     {
         // Extract or generate correlation ID
@@ -103,15 +113,15 @@ public class CorrelationIdMiddleware
         // Add to log context - all subsequent log entries will include this correlation ID
         using (LogContext.PushProperty(CorrelationIdConstants.LogPropertyName, correlationId))
         {
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Request started | Method: {Method} | Path: {Path} | CorrelationId: {CorrelationId}",
                 context.Request.Method,
                 context.Request.Path,
                 correlationId);
 
-            await _next(context);
+            await this.next(context);
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Request completed | Method: {Method} | Path: {Path} | StatusCode: {StatusCode} | CorrelationId: {CorrelationId}",
                 context.Request.Method,
                 context.Request.Path,
@@ -124,6 +134,8 @@ public class CorrelationIdMiddleware
     /// Gets or creates a correlation ID for the current request.
     /// Checks headers first (X-Correlation-ID, then traceparent), generates new one if needed.
     /// </summary>
+    /// <param name="context">The HTTP context.</param>
+    /// <returns>The correlation ID.</returns>
     private static string GetOrCreateCorrelationId(HttpContext context)
     {
         // Try to extract from request headers

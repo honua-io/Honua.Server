@@ -47,9 +47,9 @@ public interface IRegistryAccessManager
 /// </summary>
 public sealed class RegistryAccessManager : IRegistryAccessManager
 {
-    private readonly ILogger<RegistryAccessManager> _logger;
-    private readonly RegistryProvisioningOptions _options;
-    private readonly AsyncRetryPolicy _retryPolicy;
+    private readonly ILogger<RegistryAccessManager> logger;
+    private readonly RegistryProvisioningOptions options;
+    private readonly AsyncRetryPolicy retryPolicy;
 
     // In a real implementation, this would query a license service
     private static readonly Dictionary<string, string> CustomerLicenseTiers = new()
@@ -63,18 +63,18 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
         ILogger<RegistryAccessManager> logger,
         IOptions<RegistryProvisioningOptions> options)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
         // Configure retry policy with exponential backoff
-        _retryPolicy = Policy
+        this.retryPolicy = Policy
             .Handle<Exception>(ex => IsTransientError(ex))
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                 onRetry: (exception, timeSpan, retryCount, context) =>
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         exception,
                         "Retry {RetryCount} after {Delay}ms due to transient error",
                         retryCount,
@@ -93,7 +93,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
             throw new ArgumentException("Customer ID cannot be null or empty", nameof(customerId));
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Validating registry access for customer {CustomerId} to {RegistryType}",
             customerId,
             registryType);
@@ -101,7 +101,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
         // Check if customer has a valid license
         if (!CustomerLicenseTiers.TryGetValue(customerId, out var licenseTier))
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Customer {CustomerId} does not have a valid license",
                 customerId);
 
@@ -119,7 +119,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
 
         if (!hasAccess)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Customer {CustomerId} with license tier {LicenseTier} does not have access to {RegistryType}",
                 customerId,
                 licenseTier,
@@ -135,7 +135,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
             };
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Customer {CustomerId} has valid access to {RegistryType}",
             customerId,
             registryType);
@@ -170,7 +170,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
             return accessResult;
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Generating registry token for customer {CustomerId} to {RegistryType}",
             customerId,
             registryType);
@@ -188,7 +188,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to generate token for customer {CustomerId}", customerId);
+            this.logger.LogError(ex, "Failed to generate token for customer {CustomerId}", customerId);
             return new RegistryAccessResult
             {
                 AccessGranted = false,
@@ -208,21 +208,21 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
         string? licenseTier,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.GitHubToken))
+        if (string.IsNullOrWhiteSpace(this.options.GitHubToken))
         {
             throw new InvalidOperationException("GitHub token is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.GitHubOrganization))
+        if (string.IsNullOrWhiteSpace(this.options.GitHubOrganization))
         {
             throw new InvalidOperationException("GitHub organization is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var client = new GitHubClient(new ProductHeaderValue("Honua-Registry-Access"))
             {
-                Credentials = new Credentials(_options.GitHubToken)
+                Credentials = new Credentials(this.options.GitHubToken)
             };
 
             // Note: GitHub's fine-grained PAT API is still evolving
@@ -230,7 +230,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
             // For now, we'll generate a temporary token
             var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Generated GHCR token for customer {CustomerId} (expires at {ExpiresAt})",
                 customerId,
                 expiresAt);
@@ -255,16 +255,16 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
         string? licenseTier,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.AwsRegion))
+        if (string.IsNullOrWhiteSpace(this.options.AwsRegion))
         {
             throw new InvalidOperationException("AWS region is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
-            var ecrClient = new AmazonECRClient(Amazon.RegionEndpoint.GetBySystemName(_options.AwsRegion));
+            var ecrClient = new AmazonECRClient(Amazon.RegionEndpoint.GetBySystemName(this.options.AwsRegion));
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Generating ECR authorization token for customer {CustomerId}",
                 customerId);
 
@@ -282,7 +282,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
             var token = authData.AuthorizationToken;
             var expiresAt = authData.ExpiresAt;
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Generated ECR token for customer {CustomerId} (expires at {ExpiresAt})",
                 customerId,
                 expiresAt);
@@ -307,26 +307,26 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
         string? licenseTier,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.AzureSubscriptionId))
+        if (string.IsNullOrWhiteSpace(this.options.AzureSubscriptionId))
         {
             throw new InvalidOperationException("Azure subscription ID is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.AzureResourceGroup))
+        if (string.IsNullOrWhiteSpace(this.options.AzureResourceGroup))
         {
             throw new InvalidOperationException("Azure resource group is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.AzureRegistryName))
+        if (string.IsNullOrWhiteSpace(this.options.AzureRegistryName))
         {
             throw new InvalidOperationException("Azure registry name is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var credential = new DefaultAzureCredential();
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Generating ACR refresh token for customer {CustomerId}",
                 customerId);
 
@@ -337,7 +337,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
             var accessToken = await credential.GetTokenAsync(tokenRequestContext, cancellationToken);
             var expiresAt = accessToken.ExpiresOn;
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Generated ACR token for customer {CustomerId} (expires at {ExpiresAt})",
                 customerId,
                 expiresAt);
@@ -362,16 +362,16 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
         string? licenseTier,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.GcpProjectId))
+        if (string.IsNullOrWhiteSpace(this.options.GcpProjectId))
         {
             throw new InvalidOperationException("GCP project ID is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var credential = GoogleCredential.GetApplicationDefault();
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Generating GCP Artifact Registry token for customer {CustomerId}",
                 customerId);
 
@@ -386,7 +386,7 @@ public sealed class RegistryAccessManager : IRegistryAccessManager
                 // GCP access tokens typically expire after 1 hour
                 var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
 
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Generated GCP token for customer {CustomerId} (expires at {ExpiresAt})",
                     customerId,
                     expiresAt);

@@ -31,7 +31,7 @@ public sealed class RuntimeLoggingConfigurationService
     /// </summary>
     public bool TryGetLevel(string category, out LogLevel level)
     {
-        return _categoryLevels.TryGetValue(category, out level);
+        return this.categoryLevels.TryGetValue(category, out level);
     }
 
     /// <summary>
@@ -50,7 +50,7 @@ public sealed class RuntimeLoggingConfigurationService
     {
         var category = string.IsNullOrWhiteSpace(categoryName) ? "" : categoryName;
 
-        if (_categoryLevels.TryGetValue(category, out var minLevel))
+        if (this.categoryLevels.TryGetValue(category, out var minLevel))
         {
             return logLevel >= minLevel;
         }
@@ -61,14 +61,14 @@ public sealed class RuntimeLoggingConfigurationService
             for (var i = parts.Length - 1; i > 0; i--)
             {
                 var parentCategory = string.Join('.', parts[..i]);
-                if (_categoryLevels.TryGetValue(parentCategory, out minLevel))
+                if (this.categoryLevels.TryGetValue(parentCategory, out minLevel))
                 {
                     return logLevel >= minLevel;
                 }
             }
         }
 
-        if (_categoryLevels.TryGetValue("Default", out minLevel))
+        if (this.categoryLevels.TryGetValue("Default", out minLevel))
         {
             return logLevel >= minLevel;
         }
@@ -81,7 +81,7 @@ public sealed class RuntimeLoggingConfigurationService
     /// </summary>
     public bool RemoveLevel(string category)
     {
-        return _categoryLevels.TryRemove(category, out _);
+        return this.categoryLevels.TryRemove(category, out _);
     }
 
     /// <summary>
@@ -89,7 +89,7 @@ public sealed class RuntimeLoggingConfigurationService
     /// </summary>
     public void Clear()
     {
-        _categoryLevels.Clear();
+        this.categoryLevels.Clear();
     }
 }
 
@@ -98,18 +98,18 @@ public sealed class RuntimeLoggingConfigurationService
 /// </summary>
 public sealed class RuntimeLoggingFilter : ILoggerProvider, IDisposable
 {
-    private readonly RuntimeLoggingConfigurationService _configService;
-    private readonly ILoggerProvider _innerProvider;
+    private readonly RuntimeLoggingConfigurationService configService;
+    private readonly ILoggerProvider innerProvider;
 
     public RuntimeLoggingFilter(RuntimeLoggingConfigurationService configService, ILoggerProvider innerProvider)
     {
-        _configService = Guard.NotNull(configService);
-        _innerProvider = Guard.NotNull(innerProvider);
+        this.configService = Guard.NotNull(configService);
+        this.innerProvider = Guard.NotNull(innerProvider);
     }
 
     public ILogger CreateLogger(string categoryName)
     {
-        var innerLogger = _innerProvider.CreateLogger(categoryName);
+        var innerLogger = this.innerProvider.CreateLogger(categoryName);
         return new FilteredLogger(categoryName, innerLogger, _configService);
     }
 
@@ -123,49 +123,49 @@ public sealed class RuntimeLoggingFilter : ILoggerProvider, IDisposable
 
     private sealed class FilteredLogger : ILogger
     {
-        private readonly string _categoryName;
-        private readonly ILogger _innerLogger;
-        private readonly RuntimeLoggingConfigurationService _configService;
+        private readonly string categoryName;
+        private readonly ILogger innerLogger;
+        private readonly RuntimeLoggingConfigurationService configService;
 
         public FilteredLogger(string categoryName, ILogger innerLogger, RuntimeLoggingConfigurationService configService)
         {
-            _categoryName = categoryName;
-            _innerLogger = innerLogger;
-            _configService = configService;
+            this.categoryName = categoryName;
+            this.innerLogger = innerLogger;
+            this.configService = configService;
         }
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull
         {
-            return _innerLogger.BeginScope(state);
+            return this.innerLogger.BeginScope(state);
         }
 
         public bool IsEnabled(LogLevel logLevel)
         {
             // Check if there's a runtime override
-            if (_configService.TryGetLevel(_categoryName, out var minLevel))
+            if (this.configService.TryGetLevel(_categoryName, out var minLevel))
             {
                 return logLevel >= minLevel;
             }
 
             // Check parent categories (e.g., "Honua.Server" for "Honua.Server.Core.Data")
-            var parts = _categoryName.Split('.');
+            var parts = this.categoryName.Split('.');
             for (var i = parts.Length - 1; i > 0; i--)
             {
                 var parentCategory = string.Join('.', parts[..i]);
-                if (_configService.TryGetLevel(parentCategory, out minLevel))
+                if (this.configService.TryGetLevel(parentCategory, out minLevel))
                 {
                     return logLevel >= minLevel;
                 }
             }
 
             // Check "Default" category
-            if (_configService.TryGetLevel("Default", out minLevel))
+            if (this.configService.TryGetLevel("Default", out minLevel))
             {
                 return logLevel >= minLevel;
             }
 
             // Fall back to inner logger's configuration
-            return _innerLogger.IsEnabled(logLevel);
+            return this.innerLogger.IsEnabled(logLevel);
         }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -175,7 +175,7 @@ public sealed class RuntimeLoggingFilter : ILoggerProvider, IDisposable
                 return;
             }
 
-            _innerLogger.Log(logLevel, eventId, state, exception, formatter);
+            this.innerLogger.Log(logLevel, eventId, state, exception, formatter);
         }
     }
 }

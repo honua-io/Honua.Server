@@ -87,7 +87,7 @@ public class TracingConfiguration
         "/health",
         "/metrics",
         "/ready",
-        "/live"
+        "/live",
     };
 
     /// <summary>
@@ -122,9 +122,9 @@ public static class TracingConfigurationExtensions
     /// Configures OpenTelemetry tracing exporters based on configuration.
     /// Supports Console, OTLP, Jaeger, and multiple exporters simultaneously.
     /// </summary>
-    /// <param name="builder">The tracer provider builder</param>
-    /// <param name="configuration">The application configuration</param>
-    /// <returns>The tracer provider builder for chaining</returns>
+    /// <param name="builder">The tracer provider builder.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <returns>The tracer provider builder for chaining.</returns>
     public static TracerProviderBuilder ConfigureHonuaExporters(
         this TracerProviderBuilder builder,
         IConfiguration configuration)
@@ -139,9 +139,9 @@ public static class TracingConfigurationExtensions
     /// Configures OpenTelemetry tracing exporters based on TracingConfiguration.
     /// Supports Console, OTLP, Jaeger, and multiple exporters simultaneously.
     /// </summary>
-    /// <param name="builder">The tracer provider builder</param>
-    /// <param name="config">The tracing configuration</param>
-    /// <returns>The tracer provider builder for chaining</returns>
+    /// <param name="builder">The tracer provider builder.</param>
+    /// <param name="config">The tracing configuration.</param>
+    /// <returns>The tracer provider builder for chaining.</returns>
     public static TracerProviderBuilder ConfigureHonuaExporters(
         this TracerProviderBuilder builder,
         TracingConfiguration config)
@@ -236,6 +236,8 @@ public static class TracingConfigurationExtensions
     /// <summary>
     /// Creates a sampler based on the configuration.
     /// </summary>
+    /// <param name="config">The tracing configuration.</param>
+    /// <returns>The configured sampler.</returns>
     private static Sampler CreateSampler(TracingConfiguration config)
     {
         return config.SamplingStrategy.ToLowerInvariant() switch
@@ -244,14 +246,14 @@ public static class TracingConfigurationExtensions
             "always_off" => new AlwaysOffSampler(),
             "trace_id_ratio" => new TraceIdRatioBasedSampler(config.SamplingRatio),
             "parent_based" => new ParentBasedSampler(new TraceIdRatioBasedSampler(config.SamplingRatio)),
-            _ => new ParentBasedSampler(new AlwaysOnSampler())
+            _ => new ParentBasedSampler(new AlwaysOnSampler()),
         };
     }
 
     /// <summary>
     /// Adds custom baggage to the current activity based on configuration.
     /// </summary>
-    /// <param name="config">The tracing configuration</param>
+    /// <param name="config">The tracing configuration.</param>
     public static void ApplyBaggage(this TracingConfiguration config)
     {
         var activity = Activity.Current;

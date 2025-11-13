@@ -22,37 +22,37 @@ public sealed class RasterTileCacheMetrics : IRasterTileCacheMetrics, IDisposabl
     private static readonly KeyValuePair<string, object?> SourceOnDemand = new("source", "request");
     private static readonly KeyValuePair<string, object?> SourcePreseed = new("source", "preseed");
 
-    private readonly Meter _meter;
-    private readonly Counter<long> _cacheHits;
-    private readonly Counter<long> _cacheMisses;
-    private readonly Histogram<double> _renderLatencyMs;
-    private readonly Counter<long> _jobsCompleted;
-    private readonly Counter<long> _jobsFailed;
-    private readonly Counter<long> _jobsCancelled;
-    private readonly Counter<long> _purgesSucceeded;
-    private readonly Counter<long> _purgesFailed;
+    private readonly Meter meter;
+    private readonly Counter<long> cacheHits;
+    private readonly Counter<long> cacheMisses;
+    private readonly Histogram<double> renderLatencyMs;
+    private readonly Counter<long> jobsCompleted;
+    private readonly Counter<long> jobsFailed;
+    private readonly Counter<long> jobsCancelled;
+    private readonly Counter<long> purgesSucceeded;
+    private readonly Counter<long> purgesFailed;
 
     public RasterTileCacheMetrics()
     {
-        _meter = new Meter("Honua.Server.RasterCache");
-        _cacheHits = _meter.CreateCounter<long>("honua.raster.cache_hits", description: "Number of raster tile cache hits.");
-        _cacheMisses = _meter.CreateCounter<long>("honua.raster.cache_misses", description: "Number of raster tile cache misses.");
-        _renderLatencyMs = _meter.CreateHistogram<double>("honua.raster.render_latency_ms", unit: "ms", description: "Raster tile render latency.");
-        _jobsCompleted = _meter.CreateCounter<long>("honua.raster.preseed_jobs_completed", description: "Completed raster preseed jobs.");
-        _jobsFailed = _meter.CreateCounter<long>("honua.raster.preseed_jobs_failed", description: "Failed raster preseed jobs.");
-        _jobsCancelled = _meter.CreateCounter<long>("honua.raster.preseed_jobs_cancelled", description: "Cancelled raster preseed jobs.");
-        _purgesSucceeded = _meter.CreateCounter<long>("honua.raster.cache_purges_succeeded", description: "Successful raster cache purges.");
-        _purgesFailed = _meter.CreateCounter<long>("honua.raster.cache_purges_failed", description: "Failed raster cache purges.");
+        this.meter = new Meter("Honua.Server.RasterCache");
+        this.cacheHits = this.meter.CreateCounter<long>("honua.raster.cache_hits", description: "Number of raster tile cache hits.");
+        this.cacheMisses = this.meter.CreateCounter<long>("honua.raster.cache_misses", description: "Number of raster tile cache misses.");
+        this.renderLatencyMs = this.meter.CreateHistogram<double>("honua.raster.render_latency_ms", unit: "ms", description: "Raster tile render latency.");
+        this.jobsCompleted = this.meter.CreateCounter<long>("honua.raster.preseed_jobs_completed", description: "Completed raster preseed jobs.");
+        this.jobsFailed = this.meter.CreateCounter<long>("honua.raster.preseed_jobs_failed", description: "Failed raster preseed jobs.");
+        this.jobsCancelled = this.meter.CreateCounter<long>("honua.raster.preseed_jobs_cancelled", description: "Cancelled raster preseed jobs.");
+        this.purgesSucceeded = this.meter.CreateCounter<long>("honua.raster.cache_purges_succeeded", description: "Successful raster cache purges.");
+        this.purgesFailed = this.meter.CreateCounter<long>("honua.raster.cache_purges_failed", description: "Failed raster cache purges.");
     }
 
     public void RecordCacheHit(string datasetId, string? variant = null, string? timeSlice = null)
     {
-        _cacheHits.Add(1, BuildTags(datasetId, variant, timeSlice));
+        this.cacheHits.Add(1, BuildTags(datasetId, variant, timeSlice));
     }
 
     public void RecordCacheMiss(string datasetId, string? variant = null, string? timeSlice = null)
     {
-        _cacheMisses.Add(1, BuildTags(datasetId, variant, timeSlice));
+        this.cacheMisses.Add(1, BuildTags(datasetId, variant, timeSlice));
     }
 
     public void RecordRenderLatency(string datasetId, TimeSpan duration, bool fromPreseed)
@@ -63,20 +63,20 @@ public sealed class RasterTileCacheMetrics : IRasterTileCacheMetrics, IDisposabl
             fromPreseed ? SourcePreseed : SourceOnDemand
         };
 
-        _renderLatencyMs.Record(duration.TotalMilliseconds, tags);
+        this.renderLatencyMs.Record(duration.TotalMilliseconds, tags);
     }
 
     public void RecordPreseedJobCompleted(RasterTilePreseedJobSnapshot snapshot)
     {
         var datasets = string.Join(",", snapshot.DatasetIds);
-        _jobsCompleted.Add(1,
+        this.jobsCompleted.Add(1,
             new KeyValuePair<string, object?>("jobId", snapshot.JobId.ToString()),
             new KeyValuePair<string, object?>("datasets", datasets));
 
         if (snapshot.CompletedAtUtc is { } completed)
         {
             var duration = completed - snapshot.CreatedAtUtc;
-            _renderLatencyMs.Record(duration.TotalMilliseconds,
+            this.renderLatencyMs.Record(duration.TotalMilliseconds,
                 SourcePreseed,
                 new KeyValuePair<string, object?>("dataset", "(preseed-job)"),
                 new KeyValuePair<string, object?>("jobId", snapshot.JobId.ToString()));
@@ -85,14 +85,14 @@ public sealed class RasterTileCacheMetrics : IRasterTileCacheMetrics, IDisposabl
 
     public void RecordPreseedJobFailed(Guid jobId, string? message)
     {
-        _jobsFailed.Add(1,
+        this.jobsFailed.Add(1,
             new KeyValuePair<string, object?>("jobId", jobId.ToString()),
             new KeyValuePair<string, object?>("error", message ?? string.Empty));
     }
 
     public void RecordPreseedJobCancelled(Guid jobId)
     {
-        _jobsCancelled.Add(1, new KeyValuePair<string, object?>("jobId", jobId.ToString()));
+        this.jobsCancelled.Add(1, new KeyValuePair<string, object?>("jobId", jobId.ToString()));
     }
 
     public void RecordCachePurge(string datasetId, bool succeeded)
@@ -100,17 +100,17 @@ public sealed class RasterTileCacheMetrics : IRasterTileCacheMetrics, IDisposabl
         var tag = new KeyValuePair<string, object?>("dataset", Normalize(datasetId));
         if (succeeded)
         {
-            _purgesSucceeded.Add(1, tag);
+            this.purgesSucceeded.Add(1, tag);
         }
         else
         {
-            _purgesFailed.Add(1, tag);
+            this.purgesFailed.Add(1, tag);
         }
     }
 
     public void Dispose()
     {
-        _meter.Dispose();
+        this.meter.Dispose();
     }
 
     private static string Normalize(string value)

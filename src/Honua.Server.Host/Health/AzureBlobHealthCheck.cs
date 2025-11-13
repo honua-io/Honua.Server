@@ -21,8 +21,8 @@ namespace Honua.Server.Host.Health;
 /// </summary>
 public sealed class AzureBlobHealthCheck : HealthCheckBase
 {
-    private readonly BlobServiceClient? _blobServiceClient;
-    private readonly string? _testContainer;
+    private readonly BlobServiceClient? blobServiceClient;
+    private readonly string? testContainer;
 
     public AzureBlobHealthCheck(
         ILogger<AzureBlobHealthCheck> logger,
@@ -30,8 +30,8 @@ public sealed class AzureBlobHealthCheck : HealthCheckBase
         string? testContainer = null)
         : base(logger)
     {
-        _blobServiceClient = blobServiceClient;
-        _testContainer = testContainer;
+        this.blobServiceClient = blobServiceClient;
+        this.testContainer = testContainer;
     }
 
     protected override async Task<HealthCheckResult> ExecuteHealthCheckAsync(
@@ -50,20 +50,20 @@ public sealed class AzureBlobHealthCheck : HealthCheckBase
             }
 
             data["azure_blob.configured"] = true;
-            data["azure_blob.account_name"] = _blobServiceClient.AccountName;
+            data["azure_blob.account_name"] = this.blobServiceClient.AccountName;
 
             // Test basic connectivity by getting account info
-            var accountInfo = await _blobServiceClient.GetAccountInfoAsync(cancellationToken);
+            var accountInfo = await this.blobServiceClient.GetAccountInfoAsync(cancellationToken);
             data["azure_blob.account_kind"] = accountInfo.Value.AccountKind.ToString();
             data["azure_blob.sku_name"] = accountInfo.Value.SkuName.ToString();
             data["azure_blob.can_access_account"] = true;
 
             // If a test container is specified, verify access to it
-            if (_testContainer.HasValue())
+            if (this.testContainer.HasValue())
             {
                 try
                 {
-                    var containerClient = _blobServiceClient.GetBlobContainerClient(_testContainer);
+                    var containerClient = this.blobServiceClient.GetBlobContainerClient(_testContainer);
                     var exists = await containerClient.ExistsAsync(cancellationToken);
 
                     data["azure_blob.test_container"] = _testContainer;
@@ -77,7 +77,7 @@ public sealed class AzureBlobHealthCheck : HealthCheckBase
 
                         Logger.LogDebug(
                             "Azure Blob health check passed. Account: {AccountName}, Test container: {TestContainer}",
-                            _blobServiceClient.AccountName,
+                            this.blobServiceClient.AccountName,
                             _testContainer);
                     }
                     else

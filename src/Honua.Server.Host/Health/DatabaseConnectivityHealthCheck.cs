@@ -22,18 +22,18 @@ namespace Honua.Server.Host.Health;
 /// </summary>
 public sealed class DatabaseConnectivityHealthCheck : IHealthCheck
 {
-    private readonly IMetadataRegistry _registry;
-    private readonly IDataStoreProviderFactory _providerFactory;
-    private readonly ILogger<DatabaseConnectivityHealthCheck> _logger;
+    private readonly IMetadataRegistry registry;
+    private readonly IDataStoreProviderFactory providerFactory;
+    private readonly ILogger<DatabaseConnectivityHealthCheck> logger;
 
     public DatabaseConnectivityHealthCheck(
         IMetadataRegistry registry,
         IDataStoreProviderFactory providerFactory,
         ILogger<DatabaseConnectivityHealthCheck> logger)
     {
-        _registry = Guard.NotNull(registry);
-        _providerFactory = Guard.NotNull(providerFactory);
-        _logger = Guard.NotNull(logger);
+        this.registry = Guard.NotNull(registry);
+        this.providerFactory = Guard.NotNull(providerFactory);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -47,7 +47,7 @@ public sealed class DatabaseConnectivityHealthCheck : IHealthCheck
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken, timeoutCts.Token);
 
-            var snapshot = await _registry.GetSnapshotAsync(linkedCts.Token).ConfigureAwait(false);
+            var snapshot = await this.registry.GetSnapshotAsync(linkedCts.Token).ConfigureAwait(false);
 
             var testedDataSources = new List<string>();
             var failedDataSources = new List<(string id, string error)>();
@@ -59,10 +59,10 @@ public sealed class DatabaseConnectivityHealthCheck : IHealthCheck
 
                 try
                 {
-                    var provider = _providerFactory.Create(dataSource.Provider);
+                    var provider = this.providerFactory.Create(dataSource.Provider);
                     if (provider == null)
                     {
-                        _logger.LogWarning("No provider found for {Provider}", dataSource.Provider);
+                        this.logger.LogWarning("No provider found for {Provider}", dataSource.Provider);
                         continue;
                     }
 
@@ -74,7 +74,7 @@ public sealed class DatabaseConnectivityHealthCheck : IHealthCheck
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogExternalServiceFailure(ex, dataSource.Provider, "connectivity check", dataSource.Id);
+                    this.logger.LogExternalServiceFailure(ex, dataSource.Provider, "connectivity check", dataSource.Id);
 
                     failedDataSources.Add((dataSource.Id, ex.Message));
                 }
@@ -102,12 +102,12 @@ public sealed class DatabaseConnectivityHealthCheck : IHealthCheck
         }
         catch (OperationCanceledException)
         {
-            _logger.LogWarning("Database connectivity health check timed out");
+            this.logger.LogWarning("Database connectivity health check timed out");
             return HealthCheckResult.Degraded("Database connectivity check timed out");
         }
         catch (Exception ex)
         {
-            _logger.LogOperationFailure(ex, "Database connectivity health check");
+            this.logger.LogOperationFailure(ex, "Database connectivity health check");
             return HealthCheckResult.Unhealthy("Database connectivity check error", ex);
         }
     }

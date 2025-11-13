@@ -23,11 +23,11 @@ public sealed class WcsCapabilitiesBuilder : OgcCapabilitiesBuilder
     private static readonly XNamespace Crs = "http://www.opengis.net/wcs/service-extension/crs/1.0";
     private static readonly XNamespace Gml = "http://www.opengis.net/gml/3.2";
 
-    private readonly IRasterDatasetRegistry _rasterRegistry;
+    private readonly IRasterDatasetRegistry rasterRegistry;
 
     public WcsCapabilitiesBuilder(IRasterDatasetRegistry rasterRegistry)
     {
-        _rasterRegistry = rasterRegistry ?? throw new System.ArgumentNullException(nameof(rasterRegistry));
+        this.rasterRegistry = rasterRegistry ?? throw new System.ArgumentNullException(nameof(rasterRegistry));
     }
 
     protected override XName GetRootElementName() => Wcs + "Capabilities";
@@ -77,7 +77,7 @@ public sealed class WcsCapabilitiesBuilder : OgcCapabilitiesBuilder
     protected override async Task AddProtocolSpecificSectionsAsync(XElement root, MetadataSnapshot metadata, HttpRequest request, CancellationToken cancellationToken)
     {
         // PERFORMANCE FIX (Issue #40): Use async/await instead of blocking on GetAwaiter().GetResult()
-        var coverages = await _rasterRegistry.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var coverages = await this.rasterRegistry.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         // Add ServiceMetadata section
         root.Add(BuildServiceMetadata());

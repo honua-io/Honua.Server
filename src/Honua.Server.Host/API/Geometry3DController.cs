@@ -21,18 +21,18 @@ namespace Honua.Server.Host.API;
 [Produces("application/json")]
 public class Geometry3DController : ControllerBase
 {
-    private readonly IGeometry3DService _geometryService;
-    private readonly IMeshConverter _meshConverter;
-    private readonly ILogger<Geometry3DController> _logger;
+    private readonly IGeometry3DService geometryService;
+    private readonly IMeshConverter meshConverter;
+    private readonly ILogger<Geometry3DController> logger;
 
     public Geometry3DController(
         IGeometry3DService geometryService,
         IMeshConverter meshConverter,
         ILogger<Geometry3DController> logger)
     {
-        _geometryService = geometryService;
-        _meshConverter = meshConverter;
-        _logger = logger;
+        this.geometryService = geometryService;
+        this.meshConverter = meshConverter;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -52,7 +52,7 @@ public class Geometry3DController : ControllerBase
     {
         if (file == null || file.Length == 0)
         {
-            return BadRequest("No file provided");
+            return this.BadRequest("No file provided");
         }
 
         // Validate file extension
@@ -61,14 +61,14 @@ public class Geometry3DController : ControllerBase
 
         if (!supportedExtensions.Contains(extension))
         {
-            return BadRequest($"Unsupported file format: {extension}. Supported formats: {string.Join(", ", supportedExtensions)}");
+            return this.BadRequest($"Unsupported file format: {extension}. Supported formats: {string.Join(", ", supportedExtensions)}");
         }
 
         // Validate file size (max 100 MB for proof-of-concept)
         const long maxSizeBytes = 100 * 1024 * 1024;
         if (file.Length > maxSizeBytes)
         {
-            return BadRequest($"File too large. Maximum size: {maxSizeBytes / (1024 * 1024)} MB");
+            return this.BadRequest($"File too large. Maximum size: {maxSizeBytes / (1024 * 1024)} MB");
         }
 
         var request = new UploadGeometry3DRequest
@@ -78,7 +78,7 @@ public class Geometry3DController : ControllerBase
         };
 
         using var stream = file.OpenReadStream();
-        var response = await _geometryService.ImportGeometryAsync(
+        var response = await this.geometryService.ImportGeometryAsync(
             stream,
             file.FileName,
             request,
@@ -86,10 +86,10 @@ public class Geometry3DController : ControllerBase
 
         if (!response.Success)
         {
-            return BadRequest(response.ErrorMessage);
+            return this.BadRequest(response.ErrorMessage);
         }
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     /// <summary>
@@ -106,14 +106,14 @@ public class Geometry3DController : ControllerBase
         [FromQuery] bool includeMesh = false,
         CancellationToken cancellationToken = default)
     {
-        var geometry = await _geometryService.GetGeometryAsync(id, includeMesh, cancellationToken);
+        var geometry = await this.geometryService.GetGeometryAsync(id, includeMesh, cancellationToken);
 
         if (geometry == null)
         {
-            return NotFound($"Geometry {id} not found");
+            return this.NotFound($"Geometry {id} not found");
         }
 
-        return Ok(geometry);
+        return this.Ok(geometry);
     }
 
     /// <summary>
@@ -133,11 +133,11 @@ public class Geometry3DController : ControllerBase
         [FromQuery] bool binary = true,
         CancellationToken cancellationToken = default)
     {
-        var geometry = await _geometryService.GetGeometryAsync(id, includeMeshData: false, cancellationToken);
+        var geometry = await this.geometryService.GetGeometryAsync(id, includeMeshData: false, cancellationToken);
 
         if (geometry == null)
         {
-            return NotFound($"Geometry {id} not found");
+            return this.NotFound($"Geometry {id} not found");
         }
 
         var options = new ExportGeometry3DOptions
@@ -146,7 +146,7 @@ public class Geometry3DController : ControllerBase
             BinaryFormat = binary
         };
 
-        var stream = await _geometryService.ExportGeometryAsync(id, options, cancellationToken);
+        var stream = await this.geometryService.ExportGeometryAsync(id, options, cancellationToken);
 
         var contentType = format.ToLowerInvariant() switch
         {
@@ -159,7 +159,7 @@ public class Geometry3DController : ControllerBase
         };
 
         var fileName = $"geometry_{id}.{format}";
-        return File(stream, contentType, fileName);
+        return this.File(stream, contentType, fileName);
     }
 
     /// <summary>
@@ -174,15 +174,15 @@ public class Geometry3DController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var geometry = await _geometryService.GetGeometryAsync(id, includeMeshData: false, cancellationToken);
+        var geometry = await this.geometryService.GetGeometryAsync(id, includeMeshData: false, cancellationToken);
 
         if (geometry == null)
         {
-            return NotFound($"Geometry {id} not found");
+            return this.NotFound($"Geometry {id} not found");
         }
 
-        await _geometryService.DeleteGeometryAsync(id, cancellationToken);
-        return NoContent();
+        await this.geometryService.DeleteGeometryAsync(id, cancellationToken);
+        return this.NoContent();
     }
 
     /// <summary>
@@ -196,8 +196,8 @@ public class Geometry3DController : ControllerBase
         Guid featureId,
         CancellationToken cancellationToken)
     {
-        var geometries = await _geometryService.GetGeometriesForFeatureAsync(featureId, cancellationToken);
-        return Ok(geometries);
+        var geometries = await this.geometryService.GetGeometriesForFeatureAsync(featureId, cancellationToken);
+        return this.Ok(geometries);
     }
 
     /// <summary>
@@ -216,8 +216,8 @@ public class Geometry3DController : ControllerBase
     {
         // NOTE: Service should throw appropriate domain exception instead of InvalidOperationException
         // InvalidOperationException is mapped to 400 BadRequest by middleware
-        await _geometryService.UpdateGeometryMetadataAsync(id, metadata, cancellationToken);
-        return NoContent();
+        await this.geometryService.UpdateGeometryMetadataAsync(id, metadata, cancellationToken);
+        return this.NoContent();
     }
 
     /// <summary>
@@ -242,8 +242,8 @@ public class Geometry3DController : ControllerBase
         CancellationToken cancellationToken)
     {
         var bbox = new BoundingBox3D(minX, minY, minZ, maxX, maxY, maxZ);
-        var geometries = await _geometryService.FindGeometriesByBoundingBoxAsync(bbox, cancellationToken);
-        return Ok(geometries);
+        var geometries = await this.geometryService.FindGeometriesByBoundingBoxAsync(bbox, cancellationToken);
+        return this.Ok(geometries);
     }
 
     /// <summary>
@@ -267,33 +267,33 @@ public class Geometry3DController : ControllerBase
         // Validate format
         if (format != "simple" && format != "gltf")
         {
-            return BadRequest("Format must be 'simple' or 'gltf'");
+            return this.BadRequest("Format must be 'simple' or 'gltf'");
         }
 
         // Validate LOD
         if (lod < 0 || lod > 100)
         {
-            return BadRequest("Level of detail must be between 0 and 100");
+            return this.BadRequest("Level of detail must be between 0 and 100");
         }
 
         // Get geometry with mesh data
-        var geometry = await _geometryService.GetGeometryAsync(id, includeMeshData: true, cancellationToken);
+        var geometry = await this.geometryService.GetGeometryAsync(id, includeMeshData: true, cancellationToken);
 
         if (geometry == null)
         {
-            return NotFound($"Geometry {id} not found");
+            return this.NotFound($"Geometry {id} not found");
         }
 
         if (geometry.Mesh == null)
         {
-            return BadRequest("Geometry has no mesh data available");
+            return this.BadRequest("Geometry has no mesh data available");
         }
 
         MeshPreviewResponse response;
 
         if (format == "simple")
         {
-            response = await _meshConverter.ToSimpleMeshAsync(
+            response = await this.meshConverter.ToSimpleMeshAsync(
                 geometry.Mesh,
                 lod,
                 geometry.Id,
@@ -301,13 +301,13 @@ public class Geometry3DController : ControllerBase
         }
         else
         {
-            response = await _meshConverter.ToGltfJsonAsync(
+            response = await this.meshConverter.ToGltfJsonAsync(
                 geometry.Mesh,
                 lod,
                 geometry.Id,
                 geometry.SourceFormat);
         }
 
-        return Ok(response);
+        return this.Ok(response);
     }
 }

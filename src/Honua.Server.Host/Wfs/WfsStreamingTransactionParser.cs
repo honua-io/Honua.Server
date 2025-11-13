@@ -272,15 +272,15 @@ internal static class WfsStreamingTransactionParser
     /// </summary>
     private sealed class TransactionOperationEnumerable : IAsyncEnumerable<TransactionOperation>
     {
-        private readonly XmlReader _reader;
-        private readonly int _maxOperations;
-        private readonly CancellationToken _cancellationToken;
+        private readonly XmlReader reader;
+        private readonly int maxOperations;
+        private readonly CancellationToken cancellationToken;
 
         public TransactionOperationEnumerable(XmlReader reader, int maxOperations, CancellationToken cancellationToken)
         {
-            _reader = reader;
-            _maxOperations = maxOperations;
-            _cancellationToken = cancellationToken;
+            this.reader = reader;
+            this.maxOperations = maxOperations;
+            this.cancellationToken = cancellationToken;
         }
 
         public IAsyncEnumerator<TransactionOperation> GetAsyncEnumerator(CancellationToken cancellationToken = default)
@@ -296,22 +296,22 @@ internal static class WfsStreamingTransactionParser
     /// </summary>
     private sealed class TransactionOperationEnumerator : IAsyncEnumerator<TransactionOperation>
     {
-        private readonly XmlReader _reader;
-        private readonly int _maxOperations;
-        private readonly CancellationToken _cancellationToken;
-        private readonly CancellationTokenSource _cts;
-        private readonly int _initialDepth;
+        private readonly XmlReader reader;
+        private readonly int maxOperations;
+        private readonly CancellationToken cancellationToken;
+        private readonly CancellationTokenSource cts;
+        private readonly int initialDepth;
         private int _operationCount;
         private TransactionOperation? _current;
         private bool _disposed;
 
         public TransactionOperationEnumerator(XmlReader reader, int maxOperations, CancellationTokenSource cts, CancellationToken cancellationToken)
         {
-            _reader = reader;
-            _maxOperations = maxOperations;
-            _cancellationToken = cancellationToken;
-            _cts = cts;
-            _initialDepth = reader.Depth;
+            this.reader = reader;
+            this.maxOperations = maxOperations;
+            this.cancellationToken = cancellationToken;
+            this.cts = cts;
+            this.initialDepth = reader.Depth;
         }
 
         public TransactionOperation Current => _current ?? throw new InvalidOperationException("Enumeration has not started or has already finished.");
@@ -323,20 +323,20 @@ internal static class WfsStreamingTransactionParser
                 return false;
             }
 
-            while (await _reader.ReadAsync().ConfigureAwait(false))
+            while (await this.reader.ReadAsync().ConfigureAwait(false))
             {
-                _cancellationToken.ThrowIfCancellationRequested();
+                this.cancellationToken.ThrowIfCancellationRequested();
 
                 // Stop if we've exited the Transaction element
-                if (_reader.NodeType == XmlNodeType.EndElement && _reader.Depth <= _initialDepth)
+                if (this.reader.NodeType == XmlNodeType.EndElement && this.reader.Depth <= _initialDepth)
                 {
                     return false;
                 }
 
-                if (_reader.NodeType == XmlNodeType.Element &&
-                    _reader.NamespaceURI == WfsConstants.Wfs.NamespaceName)
+                if (this.reader.NodeType == XmlNodeType.Element &&
+                    this.reader.NamespaceURI == WfsConstants.Wfs.NamespaceName)
                 {
-                    var localName = _reader.LocalName;
+                    var localName = this.reader.LocalName;
 
                     if (localName == "Insert" || localName == "Update" || localName == "Delete" || localName == "Replace")
                     {
@@ -371,7 +371,7 @@ internal static class WfsStreamingTransactionParser
                                        element.Attribute(XName.Get("typeName"))?.Value;
                         }
 
-                        _current = new TransactionOperation(operationType, typeName, null, element);
+                        this.current = new TransactionOperation(operationType, typeName, null, element);
                         return true;
                     }
                 }
@@ -384,9 +384,9 @@ internal static class WfsStreamingTransactionParser
         {
             if (!_disposed)
             {
-                _disposed = true;
-                _reader.Dispose();
-                _cts.Dispose();
+                this.disposed = true;
+                this.reader.Dispose();
+                this.cts.Dispose();
             }
             return ValueTask.CompletedTask;
         }

@@ -25,15 +25,15 @@ namespace Honua.Server.Host.GeoEvent;
 [Tags("GeoFencing")]
 public class GeoEventController : ControllerBase
 {
-    private readonly IGeofenceEvaluationService _evaluationService;
-    private readonly ILogger<GeoEventController> _logger;
+    private readonly IGeofenceEvaluationService evaluationService;
+    private readonly ILogger<GeoEventController> logger;
 
     public GeoEventController(
         IGeofenceEvaluationService evaluationService,
         ILogger<GeoEventController> logger)
     {
-        _evaluationService = evaluationService;
-        _logger = logger;
+        this.evaluationService = evaluationService;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -86,12 +86,12 @@ public class GeoEventController : ControllerBase
             // Validate request
             if (request.Location?.Coordinates == null || request.Location.Coordinates.Length != 2)
             {
-                return BadRequest(new { error = "Location must be a point with [longitude, latitude] coordinates" });
+                return this.BadRequest(new { error = "Location must be a point with [longitude, latitude] coordinates" });
             }
 
             if (string.IsNullOrWhiteSpace(request.EntityId))
             {
-                return BadRequest(new { error = "EntityId is required" });
+                return this.BadRequest(new { error = "EntityId is required" });
             }
 
             var tenantId = GetTenantId();
@@ -103,12 +103,12 @@ public class GeoEventController : ControllerBase
             // Validate coordinate ranges
             if (longitude < -180 || longitude > 180)
             {
-                return BadRequest(new { error = "Longitude must be between -180 and 180" });
+                return this.BadRequest(new { error = "Longitude must be between -180 and 180" });
             }
 
             if (latitude < -90 || latitude > 90)
             {
-                return BadRequest(new { error = "Latitude must be between -90 and 90" });
+                return this.BadRequest(new { error = "Latitude must be between -90 and 90" });
             }
 
             // Create NetTopologySuite Point (SRID 4326 - WGS84)
@@ -121,7 +121,7 @@ public class GeoEventController : ControllerBase
             // Evaluate location against geofences
             var startTime = DateTime.UtcNow;
 
-            var result = await _evaluationService.EvaluateLocationAsync(
+            var result = await this.evaluationService.EvaluateLocationAsync(
                 request.EntityId,
                 location,
                 eventTime,
@@ -135,7 +135,7 @@ public class GeoEventController : ControllerBase
             // Log performance metrics
             if (processingTime > 100)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Slow geofence evaluation: {ProcessingTime}ms for entity {EntityId} against {GeofenceCount} geofences",
                     processingTime,
                     request.EntityId,
@@ -165,17 +165,17 @@ public class GeoEventController : ControllerBase
                 ProcessingTimeMs = processingTime
             };
 
-            return Ok(response);
+            return this.Ok(response);
         }
         catch (ArgumentException ex)
         {
-            _logger.LogWarning(ex, "Invalid location evaluation request");
-            return BadRequest(new { error = ex.Message });
+            this.logger.LogWarning(ex, "Invalid location evaluation request");
+            return this.BadRequest(new { error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error evaluating location for entity {EntityId}", request.EntityId);
-            return StatusCode(500, new { error = "Internal server error processing location" });
+            this.logger.LogError(ex, "Error evaluating location for entity {EntityId}", request.EntityId);
+            return this.StatusCode(500, new { error = "Internal server error processing location" });
         }
     }
 
@@ -227,12 +227,12 @@ public class GeoEventController : ControllerBase
         {
             if (requests == null || !requests.Any())
             {
-                return BadRequest(new { error = "At least one location request is required" });
+                return this.BadRequest(new { error = "At least one location request is required" });
             }
 
             if (requests.Count > 1000)
             {
-                return BadRequest(new { error = "Maximum 1000 locations per batch request" });
+                return this.BadRequest(new { error = "Maximum 1000 locations per batch request" });
             }
 
             var tenantId = GetTenantId();
@@ -274,7 +274,7 @@ public class GeoEventController : ControllerBase
                     var location = geometryFactory.CreatePoint(new Coordinate(longitude, latitude));
                     var eventTime = request.EventTime ?? DateTime.UtcNow;
 
-                    var result = await _evaluationService.EvaluateLocationAsync(
+                    var result = await this.evaluationService.EvaluateLocationAsync(
                         request.EntityId,
                         location,
                         eventTime,
@@ -306,7 +306,7 @@ public class GeoEventController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error evaluating location for entity {EntityId} in batch", request.EntityId);
+                    this.logger.LogError(ex, "Error evaluating location for entity {EntityId} in batch", request.EntityId);
                     responses.Add(new EvaluateLocationResponse
                     {
                         EntityId = request.EntityId,
@@ -327,19 +327,19 @@ public class GeoEventController : ControllerBase
                 TotalProcessingTimeMs = totalProcessingTime
             };
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Batch evaluation completed: {TotalProcessed} locations, {SuccessCount} success, {ErrorCount} errors, {ProcessingTime}ms",
                 batchResponse.TotalProcessed,
                 batchResponse.SuccessCount,
                 batchResponse.ErrorCount,
                 totalProcessingTime);
 
-            return Ok(batchResponse);
+            return this.Ok(batchResponse);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing batch location evaluation");
-            return StatusCode(500, new { error = "Internal server error processing batch" });
+            this.logger.LogError(ex, "Error processing batch location evaluation");
+            return this.StatusCode(500, new { error = "Internal server error processing batch" });
         }
     }
 
@@ -357,12 +357,12 @@ public class GeoEventController : ControllerBase
 
         if (tenantContext != null)
         {
-            _logger.LogDebug("Request executing for tenant: {TenantId}", tenantContext.TenantId);
+            this.logger.LogDebug("Request executing for tenant: {TenantId}", tenantContext.TenantId);
             return tenantContext.TenantId;
         }
 
         // No tenant context - single-tenant mode or TenantMiddleware not active
-        _logger.LogDebug("No tenant context found - operating in single-tenant mode");
+        this.logger.LogDebug("No tenant context found - operating in single-tenant mode");
         return null;
     }
 }

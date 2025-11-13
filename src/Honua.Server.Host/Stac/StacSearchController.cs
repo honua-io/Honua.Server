@@ -41,17 +41,17 @@ namespace Honua.Server.Host.Stac;
 [Route("v1/stac/search")]
 public sealed class StacSearchController : ControllerBase
 {
-    private readonly IStacCatalogStore _store;
-    private readonly StacControllerHelper _helper;
-    private readonly ILogger<StacSearchController> _logger;
-    private readonly StacMetrics _metrics;
+    private readonly IStacCatalogStore store;
+    private readonly StacControllerHelper helper;
+    private readonly ILogger<StacSearchController> logger;
+    private readonly StacMetrics metrics;
 
     public StacSearchController(IStacCatalogStore store, StacControllerHelper helper, ILogger<StacSearchController> logger, StacMetrics metrics)
     {
-        _store = Guard.NotNull(store);
-        _helper = Guard.NotNull(helper);
-        _logger = Guard.NotNull(logger);
-        _metrics = Guard.NotNull(metrics);
+        this.store = Guard.NotNull(store);
+        this.helper = Guard.NotNull(helper);
+        this.logger = Guard.NotNull(logger);
+        this.metrics = Guard.NotNull(metrics);
     }
 
     /// <summary>
@@ -88,45 +88,45 @@ public sealed class StacSearchController : ControllerBase
         [FromQuery(Name = "fields")] string? fields,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("STAC search GET request received with collections: {Collections}, bbox: {Bbox}, datetime: {Datetime}, limit: {Limit}",
+        this.logger.LogInformation("STAC search GET request received with collections: {Collections}, bbox: {Bbox}, datetime: {Datetime}, limit: {Limit}",
             collections ?? "all", bbox ?? "none", datetime ?? "none", limit);
 
         // Validate collections and ids counts
         var collectionsList = Split(collections);
         var idsList = Split(ids);
 
-        var (isValid, validationError) = _helper.ValidateCollectionsAndIds(collectionsList, idsList, StacConstants.MaxCollectionsCount, StacConstants.MaxIdsCount);
+        var (isValid, validationError) = this.helper.ValidateCollectionsAndIds(collectionsList, idsList, StacConstants.MaxCollectionsCount, StacConstants.MaxIdsCount);
         if (!isValid)
         {
-            _logger.LogRequestRejected("STAC search GET request", "collections or ids count exceeds maximum");
+            this.logger.LogRequestRejected("STAC search GET request", "collections or ids count exceeds maximum");
             return validationError!;
         }
 
         var (parsedBbox, bboxError) = ParseBbox(bbox);
         if (bboxError is not null)
         {
-            _logger.LogValidationFailure("bbox", "Invalid format", bbox);
+            this.logger.LogValidationFailure("bbox", "Invalid format", bbox);
             return bboxError;
         }
 
         var (datetimeRange, datetimeError) = ParseDatetimeRange(datetime);
         if (datetimeError is not null)
         {
-            _logger.LogValidationFailure("datetime", "Invalid format", datetime);
+            this.logger.LogValidationFailure("datetime", "Invalid format", datetime);
             return datetimeError;
         }
 
         var (sortFields, sortError) = StacSortParser.ParseGetSortBy(sortby);
         if (sortError is not null)
         {
-            _logger.LogValidationFailure("sortby", sortError, sortby);
-            return BadRequest(_helper.CreateInvalidParameterProblem("sortby", sortError));
+            this.logger.LogValidationFailure("sortby", sortError, sortby);
+            return this.BadRequest(this.helper.CreateInvalidParameterProblem("sortby", sortError));
         }
 
         var fieldsSpec = FieldsParser.ParseGetFields(fields);
 
         JsonObject? filterObject = null;
-        if (Request.Query.TryGetValue("filter", out var filterValues))
+        if (this.Request.Query.TryGetValue("filter", out var filterValues))
         {
             var filterRaw = filterValues.ToString();
             if (!filterRaw.IsNullOrWhiteSpace())
@@ -140,24 +140,24 @@ public sealed class StacSearchController : ControllerBase
                     }
                     else
                     {
-                        _logger.LogValidationFailure("filter", "Filter parameter must be a JSON object", filterRaw);
-                        return BadRequest(_helper.CreateInvalidParameterProblem("filter", "Filter parameter must be a JSON object."));
+                        this.logger.LogValidationFailure("filter", "Filter parameter must be a JSON object", filterRaw);
+                        return this.BadRequest(this.helper.CreateInvalidParameterProblem("filter", "Filter parameter must be a JSON object."));
                     }
                 }
                 catch (JsonException ex)
                 {
-                    _logger.LogValidationFailure("filter", "Invalid JSON", filterRaw);
-                    return BadRequest(_helper.CreateInvalidParameterProblem("filter", $"Invalid JSON payload: {ex.Message}"));
+                    this.logger.LogValidationFailure("filter", "Invalid JSON", filterRaw);
+                    return this.BadRequest(this.helper.CreateInvalidParameterProblem("filter", $"Invalid JSON payload: {ex.Message}"));
                 }
             }
         }
 
-        var filterLangValue = Request.Query.TryGetValue("filter-lang", out var filterLangValues)
+        var filterLangValue = this.Request.Query.TryGetValue("filter-lang", out var filterLangValues)
             ? filterLangValues.ToString()
             : null;
 
         JsonNode? intersectsNode = null;
-        if (Request.Query.TryGetValue("intersects", out var intersectsValues))
+        if (this.Request.Query.TryGetValue("intersects", out var intersectsValues))
         {
             var intersectsRaw = intersectsValues.ToString();
             if (!intersectsRaw.IsNullOrWhiteSpace())
@@ -168,8 +168,8 @@ public sealed class StacSearchController : ControllerBase
                 }
                 catch (JsonException ex)
                 {
-                    _logger.LogValidationFailure("intersects", "Invalid JSON", intersectsRaw);
-                    return BadRequest(_helper.CreateInvalidParameterProblem("intersects", $"Invalid GeoJSON geometry: {ex.Message}"));
+                    this.logger.LogValidationFailure("intersects", "Invalid JSON", intersectsRaw);
+                    return this.BadRequest(this.helper.CreateInvalidParameterProblem("intersects", $"Invalid GeoJSON geometry: {ex.Message}"));
                 }
             }
         }
@@ -228,22 +228,22 @@ public sealed class StacSearchController : ControllerBase
         CancellationToken cancellationToken)
     {
         // Validate model state before processing
-        if (!ModelState.IsValid)
+        if (!this.ModelState.IsValid)
         {
-            _logger.LogWarning("STAC search POST request validation failed: {ValidationErrors}",
+            this.logger.LogWarning("STAC search POST request validation failed: {ValidationErrors}",
                 string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
-            return BadRequest(ModelState);
+            return this.BadRequest(ModelState);
         }
 
         // Additional validation for collections and ids count
-        var (isValid, validationError) = _helper.ValidateCollectionsAndIds(request.Collections, request.Ids, StacConstants.MaxCollectionsCount, StacConstants.MaxIdsCount);
+        var (isValid, validationError) = this.helper.ValidateCollectionsAndIds(request.Collections, request.Ids, StacConstants.MaxCollectionsCount, StacConstants.MaxIdsCount);
         if (!isValid)
         {
-            _logger.LogWarning("STAC search POST request validation failed: collections or ids count exceeds maximum");
+            this.logger.LogWarning("STAC search POST request validation failed: collections or ids count exceeds maximum");
             return validationError!;
         }
 
-        _logger.LogInformation("STAC search POST request received with collections: {Collections}, bbox: {HasBbox}, datetime: {Datetime}, limit: {Limit}",
+        this.logger.LogInformation("STAC search POST request received with collections: {Collections}, bbox: {HasBbox}, datetime: {Datetime}, limit: {Limit}",
             request.Collections is not null ? string.Join(",", request.Collections) : "all",
             request.Bbox is not null,
             request.Datetime ?? "none",
@@ -252,15 +252,15 @@ public sealed class StacSearchController : ControllerBase
         var (datetimeRange, datetimeError) = ParseDatetimeRange(request.Datetime);
         if (datetimeError is not null)
         {
-            _logger.LogValidationFailure("datetime", "Invalid format in POST request", request.Datetime);
+            this.logger.LogValidationFailure("datetime", "Invalid format in POST request", request.Datetime);
             return datetimeError;
         }
 
         // Validate bbox and intersects mutual exclusivity
         if (request.Bbox is not null && request.Intersects is not null)
         {
-            _logger.LogWarning("STAC search POST request contains both bbox and intersects");
-            return BadRequest(_helper.CreateBadRequestProblem("Invalid spatial parameters", "Cannot specify both 'bbox' and 'intersects' parameters. Use only one spatial filter."));
+            this.logger.LogWarning("STAC search POST request contains both bbox and intersects");
+            return this.BadRequest(this.helper.CreateBadRequestProblem("Invalid spatial parameters", "Cannot specify both 'bbox' and 'intersects' parameters. Use only one spatial filter."));
         }
 
         // Parse and validate intersects geometry if provided
@@ -277,8 +277,8 @@ public sealed class StacSearchController : ControllerBase
             var (convertedFields, conversionError) = ConvertPostSortFields(request.SortBy);
             if (conversionError is not null)
             {
-                _logger.LogWarning("Invalid sortby parameter in STAC POST search: {Error}", conversionError);
-                return BadRequest(_helper.CreateInvalidParameterProblem("sortby", conversionError));
+                this.logger.LogWarning("Invalid sortby parameter in STAC POST search: {Error}", conversionError);
+                return this.BadRequest(this.helper.CreateInvalidParameterProblem("sortby", conversionError));
             }
             sortFields = convertedFields;
         }
@@ -299,10 +299,10 @@ public sealed class StacSearchController : ControllerBase
         ParsedGeometry? parsedGeometry,
         CancellationToken cancellationToken)
     {
-        var stacEnabledError = _helper.EnsureStacEnabledOrNotFound();
+        var stacEnabledError = this.helper.EnsureStacEnabledOrNotFound();
         if (stacEnabledError is not null)
         {
-            _logger.LogFeatureDisabled("STAC");
+            this.logger.LogFeatureDisabled("STAC");
             return stacEnabledError;
         }
 
@@ -325,9 +325,9 @@ public sealed class StacSearchController : ControllerBase
                 var sw = Stopwatch.StartNew();
                 try
                 {
-                    await _store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+                    await this.store.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
-                    var baseUri = _helper.BuildBaseUri(Request);
+                    var baseUri = this.helper.BuildBaseUri(Request);
 
                     // Optimize collection fetching: only fetch requested collections if specified
                     IReadOnlyList<StacCollectionRecord> requestedCollections;
@@ -335,13 +335,13 @@ public sealed class StacSearchController : ControllerBase
                     {
                         // Use batch fetching to avoid N+1 query problem
                         // This fetches all requested collections in a single database query
-                        requestedCollections = await _store.GetCollectionsAsync(request.Collections, cancellationToken).ConfigureAwait(false);
+                        requestedCollections = await this.store.GetCollectionsAsync(request.Collections, cancellationToken).ConfigureAwait(false);
 
                         if (requestedCollections.Count == 0)
                         {
-                            _logger.LogWarning("STAC search: no matching collections found for requested collections: {RequestedCollections}",
+                            this.logger.LogWarning("STAC search: no matching collections found for requested collections: {RequestedCollections}",
                                 string.Join(",", request.Collections));
-                            return NotFound();
+                            return this.NotFound();
                         }
 
                         // Log if some collections were not found
@@ -349,24 +349,24 @@ public sealed class StacSearchController : ControllerBase
                         {
                             var foundIds = requestedCollections.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
                             var missingIds = request.Collections.Where(id => !foundIds.Contains(id)).ToList();
-                            _logger.LogDebug("STAC search: {MissingCount} collections not found: {MissingCollections}",
+                            this.logger.LogDebug("STAC search: {MissingCount} collections not found: {MissingCollections}",
                                 missingIds.Count, string.Join(",", missingIds));
                         }
                     }
                     else
                     {
                         // No specific collections requested - search all collections
-                        var allCollections = await _store.ListCollectionsAsync(cancellationToken).ConfigureAwait(false);
+                        var allCollections = await this.store.ListCollectionsAsync(cancellationToken).ConfigureAwait(false);
 
                         if (allCollections.Count == 0)
                         {
-                            _logger.LogInformation("STAC search completed: no collections available, returning empty result");
+                            this.logger.LogInformation("STAC search completed: no collections available, returning empty result");
                             activity?.SetTag("stac.result_count", 0);
 
                             // Record metrics for empty search
-                            _metrics.RecordSearch(sw.Elapsed.TotalMilliseconds, 0, collectionCount, hasBbox, hasDatetime);
+                            this.metrics.RecordSearch(sw.Elapsed.TotalMilliseconds, 0, collectionCount, hasBbox, hasDatetime);
 
-                            return Ok(StacApiMapper.BuildSearchCollection(Array.Empty<StacItemRecord>(), baseUri, matched: 0, nextToken: null, limit: null, fieldsSpec));
+                            return this.Ok(StacApiMapper.BuildSearchCollection(Array.Empty<StacItemRecord>(), baseUri, matched: 0, nextToken: null, limit: null, fieldsSpec));
                         }
 
                         requestedCollections = allCollections
@@ -377,7 +377,7 @@ public sealed class StacSearchController : ControllerBase
                     var limit = NormalizeLimit(request.Limit);
                     var (start, end) = datetimeRange;
 
-                    _logger.LogDebug("STAC search executing: collections={Collections}, limit={Limit}, hasBbox={HasBbox}, hasDatetime={HasDatetime}, hasIds={HasIds}",
+                    this.logger.LogDebug("STAC search executing: collections={Collections}, limit={Limit}, hasBbox={HasBbox}, hasDatetime={HasDatetime}, hasIds={HasIds}",
                         string.Join(",", requestedCollections.Select(c => c.Id)),
                         limit,
                         request.Bbox is not null,
@@ -405,25 +405,25 @@ public sealed class StacSearchController : ControllerBase
                         FilterLang = request.FilterLang
                     };
 
-                    var result = await _store.SearchAsync(parameters, cancellationToken).ConfigureAwait(false);
+                    var result = await this.store.SearchAsync(parameters, cancellationToken).ConfigureAwait(false);
                     activity?.SetTag("stac.result_count", result.Items.Count);
                     activity?.SetTag("stac.matched", result.Matched);
 
-                    _logger.LogInformation("STAC search completed successfully: returned {ReturnedCount} items, matched {MatchedCount} total",
+                    this.logger.LogInformation("STAC search completed successfully: returned {ReturnedCount} items, matched {MatchedCount} total",
                         result.Items.Count, result.Matched);
 
                     // Record search metrics
-                    _metrics.RecordSearch(sw.Elapsed.TotalMilliseconds, result.Items.Count, collectionCount, hasBbox, hasDatetime);
+                    this.metrics.RecordSearch(sw.Elapsed.TotalMilliseconds, result.Items.Count, collectionCount, hasBbox, hasDatetime);
 
                     var response = StacApiMapper.BuildSearchCollection(result.Items, baseUri, result.Matched, result.NextToken, limit, fieldsSpec);
-                    return Ok(response);
+                    return this.Ok(response);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogOperationFailure(ex, "STAC search");
+                    this.logger.LogOperationFailure(ex, "STAC search");
 
                     // Record failed search metrics
-                    _metrics.RecordSearch(sw.Elapsed.TotalMilliseconds, 0, collectionCount, hasBbox, hasDatetime);
+                    this.metrics.RecordSearch(sw.Elapsed.TotalMilliseconds, 0, collectionCount, hasBbox, hasDatetime);
 
                     throw;
                 }
@@ -437,7 +437,7 @@ public sealed class StacSearchController : ControllerBase
         var (temporalRange, error) = QueryParsingHelpers.ParseTemporalRange(value, "datetime");
         if (error is not null)
         {
-            return ((null, null), BadRequest(_helper.CreateInvalidParameterProblem("datetime", QueryParsingHelpers.ExtractProblemMessage(error, "Invalid datetime format."))));
+            return ((null, null), BadRequest(this.helper.CreateInvalidParameterProblem("datetime", QueryParsingHelpers.ExtractProblemMessage(error, "Invalid datetime format."))));
         }
 
         if (temporalRange is null)
@@ -460,7 +460,7 @@ public sealed class StacSearchController : ControllerBase
         var (bbox, error) = QueryParsingHelpers.ParseBoundingBox(value, "bbox", allowAltitude: true);
         if (error is not null)
         {
-            return (null, BadRequest(_helper.CreateInvalidParameterProblem("bbox", QueryParsingHelpers.ExtractProblemMessage(error, "Invalid bounding box format."))));
+            return (null, BadRequest(this.helper.CreateInvalidParameterProblem("bbox", QueryParsingHelpers.ExtractProblemMessage(error, "Invalid bounding box format."))));
         }
 
         return (bbox, null);
@@ -535,14 +535,14 @@ public sealed class StacSearchController : ControllerBase
         try
         {
             var parsedGeometry = GeometryParser.Parse(intersects);
-            _logger.LogInformation("Parsed intersects geometry in {Context}: type={GeometryType}, vertices={VertexCount}",
+            this.logger.LogInformation("Parsed intersects geometry in {Context}: type={GeometryType}, vertices={VertexCount}",
                 context, parsedGeometry.Type, parsedGeometry.VertexCount);
             return (parsedGeometry, null);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Invalid intersects geometry in {Context}", context);
-            return (null, BadRequest(_helper.CreateInvalidParameterProblem("intersects", $"Invalid GeoJSON geometry: {ex.Message}")));
+            this.logger.LogWarning(ex, "Invalid intersects geometry in {Context}", context);
+            return (null, BadRequest(this.helper.CreateInvalidParameterProblem("intersects", $"Invalid GeoJSON geometry: {ex.Message}")));
         }
     }
 }

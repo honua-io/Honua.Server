@@ -13,11 +13,11 @@ namespace Honua.Server.Host.Ogc;
 /// </summary>
 public sealed class CachedResult : IResult
 {
-    private readonly IResult _innerResult;
-    private readonly OgcCacheHeaderService _cacheService;
-    private readonly OgcResourceType _resourceType;
-    private readonly string? _etag;
-    private readonly DateTimeOffset? _lastModified;
+    private readonly IResult innerResult;
+    private readonly OgcCacheHeaderService cacheService;
+    private readonly OgcResourceType resourceType;
+    private readonly string? etag;
+    private readonly DateTimeOffset? lastModified;
 
     public CachedResult(
         IResult innerResult,
@@ -26,11 +26,11 @@ public sealed class CachedResult : IResult
         string? etag = null,
         DateTimeOffset? lastModified = null)
     {
-        _innerResult = Guard.NotNull(innerResult);
-        _cacheService = Guard.NotNull(cacheService);
-        _resourceType = resourceType;
-        _etag = etag;
-        _lastModified = lastModified;
+        this.innerResult = Guard.NotNull(innerResult);
+        this.cacheService = Guard.NotNull(cacheService);
+        this.resourceType = resourceType;
+        this.etag = etag;
+        this.lastModified = lastModified;
     }
 
     public async Task ExecuteAsync(HttpContext httpContext)
@@ -38,18 +38,18 @@ public sealed class CachedResult : IResult
         Guard.NotNull(httpContext);
 
         // Check if we should return 304 Not Modified
-        if (_cacheService.ShouldReturn304NotModified(httpContext, _etag, _lastModified))
+        if (this.cacheService.ShouldReturn304NotModified(httpContext, _etag, _lastModified))
         {
             // Apply cache headers before returning 304
-            _cacheService.ApplyCacheHeaders(httpContext, _resourceType, _etag, _lastModified);
+            this.cacheService.ApplyCacheHeaders(httpContext, _resourceType, _etag, _lastModified);
             httpContext.Response.StatusCode = StatusCodes.Status304NotModified;
             return;
         }
 
         // Apply cache headers
-        _cacheService.ApplyCacheHeaders(httpContext, _resourceType, _etag, _lastModified);
+        this.cacheService.ApplyCacheHeaders(httpContext, _resourceType, _etag, _lastModified);
 
         // Execute the inner result
-        await _innerResult.ExecuteAsync(httpContext).ConfigureAwait(false);
+        await this.innerResult.ExecuteAsync(httpContext).ConfigureAwait(false);
     }
 }

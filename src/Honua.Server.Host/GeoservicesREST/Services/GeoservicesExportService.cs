@@ -32,13 +32,13 @@ namespace Honua.Server.Host.GeoservicesREST.Services;
 /// </summary>
 public sealed class GeoservicesExportService : IGeoservicesExportService
 {
-    private readonly IFeatureRepository _repository;
-    private readonly IShapefileExporter _shapefileExporter;
-    private readonly ICsvExporter _csvExporter;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly StreamingKmlWriter _streamingKmlWriter;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<GeoservicesExportService> _logger;
+    private readonly IFeatureRepository repository;
+    private readonly IShapefileExporter shapefileExporter;
+    private readonly ICsvExporter csvExporter;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly StreamingKmlWriter streamingKmlWriter;
+    private readonly IHttpContextAccessor httpContextAccessor;
+    private readonly ILogger<GeoservicesExportService> logger;
 
     public GeoservicesExportService(
         IFeatureRepository repository,
@@ -49,13 +49,13 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
         IHttpContextAccessor httpContextAccessor,
         ILogger<GeoservicesExportService> logger)
     {
-        _repository = Guard.NotNull(repository);
-        _shapefileExporter = Guard.NotNull(shapefileExporter);
-        _csvExporter = Guard.NotNull(csvExporter);
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _streamingKmlWriter = Guard.NotNull(streamingKmlWriter);
-        _httpContextAccessor = Guard.NotNull(httpContextAccessor);
-        _logger = Guard.NotNull(logger);
+        this.repository = Guard.NotNull(repository);
+        this.shapefileExporter = Guard.NotNull(shapefileExporter);
+        this.csvExporter = Guard.NotNull(csvExporter);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.streamingKmlWriter = Guard.NotNull(streamingKmlWriter);
+        this.httpContextAccessor = Guard.NotNull(httpContextAccessor);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task<IActionResult> ExportShapefileAsync(
@@ -74,8 +74,8 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
         };
 
         var contentCrs = shapefileQuery.Crs ?? $"EPSG:{context.TargetWkid}";
-        var records = _repository.QueryAsync(service.Id, layer.Id, shapefileQuery, cancellationToken);
-        var export = await _shapefileExporter.ExportAsync(layer, shapefileQuery, contentCrs, records, cancellationToken).ConfigureAwait(false);
+        var records = this.repository.QueryAsync(service.Id, layer.Id, shapefileQuery, cancellationToken);
+        var export = await this.shapefileExporter.ExportAsync(layer, shapefileQuery, contentCrs, records, cancellationToken).ConfigureAwait(false);
 
         if (export.Content.CanSeek)
         {
@@ -125,7 +125,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
         {
             if (kmz)
             {
-                await _streamingKmlWriter.WriteKmzAsync(
+                await this.streamingKmlWriter.WriteKmzAsync(
                     response,
                     _repository,
                     service.Id,
@@ -137,7 +137,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
             }
             else
             {
-                await _streamingKmlWriter.WriteKmlAsync(
+                await this.streamingKmlWriter.WriteKmlAsync(
                     response,
                     _repository,
                     service.Id,
@@ -152,7 +152,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogError(ex, "KML export failed for {ServiceId}/{LayerId}.", service.Id, layer.Id);
+            this.logger.LogError(ex, "KML export failed for {ServiceId}/{LayerId}.", service.Id, layer.Id);
             return new ObjectResult("KML conversion failed.") { StatusCode = StatusCodes.Status500InternalServerError };
         }
     }
@@ -181,12 +181,12 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
                 };
 
                 // Count features first to enforce limit
-                var featureCount = await _repository.CountAsync(service.Id, layer.Id, csvQuery, cancellationToken).ConfigureAwait(false);
+                var featureCount = await this.repository.CountAsync(service.Id, layer.Id, csvQuery, cancellationToken).ConfigureAwait(false);
 
                 // Check maximum feature count limit
                 if (featureCount > 10000)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "CSV export exceeded maximum feature count limit. Service={ServiceId}, Layer={LayerId}, RequestedCount={RequestedCount}, Limit=10000",
                         service.Id,
                         layer.Id,
@@ -194,8 +194,8 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
                     return new BadRequestObjectResult(new { error = "CSV export is limited to 10,000 features. Please refine your query to return fewer features." });
                 }
 
-                var records = _repository.QueryAsync(service.Id, layer.Id, csvQuery, cancellationToken);
-                var export = await _csvExporter.ExportAsync(layer, csvQuery, records, cancellationToken).ConfigureAwait(false);
+                var records = this.repository.QueryAsync(service.Id, layer.Id, csvQuery, cancellationToken);
+                var export = await this.csvExporter.ExportAsync(layer, csvQuery, records, cancellationToken).ConfigureAwait(false);
 
                 if (export.Content.CanSeek)
                 {
@@ -215,7 +215,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
                 // Log slow exports
                 if (startTime.ElapsedMilliseconds > 5000)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "Slow CSV export detected. Service={ServiceId}, Layer={LayerId}, FeatureCount={FeatureCount}, Duration={DurationMs}ms, Size={SizeBytes} bytes",
                         service.Id,
                         layer.Id,
@@ -242,7 +242,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
         };
 
         var contentCrs = shapefileQuery.Crs ?? $"EPSG:{context.TargetWkid}";
-        var export = await _shapefileExporter.ExportAsync(layer, shapefileQuery, contentCrs, EmptyFeatureRecords(), cancellationToken).ConfigureAwait(false);
+        var export = await this.shapefileExporter.ExportAsync(layer, shapefileQuery, contentCrs, EmptyFeatureRecords(), cancellationToken).ConfigureAwait(false);
 
         if (export.Content.CanSeek)
         {
@@ -298,7 +298,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
             ResultType = FeatureResultType.Results
         };
 
-        var export = await _csvExporter.ExportAsync(layer, csvQuery, EmptyFeatureRecords(), cancellationToken).ConfigureAwait(false);
+        var export = await this.csvExporter.ExportAsync(layer, csvQuery, EmptyFeatureRecords(), cancellationToken).ConfigureAwait(false);
 
         if (export.Content.CanSeek)
         {
@@ -341,7 +341,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
 
     private async Task<StyleDefinition?> ResolveDefaultStyleAsync(LayerDefinition layer, CancellationToken cancellationToken)
     {
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(layer.DefaultStyleId) &&
             snapshot.TryGetStyle(layer.DefaultStyleId, out var defaultStyle))
@@ -362,6 +362,6 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
 
     private HttpContext GetHttpContext()
     {
-        return _httpContextAccessor.HttpContext ?? throw new InvalidOperationException("HttpContext is not available.");
+        return this.httpContextAccessor.HttpContext ?? throw new InvalidOperationException("HttpContext is not available.");
     }
 }

@@ -11,27 +11,39 @@ namespace Honua.Server.Observability.HealthChecks;
 /// </summary>
 public class QueueHealthCheck : IHealthCheck
 {
-    private readonly string _connectionString;
-    private readonly int _maxQueueDepthWarning;
-    private readonly TimeSpan _maxAgeWarning;
+    private readonly string connectionString;
+    private readonly int maxQueueDepthWarning;
+    private readonly TimeSpan maxAgeWarning;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="QueueHealthCheck"/> class.
+    /// </summary>
+    /// <param name="connectionString">The PostgreSQL connection string.</param>
+    /// <param name="maxQueueDepthWarning">The maximum queue depth before warning.</param>
+    /// <param name="maxAgeWarning">The maximum age before warning.</param>
     public QueueHealthCheck(
         string connectionString,
         int maxQueueDepthWarning = 100,
         TimeSpan? maxAgeWarning = null)
     {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
-        _maxQueueDepthWarning = maxQueueDepthWarning;
-        _maxAgeWarning = maxAgeWarning ?? TimeSpan.FromMinutes(30);
+        this.connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        this.maxQueueDepthWarning = maxQueueDepthWarning;
+        this.maxAgeWarning = maxAgeWarning ?? TimeSpan.FromMinutes(30);
     }
 
+    /// <summary>
+    /// Checks the health of the build queue processing status.
+    /// </summary>
+    /// <param name="context">The health check context.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that represents the asynchronous health check operation.</returns>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = new NpgsqlConnection(this.connectionString);
             await connection.OpenAsync(cancellationToken);
 
             // Check if queue table exists
@@ -49,7 +61,7 @@ public class QueueHealthCheck : IHealthCheck
                     "Build queue table does not exist",
                     data: new Dictionary<string, object>
                     {
-                        { "table_exists", false }
+                        { "table_exists", false },
                     });
             }
 
@@ -71,7 +83,7 @@ public class QueueHealthCheck : IHealthCheck
                 { "pending_count", stats.PendingCount },
                 { "processing_count", stats.ProcessingCount },
                 { "completed_count", stats.CompletedCount },
-                { "failed_count", stats.FailedCount }
+                { "failed_count", stats.FailedCount },
             };
 
             if (stats.AvgProcessingTimeSeconds.HasValue)
@@ -86,30 +98,30 @@ public class QueueHealthCheck : IHealthCheck
                 var age = DateTime.UtcNow - stats.OldestPending.Value;
                 data["oldest_pending_age_seconds"] = age.TotalSeconds;
 
-                if (age > _maxAgeWarning)
+                if (age > this.maxAgeWarning)
                 {
                     stuckItems = await connection.QuerySingleAsync<int>(
                         @"SELECT COUNT(*) FROM build_queue
                           WHERE status = 'pending'
                           AND created_at < NOW() - @MaxAge",
-                        new { MaxAge = _maxAgeWarning });
+                        new { MaxAge = this.maxAgeWarning });
 
                     data["stuck_items"] = stuckItems;
                 }
             }
 
             // Determine health status
-            if (stats.PendingCount > _maxQueueDepthWarning)
+            if (stats.PendingCount > this.maxQueueDepthWarning)
             {
                 return HealthCheckResult.Degraded(
-                    $"Queue depth ({stats.PendingCount}) exceeds warning threshold ({_maxQueueDepthWarning})",
+                    $"Queue depth ({stats.PendingCount}) exceeds warning threshold ({this.maxQueueDepthWarning})",
                     data: data);
             }
 
             if (stuckItems > 0)
             {
                 return HealthCheckResult.Degraded(
-                    $"{stuckItems} item(s) stuck in queue for more than {_maxAgeWarning.TotalMinutes} minutes",
+                    $"{stuckItems} item(s) stuck in queue for more than {this.maxAgeWarning.TotalMinutes} minutes",
                     data: data);
             }
 
@@ -125,13 +137,39 @@ public class QueueHealthCheck : IHealthCheck
         }
     }
 
+    /// <summary>
+    /// Queue statistics data transfer object.
+    /// </summary>
     private class QueueStats
     {
+        /// <summary>
+        /// Gets or sets the number of pending items.
+        /// </summary>
         public int PendingCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the number of processing items.
+        /// </summary>
         public int ProcessingCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the number of completed items.
+        /// </summary>
         public int CompletedCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the number of failed items.
+        /// </summary>
         public int FailedCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the oldest pending timestamp.
+        /// </summary>
         public DateTime? OldestPending { get; set; }
+
+        /// <summary>
+        /// Gets or sets the average processing time in seconds.
+        /// </summary>
         public double? AvgProcessingTimeSeconds { get; set; }
     }
 }
