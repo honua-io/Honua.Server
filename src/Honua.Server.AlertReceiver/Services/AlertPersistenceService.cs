@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="AlertPersistenceService.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,24 +18,26 @@ namespace Honua.Server.AlertReceiver.Services;
 public interface IAlertPersistenceService
 {
     Task SaveAlertAsync(GenericAlert alert, string[] publishedTo, bool wasSuppressed, string? suppressionReason = null);
+
     Task<List<AlertHistoryEntry>> GetRecentAlertsAsync(int limit = 100, string? severity = null);
+
     Task<AlertHistoryEntry?> GetAlertByFingerprintAsync(string fingerprint);
 }
 
 public sealed class AlertPersistenceService : IAlertPersistenceService
 {
-    private readonly IAlertHistoryStore _historyStore;
-    private readonly IAlertMetricsService _metricsService;
-    private readonly ILogger<AlertPersistenceService> _logger;
+    private readonly IAlertHistoryStore historyStore;
+    private readonly IAlertMetricsService metricsService;
+    private readonly ILogger<AlertPersistenceService> logger;
 
     public AlertPersistenceService(
         IAlertHistoryStore historyStore,
         IAlertMetricsService metricsService,
         ILogger<AlertPersistenceService> logger)
     {
-        _historyStore = historyStore;
-        _metricsService = metricsService;
-        _logger = logger;
+        this.historyStore = historyStore;
+        this.metricsService = metricsService;
+        this.logger = logger;
     }
 
     public async Task SaveAlertAsync(GenericAlert alert, string[] publishedTo, bool wasSuppressed, string? suppressionReason = null)
@@ -55,30 +60,30 @@ public sealed class AlertPersistenceService : IAlertPersistenceService
                 Timestamp = alert.Timestamp,
                 PublishedTo = publishedTo,
                 WasSuppressed = wasSuppressed,
-                SuppressionReason = suppressionReason
+                SuppressionReason = suppressionReason,
             };
 
-            await _historyStore.InsertAlertAsync(entry).ConfigureAwait(false);
+            await this.historyStore.InsertAlertAsync(entry).ConfigureAwait(false);
 
-            _logger.LogDebug("Persisted alert: {Name} ({Fingerprint})", alert.Name, entry.Fingerprint);
+            this.logger.LogDebug("Persisted alert: {Name} ({Fingerprint})", alert.Name, entry.Fingerprint);
         }
         catch (Exception ex)
         {
-            _metricsService.RecordAlertPersistenceFailure("save");
-            _logger.LogCritical(ex, "Failed to persist alert: {Name}", alert.Name);
+            this.metricsService.RecordAlertPersistenceFailure("save");
+            this.logger.LogCritical(ex, "Failed to persist alert: {Name}", alert.Name);
             throw new AlertPersistenceException("Failed to persist alert history entry.", ex);
         }
     }
 
     public async Task<List<AlertHistoryEntry>> GetRecentAlertsAsync(int limit = 100, string? severity = null)
     {
-        var results = await _historyStore.GetRecentAlertsAsync(limit, severity).ConfigureAwait(false);
+        var results = await this.historyStore.GetRecentAlertsAsync(limit, severity).ConfigureAwait(false);
         return results.ToList();
     }
 
     public async Task<AlertHistoryEntry?> GetAlertByFingerprintAsync(string fingerprint)
     {
-        return await _historyStore.GetAlertByFingerprintAsync(fingerprint).ConfigureAwait(false);
+        return await this.historyStore.GetAlertByFingerprintAsync(fingerprint).ConfigureAwait(false);
     }
 
     private static string GenerateFingerprint(GenericAlert alert)

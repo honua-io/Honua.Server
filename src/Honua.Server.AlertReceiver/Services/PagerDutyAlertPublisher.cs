@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="PagerDutyAlertPublisher.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Honua.Server.AlertReceiver.Models;
 using System.Text;
 using Honua.Server.AlertReceiver.Extensions;
@@ -30,7 +33,7 @@ public sealed class PagerDutyAlertPublisher : WebhookAlertPublisherBase
     {
         // PagerDuty uses a routing key instead of different endpoints
         // We still need to check if a routing key is configured
-        var routingKey = GetRoutingKey(severity);
+        var routingKey = this.GetRoutingKey(severity);
         if (routingKey.IsNullOrWhiteSpace())
         {
             return null; // Will trigger skip logic in base class
@@ -53,12 +56,12 @@ public sealed class PagerDutyAlertPublisher : WebhookAlertPublisherBase
     {
         ArgumentNullException.ThrowIfNull(webhook);
 
-        var routingKey = GetRoutingKey(severity);
+        var routingKey = this.GetRoutingKey(severity);
         if (routingKey.IsNullOrWhiteSpace())
         {
-            Logger.LogDebug(
+            this.Logger.LogDebug(
                 "No {Service} routing key configured for severity {Severity}, skipping alert publication",
-                ServiceName,
+                this.ServiceName,
                 severity);
             return;
         }
@@ -67,13 +70,13 @@ public sealed class PagerDutyAlertPublisher : WebhookAlertPublisherBase
         {
             foreach (var alert in webhook.Alerts)
             {
-                await PublishSingleAlert(alert, severity, routingKey, cancellationToken)
+                await this.PublishSingleAlert(alert, severity, routingKey, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to publish alert to {Service}", ServiceName);
+            this.Logger.LogError(ex, "Failed to publish alert to {Service}", this.ServiceName);
             throw;
         }
     }
@@ -88,7 +91,7 @@ public sealed class PagerDutyAlertPublisher : WebhookAlertPublisherBase
         {
             "firing" => "trigger",
             "resolved" => "resolve",
-            _ => "trigger"
+            _ => "trigger",
         };
 
         var payload = new
@@ -105,40 +108,40 @@ public sealed class PagerDutyAlertPublisher : WebhookAlertPublisherBase
                 custom_details = new
                 {
                     alertname = alert.Labels.GetValueOrDefault("alertname", "Unknown"),
-                    description = alert.Annotations.GetValueOrDefault("description", ""),
-                    protocol = alert.Labels.GetValueOrDefault("api_protocol", ""),
-                    service = alert.Labels.GetValueOrDefault("service_id", ""),
-                    layer = alert.Labels.GetValueOrDefault("layer_id", ""),
+                    description = alert.Annotations.GetValueOrDefault("description", string.Empty),
+                    protocol = alert.Labels.GetValueOrDefault("api_protocol", string.Empty),
+                    service = alert.Labels.GetValueOrDefault("service_id", string.Empty),
+                    layer = alert.Labels.GetValueOrDefault("layer_id", string.Empty),
                     generator_url = alert.GeneratorUrl,
                     labels = alert.Labels,
                     annotations = alert.Annotations
-                }
-            }
+                },
+            },
         };
 
-        var json = SerializePayload(payload);
+        var json = this.SerializePayload(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         try
         {
             // BUG FIX #36: Remove redundant ConfigureAwait chaining
-            var response = await HttpClient.PostAsync(PagerDutyEventsEndpoint, content, cancellationToken).ConfigureAwait(false);
+            var response = await this.HttpClient.PostAsync(PagerDutyEventsEndpoint, content, cancellationToken).ConfigureAwait(false);
 
             response.EnsureSuccessStatusCode();
 
-            Logger.LogInformation(
+            this.Logger.LogInformation(
                 "Published alert to {Service} - Alert: {AlertName}, Action: {Action}, Severity: {Severity}",
-                ServiceName,
+                this.ServiceName,
                 alert.Labels.GetValueOrDefault("alertname", "Unknown"),
                 eventAction,
                 severity);
         }
         catch (System.Net.Http.HttpRequestException ex)
         {
-            Logger.LogError(
+            this.Logger.LogError(
                 ex,
                 "HTTP error publishing alert to {Service} - Status: {StatusCode}",
-                ServiceName,
+                this.ServiceName,
                 ex.StatusCode);
             throw;
         }
@@ -151,10 +154,10 @@ public sealed class PagerDutyAlertPublisher : WebhookAlertPublisherBase
             "critical" => "Alerts:PagerDuty:CriticalRoutingKey",
             "warning" => "Alerts:PagerDuty:WarningRoutingKey",
             "database" => "Alerts:PagerDuty:DatabaseRoutingKey",
-            _ => "Alerts:PagerDuty:DefaultRoutingKey"
+            _ => "Alerts:PagerDuty:DefaultRoutingKey",
         };
 
-        return Configuration[key] ?? string.Empty;
+        return this.Configuration[key] ?? string.Empty;
     }
 
     private static string MapSeverity(string severity)
@@ -165,7 +168,7 @@ public sealed class PagerDutyAlertPublisher : WebhookAlertPublisherBase
             "warning" => "warning",
             "database" => "error",
             "storage" => "error",
-            _ => "info"
+            _ => "info",
         };
     }
 }

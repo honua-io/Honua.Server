@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="SqlAlertDeduplicator.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System.Data;
 using Dapper;
 using Microsoft.Extensions.Caching.Memory;
@@ -16,16 +19,16 @@ public interface IAlertReceiverDbConnectionFactory
 
 public sealed class NpgsqlAlertReceiverDbConnectionFactory : IAlertReceiverDbConnectionFactory
 {
-    private readonly string _connectionString;
+    private readonly string connectionString;
 
     public NpgsqlAlertReceiverDbConnectionFactory(string connectionString)
     {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        this.connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
     }
 
     public IDbConnection CreateConnection()
     {
-        var connection = new NpgsqlConnection(_connectionString);
+        var connection = new NpgsqlConnection(this.connectionString);
         return connection;
     }
 }
@@ -67,24 +70,24 @@ public sealed partial class SqlAlertDeduplicator : IAlertDeduplicator
     private const int MaxTimestampHistory = 100;
     private const int ReservationTimeoutSeconds = 30;
 
-    private readonly IAlertReceiverDbConnectionFactory _connectionFactory;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<SqlAlertDeduplicator> _logger;
-    private readonly IAlertMetricsService _metrics;
-    private readonly IMemoryCache _reservationCache;
-    private readonly AlertDeduplicationCacheOptions _cacheOptions;
+    private readonly IAlertReceiverDbConnectionFactory connectionFactory;
+    private readonly IConfiguration configuration;
+    private readonly ILogger<SqlAlertDeduplicator> logger;
+    private readonly IAlertMetricsService metrics;
+    private readonly IMemoryCache reservationCache;
+    private readonly AlertDeduplicationCacheOptions cacheOptions;
 
     private static readonly object SchemaLock = new();
-    private static volatile bool _schemaInitialized;
+    private static volatile bool schemaInitialized;
 
     // MEMORY MANAGEMENT: Track cache size for monitoring
     // This is thread-safe because Interlocked operations are atomic
-    private int _currentCacheSize;
+    private int currentCacheSize;
 
     // TOCTOU RACE CONDITION FIX: Secondary index to track active reservations by stateId
     // Allows quick lookup of completed reservations without scanning entire cache
     // Key: stateId (fingerprint:severity), Value: most recent reservationId for this state
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _stateToReservationIndex = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> stateToReservationIndex = new();
 
     public SqlAlertDeduplicator(
         IAlertReceiverDbConnectionFactory connectionFactory,
@@ -94,19 +97,19 @@ public sealed partial class SqlAlertDeduplicator : IAlertDeduplicator
         IMemoryCache reservationCache,
         IOptions<AlertDeduplicationCacheOptions> cacheOptions)
     {
-        _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
-        _reservationCache = reservationCache ?? throw new ArgumentNullException(nameof(reservationCache));
-        _cacheOptions = cacheOptions?.Value ?? throw new ArgumentNullException(nameof(cacheOptions));
+        this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        this.reservationCache = reservationCache ?? throw new ArgumentNullException(nameof(reservationCache));
+        this.cacheOptions = cacheOptions?.Value ?? throw new ArgumentNullException(nameof(cacheOptions));
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Alert deduplication cache initialized with MaxEntries={MaxEntries}, " +
             "SlidingExpiration={SlidingExpiration}s, AbsoluteExpiration={AbsoluteExpiration}s",
-            _cacheOptions.MaxEntries,
-            _cacheOptions.SlidingExpirationSeconds,
-            _cacheOptions.AbsoluteExpirationSeconds);
+            this.cacheOptions.MaxEntries,
+            this.cacheOptions.SlidingExpirationSeconds,
+            this.cacheOptions.AbsoluteExpirationSeconds);
     }
 
     public async Task<(bool shouldSend, string reservationId)> ShouldSendAlertAsync(
@@ -124,22 +127,22 @@ public sealed partial class SqlAlertDeduplicator : IAlertDeduplicator
         // 3. Thread A creates new reservation (bypasses deduplication)
         // By checking the cache first, we catch recently-completed reservations that may have
         // cleared their DB reservation but are still within the deduplication window.
-        if (TryGetCompletedReservationFromCache(stateId, out var cachedReservation))
+        if (this.TryGetCompletedReservationFromCache(stateId, out var cachedReservation))
         {
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Alert suppressed due to recently completed reservation in cache: {Fingerprint} (severity {Severity}), " +
                 "completed {Elapsed:0.00}s ago.",
                 fingerprint,
                 severity,
                 (DateTimeOffset.UtcNow - cachedReservation!.ExpiresAt).TotalSeconds);
 
-            _metrics.RecordAlertSuppressed("completed_reservation_cache", severity);
-            _metrics.RecordRaceConditionPrevented("toctou_cache_check");
+            this.metrics.RecordAlertSuppressed("completed_reservation_cache", severity);
+            this.metrics.RecordRaceConditionPrevented("toctou_cache_check");
             return (false, reservationId);
         }
 
         // RESOURCE LEAK FIX: Ensure connection is properly disposed in all error paths
-        using var connection = _connectionFactory.CreateConnection();
+        using var connection = this.connectionFactory.CreateConnection();
         IDbTransaction? transaction = null;
 
         try
@@ -154,7 +157,7 @@ public sealed partial class SqlAlertDeduplicator : IAlertDeduplicator
                 connection.Open();
             }
 
-            await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+            await this.EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
 
             // RACE CONDITION FIX: Use advisory lock to serialize access per fingerprint+severity
             // Convert state ID to a 64-bit hash for pg_advisory_xact_lock
@@ -175,18 +178,19 @@ public sealed partial class SqlAlertDeduplicator : IAlertDeduplicator
             {
                 // DOUBLE-CHECK: Verify this reservation isn't already completed in cache
                 // This catches the narrow race where a reservation completed between our cache check and DB query
-                if (TryGetReservationFromCache(state.ReservationId, out var existingReservation) &&
+                if (this.TryGetReservationFromCache(state.ReservationId, out var existingReservation) &&
                     existingReservation!.Completed)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "RACE CONDITION DETECTED: Database shows active reservation {ReservationId} but cache shows it's completed. " +
                         "Allowing alert to proceed to prevent suppression.",
                         state.ReservationId);
 
-                    _metrics.RecordRaceConditionPrevented("completed_reservation_mismatch");
+                    this.metrics.RecordRaceConditionPrevented("completed_reservation_mismatch");
 
                     // Clear the stale reservation and proceed
-                    await connection.ExecuteAsync(@"
+                    await connection.ExecuteAsync(
+                        @"
 UPDATE alert_deduplication_state
 SET reservation_id = NULL,
     reservation_expires_at = NULL,
@@ -206,26 +210,26 @@ WHERE id = @Id",
                     if (suppressRowsAffected == 0)
                     {
                         // Concurrent modification detected - another process updated this row
-                        _logger.LogWarning(
+                        this.logger.LogWarning(
                             "RACE CONDITION DETECTED: Optimistic locking failure when suppressing alert for {Fingerprint} (severity {Severity}). " +
                             "Another process modified the row.",
                             fingerprint,
                             severity);
 
-                        _metrics.RecordRaceConditionPrevented("optimistic_lock_failure_suppress");
+                        this.metrics.RecordRaceConditionPrevented("optimistic_lock_failure_suppress");
                         transaction.Rollback();
                         return (false, reservationId);
                     }
 
                     transaction.Commit();
 
-                    _logger.LogDebug(
+                    this.logger.LogDebug(
                         "Alert suppressed due to active reservation: {Fingerprint} (severity {Severity}), reservation expires in {Seconds:0.00}s.",
                         fingerprint,
                         severity,
                         (state.ReservationExpiresAt.Value - now).TotalSeconds);
 
-                    _metrics.RecordAlertSuppressed("active_reservation", severity);
+                    this.metrics.RecordAlertSuppressed("active_reservation", severity);
                     return (false, reservationId);
                 }
             }
@@ -244,13 +248,13 @@ WHERE id = @Id",
                     SentTimestampsJson = "[]",
                     UpdatedAt = now,
                     ReservationId = null,
-                    ReservationExpiresAt = null
+                    ReservationExpiresAt = null,
                 };
 
                 await connection.ExecuteAsync(InsertStateSql, state, transaction).ConfigureAwait(false);
             }
 
-            var dedupWindow = GetDeduplicationWindow(severity);
+            var dedupWindow = this.GetDeduplicationWindow(severity);
             if (state.LastSent != DateTimeOffset.MinValue &&
                 now - state.LastSent < dedupWindow)
             {
@@ -262,31 +266,31 @@ WHERE id = @Id",
 
                 if (dedupRowsAffected == 0)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "RACE CONDITION DETECTED: Optimistic locking failure in deduplication window check for {Fingerprint} (severity {Severity}).",
                         fingerprint,
                         severity);
 
-                    _metrics.RecordRaceConditionPrevented("optimistic_lock_failure_dedup_window");
+                    this.metrics.RecordRaceConditionPrevented("optimistic_lock_failure_dedup_window");
                     transaction.Rollback();
                     return (false, reservationId);
                 }
 
                 transaction.Commit();
 
-                _logger.LogDebug(
+                this.logger.LogDebug(
                     "Alert suppressed by deduplication window: {Fingerprint} (severity {Severity}) last sent {Elapsed:0.00}s ago.",
                     fingerprint,
                     severity,
                     (now - state.LastSent).TotalSeconds);
 
-                _metrics.RecordAlertSuppressed("deduplication_window", severity);
+                this.metrics.RecordAlertSuppressed("deduplication_window", severity);
                 return (false, reservationId);
             }
 
             var timestamps = DeserializeTimestamps(state.SentTimestampsJson);
             var recentCount = timestamps.Count(ts => ts > now.AddHours(-1));
-            var hourlyLimit = GetRateLimit(severity);
+            var hourlyLimit = this.GetRateLimit(severity);
 
             if (recentCount >= hourlyLimit)
             {
@@ -298,25 +302,25 @@ WHERE id = @Id",
 
                 if (rateLimitRowsAffected == 0)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "RACE CONDITION DETECTED: Optimistic locking failure in rate limit check for {Fingerprint} (severity {Severity}).",
                         fingerprint,
                         severity);
 
-                    _metrics.RecordRaceConditionPrevented("optimistic_lock_failure_rate_limit");
+                    this.metrics.RecordRaceConditionPrevented("optimistic_lock_failure_rate_limit");
                     transaction.Rollback();
                     return (false, reservationId);
                 }
 
                 transaction.Commit();
 
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Alert rate limited: {Fingerprint} (severity {Severity}) exceeded {Limit} alerts/hour.",
                     fingerprint,
                     severity,
                     hourlyLimit);
 
-                _metrics.RecordAlertSuppressed("rate_limit", severity);
+                this.metrics.RecordAlertSuppressed("rate_limit", severity);
                 return (false, reservationId);
             }
 
@@ -324,7 +328,8 @@ WHERE id = @Id",
             // This prevents concurrent alerts from bypassing deduplication
             // OPTIMISTIC LOCKING: Include row version to detect concurrent modifications
             var reservationExpiry = now.AddSeconds(ReservationTimeoutSeconds);
-            var rowsAffected = await connection.ExecuteAsync(@"
+            var rowsAffected = await connection.ExecuteAsync(
+                @"
 UPDATE alert_deduplication_state
 SET reservation_id = @ReservationId,
     reservation_expires_at = @ReservationExpiresAt,
@@ -337,20 +342,20 @@ WHERE id = @Id AND row_version = @RowVersion",
                     ReservationId = reservationId,
                     ReservationExpiresAt = reservationExpiry,
                     UpdatedAt = now,
-                    RowVersion = state.RowVersion
+                    RowVersion = state.RowVersion,
                 },
                 transaction).ConfigureAwait(false);
 
             if (rowsAffected == 0)
             {
                 // Concurrent modification - another process updated this row
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "RACE CONDITION DETECTED: Optimistic locking failure when creating reservation for {Fingerprint} (severity {Severity}). " +
                     "Suppressing alert to prevent duplicate sends.",
                     fingerprint,
                     severity);
 
-                _metrics.RecordRaceConditionPrevented("optimistic_lock_failure_create_reservation");
+                this.metrics.RecordRaceConditionPrevented("optimistic_lock_failure_create_reservation");
                 transaction.Rollback();
                 return (false, reservationId);
             }
@@ -359,17 +364,17 @@ WHERE id = @Id AND row_version = @RowVersion",
 
             // MEMORY LEAK FIX: Store reservation in bounded MemoryCache instead of unbounded dictionary
             // Cache automatically evicts old entries based on size limit and TTL
-            AddReservationToCache(reservationId, new ReservationState
+            this.AddReservationToCache(reservationId, new ReservationState
             {
                 StateId = stateId,
                 Fingerprint = fingerprint,
                 Severity = severity,
                 ExpiresAt = reservationExpiry,
-                Completed = false
+                Completed = false,
             });
 
             // TOCTOU RACE CONDITION FIX: Add to secondary index for quick lookup by stateId
-            _stateToReservationIndex[stateId] = reservationId;
+            this.stateToReservationIndex[stateId] = reservationId;
 
             return (true, reservationId);
         }
@@ -382,7 +387,7 @@ WHERE id = @Id AND row_version = @RowVersion",
             }
             catch (Exception rollbackEx)
             {
-                _logger.LogWarning(rollbackEx, "Failed to rollback transaction during exception handling");
+                this.logger.LogWarning(rollbackEx, "Failed to rollback transaction during exception handling");
             }
 
             // Connection will be disposed by using statement
@@ -398,21 +403,21 @@ WHERE id = @Id AND row_version = @RowVersion",
     {
         // RACE CONDITION FIX: Verify this is a valid reservation
         // MEMORY LEAK FIX: Use MemoryCache instead of static dictionary
-        if (!TryGetReservationFromCache(reservationId, out var reservation))
+        if (!this.TryGetReservationFromCache(reservationId, out var reservation))
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Attempted to record alert with unknown reservation ID: {ReservationId}",
                 reservationId);
-            _metrics.RecordDeduplicationCacheOperation("get", hit: false);
+            this.metrics.RecordDeduplicationCacheOperation("get", hit: false);
             return;
         }
 
-        _metrics.RecordDeduplicationCacheOperation("get", hit: true);
+        this.metrics.RecordDeduplicationCacheOperation("get", hit: true);
 
         // Check if already completed (idempotency)
         if (reservation!.Completed)
         {
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Reservation {ReservationId} already completed, skipping duplicate record",
                 reservationId);
             return;
@@ -421,7 +426,7 @@ WHERE id = @Id AND row_version = @RowVersion",
         var stateId = BuildKey(fingerprint, severity);
 
         // RESOURCE LEAK FIX: Ensure connection is properly disposed in all error paths
-        using var connection = _connectionFactory.CreateConnection();
+        using var connection = this.connectionFactory.CreateConnection();
         IDbTransaction? transaction = null;
 
         try
@@ -436,7 +441,7 @@ WHERE id = @Id AND row_version = @RowVersion",
                 connection.Open();
             }
 
-            await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+            await this.EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
 
             // RACE CONDITION FIX: Use same advisory lock as ShouldSendAlert
             var lockKey = ComputeLockKey(stateId);
@@ -451,7 +456,7 @@ WHERE id = @Id AND row_version = @RowVersion",
 
             if (state is null)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Alert state not found for reservation {ReservationId}, fingerprint {Fingerprint}",
                     reservationId,
                     fingerprint);
@@ -462,7 +467,7 @@ WHERE id = @Id AND row_version = @RowVersion",
             // RACE CONDITION FIX: Verify the reservation matches
             if (state.ReservationId != reservationId)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Reservation ID mismatch: expected {Expected}, got {Actual}",
                     state.ReservationId,
                     reservationId);
@@ -482,7 +487,8 @@ WHERE id = @Id AND row_version = @RowVersion",
 
             // RACE CONDITION FIX: Clear reservation and update sent timestamp atomically
             // OPTIMISTIC LOCKING: Include row version to detect concurrent modifications
-            var rowsAffected = await connection.ExecuteAsync(@"
+            var rowsAffected = await connection.ExecuteAsync(
+                @"
 UPDATE alert_deduplication_state
 SET last_sent = @LastSent,
     sent_count = sent_count + 1,
@@ -498,20 +504,20 @@ WHERE id = @Id AND row_version = @RowVersion",
                     LastSent = now,
                     SentTimestampsJson = updatedPayload,
                     UpdatedAt = now,
-                    RowVersion = state.RowVersion
+                    RowVersion = state.RowVersion,
                 },
                 transaction).ConfigureAwait(false);
 
             if (rowsAffected == 0)
             {
                 // Concurrent modification detected
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "RACE CONDITION DETECTED: Optimistic locking failure when recording alert for {Fingerprint} (severity {Severity}). " +
                     "Another process modified the row.",
                     fingerprint,
                     severity);
 
-                _metrics.RecordRaceConditionPrevented("optimistic_lock_failure_record_alert");
+                this.metrics.RecordRaceConditionPrevented("optimistic_lock_failure_record_alert");
                 transaction.Rollback();
                 return;
             }
@@ -536,7 +542,7 @@ WHERE id = @Id AND row_version = @RowVersion",
             }
             catch (Exception rollbackEx)
             {
-                _logger.LogWarning(rollbackEx, "Failed to rollback transaction during exception handling");
+                this.logger.LogWarning(rollbackEx, "Failed to rollback transaction during exception handling");
             }
 
             // Connection will be disposed by using statement
@@ -550,13 +556,13 @@ WHERE id = @Id AND row_version = @RowVersion",
     {
         // RACE CONDITION FIX: Release reservation if alert publishing failed
         // MEMORY LEAK FIX: Use MemoryCache instead of static dictionary
-        if (!TryGetReservationFromCache(reservationId, out var reservation))
+        if (!this.TryGetReservationFromCache(reservationId, out var reservation))
         {
-            _metrics.RecordDeduplicationCacheOperation("get", hit: false);
+            this.metrics.RecordDeduplicationCacheOperation("get", hit: false);
             return;
         }
 
-        _metrics.RecordDeduplicationCacheOperation("get", hit: true);
+        this.metrics.RecordDeduplicationCacheOperation("get", hit: true);
 
         if (reservation!.Completed)
         {
@@ -569,7 +575,7 @@ WHERE id = @Id AND row_version = @RowVersion",
         // RESOURCE LEAK FIX: Ensure connection is properly disposed in all error paths
         try
         {
-            using var connection = _connectionFactory.CreateConnection();
+            using var connection = this.connectionFactory.CreateConnection();
             IDbTransaction? transaction = null;
 
             try
@@ -594,7 +600,8 @@ WHERE id = @Id AND row_version = @RowVersion",
                 // RACE CONDITION FIX: Clear the reservation in the database
                 // Note: We don't need row_version here because we're checking reservation_id
                 // which provides sufficient protection (reservation_id is unique per state)
-                await connection.ExecuteAsync(@"
+                await connection.ExecuteAsync(
+                    @"
 UPDATE alert_deduplication_state
 SET reservation_id = NULL,
     reservation_expires_at = NULL,
@@ -605,19 +612,19 @@ WHERE id = @Id AND reservation_id = @ReservationId",
                     {
                         Id = stateId,
                         ReservationId = reservationId,
-                        UpdatedAt = DateTimeOffset.UtcNow
+                        UpdatedAt = DateTimeOffset.UtcNow,
                     },
                     transaction).ConfigureAwait(false);
 
                 transaction.Commit();
 
                 // MEMORY LEAK FIX: Remove from cache (will be evicted automatically, but remove now for consistency)
-                RemoveReservationFromCache(reservationId);
+                this.RemoveReservationFromCache(reservationId);
 
                 // TOCTOU RACE CONDITION FIX: Clean up secondary index
-                _stateToReservationIndex.TryRemove(stateId, out _);
+                this.stateToReservationIndex.TryRemove(stateId, out _);
 
-                _logger.LogDebug("Released reservation {ReservationId}", reservationId);
+                this.logger.LogDebug("Released reservation {ReservationId}", reservationId);
             }
             catch (Exception ex)
             {
@@ -628,17 +635,17 @@ WHERE id = @Id AND reservation_id = @ReservationId",
                 }
                 catch (Exception rollbackEx)
                 {
-                    _logger.LogWarning(rollbackEx, "Failed to rollback transaction during exception handling");
+                    this.logger.LogWarning(rollbackEx, "Failed to rollback transaction during exception handling");
                 }
 
-                _logger.LogWarning(ex, "Failed to release reservation {ReservationId}", reservationId);
+                this.logger.LogWarning(ex, "Failed to release reservation {ReservationId}", reservationId);
                 // Connection will be disposed by using statement
             }
         }
         catch (Exception ex)
         {
             // RESOURCE LEAK FIX: Log factory-level errors
-            _logger.LogWarning(ex, "Failed to create connection for releasing reservation {ReservationId}", reservationId);
+            this.logger.LogWarning(ex, "Failed to create connection for releasing reservation {ReservationId}", reservationId);
         }
     }
 }

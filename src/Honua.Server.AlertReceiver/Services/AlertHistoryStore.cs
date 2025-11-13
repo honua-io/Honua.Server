@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="AlertHistoryStore.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System.Data;
 using System.Linq;
 using Dapper;
@@ -11,20 +14,28 @@ namespace Honua.Server.AlertReceiver.Services;
 public interface IAlertHistoryStore
 {
     Task<long> InsertAlertAsync(AlertHistoryEntry entry, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AlertHistoryEntry>> GetRecentAlertsAsync(int limit, string? severity, CancellationToken cancellationToken = default);
+
     Task<AlertHistoryEntry?> GetAlertByFingerprintAsync(string fingerprint, CancellationToken cancellationToken = default);
+
     Task InsertAcknowledgementAsync(AlertAcknowledgement acknowledgement, CancellationToken cancellationToken = default);
+
     Task<AlertAcknowledgement?> GetLatestAcknowledgementAsync(string fingerprint, CancellationToken cancellationToken = default);
+
     Task<long> InsertSilencingRuleAsync(AlertSilencingRule rule, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<AlertSilencingRule>> GetActiveSilencingRulesAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+
     Task DeactivateSilencingRuleAsync(long ruleId, CancellationToken cancellationToken = default);
+
     Task CheckConnectivityAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class AlertHistoryStore : IAlertHistoryStore
 {
-    private readonly IAlertReceiverDbConnectionFactory _connectionFactory;
-    private readonly ILogger<AlertHistoryStore> _logger;
+    private readonly IAlertReceiverDbConnectionFactory connectionFactory;
+    private readonly ILogger<AlertHistoryStore> logger;
 
     private static readonly object SchemaLock = new();
     private static volatile bool schemaInitialized;
@@ -225,14 +236,14 @@ WHERE id = @RuleId;";
 
     public AlertHistoryStore(IAlertReceiverDbConnectionFactory connectionFactory, ILogger<AlertHistoryStore> logger)
     {
-        this._connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
-        this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<long> InsertAlertAsync(AlertHistoryEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         var record = entry.ToRecord();
         var command = new CommandDefinition(
@@ -253,7 +264,7 @@ WHERE id = @RuleId;";
                 record.Timestamp,
                 record.PublishedToJson,
                 record.WasSuppressed,
-                record.SuppressionReason
+                record.SuppressionReason,
             },
             cancellationToken: cancellationToken);
 
@@ -264,7 +275,7 @@ WHERE id = @RuleId;";
 
     public async Task<IReadOnlyList<AlertHistoryEntry>> GetRecentAlertsAsync(int limit, string? severity, CancellationToken cancellationToken = default)
     {
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         var command = new CommandDefinition(
             SelectRecentAlertsSql,
@@ -277,7 +288,7 @@ WHERE id = @RuleId;";
 
     public async Task<AlertHistoryEntry?> GetAlertByFingerprintAsync(string fingerprint, CancellationToken cancellationToken = default)
     {
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         var command = new CommandDefinition(
             SelectAlertByFingerprintSql,
@@ -291,7 +302,7 @@ WHERE id = @RuleId;";
     public async Task InsertAcknowledgementAsync(AlertAcknowledgement acknowledgement, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(acknowledgement);
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         var command = new CommandDefinition(
             InsertAcknowledgementSql,
@@ -301,7 +312,7 @@ WHERE id = @RuleId;";
                 acknowledgement.AcknowledgedBy,
                 acknowledgement.AcknowledgedAt,
                 acknowledgement.Comment,
-                acknowledgement.ExpiresAt
+                acknowledgement.ExpiresAt,
             },
             cancellationToken: cancellationToken);
 
@@ -310,7 +321,7 @@ WHERE id = @RuleId;";
 
     public async Task<AlertAcknowledgement?> GetLatestAcknowledgementAsync(string fingerprint, CancellationToken cancellationToken = default)
     {
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         var command = new CommandDefinition(
             SelectLatestAcknowledgementSql,
@@ -323,7 +334,7 @@ WHERE id = @RuleId;";
     public async Task<long> InsertSilencingRuleAsync(AlertSilencingRule rule, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         var record = rule.ToRecord();
         var command = new CommandDefinition(
@@ -337,7 +348,7 @@ WHERE id = @RuleId;";
                 record.StartsAt,
                 record.EndsAt,
                 record.Comment,
-                record.IsActive
+                record.IsActive,
             },
             cancellationToken: cancellationToken);
 
@@ -348,7 +359,7 @@ WHERE id = @RuleId;";
 
     public async Task<IReadOnlyList<AlertSilencingRule>> GetActiveSilencingRulesAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
 
         var command = new CommandDefinition(
             SelectActiveSilencingRulesSql,
@@ -361,7 +372,7 @@ WHERE id = @RuleId;";
 
     public async Task DeactivateSilencingRuleAsync(long ruleId, CancellationToken cancellationToken = default)
     {
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var command = new CommandDefinition(
             DeactivateSilencingRuleSql,
             new { RuleId = ruleId },
@@ -372,14 +383,14 @@ WHERE id = @RuleId;";
 
     public async Task CheckConnectivityAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var command = new CommandDefinition("SELECT 1;", cancellationToken: cancellationToken);
         await connection.ExecuteScalarAsync<int>(command).ConfigureAwait(false);
     }
 
     private async Task<System.Data.Common.DbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
-        var connection = this._connectionFactory.CreateConnection();
+        var connection = this.connectionFactory.CreateConnection();
         if (connection is not System.Data.Common.DbConnection dbConnection)
         {
             throw new InvalidOperationException("Alert history store requires DbConnection-compatible factory.");
@@ -407,7 +418,7 @@ WHERE id = @RuleId;";
 
             connection.Execute(EnsureSchemaSql);
             schemaInitialized = true;
-            this._logger.LogInformation("Alert history schema verified.");
+            this.logger.LogInformation("Alert history schema verified.");
         }
     }
 }

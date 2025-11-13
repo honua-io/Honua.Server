@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Honua.Server.AlertReceiver</RootNamespace>
+    <NoWarn>$(NoWarn);CA2234;CA2213</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

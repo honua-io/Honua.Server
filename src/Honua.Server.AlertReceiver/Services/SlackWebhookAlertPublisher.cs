@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="SlackWebhookAlertPublisher.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Honua.Server.AlertReceiver.Models;
 
 namespace Honua.Server.AlertReceiver.Services;
@@ -29,17 +32,17 @@ public sealed class SlackWebhookAlertPublisher : WebhookAlertPublisherBase
             "warning" => "Alerts:Slack:WarningWebhookUrl",
             "database" => "Alerts:Slack:DatabaseWebhookUrl",
             "storage" => "Alerts:Slack:StorageWebhookUrl",
-            _ => "Alerts:Slack:DefaultWebhookUrl"
+            _ => "Alerts:Slack:DefaultWebhookUrl",
         };
 
-        return Configuration[key];
+        return this.Configuration[key];
     }
 
     protected override object BuildPayload(AlertManagerWebhook webhook, string severity)
     {
         var icon = GetSeverityIcon(severity);
         var color = GetSeverityColor(severity);
-        var alertName = GetAlertName(webhook);
+        var alertName = this.GetAlertName(webhook);
         var status = webhook.Status.ToUpperInvariant();
 
         var attachments = new List<object>();
@@ -49,7 +52,7 @@ public sealed class SlackWebhookAlertPublisher : WebhookAlertPublisherBase
             var fields = new List<object>
             {
                 new { title = "Status", value = alert.Status, @short = true },
-                new { title = "Severity", value = alert.Labels.GetValueOrDefault("severity", "unknown"), @short = true }
+                new { title = "Severity", value = alert.Labels.GetValueOrDefault("severity", "unknown"), @short = true },
             };
 
             if (alert.Labels.TryGetValue("api_protocol", out var protocol))
@@ -69,7 +72,7 @@ public sealed class SlackWebhookAlertPublisher : WebhookAlertPublisherBase
                 text = alert.Annotations.GetValueOrDefault("description", "No description"),
                 fields = fields,
                 footer = "Honua Alerts",
-                ts = alert.StartsAt.ToUnixTimeSeconds()
+                ts = alert.StartsAt.ToUnixTimeSeconds(),
             });
         }
 
@@ -78,14 +81,14 @@ public sealed class SlackWebhookAlertPublisher : WebhookAlertPublisherBase
             attachments.Add(new
             {
                 color = "warning",
-                text = $"_... and {webhook.Alerts.Count - 5} more alerts_"
+                text = $"_... and {webhook.Alerts.Count - 5} more alerts_",
             });
         }
 
         return new
         {
             text = $"{icon} *{status}: {alertName}*",
-            attachments = attachments
+            attachments = attachments,
         };
     }
 
@@ -97,7 +100,7 @@ public sealed class SlackWebhookAlertPublisher : WebhookAlertPublisherBase
             "warning" => ":warning:",
             "database" => ":file_cabinet:",
             "storage" => ":floppy_disk:",
-            _ => ":information_source:"
+            _ => ":information_source:",
         };
     }
 
@@ -107,7 +110,7 @@ public sealed class SlackWebhookAlertPublisher : WebhookAlertPublisherBase
         {
             "critical" => "danger",
             "warning" => "warning",
-            _ => "good"
+            _ => "good",
         };
     }
 }

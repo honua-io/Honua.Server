@@ -67,20 +67,24 @@ public class LocalAuthenticationServiceTests
         var roles = new List<string> { "Admin", "User" };
         var token = "jwt-token-123";
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = userId,
-            Username = username,
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4;memoryCost=65536",
-            IsActive = true,
-            IsLocked = false,
-            FailedAttempts = 0,
-            Roles = roles,
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: userId,
+            Username: username,
+            Email: null,
+            IsActive: true,
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 0,
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4;memoryCost=65536",
+            Roles: roles
+        );
 
         _mockRepository.Setup(x => x.GetCredentialsByUsernameAsync(username, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credentials);
@@ -109,20 +113,24 @@ public class LocalAuthenticationServiceTests
         var password = "WrongPassword";
         var userId = "user-123";
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = userId,
-            Username = username,
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4",
-            IsActive = true,
-            IsLocked = false,
-            FailedAttempts = 2,
-            Roles = new List<string>(),
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: userId,
+            Username: username,
+            Email: null,
+            IsActive: true,
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 2,
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
 
         _mockRepository.Setup(x => x.GetCredentialsByUsernameAsync(username, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credentials);
@@ -154,20 +162,24 @@ public class LocalAuthenticationServiceTests
         var password = "WrongPassword";
         var userId = "user-123";
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = userId,
-            Username = username,
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4",
-            IsActive = true,
-            IsLocked = false,
-            FailedAttempts = 4, // One more failure will lock the account
-            Roles = new List<string>(),
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: userId,
+            Username: username,
+            Email: null,
+            IsActive: true,
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 4, // One more failure will lock the account
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
 
         _mockRepository.Setup(x => x.GetCredentialsByUsernameAsync(username, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credentials);
@@ -200,21 +212,24 @@ public class LocalAuthenticationServiceTests
         var password = "ValidPassword123!";
         var now = DateTimeOffset.UtcNow;
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = "user-123",
-            Username = username,
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4",
-            IsActive = true,
-            IsLocked = true,
-            FailedAttempts = 5,
-            LastFailedAt = now.AddMinutes(-5), // Locked 5 minutes ago
-            Roles = new List<string>(),
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: "user-123",
+            Username: username,
+            Email: null,
+            IsActive: true,
+            IsLocked: true,
+            IsServiceAccount: false,
+            FailedAttempts: 5,
+            LastFailedAt: now.AddMinutes(-5), // Locked 5 minutes ago
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
 
         _mockRepository.Setup(x => x.GetCredentialsByUsernameAsync(username, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credentials);
@@ -235,20 +250,24 @@ public class LocalAuthenticationServiceTests
         var username = "testuser";
         var password = "ValidPassword123!";
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = "user-123",
-            Username = username,
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4",
-            IsActive = false, // Disabled account
-            IsLocked = false,
-            FailedAttempts = 0,
-            Roles = new List<string>(),
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: "user-123",
+            Username: username,
+            Email: null,
+            IsActive: false, // Disabled account
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 0,
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
 
         _mockRepository.Setup(x => x.GetCredentialsByUsernameAsync(username, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credentials);
@@ -267,7 +286,7 @@ public class LocalAuthenticationServiceTests
         // Arrange
         var options = new HonuaAuthenticationOptions
         {
-            Mode = HonuaAuthenticationOptions.AuthenticationMode.AzureAd // Not Local
+            Mode = HonuaAuthenticationOptions.AuthenticationMode.Oidc // Not Local
         };
         _mockOptions.Setup(x => x.CurrentValue).Returns(options);
 
@@ -319,18 +338,24 @@ public class LocalAuthenticationServiceTests
         var currentPassword = "OldPassword123!";
         var newPassword = "NewPassword456!";
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = userId,
-            Username = "testuser",
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4",
-            IsActive = true,
-            Roles = new List<string>(),
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: userId,
+            Username: "testuser",
+            Email: null,
+            IsActive: true,
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 0,
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
 
         var newHashResult = new PasswordHashResult(
             new byte[] { 7, 8, 9 },
@@ -369,18 +394,24 @@ public class LocalAuthenticationServiceTests
         var currentPassword = "WrongPassword";
         var newPassword = "NewPassword456!";
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = userId,
-            Username = "testuser",
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4",
-            IsActive = true,
-            Roles = new List<string>(),
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: userId,
+            Username: "testuser",
+            Email: null,
+            IsActive: true,
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 0,
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
 
         _mockRepository.Setup(x => x.GetCredentialsByIdAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credentials);
@@ -400,18 +431,24 @@ public class LocalAuthenticationServiceTests
         var currentPassword = "OldPassword123!";
         var newPassword = "weak";
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = userId,
-            Username = "testuser",
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4",
-            IsActive = true,
-            Roles = new List<string>(),
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: userId,
+            Username: "testuser",
+            Email: null,
+            IsActive: true,
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 0,
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
 
         _mockRepository.Setup(x => x.GetCredentialsByIdAsync(userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(credentials);
@@ -434,18 +471,24 @@ public class LocalAuthenticationServiceTests
         var actorUserId = "admin-456";
         var newPassword = "NewPassword456!";
 
-        var credentials = new AuthUserCredentials
-        {
-            Id = targetUserId,
-            Username = "testuser",
-            PasswordHash = new byte[] { 1, 2, 3 },
-            PasswordSalt = new byte[] { 4, 5, 6 },
-            HashAlgorithm = "Argon2id",
-            HashParameters = "timeCost=4",
-            IsActive = true,
-            Roles = new List<string>(),
-            IsServiceAccount = false
-        };
+        var credentials = new AuthUserCredentials(
+            Id: targetUserId,
+            Username: "testuser",
+            Email: null,
+            IsActive: true,
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 0,
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
 
         var newHashResult = new PasswordHashResult(
             new byte[] { 7, 8, 9 },
@@ -470,7 +513,7 @@ public class LocalAuthenticationServiceTests
             newHashResult.Salt,
             newHashResult.Algorithm,
             newHashResult.Parameters,
-            It.Is<AuditContext>(a => a.ActorUserId == actorUserId),
+            It.Is<AuditContext>(a => a.ActorId == actorUserId),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }

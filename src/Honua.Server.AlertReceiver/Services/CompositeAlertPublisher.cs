@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="CompositeAlertPublisher.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Honua.Server.AlertReceiver.Models;
 using Honua.Server.Core.Utilities;
 
@@ -11,19 +14,19 @@ namespace Honua.Server.AlertReceiver.Services;
 /// </summary>
 public sealed class CompositeAlertPublisher : DisposableBase, IAlertPublisher
 {
-    private readonly IEnumerable<IAlertPublisher> _publishers;
-    private readonly ILogger<CompositeAlertPublisher> _logger;
+    private readonly IEnumerable<IAlertPublisher> publishers;
+    private readonly ILogger<CompositeAlertPublisher> logger;
 
     // CONCURRENCY FIX: Throttle concurrent publishing to prevent overwhelming downstream services
     // Allows max 10 concurrent publisher executions
-    private readonly SemaphoreSlim _concurrencyThrottle = new(10, 10);
+    private readonly SemaphoreSlim concurrencyThrottle = new(10, 10);
 
     public CompositeAlertPublisher(
         IEnumerable<IAlertPublisher> publishers,
         ILogger<CompositeAlertPublisher> logger)
     {
-        _publishers = publishers ?? throw new ArgumentNullException(nameof(publishers));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.publishers = publishers ?? throw new ArgumentNullException(nameof(publishers));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task PublishAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default)
@@ -31,10 +34,10 @@ public sealed class CompositeAlertPublisher : DisposableBase, IAlertPublisher
         var tasks = new List<Task>();
         var errors = new List<Exception>();
 
-        foreach (var publisher in _publishers)
+        foreach (var publisher in this.publishers)
         {
             // Fire-and-forget pattern with error capture
-        var task = PublishWithErrorHandling(publisher, webhook, severity, errors, cancellationToken);
+        var task = this.PublishWithErrorHandling(publisher, webhook, severity, errors, cancellationToken);
             tasks.Add(task);
         }
 
@@ -42,23 +45,23 @@ public sealed class CompositeAlertPublisher : DisposableBase, IAlertPublisher
 
         if (errors.Count > 0)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Published to {SuccessCount}/{TotalCount} providers, {ErrorCount} failed",
-                _publishers.Count() - errors.Count,
-                _publishers.Count(),
+                this.publishers.Count() - errors.Count,
+                this.publishers.Count(),
                 errors.Count);
 
             // Re-throw if ALL publishers failed
-            if (errors.Count == _publishers.Count())
+            if (errors.Count == this.publishers.Count())
             {
                 throw new AggregateException("All alert publishers failed", errors);
             }
         }
         else
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Successfully published alert to {Count} providers",
-                _publishers.Count());
+                this.publishers.Count());
         }
     }
 
@@ -74,7 +77,7 @@ public sealed class CompositeAlertPublisher : DisposableBase, IAlertPublisher
         try
         {
             // CONCURRENCY FIX: Throttle concurrent publishing
-            await _concurrencyThrottle.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await this.concurrencyThrottle.WaitAsync(cancellationToken).ConfigureAwait(false);
             semaphoreAcquired = true;
 
             await publisher.PublishAsync(webhook, severity, cancellationToken).ConfigureAwait(false);
@@ -86,7 +89,7 @@ public sealed class CompositeAlertPublisher : DisposableBase, IAlertPublisher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Publisher {Publisher} failed to publish alert", publisher.GetType().Name);
+            this.logger.LogError(ex, "Publisher {Publisher} failed to publish alert", publisher.GetType().Name);
             lock (errors)
             {
                 errors.Add(ex);
@@ -97,13 +100,13 @@ public sealed class CompositeAlertPublisher : DisposableBase, IAlertPublisher
             // RESOURCE LEAK FIX: Only release if we actually acquired the semaphore
             if (semaphoreAcquired)
             {
-                _concurrencyThrottle.Release();
+                this.concurrencyThrottle.Release();
             }
         }
     }
 
     protected override void DisposeCore()
     {
-        _concurrencyThrottle.Dispose();
+        this.concurrencyThrottle.Dispose();
     }
 }

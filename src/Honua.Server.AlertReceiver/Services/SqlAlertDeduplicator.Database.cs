@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="SqlAlertDeduplicator.Database.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System.Data;
 using Dapper;
 using Npgsql;
@@ -89,14 +92,14 @@ WHERE id = @Id AND row_version = @RowVersion;";
     /// </summary>
     private Task EnsureSchemaAsync(IDbConnection connection, CancellationToken cancellationToken)
     {
-        if (_schemaInitialized)
+        if (schemaInitialized)
         {
             return Task.CompletedTask;
         }
 
         lock (SchemaLock)
         {
-            if (_schemaInitialized)
+            if (schemaInitialized)
             {
                 return Task.CompletedTask;
             }
@@ -104,7 +107,7 @@ WHERE id = @Id AND row_version = @RowVersion;";
             // Execute synchronously within the lock to prevent race conditions
             connection.Execute(EnsureSchemaSql);
 
-            _schemaInitialized = true;
+            schemaInitialized = true;
         }
 
         return Task.CompletedTask;
@@ -117,15 +120,25 @@ WHERE id = @Id AND row_version = @RowVersion;";
     private sealed class AlertDeduplicationRecord
     {
         public string Id { get; set; } = string.Empty;
+
         public string Fingerprint { get; set; } = string.Empty;
+
         public string Severity { get; set; } = string.Empty;
+
         public DateTimeOffset FirstSeen { get; set; }
+
         public DateTimeOffset LastSent { get; set; }
+
         public int SentCount { get; set; }
+
         public int SuppressedCount { get; set; }
+
         public string SentTimestampsJson { get; set; } = "[]";
+
         public DateTimeOffset UpdatedAt { get; set; }
+
         public string? ReservationId { get; set; }
+
         public DateTimeOffset? ReservationExpiresAt { get; set; }
 
         /// <summary>

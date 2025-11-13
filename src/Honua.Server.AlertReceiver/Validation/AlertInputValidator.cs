@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="AlertInputValidator.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -68,7 +71,7 @@ public static class AlertInputValidator
         "method",
         "status_code",
         "error_type",
-        "error_code"
+        "error_code",
     };
 
     /// <summary>

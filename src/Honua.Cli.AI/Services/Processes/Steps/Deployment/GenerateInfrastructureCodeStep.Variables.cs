@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Honua.Cli.AI.Services.Processes.State;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Cli.AI.Services.Processes.Steps.Deployment;
 

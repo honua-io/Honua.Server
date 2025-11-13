@@ -455,6 +455,161 @@ public sealed class PostgresPatternUsageTelemetry : IPatternUsageTelemetry
         }
     }
 
+    public async Task TrackPatternInteractionAsync(
+        PatternInteractionFeedback feedback,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var connection = await OpenConnectionAsync(cancellationToken);
+
+            await connection.ExecuteAsync(@"
+                INSERT INTO pattern_interaction_feedback
+                    (id, pattern_id, deployment_id, recommended_at, recommendation_rank,
+                     confidence_score, recommended_config_json, decision_timestamp,
+                     time_to_decision_seconds, was_accepted, was_modified,
+                     actual_config_json, config_modifications_json, follow_up_questions_count,
+                     user_hesitation_indicators_json, user_satisfaction_rating, user_feedback_text)
+                VALUES
+                    (@Id, @PatternId, @DeploymentId, @RecommendedAt, @RecommendationRank,
+                     @ConfidenceScore, @RecommendedConfigJson::jsonb, @DecisionTimestamp,
+                     @TimeToDecisionSeconds, @WasAccepted, @WasModified,
+                     @ActualConfigJson::jsonb, @ConfigModificationsJson::jsonb, @FollowUpQuestionsCount,
+                     @UserHesitationIndicatorsJson::jsonb, @UserSatisfactionRating, @UserFeedbackText)",
+                new
+                {
+                    feedback.Id,
+                    feedback.PatternId,
+                    feedback.DeploymentId,
+                    feedback.RecommendedAt,
+                    feedback.RecommendationRank,
+                    feedback.ConfidenceScore,
+                    feedback.RecommendedConfigJson,
+                    feedback.DecisionTimestamp,
+                    feedback.TimeToDecisionSeconds,
+                    feedback.WasAccepted,
+                    feedback.WasModified,
+                    feedback.ActualConfigJson,
+                    feedback.ConfigModificationsJson,
+                    feedback.FollowUpQuestionsCount,
+                    feedback.UserHesitationIndicatorsJson,
+                    feedback.UserSatisfactionRating,
+                    feedback.UserFeedbackText
+                });
+
+            _logger.LogInformation(
+                "Tracked pattern interaction: {PatternId}, Accepted: {Accepted}",
+                feedback.PatternId,
+                feedback.WasAccepted);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to track pattern interaction");
+            // Don't throw - telemetry failures shouldn't break the workflow
+        }
+    }
+
+    public async Task UpdatePatternDecisionAsync(
+        Guid interactionId,
+        bool wasAccepted,
+        DateTime decisionTimestamp,
+        string? actualConfigJson = null,
+        string? configModificationsJson = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var connection = await OpenConnectionAsync(cancellationToken);
+
+            await connection.ExecuteAsync(@"
+                UPDATE pattern_interaction_feedback
+                SET decision_timestamp = @DecisionTimestamp,
+                    time_to_decision_seconds = EXTRACT(EPOCH FROM (@DecisionTimestamp - recommended_at))::int,
+                    was_accepted = @WasAccepted,
+                    actual_config_json = @ActualConfigJson::jsonb,
+                    config_modifications_json = @ConfigModificationsJson::jsonb,
+                    was_modified = (@ConfigModificationsJson IS NOT NULL)
+                WHERE id = @InteractionId",
+                new
+                {
+                    InteractionId = interactionId,
+                    WasAccepted = wasAccepted,
+                    DecisionTimestamp = decisionTimestamp,
+                    ActualConfigJson = actualConfigJson,
+                    ConfigModificationsJson = configModificationsJson
+                });
+
+            _logger.LogInformation(
+                "Updated pattern decision: {InteractionId}, Accepted: {Accepted}",
+                interactionId,
+                wasAccepted);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update pattern decision");
+            // Don't throw - telemetry failures shouldn't break the workflow
+        }
+    }
+
+    public async Task RecordUserSatisfactionAsync(
+        Guid interactionId,
+        int rating,
+        string? feedbackText = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var connection = await OpenConnectionAsync(cancellationToken);
+
+            await connection.ExecuteAsync(@"
+                UPDATE pattern_interaction_feedback
+                SET user_satisfaction_rating = @Rating,
+                    user_feedback_text = @FeedbackText
+                WHERE id = @InteractionId",
+                new
+                {
+                    InteractionId = interactionId,
+                    Rating = rating,
+                    FeedbackText = feedbackText
+                });
+
+            _logger.LogInformation(
+                "Recorded user satisfaction: {InteractionId}, Rating: {Rating}",
+                interactionId,
+                rating);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to record user satisfaction");
+            // Don't throw - telemetry failures shouldn't break the workflow
+        }
+    }
+
+    public async Task IncrementFollowUpQuestionsAsync(
+        Guid interactionId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var connection = await OpenConnectionAsync(cancellationToken);
+
+            await connection.ExecuteAsync(@"
+                UPDATE pattern_interaction_feedback
+                SET follow_up_questions_count = follow_up_questions_count + 1
+                WHERE id = @InteractionId",
+                new { InteractionId = interactionId });
+
+            _logger.LogDebug(
+                "Incremented follow-up questions count for interaction {InteractionId}",
+                interactionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to increment follow-up questions");
+            // Don't throw - telemetry failures shouldn't break the workflow
+        }
+    }
+
     private async Task<IDbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
         var connectionString = _configuration.GetConnectionString("PostgreSQL")

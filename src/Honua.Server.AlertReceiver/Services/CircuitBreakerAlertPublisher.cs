@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="CircuitBreakerAlertPublisher.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Honua.Server.AlertReceiver.Models;
 using Polly;
 using Polly.CircuitBreaker;
@@ -12,41 +15,43 @@ namespace Honua.Server.AlertReceiver.Services;
 /// </summary>
 public sealed class CircuitBreakerAlertPublisher : IAlertPublisher
 {
-    private readonly IAlertPublisher _innerPublisher;
-    private readonly AsyncCircuitBreakerPolicy _circuitBreaker;
-    private readonly ILogger<CircuitBreakerAlertPublisher> _logger;
-    private readonly string _publisherName;
+    private readonly IAlertPublisher innerPublisher;
+    private readonly AsyncCircuitBreakerPolicy circuitBreaker;
+    private readonly ILogger<CircuitBreakerAlertPublisher> logger;
+    private readonly string publisherName;
 
     public CircuitBreakerAlertPublisher(
         IAlertPublisher innerPublisher,
         IConfiguration configuration,
         ILogger<CircuitBreakerAlertPublisher> logger)
     {
-        _innerPublisher = innerPublisher;
-        _logger = logger;
-        _publisherName = innerPublisher.GetType().Name;
+        this.innerPublisher = innerPublisher;
+        this.logger = logger;
+        this.publisherName = innerPublisher.GetType().Name;
 
         var failureThreshold = configuration.GetValue("Alerts:CircuitBreaker:FailureThreshold", 5);
         var breakDuration = configuration.GetValue("Alerts:CircuitBreaker:BreakDurationSeconds", 60);
 
-        _circuitBreaker = Policy
+        this.circuitBreaker = Policy
             .Handle<Exception>()
             .CircuitBreakerAsync(
                 exceptionsAllowedBeforeBreaking: failureThreshold,
                 durationOfBreak: TimeSpan.FromSeconds(breakDuration),
                 onBreak: (exception, duration) =>
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "Circuit breaker OPEN for {Publisher}: {Exception}. Breaking for {Duration}s",
-                        _publisherName, exception.GetType().Name, duration.TotalSeconds);
+                        this.publisherName,
+                        exception.GetType().Name,
+                        duration.TotalSeconds);
                 },
                 onReset: () =>
                 {
-                    _logger.LogInformation("Circuit breaker CLOSED for {Publisher}", _publisherName);
+                    this.logger.LogInformation("Circuit breaker CLOSED for {Publisher}", this.publisherName);
                 },
                 onHalfOpen: () =>
                 {
-                    _logger.LogInformation("Circuit breaker HALF-OPEN for {Publisher}, testing...", _publisherName);
+                    this.logger.LogInformation("Circuit breaker HALF-OPEN for {Publisher}, testing...", this.publisherName);
                 });
     }
 
@@ -54,31 +59,17 @@ public sealed class CircuitBreakerAlertPublisher : IAlertPublisher
     {
         try
         {
-            await _circuitBreaker.ExecuteAsync(async () =>
+            await this.circuitBreaker.ExecuteAsync(async () =>
             {
-                await _innerPublisher.PublishAsync(webhook, severity, cancellationToken);
+                await this.innerPublisher.PublishAsync(webhook, severity, cancellationToken);
             });
         }
         catch (BrokenCircuitException)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Alert not sent to {Publisher} - circuit breaker is OPEN",
-                _publisherName);
+                this.publisherName);
             throw;
         }
-    }
-}
-
-/// <summary>
-/// Factory for creating circuit breaker wrapped publishers.
-/// </summary>
-public static class CircuitBreakerPublisherFactory
-{
-    public static IAlertPublisher Wrap(
-        IAlertPublisher publisher,
-        IConfiguration configuration,
-        ILogger<CircuitBreakerAlertPublisher> logger)
-    {
-        return new CircuitBreakerAlertPublisher(publisher, configuration, logger);
     }
 }

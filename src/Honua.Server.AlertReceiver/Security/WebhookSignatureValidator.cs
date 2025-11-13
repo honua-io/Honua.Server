@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="WebhookSignatureValidator.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System.Security.Cryptography;
 using System.Text;
 using Honua.Server.AlertReceiver.Configuration;
@@ -36,15 +39,15 @@ public interface IWebhookSignatureValidator
 /// </summary>
 public sealed class WebhookSignatureValidator : IWebhookSignatureValidator
 {
-    private readonly WebhookSecurityOptions _options;
-    private readonly ILogger<WebhookSignatureValidator> _logger;
+    private readonly WebhookSecurityOptions options;
+    private readonly ILogger<WebhookSignatureValidator> logger;
 
     public WebhookSignatureValidator(
         IOptions<WebhookSecurityOptions> options,
         ILogger<WebhookSignatureValidator> logger)
     {
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -63,23 +66,23 @@ public sealed class WebhookSignatureValidator : IWebhookSignatureValidator
 
         if (string.IsNullOrWhiteSpace(secret))
         {
-            _logger.LogWarning("Webhook signature validation failed: secret is null or empty");
+            this.logger.LogWarning("Webhook signature validation failed: secret is null or empty");
             return false;
         }
 
         // Extract signature from header
-        if (!request.Headers.TryGetValue(_options.SignatureHeaderName, out var signatureHeader))
+        if (!request.Headers.TryGetValue(this.options.SignatureHeaderName, out var signatureHeader))
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Webhook signature validation failed: {HeaderName} header not found",
-                _options.SignatureHeaderName);
+                this.options.SignatureHeaderName);
             return false;
         }
 
         var providedSignature = signatureHeader.ToString();
         if (string.IsNullOrWhiteSpace(providedSignature))
         {
-            _logger.LogWarning("Webhook signature validation failed: signature header is empty");
+            this.logger.LogWarning("Webhook signature validation failed: signature header is empty");
             return false;
         }
 
@@ -98,29 +101,29 @@ public sealed class WebhookSignatureValidator : IWebhookSignatureValidator
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to read request body for signature validation");
+            this.logger.LogError(ex, "Failed to read request body for signature validation");
             return false;
         }
 
         // Check payload size
-        if (payload.Length > _options.MaxPayloadSize)
+        if (payload.Length > this.options.MaxPayloadSize)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Webhook signature validation failed: payload size {Size} exceeds maximum {MaxSize}",
                 payload.Length,
-                _options.MaxPayloadSize);
+                this.options.MaxPayloadSize);
             return false;
         }
 
         // Generate expected signature
-        var expectedSignature = GenerateSignature(payload, secret);
+        var expectedSignature = this.GenerateSignature(payload, secret);
 
         // Perform constant-time comparison to prevent timing attacks
         var isValid = CompareSignaturesConstantTime(expectedSignature, providedSignature);
 
         if (!isValid)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Webhook signature validation failed: signature mismatch from {RemoteIp}",
                 request.HttpContext.Connection.RemoteIpAddress);
         }

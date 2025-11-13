@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="SqlAlertDeduplicator.Helpers.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -26,10 +29,10 @@ public sealed partial class SqlAlertDeduplicator
     {
         var minutes = severity.ToLowerInvariant() switch
         {
-            "critical" => _configuration.GetValue("Alerts:Deduplication:CriticalWindowMinutes", 5),
-            "high" => _configuration.GetValue("Alerts:Deduplication:HighWindowMinutes", 10),
-            "medium" or "warning" => _configuration.GetValue("Alerts:Deduplication:WarningWindowMinutes", 15),
-            _ => _configuration.GetValue("Alerts:Deduplication:DefaultWindowMinutes", 30)
+            "critical" => this.configuration.GetValue("Alerts:Deduplication:CriticalWindowMinutes", 5),
+            "high" => this.configuration.GetValue("Alerts:Deduplication:HighWindowMinutes", 10),
+            "medium" or "warning" => this.configuration.GetValue("Alerts:Deduplication:WarningWindowMinutes", 15),
+            _ => this.configuration.GetValue("Alerts:Deduplication:DefaultWindowMinutes", 30),
         };
 
         return TimeSpan.FromMinutes(minutes);
@@ -43,10 +46,10 @@ public sealed partial class SqlAlertDeduplicator
     {
         return severity.ToLowerInvariant() switch
         {
-            "critical" => _configuration.GetValue("Alerts:RateLimit:CriticalPerHour", 20),
-            "high" => _configuration.GetValue("Alerts:RateLimit:HighPerHour", 10),
-            "medium" or "warning" => _configuration.GetValue("Alerts:RateLimit:WarningPerHour", 5),
-            _ => _configuration.GetValue("Alerts:RateLimit:DefaultPerHour", 3)
+            "critical" => this.configuration.GetValue("Alerts:RateLimit:CriticalPerHour", 20),
+            "high" => this.configuration.GetValue("Alerts:RateLimit:HighPerHour", 10),
+            "medium" or "warning" => this.configuration.GetValue("Alerts:RateLimit:WarningPerHour", 5),
+            _ => this.configuration.GetValue("Alerts:RateLimit:DefaultPerHour", 3),
         };
     }
 

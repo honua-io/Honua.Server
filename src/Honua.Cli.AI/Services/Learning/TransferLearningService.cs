@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
+using Honua.Cli.AI.Services.AI;
 using Honua.Cli.AI.Services.VectorSearch;
 using Microsoft.Extensions.Logging;
 using Npgsql;
