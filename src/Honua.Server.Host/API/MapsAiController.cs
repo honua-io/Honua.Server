@@ -18,6 +18,11 @@ namespace Honua.Server.Host.API;
 /// <summary>
 /// AI-powered map generation API endpoints
 /// </summary>
+/// <remarks>
+/// TODO: Re-enable when IMapGenerationAiService implementation is available.
+/// The types exist in Core but the service implementation may not be registered.
+/// </remarks>
+/*
 [ApiController]
 [Route("api/maps/ai")]
 [Produces("application/json")]
@@ -414,3 +419,4 @@ public class ServiceHealthResponse
     /// </summary>
     public string Message { get; set; } = string.Empty;
 }
+*/

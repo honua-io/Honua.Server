@@ -24,12 +24,13 @@ public class StyleGenerationController : ControllerBase
 {
     private readonly StyleGeneratorService styleGenerator = new();
     private readonly IMetadataProvider metadataProvider;
-    private readonly IQueryService queryService;
+    // TODO: IQueryService is not defined in the codebase. Re-enable when available.
+    // private readonly IQueryService queryService;
 
-    public StyleGenerationController(IMetadataProvider metadataProvider, IQueryService queryService)
+    public StyleGenerationController(IMetadataProvider metadataProvider/*, IQueryService queryService*/)
     {
         this.metadataProvider = metadataProvider;
-        this.queryService = queryService;
+        // this.queryService = queryService;
     }
 
     /// <summary>
@@ -75,6 +76,11 @@ public class StyleGenerationController : ControllerBase
     /// </summary>
     /// <param name="request">Layer style generation request</param>
     /// <returns>Generated style based on layer data</returns>
+    /// <remarks>
+    /// TODO: Re-enable when IQueryService is available.
+    /// This endpoint depends on IQueryService for data sampling.
+    /// </remarks>
+    /*
     [HttpPost("generate-from-layer")]
     [ProducesResponseType(typeof(GeneratedStyle), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -153,6 +159,7 @@ public class StyleGenerationController : ControllerBase
             return this.BadRequest(new { error = ex.Message });
         }
     }
+    */
 
     /// <summary>
     /// Get available color palettes

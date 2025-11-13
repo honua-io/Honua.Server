@@ -82,7 +82,7 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
         return Task.CompletedTask;
     }
 
-    private void OnMetadataChanged(object? sender, MetadataChangedEventArgs e)
+    private void OnMetadataChanged(object? sender, Honua.Server.Host.Admin.Hubs.MetadataChangedEventArgs e)
     {
         try
         {
