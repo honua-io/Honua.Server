@@ -18,22 +18,22 @@ namespace Honua.Server.Host.Authentication;
 [Route("api/auth/local")]
 public sealed class LocalPasswordController : ControllerBase
 {
-    private readonly ILocalAuthenticationService _localAuthenticationService;
-    private readonly IPasswordComplexityValidator _passwordValidator;
+    private readonly ILocalAuthenticationService localAuthenticationService;
+    private readonly IPasswordComplexityValidator passwordValidator;
 
     public LocalPasswordController(
         ILocalAuthenticationService localAuthenticationService,
         IPasswordComplexityValidator passwordValidator)
     {
-        _localAuthenticationService = Guard.NotNull(localAuthenticationService);
-        _passwordValidator = Guard.NotNull(passwordValidator);
+        this.localAuthenticationService = Guard.NotNull(localAuthenticationService);
+        this.passwordValidator = Guard.NotNull(passwordValidator);
     }
 
     [HttpPost("change-password")]
     [Authorize]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid)
+        if (!this.ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
@@ -51,15 +51,15 @@ public sealed class LocalPasswordController : ControllerBase
 
         try
         {
-            await _localAuthenticationService.ChangePasswordAsync(
+            await this.localAuthenticationService.ChangePasswordAsync(
                 userId,
                 request.CurrentPassword,
                 request.NewPassword,
-                HttpContext.Connection.RemoteIpAddress?.ToString(),
-                Request.Headers.UserAgent.ToString(),
+                this.HttpContext.Connection.RemoteIpAddress?.ToString(),
+                this.Request.Headers.UserAgent.ToString(),
                 cancellationToken).ConfigureAwait(false);
 
-            return NoContent();
+            return this.NoContent();
         }
         catch (KeyNotFoundException ex)
         {
@@ -78,7 +78,7 @@ public sealed class LocalPasswordController : ControllerBase
         [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid)
+        if (!this.ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
@@ -90,15 +90,15 @@ public sealed class LocalPasswordController : ControllerBase
 
         try
         {
-            await _localAuthenticationService.ResetPasswordAsync(
+            await this.localAuthenticationService.ResetPasswordAsync(
                 userId,
                 request.NewPassword,
                 UserIdentityHelper.GetUserIdentifierOrNull(User),
-                HttpContext.Connection.RemoteIpAddress?.ToString(),
-                Request.Headers.UserAgent.ToString(),
+                this.HttpContext.Connection.RemoteIpAddress?.ToString(),
+                this.Request.Headers.UserAgent.ToString(),
                 cancellationToken).ConfigureAwait(false);
 
-            return NoContent();
+            return this.NoContent();
         }
         catch (KeyNotFoundException ex)
         {
@@ -127,7 +127,7 @@ public sealed class LocalPasswordController : ControllerBase
 
     private bool ValidatePasswordComplexity(string password, string modelStateKey)
     {
-        var result = _passwordValidator.Validate(password);
+        var result = this.passwordValidator.Validate(password);
         if (result.IsValid)
         {
             return true;
@@ -135,7 +135,7 @@ public sealed class LocalPasswordController : ControllerBase
 
         foreach (var error in result.Errors)
         {
-            ModelState.AddModelError(modelStateKey, error);
+            this.ModelState.AddModelError(modelStateKey, error);
         }
 
         return false;

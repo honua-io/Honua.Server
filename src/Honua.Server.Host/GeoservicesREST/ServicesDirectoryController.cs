@@ -39,15 +39,15 @@ public sealed class ServicesDirectoryController : ControllerBase
 {
     private const double GeoServicesVersion = 10.81;
     private const int DefaultMaxRecordCount = 1000;
-    private readonly ICatalogProjectionService _catalog;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly HonuaConfig? _honuaConfig;
+    private readonly ICatalogProjectionService catalog;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly HonuaConfig? honuaConfig;
 
     public ServicesDirectoryController(ICatalogProjectionService catalog, IMetadataRegistry metadataRegistry, HonuaConfig? honuaConfig = null)
     {
-        _catalog = Guard.NotNull(catalog);
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _honuaConfig = honuaConfig;
+        this.catalog = Guard.NotNull(catalog);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.honuaConfig = honuaConfig;
     }
 
     [HttpGet]
@@ -59,7 +59,7 @@ public sealed class ServicesDirectoryController : ControllerBase
             [("arcgis.operation", "GetRoot")],
             async activity =>
             {
-                var snapshot = _catalog.GetSnapshot();
+                var snapshot = this.catalog.GetSnapshot();
                 var rasterServices = await ResolveRasterServicesAsync(cancellationToken).ConfigureAwait(false);
                 var urlFactory = new Func<string?, string, string, string>(BuildServiceUrl);
                 var folders = snapshot.Groups.Select(group => group.Id).ToArray();
@@ -81,7 +81,7 @@ public sealed class ServicesDirectoryController : ControllerBase
                     });
                 }
 
-                return Ok(new ServicesDirectoryResponse
+                return this.Ok(new ServicesDirectoryResponse
                 {
                     CurrentVersion = GeoServicesVersion,
                     Folders = folders,
@@ -102,10 +102,10 @@ public sealed class ServicesDirectoryController : ControllerBase
             ],
             async activity =>
             {
-                var group = _catalog.GetGroup(folderId);
+                var group = this.catalog.GetGroup(folderId);
                 if (group is null)
                 {
-                    return NotFound();
+                    return this.NotFound();
                 }
 
                 var rasterServices = await ResolveRasterServicesAsync(cancellationToken).ConfigureAwait(false);
@@ -114,7 +114,7 @@ public sealed class ServicesDirectoryController : ControllerBase
                     .SelectMany(service => CreateFolderEntries(service, rasterServices, urlFactory))
                     .ToArray();
 
-                return Ok(new FolderDirectoryResponse
+                return this.Ok(new FolderDirectoryResponse
                 {
                     CurrentVersion = GeoServicesVersion,
                     FolderName = group.Title,
@@ -204,13 +204,13 @@ public sealed class ServicesDirectoryController : ControllerBase
     private string BuildServiceUrl(string? folderId, string serviceId, string serviceType)
     {
         var builder = new StringBuilder();
-        builder.Append(Request.Scheme)
+        builder.Append(this.Request.Scheme)
             .Append("://")
             .Append(Request.Host);
 
-        if (Request.PathBase.HasValue)
+        if (this.Request.PathBase.HasValue)
         {
-            builder.Append(Request.PathBase.Value);
+            builder.Append(this.Request.PathBase.Value);
         }
 
         builder.Append("/rest/services");
@@ -232,13 +232,13 @@ public sealed class ServicesDirectoryController : ControllerBase
     private string BuildGeometryServiceUrl()
     {
         var builder = new StringBuilder();
-        builder.Append(Request.Scheme)
+        builder.Append(this.Request.Scheme)
             .Append("://")
             .Append(Request.Host);
 
-        if (Request.PathBase.HasValue)
+        if (this.Request.PathBase.HasValue)
         {
-            builder.Append(Request.PathBase.Value);
+            builder.Append(this.Request.PathBase.Value);
         }
 
         builder.Append("/rest/services/Geometry/GeometryServer");
@@ -247,7 +247,7 @@ public sealed class ServicesDirectoryController : ControllerBase
 
     private async Task<HashSet<string>> ResolveRasterServicesAsync(CancellationToken cancellationToken = default)
     {
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
         var services = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var dataset in snapshot.RasterDatasets)

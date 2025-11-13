@@ -21,20 +21,20 @@ namespace Honua.Server.Host.Middleware;
 /// </summary>
 public sealed class RequestResponseLoggingMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<RequestResponseLoggingMiddleware> _logger;
-    private readonly RequestResponseLoggingOptions _options;
-    private readonly SensitiveDataRedactor _redactor;
+    private readonly RequestDelegate next;
+    private readonly ILogger<RequestResponseLoggingMiddleware> logger;
+    private readonly RequestResponseLoggingOptions options;
+    private readonly SensitiveDataRedactor redactor;
 
     public RequestResponseLoggingMiddleware(
         RequestDelegate next,
         ILogger<RequestResponseLoggingMiddleware> logger,
         RequestResponseLoggingOptions options)
     {
-        _next = Guard.NotNull(next);
-        _logger = Guard.NotNull(logger);
-        _options = Guard.NotNull(options);
-        _redactor = new SensitiveDataRedactor(options.RedactionOptions);
+        this.next = Guard.NotNull(next);
+        this.logger = Guard.NotNull(logger);
+        this.options = Guard.NotNull(options);
+        this.redactor = new SensitiveDataRedactor(options.RedactionOptions);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -50,7 +50,7 @@ public sealed class RequestResponseLoggingMiddleware
         var requestId = context.TraceIdentifier;
 
         // Log request
-        if (_options.LogRequests)
+        if (this.options.LogRequests)
         {
             await LogRequestAsync(context, requestId).ConfigureAwait(false);
         }
@@ -64,7 +64,7 @@ public sealed class RequestResponseLoggingMiddleware
             stopwatch.Stop();
 
             // Log response
-            if (_options.LogResponses)
+            if (this.options.LogResponses)
             {
                 LogResponse(context, requestId, stopwatch.ElapsedMilliseconds);
             }
@@ -77,11 +77,11 @@ public sealed class RequestResponseLoggingMiddleware
         var user = context.User.Identity?.Name ?? "anonymous";
 
         // Redact sensitive query string parameters
-        var queryString = _options.RedactionOptions.RedactQueryStrings
-            ? _redactor.RedactQueryString(request.QueryString.ToString())
+        var queryString = this.options.RedactionOptions.RedactQueryStrings
+            ? this.redactor.RedactQueryString(request.QueryString.ToString())
             : request.QueryString.ToString();
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "HTTP {Method} {Path}{QueryString} - User: {User} - RequestId: {RequestId} - IP: {RemoteIp}",
             request.Method,
             request.Path,
@@ -91,13 +91,13 @@ public sealed class RequestResponseLoggingMiddleware
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
 
         // Log request headers if configured
-        if (_options.LogHeaders && _logger.IsEnabled(LogLevel.Debug))
+        if (this.options.LogHeaders && this.logger.IsEnabled(LogLevel.Debug))
         {
             var headers = new StringBuilder();
             foreach (var (key, value) in request.Headers)
             {
                 // Redact sensitive headers
-                if (_options.RedactionOptions.RedactHeaders && _redactor.IsSensitiveField(key))
+                if (this.options.RedactionOptions.RedactHeaders && this.redactor.IsSensitiveField(key))
                 {
                     headers.AppendLine($"  {key}: ***REDACTED***");
                 }
@@ -107,11 +107,11 @@ public sealed class RequestResponseLoggingMiddleware
                 }
             }
 
-            _logger.LogDebug("Request Headers - RequestId: {RequestId}\n{Headers}", requestId, headers.ToString());
+            this.logger.LogDebug("Request Headers - RequestId: {RequestId}\n{Headers}", requestId, headers.ToString());
         }
 
         // Log request body if configured (JSON only)
-        if (_options.LogRequestBody && _logger.IsEnabled(LogLevel.Debug))
+        if (this.options.LogRequestBody && this.logger.IsEnabled(LogLevel.Debug))
         {
             await LogRequestBodyAsync(context, requestId).ConfigureAwait(false);
         }
@@ -125,12 +125,12 @@ public sealed class RequestResponseLoggingMiddleware
         if (!request.ContentType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) ?? true)
             return;
 
-        if (_options.MaxRequestBodyLogSize <= 0)
+        if (this.options.MaxRequestBodyLogSize <= 0)
         {
             return;
         }
 
-        var bufferLimit = (int)Math.Min(_options.MaxRequestBodyLogSize, int.MaxValue);
+        var bufferLimit = (int)Math.Min(this.options.MaxRequestBodyLogSize, int.MaxValue);
 
         // Enable buffering to allow multiple reads
         request.EnableBuffering(bufferThreshold: 1024 * 16, bufferLimit: bufferLimit);
@@ -183,9 +183,9 @@ public sealed class RequestResponseLoggingMiddleware
             {
                 var body = builder.ToString();
 
-                if (_options.RedactionOptions.RedactJsonBodies)
+                if (this.options.RedactionOptions.RedactJsonBodies)
                 {
-                    body = _redactor.RedactJson(body);
+                    body = this.redactor.RedactJson(body);
                 }
 
                 if (truncated)
@@ -193,12 +193,12 @@ public sealed class RequestResponseLoggingMiddleware
                     body += "\n[Body truncated due to logging size limit]";
                 }
 
-                _logger.LogDebug("Request Body - RequestId: {RequestId}\n{Body}", requestId, body);
+                this.logger.LogDebug("Request Body - RequestId: {RequestId}\n{Body}", requestId, body);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to read request body for logging - RequestId: {RequestId}", requestId);
+            this.logger.LogWarning(ex, "Failed to read request body for logging - RequestId: {RequestId}", requestId);
             // Reset position on error
             if (request.Body.CanSeek)
                 request.Body.Position = 0;
@@ -220,7 +220,7 @@ public sealed class RequestResponseLoggingMiddleware
                       response.StatusCode >= 400 ? LogLevel.Warning :
                       LogLevel.Information;
 
-        _logger.Log(
+        this.logger.Log(
             logLevel,
             "HTTP {Method} {Path} - Status: {StatusCode} - Duration: {ElapsedMs}ms - RequestId: {RequestId}",
             context.Request.Method,
@@ -230,9 +230,9 @@ public sealed class RequestResponseLoggingMiddleware
             requestId);
 
         // Log slow requests
-        if (elapsedMs > _options.SlowRequestThresholdMs)
+        if (elapsedMs > this.options.SlowRequestThresholdMs)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Slow request detected - {Method} {Path} - Duration: {ElapsedMs}ms - RequestId: {RequestId}",
                 context.Request.Method,
                 context.Request.Path,
@@ -241,7 +241,7 @@ public sealed class RequestResponseLoggingMiddleware
         }
 
         // Log response headers if configured
-        if (_options.LogHeaders && _logger.IsEnabled(LogLevel.Debug))
+        if (this.options.LogHeaders && this.logger.IsEnabled(LogLevel.Debug))
         {
             var headers = new StringBuilder();
             foreach (var (key, value) in response.Headers)
@@ -249,7 +249,7 @@ public sealed class RequestResponseLoggingMiddleware
                 headers.AppendLine($"  {key}: {value}");
             }
 
-            _logger.LogDebug("Response Headers - RequestId: {RequestId}\n{Headers}", requestId, headers.ToString());
+            this.logger.LogDebug("Response Headers - RequestId: {RequestId}\n{Headers}", requestId, headers.ToString());
         }
     }
 

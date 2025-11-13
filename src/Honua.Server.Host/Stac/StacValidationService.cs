@@ -108,7 +108,7 @@ public sealed record StacValidationError
 /// </summary>
 public sealed class StacValidationService : IStacValidationService
 {
-    private readonly ILogger<StacValidationService> _logger;
+    private readonly ILogger<StacValidationService> logger;
     private static readonly HashSet<string> SupportedGeometryTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "Point",
@@ -122,7 +122,7 @@ public sealed class StacValidationService : IStacValidationService
 
     public StacValidationService(ILogger<StacValidationService> logger)
     {
-        _logger = Guard.NotNull(logger);
+        this.logger = Guard.NotNull(logger);
     }
 
     public StacValidationResult ValidateCollection(JsonObject collectionJson)
@@ -136,7 +136,7 @@ public sealed class StacValidationService : IStacValidationService
             collectionId = idNode?.GetValue<string>();
         }
 
-        _logger.LogDebug("Validating STAC collection: {CollectionId}", collectionId ?? "unknown");
+        this.logger.LogDebug("Validating STAC collection: {CollectionId}", collectionId ?? "unknown");
 
         // Validate required 'id' field
         if (collectionId.IsNullOrWhiteSpace())
@@ -148,7 +148,7 @@ public sealed class StacValidationService : IStacValidationService
                 ExpectedFormat = "A non-empty string identifier",
                 Example = "my-collection-123"
             });
-            _logger.LogWarning("Collection validation failed: missing or empty 'id' field");
+            this.logger.LogWarning("Collection validation failed: missing or empty 'id' field");
         }
         else if (collectionId.Length > 256)
         {
@@ -171,7 +171,7 @@ public sealed class StacValidationService : IStacValidationService
                 ExpectedFormat = "A non-empty string describing the collection",
                 Example = "Satellite imagery of agricultural land cover"
             });
-            _logger.LogDebug("Collection {CollectionId} validation: missing 'description'", collectionId ?? "unknown");
+            this.logger.LogDebug("Collection {CollectionId} validation: missing 'description'", collectionId ?? "unknown");
         }
 
         // Validate required 'license' field
@@ -184,7 +184,7 @@ public sealed class StacValidationService : IStacValidationService
                 ExpectedFormat = "A valid SPDX license identifier or 'proprietary' or 'various'",
                 Example = "CC-BY-4.0, MIT, proprietary"
             });
-            _logger.LogDebug("Collection {CollectionId} validation: missing 'license'", collectionId ?? "unknown");
+            this.logger.LogDebug("Collection {CollectionId} validation: missing 'license'", collectionId ?? "unknown");
         }
 
         // Validate required 'extent' field
@@ -200,7 +200,7 @@ public sealed class StacValidationService : IStacValidationService
                 Message = "Required field is missing or not an object",
                 ExpectedFormat = "An object with 'spatial' and 'temporal' properties"
             });
-            _logger.LogDebug("Collection {CollectionId} validation: missing 'extent'", collectionId ?? "unknown");
+            this.logger.LogDebug("Collection {CollectionId} validation: missing 'extent'", collectionId ?? "unknown");
         }
 
         // Validate 'stac_version' if present
@@ -217,7 +217,7 @@ public sealed class StacValidationService : IStacValidationService
                     ExpectedFormat = "Version 1.0.0 or compatible (1.x.x)",
                     Example = "1.0.0"
                 });
-                _logger.LogWarning("Collection {CollectionId} validation: unsupported STAC version {Version}", collectionId ?? "unknown", version);
+                this.logger.LogWarning("Collection {CollectionId} validation: unsupported STAC version {Version}", collectionId ?? "unknown", version);
             }
         }
 
@@ -240,11 +240,11 @@ public sealed class StacValidationService : IStacValidationService
 
         if (errors.Count == 0)
         {
-            _logger.LogDebug("STAC collection validation successful: {CollectionId}", collectionId ?? "unknown");
+            this.logger.LogDebug("STAC collection validation successful: {CollectionId}", collectionId ?? "unknown");
         }
         else
         {
-            _logger.LogWarning("STAC collection validation failed for {CollectionId}: {ErrorCount} errors found",
+            this.logger.LogWarning("STAC collection validation failed for {CollectionId}: {ErrorCount} errors found",
                 collectionId ?? "unknown", errors.Count);
         }
 
@@ -262,7 +262,7 @@ public sealed class StacValidationService : IStacValidationService
             itemId = idNode?.GetValue<string>();
         }
 
-        _logger.LogDebug("Validating STAC item: {ItemId}", itemId ?? "unknown");
+        this.logger.LogDebug("Validating STAC item: {ItemId}", itemId ?? "unknown");
 
         // Validate required 'id' field
         if (itemId.IsNullOrWhiteSpace())
@@ -274,7 +274,7 @@ public sealed class StacValidationService : IStacValidationService
                 ExpectedFormat = "A non-empty string identifier unique within the collection",
                 Example = "item-2024-01-01-abc123"
             });
-            _logger.LogWarning("Item validation failed: missing or empty 'id' field");
+            this.logger.LogWarning("Item validation failed: missing or empty 'id' field");
         }
         else if (itemId.Length > 256)
         {
@@ -299,7 +299,7 @@ public sealed class StacValidationService : IStacValidationService
                 ExpectedFormat = "Must be 'Feature' (GeoJSON Feature type)",
                 Example = "Feature"
             });
-            _logger.LogDebug("Item {ItemId} validation: invalid 'type' field", itemId ?? "unknown");
+            this.logger.LogDebug("Item {ItemId} validation: invalid 'type' field", itemId ?? "unknown");
         }
 
         // Validate required 'geometry' field
@@ -312,7 +312,7 @@ public sealed class StacValidationService : IStacValidationService
                 ExpectedFormat = "A valid GeoJSON geometry object or null",
                 Example = "{\"type\": \"Point\", \"coordinates\": [-122.5, 45.5]}"
             });
-            _logger.LogDebug("Item {ItemId} validation: missing 'geometry'", itemId ?? "unknown");
+            this.logger.LogDebug("Item {ItemId} validation: missing 'geometry'", itemId ?? "unknown");
         }
         else if (geometryNode is not null && geometryNode is not JsonObject && geometryNode.GetValueKind() != JsonValueKind.Null)
         {
@@ -323,7 +323,7 @@ public sealed class StacValidationService : IStacValidationService
                 ActualValue = geometryNode.GetValueKind().ToString(),
                 ExpectedFormat = "A GeoJSON geometry object or null"
             });
-            _logger.LogDebug("Item {ItemId} validation: invalid 'geometry' type", itemId ?? "unknown");
+            this.logger.LogDebug("Item {ItemId} validation: invalid 'geometry' type", itemId ?? "unknown");
         }
         else if (geometryNode is JsonObject geometryObj)
         {
@@ -340,7 +340,7 @@ public sealed class StacValidationService : IStacValidationService
                 ExpectedFormat = "A JSON object containing item properties",
                 Example = "{\"datetime\": \"2024-01-01T00:00:00Z\"}"
             });
-            _logger.LogDebug("Item {ItemId} validation: missing or invalid 'properties'", itemId ?? "unknown");
+            this.logger.LogDebug("Item {ItemId} validation: missing or invalid 'properties'", itemId ?? "unknown");
         }
         else
         {
@@ -358,7 +358,7 @@ public sealed class StacValidationService : IStacValidationService
                 ExpectedFormat = "A JSON object containing asset definitions",
                 Example = "{\"data\": {\"href\": \"https://example.com/data.tif\", \"type\": \"image/tiff\"}}"
             });
-            _logger.LogDebug("Item {ItemId} validation: missing 'assets'", itemId ?? "unknown");
+            this.logger.LogDebug("Item {ItemId} validation: missing 'assets'", itemId ?? "unknown");
         }
         else if (assetsNode is not JsonObject)
         {
@@ -369,7 +369,7 @@ public sealed class StacValidationService : IStacValidationService
                 ActualValue = assetsNode.GetValueKind().ToString(),
                 ExpectedFormat = "A JSON object where each key is an asset identifier"
             });
-            _logger.LogDebug("Item {ItemId} validation: invalid 'assets' type", itemId ?? "unknown");
+            this.logger.LogDebug("Item {ItemId} validation: invalid 'assets' type", itemId ?? "unknown");
         }
 
         // Validate 'links' if present
@@ -386,11 +386,11 @@ public sealed class StacValidationService : IStacValidationService
 
         if (errors.Count == 0)
         {
-            _logger.LogDebug("STAC item validation successful: {ItemId}", itemId ?? "unknown");
+            this.logger.LogDebug("STAC item validation successful: {ItemId}", itemId ?? "unknown");
         }
         else
         {
-            _logger.LogWarning("STAC item validation failed for {ItemId}: {ErrorCount} errors found",
+            this.logger.LogWarning("STAC item validation failed for {ItemId}: {ErrorCount} errors found",
                 itemId ?? "unknown", errors.Count);
         }
 

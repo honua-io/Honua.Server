@@ -30,11 +30,11 @@ namespace Honua.Server.Host.Stac;
 
 internal sealed class StacCatalogSynchronizationHostedService : IHostedService, IDisposable
 {
-    private readonly HonuaConfig? _honuaConfig;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IRasterStacCatalogSynchronizer _rasterSynchronizer;
-    private readonly IVectorStacCatalogSynchronizer? _vectorSynchronizer;
-    private readonly ILogger<StacCatalogSynchronizationHostedService> _logger;
+    private readonly HonuaConfig? honuaConfig;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly IRasterStacCatalogSynchronizer rasterSynchronizer;
+    private readonly IVectorStacCatalogSynchronizer? vectorSynchronizer;
+    private readonly ILogger<StacCatalogSynchronizationHostedService> logger;
 
     private IDisposable? _changeTokenRegistration;
 
@@ -50,18 +50,18 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
         HonuaConfig? honuaConfig = null,
         IVectorStacCatalogSynchronizer? vectorSynchronizer = null)
     {
-        _honuaConfig = honuaConfig;
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _rasterSynchronizer = Guard.NotNull(rasterSynchronizer);
-        _vectorSynchronizer = vectorSynchronizer;
-        _logger = Guard.NotNull(logger);
+        this.honuaConfig = honuaConfig;
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.rasterSynchronizer = Guard.NotNull(rasterSynchronizer);
+        this.vectorSynchronizer = vectorSynchronizer;
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (Environment.GetEnvironmentVariable("HONUA_SKIP_STAC_SYNCHRONIZATION").EqualsIgnoreCase("1"))
         {
-            _logger.LogInformation("STAC synchronization skipped due to HONUA_SKIP_STAC_SYNCHRONIZATION=1 environment variable.");
+            this.logger.LogInformation("STAC synchronization skipped due to HONUA_SKIP_STAC_SYNCHRONIZATION=1 environment variable.");
             return;
         }
 
@@ -72,26 +72,26 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
 
         try
         {
-            await _metadataRegistry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+            await this.metadataRegistry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
             // Synchronize both raster and vector data
-            await _rasterSynchronizer.SynchronizeAllAsync(cancellationToken).ConfigureAwait(false);
+            await this.rasterSynchronizer.SynchronizeAllAsync(cancellationToken).ConfigureAwait(false);
 
             if (_vectorSynchronizer is not null)
             {
-                await _vectorSynchronizer.SynchronizeAllVectorLayersAsync(cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("STAC catalog initialized with raster and vector data.");
+                await this.vectorSynchronizer.SynchronizeAllVectorLayersAsync(cancellationToken).ConfigureAwait(false);
+                this.logger.LogInformation("STAC catalog initialized with raster and vector data.");
             }
             else
             {
-                _logger.LogInformation("STAC catalog initialized with raster data only.");
+                this.logger.LogInformation("STAC catalog initialized with raster data only.");
             }
 
             RegisterForMetadataChanges();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize STAC catalog store.");
+            this.logger.LogError(ex, "Failed to initialize STAC catalog store.");
             throw;
         }
     }
@@ -99,12 +99,12 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _changeTokenRegistration?.Dispose();
-        _changeTokenRegistration = null;
+        this.changeTokenRegistration = null;
 
         // Cancel any in-progress synchronization
         _synchronizationCts?.Cancel();
         _synchronizationCts?.Dispose();
-        _synchronizationCts = null;
+        this.synchronizationCts = null;
 
         return Task.CompletedTask;
     }
@@ -121,14 +121,14 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
         IChangeToken changeToken;
         try
         {
-            changeToken = _metadataRegistry.GetChangeToken();
+            changeToken = this.metadataRegistry.GetChangeToken();
         }
         catch (ObjectDisposedException)
         {
             return;
         }
 
-        _changeTokenRegistration = changeToken.RegisterChangeCallback(_ => OnMetadataChanged(), state: null);
+        this.changeTokenRegistration = changeToken.RegisterChangeCallback(_ => OnMetadataChanged(), state: null);
     }
 
     private void OnMetadataChanged()
@@ -139,12 +139,12 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
             // Cancel any existing synchronization task
             _synchronizationCts?.Cancel();
             _synchronizationCts?.Dispose();
-            _synchronizationCts = new CancellationTokenSource();
+            this.synchronizationCts = new CancellationTokenSource();
 
             // Only start a new task if the previous one is complete
             if (_synchronizationTask?.IsCompleted != false)
             {
-                _synchronizationTask = SynchronizeWithDebounceAsync(_synchronizationCts.Token);
+                this.synchronizationTask = SynchronizeWithDebounceAsync(this.synchronizationCts.Token);
             }
         }
     }
@@ -156,26 +156,26 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
             // Debounce: wait 500ms to batch multiple rapid metadata changes
             await Task.Delay(500, cancellationToken).ConfigureAwait(false);
 
-            _logger.LogDebug("Metadata changed, starting STAC catalog synchronization");
+            this.logger.LogDebug("Metadata changed, starting STAC catalog synchronization");
 
             // Synchronize both raster and vector data
-            await _rasterSynchronizer.SynchronizeAllAsync(cancellationToken).ConfigureAwait(false);
+            await this.rasterSynchronizer.SynchronizeAllAsync(cancellationToken).ConfigureAwait(false);
 
             if (_vectorSynchronizer is not null)
             {
-                await _vectorSynchronizer.SynchronizeAllVectorLayersAsync(cancellationToken).ConfigureAwait(false);
+                await this.vectorSynchronizer.SynchronizeAllVectorLayersAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            _logger.LogInformation("STAC catalog synchronized successfully after metadata change");
+            this.logger.LogInformation("STAC catalog synchronized successfully after metadata change");
         }
         catch (OperationCanceledException)
         {
             // Expected when a new change arrives - previous sync was cancelled
-            _logger.LogDebug("STAC catalog synchronization cancelled due to new metadata change");
+            this.logger.LogDebug("STAC catalog synchronization cancelled due to new metadata change");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to synchronize STAC catalog after metadata change");
+            this.logger.LogError(ex, "Failed to synchronize STAC catalog after metadata change");
         }
         finally
         {

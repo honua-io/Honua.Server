@@ -26,9 +26,9 @@ namespace Honua.Server.Host.Infrastructure;
 /// </remarks>
 public sealed class ReverseProxyDetector
 {
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<ReverseProxyDetector> _logger;
-    private readonly bool? _explicitConfiguration;
+    private readonly IConfiguration configuration;
+    private readonly ILogger<ReverseProxyDetector> logger;
+    private readonly bool? explicitConfiguration;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ReverseProxyDetector"/> class.
@@ -37,24 +37,24 @@ public sealed class ReverseProxyDetector
     /// <param name="logger">Logger instance.</param>
     public ReverseProxyDetector(IConfiguration configuration, ILogger<ReverseProxyDetector> logger)
     {
-        _configuration = Guard.NotNull(configuration);
-        _logger = Guard.NotNull(logger);
+        this.configuration = Guard.NotNull(configuration);
+        this.logger = Guard.NotNull(logger);
 
         // Check for explicit configuration at startup
-        _explicitConfiguration = ResolveExplicitConfiguration();
+        this.explicitConfiguration = ResolveExplicitConfiguration();
 
-        if (_explicitConfiguration.HasValue)
+        if (this.explicitConfiguration.HasValue)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Reverse proxy detection: Explicit configuration detected. Behind reverse proxy: {BehindProxy}",
-                _explicitConfiguration.Value);
+                this.explicitConfiguration.Value);
         }
     }
 
     /// <summary>
     /// Gets a value indicating whether explicit configuration has been set.
     /// </summary>
-    public bool HasExplicitConfiguration => _explicitConfiguration.HasValue;
+    public bool HasExplicitConfiguration => this.explicitConfiguration.HasValue;
 
     /// <summary>
     /// Gets the explicitly configured reverse proxy state, if set.
@@ -69,9 +69,9 @@ public sealed class ReverseProxyDetector
     public bool IsBehindReverseProxy(HttpContext? context = null)
     {
         // Explicit configuration takes precedence
-        if (_explicitConfiguration.HasValue)
+        if (this.explicitConfiguration.HasValue)
         {
-            return _explicitConfiguration.Value;
+            return this.explicitConfiguration.Value;
         }
 
         // Runtime detection based on headers
@@ -80,7 +80,7 @@ public sealed class ReverseProxyDetector
             var hasForwardedHeaders = HasYarpHeaders(context);
             if (hasForwardedHeaders)
             {
-                _logger.LogDebug("Reverse proxy detected via X-Forwarded-* headers");
+                this.logger.LogDebug("Reverse proxy detected via X-Forwarded-* headers");
                 return true;
             }
         }
@@ -89,11 +89,11 @@ public sealed class ReverseProxyDetector
         var hasTrustedProxies = HasTrustedProxiesConfigured();
         if (hasTrustedProxies)
         {
-            _logger.LogDebug("Reverse proxy detected via trusted proxy configuration");
+            this.logger.LogDebug("Reverse proxy detected via trusted proxy configuration");
             return true;
         }
 
-        _logger.LogDebug("No reverse proxy detected");
+        this.logger.LogDebug("No reverse proxy detected");
         return false;
     }
 
@@ -122,8 +122,8 @@ public sealed class ReverseProxyDetector
     /// <returns>True if trusted proxies are configured; otherwise, false.</returns>
     private bool HasTrustedProxiesConfigured()
     {
-        var trustedProxies = _configuration.GetSection("TrustedProxies").Get<string[]>();
-        var trustedNetworks = _configuration.GetSection("TrustedProxyNetworks").Get<string[]>();
+        var trustedProxies = this.configuration.GetSection("TrustedProxies").Get<string[]>();
+        var trustedNetworks = this.configuration.GetSection("TrustedProxyNetworks").Get<string[]>();
 
         return (trustedProxies?.Length > 0) || (trustedNetworks?.Length > 0);
     }
@@ -140,32 +140,32 @@ public sealed class ReverseProxyDetector
         {
             if (bool.TryParse(envVar, out var envValue))
             {
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Reverse proxy configuration from environment variable: {Value}",
                     envValue);
                 return envValue;
             }
 
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Invalid HONUA_BEHIND_REVERSE_PROXY environment variable value: {Value}. Expected 'true' or 'false'.",
                 envVar);
         }
 
         // 2. Configuration setting
-        var configValue = _configuration.GetValue<bool?>("Honua:ReverseProxy:Enabled");
+        var configValue = this.configuration.GetValue<bool?>("Honua:ReverseProxy:Enabled");
         if (configValue.HasValue)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Reverse proxy configuration from appsettings: {Value}",
                 configValue.Value);
             return configValue.Value;
         }
 
         // Alternative configuration path
-        configValue = _configuration.GetValue<bool?>("ReverseProxy:Enabled");
+        configValue = this.configuration.GetValue<bool?>("ReverseProxy:Enabled");
         if (configValue.HasValue)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Reverse proxy configuration from appsettings (ReverseProxy section): {Value}",
                 configValue.Value);
             return configValue.Value;

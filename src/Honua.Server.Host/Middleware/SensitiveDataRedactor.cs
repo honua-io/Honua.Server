@@ -19,21 +19,21 @@ namespace Honua.Server.Host.Middleware;
 public sealed class SensitiveDataRedactor
 {
     private const string RedactedValue = "***REDACTED***";
-    private readonly SensitiveDataRedactionOptions _options;
-    private readonly HashSet<string> _sensitiveFieldsLower;
-    private readonly List<Regex> _sensitivePatterns;
+    private readonly SensitiveDataRedactionOptions options;
+    private readonly HashSet<string> sensitiveFieldsLower;
+    private readonly List<Regex> sensitivePatterns;
 
     public SensitiveDataRedactor(SensitiveDataRedactionOptions options)
     {
-        _options = Guard.NotNull(options);
+        this.options = Guard.NotNull(options);
 
         // Pre-process field names to lowercase for case-insensitive matching
-        _sensitiveFieldsLower = new HashSet<string>(
-            _options.SensitiveFieldNames.Select(f => f.ToLowerInvariant()),
+        this.sensitiveFieldsLower = new HashSet<string>(
+            this.options.SensitiveFieldNames.Select(f => f.ToLowerInvariant()),
             StringComparer.OrdinalIgnoreCase);
 
         // Compile regex patterns for efficient matching
-        _sensitivePatterns = _options.SensitiveFieldPatterns
+        this.sensitivePatterns = this.options.SensitiveFieldPatterns
             .Select(pattern => new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled))
             .ToList();
     }
@@ -154,7 +154,7 @@ public sealed class SensitiveDataRedactor
         var lowerFieldName = fieldName.ToLowerInvariant();
 
         // Check exact matches
-        if (_sensitiveFieldsLower.Contains(lowerFieldName))
+        if (this.sensitiveFieldsLower.Contains(lowerFieldName))
             return true;
 
         // Check regex patterns

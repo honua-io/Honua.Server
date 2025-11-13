@@ -387,8 +387,8 @@ public static class BoundingBoxValidator
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
 public sealed class ValidBoundingBoxAttribute : ValidationAttribute
 {
-    private readonly int _srid;
-    private readonly bool _allow3D;
+    private readonly int srid;
+    private readonly bool allow3D;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValidBoundingBoxAttribute"/> class.
@@ -397,8 +397,8 @@ public sealed class ValidBoundingBoxAttribute : ValidationAttribute
     /// <param name="allow3D">Whether to allow 3D bounding boxes with altitude. Default is true.</param>
     public ValidBoundingBoxAttribute(int srid = 4326, bool allow3D = true)
     {
-        _srid = srid;
-        _allow3D = allow3D;
+        this.srid = srid;
+        this.allow3D = allow3D;
     }
 
     protected override System.ComponentModel.DataAnnotations.ValidationResult? IsValid(object? value, ValidationContext validationContext)

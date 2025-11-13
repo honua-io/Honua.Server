@@ -12,11 +12,11 @@ namespace Honua.Server.Host.Observability;
 /// </summary>
 public sealed class RuntimeLoggingConfigurationFilter : ILoggerProvider
 {
-    private readonly RuntimeLoggingConfigurationService _configService;
+    private readonly RuntimeLoggingConfigurationService configService;
 
     public RuntimeLoggingConfigurationFilter(RuntimeLoggingConfigurationService configService)
     {
-        _configService = Guard.NotNull(configService);
+        this.configService = Guard.NotNull(configService);
     }
 
     public ILogger CreateLogger(string categoryName)
@@ -38,6 +38,6 @@ public sealed class RuntimeLoggingConfigurationFilter : ILoggerProvider
     public bool? IsEnabled(string categoryName, LogLevel logLevel)
     {
         // Check if there's a runtime override for this exact category
-        return _configService.IsEnabled(categoryName, logLevel);
+        return this.configService.IsEnabled(categoryName, logLevel);
     }
 }

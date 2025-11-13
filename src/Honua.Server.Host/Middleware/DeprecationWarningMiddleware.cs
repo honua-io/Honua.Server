@@ -34,10 +34,10 @@ namespace Honua.Server.Host.Middleware;
 /// </remarks>
 public sealed class DeprecationWarningMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<DeprecationWarningMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly ILogger<DeprecationWarningMiddleware> logger;
     private readonly IReadOnlyDictionary<string, string> _deprecations;
-    private readonly string? _deprecationDocUrl;
+    private readonly string? deprecationDocUrl;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeprecationWarningMiddleware"/> class.
@@ -50,8 +50,8 @@ public sealed class DeprecationWarningMiddleware
         IConfiguration configuration,
         ILogger<DeprecationWarningMiddleware> logger)
     {
-        _next = next ?? throw new ArgumentNullException(nameof(next));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.next = next ?? throw new ArgumentNullException(nameof(next));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         if (configuration == null)
         {
@@ -74,15 +74,15 @@ public sealed class DeprecationWarningMiddleware
             }
         }
 
-        _deprecations = deprecationConfig;
-        _deprecationDocUrl = configuration.GetValue<string>("ApiVersioning:DeprecationDocumentationUrl");
+        this.deprecations = deprecationConfig;
+        this.deprecationDocUrl = configuration.GetValue<string>("ApiVersioning:DeprecationDocumentationUrl");
 
-        if (_deprecations.Count > 0)
+        if (this.deprecations.Count > 0)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Deprecation warning middleware configured with {Count} deprecated version(s): {Versions}",
-                _deprecations.Count,
-                string.Join(", ", _deprecations.Keys));
+                this.deprecations.Count,
+                string.Join(", ", this.deprecations.Keys));
         }
     }
 
@@ -101,7 +101,7 @@ public sealed class DeprecationWarningMiddleware
         var version = context.Items[ApiVersionMiddleware.ApiVersionContextKey] as string;
 
         // Check if this version is deprecated
-        if (version != null && _deprecations.TryGetValue(version, out var sunsetDate))
+        if (version != null && this.deprecations.TryGetValue(version, out var sunsetDate))
         {
             // Add deprecation headers before the response starts
             context.Response.OnStarting(() =>
@@ -121,7 +121,7 @@ public sealed class DeprecationWarningMiddleware
                     context.Response.Headers["Link"] = $"<{_deprecationDocUrl}>; rel=\"deprecation\"";
                 }
 
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Deprecated API version {Version} used. Path: {Path}. Sunset date: {SunsetDate}",
                     version,
                     context.Request.Path,
@@ -147,7 +147,7 @@ public static class DeprecationWarningMiddlewareExtensions
     /// <returns>The application builder for method chaining.</returns>
     /// <remarks>
     /// This middleware should be registered after ApiVersionMiddleware
-    /// since it depends on the version being extracted and stored in HttpContext.Items.
+    /// since it depends on the version being extracted and stored in this.HttpContext.Items.
     /// </remarks>
     public static IApplicationBuilder UseDeprecationWarnings(this IApplicationBuilder app)
     {

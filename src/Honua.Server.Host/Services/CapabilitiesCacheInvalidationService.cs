@@ -38,10 +38,10 @@ namespace Honua.Server.Host.Services;
 /// </remarks>
 public sealed class CapabilitiesCacheInvalidationService : BackgroundService
 {
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly ICapabilitiesCache _capabilitiesCache;
-    private readonly ILogger<CapabilitiesCacheInvalidationService> _logger;
-    private readonly CapabilitiesCacheOptions _options;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly ICapabilitiesCache capabilitiesCache;
+    private readonly ILogger<CapabilitiesCacheInvalidationService> logger;
+    private readonly CapabilitiesCacheOptions options;
     private IDisposable? _changeTokenRegistration;
 
     public CapabilitiesCacheInvalidationService(
@@ -50,26 +50,26 @@ public sealed class CapabilitiesCacheInvalidationService : BackgroundService
         ILogger<CapabilitiesCacheInvalidationService> logger,
         IOptions<CapabilitiesCacheOptions> options)
     {
-        _metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
-        _capabilitiesCache = capabilitiesCache ?? throw new ArgumentNullException(nameof(capabilitiesCache));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
+        this.capabilitiesCache = capabilitiesCache ?? throw new ArgumentNullException(nameof(capabilitiesCache));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     }
 
     /// <inheritdoc />
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_options.EnableCaching || !_options.AutoInvalidateOnMetadataChange)
+        if (!this.options.EnableCaching || !this.options.AutoInvalidateOnMetadataChange)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Capabilities cache invalidation service disabled " +
                 "(EnableCaching={EnableCaching}, AutoInvalidateOnMetadataChange={AutoInvalidate})",
-                _options.EnableCaching,
-                _options.AutoInvalidateOnMetadataChange);
+                this.options.EnableCaching,
+                this.options.AutoInvalidateOnMetadataChange);
             return Task.CompletedTask;
         }
 
-        _logger.LogInformation("Capabilities cache invalidation service started");
+        this.logger.LogInformation("Capabilities cache invalidation service started");
 
         // Register for metadata change notifications
         RegisterChangeCallback();
@@ -91,16 +91,16 @@ public sealed class CapabilitiesCacheInvalidationService : BackgroundService
     {
         try
         {
-            var changeToken = _metadataRegistry.GetChangeToken();
-            _changeTokenRegistration = ChangeToken.OnChange(
-                () => _metadataRegistry.GetChangeToken(),
+            var changeToken = this.metadataRegistry.GetChangeToken();
+            this.changeTokenRegistration = ChangeToken.OnChange(
+                () => this.metadataRegistry.GetChangeToken(),
                 OnMetadataChanged);
 
-            _logger.LogDebug("Registered metadata change callback for capabilities cache invalidation");
+            this.logger.LogDebug("Registered metadata change callback for capabilities cache invalidation");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to register metadata change callback");
+            this.logger.LogError(ex, "Failed to register metadata change callback");
         }
     }
 
@@ -111,15 +111,15 @@ public sealed class CapabilitiesCacheInvalidationService : BackgroundService
     {
         try
         {
-            _logger.LogInformation("Metadata change detected, invalidating capabilities cache");
+            this.logger.LogInformation("Metadata change detected, invalidating capabilities cache");
 
             // Get statistics before invalidation for logging
-            var statsBefore = _capabilitiesCache.GetStatistics();
+            var statsBefore = this.capabilitiesCache.GetStatistics();
 
             // Invalidate all cached capabilities documents
-            _capabilitiesCache.InvalidateAll();
+            this.capabilitiesCache.InvalidateAll();
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Invalidated {EntryCount} capabilities cache entries. " +
                 "Previous hit rate: {HitRate:P2} ({Hits} hits / {Misses} misses)",
                 statsBefore.EntryCount,
@@ -129,7 +129,7 @@ public sealed class CapabilitiesCacheInvalidationService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error invalidating capabilities cache on metadata change");
+            this.logger.LogError(ex, "Error invalidating capabilities cache on metadata change");
         }
     }
 }

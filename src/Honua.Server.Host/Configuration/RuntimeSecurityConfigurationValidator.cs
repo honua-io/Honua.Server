@@ -32,11 +32,11 @@ public enum ValidationSeverity
 
 public sealed class RuntimeSecurityConfigurationValidator : IRuntimeSecurityConfigurationValidator
 {
-    private readonly ILogger<RuntimeSecurityConfigurationValidator> _logger;
+    private readonly ILogger<RuntimeSecurityConfigurationValidator> logger;
 
     public RuntimeSecurityConfigurationValidator(ILogger<RuntimeSecurityConfigurationValidator> logger)
     {
-        _logger = Guard.NotNull(logger);
+        this.logger = Guard.NotNull(logger);
     }
 
     public ValidationResult Validate(IConfiguration configuration, bool isProduction)
@@ -50,7 +50,7 @@ public sealed class RuntimeSecurityConfigurationValidator : IRuntimeSecurityConf
             foreach (var issue in issues)
             {
                 var logLevel = issue.Severity == ValidationSeverity.Error ? LogLevel.Error : LogLevel.Warning;
-                _logger.Log(logLevel, "Runtime security configuration issue [{Category}]: {Message}", issue.Category, issue.Message);
+                this.logger.Log(logLevel, "Runtime security configuration issue [{Category}]: {Message}", issue.Category, issue.Message);
             }
         }
 

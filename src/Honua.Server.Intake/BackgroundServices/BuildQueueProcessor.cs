@@ -23,11 +23,11 @@ namespace Honua.Server.Intake.BackgroundServices;
 /// </summary>
 public sealed class BuildQueueProcessor : BackgroundService
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly BuildQueueOptions _options;
-    private readonly ILogger<BuildQueueProcessor> _logger;
-    private readonly SemaphoreSlim _concurrencySemaphore;
-    private readonly ResiliencePipeline _retryPipeline;
+    private readonly IServiceProvider serviceProvider;
+    private readonly BuildQueueOptions options;
+    private readonly ILogger<BuildQueueProcessor> logger;
+    private readonly SemaphoreSlim concurrencySemaphore;
+    private readonly ResiliencePipeline retryPipeline;
     private readonly CancellationTokenSource _shutdownCts = new();
     private int _activeBuilds = 0;
 
@@ -36,22 +36,22 @@ public sealed class BuildQueueProcessor : BackgroundService
         IOptions<BuildQueueOptions> options,
         ILogger<BuildQueueProcessor> logger)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        _options.Validate();
+        this.options.Validate();
 
         // Create semaphore for concurrency control
-        _concurrencySemaphore = new SemaphoreSlim(_options.MaxConcurrentBuilds, _options.MaxConcurrentBuilds);
+        this.concurrencySemaphore = new SemaphoreSlim(this.options.MaxConcurrentBuilds, this.options.MaxConcurrentBuilds);
 
         // Configure retry policy for individual build operations
-        _retryPipeline = new ResiliencePipelineBuilder()
+        this.retryPipeline = new ResiliencePipelineBuilder()
             .AddRetry(new RetryStrategyOptions
             {
-                MaxRetryAttempts = _options.MaxRetryAttempts,
-                Delay = TimeSpan.FromMinutes(_options.RetryDelayMinutes),
-                BackoffType = _options.UseExponentialBackoff ? DelayBackoffType.Exponential : DelayBackoffType.Constant,
+                MaxRetryAttempts = this.options.MaxRetryAttempts,
+                Delay = TimeSpan.FromMinutes(this.options.RetryDelayMinutes),
+                BackoffType = this.options.UseExponentialBackoff ? DelayBackoffType.Exponential : DelayBackoffType.Constant,
                 UseJitter = true,
                 ShouldHandle = new PredicateBuilder()
                     .Handle<IOException>()
@@ -59,9 +59,9 @@ public sealed class BuildQueueProcessor : BackgroundService
             })
             .Build();
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "BuildQueueProcessor initialized: MaxConcurrent={MaxConcurrent}, PollInterval={PollInterval}s, BuildTimeout={Timeout}min",
-            _options.MaxConcurrentBuilds, _options.PollIntervalSeconds, _options.BuildTimeoutMinutes);
+            this.options.MaxConcurrentBuilds, this.options.PollIntervalSeconds, this.options.BuildTimeoutMinutes);
     }
 
     /// <summary>
@@ -70,7 +70,7 @@ public sealed class BuildQueueProcessor : BackgroundService
     /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("BuildQueueProcessor starting");
+        this.logger.LogInformation("BuildQueueProcessor starting");
 
         // Ensure workspace directories exist
         EnsureDirectoriesExist();
@@ -80,7 +80,7 @@ public sealed class BuildQueueProcessor : BackgroundService
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
+                using var scope = this.serviceProvider.CreateScope();
                 var queueManager = scope.ServiceProvider.GetRequiredService<IBuildQueueManager>();
 
                 // Get next build from queue
@@ -88,12 +88,12 @@ public sealed class BuildQueueProcessor : BackgroundService
 
                 if (job != null)
                 {
-                    _logger.LogInformation(
+                    this.logger.LogInformation(
                         "Found pending build job {JobId} for customer {CustomerId} (priority: {Priority})",
                         job.Id, job.CustomerId, job.Priority);
 
                     // Wait for available slot (respects concurrency limit)
-                    await _concurrencySemaphore.WaitAsync(stoppingToken);
+                    await this.concurrencySemaphore.WaitAsync(stoppingToken);
 
                     Interlocked.Increment(ref _activeBuilds);
 
@@ -106,35 +106,35 @@ public sealed class BuildQueueProcessor : BackgroundService
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Unhandled exception processing build job {JobId}", job.Id);
+                            this.logger.LogError(ex, "Unhandled exception processing build job {JobId}", job.Id);
                         }
                         finally
                         {
                             Interlocked.Decrement(ref _activeBuilds);
-                            _concurrencySemaphore.Release();
+                            this.concurrencySemaphore.Release();
                         }
                     }, stoppingToken);
                 }
                 else
                 {
                     // No pending builds, wait before polling again
-                    _logger.LogDebug("No pending builds, waiting {Seconds}s before next poll", _options.PollIntervalSeconds);
-                    await Task.Delay(TimeSpan.FromSeconds(_options.PollIntervalSeconds), stoppingToken);
+                    this.logger.LogDebug("No pending builds, waiting {Seconds}s before next poll", this.options.PollIntervalSeconds);
+                    await Task.Delay(TimeSpan.FromSeconds(this.options.PollIntervalSeconds), stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                _logger.LogInformation("BuildQueueProcessor stopping due to cancellation request");
+                this.logger.LogInformation("BuildQueueProcessor stopping due to cancellation request");
                 break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in BuildQueueProcessor main loop");
+                this.logger.LogError(ex, "Error in BuildQueueProcessor main loop");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
 
-        _logger.LogInformation("BuildQueueProcessor stopped");
+        this.logger.LogInformation("BuildQueueProcessor stopped");
     }
 
     /// <summary>
@@ -142,17 +142,17 @@ public sealed class BuildQueueProcessor : BackgroundService
     /// </summary>
     private async Task ProcessBuildAsync(BuildJob job, CancellationToken cancellationToken)
     {
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = this.serviceProvider.CreateScope();
         var queueManager = scope.ServiceProvider.GetRequiredService<IBuildQueueManager>();
         var notificationService = scope.ServiceProvider.GetRequiredService<IBuildNotificationService>();
 
         var stopwatch = Stopwatch.StartNew();
         var buildCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        buildCts.CancelAfter(TimeSpan.FromMinutes(_options.BuildTimeoutMinutes));
+        buildCts.CancelAfter(TimeSpan.FromMinutes(this.options.BuildTimeoutMinutes));
 
         try
         {
-            _logger.LogInformation("Starting build job {JobId}", job.Id);
+            this.logger.LogInformation("Starting build job {JobId}", job.Id);
 
             // Mark build as started
             await queueManager.MarkBuildStartedAsync(job.Id, cancellationToken);
@@ -170,7 +170,7 @@ public sealed class BuildQueueProcessor : BackgroundService
 
             if (result.Success)
             {
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Build job {JobId} completed successfully in {Duration:0.0}s",
                     job.Id, result.Duration.TotalSeconds);
 
@@ -187,7 +187,7 @@ public sealed class BuildQueueProcessor : BackgroundService
                 await notificationService.SendBuildCompletedAsync(job, result, cancellationToken);
 
                 // Cleanup workspace if configured
-                if (_options.CleanupWorkspaceAfterBuild)
+                if (this.options.CleanupWorkspaceAfterBuild)
                 {
                     CleanupWorkspace(job);
                 }
@@ -199,22 +199,22 @@ public sealed class BuildQueueProcessor : BackgroundService
         }
         catch (OperationCanceledException) when (buildCts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning("Build job {JobId} timed out after {Timeout} minutes", job.Id, _options.BuildTimeoutMinutes);
+            this.logger.LogWarning("Build job {JobId} timed out after {Timeout} minutes", job.Id, this.options.BuildTimeoutMinutes);
 
             await queueManager.UpdateBuildStatusAsync(
                 job.Id,
                 BuildJobStatus.TimedOut,
-                errorMessage: $"Build timed out after {_options.BuildTimeoutMinutes} minutes",
+                errorMessage: $"Build timed out after {this.options.BuildTimeoutMinutes} minutes",
                 cancellationToken: cancellationToken);
 
             await notificationService.SendBuildFailedAsync(
                 job,
-                $"Build timed out after {_options.BuildTimeoutMinutes} minutes",
+                $"Build timed out after {this.options.BuildTimeoutMinutes} minutes",
                 cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Build job {JobId} failed with exception", job.Id);
+            this.logger.LogError(ex, "Build job {JobId} failed with exception", job.Id);
             await HandleBuildFailureAsync(job, ex.Message, queueManager, notificationService, cancellationToken);
         }
         finally
@@ -234,7 +234,7 @@ public sealed class BuildQueueProcessor : BackgroundService
             throw new FileNotFoundException($"Manifest file not found: {manifestPath}");
         }
 
-        _logger.LogDebug("Loading manifest from {Path}", manifestPath);
+        this.logger.LogDebug("Loading manifest from {Path}", manifestPath);
 
         var json = await File.ReadAllTextAsync(manifestPath, cancellationToken);
         var manifest = JsonSerializer.Deserialize<BuildManifest>(json)
@@ -253,7 +253,7 @@ public sealed class BuildQueueProcessor : BackgroundService
     {
         var startTime = DateTimeOffset.UtcNow;
 
-        using var scope = _serviceProvider.CreateScope();
+        using var scope = this.serviceProvider.CreateScope();
         var queueManager = scope.ServiceProvider.GetRequiredService<IBuildQueueManager>();
 
         // Progress callback
@@ -269,11 +269,11 @@ public sealed class BuildQueueProcessor : BackgroundService
                         CurrentStep = step
                     });
 
-                _logger.LogDebug("Build {JobId} progress: {Percent}% - {Step}", job.Id, percent, step);
+                this.logger.LogDebug("Build {JobId} progress: {Percent}% - {Step}", job.Id, percent, step);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to update progress for build {JobId}", job.Id);
+                this.logger.LogWarning(ex, "Failed to update progress for build {JobId}", job.Id);
             }
         });
 
@@ -299,14 +299,14 @@ public sealed class BuildQueueProcessor : BackgroundService
             progressCallback(100, "Build complete");
 
             var duration = DateTimeOffset.UtcNow - startTime;
-            var outputPath = Path.Combine(_options.OutputDirectory, job.Id.ToString());
+            var outputPath = Path.Combine(this.options.OutputDirectory, job.Id.ToString());
 
             return new BuildResult
             {
                 Success = true,
                 OutputPath = outputPath,
                 ImageUrl = $"honua.io/{job.CustomerId}/{job.ConfigurationName}:latest",
-                DownloadUrl = $"{_options.DownloadBaseUrl}/{job.Id}",
+                DownloadUrl = $"{this.options.DownloadBaseUrl}/{job.Id}",
                 Duration = duration,
                 DeploymentInstructions = GenerateDeploymentInstructions(job)
             };
@@ -333,14 +333,14 @@ public sealed class BuildQueueProcessor : BackgroundService
         IBuildNotificationService notificationService,
         CancellationToken cancellationToken)
     {
-        _logger.LogWarning("Build job {JobId} failed: {Error}", job.Id, error);
+        this.logger.LogWarning("Build job {JobId} failed: {Error}", job.Id, error);
 
         // Check if we should retry
-        if (job.RetryCount < _options.MaxRetryAttempts)
+        if (job.RetryCount < this.options.MaxRetryAttempts)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Scheduling retry for build job {JobId} (attempt {Attempt}/{Max})",
-                job.Id, job.RetryCount + 1, _options.MaxRetryAttempts);
+                job.Id, job.RetryCount + 1, this.options.MaxRetryAttempts);
 
             await queueManager.IncrementRetryCountAsync(job.Id, cancellationToken);
 
@@ -353,9 +353,9 @@ public sealed class BuildQueueProcessor : BackgroundService
         }
         else
         {
-            _logger.LogError(
+            this.logger.LogError(
                 "Build job {JobId} failed after {Attempts} attempts",
-                job.Id, _options.MaxRetryAttempts);
+                job.Id, this.options.MaxRetryAttempts);
 
             // Mark as permanently failed
             await queueManager.UpdateBuildStatusAsync(
@@ -423,16 +423,16 @@ docker run -d \
     {
         try
         {
-            Directory.CreateDirectory(_options.WorkspaceDirectory);
-            Directory.CreateDirectory(_options.OutputDirectory);
+            Directory.CreateDirectory(this.options.WorkspaceDirectory);
+            Directory.CreateDirectory(this.options.OutputDirectory);
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Build directories initialized: workspace={Workspace}, output={Output}",
-                _options.WorkspaceDirectory, _options.OutputDirectory);
+                this.options.WorkspaceDirectory, this.options.OutputDirectory);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create build directories");
+            this.logger.LogError(ex, "Failed to create build directories");
             throw;
         }
     }
@@ -444,16 +444,16 @@ docker run -d \
     {
         try
         {
-            var workspaceDir = Path.Combine(_options.WorkspaceDirectory, job.Id.ToString());
+            var workspaceDir = Path.Combine(this.options.WorkspaceDirectory, job.Id.ToString());
             if (Directory.Exists(workspaceDir))
             {
                 Directory.Delete(workspaceDir, recursive: true);
-                _logger.LogDebug("Cleaned up workspace for build {JobId}", job.Id);
+                this.logger.LogDebug("Cleaned up workspace for build {JobId}", job.Id);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to cleanup workspace for build {JobId}", job.Id);
+            this.logger.LogWarning(ex, "Failed to cleanup workspace for build {JobId}", job.Id);
         }
     }
 
@@ -462,15 +462,15 @@ docker run -d \
     /// </summary>
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("BuildQueueProcessor stopping gracefully");
+        this.logger.LogInformation("BuildQueueProcessor stopping gracefully");
 
-        if (_options.EnableGracefulShutdown && _activeBuilds > 0)
+        if (this.options.EnableGracefulShutdown && _activeBuilds > 0)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Waiting for {Count} active builds to complete (timeout: {Timeout}s)",
-                _activeBuilds, _options.GracefulShutdownTimeoutSeconds);
+                _activeBuilds, this.options.GracefulShutdownTimeoutSeconds);
 
-            var shutdownTimeout = TimeSpan.FromSeconds(_options.GracefulShutdownTimeoutSeconds);
+            var shutdownTimeout = TimeSpan.FromSeconds(this.options.GracefulShutdownTimeoutSeconds);
             var deadline = DateTimeOffset.UtcNow + shutdownTimeout;
 
             while (_activeBuilds > 0 && DateTimeOffset.UtcNow < deadline)
@@ -480,13 +480,13 @@ docker run -d \
 
             if (_activeBuilds > 0)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "{Count} builds still in progress after timeout, forcing shutdown",
                     _activeBuilds);
             }
             else
             {
-                _logger.LogInformation("All active builds completed, shutting down");
+                this.logger.LogInformation("All active builds completed, shutting down");
             }
         }
 
@@ -496,7 +496,7 @@ docker run -d \
 
     public override void Dispose()
     {
-        _concurrencySemaphore?.Dispose();
+        this.concurrencySemaphore?.Dispose();
         _shutdownCts?.Dispose();
         base.Dispose();
     }

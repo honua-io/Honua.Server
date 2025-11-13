@@ -48,15 +48,15 @@ namespace Honua.Server.Host.GeoEvent;
 [Tags("Azure Integration")]
 public class AzureStreamAnalyticsController : ControllerBase
 {
-    private readonly IGeofenceEvaluationService _evaluationService;
-    private readonly ILogger<AzureStreamAnalyticsController> _logger;
+    private readonly IGeofenceEvaluationService evaluationService;
+    private readonly ILogger<AzureStreamAnalyticsController> logger;
 
     public AzureStreamAnalyticsController(
         IGeofenceEvaluationService evaluationService,
         ILogger<AzureStreamAnalyticsController> logger)
     {
-        _evaluationService = evaluationService;
-        _logger = logger;
+        this.evaluationService = evaluationService;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -110,12 +110,12 @@ public class AzureStreamAnalyticsController : ControllerBase
     {
         if (batch?.Events == null || !batch.Events.Any())
         {
-            return BadRequest(new { error = "Events array is required and cannot be empty" });
+            return this.BadRequest(new { error = "Events array is required and cannot be empty" });
         }
 
         if (batch.Events.Count > 1000)
         {
-            return BadRequest(new { error = "Maximum 1000 events per batch" });
+            return this.BadRequest(new { error = "Maximum 1000 events per batch" });
         }
 
         var tenantId = GetTenantId();
@@ -127,7 +127,7 @@ public class AzureStreamAnalyticsController : ControllerBase
         var eventsGeneratedCount = 0;
         var errors = new List<string>();
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Processing Azure Stream Analytics batch: {EventCount} events from job '{JobName}'",
             batch.Events.Count,
             batch.Metadata?.JobName ?? "unknown");
@@ -160,7 +160,7 @@ public class AzureStreamAnalyticsController : ControllerBase
                 var eventTime = asaEvent.EventTime ?? DateTime.UtcNow;
 
                 // Evaluate location against geofences
-                var result = await _evaluationService.EvaluateLocationAsync(
+                var result = await this.evaluationService.EvaluateLocationAsync(
                     asaEvent.EntityId,
                     location,
                     eventTime,
@@ -174,7 +174,7 @@ public class AzureStreamAnalyticsController : ControllerBase
 
                 if (result.Events.Any())
                 {
-                    _logger.LogDebug(
+                    this.logger.LogDebug(
                         "Entity {EntityId} generated {EventCount} geofence events",
                         asaEvent.EntityId,
                         result.Events.Count);
@@ -182,7 +182,7 @@ public class AzureStreamAnalyticsController : ControllerBase
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing event for entity {EntityId}", asaEvent.EntityId);
+                this.logger.LogError(ex, "Error processing event for entity {EntityId}", asaEvent.EntityId);
                 errors.Add($"Error processing entity {asaEvent.EntityId}: {ex.Message}");
                 failedCount++;
             }
@@ -190,7 +190,7 @@ public class AzureStreamAnalyticsController : ControllerBase
 
         var processingTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Azure SA batch processed: {ProcessedCount} succeeded, {FailedCount} failed, {EventsGenerated} geofence events generated in {ProcessingTime}ms",
             processedCount,
             failedCount,
@@ -206,7 +206,7 @@ public class AzureStreamAnalyticsController : ControllerBase
             Errors = errors.Any() ? errors : null
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     /// <summary>
@@ -229,19 +229,19 @@ public class AzureStreamAnalyticsController : ControllerBase
     {
         if (asaEvent == null)
         {
-            return BadRequest(new { error = "Event is required" });
+            return this.BadRequest(new { error = "Event is required" });
         }
 
         if (string.IsNullOrWhiteSpace(asaEvent.EntityId))
         {
-            return BadRequest(new { error = "entity_id is required" });
+            return this.BadRequest(new { error = "entity_id is required" });
         }
 
         // Validate coordinates
         if (asaEvent.Longitude < -180 || asaEvent.Longitude > 180 ||
             asaEvent.Latitude < -90 || asaEvent.Latitude > 90)
         {
-            return BadRequest(new { error = "Invalid coordinates" });
+            return this.BadRequest(new { error = "Invalid coordinates" });
         }
 
         var tenantId = GetTenantId();
@@ -250,7 +250,7 @@ public class AzureStreamAnalyticsController : ControllerBase
         var eventTime = asaEvent.EventTime ?? DateTime.UtcNow;
         var startTime = DateTime.UtcNow;
 
-        var result = await _evaluationService.EvaluateLocationAsync(
+        var result = await this.evaluationService.EvaluateLocationAsync(
             asaEvent.EntityId,
             location,
             eventTime,
@@ -286,7 +286,7 @@ public class AzureStreamAnalyticsController : ControllerBase
             ProcessingTimeMs = processingTime
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     /// <summary>
@@ -303,12 +303,12 @@ public class AzureStreamAnalyticsController : ControllerBase
 
         if (tenantContext != null)
         {
-            _logger.LogDebug("Request executing for tenant: {TenantId}", tenantContext.TenantId);
+            this.logger.LogDebug("Request executing for tenant: {TenantId}", tenantContext.TenantId);
             return tenantContext.TenantId;
         }
 
         // No tenant context - single-tenant mode or TenantMiddleware not active
-        _logger.LogDebug("No tenant context found - operating in single-tenant mode");
+        this.logger.LogDebug("No tenant context found - operating in single-tenant mode");
         return null;
     }
 }

@@ -34,22 +34,22 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 var serviceView = ResolveService(folderId, serviceId);
                 if (serviceView is null)
                 {
-                    return NotFound();
+                    return this.NotFound();
                 }
 
                 var layerView = ResolveLayer(serviceView, layerIndex);
                 if (layerView is null)
                 {
-                    return NotFound();
+                    return this.NotFound();
                 }
 
                 using var payload = await ParsePayloadAsync(Request, cancellationToken).ConfigureAwait(false);
                 if (payload is null)
                 {
-                    return BadRequest(new { error = "Invalid or empty JSON payload." });
+                    return this.BadRequest(new { error = "Invalid or empty JSON payload." });
                 }
 
-                var execution = await _editingService.ExecuteEditsAsync(
+                var execution = await this.editingService.ExecuteEditsAsync(
                     serviceView,
                     layerView,
                     payload.RootElement,
@@ -64,7 +64,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
                 if (!execution.HasOperations)
                 {
-                    return BadRequest(new { error = "No edits were supplied." });
+                    return this.BadRequest(new { error = "No edits were supplied." });
                 }
 
                 var response = new Dictionary<string, object?>
@@ -79,7 +79,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
                     response["editMoment"] = execution.EditMoment.Value.ToUnixTimeMilliseconds();
                 }
 
-                return Ok(response);
+                return this.Ok(response);
             });
     }
 
@@ -91,22 +91,22 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var layerView = ResolveLayer(serviceView, layerIndex);
         if (layerView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var payload = await ParsePayloadAsync(Request, cancellationToken).ConfigureAwait(false);
         if (payload is null)
         {
-            return BadRequest(new { error = "Invalid or empty JSON payload." });
+            return this.BadRequest(new { error = "Invalid or empty JSON payload." });
         }
 
-        var execution = await _editingService.ExecuteEditsAsync(
+        var execution = await this.editingService.ExecuteEditsAsync(
             serviceView,
             layerView,
             payload.RootElement,
@@ -121,11 +121,11 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
         if (!execution.HasOperations)
         {
-            return BadRequest(new { error = "No edits were supplied." });
+            return this.BadRequest(new { error = "No edits were supplied." });
         }
 
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-        _auditLogger.LogFeatureAdd(
+        var ipAddress = this.HttpContext.Connection.RemoteIpAddress?.ToString();
+        this.auditLogger.LogFeatureAdd(
             serviceId,
             layerView.Layer.Id,
             execution.AddResults.Count,
@@ -142,7 +142,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             response["editMoment"] = execution.EditMoment.Value.ToUnixTimeMilliseconds();
         }
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpPost("{layerIndex:int}/updateFeatures")]
@@ -153,22 +153,22 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var layerView = ResolveLayer(serviceView, layerIndex);
         if (layerView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var payload = await ParsePayloadAsync(Request, cancellationToken).ConfigureAwait(false);
         if (payload is null)
         {
-            return BadRequest(new { error = "Invalid or empty JSON payload." });
+            return this.BadRequest(new { error = "Invalid or empty JSON payload." });
         }
 
-        var execution = await _editingService.ExecuteEditsAsync(
+        var execution = await this.editingService.ExecuteEditsAsync(
             serviceView,
             layerView,
             payload.RootElement,
@@ -183,12 +183,12 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
         if (!execution.HasOperations)
         {
-            return BadRequest(new { error = "No edits were supplied." });
+            return this.BadRequest(new { error = "No edits were supplied." });
         }
 
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var ipAddress = this.HttpContext.Connection.RemoteIpAddress?.ToString();
         var featureIds = ExtractFeatureIds(execution.UpdateResults);
-        _auditLogger.LogFeatureUpdate(
+        this.auditLogger.LogFeatureUpdate(
             serviceId,
             layerView.Layer.Id,
             featureIds,
@@ -205,7 +205,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             response["editMoment"] = execution.EditMoment.Value.ToUnixTimeMilliseconds();
         }
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpPost("{layerIndex:int}/deleteFeatures")]
@@ -216,19 +216,19 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var layerView = ResolveLayer(serviceView, layerIndex);
         if (layerView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         using var payload = await ParsePayloadAsync(Request, cancellationToken).ConfigureAwait(false);
         using var document = payload ?? JsonDocument.Parse("{}");
 
-        var execution = await _editingService.ExecuteEditsAsync(
+        var execution = await this.editingService.ExecuteEditsAsync(
             serviceView,
             layerView,
             document.RootElement,
@@ -243,12 +243,12 @@ public sealed partial class GeoservicesRESTFeatureServerController
 
         if (!execution.HasOperations)
         {
-            return BadRequest(new { error = "No edits were supplied." });
+            return this.BadRequest(new { error = "No edits were supplied." });
         }
 
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var ipAddress = this.HttpContext.Connection.RemoteIpAddress?.ToString();
         var featureIds = ExtractFeatureIds(execution.DeleteResults);
-        _auditLogger.LogFeatureDelete(
+        this.auditLogger.LogFeatureDelete(
             serviceId,
             layerView.Layer.Id,
             featureIds,
@@ -265,7 +265,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             response["editMoment"] = execution.EditMoment.Value.ToUnixTimeMilliseconds();
         }
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     private static async Task<JsonDocument?> ParsePayloadAsync(HttpRequest request, CancellationToken cancellationToken)

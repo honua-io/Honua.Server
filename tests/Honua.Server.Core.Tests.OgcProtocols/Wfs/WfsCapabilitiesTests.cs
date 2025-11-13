@@ -136,9 +136,9 @@ public class WfsCapabilitiesBuilder
         return this;
     }
 
-    public WfsCapabilitiesBuilder WithAbstract(string abstract)
+    public WfsCapabilitiesBuilder WithAbstract(string @abstract)
     {
-        _capabilities.Abstract = abstract;
+        _capabilities.Abstract = @abstract;
         return this;
     }
 

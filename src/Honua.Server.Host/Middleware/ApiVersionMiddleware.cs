@@ -16,7 +16,7 @@ namespace Honua.Server.Host.Middleware;
 /// This middleware:
 /// - Extracts version from URL path (e.g., /v1/ogc/collections)
 /// - Validates the version is supported
-/// - Stores the version in HttpContext.Items for downstream use
+/// - Stores the version in this.HttpContext.Items for downstream use
 /// - Adds version to response headers
 /// - Returns 400 Bad Request for unsupported versions
 ///
@@ -26,8 +26,8 @@ namespace Honua.Server.Host.Middleware;
 /// </remarks>
 public sealed class ApiVersionMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ApiVersionMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly ILogger<ApiVersionMiddleware> logger;
 
     // Regex to match version pattern at the start of the path: /v1/, /v2/, etc.
     private static readonly Regex VersionPattern = new(@"^/(v\d+)(/|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -49,8 +49,8 @@ public sealed class ApiVersionMiddleware
     /// <param name="logger">The logger instance.</param>
     public ApiVersionMiddleware(RequestDelegate next, ILogger<ApiVersionMiddleware> logger)
     {
-        _next = next ?? throw new ArgumentNullException(nameof(next));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.next = next ?? throw new ArgumentNullException(nameof(next));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -72,7 +72,7 @@ public sealed class ApiVersionMiddleware
         {
             if (!ApiVersioning.IsVersionSupported(version))
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Unsupported API version requested: {Version}. Path: {Path}",
                     version,
                     path);
@@ -95,7 +95,7 @@ public sealed class ApiVersionMiddleware
             // Store version in HttpContext for later use by endpoints
             context.Items[ApiVersionContextKey] = version;
 
-            _logger.LogDebug("API version {Version} extracted from path: {Path}", version, path);
+            this.logger.LogDebug("API version {Version} extracted from path: {Path}", version, path);
         }
 
         // Add version to response headers

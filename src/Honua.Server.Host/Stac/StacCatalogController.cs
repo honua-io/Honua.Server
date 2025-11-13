@@ -29,17 +29,17 @@ namespace Honua.Server.Host.Stac;
 [Route("v1/stac")]
 public sealed class StacCatalogController : ControllerBase
 {
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly StacControllerHelper _helper;
-    private readonly ILogger<StacCatalogController> _logger;
-    private readonly StacMetrics _metrics;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly StacControllerHelper helper;
+    private readonly ILogger<StacCatalogController> logger;
+    private readonly StacMetrics metrics;
 
     public StacCatalogController(IMetadataRegistry metadataRegistry, StacControllerHelper helper, ILogger<StacCatalogController> logger, StacMetrics metrics)
     {
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _helper = Guard.NotNull(helper);
-        _logger = Guard.NotNull(logger);
-        _metrics = Guard.NotNull(metrics);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.helper = Guard.NotNull(helper);
+        this.logger = Guard.NotNull(logger);
+        this.metrics = Guard.NotNull(metrics);
     }
 
     /// <summary>
@@ -56,30 +56,30 @@ public sealed class StacCatalogController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<StacRootResponse>> GetRoot(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("STAC catalog root requested");
+        this.logger.LogInformation("STAC catalog root requested");
 
-        if (!_helper.IsStacEnabled())
+        if (!this.helper.IsStacEnabled())
         {
-            _logger.LogWarning("STAC catalog root request rejected: STAC is not enabled");
-            return NotFound();
+            this.logger.LogWarning("STAC catalog root request rejected: STAC is not enabled");
+            return this.NotFound();
         }
 
         return await OperationInstrumentation.Create<ActionResult<StacRootResponse>>("STAC GetRoot")
             .WithActivitySource(HonuaTelemetry.Stac)
             .WithLogger(_logger)
-            .WithMetrics(_metrics.ReadOperationsCounter, _metrics.ReadOperationsCounter, _metrics.ReadOperationDuration)
+            .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("stac.operation", "GetRoot")
             .WithTag("operation", "get_root")
             .WithTag("resource", "catalog")
             .ExecuteAsync(async activity =>
             {
-                var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
-                var baseUri = _helper.BuildBaseUri(Request);
+                var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+                var baseUri = this.helper.BuildBaseUri(Request);
 
                 var response = StacApiMapper.BuildRoot(snapshot.Catalog, baseUri);
                 activity?.SetTag("catalog.id", response.Id);
                 activity?.SetTag("catalog.title", response.Title);
-                return Ok(response);
+                return this.Ok(response);
             });
     }
 
@@ -96,18 +96,18 @@ public sealed class StacCatalogController : ControllerBase
     [AllowAnonymous]
     public async Task<ActionResult<StacConformanceResponse>> GetConformance()
     {
-        _logger.LogInformation("STAC conformance declaration requested");
+        this.logger.LogInformation("STAC conformance declaration requested");
 
-        if (!_helper.IsStacEnabled())
+        if (!this.helper.IsStacEnabled())
         {
-            _logger.LogWarning("STAC conformance request rejected: STAC is not enabled");
-            return NotFound();
+            this.logger.LogWarning("STAC conformance request rejected: STAC is not enabled");
+            return this.NotFound();
         }
 
         return await OperationInstrumentation.Create<ActionResult<StacConformanceResponse>>("STAC GetConformance")
             .WithActivitySource(HonuaTelemetry.Stac)
             .WithLogger(_logger)
-            .WithMetrics(_metrics.ReadOperationsCounter, _metrics.ReadOperationsCounter, _metrics.ReadOperationDuration)
+            .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("stac.operation", "GetConformance")
             .WithTag("operation", "get_conformance")
             .WithTag("resource", "conformance")

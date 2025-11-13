@@ -21,15 +21,15 @@ namespace Honua.Server.Host.API;
 [Produces("application/json")]
 public class ShareController : ControllerBase
 {
-    private readonly ILogger<ShareController> _logger;
-    private readonly ShareService _shareService;
+    private readonly ILogger<ShareController> logger;
+    private readonly ShareService shareService;
 
     public ShareController(
         ILogger<ShareController> logger,
         ShareService shareService)
     {
-        _logger = logger;
-        _shareService = shareService;
+        this.logger = logger;
+        this.shareService = shareService;
     }
 
     // ==================== Share Token Management ====================
@@ -52,20 +52,20 @@ public class ShareController : ControllerBase
         // Validate mapId
         if (string.IsNullOrWhiteSpace(mapId) || mapId.Length > 200)
         {
-            return BadRequest(new { error = "Invalid mapId. Must be between 1 and 200 characters." });
+            return this.BadRequest(new { error = "Invalid mapId. Must be between 1 and 200 characters." });
         }
 
         // Validate ExpiresAt is in the future if provided
         if (request.ExpiresAt.HasValue && request.ExpiresAt.Value <= DateTime.UtcNow)
         {
-            return BadRequest(new { error = "ExpiresAt must be a future date." });
+            return this.BadRequest(new { error = "ExpiresAt must be a future date." });
         }
 
         try
         {
-            var userId = User.Identity?.Name ?? "anonymous";
+            var userId = this.User.Identity?.Name ?? "anonymous";
 
-            var token = await _shareService.CreateShareAsync(
+            var token = await this.shareService.CreateShareAsync(
                 mapId,
                 request.Permission ?? SharePermission.View,
                 userId,
@@ -74,11 +74,11 @@ public class ShareController : ControllerBase
                 request.Password,
                 request.EmbedSettings);
 
-            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var baseUrl = $"{this.Request.Scheme}://{Request.Host}";
             var shareUrl = $"{baseUrl}/share/{token.Token}";
 
-            var embedCode = _shareService.GenerateEmbedCode(token, baseUrl, EmbedCodeType.Iframe);
-            var jsEmbedCode = _shareService.GenerateEmbedCode(token, baseUrl, EmbedCodeType.JavaScript);
+            var embedCode = this.shareService.GenerateEmbedCode(token, baseUrl, EmbedCodeType.Iframe);
+            var jsEmbedCode = this.shareService.GenerateEmbedCode(token, baseUrl, EmbedCodeType.JavaScript);
 
             var response = new ShareTokenResponse
             {
@@ -93,12 +93,12 @@ public class ShareController : ControllerBase
                 HasPassword = !string.IsNullOrEmpty(token.PasswordHash)
             };
 
-            _logger.LogInformation("Created share link for map {MapId}: {Token}", mapId, token.Token);
-            return CreatedAtAction(nameof(GetShare), new { token = token.Token }, response);
+            this.logger.LogInformation("Created share link for map {MapId}: {Token}", mapId, token.Token);
+            return this.CreatedAtAction(nameof(GetShare), new { token = token.Token }, response);
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -119,7 +119,7 @@ public class ShareController : ControllerBase
         [FromRoute] string token,
         [FromQuery] string? password = null)
     {
-        var (isValid, shareToken, error) = await _shareService.ValidateShareAsync(token, password);
+        var (isValid, shareToken, error) = await this.shareService.ValidateShareAsync(token, password);
 
         if (!isValid || shareToken == null)
         {
@@ -127,10 +127,10 @@ public class ShareController : ControllerBase
             {
                 return Unauthorized(new { error });
             }
-            return NotFound(new { error = error ?? "Share not found" });
+            return this.NotFound(new { error = error ?? "Share not found" });
         }
 
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var baseUrl = $"{this.Request.Scheme}://{Request.Host}";
         var shareUrl = $"{baseUrl}/share/{token}";
 
         var response = new ShareTokenResponse
@@ -146,7 +146,7 @@ public class ShareController : ControllerBase
             HasPassword = !string.IsNullOrEmpty(shareToken.PasswordHash)
         };
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     /// <summary>
@@ -159,8 +159,8 @@ public class ShareController : ControllerBase
     [ProducesResponseType(typeof(List<ShareTokenResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<ShareTokenResponse>>> GetSharesForMap([FromRoute] string mapId)
     {
-        var tokens = await _shareService.GetSharesForMapAsync(mapId);
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var tokens = await this.shareService.GetSharesForMapAsync(mapId);
+        var baseUrl = $"{this.Request.Scheme}://{Request.Host}";
 
         var responses = tokens.Select(t => new ShareTokenResponse
         {
@@ -177,7 +177,7 @@ public class ShareController : ControllerBase
             HasPassword = !string.IsNullOrEmpty(t.PasswordHash)
         }).ToList();
 
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     /// <summary>
@@ -195,18 +195,18 @@ public class ShareController : ControllerBase
         [FromRoute] string token,
         [FromBody] UpdateShareRequest request)
     {
-        var (isValid, shareToken, _) = await _shareService.ValidateShareAsync(token);
+        var (isValid, shareToken, _) = await this.shareService.ValidateShareAsync(token);
 
         if (!isValid || shareToken == null)
         {
-            return NotFound(new { error = "Share not found" });
+            return this.NotFound(new { error = "Share not found" });
         }
 
         // Verify ownership
-        var userId = User.Identity?.Name ?? "anonymous";
+        var userId = this.User.Identity?.Name ?? "anonymous";
         if (shareToken.CreatedBy != userId && !User.IsInRole("administrator"))
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "User {UserId} attempted to update share {Token} owned by {OwnerId}",
                 userId, token, shareToken.CreatedBy);
             return Forbid();
@@ -224,10 +224,10 @@ public class ShareController : ControllerBase
         if (request.IsActive.HasValue)
             shareToken.IsActive = request.IsActive.Value;
 
-        await _shareService.UpdateShareAsync(shareToken);
+        await this.shareService.UpdateShareAsync(shareToken);
 
-        _logger.LogInformation("Updated share token {Token}", token);
-        return Ok(new { message = "Share updated successfully" });
+        this.logger.LogInformation("Updated share token {Token}", token);
+        return this.Ok(new { message = "Share updated successfully" });
     }
 
     /// <summary>
@@ -242,25 +242,25 @@ public class ShareController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateShare([FromRoute] string token)
     {
-        var (isValid, shareToken, _) = await _shareService.ValidateShareAsync(token);
+        var (isValid, shareToken, _) = await this.shareService.ValidateShareAsync(token);
 
         if (!isValid || shareToken == null)
         {
-            return NotFound(new { error = "Share not found" });
+            return this.NotFound(new { error = "Share not found" });
         }
 
         // Verify ownership
-        var userId = User.Identity?.Name ?? "anonymous";
+        var userId = this.User.Identity?.Name ?? "anonymous";
         if (shareToken.CreatedBy != userId && !User.IsInRole("administrator"))
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "User {UserId} attempted to deactivate share {Token} owned by {OwnerId}",
                 userId, token, shareToken.CreatedBy);
             return Forbid();
         }
 
-        await _shareService.DeactivateShareAsync(token);
-        return NoContent();
+        await this.shareService.DeactivateShareAsync(token);
+        return this.NoContent();
     }
 
     /// <summary>
@@ -278,18 +278,18 @@ public class ShareController : ControllerBase
         [FromRoute] string token,
         [FromQuery] string type = "iframe")
     {
-        var (isValid, shareToken, error) = await _shareService.ValidateShareAsync(token);
+        var (isValid, shareToken, error) = await this.shareService.ValidateShareAsync(token);
 
         if (!isValid || shareToken == null)
         {
-            return NotFound(new { error = error ?? "Share not found" });
+            return this.NotFound(new { error = error ?? "Share not found" });
         }
 
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var baseUrl = $"{this.Request.Scheme}://{Request.Host}";
         var embedType = type.ToLower() == "javascript" ? EmbedCodeType.JavaScript : EmbedCodeType.Iframe;
-        var embedCode = _shareService.GenerateEmbedCode(shareToken, baseUrl, embedType);
+        var embedCode = this.shareService.GenerateEmbedCode(shareToken, baseUrl, embedType);
 
-        return Ok(new EmbedCodeResponse
+        return this.Ok(new EmbedCodeResponse
         {
             Type = embedType.ToString().ToLower(),
             Code = embedCode
@@ -317,12 +317,12 @@ public class ShareController : ControllerBase
     {
         try
         {
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var userAgent = Request.Headers["User-Agent"].ToString();
-            var isGuest = !User.Identity?.IsAuthenticated ?? true;
-            var author = isGuest ? request.Author : (User.Identity?.Name ?? request.Author);
+            var ipAddress = this.HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = this.Request.Headers["User-Agent"].ToString();
+            var isGuest = !this.User.Identity?.IsAuthenticated ?? true;
+            var author = isGuest ? request.Author : (this.User.Identity?.Name ?? request.Author);
 
-            var comment = await _shareService.CreateCommentAsync(
+            var comment = await this.shareService.CreateCommentAsync(
                 token,
                 request.MapId,
                 author,
@@ -348,11 +348,11 @@ public class ShareController : ControllerBase
                 LocationY = comment.LocationY
             };
 
-            return CreatedAtAction(nameof(GetComments), new { token }, response);
+            return this.CreatedAtAction(nameof(GetComments), new { token }, response);
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
+            return this.StatusCode(StatusCodes.Status403Forbidden, new { error = ex.Message });
         }
     }
 
@@ -366,8 +366,8 @@ public class ShareController : ControllerBase
     [ProducesResponseType(typeof(List<ShareCommentResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<ShareCommentResponse>>> GetComments([FromRoute] string token)
     {
-        var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
-        var comments = await _shareService.GetCommentsAsync(token, includeUnapproved: isAuthenticated);
+        var isAuthenticated = this.User.Identity?.IsAuthenticated ?? false;
+        var comments = await this.shareService.GetCommentsAsync(token, includeUnapproved: isAuthenticated);
 
         var responses = comments.Select(c => new ShareCommentResponse
         {
@@ -381,7 +381,7 @@ public class ShareController : ControllerBase
             LocationY = c.LocationY
         }).ToList();
 
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     /// <summary>
@@ -396,8 +396,8 @@ public class ShareController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ApproveComment([FromRoute] string commentId)
     {
-        await _shareService.ApproveCommentAsync(commentId);
-        return Ok(new { message = "Comment approved" });
+        await this.shareService.ApproveCommentAsync(commentId);
+        return this.Ok(new { message = "Comment approved" });
     }
 
     /// <summary>
@@ -410,8 +410,8 @@ public class ShareController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteComment([FromRoute] string commentId)
     {
-        await _shareService.DeleteCommentAsync(commentId);
-        return NoContent();
+        await this.shareService.DeleteCommentAsync(commentId);
+        return this.NoContent();
     }
 
     /// <summary>
@@ -423,7 +423,7 @@ public class ShareController : ControllerBase
     [ProducesResponseType(typeof(List<ShareCommentResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<ShareCommentResponse>>> GetPendingComments()
     {
-        var comments = await _shareService.GetPendingCommentsAsync();
+        var comments = await this.shareService.GetPendingCommentsAsync();
 
         var responses = comments.Select(c => new ShareCommentResponse
         {
@@ -439,7 +439,7 @@ public class ShareController : ControllerBase
             ShareToken = c.ShareToken
         }).ToList();
 
-        return Ok(responses);
+        return this.Ok(responses);
     }
 }
 

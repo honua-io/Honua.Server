@@ -16,12 +16,12 @@ namespace Honua.Server.Intake.Services;
 /// </summary>
 public sealed class ConversationStore : IConversationStore
 {
-    private readonly string _connectionString;
-    private readonly ILogger<ConversationStore> _logger;
+    private readonly string connectionString;
+    private readonly ILogger<ConversationStore> logger;
 
     public ConversationStore(IOptions<IntakeAgentOptions> options, ILogger<ConversationStore> logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         var opts = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
         if (string.IsNullOrWhiteSpace(opts.ConnectionString))
@@ -29,15 +29,15 @@ public sealed class ConversationStore : IConversationStore
             throw new ArgumentException("ConnectionString is required for ConversationStore", nameof(options));
         }
 
-        _connectionString = opts.ConnectionString;
+        this.connectionString = opts.ConnectionString;
     }
 
     /// <inheritdoc/>
     public async Task SaveConversationAsync(ConversationRecord conversation, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Saving conversation {ConversationId}", conversation.ConversationId);
+        this.logger.LogDebug("Saving conversation {ConversationId}", conversation.ConversationId);
 
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         const string sql = @"
@@ -71,16 +71,16 @@ public sealed class ConversationStore : IConversationStore
         var rowsAffected = await connection.ExecuteAsync(
             new CommandDefinition(sql, conversation, cancellationToken: cancellationToken));
 
-        _logger.LogInformation("Saved conversation {ConversationId}, affected {RowsAffected} rows",
+        this.logger.LogInformation("Saved conversation {ConversationId}, affected {RowsAffected} rows",
             conversation.ConversationId, rowsAffected);
     }
 
     /// <inheritdoc/>
     public async Task<ConversationRecord?> GetConversationAsync(string conversationId, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Retrieving conversation {ConversationId}", conversationId);
+        this.logger.LogDebug("Retrieving conversation {ConversationId}", conversationId);
 
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         const string sql = @"
@@ -102,7 +102,7 @@ public sealed class ConversationStore : IConversationStore
 
         if (conversation == null)
         {
-            _logger.LogWarning("Conversation {ConversationId} not found", conversationId);
+            this.logger.LogWarning("Conversation {ConversationId} not found", conversationId);
         }
 
         return conversation;
@@ -114,9 +114,9 @@ public sealed class ConversationStore : IConversationStore
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task InitializeDatabaseAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Initializing conversation database schema");
+        this.logger.LogInformation("Initializing conversation database schema");
 
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         const string sql = @"
@@ -144,6 +144,6 @@ public sealed class ConversationStore : IConversationStore
 
         await connection.ExecuteAsync(new CommandDefinition(sql, cancellationToken: cancellationToken));
 
-        _logger.LogInformation("Conversation database schema initialized successfully");
+        this.logger.LogInformation("Conversation database schema initialized successfully");
     }
 }

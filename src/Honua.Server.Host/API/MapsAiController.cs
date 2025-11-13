@@ -24,15 +24,15 @@ namespace Honua.Server.Host.API;
 [Tags("AI Map Generation")]
 public class MapsAiController : ControllerBase
 {
-    private readonly IMapGenerationAiService _mapAiService;
-    private readonly ILogger<MapsAiController> _logger;
+    private readonly IMapGenerationAiService mapAiService;
+    private readonly ILogger<MapsAiController> logger;
 
     public MapsAiController(
         IMapGenerationAiService mapAiService,
         ILogger<MapsAiController> logger)
     {
-        _mapAiService = mapAiService ?? throw new ArgumentNullException(nameof(mapAiService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.mapAiService = mapAiService ?? throw new ArgumentNullException(nameof(mapAiService));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -68,7 +68,7 @@ public class MapsAiController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(request.Prompt))
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Invalid Request",
@@ -79,10 +79,10 @@ public class MapsAiController : ControllerBase
         try
         {
             // Check if AI service is available
-            var isAvailable = await _mapAiService.IsAvailableAsync(cancellationToken);
+            var isAvailable = await this.mapAiService.IsAvailableAsync(cancellationToken);
             if (!isAvailable)
             {
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
+                return this.StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
                 {
                     Status = StatusCodes.Status503ServiceUnavailable,
                     Title = "AI Service Unavailable",
@@ -90,18 +90,18 @@ public class MapsAiController : ControllerBase
                 });
             }
 
-            var userId = User.Identity?.Name ?? "anonymous";
+            var userId = this.User.Identity?.Name ?? "anonymous";
 
-            _logger.LogInformation("Generating map for user {UserId} with prompt: {Prompt}", userId, request.Prompt);
+            this.logger.LogInformation("Generating map for user {UserId} with prompt: {Prompt}", userId, request.Prompt);
 
-            var result = await _mapAiService.GenerateMapAsync(
+            var result = await this.mapAiService.GenerateMapAsync(
                 request.Prompt,
                 userId,
                 cancellationToken);
 
             if (!result.Success || result.MapConfiguration == null)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+                return this.StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
                 {
                     Status = StatusCodes.Status500InternalServerError,
                     Title = "Map Generation Failed",
@@ -109,12 +109,12 @@ public class MapsAiController : ControllerBase
                 });
             }
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Successfully generated map with {LayerCount} layers for user {UserId}",
                 result.MapConfiguration.Layers.Count,
                 userId);
 
-            return Ok(new MapGenerationResponse
+            return this.Ok(new MapGenerationResponse
             {
                 MapConfiguration = result.MapConfiguration,
                 Explanation = result.Explanation ?? "",
@@ -125,8 +125,8 @@ public class MapsAiController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error generating map from prompt: {Prompt}", request.Prompt);
-            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            this.logger.LogError(ex, "Error generating map from prompt: {Prompt}", request.Prompt);
+            return this.StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "Internal Server Error",
@@ -151,7 +151,7 @@ public class MapsAiController : ControllerBase
     {
         if (request.MapConfiguration == null)
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Invalid Request",
@@ -161,13 +161,13 @@ public class MapsAiController : ControllerBase
 
         try
         {
-            var result = await _mapAiService.ExplainMapAsync(
+            var result = await this.mapAiService.ExplainMapAsync(
                 request.MapConfiguration,
                 cancellationToken);
 
             if (!result.Success)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+                return this.StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
                 {
                     Status = StatusCodes.Status500InternalServerError,
                     Title = "Explanation Failed",
@@ -175,7 +175,7 @@ public class MapsAiController : ControllerBase
                 });
             }
 
-            return Ok(new MapExplanationResponse
+            return this.Ok(new MapExplanationResponse
             {
                 Explanation = result.Explanation,
                 KeyFeatures = result.KeyFeatures
@@ -183,8 +183,8 @@ public class MapsAiController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error explaining map: {MapId}", request.MapConfiguration.Id);
-            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            this.logger.LogError(ex, "Error explaining map: {MapId}", request.MapConfiguration.Id);
+            return this.StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "Internal Server Error",
@@ -209,7 +209,7 @@ public class MapsAiController : ControllerBase
     {
         if (request.MapConfiguration == null)
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Invalid Request",
@@ -219,14 +219,14 @@ public class MapsAiController : ControllerBase
 
         try
         {
-            var result = await _mapAiService.SuggestImprovementsAsync(
+            var result = await this.mapAiService.SuggestImprovementsAsync(
                 request.MapConfiguration,
                 request.UserFeedback,
                 cancellationToken);
 
             if (!result.Success)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+                return this.StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
                 {
                     Status = StatusCodes.Status500InternalServerError,
                     Title = "Suggestion Generation Failed",
@@ -234,15 +234,15 @@ public class MapsAiController : ControllerBase
                 });
             }
 
-            return Ok(new MapSuggestionResponse
+            return this.Ok(new MapSuggestionResponse
             {
                 Suggestions = result.Suggestions
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error generating suggestions for map: {MapId}", request.MapConfiguration.Id);
-            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            this.logger.LogError(ex, "Error generating suggestions for map: {MapId}", request.MapConfiguration.Id);
+            return this.StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "Internal Server Error",
@@ -259,7 +259,7 @@ public class MapsAiController : ControllerBase
     [ProducesResponseType(typeof(ExamplePromptsResponse), StatusCodes.Status200OK)]
     public ActionResult<ExamplePromptsResponse> GetExamplePrompts()
     {
-        return Ok(new ExamplePromptsResponse
+        return this.Ok(new ExamplePromptsResponse
         {
             Examples = MapGenerationPromptTemplates.GetExamplePrompts()
         });
@@ -274,9 +274,9 @@ public class MapsAiController : ControllerBase
     [ProducesResponseType(typeof(ServiceHealthResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<ServiceHealthResponse>> CheckHealthAsync(CancellationToken cancellationToken = default)
     {
-        var isAvailable = await _mapAiService.IsAvailableAsync(cancellationToken);
+        var isAvailable = await this.mapAiService.IsAvailableAsync(cancellationToken);
 
-        return Ok(new ServiceHealthResponse
+        return this.Ok(new ServiceHealthResponse
         {
             Available = isAvailable,
             Message = isAvailable

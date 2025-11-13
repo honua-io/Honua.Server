@@ -28,11 +28,11 @@ namespace Honua.Server.Host.Middleware;
 /// </remarks>
 public sealed class CsrfValidationMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly IAntiforgery _antiforgery;
-    private readonly ILogger<CsrfValidationMiddleware> _logger;
-    private readonly ISecurityAuditLogger _auditLogger;
-    private readonly CsrfProtectionOptions _options;
+    private readonly RequestDelegate next;
+    private readonly IAntiforgery antiforgery;
+    private readonly ILogger<CsrfValidationMiddleware> logger;
+    private readonly ISecurityAuditLogger auditLogger;
+    private readonly CsrfProtectionOptions options;
 
     // Safe HTTP methods that don't require CSRF protection (per RFC 7231)
     private static readonly string[] SafeMethods = { "GET", "HEAD", "OPTIONS", "TRACE" };
@@ -44,11 +44,11 @@ public sealed class CsrfValidationMiddleware
         ISecurityAuditLogger auditLogger,
         CsrfProtectionOptions options)
     {
-        _next = Guard.NotNull(next);
-        _antiforgery = Guard.NotNull(antiforgery);
-        _logger = Guard.NotNull(logger);
-        _auditLogger = Guard.NotNull(auditLogger);
-        _options = Guard.NotNull(options);
+        this.next = Guard.NotNull(next);
+        this.antiforgery = Guard.NotNull(antiforgery);
+        this.logger = Guard.NotNull(logger);
+        this.auditLogger = Guard.NotNull(auditLogger);
+        this.options = Guard.NotNull(options);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -56,7 +56,7 @@ public sealed class CsrfValidationMiddleware
         Guard.NotNull(context);
 
         // Skip CSRF validation if protection is disabled globally
-        if (!_options.Enabled)
+        if (!this.options.Enabled)
         {
             await _next(context).ConfigureAwait(false);
             return;
@@ -79,7 +79,7 @@ public sealed class CsrfValidationMiddleware
         // Skip validation for API key authenticated requests (non-browser clients)
         if (IsApiKeyAuthenticated(context))
         {
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "CSRF validation skipped for API key authenticated request to {Path}",
                 context.Request.Path);
             await _next(context).ConfigureAwait(false);
@@ -89,9 +89,9 @@ public sealed class CsrfValidationMiddleware
         // Validate CSRF token for state-changing requests from browser clients
         try
         {
-            await _antiforgery.ValidateRequestAsync(context).ConfigureAwait(false);
+            await this.antiforgery.ValidateRequestAsync(context).ConfigureAwait(false);
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "CSRF token validated successfully for {Method} {Path}",
                 context.Request.Method,
                 context.Request.Path);
@@ -100,7 +100,7 @@ public sealed class CsrfValidationMiddleware
         }
         catch (AntiforgeryValidationException ex)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 ex,
                 "CSRF token validation failed for {Method} {Path} from {RemoteIp}. User={User}",
                 context.Request.Method,
@@ -108,7 +108,7 @@ public sealed class CsrfValidationMiddleware
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 context.User?.Identity?.Name ?? "anonymous");
 
-            _auditLogger.LogSuspiciousActivity(
+            this.auditLogger.LogSuspiciousActivity(
                 "csrf_validation_failure",
                 context.User?.Identity?.Name,
                 context.Connection.RemoteIpAddress?.ToString(),
@@ -131,7 +131,7 @@ public sealed class CsrfValidationMiddleware
         }
         catch (Exception ex)
         {
-            _logger.LogError(
+            this.logger.LogError(
                 ex,
                 "Unexpected error in CSRF validation middleware for {Method} {Path} from {RemoteIp}",
                 context.Request.Method,
@@ -180,7 +180,7 @@ public sealed class CsrfValidationMiddleware
     /// </summary>
     private bool IsExcludedPath(PathString path)
     {
-        foreach (var excludedPath in _options.ExcludedPaths)
+        foreach (var excludedPath in this.options.ExcludedPaths)
         {
             if (path.StartsWithSegments(excludedPath, StringComparison.OrdinalIgnoreCase))
             {

@@ -22,14 +22,14 @@ namespace Honua.Server.Host.API;
 [Produces("application/json")]
 public class StyleGenerationController : ControllerBase
 {
-    private readonly StyleGeneratorService _styleGenerator = new();
-    private readonly IMetadataProvider _metadataProvider;
-    private readonly IQueryService _queryService;
+    private readonly StyleGeneratorService styleGenerator = new();
+    private readonly IMetadataProvider metadataProvider;
+    private readonly IQueryService queryService;
 
     public StyleGenerationController(IMetadataProvider metadataProvider, IQueryService queryService)
     {
-        _metadataProvider = metadataProvider;
-        _queryService = queryService;
+        this.metadataProvider = metadataProvider;
+        this.queryService = queryService;
     }
 
     /// <summary>
@@ -61,12 +61,12 @@ public class StyleGenerationController : ControllerBase
                 ClassificationMethod = request.ClassificationMethod
             };
 
-            var result = _styleGenerator.GenerateStyle(generationRequest);
-            return Ok(result);
+            var result = this.styleGenerator.GenerateStyle(generationRequest);
+            return this.Ok(result);
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -83,10 +83,10 @@ public class StyleGenerationController : ControllerBase
     {
         try
         {
-            var metadata = await _metadataProvider.GetSnapshotAsync();
+            var metadata = await this.metadataProvider.GetSnapshotAsync();
             if (!metadata.TryGetLayer(request.ServiceId, request.LayerId, out var layer))
             {
-                return NotFound(new { error = $"Layer {request.LayerId} not found" });
+                return this.NotFound(new { error = $"Layer {request.LayerId} not found" });
             }
 
             // Sample data from the layer
@@ -99,7 +99,7 @@ public class StyleGenerationController : ControllerBase
                 OutputCrs = "EPSG:4326"
             };
 
-            var queryResult = await _queryService.ExecuteQueryAsync(queryRequest, default);
+            var queryResult = await this.queryService.ExecuteQueryAsync(queryRequest, default);
 
             // Extract field values and coordinates
             List<object?> fieldValues = new();
@@ -145,12 +145,12 @@ public class StyleGenerationController : ControllerBase
                 ClassificationMethod = request.ClassificationMethod
             };
 
-            var result = _styleGenerator.GenerateStyle(generationRequest);
-            return Ok(result);
+            var result = this.styleGenerator.GenerateStyle(generationRequest);
+            return this.Ok(result);
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -171,7 +171,7 @@ public class StyleGenerationController : ControllerBase
             })
             .ToList();
 
-        return Ok(palettes);
+        return this.Ok(palettes);
     }
 
     /// <summary>
@@ -187,17 +187,17 @@ public class StyleGenerationController : ControllerBase
     {
         if (classes < 3 || classes > 12)
         {
-            return BadRequest(new { error = "Class count must be between 3 and 12" });
+            return this.BadRequest(new { error = "Class count must be between 3 and 12" });
         }
 
         try
         {
             var colors = CartographicPalettes.GetPalette(name, classes);
-            return Ok(colors);
+            return this.Ok(colors);
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -241,7 +241,7 @@ public class StyleGenerationController : ControllerBase
             ThumbnailUrl = t.ThumbnailUrl
         }).ToList();
 
-        return Ok(result);
+        return this.Ok(result);
     }
 
     /// <summary>
@@ -263,15 +263,15 @@ public class StyleGenerationController : ControllerBase
             var template = StyleTemplateLibrary.GetTemplate(templateName);
             if (template == null)
             {
-                return NotFound(new { error = $"Template '{templateName}' not found" });
+                return this.NotFound(new { error = $"Template '{templateName}' not found" });
             }
 
             var style = StyleTemplateLibrary.ApplyTemplate(templateName, options);
-            return Ok(style);
+            return this.Ok(style);
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -289,11 +289,11 @@ public class StyleGenerationController : ControllerBase
         {
             var analyzer = new DataAnalyzer();
             var result = analyzer.AnalyzeField(request.Values, request.FieldName);
-            return Ok(result);
+            return this.Ok(result);
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -316,7 +316,7 @@ public class StyleGenerationController : ControllerBase
             var breaks = ClassificationStrategy.Classify(sorted, optimalClasses, method);
             var gvf = ClassificationStrategy.CalculateGVF(sorted, breaks);
 
-            return Ok(new ClassificationRecommendation
+            return this.Ok(new ClassificationRecommendation
             {
                 Method = method,
                 OptimalClassCount = optimalClasses,
@@ -326,7 +326,7 @@ public class StyleGenerationController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 

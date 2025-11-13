@@ -14,13 +14,13 @@ namespace Honua.Server.Host.Hosting;
 
 internal sealed class MetadataCorsPolicyProvider : ICorsPolicyProvider
 {
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly ILogger<MetadataCorsPolicyProvider> _logger;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly ILogger<MetadataCorsPolicyProvider> logger;
 
     public MetadataCorsPolicyProvider(IMetadataRegistry metadataRegistry, ILogger<MetadataCorsPolicyProvider> logger)
     {
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _logger = Guard.NotNull(logger);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task<CorsPolicy?> GetPolicyAsync(HttpContext context, string? policyName)
@@ -30,11 +30,11 @@ internal sealed class MetadataCorsPolicyProvider : ICorsPolicyProvider
         MetadataSnapshot snapshot;
         try
         {
-            snapshot = await _metadataRegistry.GetSnapshotAsync(context.RequestAborted).ConfigureAwait(false);
+            snapshot = await this.metadataRegistry.GetSnapshotAsync(context.RequestAborted).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to resolve metadata snapshot while building CORS policy.");
+            this.logger.LogWarning(ex, "Failed to resolve metadata snapshot while building CORS policy.");
             return new CorsPolicyBuilder().Build();
         }
 
@@ -46,7 +46,7 @@ internal sealed class MetadataCorsPolicyProvider : ICorsPolicyProvider
 
         if (!cors.AllowAnyOrigin && cors.AllowedOrigins.Count == 0)
         {
-            _logger.LogDebug("CORS is enabled but no allowed origins are defined in metadata. Requests will be rejected.");
+            this.logger.LogDebug("CORS is enabled but no allowed origins are defined in metadata. Requests will be rejected.");
             return new CorsPolicyBuilder().Build();
         }
 
@@ -57,7 +57,7 @@ internal sealed class MetadataCorsPolicyProvider : ICorsPolicyProvider
             // SECURITY: Cannot use AllowAnyOrigin with AllowCredentials - violates CORS spec
             if (cors.AllowCredentials)
             {
-                _logger.LogError(
+                this.logger.LogError(
                     "CORS configuration error: " +
                     "Cannot use AllowAnyOrigin with AllowCredentials. This violates the CORS specification. " +
                     "Either set AllowAnyOrigin=false and specify allowed origins, or set AllowCredentials=false.");
@@ -76,11 +76,11 @@ internal sealed class MetadataCorsPolicyProvider : ICorsPolicyProvider
                 {
                     if (IsWildcardMatch(origin, pattern))
                     {
-                        _logger.LogDebug("CORS: Origin {Origin} matched pattern {Pattern}", origin, pattern);
+                        this.logger.LogDebug("CORS: Origin {Origin} matched pattern {Pattern}", origin, pattern);
                         return true;
                     }
                 }
-                _logger.LogDebug("CORS: Origin {Origin} did not match any allowed patterns", origin);
+                this.logger.LogDebug("CORS: Origin {Origin} did not match any allowed patterns", origin);
                 return false;
             });
         }

@@ -16,10 +16,10 @@ namespace Honua.Server.Host.Drone;
 [Produces("application/json")]
 public class DroneDataController : ControllerBase
 {
-    private readonly DroneDataService _droneDataService;
-    private readonly PointCloudService _pointCloudService;
-    private readonly OrthomosaicService _orthomosaicService;
-    private readonly ILogger<DroneDataController> _logger;
+    private readonly DroneDataService droneDataService;
+    private readonly PointCloudService pointCloudService;
+    private readonly OrthomosaicService orthomosaicService;
+    private readonly ILogger<DroneDataController> logger;
 
     public DroneDataController(
         DroneDataService droneDataService,
@@ -27,10 +27,10 @@ public class DroneDataController : ControllerBase
         OrthomosaicService orthomosaicService,
         ILogger<DroneDataController> logger)
     {
-        _droneDataService = droneDataService;
-        _pointCloudService = pointCloudService;
-        _orthomosaicService = orthomosaicService;
-        _logger = logger;
+        this.droneDataService = droneDataService;
+        this.pointCloudService = pointCloudService;
+        this.orthomosaicService = orthomosaicService;
+        this.logger = logger;
     }
 
     #region Survey Endpoints
@@ -45,8 +45,8 @@ public class DroneDataController : ControllerBase
         [FromQuery] int offset = 0,
         CancellationToken cancellationToken = default)
     {
-        var surveys = await _droneDataService.ListSurveysAsync(limit, offset, cancellationToken);
-        return Ok(surveys);
+        var surveys = await this.droneDataService.ListSurveysAsync(limit, offset, cancellationToken);
+        return this.Ok(surveys);
     }
 
     /// <summary>
@@ -59,14 +59,14 @@ public class DroneDataController : ControllerBase
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        var survey = await _droneDataService.GetSurveyAsync(surveyId, cancellationToken);
+        var survey = await this.droneDataService.GetSurveyAsync(surveyId, cancellationToken);
 
         if (survey == null)
         {
-            return NotFound(new { message = $"Survey {surveyId} not found" });
+            return this.NotFound(new { message = $"Survey {surveyId} not found" });
         }
 
-        return Ok(survey);
+        return this.Ok(survey);
     }
 
     /// <summary>
@@ -81,16 +81,16 @@ public class DroneDataController : ControllerBase
     {
         try
         {
-            var survey = await _droneDataService.CreateSurveyAsync(dto, cancellationToken);
-            return CreatedAtAction(
+            var survey = await this.droneDataService.CreateSurveyAsync(dto, cancellationToken);
+            return this.CreatedAtAction(
                 nameof(GetSurvey),
                 new { surveyId = survey.Id },
                 survey);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create survey");
-            return BadRequest(new { message = ex.Message });
+            this.logger.LogError(ex, "Failed to create survey");
+            return this.BadRequest(new { message = ex.Message });
         }
     }
 
@@ -104,14 +104,14 @@ public class DroneDataController : ControllerBase
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        var deleted = await _droneDataService.DeleteSurveyAsync(surveyId, cancellationToken);
+        var deleted = await this.droneDataService.DeleteSurveyAsync(surveyId, cancellationToken);
 
         if (!deleted)
         {
-            return NotFound(new { message = $"Survey {surveyId} not found" });
+            return this.NotFound(new { message = $"Survey {surveyId} not found" });
         }
 
-        return NoContent();
+        return this.NoContent();
     }
 
     /// <summary>
@@ -126,12 +126,12 @@ public class DroneDataController : ControllerBase
     {
         try
         {
-            var stats = await _droneDataService.GetSurveyStatisticsAsync(surveyId, cancellationToken);
-            return Ok(stats);
+            var stats = await this.droneDataService.GetSurveyStatisticsAsync(surveyId, cancellationToken);
+            return this.Ok(stats);
         }
         catch (KeyNotFoundException)
         {
-            return NotFound(new { message = $"Survey {surveyId} not found" });
+            return this.NotFound(new { message = $"Survey {surveyId} not found" });
         }
     }
 
@@ -169,9 +169,9 @@ public class DroneDataController : ControllerBase
         };
 
         // Stream as GeoJSON-Seq (newline-delimited JSON)
-        Response.ContentType = "application/geo+json-seq";
+        this.Response.ContentType = "application/geo+json-seq";
 
-        await foreach (var point in _pointCloudService.QueryWithLodAsync(
+        await foreach (var point in this.pointCloudService.QueryWithLodAsync(
             surveyId, options, cancellationToken))
         {
             var feature = new
@@ -193,7 +193,7 @@ public class DroneDataController : ControllerBase
                 }
             };
 
-            await Response.WriteAsync(
+            await this.Response.WriteAsync(
                 JsonSerializer.Serialize(feature) + "\n",
                 cancellationToken);
         }
@@ -208,8 +208,8 @@ public class DroneDataController : ControllerBase
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        var stats = await _pointCloudService.GetStatisticsAsync(surveyId, cancellationToken);
-        return Ok(stats);
+        var stats = await this.pointCloudService.GetStatisticsAsync(surveyId, cancellationToken);
+        return this.Ok(stats);
     }
 
     /// <summary>
@@ -225,13 +225,13 @@ public class DroneDataController : ControllerBase
     {
         if (file == null || file.Length == 0)
         {
-            return BadRequest(new { message = "No file uploaded" });
+            return this.BadRequest(new { message = "No file uploaded" });
         }
 
         if (!file.FileName.EndsWith(".laz", StringComparison.OrdinalIgnoreCase) &&
             !file.FileName.EndsWith(".las", StringComparison.OrdinalIgnoreCase))
         {
-            return BadRequest(new { message = "Only LAZ/LAS files are supported" });
+            return this.BadRequest(new { message = "Only LAZ/LAS files are supported" });
         }
 
         try
@@ -243,7 +243,7 @@ public class DroneDataController : ControllerBase
                 await file.CopyToAsync(stream, cancellationToken);
             }
 
-            var result = await _pointCloudService.ImportLazFileAsync(
+            var result = await this.pointCloudService.ImportLazFileAsync(
                 surveyId, tempPath, cancellationToken);
 
             // Clean up temp file
@@ -252,12 +252,12 @@ public class DroneDataController : ControllerBase
                 System.IO.File.Delete(tempPath);
             }
 
-            return Ok(result);
+            return this.Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to import point cloud");
-            return BadRequest(new { message = ex.Message });
+            this.logger.LogError(ex, "Failed to import point cloud");
+            return this.BadRequest(new { message = ex.Message });
         }
     }
 
@@ -274,8 +274,8 @@ public class DroneDataController : ControllerBase
         Guid surveyId,
         CancellationToken cancellationToken = default)
     {
-        var orthomosaics = await _orthomosaicService.ListOrthomosaicsAsync(surveyId, cancellationToken);
-        return Ok(orthomosaics);
+        var orthomosaics = await this.orthomosaicService.ListOrthomosaicsAsync(surveyId, cancellationToken);
+        return this.Ok(orthomosaics);
     }
 
     /// <summary>
@@ -288,14 +288,14 @@ public class DroneDataController : ControllerBase
         Guid orthomosaicId,
         CancellationToken cancellationToken = default)
     {
-        var orthomosaic = await _orthomosaicService.GetOrthomosaicAsync(orthomosaicId, cancellationToken);
+        var orthomosaic = await this.orthomosaicService.GetOrthomosaicAsync(orthomosaicId, cancellationToken);
 
         if (orthomosaic == null)
         {
-            return NotFound(new { message = $"Orthomosaic {orthomosaicId} not found" });
+            return this.NotFound(new { message = $"Orthomosaic {orthomosaicId} not found" });
         }
 
-        return Ok(orthomosaic);
+        return this.Ok(orthomosaic);
     }
 
     /// <summary>
@@ -310,16 +310,16 @@ public class DroneDataController : ControllerBase
     {
         try
         {
-            var orthomosaic = await _orthomosaicService.CreateOrthomosaicAsync(dto, cancellationToken);
-            return CreatedAtAction(
+            var orthomosaic = await this.orthomosaicService.CreateOrthomosaicAsync(dto, cancellationToken);
+            return this.CreatedAtAction(
                 nameof(GetOrthomosaic),
                 new { orthomosaicId = orthomosaic.Id },
                 orthomosaic);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create orthomosaic");
-            return BadRequest(new { message = ex.Message });
+            this.logger.LogError(ex, "Failed to create orthomosaic");
+            return this.BadRequest(new { message = ex.Message });
         }
     }
 
@@ -335,13 +335,13 @@ public class DroneDataController : ControllerBase
     {
         try
         {
-            var capabilities = await _orthomosaicService.GetWmtsCapabilitiesAsync(
+            var capabilities = await this.orthomosaicService.GetWmtsCapabilitiesAsync(
                 orthomosaicId, cancellationToken);
-            return Ok(capabilities);
+            return this.Ok(capabilities);
         }
         catch (KeyNotFoundException)
         {
-            return NotFound(new { message = $"Orthomosaic {orthomosaicId} not found" });
+            return this.NotFound(new { message = $"Orthomosaic {orthomosaicId} not found" });
         }
     }
 
@@ -356,7 +356,7 @@ public class DroneDataController : ControllerBase
     [ProducesResponseType(200)]
     public IActionResult HealthCheck()
     {
-        return Ok(new
+        return this.Ok(new
         {
             status = "healthy",
             timestamp = DateTime.UtcNow,

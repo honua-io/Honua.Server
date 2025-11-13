@@ -83,9 +83,9 @@ public sealed class GmlStreamingWriter : StreamingFeatureCollectionWriterBase
         Guard.NotNull(layer);
         Guard.NotNull(context);
 
-        _lockId = context.GetOption<string>("lockId");
-        _expectedFeatureCount = context.ExpectedFeatureCount;
-        _boundingEnvelope = null;
+        this.lockId = context.GetOption<string>("lockId");
+        this.expectedFeatureCount = context.ExpectedFeatureCount;
+        this.boundingEnvelope = null;
 
         var serviceId = context.ServiceId ?? "default";
         var featureNamespace = XNamespace.Get($"https://honua.dev/wfs/{serviceId}");
@@ -117,7 +117,7 @@ public sealed class GmlStreamingWriter : StreamingFeatureCollectionWriterBase
         var numberReturned = _expectedFeatureCount ?? 0;
         builder.Append($" numberReturned=\"{numberReturned}\"");
 
-        if (_lockId.HasValue())
+        if (this.lockId.HasValue())
         {
             builder.Append($" lockId=\"{_lockId}\"");
         }
@@ -246,11 +246,11 @@ public sealed class GmlStreamingWriter : StreamingFeatureCollectionWriterBase
             builder.Append($" srsName=\"{BuildSrsName(context.TargetWkid)}\"");
             builder.Append('>');
             builder.AppendFormat(CultureInfo.InvariantCulture, "<gml:lowerCorner>{0} {1}</gml:lowerCorner>",
-                WfsHelpers.FormatCoordinate(_boundingEnvelope.MinX),
-                WfsHelpers.FormatCoordinate(_boundingEnvelope.MinY));
+                WfsHelpers.FormatCoordinate(this.boundingEnvelope.MinX),
+                WfsHelpers.FormatCoordinate(this.boundingEnvelope.MinY));
             builder.AppendFormat(CultureInfo.InvariantCulture, "<gml:upperCorner>{0} {1}</gml:upperCorner>",
-                WfsHelpers.FormatCoordinate(_boundingEnvelope.MaxX),
-                WfsHelpers.FormatCoordinate(_boundingEnvelope.MaxY));
+                WfsHelpers.FormatCoordinate(this.boundingEnvelope.MaxX),
+                WfsHelpers.FormatCoordinate(this.boundingEnvelope.MaxY));
             builder.Append("</gml:Envelope>");
             builder.Append("</gml:boundedBy>");
         }

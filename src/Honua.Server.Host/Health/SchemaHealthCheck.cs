@@ -24,10 +24,10 @@ namespace Honua.Server.Host.Health;
 /// </summary>
 public sealed class SchemaHealthCheck : IHealthCheck
 {
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly ISchemaValidatorFactory _schemaValidatorFactory;
-    private readonly ILogger<SchemaHealthCheck> _logger;
-    private readonly SchemaValidationOptions _options;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly ISchemaValidatorFactory schemaValidatorFactory;
+    private readonly ILogger<SchemaHealthCheck> logger;
+    private readonly SchemaValidationOptions options;
 
     public SchemaHealthCheck(
         IMetadataRegistry metadataRegistry,
@@ -35,17 +35,17 @@ public sealed class SchemaHealthCheck : IHealthCheck
         IOptions<SchemaValidationOptions> options,
         ILogger<SchemaHealthCheck> logger)
     {
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _schemaValidatorFactory = Guard.NotNull(schemaValidatorFactory);
-        _options = options?.Value ?? new SchemaValidationOptions();
-        _logger = Guard.NotNull(logger);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.schemaValidatorFactory = Guard.NotNull(schemaValidatorFactory);
+        this.options = options?.Value ?? new SchemaValidationOptions();
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try
         {
-            var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
             var layerDetails = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             var overallStatus = HealthStatus.Healthy;
@@ -69,10 +69,10 @@ public sealed class SchemaHealthCheck : IHealthCheck
                     continue;
                 }
 
-                var schemaValidator = _schemaValidatorFactory.GetValidator(dataSource);
+                var schemaValidator = this.schemaValidatorFactory.GetValidator(dataSource);
                 if (schemaValidator is null)
                 {
-                    _logger.LogWarning("No schema validator registered for provider {Provider}", dataSource.Provider);
+                    this.logger.LogWarning("No schema validator registered for provider {Provider}", dataSource.Provider);
                     continue;
                 }
 
@@ -99,7 +99,7 @@ public sealed class SchemaHealthCheck : IHealthCheck
                         layerDetails[layer.Id] = layerData;
 
                         // Log details server-side only
-                        _logger.LogValidationFailure(layer.Id, $"{result.Errors.Count} schema errors detected");
+                        this.logger.LogValidationFailure(layer.Id, $"{result.Errors.Count} schema errors detected");
                     }
                     else if (result.Warnings.Count > 0)
                     {
@@ -114,7 +114,7 @@ public sealed class SchemaHealthCheck : IHealthCheck
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogOperationFailure(ex, "Schema validation", layer.Id);
+                    this.logger.LogOperationFailure(ex, "Schema validation", layer.Id);
                     var layerStatus = DetermineLayerStatus(hasErrors: true);
                     overallStatus = PromoteStatus(overallStatus, layerStatus);
                     driftLayers++;
@@ -146,7 +146,7 @@ public sealed class SchemaHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogOperationFailure(ex, "Schema health check");
+            this.logger.LogOperationFailure(ex, "Schema health check");
             return HealthCheckResult.Unhealthy("Schema validation is unavailable.", ex);
         }
     }
@@ -158,12 +158,12 @@ public sealed class SchemaHealthCheck : IHealthCheck
             return HealthStatus.Healthy;
         }
 
-        if (_options.FailOnError)
+        if (this.options.FailOnError)
         {
             return HealthStatus.Unhealthy;
         }
 
-        return _options.DegradeOnSchemaDrift ? HealthStatus.Degraded : HealthStatus.Healthy;
+        return this.options.DegradeOnSchemaDrift ? HealthStatus.Degraded : HealthStatus.Healthy;
     }
 
     private static HealthStatus PromoteStatus(HealthStatus current, HealthStatus candidate)

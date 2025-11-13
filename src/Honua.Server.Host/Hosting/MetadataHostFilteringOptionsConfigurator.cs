@@ -18,15 +18,15 @@ internal sealed class MetadataHostFilteringOptionsConfigurator :
     IConfigureOptions<HostFilteringOptions>,
     IOptionsChangeTokenSource<HostFilteringOptions>
 {
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly ILogger<MetadataHostFilteringOptionsConfigurator> _logger;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly ILogger<MetadataHostFilteringOptionsConfigurator> logger;
 
     public MetadataHostFilteringOptionsConfigurator(
         IMetadataRegistry metadataRegistry,
         ILogger<MetadataHostFilteringOptionsConfigurator> logger)
     {
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _logger = Guard.NotNull(logger);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.logger = Guard.NotNull(logger);
     }
 
     public void Configure(HostFilteringOptions options)
@@ -35,7 +35,7 @@ internal sealed class MetadataHostFilteringOptionsConfigurator :
 
         if (!TryGetCurrentSnapshot(out var snapshot))
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Metadata registry is not ready yet; host filtering temporarily allows all hosts until metadata initialization completes.");
             options.AllowedHosts = new[] { "*" };
             return;
@@ -78,7 +78,7 @@ internal sealed class MetadataHostFilteringOptionsConfigurator :
 
             if (containsWildcardPattern)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Wildcard host entries (e.g. '*.example.com') are not supported by ASP.NET Core host filtering. Allowing all hosts instead. Configure explicit hosts to enable filtering.");
                 normalizedHosts.Clear();
                 normalizedHosts.Add("*");
@@ -93,12 +93,12 @@ internal sealed class MetadataHostFilteringOptionsConfigurator :
         }
         catch (Exception ex) when (ex is InvalidOperationException or TaskCanceledException)
         {
-            _logger.LogCritical(ex, "Failed to configure host filtering options from metadata.");
+            this.logger.LogCritical(ex, "Failed to configure host filtering options from metadata.");
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(ex, "Failed to load metadata for host filtering configuration.");
+            this.logger.LogCritical(ex, "Failed to load metadata for host filtering configuration.");
             throw new InvalidOperationException("Unable to configure host filtering options from metadata.", ex);
         }
     }
@@ -107,12 +107,12 @@ internal sealed class MetadataHostFilteringOptionsConfigurator :
 
     public IChangeToken GetChangeToken()
     {
-        return _metadataRegistry.GetChangeToken();
+        return this.metadataRegistry.GetChangeToken();
     }
 
     private bool TryGetCurrentSnapshot(out MetadataSnapshot snapshot)
     {
-        if (_metadataRegistry.TryGetSnapshot(out snapshot))
+        if (this.metadataRegistry.TryGetSnapshot(out snapshot))
         {
             return true;
         }

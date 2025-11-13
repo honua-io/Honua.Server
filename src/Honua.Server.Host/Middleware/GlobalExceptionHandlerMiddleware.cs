@@ -22,18 +22,18 @@ namespace Honua.Server.Host.Middleware;
 /// </summary>
 public sealed class GlobalExceptionHandlerMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly IWebHostEnvironment _environment;
-    private readonly ILogger<GlobalExceptionHandlerMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly IWebHostEnvironment environment;
+    private readonly ILogger<GlobalExceptionHandlerMiddleware> logger;
 
     public GlobalExceptionHandlerMiddleware(
         RequestDelegate next,
         IWebHostEnvironment environment,
         ILogger<GlobalExceptionHandlerMiddleware> logger)
     {
-        _next = Guard.NotNull(next);
-        _environment = Guard.NotNull(environment);
-        _logger = Guard.NotNull(logger);
+        this.next = Guard.NotNull(next);
+        this.environment = Guard.NotNull(environment);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -83,7 +83,7 @@ public sealed class GlobalExceptionHandlerMiddleware
         };
 
         // Log with structured scope including correlation ID
-        using (_logger.BeginScope(new Dictionary<string, object>
+        using (this.logger.BeginScope(new Dictionary<string, object>
         {
             ["ExceptionType"] = exception.GetType().Name,
             ["Path"] = context.Request.Path.ToString(),
@@ -95,24 +95,24 @@ public sealed class GlobalExceptionHandlerMiddleware
             // Transient errors are warnings, permanent errors are errors
             if (isTransient)
             {
-                _logger.LogWarning(exception, logMessage, args);
+                this.logger.LogWarning(exception, logMessage, args);
             }
             else if (exception is HonuaException)
             {
                 // Application exceptions are logged as errors (with stack trace)
-                _logger.LogError(exception, logMessage, args);
+                this.logger.LogError(exception, logMessage, args);
             }
             else
             {
                 // Unexpected exceptions are critical
-                _logger.LogCritical(exception, "CRITICAL: " + logMessage, args);
+                this.logger.LogCritical(exception, "CRITICAL: " + logMessage, args);
             }
         }
     }
 
     private ProblemDetails CreateProblemDetails(Exception exception, HttpContext context)
     {
-        var isDevelopment = _environment.IsDevelopment();
+        var isDevelopment = this.environment.IsDevelopment();
 
         // Get correlation ID from context
         var correlationId = CorrelationIdUtilities.GetCorrelationId(context) ?? context.TraceIdentifier;

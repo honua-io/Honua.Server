@@ -19,11 +19,11 @@ namespace Honua.Server.Host.Hosting;
 /// </summary>
 public sealed class SchemaValidationHostedService : IHostedService
 {
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly ISchemaValidatorFactory _schemaValidatorFactory;
-    private readonly ISchemaDiscoveryServiceFactory _schemaDiscoveryServiceFactory;
-    private readonly ILogger<SchemaValidationHostedService> _logger;
-    private readonly SchemaValidationOptions _options;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly ISchemaValidatorFactory schemaValidatorFactory;
+    private readonly ISchemaDiscoveryServiceFactory schemaDiscoveryServiceFactory;
+    private readonly ILogger<SchemaValidationHostedService> logger;
+    private readonly SchemaValidationOptions options;
 
     public SchemaValidationHostedService(
         IMetadataRegistry metadataRegistry,
@@ -32,25 +32,25 @@ public sealed class SchemaValidationHostedService : IHostedService
         ILogger<SchemaValidationHostedService> logger,
         IOptions<SchemaValidationOptions> options)
     {
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _schemaValidatorFactory = Guard.NotNull(schemaValidatorFactory);
-        _schemaDiscoveryServiceFactory = Guard.NotNull(schemaDiscoveryServiceFactory);
-        _logger = Guard.NotNull(logger);
-        _options = Guard.NotNull(options?.Value);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.schemaValidatorFactory = Guard.NotNull(schemaValidatorFactory);
+        this.schemaDiscoveryServiceFactory = Guard.NotNull(schemaDiscoveryServiceFactory);
+        this.logger = Guard.NotNull(logger);
+        this.options = Guard.NotNull(options?.Value);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!_options.Enabled)
+        if (!this.options.Enabled)
         {
-            _logger.LogInformation("Schema validation is disabled");
+            this.logger.LogInformation("Schema validation is disabled");
             return;
         }
 
-        _logger.LogInformation("Starting database schema validation for all layers");
+        this.logger.LogInformation("Starting database schema validation for all layers");
 
-        await _metadataRegistry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        await this.metadataRegistry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
         var totalErrors = 0;
         var totalWarnings = 0;
         var validatedLayers = 0;
@@ -61,14 +61,14 @@ public sealed class SchemaValidationHostedService : IHostedService
             var service = snapshot.Services.FirstOrDefault(s => s.Id == layer.ServiceId);
             if (service is null)
             {
-                _logger.LogWarning("Layer {LayerId} references unknown service {ServiceId}", layer.Id, layer.ServiceId);
+                this.logger.LogWarning("Layer {LayerId} references unknown service {ServiceId}", layer.Id, layer.ServiceId);
                 continue;
             }
 
             var dataSource = snapshot.DataSources.FirstOrDefault(ds => ds.Id == service.DataSourceId);
             if (dataSource is null)
             {
-                _logger.LogWarning("Service {ServiceId} references unknown data source {DataSourceId}", service.Id, service.DataSourceId);
+                this.logger.LogWarning("Service {ServiceId} references unknown data source {DataSourceId}", service.Id, service.DataSourceId);
                 continue;
             }
 
@@ -79,10 +79,10 @@ public sealed class SchemaValidationHostedService : IHostedService
             }
 
             // Get provider-specific validator
-            var validator = _schemaValidatorFactory.GetValidator(dataSource);
+            var validator = this.schemaValidatorFactory.GetValidator(dataSource);
             if (validator == null)
             {
-                _logger.LogDebug(
+                this.logger.LogDebug(
                     "Schema validation not supported for provider '{Provider}' (layer: {LayerId}). Skipping.",
                     dataSource.Provider,
                     layer.Id);
@@ -99,7 +99,7 @@ public sealed class SchemaValidationHostedService : IHostedService
 
                 if (result.Errors.Count > 0)
                 {
-                    _logger.LogError(
+                    this.logger.LogError(
                         "Schema validation FAILED for layer {LayerId} (table: {TableName}): {ErrorCount} errors",
                         layer.Id,
                         layer.Storage?.Table ?? layer.Id,
@@ -107,7 +107,7 @@ public sealed class SchemaValidationHostedService : IHostedService
 
                     foreach (var error in result.Errors)
                     {
-                        _logger.LogError(
+                        this.logger.LogError(
                             "  [{ErrorType}] {Message} {FieldName}",
                             error.Type,
                             error.Message,
@@ -115,16 +115,16 @@ public sealed class SchemaValidationHostedService : IHostedService
                     }
 
                     // Provide sync recommendation if enabled
-                    if (_options.AutoSyncSchema)
+                    if (this.options.AutoSyncSchema)
                     {
-                        _logger.LogWarning(
+                        this.logger.LogWarning(
                             "Schema drift detected for layer {LayerId} with {ErrorCount} validation errors. " +
                             "Run 'honua metadata sync-schema' CLI command to automatically fix metadata, " +
                             "or use ISchemaDiscoveryService.SyncLayerFieldsAsync() programmatically.",
                             layer.Id,
                             result.Errors.Count);
                     }
-                    else if (_options.FailOnError)
+                    else if (this.options.FailOnError)
                     {
                         throw new InvalidOperationException(
                             $"Schema validation failed for layer '{layer.Id}': {result.Errors.Count} error(s). " +
@@ -136,19 +136,19 @@ public sealed class SchemaValidationHostedService : IHostedService
                 {
                     foreach (var warning in result.Warnings)
                     {
-                        _logger.LogWarning("  {Warning}", warning);
+                        this.logger.LogWarning("  {Warning}", warning);
                     }
                 }
             }
-            catch (Exception ex) when (!_options.FailOnError)
+            catch (Exception ex) when (!this.options.FailOnError)
             {
-                _logger.LogError(ex, "Error validating schema for layer {LayerId}", layer.Id);
+                this.logger.LogError(ex, "Error validating schema for layer {LayerId}", layer.Id);
             }
         }
 
         if (totalErrors > 0 || totalWarnings > 0)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Schema validation completed: {ValidatedLayers} layers, {TotalErrors} errors, {TotalWarnings} warnings",
                 validatedLayers,
                 totalErrors,
@@ -156,7 +156,7 @@ public sealed class SchemaValidationHostedService : IHostedService
         }
         else
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Schema validation completed successfully: {ValidatedLayers} layers validated",
                 validatedLayers);
         }

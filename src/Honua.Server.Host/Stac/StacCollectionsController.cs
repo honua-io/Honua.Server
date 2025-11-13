@@ -34,11 +34,11 @@ namespace Honua.Server.Host.Stac;
 [Route("v{version:apiVersion}/stac/collections")]
 public sealed class StacCollectionsController : ControllerBase
 {
-    private readonly StacReadService _readService;
-    private readonly StacCollectionService _collectionService;
-    private readonly StacItemService _itemService;
-    private readonly StacControllerHelper _helper;
-    private readonly ILogger<StacCollectionsController> _logger;
+    private readonly StacReadService readService;
+    private readonly StacCollectionService collectionService;
+    private readonly StacItemService itemService;
+    private readonly StacControllerHelper helper;
+    private readonly ILogger<StacCollectionsController> logger;
 
     public StacCollectionsController(
         StacReadService readService,
@@ -47,11 +47,11 @@ public sealed class StacCollectionsController : ControllerBase
         StacControllerHelper helper,
         ILogger<StacCollectionsController> logger)
     {
-        _readService = Guard.NotNull(readService);
-        _collectionService = Guard.NotNull(collectionService);
-        _itemService = Guard.NotNull(itemService);
-        _helper = Guard.NotNull(helper);
-        _logger = Guard.NotNull(logger);
+        this.readService = Guard.NotNull(readService);
+        this.collectionService = Guard.NotNull(collectionService);
+        this.itemService = Guard.NotNull(itemService);
+        this.helper = Guard.NotNull(helper);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -88,32 +88,32 @@ public sealed class StacCollectionsController : ControllerBase
             {
                 if (limit != normalizedLimit)
                 {
-                    _logger.LogInformation("STAC collections list requested with limit={RequestedLimit} (normalized to {NormalizedLimit}), hasToken={HasToken}",
+                    this.logger.LogInformation("STAC collections list requested with limit={RequestedLimit} (normalized to {NormalizedLimit}), hasToken={HasToken}",
                         limit, normalizedLimit, !token.IsNullOrEmpty());
                 }
                 else
                 {
-                    _logger.LogInformation("STAC collections list requested with limit={Limit}, hasToken={HasToken}", normalizedLimit, !token.IsNullOrEmpty());
+                    this.logger.LogInformation("STAC collections list requested with limit={Limit}, hasToken={HasToken}", normalizedLimit, !token.IsNullOrEmpty());
                 }
 
                 var error = EnsureStacEnabledOrNotFound();
                 if (error is not null)
                 {
-                    _logger.LogFeatureDisabled("STAC");
+                    this.logger.LogFeatureDisabled("STAC");
                     return error;
                 }
 
                 try
                 {
-                    var baseUri = _helper.GetBaseUriAndSetETag(Request, Response);
-                    var response = await _readService.GetCollectionsAsync(baseUri.ToString(), normalizedLimit, token, cancellationToken).ConfigureAwait(false);
-                    _logger.LogInformation("STAC collections returned: {CollectionCount} collections, hasMore={HasMore}",
+                    var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response);
+                    var response = await this.readService.GetCollectionsAsync(baseUri.ToString(), normalizedLimit, token, cancellationToken).ConfigureAwait(false);
+                    this.logger.LogInformation("STAC collections returned: {CollectionCount} collections, hasMore={HasMore}",
                         response.Collections?.Count ?? 0, response.Context?["matched"] != null);
-                    return Ok(response);
+                    return this.Ok(response);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogOperationFailure(ex, "STAC GetCollections");
+                    this.logger.LogOperationFailure(ex, "STAC GetCollections");
                     throw;
                 }
             }).ConfigureAwait(false);
@@ -144,27 +144,27 @@ public sealed class StacCollectionsController : ControllerBase
             ],
             async activity =>
             {
-                _logger.LogInformation("STAC collection requested: {CollectionId}", collectionId);
+                this.logger.LogInformation("STAC collection requested: {CollectionId}", collectionId);
 
                 var error = EnsureStacEnabledOrNotFound();
                 if (error is not null)
                 {
-                    _logger.LogFeatureDisabled("STAC");
+                    this.logger.LogFeatureDisabled("STAC");
                     return error;
                 }
 
-                var record = await _readService.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
+                var record = await this.readService.GetCollectionAsync(collectionId, cancellationToken).ConfigureAwait(false);
                 if (record is null)
                 {
-                    _logger.LogResourceNotFound("Collection", collectionId);
-                    return NotFound();
+                    this.logger.LogResourceNotFound("Collection", collectionId);
+                    return this.NotFound();
                 }
 
-                var baseUri = _helper.GetBaseUriAndSetETag(Request, Response, record.ETag);
+                var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response, record.ETag);
                 var response = StacApiMapper.BuildCollection(record, baseUri);
 
-                _logger.LogDebug("STAC collection returned: {CollectionId}", collectionId);
-                return Ok(response);
+                this.logger.LogDebug("STAC collection returned: {CollectionId}", collectionId);
+                return this.Ok(response);
             }).ConfigureAwait(false);
     }
 
@@ -185,14 +185,14 @@ public sealed class StacCollectionsController : ControllerBase
 
         try
         {
-            var baseUri = _helper.GetBaseUriAndSetETag(Request, Response);
-            var response = await _readService.GetCollectionItemsAsync(
+            var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response);
+            var response = await this.readService.GetCollectionItemsAsync(
                 collectionId, limit, pageToken, baseUri.ToString(), cancellationToken).ConfigureAwait(false);
-            return Ok(response);
+            return this.Ok(response);
         }
         catch (InvalidOperationException)
         {
-            return NotFound();
+            return this.NotFound();
         }
     }
 
@@ -207,16 +207,16 @@ public sealed class StacCollectionsController : ControllerBase
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null) return error;
 
-        var record = await _readService.GetCollectionItemAsync(collectionId, itemId, cancellationToken).ConfigureAwait(false);
+        var record = await this.readService.GetCollectionItemAsync(collectionId, itemId, cancellationToken).ConfigureAwait(false);
         if (record is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
-        var baseUri = _helper.GetBaseUriAndSetETag(Request, Response, record.ETag);
+        var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response, record.ETag);
         var response = StacApiMapper.BuildItem(record, baseUri);
 
-        return Ok(response);
+        return this.Ok(response);
     }
 
     /// <summary>
@@ -234,34 +234,34 @@ public sealed class StacCollectionsController : ControllerBase
     [RequestSizeLimit((int)ApiLimitsAndConstants.StacMaxRequestBodyBytes)] // STAC metadata size limit
     public async Task<ActionResult<StacCollectionResponse>> PostCollection([FromBody] System.Text.Json.Nodes.JsonObject collectionJson, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("STAC collection creation requested by {Username}", _helper.GetUsername(User));
+        this.logger.LogInformation("STAC collection creation requested by {Username}", this.helper.GetUsername(User));
 
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null)
         {
-            _logger.LogFeatureDisabled("STAC");
+            this.logger.LogFeatureDisabled("STAC");
             return error;
         }
 
-        var (username, ipAddress) = _helper.BuildAuditContext(HttpContext);
+        var (username, ipAddress) = this.helper.BuildAuditContext(HttpContext);
 
-        var result = await _collectionService.CreateCollectionAsync(
+        var result = await this.collectionService.CreateCollectionAsync(
             collectionJson, username, ipAddress, cancellationToken).ConfigureAwait(false);
 
         if (!result.IsSuccess)
         {
-            _logger.LogWarning("STAC collection creation failed: {ErrorType} - {ErrorMessage}",
+            this.logger.LogWarning("STAC collection creation failed: {ErrorType} - {ErrorMessage}",
                 result.ErrorType, result.ErrorMessage);
-            return _helper.MapOperationErrorToResponse(result.ErrorType!.Value, result.ErrorMessage!, Request.Path);
+            return this.helper.MapOperationErrorToResponse(result.ErrorType!.Value, result.ErrorMessage!, this.Request.Path);
         }
 
-        _logger.LogInformation("STAC collection created successfully: {CollectionId} by {Username}",
+        this.logger.LogInformation("STAC collection created successfully: {CollectionId} by {Username}",
             result.Record!.Id, username);
 
-        var baseUri = _helper.GetBaseUriAndSetETag(Request, Response, result.Record!.ETag);
+        var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response, result.Record!.ETag);
         var response = StacApiMapper.BuildCollection(result.Record!, baseUri);
 
-        return CreatedAtAction(nameof(GetCollection), new { collectionId = result.Record.Id }, response);
+        return this.CreatedAtAction(nameof(GetCollection), new { collectionId = result.Record.Id }, response);
     }
 
     /// <summary>
@@ -291,28 +291,28 @@ public sealed class StacCollectionsController : ControllerBase
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null) return error;
 
-        var (username, ipAddress) = _helper.BuildAuditContext(HttpContext);
-        var ifMatch = _helper.GetIfMatchETag(Request);
+        var (username, ipAddress) = this.helper.BuildAuditContext(HttpContext);
+        var ifMatch = this.helper.GetIfMatchETag(Request);
 
         try
         {
-            var result = await _collectionService.UpsertCollectionAsync(
+            var result = await this.collectionService.UpsertCollectionAsync(
                 collectionId, collectionJson, ifMatch, username, ipAddress, cancellationToken).ConfigureAwait(false);
 
             if (!result.IsSuccess)
             {
-                return _helper.MapOperationErrorToResponse(result.ErrorType!.Value, result.ErrorMessage!, Request.Path);
+                return this.helper.MapOperationErrorToResponse(result.ErrorType!.Value, result.ErrorMessage!, this.Request.Path);
             }
 
-            var baseUri = _helper.GetBaseUriAndSetETag(Request, Response, result.Record!.ETag);
+            var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response, result.Record!.ETag);
             var response = StacApiMapper.BuildCollection(result.Record!, baseUri);
 
-            return Ok(response);
+            return this.Ok(response);
         }
         catch (System.Data.DBConcurrencyException ex)
         {
-            _logger.LogWarning(ex, "STAC collection update failed due to ETag mismatch: {CollectionId}", collectionId);
-            return _helper.HandleDBConcurrencyException(ex, "collection", Request.Path);
+            this.logger.LogWarning(ex, "STAC collection update failed due to ETag mismatch: {CollectionId}", collectionId);
+            return this.helper.HandleDBConcurrencyException(ex, "collection", this.Request.Path);
         }
     }
 
@@ -333,20 +333,20 @@ public sealed class StacCollectionsController : ControllerBase
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null) return error;
 
-        var result = await _collectionService.PatchCollectionAsync(collectionId, patchJson, cancellationToken).ConfigureAwait(false);
+        var result = await this.collectionService.PatchCollectionAsync(collectionId, patchJson, cancellationToken).ConfigureAwait(false);
 
         if (!result.IsSuccess)
         {
             return result.ErrorType switch
             {
-                OperationErrorType.NotFound => NotFound(_helper.CreateNotFoundProblem("Collection not found", result.ErrorMessage!, Request.Path)),
-                _ => BadRequest(_helper.CreateBadRequestProblem("Invalid patch data", result.ErrorMessage!))
+                OperationErrorType.NotFound => NotFound(this.helper.CreateNotFoundProblem("Collection not found", result.ErrorMessage!, this.Request.Path)),
+                _ => BadRequest(this.helper.CreateBadRequestProblem("Invalid patch data", result.ErrorMessage!))
             };
         }
 
-        var baseUri = _helper.GetBaseUriAndSetETag(Request, Response);
+        var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response);
         var response = StacApiMapper.BuildCollection(result.Record!, baseUri);
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpDelete("{collectionId}")]
@@ -356,30 +356,30 @@ public sealed class StacCollectionsController : ControllerBase
     [OutputCache(PolicyName = OutputCachePolicies.NoCache)]
     public async Task<ActionResult> DeleteCollection(string collectionId, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("STAC collection deletion requested: {CollectionId} by {Username}",
-            collectionId, _helper.GetUsername(User));
+        this.logger.LogInformation("STAC collection deletion requested: {CollectionId} by {Username}",
+            collectionId, this.helper.GetUsername(User));
 
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null)
         {
-            _logger.LogFeatureDisabled("STAC");
+            this.logger.LogFeatureDisabled("STAC");
             return error;
         }
 
-        var (username, ipAddress) = _helper.BuildAuditContext(HttpContext);
+        var (username, ipAddress) = this.helper.BuildAuditContext(HttpContext);
 
-        var deleted = await _collectionService.DeleteCollectionAsync(
+        var deleted = await this.collectionService.DeleteCollectionAsync(
             collectionId, username, ipAddress, cancellationToken).ConfigureAwait(false);
 
         if (!deleted)
         {
-            _logger.LogWarning("STAC collection deletion failed: collection not found: {CollectionId}", collectionId);
-            return NotFound(_helper.CreateNotFoundProblem("Collection not found", $"Collection '{collectionId}' not found.", Request.Path));
+            this.logger.LogWarning("STAC collection deletion failed: collection not found: {CollectionId}", collectionId);
+            return this.NotFound(this.helper.CreateNotFoundProblem("Collection not found", $"Collection '{collectionId}' not found.", this.Request.Path));
         }
 
-        _logger.LogInformation("STAC collection deleted successfully: {CollectionId} by {Username}",
+        this.logger.LogInformation("STAC collection deleted successfully: {CollectionId} by {Username}",
             collectionId, username);
-        return NoContent();
+        return this.NoContent();
     }
 
     /// <summary>
@@ -400,20 +400,20 @@ public sealed class StacCollectionsController : ControllerBase
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null) return error;
 
-        var (username, ipAddress) = _helper.BuildAuditContext(HttpContext);
+        var (username, ipAddress) = this.helper.BuildAuditContext(HttpContext);
 
-        var result = await _itemService.CreateItemAsync(
+        var result = await this.itemService.CreateItemAsync(
             collectionId, itemJson, username, ipAddress, cancellationToken).ConfigureAwait(false);
 
         if (!result.IsSuccess)
         {
-            return _helper.MapOperationErrorToResponse(result.ErrorType!.Value, result.ErrorMessage!, Request.Path);
+            return this.helper.MapOperationErrorToResponse(result.ErrorType!.Value, result.ErrorMessage!, this.Request.Path);
         }
 
-        var baseUri = _helper.GetBaseUriAndSetETag(Request, Response, result.Record!.ETag);
+        var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response, result.Record!.ETag);
         var response = StacApiMapper.BuildItem(result.Record!, baseUri);
 
-        return CreatedAtAction(nameof(GetCollectionItem), new { collectionId, itemId = result.Record.Id }, response);
+        return this.CreatedAtAction(nameof(GetCollectionItem), new { collectionId, itemId = result.Record.Id }, response);
     }
 
     /// <summary>
@@ -444,32 +444,32 @@ public sealed class StacCollectionsController : ControllerBase
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null) return error;
 
-        var (username, ipAddress) = _helper.BuildAuditContext(HttpContext);
-        var ifMatch = _helper.GetIfMatchETag(Request);
+        var (username, ipAddress) = this.helper.BuildAuditContext(HttpContext);
+        var ifMatch = this.helper.GetIfMatchETag(Request);
 
         try
         {
-            var result = await _itemService.UpsertItemAsync(
+            var result = await this.itemService.UpsertItemAsync(
                 collectionId, itemId, itemJson, ifMatch, username, ipAddress, cancellationToken).ConfigureAwait(false);
 
             if (!result.IsSuccess)
             {
                 return result.ErrorType switch
                 {
-                    OperationErrorType.NotFound => NotFound(_helper.CreateNotFoundProblem("Collection not found", result.ErrorMessage!, Request.Path)),
-                    _ => BadRequest(_helper.CreateBadRequestProblem("Validation failed", result.ErrorMessage!))
+                    OperationErrorType.NotFound => NotFound(this.helper.CreateNotFoundProblem("Collection not found", result.ErrorMessage!, this.Request.Path)),
+                    _ => BadRequest(this.helper.CreateBadRequestProblem("Validation failed", result.ErrorMessage!))
                 };
             }
 
-            var baseUri = _helper.GetBaseUriAndSetETag(Request, Response, result.Record!.ETag);
+            var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response, result.Record!.ETag);
             var response = StacApiMapper.BuildItem(result.Record!, baseUri);
 
-            return Ok(response);
+            return this.Ok(response);
         }
         catch (System.Data.DBConcurrencyException ex)
         {
-            _logger.LogWarning(ex, "STAC item update failed due to ETag mismatch: {CollectionId}/{ItemId}", collectionId, itemId);
-            return _helper.HandleDBConcurrencyException(ex, "item", Request.Path);
+            this.logger.LogWarning(ex, "STAC item update failed due to ETag mismatch: {CollectionId}/{ItemId}", collectionId, itemId);
+            return this.helper.HandleDBConcurrencyException(ex, "item", this.Request.Path);
         }
     }
 
@@ -490,20 +490,20 @@ public sealed class StacCollectionsController : ControllerBase
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null) return error;
 
-        var result = await _itemService.PatchItemAsync(collectionId, itemId, patchJson, cancellationToken).ConfigureAwait(false);
+        var result = await this.itemService.PatchItemAsync(collectionId, itemId, patchJson, cancellationToken).ConfigureAwait(false);
 
         if (!result.IsSuccess)
         {
             return result.ErrorType switch
             {
-                OperationErrorType.NotFound => NotFound(_helper.CreateNotFoundProblem("Item not found", result.ErrorMessage!, Request.Path)),
-                _ => BadRequest(_helper.CreateBadRequestProblem("Invalid patch data", result.ErrorMessage!))
+                OperationErrorType.NotFound => NotFound(this.helper.CreateNotFoundProblem("Item not found", result.ErrorMessage!, this.Request.Path)),
+                _ => BadRequest(this.helper.CreateBadRequestProblem("Invalid patch data", result.ErrorMessage!))
             };
         }
 
-        var baseUri = _helper.GetBaseUriAndSetETag(Request, Response);
+        var baseUri = this.helper.GetBaseUriAndSetETag(Request, Response);
         var response = StacApiMapper.BuildItem(result.Record!, baseUri);
-        return Ok(response);
+        return this.Ok(response);
     }
 
     [HttpDelete("{collectionId}/items/{itemId}")]
@@ -516,17 +516,17 @@ public sealed class StacCollectionsController : ControllerBase
         var error = EnsureStacEnabledOrNotFound();
         if (error is not null) return error;
 
-        var (username, ipAddress) = _helper.BuildAuditContext(HttpContext);
+        var (username, ipAddress) = this.helper.BuildAuditContext(HttpContext);
 
-        var deleted = await _itemService.DeleteItemAsync(
+        var deleted = await this.itemService.DeleteItemAsync(
             collectionId, itemId, username, ipAddress, cancellationToken).ConfigureAwait(false);
 
         if (!deleted)
         {
-            return NotFound(_helper.CreateNotFoundProblem("Item not found", $"Item '{itemId}' not found in collection '{collectionId}'.", Request.Path));
+            return this.NotFound(this.helper.CreateNotFoundProblem("Item not found", $"Item '{itemId}' not found in collection '{collectionId}'.", this.Request.Path));
         }
 
-        return NoContent();
+        return this.NoContent();
     }
 
     /// <summary>
@@ -535,9 +535,9 @@ public sealed class StacCollectionsController : ControllerBase
     /// <returns>NotFound result if STAC is disabled, null if enabled (allowing method continuation).</returns>
     private ActionResult? EnsureStacEnabledOrNotFound()
     {
-        if (!_helper.IsStacEnabled())
+        if (!this.helper.IsStacEnabled())
         {
-            return NotFound();
+            return this.NotFound();
         }
         return null;
     }

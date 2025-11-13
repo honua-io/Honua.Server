@@ -21,18 +21,18 @@ namespace Honua.Server.Host.Authentication;
 [Route("api/auth/local")]
 public sealed class LocalAuthController : ControllerBase
 {
-    private readonly ILocalAuthenticationService _authenticationService;
-    private readonly IOptionsMonitor<HonuaAuthenticationOptions> _options;
-    private readonly ISecurityAuditLogger _auditLogger;
+    private readonly ILocalAuthenticationService authenticationService;
+    private readonly IOptionsMonitor<HonuaAuthenticationOptions> options;
+    private readonly ISecurityAuditLogger auditLogger;
 
     public LocalAuthController(
         ILocalAuthenticationService authenticationService,
         IOptionsMonitor<HonuaAuthenticationOptions> options,
         ISecurityAuditLogger auditLogger)
     {
-        _authenticationService = Guard.NotNull(authenticationService);
-        _options = Guard.NotNull(options);
-        _auditLogger = Guard.NotNull(auditLogger);
+        this.authenticationService = Guard.NotNull(authenticationService);
+        this.options = Guard.NotNull(options);
+        this.auditLogger = Guard.NotNull(auditLogger);
     }
 
     /// <summary>
@@ -44,27 +44,27 @@ public sealed class LocalAuthController : ControllerBase
     [EnableRateLimiting("authentication")]
     public async Task<IActionResult> Login([FromBody] LocalLoginRequest request, CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid)
+        if (!this.ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
         }
 
-        var options = _options.CurrentValue;
+        var options = this.options.CurrentValue;
         if (options.Mode != HonuaAuthenticationOptions.AuthenticationMode.Local)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
+            return this.StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
             {
                 Status = StatusCodes.Status503ServiceUnavailable,
                 Title = "Local authentication disabled",
                 Detail = "Local authentication is not enabled on this server.",
-                Instance = Request.Path
+                Instance = this.Request.Path
             });
         }
 
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var userAgent = Request.Headers.UserAgent.ToString();
+        var ipAddress = this.HttpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = this.Request.Headers.UserAgent.ToString();
 
-        var result = await _authenticationService.AuthenticateAsync(request.Username, request.Password, cancellationToken).ConfigureAwait(false);
+        var result = await this.authenticationService.AuthenticateAsync(request.Username, request.Password, cancellationToken).ConfigureAwait(false);
 
         return result.Status switch
         {
@@ -77,21 +77,21 @@ public sealed class LocalAuthController : ControllerBase
                 Status = StatusCodes.Status503ServiceUnavailable,
                 Title = "Local authentication disabled",
                 Detail = "Local authentication is not configured on this server.",
-                Instance = Request.Path
+                Instance = this.Request.Path
             }),
-            _ => Problem(detail: "Authentication failed.", statusCode: StatusCodes.Status500InternalServerError, title: "Authentication error", instance: Request.Path)
+            _ => Problem(detail: "Authentication failed.", statusCode: StatusCodes.Status500InternalServerError, title: "Authentication error", instance: this.Request.Path)
         };
     }
 
     private IActionResult HandleSuccess(LocalAuthenticationResult result, string username, string? ipAddress, string? userAgent)
     {
-        _auditLogger.LogLoginSuccess(username, ipAddress, userAgent);
-        return Ok(new { token = result.Token, roles = result.Roles });
+        this.auditLogger.LogLoginSuccess(username, ipAddress, userAgent);
+        return this.Ok(new { token = result.Token, roles = result.Roles });
     }
 
     private IActionResult HandleInvalidCredentials(string username, string? ipAddress, string? userAgent)
     {
-        _auditLogger.LogLoginFailure(username, ipAddress, userAgent, "invalid_credentials");
+        this.auditLogger.LogLoginFailure(username, ipAddress, userAgent, "invalid_credentials");
         return CreateUniformFailureResponse();
     }
 
@@ -99,15 +99,15 @@ public sealed class LocalAuthController : ControllerBase
     {
         if (lockedUntil.HasValue)
         {
-            _auditLogger.LogAccountLockout(username, ipAddress, lockedUntil.Value);
+            this.auditLogger.LogAccountLockout(username, ipAddress, lockedUntil.Value);
         }
-        _auditLogger.LogLoginFailure(username, ipAddress, userAgent, "account_locked");
+        this.auditLogger.LogLoginFailure(username, ipAddress, userAgent, "account_locked");
         return CreateUniformFailureResponse();
     }
 
     private IActionResult HandleDisabled(string username, string? ipAddress, string? userAgent)
     {
-        _auditLogger.LogLoginFailure(username, ipAddress, userAgent, "account_disabled");
+        this.auditLogger.LogLoginFailure(username, ipAddress, userAgent, "account_disabled");
         return CreateUniformFailureResponse();
     }
 
@@ -118,7 +118,7 @@ public sealed class LocalAuthController : ControllerBase
             Status = StatusCodes.Status401Unauthorized,
             Title = "Authentication failed",
             Detail = "Authentication failed. Verify your credentials and try again.",
-            Instance = Request.Path
+            Instance = this.Request.Path
         });
     }
 

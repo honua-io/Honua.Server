@@ -29,11 +29,11 @@ public sealed class ODataGeometryService
     private static readonly WKTReader WktReader = new();
     private static readonly WKTWriter WktWriter = new();
 
-    private readonly ILogger<ODataGeometryService> _logger;
+    private readonly ILogger<ODataGeometryService> logger;
 
     public ODataGeometryService(ILogger<ODataGeometryService> logger)
     {
-        _logger = Guard.NotNull(logger);
+        this.logger = Guard.NotNull(logger);
     }
 
     public IPreparedGeometry? PrepareFilterGeometry(GeoIntersectsFilterInfo info, int targetSrid)
@@ -62,7 +62,7 @@ public sealed class ODataGeometryService
             }
 
             var prepared = PreparedGeometryFactory.Prepare(ntsGeometry);
-            _logger.LogDebug("Prepared geo.intersects filter from SRID {SourceSrid} to {TargetSrid}", sourceSrid, ntsGeometry.SRID);
+            this.logger.LogDebug("Prepared geo.intersects filter from SRID {SourceSrid} to {TargetSrid}", sourceSrid, ntsGeometry.SRID);
             return prepared;
         }
         catch (ParseException)
@@ -98,12 +98,12 @@ public sealed class ODataGeometryService
                 sourceSrid = info.StorageSrid.Value;
             }
 
-            _logger.LogDebug("Transforming feature geometry from SRID {SourceSrid} to {TargetSrid}", sourceSrid, comparisonSrid);
+            this.logger.LogDebug("Transforming feature geometry from SRID {SourceSrid} to {TargetSrid}", sourceSrid, comparisonSrid);
 
             if (sourceSrid > 0 && sourceSrid != comparisonSrid)
             {
                 featureGeometry = (NtsGeometry)CrsTransform.TransformGeometry(featureGeometry, sourceSrid, comparisonSrid);
-                _logger.LogDebug("Transformed feature geometry: {Wkt}", WktWriter.Write(featureGeometry));
+                this.logger.LogDebug("Transformed feature geometry: {Wkt}", WktWriter.Write(featureGeometry));
             }
             else
             {
@@ -113,7 +113,7 @@ public sealed class ODataGeometryService
         }
 
         var intersects = preparedFilter.Intersects(featureGeometry);
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "Evaluated geo.intersects: feature {FeatureWkt} (SRID {FeatureSrid}) vs filter {FilterWkt} (SRID {FilterSrid}) => {Intersects}",
             WktWriter.Write(featureGeometry),
             featureGeometry.SRID,

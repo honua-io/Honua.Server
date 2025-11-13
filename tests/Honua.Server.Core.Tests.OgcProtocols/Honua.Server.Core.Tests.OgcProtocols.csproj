@@ -31,6 +31,9 @@
 
 		<!-- Spatial Dependencies -->
 		<PackageReference Include="NetTopologySuite" Version="2.6.0" />
+
+		<!-- Testcontainers for integration testing -->
+		<PackageReference Include="Testcontainers" Version="4.2.0" />
 	</ItemGroup>
 
 	<ItemGroup>

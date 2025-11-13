@@ -23,10 +23,10 @@ namespace Honua.Server.Host.HealthChecks;
 /// </summary>
 public sealed class CacheConsistencyHealthCheck : HealthCheckBase
 {
-    private readonly IMetadataRegistry _registry;
-    private readonly IDistributedCache? _cache;
-    private readonly IOptionsMonitor<CacheInvalidationOptions> _options;
-    private readonly IOptionsMonitor<MetadataCacheOptions> _cacheOptions;
+    private readonly IMetadataRegistry registry;
+    private readonly IDistributedCache? cache;
+    private readonly IOptionsMonitor<CacheInvalidationOptions> options;
+    private readonly IOptionsMonitor<MetadataCacheOptions> cacheOptions;
 
     public CacheConsistencyHealthCheck(
         IMetadataRegistry registry,
@@ -36,10 +36,10 @@ public sealed class CacheConsistencyHealthCheck : HealthCheckBase
         ILogger<CacheConsistencyHealthCheck> logger)
         : base(logger)
     {
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-        _cache = cache;
-        _options = options ?? throw new ArgumentNullException(nameof(options));
-        _cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
+        this.registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        this.cache = cache;
+        this.options = options ?? throw new ArgumentNullException(nameof(options));
+        this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
     }
 
     protected override async Task<HealthCheckResult> ExecuteHealthCheckAsync(
@@ -55,13 +55,13 @@ public sealed class CacheConsistencyHealthCheck : HealthCheckBase
         }
 
         var stopwatch = Stopwatch.StartNew();
-        var config = _options.CurrentValue;
+        var config = this.options.CurrentValue;
 
         try
         {
             // Check if metadata cache key exists
-            var cacheKey = _cacheOptions.CurrentValue.GetSnapshotCacheKey();
-            var cachedBytes = await _cache.GetAsync(cacheKey, cancellationToken).ConfigureAwait(false);
+            var cacheKey = this.cacheOptions.CurrentValue.GetSnapshotCacheKey();
+            var cachedBytes = await this.cache.GetAsync(cacheKey, cancellationToken).ConfigureAwait(false);
 
             data["cacheEnabled"] = true;
             data["cacheKey"] = cacheKey;
@@ -80,25 +80,25 @@ public sealed class CacheConsistencyHealthCheck : HealthCheckBase
             data["cacheSizeBytes"] = cachedBytes.Length;
 
             // Get fresh snapshot from source
-            var freshSnapshot = await _registry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            var freshSnapshot = await this.registry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
             // Compare key properties to detect drift
             var inconsistencies = new List<string>();
 
             // Basic sanity checks - if these differ, cache is definitely stale
-            if (freshSnapshot.Catalog.Id != _registry.Snapshot.Catalog.Id)
+            if (freshSnapshot.Catalog.Id != this.registry.Snapshot.Catalog.Id)
             {
                 inconsistencies.Add("Catalog ID mismatch");
             }
 
-            if (freshSnapshot.Services.Count != _registry.Snapshot.Services.Count)
+            if (freshSnapshot.Services.Count != this.registry.Snapshot.Services.Count)
             {
-                inconsistencies.Add($"Service count mismatch (fresh: {freshSnapshot.Services.Count}, cached: {_registry.Snapshot.Services.Count})");
+                inconsistencies.Add($"Service count mismatch (fresh: {freshSnapshot.Services.Count}, cached: {this.registry.Snapshot.Services.Count})");
             }
 
-            if (freshSnapshot.Layers.Count != _registry.Snapshot.Layers.Count)
+            if (freshSnapshot.Layers.Count != this.registry.Snapshot.Layers.Count)
             {
-                inconsistencies.Add($"Layer count mismatch (fresh: {freshSnapshot.Layers.Count}, cached: {_registry.Snapshot.Layers.Count})");
+                inconsistencies.Add($"Layer count mismatch (fresh: {freshSnapshot.Layers.Count}, cached: {this.registry.Snapshot.Layers.Count})");
             }
 
             // Sample random layers to check for detailed inconsistencies
@@ -115,7 +115,7 @@ public sealed class CacheConsistencyHealthCheck : HealthCheckBase
                 foreach (var index in sampledIndices)
                 {
                     var freshLayer = freshSnapshot.Layers[index];
-                    var cachedLayer = _registry.Snapshot.Layers.FirstOrDefault(l => l.Id == freshLayer.Id);
+                    var cachedLayer = this.registry.Snapshot.Layers.FirstOrDefault(l => l.Id == freshLayer.Id);
 
                     if (cachedLayer == null)
                     {

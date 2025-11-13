@@ -79,56 +79,72 @@ public class ProgramIntegration
 /// </summary>
 public class BuildService
 {
-    private readonly BuildQueueMetrics _metrics;
-    private readonly ILogger<BuildService> _logger;
+    private readonly BuildQueueMetrics metrics;
+    private readonly ILogger<BuildService> logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BuildService"/> class.
+    /// </summary>
+    /// <param name="metrics">The build queue metrics.</param>
+    /// <param name="logger">The logger.</param>
     public BuildService(BuildQueueMetrics metrics, ILogger<BuildService> logger)
     {
-        _metrics = metrics;
-        _logger = logger;
+        this.metrics = metrics;
+        this.logger = logger;
     }
 
+    /// <summary>
+    /// Enqueues a build asynchronously.
+    /// </summary>
+    /// <param name="tier">The build tier.</param>
+    /// <param name="architecture">The architecture.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task EnqueueBuildAsync(string tier, string architecture)
     {
-        _logger.LogInformation("Enqueueing build for tier={Tier}, architecture={Architecture}",
+        this.logger.LogInformation("Enqueueing build for tier={Tier}, architecture={Architecture}",
             tier, architecture);
 
         // Record the build being enqueued
-        _metrics.RecordBuildEnqueued(tier, architecture);
+        this.metrics.RecordBuildEnqueued(tier, architecture);
 
         // ... actual enqueueing logic ...
 
         // Update queue depth
-        var currentDepth = await GetCurrentQueueDepthAsync();
-        _metrics.UpdateQueueDepth(currentDepth);
+        var currentDepth = await this.GetCurrentQueueDepthAsync();
+        this.metrics.UpdateQueueDepth(currentDepth);
     }
 
+    /// <summary>
+    /// Processes a build asynchronously.
+    /// </summary>
+    /// <param name="buildId">The build ID.</param>
+    /// <param name="tier">The build tier.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task ProcessBuildAsync(string buildId, string tier)
     {
         var startTime = DateTime.UtcNow;
-        var queueWaitTime = await GetQueueWaitTimeAsync(buildId);
+        var queueWaitTime = await this.GetQueueWaitTimeAsync(buildId);
 
-        _logger.LogInformation("Starting build {BuildId} for tier {Tier}", buildId, tier);
+        this.logger.LogInformation("Starting build {BuildId} for tier {Tier}", buildId, tier);
 
         // Record queue wait time
-        _metrics.RecordQueueWaitTime(tier, queueWaitTime);
+        this.metrics.RecordQueueWaitTime(tier, queueWaitTime);
 
         try
         {
             // Execute the build
-            var result = await ExecuteBuildAsync(buildId, tier);
+            var result = await this.ExecuteBuildAsync(buildId, tier);
 
             var duration = DateTime.UtcNow - startTime;
 
             // Record successful build
-            _metrics.RecordBuildCompleted(
+            this.metrics.RecordBuildCompleted(
                 tier: tier,
                 success: true,
                 fromCache: result.FromCache,
-                duration: duration
-            );
+                duration: duration);
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Build {BuildId} completed successfully in {Duration}ms, FromCache={FromCache}",
                 buildId, duration.TotalMilliseconds, result.FromCache);
         }
@@ -137,15 +153,14 @@ public class BuildService
             var duration = DateTime.UtcNow - startTime;
 
             // Record failed build
-            _metrics.RecordBuildCompleted(
+            this.metrics.RecordBuildCompleted(
                 tier: tier,
                 success: false,
                 fromCache: false,
                 duration: duration,
-                errorType: ex.GetType().Name
-            );
+                errorType: ex.GetType().Name);
 
-            _logger.LogError(ex, "Build {BuildId} failed after {Duration}ms",
+            this.logger.LogError(ex, "Build {BuildId} failed after {Duration}ms",
                 buildId, duration.TotalMilliseconds);
 
             throw;
@@ -153,18 +168,26 @@ public class BuildService
         finally
         {
             // Update queue depth after processing
-            var currentDepth = await GetCurrentQueueDepthAsync();
-            _metrics.UpdateQueueDepth(currentDepth);
+            var currentDepth = await this.GetCurrentQueueDepthAsync();
+            this.metrics.UpdateQueueDepth(currentDepth);
         }
     }
 
     private Task<int> GetCurrentQueueDepthAsync() => Task.FromResult(0);
-    private Task<TimeSpan> GetQueueWaitTimeAsync(string buildId) => Task.FromResult(TimeSpan.Zero);
-    private Task<BuildResult> ExecuteBuildAsync(string buildId, string tier) =>
-        Task.FromResult(new BuildResult { FromCache = false });
 
+    private Task<TimeSpan> GetQueueWaitTimeAsync(string buildId) => Task.FromResult(TimeSpan.Zero);
+
+    private Task<BuildResult> ExecuteBuildAsync(string buildId, string tier) =>
+        Task.FromResult(new BuildResult { FromCache = false, });
+
+    /// <summary>
+    /// Represents a build result.
+    /// </summary>
     public class BuildResult
     {
+        /// <summary>
+        /// Gets or sets a value indicating whether the build was served from cache.
+        /// </summary>
         public bool FromCache { get; set; }
     }
 }
@@ -174,51 +197,73 @@ public class BuildService
 /// </summary>
 public class CacheService
 {
-    private readonly CacheMetrics _metrics;
-    private readonly ILogger<CacheService> _logger;
+    private readonly CacheMetrics metrics;
+    private readonly ILogger<CacheService> logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CacheService"/> class.
+    /// </summary>
+    /// <param name="metrics">The cache metrics.</param>
+    /// <param name="logger">The logger.</param>
     public CacheService(CacheMetrics metrics, ILogger<CacheService> logger)
     {
-        _metrics = metrics;
-        _logger = logger;
+        this.metrics = metrics;
+        this.logger = logger;
     }
 
+    /// <summary>
+    /// Gets a cached build asynchronously.
+    /// </summary>
+    /// <param name="cacheKey">The cache key.</param>
+    /// <param name="tier">The build tier.</param>
+    /// <param name="architecture">The architecture.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task<CachedBuild?> GetCachedBuildAsync(string cacheKey, string tier, string architecture)
     {
-        _logger.LogDebug("Looking up cache key {CacheKey}", cacheKey);
+        this.logger.LogDebug("Looking up cache key {CacheKey}", cacheKey);
 
-        var result = await LookupInCacheAsync(cacheKey);
+        var result = await this.LookupInCacheAsync(cacheKey);
         var hit = result != null;
 
         // Record cache lookup
-        _metrics.RecordCacheLookup(hit, tier, architecture);
+        this.metrics.RecordCacheLookup(hit, tier, architecture);
 
         if (hit)
         {
-            _logger.LogInformation("Cache hit for key {CacheKey}", cacheKey);
+            this.logger.LogInformation("Cache hit for key {CacheKey}", cacheKey);
 
             // Record time saved by cache hit
             var estimatedBuildTime = TimeSpan.FromMinutes(5);
-            _metrics.RecordCacheSavings(estimatedBuildTime, tier);
+            this.metrics.RecordCacheSavings(estimatedBuildTime, tier);
         }
         else
         {
-            _logger.LogInformation("Cache miss for key {CacheKey}", cacheKey);
+            this.logger.LogInformation("Cache miss for key {CacheKey}", cacheKey);
         }
 
         return result;
     }
 
+    /// <summary>
+    /// Updates cache statistics asynchronously.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task UpdateCacheStatisticsAsync()
     {
-        var cacheSize = await GetCacheEntriesCountAsync();
-        _metrics.UpdateCacheEntryCount(cacheSize);
+        var cacheSize = await this.GetCacheEntriesCountAsync();
+        this.metrics.UpdateCacheEntryCount(cacheSize);
     }
 
     private Task<CachedBuild?> LookupInCacheAsync(string key) => Task.FromResult<CachedBuild?>(null);
+
     private Task<long> GetCacheEntriesCountAsync() => Task.FromResult(0L);
 
-    public class CachedBuild { }
+    /// <summary>
+    /// Represents a cached build.
+    /// </summary>
+    public class CachedBuild
+    {
+    }
 }
 
 /// <summary>
@@ -226,15 +271,26 @@ public class CacheService
 /// </summary>
 public class BuildServiceWithTracing
 {
-    private readonly BuildQueueMetrics _metrics;
-    private readonly ILogger<BuildServiceWithTracing> _logger;
+    private readonly BuildQueueMetrics metrics;
+    private readonly ILogger<BuildServiceWithTracing> logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BuildServiceWithTracing"/> class.
+    /// </summary>
+    /// <param name="metrics">The build queue metrics.</param>
+    /// <param name="logger">The logger.</param>
     public BuildServiceWithTracing(BuildQueueMetrics metrics, ILogger<BuildServiceWithTracing> logger)
     {
-        _metrics = metrics;
-        _logger = logger;
+        this.metrics = metrics;
+        this.logger = logger;
     }
 
+    /// <summary>
+    /// Processes a build with tracing asynchronously.
+    /// </summary>
+    /// <param name="buildId">The build ID.</param>
+    /// <param name="tier">The build tier.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task ProcessBuildWithTracingAsync(string buildId, string tier)
     {
         // Create a custom span for the entire build operation
@@ -288,7 +344,7 @@ public class BuildServiceWithTracing
             activity?.SetSuccess();
 
             // Record metrics
-            _metrics.RecordBuildCompleted(tier, true, false, duration);
+            this.metrics.RecordBuildCompleted(tier, true, false, duration);
         }
         catch (Exception ex)
         {
@@ -297,13 +353,15 @@ public class BuildServiceWithTracing
             activity?.RecordException(ex);
 
             // Record metrics
-            _metrics.RecordBuildCompleted(tier, false, false, duration, ex.GetType().Name);
+            this.metrics.RecordBuildCompleted(tier, false, false, duration, ex.GetType().Name);
 
             throw;
         }
     }
 
     private Task PrepareBuildEnvironmentAsync() => Task.CompletedTask;
+
     private Task ExecuteBuildAsync() => Task.CompletedTask;
+
     private Task UploadArtifactsAsync() => Task.CompletedTask;
 }

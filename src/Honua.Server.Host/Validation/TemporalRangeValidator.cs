@@ -264,7 +264,7 @@ public static class TemporalRangeValidator
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
 public sealed class ValidTemporalDateAttribute : ValidationAttribute
 {
-    private readonly bool _allowFuture;
+    private readonly bool allowFuture;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ValidTemporalDateAttribute"/> class.
@@ -272,7 +272,7 @@ public sealed class ValidTemporalDateAttribute : ValidationAttribute
     /// <param name="allowFuture">Whether to allow future dates. Default is false.</param>
     public ValidTemporalDateAttribute(bool allowFuture = false)
     {
-        _allowFuture = allowFuture;
+        this.allowFuture = allowFuture;
     }
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)

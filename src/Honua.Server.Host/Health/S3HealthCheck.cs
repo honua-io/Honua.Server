@@ -21,8 +21,8 @@ namespace Honua.Server.Host.Health;
 /// </summary>
 public sealed class S3HealthCheck : HealthCheckBase
 {
-    private readonly IAmazonS3? _s3Client;
-    private readonly string? _testBucket;
+    private readonly IAmazonS3? s3Client;
+    private readonly string? testBucket;
 
     public S3HealthCheck(
         ILogger<S3HealthCheck> logger,
@@ -30,8 +30,8 @@ public sealed class S3HealthCheck : HealthCheckBase
         string? testBucket = null)
         : base(logger)
     {
-        _s3Client = s3Client;
-        _testBucket = testBucket;
+        this.s3Client = s3Client;
+        this.testBucket = testBucket;
     }
 
     protected override async Task<HealthCheckResult> ExecuteHealthCheckAsync(
@@ -52,12 +52,12 @@ public sealed class S3HealthCheck : HealthCheckBase
             data["s3.configured"] = true;
 
             // Test basic connectivity by listing buckets
-            var listBucketsResponse = await _s3Client.ListBucketsAsync(cancellationToken);
+            var listBucketsResponse = await this.s3Client.ListBucketsAsync(cancellationToken);
             data["s3.buckets_accessible"] = listBucketsResponse.Buckets.Count;
             data["s3.can_list_buckets"] = true;
 
             // If a test bucket is specified, verify access to it
-            if (_testBucket.HasValue())
+            if (this.testBucket.HasValue())
             {
                 try
                 {
@@ -65,7 +65,7 @@ public sealed class S3HealthCheck : HealthCheckBase
                     {
                         BucketName = _testBucket
                     };
-                    var location = await _s3Client.GetBucketLocationAsync(headBucketRequest, cancellationToken);
+                    var location = await this.s3Client.GetBucketLocationAsync(headBucketRequest, cancellationToken);
 
                     data["s3.test_bucket"] = _testBucket;
                     data["s3.test_bucket_accessible"] = true;

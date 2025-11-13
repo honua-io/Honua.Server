@@ -12,9 +12,9 @@ namespace Honua.Server.Host.Admin.Services;
 /// </summary>
 public sealed class MetadataChangeNotificationService : IHostedService, IDisposable
 {
-    private readonly IMetadataProvider _metadataProvider;
-    private readonly IHubContext<MetadataChangeNotificationHub> _hubContext;
-    private readonly ILogger<MetadataChangeNotificationService> _logger;
+    private readonly IMetadataProvider metadataProvider;
+    private readonly IHubContext<MetadataChangeNotificationHub> hubContext;
+    private readonly ILogger<MetadataChangeNotificationService> logger;
     private IMetadataChangeNotifier? _changeNotifier;
 
     public MetadataChangeNotificationService(
@@ -22,27 +22,27 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
         IHubContext<MetadataChangeNotificationHub> hubContext,
         ILogger<MetadataChangeNotificationService> logger)
     {
-        _metadataProvider = metadataProvider;
-        _hubContext = hubContext;
-        _logger = logger;
+        this.metadataProvider = metadataProvider;
+        this.hubContext = hubContext;
+        this.logger = logger;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Starting Metadata Change Notification Service");
+        this.logger.LogInformation("Starting Metadata Change Notification Service");
 
         // Check if the provider supports change notifications
         if (_metadataProvider is IMutableMetadataProvider mutable &&
             mutable is IMetadataChangeNotifier notifier &&
             notifier.SupportsChangeNotifications)
         {
-            _changeNotifier = notifier;
-            _changeNotifier.MetadataChanged += OnMetadataChanged;
-            _logger.LogInformation("Subscribed to metadata change notifications");
+            this.changeNotifier = notifier;
+            this.changeNotifier.MetadataChanged += OnMetadataChanged;
+            this.logger.LogInformation("Subscribed to metadata change notifications");
         }
         else
         {
-            _logger.LogInformation("Metadata provider does not support real-time change notifications");
+            this.logger.LogInformation("Metadata provider does not support real-time change notifications");
         }
 
         return Task.CompletedTask;
@@ -50,12 +50,12 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Stopping Metadata Change Notification Service");
+        this.logger.LogInformation("Stopping Metadata Change Notification Service");
 
         if (_changeNotifier != null)
         {
-            _changeNotifier.MetadataChanged -= OnMetadataChanged;
-            _logger.LogInformation("Unsubscribed from metadata change notifications");
+            this.changeNotifier.MetadataChanged -= OnMetadataChanged;
+            this.logger.LogInformation("Unsubscribed from metadata change notifications");
         }
 
         return Task.CompletedTask;
@@ -74,14 +74,14 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
     {
         try
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Metadata changed: {ChangeType} {EntityType} {EntityId}",
                 e.ChangeType,
                 e.EntityType,
                 e.EntityId);
 
             // Broadcast to all connected Admin UI clients
-            await _hubContext.Clients.All.SendAsync("MetadataChanged", new
+            await this.hubContext.Clients.All.SendAsync("MetadataChanged", new
             {
                 e.ChangeType,
                 e.EntityType,
@@ -89,11 +89,11 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
                 e.Timestamp
             });
 
-            _logger.LogDebug("Broadcasted metadata change to all SignalR clients");
+            this.logger.LogDebug("Broadcasted metadata change to all SignalR clients");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error broadcasting metadata change notification");
+            this.logger.LogError(ex, "Error broadcasting metadata change notification");
         }
     }
 
@@ -101,7 +101,7 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
     {
         if (_changeNotifier != null)
         {
-            _changeNotifier.MetadataChanged -= OnMetadataChanged;
+            this.changeNotifier.MetadataChanged -= OnMetadataChanged;
         }
     }
 }

@@ -34,15 +34,15 @@ namespace Honua.Server.Host.Ogc;
 [Obsolete("Implementation incomplete - returns stubbed responses. Do not register in DI until Phase 2 migration is complete.")]
 internal sealed class WmtsHandlers : IWmtsHandler
 {
-    private readonly IRasterDatasetRegistry _rasterRegistry;
-    private readonly ILogger<WmtsHandlers> _logger;
+    private readonly IRasterDatasetRegistry rasterRegistry;
+    private readonly ILogger<WmtsHandlers> logger;
 
     public WmtsHandlers(
         IRasterDatasetRegistry rasterRegistry,
         ILogger<WmtsHandlers> logger)
     {
-        _rasterRegistry = Guard.NotNull(rasterRegistry);
-        _logger = Guard.NotNull(logger);
+        this.rasterRegistry = Guard.NotNull(rasterRegistry);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <inheritdoc />

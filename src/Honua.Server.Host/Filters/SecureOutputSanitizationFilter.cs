@@ -58,8 +58,8 @@ namespace Honua.Server.Host.Filters;
 /// </example>
 public sealed class SecureOutputSanitizationFilter : IAsyncResultFilter
 {
-    private readonly ILogger<SecureOutputSanitizationFilter> _logger;
-    private readonly HtmlEncoder _htmlEncoder;
+    private readonly ILogger<SecureOutputSanitizationFilter> logger;
+    private readonly HtmlEncoder htmlEncoder;
 
     /// <summary>
     /// Regular expression to detect and remove script tags from content.
@@ -87,8 +87,8 @@ public sealed class SecureOutputSanitizationFilter : IAsyncResultFilter
         ILogger<SecureOutputSanitizationFilter> logger,
         HtmlEncoder htmlEncoder)
     {
-        _logger = Guard.NotNull(logger);
-        _htmlEncoder = Guard.NotNull(htmlEncoder);
+        this.logger = Guard.NotNull(logger);
+        this.htmlEncoder = Guard.NotNull(htmlEncoder);
     }
 
     /// <summary>
@@ -116,7 +116,7 @@ public sealed class SecureOutputSanitizationFilter : IAsyncResultFilter
 
         if (skipFilter)
         {
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Skipping output sanitization for {Controller}.{Action} (SkipFilter attribute present)",
                 context.RouteData.Values["controller"],
                 context.RouteData.Values["action"]);
@@ -139,7 +139,7 @@ public sealed class SecureOutputSanitizationFilter : IAsyncResultFilter
 
                 var duration = DateTime.UtcNow - startTime;
 
-                _logger.LogDebug(
+                this.logger.LogDebug(
                     "Sanitized {ObjectType} response for {Controller}.{Action} in {Duration}ms",
                     originalType,
                     context.RouteData.Values["controller"],
@@ -150,7 +150,7 @@ public sealed class SecureOutputSanitizationFilter : IAsyncResultFilter
             {
                 // Log sanitization failures but don't break the response
                 // This is a defense-in-depth measure; sanitization failure shouldn't cause 500
-                _logger.LogError(ex,
+                this.logger.LogError(ex,
                     "Failed to sanitize response for {Controller}.{Action}. Response will be returned unsanitized.",
                     context.RouteData.Values["controller"],
                     context.RouteData.Values["action"]);
@@ -397,7 +397,7 @@ public sealed class SecureOutputSanitizationFilter : IAsyncResultFilter
         }
         catch (RegexMatchTimeoutException ex)
         {
-            _logger.LogWarning(ex,
+            this.logger.LogWarning(ex,
                 "Regex timeout while sanitizing string (length: {Length}). Returning partially sanitized content.",
                 input.Length);
         }

@@ -23,18 +23,18 @@ namespace Honua.Server.Host.API;
 [Produces("application/json")]
 public class CommentsController : ControllerBase
 {
-    private readonly ILogger<CommentsController> _logger;
-    private readonly CommentService _commentService;
-    private readonly IHubContext<CommentHub> _commentHub;
+    private readonly ILogger<CommentsController> logger;
+    private readonly CommentService commentService;
+    private readonly IHubContext<CommentHub> commentHub;
 
     public CommentsController(
         ILogger<CommentsController> logger,
         CommentService commentService,
         IHubContext<CommentHub> commentHub)
     {
-        _logger = logger;
-        _commentService = commentService;
-        _commentHub = commentHub;
+        this.logger = logger;
+        this.commentService = commentService;
+        this.commentHub = commentHub;
     }
 
     // ==================== Comment CRUD Operations ====================
@@ -56,11 +56,11 @@ public class CommentsController : ControllerBase
     {
         try
         {
-            var userId = User.Identity?.Name ?? "anonymous";
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var userAgent = Request.Headers["User-Agent"].ToString();
+            var userId = this.User.Identity?.Name ?? "anonymous";
+            var ipAddress = this.HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = this.Request.Headers["User-Agent"].ToString();
 
-            var comment = await _commentService.CreateCommentAsync(
+            var comment = await this.commentService.CreateCommentAsync(
                 mapId,
                 request.Author ?? userId,
                 request.CommentText,
@@ -81,7 +81,7 @@ public class CommentsController : ControllerBase
                 userAgent);
 
             // Broadcast to SignalR clients
-            await _commentHub.Clients.Group($"map_{mapId}")
+            await this.commentHub.Clients.Group($"map_{mapId}")
                 .SendAsync(CommentHubEvents.CommentCreated, comment);
 
             // Create notifications for mentioned users
@@ -92,7 +92,7 @@ public class CommentsController : ControllerBase
                 {
                     foreach (var mentionedUser in mentions)
                     {
-                        await _commentService.CreateNotificationAsync(
+                        await this.commentService.CreateNotificationAsync(
                             comment.Id,
                             mentionedUser,
                             CommentNotificationType.Mentioned);
@@ -103,10 +103,10 @@ public class CommentsController : ControllerBase
             // Create notification for parent comment author (reply)
             if (!string.IsNullOrEmpty(comment.ParentId))
             {
-                var parentComment = await _commentService.GetCommentAsync(comment.ParentId);
+                var parentComment = await this.commentService.GetCommentAsync(comment.ParentId);
                 if (parentComment != null && parentComment.AuthorUserId != userId)
                 {
-                    await _commentService.CreateNotificationAsync(
+                    await this.commentService.CreateNotificationAsync(
                         comment.Id,
                         parentComment.AuthorUserId!,
                         CommentNotificationType.Reply);
@@ -115,14 +115,14 @@ public class CommentsController : ControllerBase
 
             var response = MapToResponse(comment);
 
-            _logger.LogInformation("Created comment {CommentId} on map {MapId} by {UserId}",
+            this.logger.LogInformation("Created comment {CommentId} on map {MapId} by {UserId}",
                 comment.Id, mapId, userId);
 
-            return CreatedAtAction(nameof(GetComment), new { mapId, commentId = comment.Id }, response);
+            return this.CreatedAtAction(nameof(GetComment), new { mapId, commentId = comment.Id }, response);
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return this.BadRequest(new { error = ex.Message });
         }
     }
 
@@ -141,14 +141,14 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string commentId)
     {
-        var comment = await _commentService.GetCommentAsync(commentId);
+        var comment = await this.commentService.GetCommentAsync(commentId);
 
         if (comment == null || comment.MapId != mapId)
         {
-            return NotFound(new { error = "Comment not found" });
+            return this.NotFound(new { error = "Comment not found" });
         }
 
-        return Ok(MapToResponse(comment));
+        return this.Ok(MapToResponse(comment));
     }
 
     /// <summary>
@@ -185,13 +185,13 @@ public class CommentsController : ControllerBase
             RootCommentsOnly = rootOnly,
             Limit = limit,
             Offset = offset,
-            IncludeUnapproved = User.Identity?.IsAuthenticated ?? false
+            IncludeUnapproved = this.User.Identity?.IsAuthenticated ?? false
         };
 
-        var comments = await _commentService.GetMapCommentsAsync(mapId, filter);
+        var comments = await this.commentService.GetMapCommentsAsync(mapId, filter);
         var responses = comments.Select(MapToResponse).ToList();
 
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     /// <summary>
@@ -207,9 +207,9 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string layerId)
     {
-        var comments = await _commentService.GetLayerCommentsAsync(mapId, layerId);
+        var comments = await this.commentService.GetLayerCommentsAsync(mapId, layerId);
         var responses = comments.Select(MapToResponse).ToList();
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     /// <summary>
@@ -225,9 +225,9 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string featureId)
     {
-        var comments = await _commentService.GetFeatureCommentsAsync(mapId, featureId);
+        var comments = await this.commentService.GetFeatureCommentsAsync(mapId, featureId);
         var responses = comments.Select(MapToResponse).ToList();
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     /// <summary>
@@ -243,9 +243,9 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string commentId)
     {
-        var replies = await _commentService.GetRepliesAsync(commentId);
+        var replies = await this.commentService.GetRepliesAsync(commentId);
         var responses = replies.Select(MapToResponse).ToList();
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     /// <summary>
@@ -267,18 +267,18 @@ public class CommentsController : ControllerBase
         [FromRoute] string commentId,
         [FromBody] UpdateCommentRequest request)
     {
-        var userId = User.Identity?.Name ?? "";
-        var comment = await _commentService.GetCommentAsync(commentId);
+        var userId = this.User.Identity?.Name ?? "";
+        var comment = await this.commentService.GetCommentAsync(commentId);
 
         if (comment == null || comment.MapId != mapId)
         {
-            return NotFound(new { error = "Comment not found" });
+            return this.NotFound(new { error = "Comment not found" });
         }
 
         // Check if user owns the comment or is admin
         if (comment.AuthorUserId != userId && !User.IsInRole("Admin"))
         {
-            return StatusCode(StatusCodes.Status403Forbidden,
+            return this.StatusCode(StatusCodes.Status403Forbidden,
                 new { error = "You can only edit your own comments" });
         }
 
@@ -294,13 +294,13 @@ public class CommentsController : ControllerBase
         if (request.Color != null)
             comment.Color = request.Color;
 
-        var updated = await _commentService.UpdateCommentAsync(comment);
+        var updated = await this.commentService.UpdateCommentAsync(comment);
 
         // Broadcast to SignalR clients
-        await _commentHub.Clients.Group($"map_{mapId}")
+        await this.commentHub.Clients.Group($"map_{mapId}")
             .SendAsync(CommentHubEvents.CommentUpdated, updated);
 
-        return Ok(MapToResponse(updated));
+        return this.Ok(MapToResponse(updated));
     }
 
     /// <summary>
@@ -320,28 +320,28 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string commentId)
     {
-        var userId = User.Identity?.Name ?? "";
-        var comment = await _commentService.GetCommentAsync(commentId);
+        var userId = this.User.Identity?.Name ?? "";
+        var comment = await this.commentService.GetCommentAsync(commentId);
 
         if (comment == null || comment.MapId != mapId)
         {
-            return NotFound(new { error = "Comment not found" });
+            return this.NotFound(new { error = "Comment not found" });
         }
 
         // Check if user owns the comment or is admin
         if (comment.AuthorUserId != userId && !User.IsInRole("Admin"))
         {
-            return StatusCode(StatusCodes.Status403Forbidden,
+            return this.StatusCode(StatusCodes.Status403Forbidden,
                 new { error = "You can only delete your own comments" });
         }
 
-        await _commentService.DeleteCommentAsync(commentId);
+        await this.commentService.DeleteCommentAsync(commentId);
 
         // Broadcast to SignalR clients
-        await _commentHub.Clients.Group($"map_{mapId}")
+        await this.commentHub.Clients.Group($"map_{mapId}")
             .SendAsync(CommentHubEvents.CommentDeleted, new { MapId = mapId, CommentId = commentId });
 
-        return NoContent();
+        return this.NoContent();
     }
 
     // ==================== Status Management ====================
@@ -361,18 +361,18 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string commentId)
     {
-        var userId = User.Identity?.Name ?? "";
-        var comment = await _commentService.GetCommentAsync(commentId);
+        var userId = this.User.Identity?.Name ?? "";
+        var comment = await this.commentService.GetCommentAsync(commentId);
 
         if (comment == null || comment.MapId != mapId)
         {
-            return NotFound(new { error = "Comment not found" });
+            return this.NotFound(new { error = "Comment not found" });
         }
 
-        await _commentService.ResolveCommentAsync(commentId, userId);
+        await this.commentService.ResolveCommentAsync(commentId, userId);
 
         // Broadcast to SignalR clients
-        await _commentHub.Clients.Group($"map_{mapId}")
+        await this.commentHub.Clients.Group($"map_{mapId}")
             .SendAsync(CommentHubEvents.CommentStatusChanged, new
             {
                 MapId = mapId,
@@ -381,7 +381,7 @@ public class CommentsController : ControllerBase
                 ResolvedBy = userId
             });
 
-        return Ok(new { message = "Comment resolved" });
+        return this.Ok(new { message = "Comment resolved" });
     }
 
     /// <summary>
@@ -399,17 +399,17 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string commentId)
     {
-        var comment = await _commentService.GetCommentAsync(commentId);
+        var comment = await this.commentService.GetCommentAsync(commentId);
 
         if (comment == null || comment.MapId != mapId)
         {
-            return NotFound(new { error = "Comment not found" });
+            return this.NotFound(new { error = "Comment not found" });
         }
 
-        await _commentService.ReopenCommentAsync(commentId);
+        await this.commentService.ReopenCommentAsync(commentId);
 
         // Broadcast to SignalR clients
-        await _commentHub.Clients.Group($"map_{mapId}")
+        await this.commentHub.Clients.Group($"map_{mapId}")
             .SendAsync(CommentHubEvents.CommentStatusChanged, new
             {
                 MapId = mapId,
@@ -418,7 +418,7 @@ public class CommentsController : ControllerBase
                 ResolvedBy = (string?)null
             });
 
-        return Ok(new { message = "Comment reopened" });
+        return this.Ok(new { message = "Comment reopened" });
     }
 
     // ==================== Reactions ====================
@@ -438,15 +438,15 @@ public class CommentsController : ControllerBase
         [FromRoute] string commentId,
         [FromBody] AddReactionRequest request)
     {
-        var userId = User.Identity?.Name ?? "";
+        var userId = this.User.Identity?.Name ?? "";
 
-        var reaction = await _commentService.AddReactionAsync(
+        var reaction = await this.commentService.AddReactionAsync(
             commentId,
             userId,
             request.ReactionType ?? "like");
 
         // Broadcast to SignalR clients
-        await _commentHub.Clients.Group($"map_{mapId}")
+        await this.commentHub.Clients.Group($"map_{mapId}")
             .SendAsync(CommentHubEvents.CommentReactionAdded, new
             {
                 MapId = mapId,
@@ -455,7 +455,7 @@ public class CommentsController : ControllerBase
                 ReactionType = reaction.ReactionType
             });
 
-        return Created("", new { message = "Reaction added" });
+        return this.Created("", new { message = "Reaction added" });
     }
 
     /// <summary>
@@ -471,7 +471,7 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string commentId)
     {
-        var reactions = await _commentService.GetReactionsAsync(commentId);
+        var reactions = await this.commentService.GetReactionsAsync(commentId);
         var responses = reactions.Select(r => new CommentReactionResponse
         {
             Id = r.Id,
@@ -481,7 +481,7 @@ public class CommentsController : ControllerBase
             CreatedAt = r.CreatedAt
         }).ToList();
 
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     // ==================== Analytics & Search ====================
@@ -501,12 +501,12 @@ public class CommentsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(q))
         {
-            return BadRequest(new { error = "Search query is required" });
+            return this.BadRequest(new { error = "Search query is required" });
         }
 
-        var comments = await _commentService.SearchCommentsAsync(mapId, q);
+        var comments = await this.commentService.SearchCommentsAsync(mapId, q);
         var responses = comments.Select(MapToResponse).ToList();
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     /// <summary>
@@ -519,8 +519,8 @@ public class CommentsController : ControllerBase
     [ProducesResponseType(typeof(CommentAnalytics), StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentAnalytics>> GetAnalytics([FromRoute] string mapId)
     {
-        var analytics = await _commentService.GetAnalyticsAsync(mapId);
-        return Ok(analytics);
+        var analytics = await this.commentService.GetAnalyticsAsync(mapId);
+        return this.Ok(analytics);
     }
 
     /// <summary>
@@ -534,10 +534,10 @@ public class CommentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ExportComments([FromRoute] string mapId)
     {
-        var comments = await _commentService.GetMapCommentsAsync(mapId);
-        var csv = _commentService.ExportToCSV(comments);
+        var comments = await this.commentService.GetMapCommentsAsync(mapId);
+        var csv = this.commentService.ExportToCSV(comments);
 
-        return File(
+        return this.File(
             System.Text.Encoding.UTF8.GetBytes(csv),
             "text/csv",
             $"map-{mapId}-comments-{DateTime.UtcNow:yyyyMMdd}.csv");
@@ -558,8 +558,8 @@ public class CommentsController : ControllerBase
         [FromRoute] string mapId,
         [FromRoute] string commentId)
     {
-        await _commentService.ApproveCommentAsync(commentId);
-        return Ok(new { message = "Comment approved" });
+        await this.commentService.ApproveCommentAsync(commentId);
+        return this.Ok(new { message = "Comment approved" });
     }
 
     /// <summary>
@@ -572,10 +572,10 @@ public class CommentsController : ControllerBase
     [ProducesResponseType(typeof(List<MapCommentResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<MapCommentResponse>>> GetPendingComments([FromRoute] string mapId)
     {
-        var comments = await _commentService.GetPendingCommentsAsync();
+        var comments = await this.commentService.GetPendingCommentsAsync();
         var filtered = comments.Where(c => c.MapId == mapId);
         var responses = filtered.Select(MapToResponse).ToList();
-        return Ok(responses);
+        return this.Ok(responses);
     }
 
     // Helper methods

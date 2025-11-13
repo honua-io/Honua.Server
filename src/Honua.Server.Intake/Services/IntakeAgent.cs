@@ -97,10 +97,10 @@ public interface IIntakeAgent
 /// </summary>
 public sealed class IntakeAgent : IIntakeAgent
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IConversationStore _conversationStore;
-    private readonly ILogger<IntakeAgent> _logger;
-    private readonly IntakeAgentOptions _options;
+    private readonly IHttpClientFactory httpClientFactory;
+    private readonly IConversationStore conversationStore;
+    private readonly ILogger<IntakeAgent> logger;
+    private readonly IntakeAgentOptions options;
 
     public IntakeAgent(
         IHttpClientFactory httpClientFactory,
@@ -108,10 +108,10 @@ public sealed class IntakeAgent : IIntakeAgent
         IOptions<IntakeAgentOptions> options,
         ILogger<IntakeAgent> logger)
     {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _conversationStore = conversationStore ?? throw new ArgumentNullException(nameof(conversationStore));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        this.conversationStore = conversationStore ?? throw new ArgumentNullException(nameof(conversationStore));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     }
 
     /// <inheritdoc/>
@@ -120,7 +120,7 @@ public sealed class IntakeAgent : IIntakeAgent
         var conversationId = Guid.NewGuid().ToString();
         var startedAt = DateTimeOffset.UtcNow;
 
-        _logger.LogInformation("Starting new conversation {ConversationId} for customer {CustomerId}", conversationId, customerId ?? "anonymous");
+        this.logger.LogInformation("Starting new conversation {ConversationId} for customer {CustomerId}", conversationId, customerId ?? "anonymous");
 
         // Initialize conversation with system prompt
         var messages = new List<ConversationMessage>
@@ -133,7 +133,7 @@ public sealed class IntakeAgent : IIntakeAgent
         };
 
         // Store initial conversation
-        await _conversationStore.SaveConversationAsync(new ConversationRecord
+        await this.conversationStore.SaveConversationAsync(new ConversationRecord
         {
             ConversationId = conversationId,
             CustomerId = customerId,
@@ -155,10 +155,10 @@ public sealed class IntakeAgent : IIntakeAgent
     /// <inheritdoc/>
     public async Task<IntakeResponse> ProcessMessageAsync(string conversationId, string userMessage, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Processing message for conversation {ConversationId}", conversationId);
+        this.logger.LogInformation("Processing message for conversation {ConversationId}", conversationId);
 
         // Load conversation history
-        var conversation = await _conversationStore.GetConversationAsync(conversationId, cancellationToken);
+        var conversation = await this.conversationStore.GetConversationAsync(conversationId, cancellationToken);
         if (conversation == null)
         {
             throw new InvalidOperationException($"Conversation {conversationId} not found");
@@ -188,7 +188,7 @@ public sealed class IntakeAgent : IIntakeAgent
 
         if (functionCall != null && functionCall.Name == "complete_intake")
         {
-            _logger.LogInformation("Intake completed for conversation {ConversationId}", conversationId);
+            this.logger.LogInformation("Intake completed for conversation {ConversationId}", conversationId);
             intakeComplete = true;
             requirements = await ExtractRequirementsAsync(functionCall.Arguments, cancellationToken);
 
@@ -208,7 +208,7 @@ public sealed class IntakeAgent : IIntakeAgent
             CompletedAt = intakeComplete ? DateTimeOffset.UtcNow : null
         };
 
-        await _conversationStore.SaveConversationAsync(updatedConversation, cancellationToken);
+        await this.conversationStore.SaveConversationAsync(updatedConversation, cancellationToken);
 
         return new IntakeResponse
         {
@@ -225,18 +225,18 @@ public sealed class IntakeAgent : IIntakeAgent
     /// <inheritdoc/>
     public async Task<ConversationRecord?> GetConversationAsync(string conversationId, CancellationToken cancellationToken = default)
     {
-        return await _conversationStore.GetConversationAsync(conversationId, cancellationToken);
+        return await this.conversationStore.GetConversationAsync(conversationId, cancellationToken);
     }
 
     private async Task<(ConversationMessage AssistantMessage, FunctionCall? FunctionCall)> CallAIProviderAsync(
         List<ConversationMessage> messages,
         CancellationToken cancellationToken)
     {
-        return _options.Provider.ToLowerInvariant() switch
+        return this.options.Provider.ToLowerInvariant() switch
         {
             "openai" => await CallOpenAIAsync(messages, cancellationToken),
             "anthropic" => await CallAnthropicAsync(messages, cancellationToken),
-            _ => throw new InvalidOperationException($"Unsupported AI provider: {_options.Provider}")
+            _ => throw new InvalidOperationException($"Unsupported AI provider: {this.options.Provider}")
         };
     }
 
@@ -244,14 +244,14 @@ public sealed class IntakeAgent : IIntakeAgent
         List<ConversationMessage> messages,
         CancellationToken cancellationToken)
     {
-        var httpClient = _httpClientFactory.CreateClient();
-        httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_options.OpenAIApiKey}");
+        var httpClient = this.httpClientFactory.CreateClient();
+        httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {this.options.OpenAIApiKey}");
 
         var functionDef = JsonSerializer.Deserialize<JsonElement>(SystemPrompts.CompleteIntakeFunctionDefinition);
 
         var requestBody = new
         {
-            model = _options.OpenAIModel,
+            model = this.options.OpenAIModel,
             messages = messages.Select(m => new
             {
                 role = m.Role,
@@ -261,16 +261,16 @@ public sealed class IntakeAgent : IIntakeAgent
             }).ToArray(),
             functions = new[] { functionDef },
             function_call = "auto",
-            temperature = _options.Temperature,
-            max_tokens = _options.MaxTokens
+            temperature = this.options.Temperature,
+            max_tokens = this.options.MaxTokens
         };
 
         var requestJson = JsonSerializer.Serialize(requestBody);
         var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-        _logger.LogDebug("Calling OpenAI API with {MessageCount} messages", messages.Count);
+        this.logger.LogDebug("Calling OpenAI API with {MessageCount} messages", messages.Count);
 
-        var response = await httpClient.PostAsync("https://api.openai.com/v1/chat/completions", content, cancellationToken);
+        var response = await httpClient.PostAsync(new Uri("https://api.openai.com/v1/chat/completions"), content, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -298,8 +298,8 @@ public sealed class IntakeAgent : IIntakeAgent
         List<ConversationMessage> messages,
         CancellationToken cancellationToken)
     {
-        var httpClient = _httpClientFactory.CreateClient();
-        httpClient.DefaultRequestHeaders.Add("x-api-key", _options.AnthropicApiKey);
+        var httpClient = this.httpClientFactory.CreateClient();
+        httpClient.DefaultRequestHeaders.Add("x-api-key", this.options.AnthropicApiKey);
         httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
 
         // Convert to Anthropic format (system message separate)
@@ -312,9 +312,9 @@ public sealed class IntakeAgent : IIntakeAgent
 
         var requestBody = new
         {
-            model = _options.AnthropicModel,
-            max_tokens = _options.MaxTokens,
-            temperature = _options.Temperature,
+            model = this.options.AnthropicModel,
+            max_tokens = this.options.MaxTokens,
+            temperature = this.options.Temperature,
             system = systemMessage,
             messages = conversationMessages
         };
@@ -322,9 +322,9 @@ public sealed class IntakeAgent : IIntakeAgent
         var requestJson = JsonSerializer.Serialize(requestBody);
         var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-        _logger.LogDebug("Calling Anthropic API with {MessageCount} messages", messages.Count);
+        this.logger.LogDebug("Calling Anthropic API with {MessageCount} messages", messages.Count);
 
-        var response = await httpClient.PostAsync("https://api.anthropic.com/v1/messages", content, cancellationToken);
+        var response = await httpClient.PostAsync(new Uri("https://api.anthropic.com/v1/messages"), content, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -370,7 +370,7 @@ public sealed class IntakeAgent : IIntakeAgent
     {
         try
         {
-            _logger.LogDebug("Extracting requirements from function arguments");
+            this.logger.LogDebug("Extracting requirements from function arguments");
 
             var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(argumentsJson);
             if (args == null)
@@ -413,14 +413,14 @@ public sealed class IntakeAgent : IIntakeAgent
                     : null
             };
 
-            _logger.LogInformation("Successfully extracted requirements: Tier={Tier}, Protocols={ProtocolCount}, Databases={DatabaseCount}",
+            this.logger.LogInformation("Successfully extracted requirements: Tier={Tier}, Protocols={ProtocolCount}, Databases={DatabaseCount}",
                 requirements.Tier, requirements.Protocols.Count, requirements.Databases.Count);
 
             return requirements;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to extract requirements from function arguments");
+            this.logger.LogError(ex, "Failed to extract requirements from function arguments");
             return null;
         }
 
@@ -431,7 +431,7 @@ public sealed class IntakeAgent : IIntakeAgent
         BuildRequirements requirements,
         CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Generating cost estimate for tier {Tier}, provider {Provider}, architecture {Architecture}",
+        this.logger.LogDebug("Generating cost estimate for tier {Tier}, provider {Provider}, architecture {Architecture}",
             requirements.Tier, requirements.CloudProvider, requirements.Architecture);
 
         // License tier cost
@@ -498,7 +498,7 @@ public sealed class IntakeAgent : IIntakeAgent
             ["storage"] = storageCost
         };
 
-        _logger.LogInformation("Cost estimate: Total=${TotalCost}, License=${LicenseCost}, Infrastructure=${InfrastructureCost}, Storage=${StorageCost}",
+        this.logger.LogInformation("Cost estimate: Total=${TotalCost}, License=${LicenseCost}, Infrastructure=${InfrastructureCost}, Storage=${StorageCost}",
             totalCost, licenseCost, infrastructureCost, storageCost);
 
         await Task.CompletedTask;

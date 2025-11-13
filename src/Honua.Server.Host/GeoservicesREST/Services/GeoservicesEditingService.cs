@@ -34,18 +34,18 @@ public sealed class GeoservicesEditingService : IGeoservicesEditingService
 {
     private const string GlobalIdFieldName = "globalId";
 
-    private readonly IFeatureEditOrchestrator _editOrchestrator;
-    private readonly IFeatureRepository _repository;
-    private readonly ILogger<GeoservicesEditingService> _logger;
+    private readonly IFeatureEditOrchestrator editOrchestrator;
+    private readonly IFeatureRepository repository;
+    private readonly ILogger<GeoservicesEditingService> logger;
 
     public GeoservicesEditingService(
         IFeatureEditOrchestrator editOrchestrator,
         IFeatureRepository repository,
         ILogger<GeoservicesEditingService> logger)
     {
-        _editOrchestrator = Guard.NotNull(editOrchestrator);
-        _repository = Guard.NotNull(repository);
-        _logger = Guard.NotNull(logger);
+        this.editOrchestrator = Guard.NotNull(editOrchestrator);
+        this.repository = Guard.NotNull(repository);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task<GeoservicesEditExecutionResult> ExecuteEditsAsync(
@@ -132,7 +132,7 @@ public sealed class GeoservicesEditingService : IGeoservicesEditingService
                 user?.Identity?.IsAuthenticated ?? false,
                 UserIdentityHelper.ExtractUserRoles(user));
 
-            orchestratorResult = await _editOrchestrator.ExecuteAsync(batch, cancellationToken).ConfigureAwait(false);
+            orchestratorResult = await this.editOrchestrator.ExecuteAsync(batch, cancellationToken).ConfigureAwait(false);
         }
         else
         {
@@ -385,7 +385,7 @@ public sealed class GeoservicesEditingService : IGeoservicesEditingService
             PropertyNames: new[] { layer.IdField },
             Limit: 1);
 
-        await foreach (var record in _repository.QueryAsync(serviceId, layer.Id, query, cancellationToken).ConfigureAwait(false))
+        await foreach (var record in this.repository.QueryAsync(serviceId, layer.Id, query, cancellationToken).ConfigureAwait(false))
         {
             if (record.Attributes.TryGetValue(layer.IdField, out var value) && value != null)
             {

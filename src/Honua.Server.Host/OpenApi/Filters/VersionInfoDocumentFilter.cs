@@ -13,18 +13,18 @@ namespace Honua.Server.Host.OpenApi.Filters;
 /// </summary>
 public sealed class VersionInfoDocumentFilter : IDocumentFilter
 {
-    private readonly string _environmentName;
-    private readonly string? _buildVersion;
-    private readonly string? _buildDate;
+    private readonly string environmentName;
+    private readonly string? buildVersion;
+    private readonly string? buildDate;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VersionInfoDocumentFilter"/> class.
     /// </summary>
     public VersionInfoDocumentFilter()
     {
-        _environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
-        _buildVersion = Environment.GetEnvironmentVariable("BUILD_VERSION");
-        _buildDate = Environment.GetEnvironmentVariable("BUILD_DATE");
+        this.environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+        this.buildVersion = Environment.GetEnvironmentVariable("BUILD_VERSION");
+        this.buildDate = Environment.GetEnvironmentVariable("BUILD_DATE");
     }
 
     /// <summary>
@@ -48,7 +48,7 @@ public sealed class VersionInfoDocumentFilter : IDocumentFilter
         // Build comprehensive version string
         var versionParts = new List<string>();
 
-        if (!_buildVersion.IsNullOrEmpty())
+        if (!this.buildVersion.IsNullOrEmpty())
         {
             versionParts.Add($"Build: {_buildVersion}");
         }
@@ -82,7 +82,7 @@ public sealed class VersionInfoDocumentFilter : IDocumentFilter
             versionInfo.AddRange(versionParts.Select(v => $"- {v}"));
         }
 
-        if (!_buildDate.IsNullOrEmpty())
+        if (!this.buildDate.IsNullOrEmpty())
         {
             versionInfo.Add($"- Build Date: {_buildDate}");
         }
@@ -106,7 +106,7 @@ public sealed class VersionInfoDocumentFilter : IDocumentFilter
         swaggerDoc.Extensions["x-api-version"] = new Microsoft.OpenApi.Any.OpenApiString(swaggerDoc.Info.Version);
         swaggerDoc.Extensions["x-environment"] = new Microsoft.OpenApi.Any.OpenApiString(_environmentName);
 
-        if (!_buildDate.IsNullOrEmpty())
+        if (!this.buildDate.IsNullOrEmpty())
         {
             swaggerDoc.Extensions["x-build-date"] = new Microsoft.OpenApi.Any.OpenApiString(_buildDate);
         }

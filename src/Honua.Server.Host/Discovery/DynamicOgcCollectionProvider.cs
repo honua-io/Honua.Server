@@ -20,10 +20,10 @@ namespace Honua.Server.Host.Discovery;
 /// </summary>
 public sealed class DynamicOgcCollectionProvider
 {
-    private readonly ITableDiscoveryService _discoveryService;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly AutoDiscoveryOptions _options;
-    private readonly ILogger<DynamicOgcCollectionProvider> _logger;
+    private readonly ITableDiscoveryService discoveryService;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly AutoDiscoveryOptions options;
+    private readonly ILogger<DynamicOgcCollectionProvider> logger;
 
     public DynamicOgcCollectionProvider(
         ITableDiscoveryService discoveryService,
@@ -31,10 +31,10 @@ public sealed class DynamicOgcCollectionProvider
         IOptions<AutoDiscoveryOptions> options,
         ILogger<DynamicOgcCollectionProvider> logger)
     {
-        _discoveryService = discoveryService ?? throw new ArgumentNullException(nameof(discoveryService));
-        _metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.discoveryService = discoveryService ?? throw new ArgumentNullException(nameof(discoveryService));
+        this.metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -45,12 +45,12 @@ public sealed class DynamicOgcCollectionProvider
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        if (!_options.Enabled || !_options.DiscoverPostGISTablesAsOgcCollections)
+        if (!this.options.Enabled || !this.options.DiscoverPostGISTablesAsOgcCollections)
         {
             return Array.Empty<OgcCollection>();
         }
 
-        var tables = await _discoveryService.DiscoverTablesAsync(dataSourceId, cancellationToken);
+        var tables = await this.discoveryService.DiscoverTablesAsync(dataSourceId, cancellationToken);
 
         var collections = new List<OgcCollection>();
 
@@ -60,7 +60,7 @@ public sealed class DynamicOgcCollectionProvider
             collections.Add(collection);
         }
 
-        _logger.LogDebug("Generated {Count} OGC collections from discovery", collections.Count);
+        this.logger.LogDebug("Generated {Count} OGC collections from discovery", collections.Count);
 
         return collections;
     }
@@ -74,7 +74,7 @@ public sealed class DynamicOgcCollectionProvider
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        if (!_options.Enabled || !_options.DiscoverPostGISTablesAsOgcCollections)
+        if (!this.options.Enabled || !this.options.DiscoverPostGISTablesAsOgcCollections)
         {
             return null;
         }
@@ -90,7 +90,7 @@ public sealed class DynamicOgcCollectionProvider
         var tableName = parts[1];
         var qualifiedName = $"{schema}.{tableName}";
 
-        var table = await _discoveryService.DiscoverTableAsync(dataSourceId, qualifiedName, cancellationToken);
+        var table = await this.discoveryService.DiscoverTableAsync(dataSourceId, qualifiedName, cancellationToken);
 
         if (table == null)
         {
@@ -103,7 +103,7 @@ public sealed class DynamicOgcCollectionProvider
     private OgcCollection CreateOgcCollection(DiscoveredTable table, HttpContext httpContext)
     {
         var collectionId = GetCollectionId(table);
-        var friendlyName = _options.UseFriendlyNames
+        var friendlyName = this.options.UseFriendlyNames
             ? table.TableName.Humanize(LetterCasing.Title)
             : table.TableName;
 
@@ -153,7 +153,7 @@ public sealed class DynamicOgcCollectionProvider
         };
 
         // Add queryables link
-        if (_options.GenerateOpenApiDocs)
+        if (this.options.GenerateOpenApiDocs)
         {
             links.Add(new OgcLink(
                 $"{baseUrl}/collections/{collectionId}/queryables",
@@ -194,7 +194,7 @@ public sealed class DynamicOgcCollectionProvider
         }
 
         var qualifiedName = $"{parts[0]}.{parts[1]}";
-        var table = await _discoveryService.DiscoverTableAsync(dataSourceId, qualifiedName, cancellationToken);
+        var table = await this.discoveryService.DiscoverTableAsync(dataSourceId, qualifiedName, cancellationToken);
 
         if (table == null)
         {

@@ -18,11 +18,11 @@ namespace Honua.Server.Host.Ogc;
 /// </summary>
 internal sealed class OgcApiDefinitionCache
 {
-    private readonly IWebHostEnvironment _environment;
-    private readonly OgcCacheHeaderService _cacheHeaderService;
-    private readonly ILogger<OgcApiDefinitionCache> _logger;
+    private readonly IWebHostEnvironment environment;
+    private readonly OgcCacheHeaderService cacheHeaderService;
+    private readonly ILogger<OgcApiDefinitionCache> logger;
     private readonly SemaphoreSlim _reloadLock = new(1, 1);
-    private readonly IFileProvider _fileProvider;
+    private readonly IFileProvider fileProvider;
     private readonly string _relativePath = Path.Combine("schemas", OgcSharedHandlers.ApiDefinitionFileName);
 
     private OgcApiDefinitionCacheEntry? _cachedEntry;
@@ -33,10 +33,10 @@ internal sealed class OgcApiDefinitionCache
         OgcCacheHeaderService cacheHeaderService,
         ILogger<OgcApiDefinitionCache> logger)
     {
-        _environment = Guard.NotNull(environment);
-        _cacheHeaderService = Guard.NotNull(cacheHeaderService);
-        _logger = Guard.NotNull(logger);
-        _fileProvider = _environment.ContentRootFileProvider;
+        this.environment = Guard.NotNull(environment);
+        this.cacheHeaderService = Guard.NotNull(cacheHeaderService);
+        this.logger = Guard.NotNull(logger);
+        this.fileProvider = this.environment.ContentRootFileProvider;
     }
 
     public async ValueTask<OgcApiDefinitionCacheEntry> GetAsync(CancellationToken cancellationToken)
@@ -47,7 +47,7 @@ internal sealed class OgcApiDefinitionCache
             return entry;
         }
 
-        await _reloadLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await this.reloadLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             entry = _cachedEntry;
@@ -56,7 +56,7 @@ internal sealed class OgcApiDefinitionCache
                 return entry;
             }
 
-            var fileInfo = _fileProvider.GetFileInfo(_relativePath);
+            var fileInfo = this.fileProvider.GetFileInfo(_relativePath);
             if (!fileInfo.Exists)
             {
                 throw new FileNotFoundException(
@@ -70,7 +70,7 @@ internal sealed class OgcApiDefinitionCache
 
             var bytes = buffer.ToArray();
             var payload = Encoding.UTF8.GetString(bytes);
-            var etag = _cacheHeaderService.GenerateETag(bytes);
+            var etag = this.cacheHeaderService.GenerateETag(bytes);
             var newEntry = new OgcApiDefinitionCacheEntry(payload, etag, fileInfo.LastModified);
 
             Volatile.Write(ref _cachedEntry, newEntry);
@@ -80,7 +80,7 @@ internal sealed class OgcApiDefinitionCache
         }
         finally
         {
-            _reloadLock.Release();
+            this.reloadLock.Release();
         }
     }
 
@@ -98,14 +98,14 @@ internal sealed class OgcApiDefinitionCache
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     ex,
                     "Failed to re-register change token for OGC API definition updates. " +
                     "API definition cache may become stale until the next request reloads it.");
             }
         }
 
-        var token = _fileProvider.Watch(_relativePath);
+        var token = this.fileProvider.Watch(_relativePath);
         var registration = token.RegisterChangeCallback(OnFileChanged, null);
         var previousRegistration = Interlocked.Exchange(ref _changeRegistration, registration);
         previousRegistration?.Dispose();

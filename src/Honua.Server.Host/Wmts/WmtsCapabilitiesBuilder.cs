@@ -36,11 +36,11 @@ public sealed class WmtsCapabilitiesBuilder : OgcCapabilitiesBuilder
         "http://www.opengis.net/spec/wmts/1.0/conf/kvp",
     };
 
-    private readonly IRasterDatasetRegistry _rasterRegistry;
+    private readonly IRasterDatasetRegistry rasterRegistry;
 
     public WmtsCapabilitiesBuilder(IRasterDatasetRegistry rasterRegistry)
     {
-        _rasterRegistry = rasterRegistry ?? throw new ArgumentNullException(nameof(rasterRegistry));
+        this.rasterRegistry = rasterRegistry ?? throw new ArgumentNullException(nameof(rasterRegistry));
     }
 
     protected override XName GetRootElementName() => Wmts + "Capabilities";
@@ -87,7 +87,7 @@ public sealed class WmtsCapabilitiesBuilder : OgcCapabilitiesBuilder
 
     protected override async Task AddProtocolSpecificSectionsAsync(XElement root, MetadataSnapshot metadata, HttpRequest request, CancellationToken cancellationToken)
     {
-        var datasets = await _rasterRegistry.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var datasets = await this.rasterRegistry.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         var contentsElement = new XElement(Wmts + "Contents");
 

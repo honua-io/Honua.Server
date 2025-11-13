@@ -162,11 +162,11 @@ public static class SpatialIndexDiagnosticsEndpoints
 /// </summary>
 public class SpatialIndexDiagnosticsService
 {
-    private readonly ILogger _logger;
+    private readonly ILogger logger;
 
     public SpatialIndexDiagnosticsService(ILogger logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<SpatialIndexDiagnosticsReport> DiagnoseAllAsync(
@@ -191,7 +191,7 @@ public class SpatialIndexDiagnosticsService
             var dataSource = snapshot.DataSources.FirstOrDefault(ds => ds.Id == group.Key);
             if (dataSource == null)
             {
-                _logger.LogWarning("Data source '{DataSourceId}' not found", group.Key);
+                this.logger.LogWarning("Data source '{DataSourceId}' not found", group.Key);
                 continue;
             }
 
@@ -203,7 +203,7 @@ public class SpatialIndexDiagnosticsService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error diagnosing data source {DataSourceId}", dataSource.Id);
+                this.logger.LogError(ex, "Error diagnosing data source {DataSourceId}", dataSource.Id);
             }
         }
 
@@ -288,7 +288,7 @@ public class SpatialIndexDiagnosticsService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error diagnosing layer {LayerId}", layer.Id);
+            this.logger.LogError(ex, "Error diagnosing layer {LayerId}", layer.Id);
             throw;
         }
         finally
@@ -316,7 +316,7 @@ public class SpatialIndexDiagnosticsService
 
         if (connection == null)
         {
-            _logger.LogWarning("Unsupported provider: {Provider}", dataSource.Provider);
+            this.logger.LogWarning("Unsupported provider: {Provider}", dataSource.Provider);
             return layers.Select(layer => CreateUnsupportedProviderResult(dataSource, layer)).ToList();
         }
 
@@ -344,7 +344,7 @@ public class SpatialIndexDiagnosticsService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error diagnosing layer {LayerId}", layer.Id);
+                    this.logger.LogError(ex, "Error diagnosing layer {LayerId}", layer.Id);
                     results.Add(new SpatialIndexLayerResult
                     {
                         DataSourceId = dataSource.Id,

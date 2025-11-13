@@ -13,18 +13,18 @@ namespace Honua.Server.Host.HealthChecks;
 /// </summary>
 public class DatabaseHealthCheck : IHealthCheck
 {
-    private readonly IDataStoreProviderFactory _dataStoreProviderFactory;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly ILogger<DatabaseHealthCheck> _logger;
+    private readonly IDataStoreProviderFactory dataStoreProviderFactory;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly ILogger<DatabaseHealthCheck> logger;
 
     public DatabaseHealthCheck(
         IDataStoreProviderFactory dataStoreProviderFactory,
         IMetadataRegistry metadataRegistry,
         ILogger<DatabaseHealthCheck> logger)
     {
-        _dataStoreProviderFactory = dataStoreProviderFactory;
-        _metadataRegistry = metadataRegistry;
-        _logger = logger;
+        this.dataStoreProviderFactory = dataStoreProviderFactory;
+        this.metadataRegistry = metadataRegistry;
+        this.logger = logger;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -38,13 +38,13 @@ public class DatabaseHealthCheck : IHealthCheck
         try
         {
             // Get metadata snapshot
-            var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken);
+            var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken);
             var dataSources = snapshot.DataSources.ToList();
 
             if (dataSources.Count == 0)
             {
                 // No data sources configured - this is degraded state
-                _logger.LogWarning("No data sources configured");
+                this.logger.LogWarning("No data sources configured");
                 return HealthCheckResult.Degraded(
                     "No data sources configured",
                     data: new Dictionary<string, object>
@@ -58,18 +58,18 @@ public class DatabaseHealthCheck : IHealthCheck
             {
                 try
                 {
-                    var provider = _dataStoreProviderFactory.Create(dataSource.Provider);
+                    var provider = this.dataStoreProviderFactory.Create(dataSource.Provider);
 
                     // Use TestConnectivityAsync method from IDataStoreProvider
                     await provider.TestConnectivityAsync(dataSource, cancellationToken);
 
                     healthyDataSources.Add(dataSource.Id);
-                    _logger.LogDebug("Data source {DataSourceId} is healthy", dataSource.Id);
+                    this.logger.LogDebug("Data source {DataSourceId} is healthy", dataSource.Id);
                 }
                 catch (Exception ex)
                 {
                     unhealthyDataSources.Add(dataSource.Id);
-                    _logger.LogError(ex, "Data source {DataSourceId} connectivity test failed", dataSource.Id);
+                    this.logger.LogError(ex, "Data source {DataSourceId} connectivity test failed", dataSource.Id);
                 }
             }
 
@@ -108,7 +108,7 @@ public class DatabaseHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Database health check failed");
+            this.logger.LogError(ex, "Database health check failed");
             return HealthCheckResult.Unhealthy(
                 "Database health check failed: " + ex.Message,
                 exception: ex,

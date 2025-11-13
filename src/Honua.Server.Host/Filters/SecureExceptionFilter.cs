@@ -101,9 +101,9 @@ namespace Honua.Server.Host.Filters;
 /// </example>
 public sealed class SecureExceptionFilter : IExceptionFilter
 {
-    private readonly ILogger<SecureExceptionFilter> _logger;
-    private readonly IHostEnvironment _environment;
-    private readonly ISecurityAuditLogger _auditLogger;
+    private readonly ILogger<SecureExceptionFilter> logger;
+    private readonly IHostEnvironment environment;
+    private readonly ISecurityAuditLogger auditLogger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SecureExceptionFilter"/> class.
@@ -119,9 +119,9 @@ public sealed class SecureExceptionFilter : IExceptionFilter
         IHostEnvironment environment,
         ISecurityAuditLogger auditLogger)
     {
-        _logger = Guard.NotNull(logger);
-        _environment = Guard.NotNull(environment);
-        _auditLogger = Guard.NotNull(auditLogger);
+        this.logger = Guard.NotNull(logger);
+        this.environment = Guard.NotNull(environment);
+        this.auditLogger = Guard.NotNull(auditLogger);
     }
 
     /// <summary>
@@ -159,7 +159,7 @@ public sealed class SecureExceptionFilter : IExceptionFilter
         var correlationId = CorrelationIdUtilities.GetCorrelationId(context.HttpContext) ?? requestId;
 
         // Structured logging with full details for server-side diagnostics including correlation ID
-        using (_logger.BeginScope(new Dictionary<string, object>
+        using (this.logger.BeginScope(new Dictionary<string, object>
         {
             ["Controller"] = controller,
             ["Action"] = action,
@@ -168,7 +168,7 @@ public sealed class SecureExceptionFilter : IExceptionFilter
             ["ExceptionType"] = exception.GetType().Name
         }))
         {
-            _logger.LogError(exception,
+            this.logger.LogError(exception,
                 "Unhandled exception in {Controller}.{Action} [RequestId: {RequestId}] [CorrelationId: {CorrelationId}]",
                 controller,
                 action,
@@ -182,7 +182,7 @@ public sealed class SecureExceptionFilter : IExceptionFilter
             var username = context.HttpContext.User?.Identity?.Name ?? "Anonymous";
             var ipAddress = context.HttpContext.Connection.RemoteIpAddress?.ToString();
 
-            _auditLogger.LogSuspiciousActivity(
+            this.auditLogger.LogSuspiciousActivity(
                 activityType: "UnhandledException",
                 username: username,
                 ipAddress: ipAddress,
@@ -235,7 +235,7 @@ public sealed class SecureExceptionFilter : IExceptionFilter
         {
             Status = StatusCodes.Status400BadRequest,
             Title = "One or more validation errors occurred",
-            Detail = _environment.IsDevelopment()
+            Detail = this.environment.IsDevelopment()
                 ? "Please correct the validation errors and try again."
                 : null,
             Instance = requestId,
@@ -317,7 +317,7 @@ public sealed class SecureExceptionFilter : IExceptionFilter
         {
             Status = StatusCodes.Status500InternalServerError,
             Title = "An error occurred while processing your request",
-            Detail = _environment.IsDevelopment()
+            Detail = this.environment.IsDevelopment()
                 ? "An unexpected error occurred. Check server logs for details."
                 : null, // Production: no hint about server internals
             Instance = requestId,
@@ -327,7 +327,7 @@ public sealed class SecureExceptionFilter : IExceptionFilter
                 ["requestId"] = requestId,
                 ["timestamp"] = DateTimeOffset.UtcNow,
                 // In development, include exception type to help with debugging
-                ["exceptionType"] = _environment.IsDevelopment()
+                ["exceptionType"] = this.environment.IsDevelopment()
                     ? exception.GetType().Name
                     : null
             }

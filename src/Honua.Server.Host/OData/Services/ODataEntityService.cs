@@ -23,18 +23,18 @@ namespace Honua.Server.Host.OData.Services;
 /// </summary>
 public sealed class ODataEntityService
 {
-    private readonly ODataGeometryService _geometryService;
-    private readonly ODataConverterService _converterService;
-    private readonly ILogger<ODataEntityService> _logger;
+    private readonly ODataGeometryService geometryService;
+    private readonly ODataConverterService converterService;
+    private readonly ILogger<ODataEntityService> logger;
 
     public ODataEntityService(
         ODataGeometryService geometryService,
         ODataConverterService converterService,
         ILogger<ODataEntityService> logger)
     {
-        _geometryService = Guard.NotNull(geometryService);
-        _converterService = Guard.NotNull(converterService);
-        _logger = Guard.NotNull(logger);
+        this.geometryService = Guard.NotNull(geometryService);
+        this.converterService = Guard.NotNull(converterService);
+        this.logger = Guard.NotNull(logger);
     }
 
     public EdmEntityObject CreateEntity(
@@ -51,7 +51,7 @@ public sealed class ODataEntityService
         var projection = BuildProjection(queryOptions, metadata, geometryField, geometryShadow);
 
         record.Attributes.TryGetValue(geometryField, out var rawGeometry);
-        var wkt = _geometryService.ComputeWkt(rawGeometry);
+        var wkt = this.geometryService.ComputeWkt(rawGeometry);
 
         foreach (var property in entityType.StructuralProperties())
         {
@@ -67,12 +67,12 @@ public sealed class ODataEntityService
             {
                 if (property.Type.PrimitiveKind() == EdmPrimitiveTypeKind.String)
                 {
-                    entity.TrySetPropertyValue(name, wkt ?? _converterService.ConvertOutgoingScalar(rawGeometry));
+                    entity.TrySetPropertyValue(name, wkt ?? this.converterService.ConvertOutgoingScalar(rawGeometry));
                     continue;
                 }
 
-                var spatialValue = _geometryService.ConvertGeometryToSpatial(rawGeometry, storageSrid);
-                entity.TrySetPropertyValue(name, spatialValue ?? _converterService.ConvertOutgoingScalar(rawGeometry));
+                var spatialValue = this.geometryService.ConvertGeometryToSpatial(rawGeometry, storageSrid);
+                entity.TrySetPropertyValue(name, spatialValue ?? this.converterService.ConvertOutgoingScalar(rawGeometry));
                 continue;
             }
 
@@ -85,7 +85,7 @@ public sealed class ODataEntityService
 
             if (record.Attributes.TryGetValue(name, out var attributeValue))
             {
-                var value = _converterService.ConvertPropertyValue(property, attributeValue);
+                var value = this.converterService.ConvertPropertyValue(property, attributeValue);
                 entity.TrySetPropertyValue(name, value);
             }
         }
@@ -139,18 +139,18 @@ public sealed class ODataEntityService
             if (geometryField.HasValue() &&
                 string.Equals(name, geometryField, StringComparison.OrdinalIgnoreCase))
             {
-                attributes[name] = _converterService.NormalizeIncomingGeometry(value);
+                attributes[name] = this.converterService.NormalizeIncomingGeometry(value);
                 continue;
             }
 
-            attributes[name] = _converterService.ConvertIncomingValue(value);
+            attributes[name] = this.converterService.ConvertIncomingValue(value);
         }
 
         if (geometryField.HasValue() &&
             !attributes.ContainsKey(geometryField) &&
             shadowGeometry is not null)
         {
-            attributes[geometryField] = _converterService.NormalizeIncomingGeometry(shadowGeometry);
+            attributes[geometryField] = this.converterService.NormalizeIncomingGeometry(shadowGeometry);
         }
 
         return new FeatureRecord(attributes);

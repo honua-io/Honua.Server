@@ -778,11 +778,11 @@ internal static class OgcTilesHandlers
 
     private sealed class TileResultWithHeaders : IResult
     {
-        private readonly Stream _content;
-        private readonly string _contentType;
-        private readonly OgcCacheHeaderService _cacheService;
-        private readonly string? _etag;
-        private readonly string? _cacheControlOverride;
+        private readonly Stream content;
+        private readonly string contentType;
+        private readonly OgcCacheHeaderService cacheService;
+        private readonly string? etag;
+        private readonly string? cacheControlOverride;
         private bool _disposed;
 
         public TileResultWithHeaders(
@@ -792,41 +792,41 @@ internal static class OgcTilesHandlers
             string? etag,
             string? cacheControlOverride)
         {
-            _content = Guard.NotNull(content);
-            _contentType = Guard.NotNull(contentType);
-            _cacheService = Guard.NotNull(cacheService);
-            _etag = etag;
-            _cacheControlOverride = cacheControlOverride;
+            this.content = Guard.NotNull(content);
+            this.contentType = Guard.NotNull(contentType);
+            this.cacheService = Guard.NotNull(cacheService);
+            this.etag = etag;
+            this.cacheControlOverride = cacheControlOverride;
         }
 
         public async Task ExecuteAsync(HttpContext httpContext)
         {
             Guard.NotNull(httpContext);
 
-            if (_cacheService.ShouldReturn304NotModified(httpContext, _etag, null))
+            if (this.cacheService.ShouldReturn304NotModified(httpContext, _etag, null))
             {
-                _cacheService.ApplyCacheHeaders(httpContext, OgcResourceType.Tile, _etag, null);
+                this.cacheService.ApplyCacheHeaders(httpContext, OgcResourceType.Tile, _etag, null);
                 ApplyCdnHeaders(httpContext.Response);
                 httpContext.Response.StatusCode = StatusCodes.Status304NotModified;
                 await DisposeContentAsync().ConfigureAwait(false);
                 return;
             }
 
-            _cacheService.ApplyCacheHeaders(httpContext, OgcResourceType.Tile, _etag, null);
+            this.cacheService.ApplyCacheHeaders(httpContext, OgcResourceType.Tile, _etag, null);
             ApplyCdnHeaders(httpContext.Response);
 
             var response = httpContext.Response;
             response.ContentType = _contentType;
 
-            if (_content.CanSeek)
+            if (this.content.CanSeek)
             {
-                _content.Seek(0, SeekOrigin.Begin);
-                response.ContentLength = _content.Length;
+                this.content.Seek(0, SeekOrigin.Begin);
+                response.ContentLength = this.content.Length;
             }
 
             try
             {
-                await _content.CopyToAsync(response.Body, 81920, httpContext.RequestAborted).ConfigureAwait(false);
+                await this.content.CopyToAsync(response.Body, 81920, httpContext.RequestAborted).ConfigureAwait(false);
             }
             finally
             {
@@ -836,7 +836,7 @@ internal static class OgcTilesHandlers
 
         private void ApplyCdnHeaders(HttpResponse response)
         {
-            if (_cacheControlOverride.IsNullOrWhiteSpace())
+            if (this.cacheControlOverride.IsNullOrWhiteSpace())
             {
                 return;
             }
@@ -852,7 +852,7 @@ internal static class OgcTilesHandlers
                 return;
             }
 
-            _disposed = true;
+            this.disposed = true;
 
             switch (_content)
             {
@@ -860,7 +860,7 @@ internal static class OgcTilesHandlers
                     await asyncDisposable.DisposeAsync().ConfigureAwait(false);
                     break;
                 default:
-                    _content.Dispose();
+                    this.content.Dispose();
                     break;
             }
         }

@@ -16,18 +16,18 @@ namespace Honua.Server.Host.HealthChecks;
 /// </summary>
 public class StorageHealthCheck : IHealthCheck
 {
-    private readonly IAttachmentStoreSelector _attachmentStoreSelector;
-    private readonly ILogger<StorageHealthCheck> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly IAttachmentStoreSelector attachmentStoreSelector;
+    private readonly ILogger<StorageHealthCheck> logger;
+    private readonly IConfiguration configuration;
 
     public StorageHealthCheck(
         IAttachmentStoreSelector attachmentStoreSelector,
         ILogger<StorageHealthCheck> logger,
         IConfiguration configuration)
     {
-        _attachmentStoreSelector = attachmentStoreSelector;
-        _logger = logger;
-        _configuration = configuration;
+        this.attachmentStoreSelector = attachmentStoreSelector;
+        this.logger = logger;
+        this.configuration = configuration;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -67,7 +67,7 @@ public class StorageHealthCheck : IHealthCheck
 
                 if (s3Result.status != "Healthy")
                 {
-                    _logger.LogWarning("S3 storage health check failed: {Status}", s3Result.status);
+                    this.logger.LogWarning("S3 storage health check failed: {Status}", s3Result.status);
                 }
             }
 
@@ -84,7 +84,7 @@ public class StorageHealthCheck : IHealthCheck
 
                 if (azureResult.status != "Healthy")
                 {
-                    _logger.LogWarning("Azure Blob storage health check failed: {Status}", azureResult.status);
+                    this.logger.LogWarning("Azure Blob storage health check failed: {Status}", azureResult.status);
                 }
             }
 
@@ -101,7 +101,7 @@ public class StorageHealthCheck : IHealthCheck
 
                 if (gcsResult.status != "Healthy")
                 {
-                    _logger.LogWarning("Google Cloud Storage health check failed: {Status}", gcsResult.status);
+                    this.logger.LogWarning("Google Cloud Storage health check failed: {Status}", gcsResult.status);
                 }
             }
 
@@ -118,7 +118,7 @@ public class StorageHealthCheck : IHealthCheck
 
                 if (fsResult.status != "Healthy")
                 {
-                    _logger.LogWarning("Filesystem storage health check failed: {Status}", fsResult.status);
+                    this.logger.LogWarning("Filesystem storage health check failed: {Status}", fsResult.status);
                 }
             }
 
@@ -127,7 +127,7 @@ public class StorageHealthCheck : IHealthCheck
             // If no storage providers are configured, return degraded
             if (storageProviders.Count == 0)
             {
-                _logger.LogWarning("No storage providers configured");
+                this.logger.LogWarning("No storage providers configured");
                 return HealthCheckResult.Degraded(
                     "No storage providers configured",
                     data: data);
@@ -156,7 +156,7 @@ public class StorageHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Storage health check failed");
+            this.logger.LogError(ex, "Storage health check failed");
             return HealthCheckResult.Unhealthy(
                 "Storage health check failed: " + ex.Message,
                 exception: ex,
@@ -200,7 +200,7 @@ public class StorageHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "S3 health check failed");
+            this.logger.LogError(ex, "S3 health check failed");
             return ("Unhealthy", new Dictionary<string, object> { ["error"] = ex.Message });
         }
     }
@@ -236,7 +236,7 @@ public class StorageHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Azure Blob health check failed");
+            this.logger.LogError(ex, "Azure Blob health check failed");
             return ("Unhealthy", new Dictionary<string, object> { ["error"] = ex.Message });
         }
     }
@@ -271,7 +271,7 @@ public class StorageHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Google Cloud Storage health check failed");
+            this.logger.LogError(ex, "Google Cloud Storage health check failed");
             return ("Unhealthy", new Dictionary<string, object> { ["error"] = ex.Message });
         }
     }
@@ -323,7 +323,7 @@ public class StorageHealthCheck : IHealthCheck
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Filesystem health check failed");
+            this.logger.LogError(ex, "Filesystem health check failed");
             return ("Unhealthy", new Dictionary<string, object> { ["error"] = ex.Message });
         }
     }

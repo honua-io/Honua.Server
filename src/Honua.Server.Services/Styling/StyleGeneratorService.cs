@@ -14,7 +14,7 @@ namespace Honua.Server.Services.Styling;
 /// </summary>
 public class StyleGeneratorService
 {
-    private readonly DataAnalyzer _dataAnalyzer = new();
+    private readonly DataAnalyzer dataAnalyzer = new();
 
     /// <summary>
     /// Generate a style for a layer automatically
@@ -27,29 +27,29 @@ public class StyleGeneratorService
         // If field is specified, analyze it for data-driven styling
         if (!string.IsNullOrEmpty(request.FieldName) && request.FieldValues != null)
         {
-            fieldAnalysis = _dataAnalyzer.AnalyzeField(request.FieldValues, request.FieldName);
-            styleDefinition = GenerateDataDrivenStyle(request, fieldAnalysis);
+            fieldAnalysis = this.dataAnalyzer.AnalyzeField(request.FieldValues, request.FieldName);
+            styleDefinition = this.GenerateDataDrivenStyle(request, fieldAnalysis);
         }
         else
         {
             // Generate simple style
-            styleDefinition = GenerateSimpleStyle(request);
+            styleDefinition = this.GenerateSimpleStyle(request);
         }
 
         var style = new GeneratedStyle
         {
             StyleId = request.StyleId ?? $"auto-style-{Guid.NewGuid():N}",
             Title = request.Title ?? "Auto-Generated Style",
-            GeometryType = NormalizeGeometryType(request.GeometryType),
+            GeometryType = this.NormalizeGeometryType(request.GeometryType),
             StyleDefinition = styleDefinition,
-            MapLibreStyle = ConvertToMapLibreStyle(styleDefinition, request),
-            FieldAnalysis = fieldAnalysis
+            MapLibreStyle = this.ConvertToMapLibreStyle(styleDefinition, request),
+            FieldAnalysis = fieldAnalysis,
         };
 
         // Add clustering/heatmap recommendations for points
         if (request.GeometryType?.ToLowerInvariant() == "point" && request.Coordinates != null)
         {
-            var geometryAnalysis = _dataAnalyzer.AnalyzeGeometryDistribution(request.Coordinates);
+            var geometryAnalysis = this.dataAnalyzer.AnalyzeGeometryDistribution(request.Coordinates);
             style.GeometryAnalysis = geometryAnalysis;
 
             if (geometryAnalysis.ShouldUseHeatmap)
@@ -70,28 +70,28 @@ public class StyleGeneratorService
     /// </summary>
     private StyleDefinition GenerateDataDrivenStyle(StyleGenerationRequest request, FieldAnalysisResult analysis)
     {
-        var geometryType = NormalizeGeometryType(request.GeometryType);
+        var geometryType = this.NormalizeGeometryType(request.GeometryType);
 
         // For categorical data, use unique value renderer
         if (analysis.IsCategorical && analysis.CategoryCounts != null)
         {
-            return GenerateCategoricalStyle(request, analysis, geometryType);
+            return this.GenerateCategoricalStyle(request, analysis, geometryType);
         }
 
         // For numeric data, use graduated/choropleth renderer
         if (analysis.DataType == DataType.Numeric)
         {
-            return GenerateChoroplethStyle(request, analysis, geometryType);
+            return this.GenerateChoroplethStyle(request, analysis, geometryType);
         }
 
         // For temporal data, use temporal styling
         if (analysis.DataType == DataType.DateTime)
         {
-            return GenerateTemporalStyle(request, analysis, geometryType);
+            return this.GenerateTemporalStyle(request, analysis, geometryType);
         }
 
         // Fallback to simple style
-        return GenerateSimpleStyle(request);
+        return this.GenerateSimpleStyle(request);
     }
 
     /// <summary>
@@ -116,7 +116,7 @@ public class StyleGeneratorService
             classes.Add(new UniqueValueStyleClassDefinition
             {
                 Value = category.Key,
-                Symbol = CreateSymbol(geometryType, color, request.Opacity ?? 0.8)
+                Symbol = this.CreateSymbol(geometryType, color, request.Opacity ?? 0.8),
             });
         }
 
@@ -131,8 +131,8 @@ public class StyleGeneratorService
             {
                 Field = analysis.FieldName,
                 Classes = classes,
-                DefaultSymbol = CreateSymbol(geometryType, "#CCCCCC", 0.5)
-            }
+                DefaultSymbol = this.CreateSymbol(geometryType, "#CCCCCC", 0.5),
+            },
         };
     }
 
@@ -186,7 +186,7 @@ public class StyleGeneratorService
             {
                 Id = $"class-{i}",
                 Label = label,
-                Symbolizer = CreateSymbol(geometryType, color, request.Opacity ?? 0.7)
+                Symbolizer = this.CreateSymbol(geometryType, color, request.Opacity ?? 0.7),
             });
         }
 
@@ -197,7 +197,7 @@ public class StyleGeneratorService
             Renderer = "classBreaks",
             GeometryType = geometryType,
             Format = "legacy",
-            Rules = rules
+            Rules = rules,
         };
     }
 
@@ -237,7 +237,7 @@ public class StyleGeneratorService
             {
                 Id = $"temporal-{i}",
                 Label = $"{startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}",
-                Symbolizer = CreateSymbol(geometryType, color, request.Opacity ?? 0.7)
+                Symbolizer = this.CreateSymbol(geometryType, color, request.Opacity ?? 0.7),
             });
         }
 
@@ -248,7 +248,7 @@ public class StyleGeneratorService
             Renderer = "temporal",
             GeometryType = geometryType,
             Format = "legacy",
-            Rules = rules
+            Rules = rules,
         };
     }
 
@@ -257,8 +257,8 @@ public class StyleGeneratorService
     /// </summary>
     private StyleDefinition GenerateSimpleStyle(StyleGenerationRequest request)
     {
-        var geometryType = NormalizeGeometryType(request.GeometryType);
-        var color = request.BaseColor ?? GetDefaultColorForGeometry(geometryType);
+        var geometryType = this.NormalizeGeometryType(request.GeometryType);
+        var color = request.BaseColor ?? this.GetDefaultColorForGeometry(geometryType);
 
         return new StyleDefinition
         {
@@ -267,7 +267,7 @@ public class StyleGeneratorService
             Renderer = "simple",
             GeometryType = geometryType,
             Format = "legacy",
-            Simple = CreateSymbol(geometryType, color, request.Opacity ?? 0.7)
+            Simple = this.CreateSymbol(geometryType, color, request.Opacity ?? 0.7),
         };
     }
 
@@ -282,10 +282,10 @@ public class StyleGeneratorService
             {
                 SymbolType = "shape",
                 FillColor = color,
-                StrokeColor = DarkenColor(color, 0.3),
+                StrokeColor = this.DarkenColor(color, 0.3),
                 StrokeWidth = 1.5,
                 Size = 8,
-                Opacity = opacity
+                Opacity = opacity,
             },
             "line" => new SimpleStyleDefinition
             {
@@ -293,21 +293,21 @@ public class StyleGeneratorService
                 StrokeColor = color,
                 StrokeWidth = 2.5,
                 StrokeStyle = "solid",
-                Opacity = opacity
+                Opacity = opacity,
             },
             "polygon" => new SimpleStyleDefinition
             {
                 SymbolType = "shape",
                 FillColor = color,
-                StrokeColor = DarkenColor(color, 0.3),
+                StrokeColor = this.DarkenColor(color, 0.3),
                 StrokeWidth = 1.5,
-                Opacity = opacity
+                Opacity = opacity,
             },
             _ => new SimpleStyleDefinition
             {
                 FillColor = color,
-                Opacity = opacity
-            }
+                Opacity = opacity,
+            },
         };
     }
 
@@ -318,49 +318,49 @@ public class StyleGeneratorService
     {
         var layerId = request.LayerId ?? "layer";
         var sourceId = request.SourceId ?? "source";
-        var geometryType = NormalizeGeometryType(styleDefinition.GeometryType);
-        var layerType = MapGeometryToLayerType(geometryType);
+        var geometryType = this.NormalizeGeometryType(styleDefinition.GeometryType);
+        var layerType = this.MapGeometryToLayerType(geometryType);
 
         var layer = new JsonObject
         {
             ["id"] = layerId,
             ["type"] = layerType,
-            ["source"] = sourceId
+            ["source"] = sourceId,
         };
 
         // Handle different renderer types
         if (styleDefinition.Renderer == "uniqueValue" && styleDefinition.UniqueValue != null)
         {
-            layer["paint"] = CreateUniqueValuePaint(styleDefinition.UniqueValue, layerType);
+            layer["paint"] = this.CreateUniqueValuePaint(styleDefinition.UniqueValue, layerType);
         }
         else if (styleDefinition.Rules.Count > 0)
         {
-            layer["paint"] = CreateGraduatedPaint(styleDefinition.Rules, layerType);
+            layer["paint"] = this.CreateGraduatedPaint(styleDefinition.Rules, layerType);
         }
         else if (styleDefinition.Simple != null)
         {
-            layer["paint"] = CreateSimplePaint(styleDefinition.Simple, layerType);
+            layer["paint"] = this.CreateSimplePaint(styleDefinition.Simple, layerType);
         }
 
         return new JsonObject
         {
             ["version"] = 8,
-            ["layers"] = new JsonArray { layer }
+            ["layers"] = new JsonArray { layer },
         };
     }
 
     private JsonObject CreateUniqueValuePaint(UniqueValueStyleDefinition uniqueValue, string layerType)
     {
         var paint = new JsonObject();
-        var colorProperty = GetColorPropertyName(layerType);
+        var colorProperty = this.GetColorPropertyName(layerType);
 
         // Build match expression
-        var matchExpression = new JsonArray { "match", new JsonArray { "get", uniqueValue.Field } };
+        var matchExpression = new JsonArray { "match", new JsonArray { "get", uniqueValue.Field, }, };
 
         foreach (var classItem in uniqueValue.Classes)
         {
             matchExpression.Add(classItem.Value);
-            var color = GetPrimaryColor(classItem.Symbol, layerType);
+            var color = this.GetPrimaryColor(classItem.Symbol, layerType);
             matchExpression.Add(color);
         }
 
@@ -394,8 +394,8 @@ public class StyleGeneratorService
         var firstSymbol = rules.First().Symbolizer;
 
         // For now, use first rule's color (would need data expression for full graduated colors)
-        var colorProperty = GetColorPropertyName(layerType);
-        paint[colorProperty] = GetPrimaryColor(firstSymbol, layerType);
+        var colorProperty = this.GetColorPropertyName(layerType);
+        paint[colorProperty] = this.GetPrimaryColor(firstSymbol, layerType);
 
         if (layerType == "circle")
         {

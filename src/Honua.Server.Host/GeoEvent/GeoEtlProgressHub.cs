@@ -57,11 +57,11 @@ namespace Honua.Server.Host.GeoEvent;
 [Authorize]
 public class GeoEtlProgressHub : Hub
 {
-    private readonly ILogger<GeoEtlProgressHub> _logger;
+    private readonly ILogger<GeoEtlProgressHub> logger;
 
     public GeoEtlProgressHub(ILogger<GeoEtlProgressHub> logger)
     {
-        _logger = logger;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -73,7 +73,7 @@ public class GeoEtlProgressHub : Hub
         var groupName = GetWorkflowGroupName(runId);
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to workflow run {RunId}",
             Context.ConnectionId,
             runId);
@@ -94,7 +94,7 @@ public class GeoEtlProgressHub : Hub
         var groupName = GetWorkflowGroupName(runId);
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} unsubscribed from workflow run {RunId}",
             Context.ConnectionId,
             runId);
@@ -108,7 +108,7 @@ public class GeoEtlProgressHub : Hub
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, "all-workflows");
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to all workflow events",
             Context.ConnectionId);
 
@@ -121,13 +121,13 @@ public class GeoEtlProgressHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        _logger.LogInformation("Client {ConnectionId} connected to GeoETL Progress hub", Context.ConnectionId);
+        this.logger.LogInformation("Client {ConnectionId} connected to GeoETL Progress hub", Context.ConnectionId);
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} disconnected from GeoETL Progress hub. Exception: {Exception}",
             Context.ConnectionId,
             exception?.Message);

@@ -46,26 +46,26 @@ public interface IRegistryProvisioner
 /// </summary>
 public sealed class RegistryProvisioner : IRegistryProvisioner
 {
-    private readonly ILogger<RegistryProvisioner> _logger;
-    private readonly RegistryProvisioningOptions _options;
-    private readonly AsyncRetryPolicy _retryPolicy;
+    private readonly ILogger<RegistryProvisioner> logger;
+    private readonly RegistryProvisioningOptions options;
+    private readonly AsyncRetryPolicy retryPolicy;
 
     public RegistryProvisioner(
         ILogger<RegistryProvisioner> logger,
         IOptions<RegistryProvisioningOptions> options)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
 
         // Configure retry policy with exponential backoff
-        _retryPolicy = Polly.Policy
+        this.retryPolicy = Polly.Policy
             .Handle<Exception>(ex => IsTransientError(ex))
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                 onRetry: (exception, timeSpan, retryCount, context) =>
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         exception,
                         "Retry {RetryCount} after {Delay}ms due to transient error",
                         retryCount,
@@ -84,7 +84,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             throw new ArgumentException("Customer ID cannot be null or empty", nameof(customerId));
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Starting registry provisioning for customer {CustomerId} with registry type {RegistryType}",
             customerId,
             registryType);
@@ -102,7 +102,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to provision registry for customer {CustomerId}", customerId);
+            this.logger.LogError(ex, "Failed to provision registry for customer {CustomerId}", customerId);
             return new RegistryProvisioningResult
             {
                 Success = false,
@@ -121,21 +121,21 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
         string customerId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.GitHubToken))
+        if (string.IsNullOrWhiteSpace(this.options.GitHubToken))
         {
             throw new InvalidOperationException("GitHub token is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.GitHubOrganization))
+        if (string.IsNullOrWhiteSpace(this.options.GitHubOrganization))
         {
             throw new InvalidOperationException("GitHub organization is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var client = new GitHubClient(new ProductHeaderValue("Honua-Registry-Provisioner"))
             {
-                Credentials = new Credentials(_options.GitHubToken)
+                Credentials = new Credentials(this.options.GitHubToken)
             };
 
             // GitHub uses fine-grained PATs for package permissions
@@ -146,10 +146,10 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             // Note: GitHub fine-grained PATs must be created via the API
             // The actual implementation would use GitHub's token API
             // For now, we'll simulate the provisioning
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Creating GitHub PAT for customer {CustomerId} in organization {Organization}",
                 customerId,
-                _options.GitHubOrganization);
+                this.options.GitHubOrganization);
 
             var @namespace = $"customers/{customerId}";
 
@@ -166,12 +166,12 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
                 ExpiresAt = DateTimeOffset.UtcNow.AddYears(1),
                 Metadata = new Dictionary<string, string>
                 {
-                    ["organization"] = _options.GitHubOrganization,
+                    ["organization"] = this.options.GitHubOrganization,
                     ["namespace"] = @namespace
                 }
             };
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Successfully provisioned GitHub Container Registry for customer {CustomerId}",
                 customerId);
 
@@ -186,7 +186,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
                 Metadata = new Dictionary<string, string>
                 {
                     ["registry_url"] = "ghcr.io",
-                    ["organization"] = _options.GitHubOrganization
+                    ["organization"] = this.options.GitHubOrganization
                 }
             };
         });
@@ -199,25 +199,25 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
         string customerId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.AwsRegion))
+        if (string.IsNullOrWhiteSpace(this.options.AwsRegion))
         {
             throw new InvalidOperationException("AWS region is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.AwsAccountId))
+        if (string.IsNullOrWhiteSpace(this.options.AwsAccountId))
         {
             throw new InvalidOperationException("AWS account ID is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
-            var ecrClient = new AmazonECRClient(Amazon.RegionEndpoint.GetBySystemName(_options.AwsRegion));
+            var ecrClient = new AmazonECRClient(Amazon.RegionEndpoint.GetBySystemName(this.options.AwsRegion));
             var iamClient = new AmazonIdentityManagementServiceClient();
 
             // 1. Create ECR repository
             var repositoryName = $"honua/{customerId}";
 
-            _logger.LogInformation("Creating ECR repository {RepositoryName}", repositoryName);
+            this.logger.LogInformation("Creating ECR repository {RepositoryName}", repositoryName);
 
             CreateRepositoryResponse? repository = null;
             try
@@ -239,17 +239,17 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             }
             catch (RepositoryAlreadyExistsException)
             {
-                _logger.LogInformation("ECR repository {RepositoryName} already exists", repositoryName);
+                this.logger.LogInformation("ECR repository {RepositoryName} already exists", repositoryName);
                 // Repository already exists, continue with IAM user creation
             }
 
             var repositoryArn = repository?.Repository?.RepositoryArn
-                ?? $"arn:aws:ecr:{_options.AwsRegion}:{_options.AwsAccountId}:repository/{repositoryName}";
+                ?? $"arn:aws:ecr:{this.options.AwsRegion}:{this.options.AwsAccountId}:repository/{repositoryName}";
 
             // 2. Create IAM user
             var iamUserName = $"honua-customer-{customerId}";
 
-            _logger.LogInformation("Creating IAM user {UserName}", iamUserName);
+            this.logger.LogInformation("Creating IAM user {UserName}", iamUserName);
 
             CreateUserResponse? user = null;
             try
@@ -266,7 +266,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             }
             catch (EntityAlreadyExistsException)
             {
-                _logger.LogInformation("IAM user {UserName} already exists", iamUserName);
+                this.logger.LogInformation("IAM user {UserName} already exists", iamUserName);
             }
 
             // 3. Create IAM policy for ECR access
@@ -305,7 +305,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
                 }
             };
 
-            _logger.LogInformation("Creating IAM policy {PolicyName}", policyName);
+            this.logger.LogInformation("Creating IAM policy {PolicyName}", policyName);
 
             CreatePolicyResponse? policy = null;
             string? policyArn = null;
@@ -328,8 +328,8 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             }
             catch (EntityAlreadyExistsException)
             {
-                _logger.LogInformation("IAM policy {PolicyName} already exists", policyName);
-                policyArn = $"arn:aws:iam::{_options.AwsAccountId}:policy/{policyName}";
+                this.logger.LogInformation("IAM policy {PolicyName} already exists", policyName);
+                policyArn = $"arn:aws:iam::{this.options.AwsAccountId}:policy/{policyName}";
             }
 
             // 4. Attach policy to user
@@ -343,7 +343,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to attach policy, may already be attached");
+                this.logger.LogWarning(ex, "Failed to attach policy, may already be attached");
             }
 
             // 5. Create access key
@@ -352,9 +352,9 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
                 UserName = iamUserName
             }, cancellationToken);
 
-            var registryUrl = $"{_options.AwsAccountId}.dkr.ecr.{_options.AwsRegion}.amazonaws.com";
+            var registryUrl = $"{this.options.AwsAccountId}.dkr.ecr.{this.options.AwsRegion}.amazonaws.com";
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Successfully provisioned AWS ECR for customer {CustomerId}",
                 customerId);
 
@@ -372,7 +372,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
                     Metadata = new Dictionary<string, string>
                     {
                         ["repository_arn"] = repositoryArn,
-                        ["region"] = _options.AwsRegion
+                        ["region"] = this.options.AwsRegion
                     }
                 },
                 ProvisionedAt = DateTimeOffset.UtcNow,
@@ -393,29 +393,29 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
         string customerId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.AzureSubscriptionId))
+        if (string.IsNullOrWhiteSpace(this.options.AzureSubscriptionId))
         {
             throw new InvalidOperationException("Azure subscription ID is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.AzureResourceGroup))
+        if (string.IsNullOrWhiteSpace(this.options.AzureResourceGroup))
         {
             throw new InvalidOperationException("Azure resource group is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.AzureRegistryName))
+        if (string.IsNullOrWhiteSpace(this.options.AzureRegistryName))
         {
             throw new InvalidOperationException("Azure registry name is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var credential = new DefaultAzureCredential();
             var armClient = new ArmClient(credential);
 
-            var subscriptionId = _options.AzureSubscriptionId;
-            var resourceGroup = _options.AzureResourceGroup;
-            var registryName = _options.AzureRegistryName;
+            var subscriptionId = this.options.AzureSubscriptionId;
+            var resourceGroup = this.options.AzureResourceGroup;
+            var registryName = this.options.AzureRegistryName;
 
             // Get the registry
             var registryResourceId = ContainerRegistryResource.CreateResourceIdentifier(
@@ -429,7 +429,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             var tokenName = $"honua-customer-{customerId}";
             var repositoryPath = $"customers/{customerId}";
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Creating ACR token {TokenName} for repository {Repository}",
                 tokenName,
                 repositoryPath);
@@ -438,7 +438,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             // This is a placeholder implementation until the SDK is updated
             // TODO: Update to use the latest Azure.ResourceManager.ContainerRegistry API
 
-            _logger.LogWarning("Azure ACR provisioning is currently not implemented due to SDK changes");
+            this.logger.LogWarning("Azure ACR provisioning is currently not implemented due to SDK changes");
 
             // For now, return a simulated success response
             // In production, implement with the correct Azure SDK API
@@ -451,7 +451,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
 
             var registryUrl = $"{registryName}.azurecr.io";
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Successfully provisioned Azure ACR for customer {CustomerId}",
                 customerId);
 
@@ -491,30 +491,30 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
         string customerId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.GcpProjectId))
+        if (string.IsNullOrWhiteSpace(this.options.GcpProjectId))
         {
             throw new InvalidOperationException("GCP project ID is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.GcpRegion))
+        if (string.IsNullOrWhiteSpace(this.options.GcpRegion))
         {
             throw new InvalidOperationException("GCP region is not configured");
         }
 
-        if (string.IsNullOrWhiteSpace(_options.GcpRepositoryName))
+        if (string.IsNullOrWhiteSpace(this.options.GcpRepositoryName))
         {
             throw new InvalidOperationException("GCP repository name is not configured");
         }
 
-        return await _retryPolicy.ExecuteAsync(async () =>
+        return await this.retryPolicy.ExecuteAsync(async () =>
         {
             var credential = GoogleCredential.GetApplicationDefault();
 
             // Create service account
             var serviceAccountName = $"honua-customer-{customerId}";
-            var serviceAccountEmail = $"{serviceAccountName}@{_options.GcpProjectId}.iam.gserviceaccount.com";
+            var serviceAccountEmail = $"{serviceAccountName}@{this.options.GcpProjectId}.iam.gserviceaccount.com";
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Creating GCP service account {ServiceAccount}",
                 serviceAccountEmail);
 
@@ -522,7 +522,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             // This is a placeholder implementation until the correct Google Cloud SDK is configured
             // TODO: Install Google.Apis.Iam.v1 NuGet package or use Google.Cloud.Iam.Admin.V1
 
-            _logger.LogWarning("GCP Artifact Registry provisioning is currently not implemented due to missing SDK");
+            this.logger.LogWarning("GCP Artifact Registry provisioning is currently not implemented due to missing SDK");
 
             // Grant Artifact Registry Writer role to service account on the repository
             var repositoryPath = $"customers/{customerId}";
@@ -531,7 +531,7 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
             var keyJson = System.Text.Json.JsonSerializer.Serialize(new
             {
                 type = "service_account",
-                project_id = _options.GcpProjectId,
+                project_id = this.options.GcpProjectId,
                 private_key_id = Guid.NewGuid().ToString(),
                 private_key = GenerateSecureToken(),
                 client_email = serviceAccountEmail,
@@ -540,9 +540,9 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
 
             await Task.CompletedTask;
 
-            var registryUrl = $"{_options.GcpRegion}-docker.pkg.dev";
+            var registryUrl = $"{this.options.GcpRegion}-docker.pkg.dev";
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Successfully provisioned GCP Artifact Registry for customer {CustomerId}",
                 customerId);
 
@@ -568,8 +568,8 @@ public sealed class RegistryProvisioner : IRegistryProvisioner
                 {
                     ["registry_url"] = registryUrl,
                     ["repository_path"] = repositoryPath,
-                    ["project_id"] = _options.GcpProjectId,
-                    ["region"] = _options.GcpRegion
+                    ["project_id"] = this.options.GcpProjectId,
+                    ["region"] = this.options.GcpRegion
                 }
             };
         });

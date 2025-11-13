@@ -11,20 +11,30 @@ namespace Honua.Server.Observability.HealthChecks;
 /// </summary>
 public class DatabaseHealthCheck : IHealthCheck
 {
-    private readonly string _connectionString;
+    private readonly string connectionString;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DatabaseHealthCheck"/> class.
+    /// </summary>
+    /// <param name="connectionString">The PostgreSQL connection string.</param>
     public DatabaseHealthCheck(string connectionString)
     {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        this.connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
     }
 
+    /// <summary>
+    /// Checks the health of the PostgreSQL database connection.
+    /// </summary>
+    /// <param name="context">The health check context.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that represents the asynchronous health check operation.</returns>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = new NpgsqlConnection(this.connectionString);
             await connection.OpenAsync(cancellationToken);
 
             // Check database version
@@ -57,7 +67,7 @@ public class DatabaseHealthCheck : IHealthCheck
             {
                 { "version", version },
                 { "migrations_applied", migrationCount },
-                { "connection_state", connection.State.ToString() }
+                { "connection_state", connection.State.ToString() },
             };
 
             return HealthCheckResult.Healthy(
@@ -72,7 +82,7 @@ public class DatabaseHealthCheck : IHealthCheck
                 new Dictionary<string, object>
                 {
                     { "error_code", ex.ErrorCode },
-                    { "sql_state", ex.SqlState ?? "unknown" }
+                    { "sql_state", ex.SqlState ?? "unknown" },
                 });
         }
         catch (Exception ex)

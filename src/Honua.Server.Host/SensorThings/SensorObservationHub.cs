@@ -83,11 +83,11 @@ namespace Honua.Server.Host.SensorThings;
 [Authorize]
 public class SensorObservationHub : Hub
 {
-    private readonly ILogger<SensorObservationHub> _logger;
+    private readonly ILogger<SensorObservationHub> logger;
 
     public SensorObservationHub(ILogger<SensorObservationHub> logger)
     {
-        _logger = logger;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -106,7 +106,7 @@ public class SensorObservationHub : Hub
         var groupName = $"datastream:{datastreamId}";
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to datastream {DatastreamId}",
             Context.ConnectionId,
             datastreamId);
@@ -128,7 +128,7 @@ public class SensorObservationHub : Hub
         var groupName = $"datastream:{datastreamId}";
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} unsubscribed from datastream {DatastreamId}",
             Context.ConnectionId,
             datastreamId);
@@ -156,7 +156,7 @@ public class SensorObservationHub : Hub
         var groupName = $"thing:{thingId}";
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to thing {ThingId}",
             Context.ConnectionId,
             thingId);
@@ -178,7 +178,7 @@ public class SensorObservationHub : Hub
         var groupName = $"thing:{thingId}";
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} unsubscribed from thing {ThingId}",
             Context.ConnectionId,
             thingId);
@@ -205,7 +205,7 @@ public class SensorObservationHub : Hub
         var groupName = $"sensor:{sensorId}";
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to sensor {SensorId}",
             Context.ConnectionId,
             sensorId);
@@ -227,7 +227,7 @@ public class SensorObservationHub : Hub
         var groupName = $"sensor:{sensorId}";
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} unsubscribed from sensor {SensorId}",
             Context.ConnectionId,
             sensorId);
@@ -248,7 +248,7 @@ public class SensorObservationHub : Hub
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, "all-observations");
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} subscribed to all observations (admin)",
             Context.ConnectionId);
 
@@ -266,7 +266,7 @@ public class SensorObservationHub : Hub
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, "all-observations");
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} unsubscribed from all observations",
             Context.ConnectionId);
 
@@ -278,7 +278,7 @@ public class SensorObservationHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Client {ConnectionId} connected to SensorObservation hub. User: {User}",
             Context.ConnectionId,
             Context.User?.Identity?.Name ?? "Anonymous");
@@ -290,14 +290,14 @@ public class SensorObservationHub : Hub
     {
         if (exception != null)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 exception,
                 "Client {ConnectionId} disconnected from SensorObservation hub with error",
                 Context.ConnectionId);
         }
         else
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Client {ConnectionId} disconnected from SensorObservation hub",
                 Context.ConnectionId);
         }

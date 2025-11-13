@@ -47,15 +47,15 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
     private static readonly GeoJsonReader GeoJsonReaderInstance = new();
     private static readonly WKTReader WktReaderInstance = new();
 
-    private readonly IFeatureRepository _repository;
-    private readonly ILogger<GeoservicesQueryService> _logger;
+    private readonly IFeatureRepository repository;
+    private readonly ILogger<GeoservicesQueryService> logger;
 
     public GeoservicesQueryService(
         IFeatureRepository repository,
         ILogger<GeoservicesQueryService> logger)
     {
-        _repository = Guard.NotNull(repository);
-        _logger = Guard.NotNull(logger);
+        this.repository = Guard.NotNull(repository);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task<IActionResult> ExecuteQueryAsync(
@@ -104,7 +104,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
                 if (needsCount)
                 {
                     var countQuery = context.Query with { Limit = null, Offset = null, ResultType = FeatureResultType.Hits };
-                    totalCount = await _repository.CountAsync(service.Id, layer.Id, countQuery, cancellationToken).ConfigureAwait(false);
+                    totalCount = await this.repository.CountAsync(service.Id, layer.Id, countQuery, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (context.ReturnCountOnly && context.ReturnExtentOnly)
@@ -284,7 +284,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
                     // Count-only mode: Track counts without buffering features
                     var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-                    await foreach (var record in _repository.QueryAsync(service.Id, relatedLayerView.Layer.Id, workingContext.Query, cancellationToken).ConfigureAwait(false))
+                    await foreach (var record in this.repository.QueryAsync(service.Id, relatedLayerView.Layer.Id, workingContext.Query, cancellationToken).ConfigureAwait(false))
                     {
                         // Extract foreign key value
                         if (!record.Attributes.TryGetValue(relationship.RelatedKeyField, out var rawValue))
@@ -316,7 +316,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
                     const int MaxChildrenPerParent = 10_000; // Cap to prevent LOH allocation (85KB threshold)
                     var grouped = new Dictionary<string, List<GeoservicesRESTFeature>>(StringComparer.OrdinalIgnoreCase);
 
-                    await foreach (var record in _repository.QueryAsync(service.Id, relatedLayerView.Layer.Id, workingContext.Query, cancellationToken).ConfigureAwait(false))
+                    await foreach (var record in this.repository.QueryAsync(service.Id, relatedLayerView.Layer.Id, workingContext.Query, cancellationToken).ConfigureAwait(false))
                     {
                         // Extract foreign key value
                         if (!record.Attributes.TryGetValue(relationship.RelatedKeyField, out var rawValue))
@@ -401,7 +401,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
 
         var exceeded = false;
 
-        await foreach (var record in _repository.QueryAsync(serviceId, layer.Id, fetchQuery, cancellationToken).ConfigureAwait(false))
+        await foreach (var record in this.repository.QueryAsync(serviceId, layer.Id, fetchQuery, cancellationToken).ConfigureAwait(false))
         {
             if (TryGetAttribute(record, layer.IdField, out var idValue) && idValue != null)
             {
@@ -425,7 +425,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
         CancellationToken cancellationToken)
     {
         // CRITICAL PERFORMANCE FIX: Use database-level ST_Extent instead of loading all geometries into memory
-        var bbox = await _repository.QueryExtentAsync(
+        var bbox = await this.repository.QueryExtentAsync(
             serviceId,
             layer.Id,
             context.Query,
@@ -469,7 +469,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
         var fetchQuery = context.Query with { Limit = requestedLimit + 1 };
         var exceeded = false;
 
-        await foreach (var record in _repository.QueryAsync(serviceId, layer.Id, fetchQuery, cancellationToken).ConfigureAwait(false))
+        await foreach (var record in this.repository.QueryAsync(serviceId, layer.Id, fetchQuery, cancellationToken).ConfigureAwait(false))
         {
             if (features.Count >= requestedLimit)
             {
@@ -523,7 +523,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
         var distinctFields = ResolveDistinctFields(layer, context);
 
         // Execute DISTINCT at database level - orders of magnitude faster than in-memory HashSet
-        var results = await _repository.QueryDistinctAsync(
+        var results = await this.repository.QueryDistinctAsync(
             serviceId,
             layer.Id,
             distinctFields,
@@ -583,7 +583,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
         )).ToList();
 
         // Execute aggregation at database level - 100x faster than in-memory aggregation
-        var results = await _repository.QueryStatisticsAsync(
+        var results = await this.repository.QueryStatisticsAsync(
             serviceId,
             layer.Id,
             statistics,
@@ -1112,8 +1112,8 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
             if (TryConvertToDouble(value, out var numericValue))
             {
                 _sum += numericValue;
-                _min = Math.Min(_min, numericValue);
-                _max = Math.Max(_max, numericValue);
+                this.min = Math.Min(_min, numericValue);
+                this.max = Math.Max(_max, numericValue);
 
                 // Welford's online algorithm for variance (streaming calculation)
                 var delta = numericValue - _mean;

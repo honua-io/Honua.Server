@@ -25,10 +25,10 @@ internal sealed class CartoSqlQueryExecutor
 {
     private const int DefaultMaxLimit = 5000;
 
-    private readonly CartoDatasetResolver _datasetResolver;
-    private readonly CartoSqlQueryParser _parser;
-    private readonly IFeatureRepository _repository;
-    private readonly ILogger<CartoSqlQueryExecutor> _logger;
+    private readonly CartoDatasetResolver datasetResolver;
+    private readonly CartoSqlQueryParser parser;
+    private readonly IFeatureRepository repository;
+    private readonly ILogger<CartoSqlQueryExecutor> logger;
 
     public CartoSqlQueryExecutor(
         CartoDatasetResolver datasetResolver,
@@ -36,22 +36,22 @@ internal sealed class CartoSqlQueryExecutor
         IFeatureRepository repository,
         ILogger<CartoSqlQueryExecutor> logger)
     {
-        _datasetResolver = Guard.NotNull(datasetResolver);
-        _parser = Guard.NotNull(parser);
-        _repository = Guard.NotNull(repository);
-        _logger = Guard.NotNull(logger);
+        this.datasetResolver = Guard.NotNull(datasetResolver);
+        this.parser = Guard.NotNull(parser);
+        this.repository = Guard.NotNull(repository);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task<CartoSqlExecutionResult> ExecuteAsync(string sql, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sql);
 
-        if (!_parser.TryParse(sql, out var definition, out var parseError))
+        if (!this.parser.TryParse(sql, out var definition, out var parseError))
         {
             return CartoSqlExecutionResult.Failure(StatusCodes.Status400BadRequest, parseError ?? "Unable to parse SQL query.");
         }
 
-        if (!_datasetResolver.TryResolve(definition.DatasetId, out var dataset))
+        if (!this.datasetResolver.TryResolve(definition.DatasetId, out var dataset))
         {
             return CartoSqlExecutionResult.Failure(StatusCodes.Status404NotFound, $"Dataset '{definition.DatasetId}' was not found.");
         }
@@ -116,7 +116,7 @@ internal sealed class CartoSqlQueryExecutor
                 ? null
                 : new FeatureQuery(Filter: filter);
 
-            var count = await _repository.CountAsync(dataset.ServiceId, dataset.LayerId, featureQuery, cancellationToken).ConfigureAwait(false);
+            var count = await this.repository.CountAsync(dataset.ServiceId, dataset.LayerId, featureQuery, cancellationToken).ConfigureAwait(false);
 
             var fieldName = string.IsNullOrWhiteSpace(definition.CountAlias) ? "count" : definition.CountAlias!;
             var fields = new Dictionary<string, CartoSqlFieldInfo>(StringComparer.OrdinalIgnoreCase)
@@ -141,7 +141,7 @@ internal sealed class CartoSqlQueryExecutor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to execute count query for dataset {DatasetId}", dataset.ServiceId);
+            this.logger.LogError(ex, "Failed to execute count query for dataset {DatasetId}", dataset.ServiceId);
             return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute count query.", ex.Message);
         }
     }
@@ -208,7 +208,7 @@ internal sealed class CartoSqlQueryExecutor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to execute aggregate query for dataset {DatasetId}", dataset.ServiceId);
+            this.logger.LogError(ex, "Failed to execute aggregate query for dataset {DatasetId}", dataset.ServiceId);
             return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute aggregate query.", ex.Message);
         }
     }
@@ -226,14 +226,14 @@ internal sealed class CartoSqlQueryExecutor
 
         try
         {
-            await foreach (var record in _repository.QueryAsync(dataset.ServiceId, dataset.LayerId, featureQuery, cancellationToken).ConfigureAwait(false))
+            await foreach (var record in this.repository.QueryAsync(dataset.ServiceId, dataset.LayerId, featureQuery, cancellationToken).ConfigureAwait(false))
             {
                 rows.Add(ShapeRow(record, dataset, definition));
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to execute SELECT query for dataset {DatasetId}", dataset.ServiceId);
+            this.logger.LogError(ex, "Failed to execute SELECT query for dataset {DatasetId}", dataset.ServiceId);
             return CartoSqlExecutionResult.Failure(StatusCodes.Status500InternalServerError, "Failed to execute query.", ex.Message);
         }
 
@@ -241,11 +241,11 @@ internal sealed class CartoSqlQueryExecutor
         try
         {
             var countQuery = featureQuery with { Limit = null, Offset = null, PropertyNames = null, SortOrders = null };
-            totalRows = await _repository.CountAsync(dataset.ServiceId, dataset.LayerId, countQuery, cancellationToken).ConfigureAwait(false);
+            totalRows = await this.repository.CountAsync(dataset.ServiceId, dataset.LayerId, countQuery, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to count records for dataset {DatasetId}, using rowset size as fallback", dataset.ServiceId);
+            this.logger.LogWarning(ex, "Failed to count records for dataset {DatasetId}, using rowset size as fallback", dataset.ServiceId);
             totalRows = rows.Count;
         }
 

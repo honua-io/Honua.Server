@@ -48,53 +48,53 @@ public interface IOutputCacheInvalidationService
 /// </summary>
 public sealed class OutputCacheInvalidationService : IOutputCacheInvalidationService
 {
-    private readonly IOutputCacheStore _cacheStore;
+    private readonly IOutputCacheStore cacheStore;
 
     public OutputCacheInvalidationService(IOutputCacheStore cacheStore)
     {
-        _cacheStore = Guard.NotNull(cacheStore);
+        this.cacheStore = Guard.NotNull(cacheStore);
     }
 
     public async Task InvalidateStacCacheAsync(CancellationToken cancellationToken = default)
     {
         // Invalidate all STAC-tagged cache entries
-        await _cacheStore.EvictByTagAsync("stac", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("stac", cancellationToken).ConfigureAwait(false);
     }
 
     public async Task InvalidateStacCollectionCacheAsync(string collectionId, CancellationToken cancellationToken = default)
     {
         // Invalidate collection-specific cache
-        await _cacheStore.EvictByTagAsync("stac-collections", cancellationToken).ConfigureAwait(false);
-        await _cacheStore.EvictByTagAsync("stac-collection-metadata", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("stac-collections", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("stac-collection-metadata", cancellationToken).ConfigureAwait(false);
 
         // SECURITY FIX (Issue 37): Also invalidate search cache when collections change
         // Search results depend on collection metadata and availability
-        await _cacheStore.EvictByTagAsync("stac-search", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("stac-search", cancellationToken).ConfigureAwait(false);
     }
 
     public async Task InvalidateStacItemsCacheAsync(string collectionId, CancellationToken cancellationToken = default)
     {
         // Invalidate items and item metadata cache for this collection
-        await _cacheStore.EvictByTagAsync("stac-items", cancellationToken).ConfigureAwait(false);
-        await _cacheStore.EvictByTagAsync("stac-item-metadata", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("stac-items", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("stac-item-metadata", cancellationToken).ConfigureAwait(false);
 
         // SECURITY FIX (Issue 37): Also invalidate search cache when items change
         // Search results include items, so item mutations should invalidate search cache
-        await _cacheStore.EvictByTagAsync("stac-search", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("stac-search", cancellationToken).ConfigureAwait(false);
     }
 
     public async Task InvalidateCatalogCacheAsync(CancellationToken cancellationToken = default)
     {
         // Invalidate all catalog-tagged cache entries
-        await _cacheStore.EvictByTagAsync("catalog", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("catalog", cancellationToken).ConfigureAwait(false);
     }
 
     public async Task InvalidateAllCacheAsync(CancellationToken cancellationToken = default)
     {
         // Invalidate everything by evicting the base api-cache tag
-        await _cacheStore.EvictByTagAsync("api-cache", cancellationToken).ConfigureAwait(false);
-        await _cacheStore.EvictByTagAsync("stac", cancellationToken).ConfigureAwait(false);
-        await _cacheStore.EvictByTagAsync("catalog", cancellationToken).ConfigureAwait(false);
-        await _cacheStore.EvictByTagAsync("ogc", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("api-cache", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("stac", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("catalog", cancellationToken).ConfigureAwait(false);
+        await this.cacheStore.EvictByTagAsync("ogc", cancellationToken).ConfigureAwait(false);
     }
 }

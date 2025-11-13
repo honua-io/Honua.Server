@@ -18,11 +18,11 @@ namespace Honua.Server.Host.Hosting;
 /// </summary>
 public sealed class ProductionSecurityValidationHostedService : IHostedService
 {
-    private readonly IOptions<HonuaAuthenticationOptions> _authOptions;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IHostEnvironment _hostEnvironment;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly ILogger<ProductionSecurityValidationHostedService> _logger;
+    private readonly IOptions<HonuaAuthenticationOptions> authOptions;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly IHostEnvironment hostEnvironment;
+    private readonly ILoggerFactory loggerFactory;
+    private readonly ILogger<ProductionSecurityValidationHostedService> logger;
 
     public ProductionSecurityValidationHostedService(
         IOptions<HonuaAuthenticationOptions> authOptions,
@@ -31,58 +31,58 @@ public sealed class ProductionSecurityValidationHostedService : IHostedService
         ILoggerFactory loggerFactory,
         ILogger<ProductionSecurityValidationHostedService> logger)
     {
-        _authOptions = authOptions;
-        _metadataRegistry = metadataRegistry;
-        _hostEnvironment = hostEnvironment;
-        _loggerFactory = loggerFactory;
-        _logger = logger;
+        this.authOptions = authOptions;
+        this.metadataRegistry = metadataRegistry;
+        this.hostEnvironment = hostEnvironment;
+        this.loggerFactory = loggerFactory;
+        this.logger = logger;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!_hostEnvironment.IsProduction())
+        if (!this.hostEnvironment.IsProduction())
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Skipping production security validation - Environment={Environment}",
-                _hostEnvironment.EnvironmentName);
+                this.hostEnvironment.EnvironmentName);
             return;
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Running production security configuration validation for Environment={Environment}",
-            _hostEnvironment.EnvironmentName);
+            this.hostEnvironment.EnvironmentName);
 
         try
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Starting {ServiceName} validation. AuthMode={AuthMode}",
                 nameof(ProductionSecurityValidationHostedService),
-                _authOptions.Value.Mode);
+                this.authOptions.Value.Mode);
 
             // Validate authentication settings
-            var validator = new ProductionSecurityValidator(_loggerFactory.CreateLogger<ProductionSecurityValidator>());
-            validator.ValidateProductionSecurity(_authOptions.Value, isProduction: true);
+            var validator = new ProductionSecurityValidator(this.loggerFactory.CreateLogger<ProductionSecurityValidator>());
+            validator.ValidateProductionSecurity(this.authOptions.Value, isProduction: true);
 
             // Validate CORS settings from metadata
-            await _metadataRegistry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-            var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+            await this.metadataRegistry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+            var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
             ValidateCorsConfiguration(snapshot);
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "{ServiceName} validation completed successfully. AuthMode={AuthMode}",
                 nameof(ProductionSecurityValidationHostedService),
-                _authOptions.Value.Mode);
+                this.authOptions.Value.Mode);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "{ServiceName} validation cancelled during startup",
                 nameof(ProductionSecurityValidationHostedService));
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(
+            this.logger.LogCritical(
                 ex,
                 "FATAL: {ServiceName} validation failed in Environment={Environment}. " +
                 "Typical causes: " +
@@ -92,7 +92,7 @@ public sealed class ProductionSecurityValidationHostedService : IHostedService
                 "4. Missing required security settings. " +
                 "Application cannot start. ExceptionType={ExceptionType}",
                 nameof(ProductionSecurityValidationHostedService),
-                _hostEnvironment.EnvironmentName,
+                this.hostEnvironment.EnvironmentName,
                 ex.GetType().Name);
 
             // For production: Fail fast with clear error
@@ -118,7 +118,7 @@ public sealed class ProductionSecurityValidationHostedService : IHostedService
 
         if (cors.AllowAnyOrigin)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "SECURITY WARNING: CORS is configured with AllowAnyOrigin=true in production. " +
                 "This allows requests from any domain and may expose your API to CSRF attacks. " +
                 "Configure specific allowed origins in metadata for production deployments. " +
@@ -127,7 +127,7 @@ public sealed class ProductionSecurityValidationHostedService : IHostedService
 
         if (cors.AllowCredentials && cors.AllowedOrigins.Count > 0)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "CORS is configured with credentials support for {OriginCount} specific origins. " +
                 "Ensure these origins are trusted domains.",
                 cors.AllowedOrigins.Count);
@@ -136,7 +136,7 @@ public sealed class ProductionSecurityValidationHostedService : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "{ServiceName} stopping",
             nameof(ProductionSecurityValidationHostedService));
         return Task.CompletedTask;

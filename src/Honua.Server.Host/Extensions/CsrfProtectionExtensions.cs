@@ -75,26 +75,26 @@ internal static class CsrfProtectionExtensions
 /// </summary>
 internal sealed class CsrfConfigurationLoggingService : IHostedService
 {
-    private readonly ILogger<CsrfConfigurationLoggingService> _logger;
-    private readonly IHostEnvironment _environment;
+    private readonly ILogger<CsrfConfigurationLoggingService> logger;
+    private readonly IHostEnvironment environment;
 
     public CsrfConfigurationLoggingService(
         ILogger<CsrfConfigurationLoggingService> logger,
         IHostEnvironment environment)
     {
-        _logger = Guard.NotNull(logger);
-        _environment = Guard.NotNull(environment);
+        this.logger = Guard.NotNull(logger);
+        this.environment = Guard.NotNull(environment);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        var cookieName = _environment.IsProduction() ? "__Host-X-CSRF-Token" : "X-CSRF-Token";
+        var cookieName = this.environment.IsProduction() ? "__Host-X-CSRF-Token" : "X-CSRF-Token";
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "CSRF protection enabled with cookie: {CookieName}, header: {HeaderName}, environment: {Environment}",
             cookieName,
             "X-CSRF-Token",
-            _environment.EnvironmentName);
+            this.environment.EnvironmentName);
 
         return Task.CompletedTask;
     }

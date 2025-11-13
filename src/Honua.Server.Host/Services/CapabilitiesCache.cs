@@ -45,15 +45,15 @@ namespace Honua.Server.Host.Services;
 /// </remarks>
 public sealed class CapabilitiesCache : ICapabilitiesCache
 {
-    private readonly IMemoryCache _cache;
-    private readonly ILogger<CapabilitiesCache> _logger;
-    private readonly CapabilitiesCacheOptions _options;
+    private readonly IMemoryCache cache;
+    private readonly ILogger<CapabilitiesCache> logger;
+    private readonly CapabilitiesCacheOptions options;
     private readonly ConcurrentDictionary<string, byte> _cacheKeys;
-    private readonly Counter<long> _hitCounter;
-    private readonly Counter<long> _missCounter;
-    private readonly Counter<long> _evictionsCounter;
-    private readonly ObservableGauge<int> _entriesGauge;
-    private readonly Histogram<double> _documentSizeHistogram;
+    private readonly Counter<long> hitCounter;
+    private readonly Counter<long> missCounter;
+    private readonly Counter<long> evictionsCounter;
+    private readonly ObservableGauge<int> entriesGauge;
+    private readonly Histogram<double> documentSizeHistogram;
     private long _hits;
     private long _misses;
     private long _evictions;
@@ -73,38 +73,38 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
         ILogger<CapabilitiesCache> logger,
         IOptions<CapabilitiesCacheOptions> options)
     {
-        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         // Initialize metrics
-        _hitCounter = _meter.CreateCounter<long>(
+        this.hitCounter = this.meter.CreateCounter<long>(
             "honua.capabilities.cache.hits",
             description: "Number of capabilities cache hits");
 
-        _missCounter = _meter.CreateCounter<long>(
+        this.missCounter = this.meter.CreateCounter<long>(
             "honua.capabilities.cache.misses",
             description: "Number of capabilities cache misses");
 
-        _evictionsCounter = _meter.CreateCounter<long>(
+        this.evictionsCounter = this.meter.CreateCounter<long>(
             "honua.capabilities.cache.evictions",
             description: "Number of capabilities cache evictions");
 
-        _entriesGauge = _meter.CreateObservableGauge<int>(
+        this.entriesGauge = this.meter.CreateObservableGauge<int>(
             "honua.capabilities.cache.entries",
-            () => _cacheKeys.Count,
+            () => this.cacheKeys.Count,
             description: "Number of cached capabilities documents");
 
-        _documentSizeHistogram = _meter.CreateHistogram<double>(
+        this.documentSizeHistogram = this.meter.CreateHistogram<double>(
             "honua.capabilities.document.size",
             unit: "bytes",
             description: "Size of cached capabilities documents");
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Capabilities cache initialized with TTL={TtlMinutes}min, MaxEntries={MaxEntries}",
-            _options.CacheDurationMinutes,
-            _options.MaxCachedDocuments);
+            this.options.CacheDurationMinutes,
+            this.options.MaxCachedDocuments);
     }
 
     /// <inheritdoc />
@@ -115,7 +115,7 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
         string? acceptLanguage,
         out string? cachedDocument)
     {
-        if (!_options.EnableCaching)
+        if (!this.options.EnableCaching)
         {
             cachedDocument = null;
             return false;
@@ -123,27 +123,27 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
 
         var cacheKey = BuildCacheKey(serviceType, serviceId, version, acceptLanguage);
 
-        if (_cache.TryGetValue(cacheKey, out cachedDocument))
+        if (this.cache.TryGetValue(cacheKey, out cachedDocument))
         {
             Interlocked.Increment(ref _hits);
-            _hitCounter.Add(1,
+            this.hitCounter.Add(1,
                 new KeyValuePair<string, object?>("service_type", serviceType),
                 new KeyValuePair<string, object?>("service_id", serviceId),
                 new KeyValuePair<string, object?>("version", version));
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Capabilities cache HIT: {ServiceType}/{ServiceId}/{Version}/{Language}",
                 serviceType, serviceId, version, acceptLanguage ?? "default");
             return true;
         }
 
         Interlocked.Increment(ref _misses);
-        _missCounter.Add(1,
+        this.missCounter.Add(1,
             new KeyValuePair<string, object?>("service_type", serviceType),
             new KeyValuePair<string, object?>("service_id", serviceId),
             new KeyValuePair<string, object?>("version", version));
 
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "Capabilities cache MISS: {ServiceType}/{ServiceId}/{Version}/{Language}",
             serviceType, serviceId, version, acceptLanguage ?? "default");
 
@@ -180,31 +180,31 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
             throw new ArgumentNullException(nameof(document));
         }
 
-        if (!_options.EnableCaching)
+        if (!this.options.EnableCaching)
         {
-            _logger.LogTrace("Capabilities caching is disabled, skipping cache storage");
+            this.logger.LogTrace("Capabilities caching is disabled, skipping cache storage");
             return Task.CompletedTask;
         }
 
         var cacheKey = BuildCacheKey(serviceType, serviceId, version, acceptLanguage);
 
         // Check if we're at the cache size limit
-        if (_options.MaxCachedDocuments > 0 && _cacheKeys.Count >= _options.MaxCachedDocuments)
+        if (this.options.MaxCachedDocuments > 0 && this.cacheKeys.Count >= this.options.MaxCachedDocuments)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Capabilities cache has reached maximum size limit of {MaxDocuments}. " +
                 "Entry will be cached but may be evicted immediately. Consider increasing MaxCachedDocuments.",
-                _options.MaxCachedDocuments);
+                this.options.MaxCachedDocuments);
         }
 
         // Track document size for metrics
         var documentSize = System.Text.Encoding.UTF8.GetByteCount(document);
-        _documentSizeHistogram.Record(documentSize,
+        this.documentSizeHistogram.Record(documentSize,
             new KeyValuePair<string, object?>("service_type", serviceType));
 
         // Build cache options with configured TTL
         var cacheOptions = new CacheOptionsBuilder()
-            .WithAbsoluteExpiration(TimeSpan.FromMinutes(_options.CacheDurationMinutes))
+            .WithAbsoluteExpiration(TimeSpan.FromMinutes(this.options.CacheDurationMinutes))
             .WithPriority(CacheItemPriority.Normal)
             .WithSize(1) // Each document counts as 1 entry toward size limit
             .BuildMemory();
@@ -212,35 +212,35 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
         // Register eviction callback to track cache keys and metrics
         cacheOptions.RegisterPostEvictionCallback((key, value, reason, state) =>
         {
-            _cacheKeys.TryRemove(key.ToString()!, out _);
+            this.cacheKeys.TryRemove(key.ToString()!, out _);
             Interlocked.Increment(ref _evictions);
-            _evictionsCounter.Add(1,
+            this.evictionsCounter.Add(1,
                 new KeyValuePair<string, object?>("service_type", serviceType),
                 new KeyValuePair<string, object?>("service_id", serviceId),
                 new KeyValuePair<string, object?>("reason", reason.ToString()));
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Capabilities cache entry evicted for {ServiceType}/{ServiceId}/{Version}, reason: {Reason}",
                 serviceType, serviceId, version, reason);
 
             // Warn if eviction is due to capacity limits
             if (reason == EvictionReason.Capacity)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Capabilities cache evicted entry for {ServiceType}/{ServiceId} due to capacity limit. " +
                     "Current entries: {CurrentEntries}, Max: {MaxDocuments}. Consider increasing cache limits.",
-                    serviceType, serviceId, _cacheKeys.Count, _options.MaxCachedDocuments);
+                    serviceType, serviceId, this.cacheKeys.Count, this.options.MaxCachedDocuments);
             }
         });
 
-        _cache.Set(cacheKey, document, cacheOptions);
-        _cacheKeys.TryAdd(cacheKey, 0);
+        this.cache.Set(cacheKey, document, cacheOptions);
+        this.cacheKeys.TryAdd(cacheKey, 0);
 
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "Capabilities cached for {ServiceType}/{ServiceId}/{Version}/{Language} " +
             "(size={Size} bytes, TTL={TtlMinutes}min)",
             serviceType, serviceId, version, acceptLanguage ?? "default",
-            documentSize, _options.CacheDurationMinutes);
+            documentSize, this.options.CacheDurationMinutes);
 
         return Task.CompletedTask;
     }
@@ -257,19 +257,19 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
             ? $"{CacheKeyPrefix}{serviceType.ToLowerInvariant()}:"
             : $"{CacheKeyPrefix}{serviceType.ToLowerInvariant()}:{serviceId.ToLowerInvariant()}:";
 
-        var keysToRemove = _cacheKeys.Keys
+        var keysToRemove = this.cacheKeys.Keys
             .Where(k => k.StartsWith(pattern, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         foreach (var key in keysToRemove)
         {
-            _cache.Remove(key);
-            _cacheKeys.TryRemove(key, out _);
+            this.cache.Remove(key);
+            this.cacheKeys.TryRemove(key, out _);
         }
 
         if (keysToRemove.Count > 0)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Invalidated {Count} capabilities cache entries for {ServiceType}/{ServiceId}",
                 keysToRemove.Count,
                 serviceType,
@@ -280,16 +280,16 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
     /// <inheritdoc />
     public void InvalidateAll()
     {
-        var count = _cacheKeys.Count;
-        var keysToRemove = _cacheKeys.Keys.ToList();
+        var count = this.cacheKeys.Count;
+        var keysToRemove = this.cacheKeys.Keys.ToList();
 
         foreach (var key in keysToRemove)
         {
-            _cache.Remove(key);
-            _cacheKeys.TryRemove(key, out _);
+            this.cache.Remove(key);
+            this.cacheKeys.TryRemove(key, out _);
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Invalidated all {Count} capabilities cache entries",
             count);
     }
@@ -305,8 +305,8 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
             Hits = hits,
             Misses = misses,
             Evictions = Interlocked.Read(ref _evictions),
-            EntryCount = _cacheKeys.Count,
-            MaxEntries = _options.MaxCachedDocuments,
+            EntryCount = this.cacheKeys.Count,
+            MaxEntries = this.options.MaxCachedDocuments,
             HitRate = (hits + misses) > 0 ? (double)hits / (hits + misses) : 0
         };
     }

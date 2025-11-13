@@ -12,36 +12,47 @@ namespace Honua.Server.Observability.Middleware;
 /// </summary>
 public class MetricsMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<MetricsMiddleware> _logger;
-    private readonly Counter<long> _httpRequests;
-    private readonly Histogram<double> _httpRequestDuration;
-    private readonly Counter<long> _httpRequestErrors;
+    private readonly RequestDelegate next;
+    private readonly ILogger<MetricsMiddleware> logger;
+    private readonly Counter<long> httpRequests;
+    private readonly Histogram<double> httpRequestDuration;
+    private readonly Counter<long> httpRequestErrors;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MetricsMiddleware"/> class.
+    /// </summary>
+    /// <param name="next">The next request delegate.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="meterFactory">The meter factory.</param>
     public MetricsMiddleware(
         RequestDelegate next,
         ILogger<MetricsMiddleware> logger,
         IMeterFactory meterFactory)
     {
-        _next = next;
-        _logger = logger;
+        this.next = next;
+        this.logger = logger;
 
         var meter = meterFactory.Create("Honua.Http");
 
-        _httpRequests = meter.CreateCounter<long>(
+        this.httpRequests = meter.CreateCounter<long>(
             "http_requests_total",
             description: "Total number of HTTP requests");
 
-        _httpRequestDuration = meter.CreateHistogram<double>(
+        this.httpRequestDuration = meter.CreateHistogram<double>(
             "http_request_duration_seconds",
             unit: "s",
             description: "HTTP request duration in seconds");
 
-        _httpRequestErrors = meter.CreateCounter<long>(
+        this.httpRequestErrors = meter.CreateCounter<long>(
             "http_request_errors_total",
             description: "Total number of HTTP request errors");
     }
 
+    /// <summary>
+    /// Invokes the middleware.
+    /// </summary>
+    /// <param name="context">The HTTP context.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async Task InvokeAsync(HttpContext context)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -49,14 +60,14 @@ public class MetricsMiddleware
 
         try
         {
-            await _next(context);
+            await this.next(context);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception in HTTP request {Method} {Path}",
+            this.logger.LogError(ex, "Unhandled exception in HTTP request {Method} {Path}",
                 context.Request.Method, path);
 
-            _httpRequestErrors.Add(1,
+            this.httpRequestErrors.Add(1,
                 new KeyValuePair<string, object?>("method", context.Request.Method),
                 new KeyValuePair<string, object?>("path", path),
                 new KeyValuePair<string, object?>("exception", ex.GetType().Name));
@@ -73,16 +84,16 @@ public class MetricsMiddleware
                 { "method", context.Request.Method },
                 { "path", path },
                 { "status", statusCode.ToString() },
-                { "status_class", GetStatusClass(statusCode) }
+                { "status_class", GetStatusClass(statusCode) },
             };
 
-            _httpRequests.Add(1, tags);
-            _httpRequestDuration.Record(stopwatch.Elapsed.TotalSeconds, tags);
+            this.httpRequests.Add(1, tags);
+            this.httpRequestDuration.Record(stopwatch.Elapsed.TotalSeconds, tags);
 
             // Record errors for 4xx and 5xx responses
             if (statusCode >= 400)
             {
-                _httpRequestErrors.Add(1,
+                this.httpRequestErrors.Add(1,
                     new KeyValuePair<string, object?>("method", context.Request.Method),
                     new KeyValuePair<string, object?>("path", path),
                     new KeyValuePair<string, object?>("status", statusCode.ToString()));
@@ -93,6 +104,8 @@ public class MetricsMiddleware
     /// <summary>
     /// Normalizes paths to prevent high cardinality (e.g., /api/items/123 -> /api/items/{id}).
     /// </summary>
+    /// <param name="path">The path to normalize.</param>
+    /// <returns>The normalized path.</returns>
     private static string NormalizePath(PathString path)
     {
         var pathValue = path.Value ?? "/";
@@ -122,6 +135,8 @@ public class MetricsMiddleware
     /// <summary>
     /// Gets the status code class (1xx, 2xx, 3xx, 4xx, 5xx).
     /// </summary>
+    /// <param name="statusCode">The status code.</param>
+    /// <returns>The status code class.</returns>
     private static string GetStatusClass(int statusCode)
     {
         return statusCode switch
@@ -131,7 +146,7 @@ public class MetricsMiddleware
             >= 300 and < 400 => "3xx",
             >= 400 and < 500 => "4xx",
             >= 500 => "5xx",
-            _ => "unknown"
+            _ => "unknown",
         };
     }
 }

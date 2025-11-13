@@ -237,15 +237,15 @@ internal static class WmtsHandlers
 
     private sealed class BytesResultWithHeaders : IResult
     {
-        private readonly byte[] _content;
-        private readonly string _contentType;
-        private readonly string _cacheControl;
+        private readonly byte[] content;
+        private readonly string contentType;
+        private readonly string cacheControl;
 
         public BytesResultWithHeaders(byte[] content, string contentType, string cacheControl)
         {
-            _content = Guard.NotNull(content);
-            _contentType = Guard.NotNullOrWhiteSpace(contentType);
-            _cacheControl = Guard.NotNullOrWhiteSpace(cacheControl);
+            this.content = Guard.NotNull(content);
+            this.contentType = Guard.NotNullOrWhiteSpace(contentType);
+            this.cacheControl = Guard.NotNullOrWhiteSpace(cacheControl);
         }
 
         public Task ExecuteAsync(HttpContext httpContext)

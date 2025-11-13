@@ -340,15 +340,15 @@ internal static class WmsGetMapHandlers
 
     private sealed class FileResultWithHeaders : IResult
     {
-        private readonly byte[] _content;
-        private readonly string _contentType;
-        private readonly string _cacheControl;
+        private readonly byte[] content;
+        private readonly string contentType;
+        private readonly string cacheControl;
 
         public FileResultWithHeaders(byte[] content, string contentType, string cacheControl)
         {
-            _content = content;
-            _contentType = contentType;
-            _cacheControl = cacheControl;
+            this.content = content;
+            this.contentType = contentType;
+            this.cacheControl = cacheControl;
         }
 
         public Task ExecuteAsync(HttpContext httpContext)
@@ -625,15 +625,15 @@ internal static class WmsGetMapHandlers
 
     private sealed class StreamingFileResult : IResult
     {
-        private readonly Stream _content;
-        private readonly string _contentType;
-        private readonly string? _cacheControl;
+        private readonly Stream content;
+        private readonly string contentType;
+        private readonly string? cacheControl;
 
         public StreamingFileResult(Stream content, string contentType, string? cacheControl)
         {
-            _content = content;
-            _contentType = contentType;
-            _cacheControl = cacheControl;
+            this.content = content;
+            this.contentType = contentType;
+            this.cacheControl = cacheControl;
         }
 
         public async Task ExecuteAsync(HttpContext httpContext)
@@ -648,7 +648,7 @@ internal static class WmsGetMapHandlers
 
             await using (_content)
             {
-                await _content.CopyToAsync(httpContext.Response.Body, httpContext.RequestAborted).ConfigureAwait(false);
+                await this.content.CopyToAsync(httpContext.Response.Body, httpContext.RequestAborted).ConfigureAwait(false);
             }
         }
     }

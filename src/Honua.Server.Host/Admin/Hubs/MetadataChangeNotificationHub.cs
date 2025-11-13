@@ -11,15 +11,15 @@ namespace Honua.Server.Host.Admin.Hubs;
 /// </summary>
 public sealed class MetadataChangeNotificationHub : Hub
 {
-    private readonly IMetadataProvider _metadataProvider;
-    private readonly ILogger<MetadataChangeNotificationHub> _logger;
+    private readonly IMetadataProvider metadataProvider;
+    private readonly ILogger<MetadataChangeNotificationHub> logger;
 
     public MetadataChangeNotificationHub(
         IMetadataProvider metadataProvider,
         ILogger<MetadataChangeNotificationHub> logger)
     {
-        _metadataProvider = metadataProvider;
-        _logger = logger;
+        this.metadataProvider = metadataProvider;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -27,7 +27,7 @@ public sealed class MetadataChangeNotificationHub : Hub
     /// </summary>
     public override async Task OnConnectedAsync()
     {
-        _logger.LogInformation("Admin UI client connected: {ConnectionId}", Context.ConnectionId);
+        this.logger.LogInformation("Admin UI client connected: {ConnectionId}", Context.ConnectionId);
         await base.OnConnectedAsync();
     }
 
@@ -38,11 +38,11 @@ public sealed class MetadataChangeNotificationHub : Hub
     {
         if (exception != null)
         {
-            _logger.LogWarning(exception, "Admin UI client disconnected with error: {ConnectionId}", Context.ConnectionId);
+            this.logger.LogWarning(exception, "Admin UI client disconnected with error: {ConnectionId}", Context.ConnectionId);
         }
         else
         {
-            _logger.LogInformation("Admin UI client disconnected: {ConnectionId}", Context.ConnectionId);
+            this.logger.LogInformation("Admin UI client disconnected: {ConnectionId}", Context.ConnectionId);
         }
         await base.OnDisconnectedAsync(exception);
     }
@@ -56,7 +56,7 @@ public sealed class MetadataChangeNotificationHub : Hub
         var supportsMutable = _metadataProvider is IMutableMetadataProvider mutable
             && (mutable as IMetadataChangeNotifier)?.SupportsChangeNotifications == true;
 
-        _logger.LogDebug("Real-time updates supported: {Supported}", supportsMutable);
+        this.logger.LogDebug("Real-time updates supported: {Supported}", supportsMutable);
         return Task.FromResult(supportsMutable);
     }
 

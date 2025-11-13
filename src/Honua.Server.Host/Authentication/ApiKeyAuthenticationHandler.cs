@@ -36,8 +36,8 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
 {
     private const string ApiKeyHeaderName = "X-API-Key";
 
-    private readonly IOptionsMonitor<HonuaAuthenticationOptions> _authOptions;
-    private readonly ISecurityAuditLogger _auditLogger;
+    private readonly IOptionsMonitor<HonuaAuthenticationOptions> authOptions;
+    private readonly ISecurityAuditLogger auditLogger;
 
     public ApiKeyAuthenticationHandler(
         IOptionsMonitor<ApiKeyAuthenticationOptions> options,
@@ -47,14 +47,14 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
         ISecurityAuditLogger auditLogger)
         : base(options, logger, encoder)
     {
-        _authOptions = Guard.NotNull(authOptions);
-        _auditLogger = Guard.NotNull(auditLogger);
+        this.authOptions = Guard.NotNull(authOptions);
+        this.auditLogger = Guard.NotNull(auditLogger);
     }
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         // API keys only work in QuickStart mode or when explicitly enabled
-        var currentAuthOptions = _authOptions.CurrentValue;
+        var currentAuthOptions = this.authOptions.CurrentValue;
         if (currentAuthOptions.Mode != HonuaAuthenticationOptions.AuthenticationMode.QuickStart &&
             !Options.AllowInProductionMode)
         {
@@ -64,7 +64,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
 
         // SECURITY: Extract API key from header only (query parameters are insecure)
         // API keys in URLs can be logged in web server logs, proxy logs, and browser history
-        var apiKey = Request.Headers[ApiKeyHeaderName].FirstOrDefault();
+        var apiKey = this.Request.Headers[ApiKeyHeaderName].FirstOrDefault();
 
         if (apiKey.IsNullOrWhiteSpace())
         {
@@ -120,7 +120,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
         {
             // SECURITY: Hash API key for logging instead of logging partial key
             var keyHash = ComputeKeyHash(apiKey);
-            _auditLogger.LogApiKeyValidationFailure(keyHash, Context.Connection.RemoteIpAddress?.ToString());
+            this.auditLogger.LogApiKeyValidationFailure(keyHash, Context.Connection.RemoteIpAddress?.ToString());
 
             Logger.LogWarning(
                 "Invalid API key attempted from {RemoteIp}, KeyHash={KeyHash}",
@@ -160,7 +160,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
-        _auditLogger.LogApiKeyAuthentication(
+        this.auditLogger.LogApiKeyAuthentication(
             validApiKey.Name,
             Context.Connection.RemoteIpAddress?.ToString());
 
@@ -175,8 +175,8 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
-        Response.StatusCode = 401;
-        Response.Headers.Append("WWW-Authenticate", $"{Scheme.Name} realm=\"Honua API\"");
+        this.Response.StatusCode = 401;
+        this.Response.Headers.Append("WWW-Authenticate", $"{Scheme.Name} realm=\"Honua API\"");
         return Task.CompletedTask;
     }
 

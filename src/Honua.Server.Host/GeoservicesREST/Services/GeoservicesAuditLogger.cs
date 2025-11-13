@@ -18,11 +18,11 @@ namespace Honua.Server.Host.GeoservicesREST.Services;
 /// </summary>
 public sealed class GeoservicesAuditLogger : IGeoservicesAuditLogger
 {
-    private readonly ILogger<GeoservicesAuditLogger> _logger;
+    private readonly ILogger<GeoservicesAuditLogger> logger;
 
     public GeoservicesAuditLogger(ILogger<GeoservicesAuditLogger> logger)
     {
-        _logger = Guard.NotNull(logger);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <inheritdoc />
@@ -40,7 +40,7 @@ public sealed class GeoservicesAuditLogger : IGeoservicesAuditLogger
         var userId = ExtractUserId(user);
         var userName = ExtractUserName(user);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "AUDIT: Feature Add - Service: {ServiceId}, Layer: {LayerId}, FeatureCount: {FeatureCount}, " +
             "UserId: {UserId}, UserName: {UserName}, IP: {IpAddress}, Timestamp: {Timestamp}",
             serviceId,
@@ -73,7 +73,7 @@ public sealed class GeoservicesAuditLogger : IGeoservicesAuditLogger
             ? $"{string.Join(", ", featureIdList.Take(10))}... ({featureCount} total)"
             : string.Join(", ", featureIdList);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "AUDIT: Feature Update - Service: {ServiceId}, Layer: {LayerId}, FeatureIds: [{FeatureIds}], " +
             "FeatureCount: {FeatureCount}, UserId: {UserId}, UserName: {UserName}, IP: {IpAddress}, Timestamp: {Timestamp}",
             serviceId,
@@ -102,7 +102,7 @@ public sealed class GeoservicesAuditLogger : IGeoservicesAuditLogger
             ? $"{string.Join(", ", featureIdList.Take(10))}... ({featureCount} total)"
             : string.Join(", ", featureIdList);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "AUDIT: Feature Delete - Service: {ServiceId}, Layer: {LayerId}, FeatureIds: [{FeatureIds}], " +
             "FeatureCount: {FeatureCount}, UserId: {UserId}, UserName: {UserName}, IP: {IpAddress}, Timestamp: {Timestamp}",
             serviceId,
@@ -128,7 +128,7 @@ public sealed class GeoservicesAuditLogger : IGeoservicesAuditLogger
         var userId = ExtractUserId(user);
         var userName = ExtractUserName(user);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "AUDIT: Attachment {Operation} - Service: {ServiceId}, Layer: {LayerId}, FeatureId: {FeatureId}, " +
             "FileName: {FileName}, UserId: {UserId}, UserName: {UserName}, IP: {IpAddress}, Timestamp: {Timestamp}",
             operation,

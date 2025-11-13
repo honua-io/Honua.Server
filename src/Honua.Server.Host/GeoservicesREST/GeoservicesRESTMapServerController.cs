@@ -39,13 +39,13 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
 {
     private const double GeoServicesVersion = 10.81;
 
-    private readonly ICatalogProjectionService _catalog;
-    private readonly IFeatureRepository _repository;
-    private readonly IRasterDatasetRegistry _rasterRegistry;
-    private readonly IRasterRenderer _rasterRenderer;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<GeoservicesRESTMapServerController> _logger;
+    private readonly ICatalogProjectionService catalog;
+    private readonly IFeatureRepository repository;
+    private readonly IRasterDatasetRegistry rasterRegistry;
+    private readonly IRasterRenderer rasterRenderer;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly IServiceProvider serviceProvider;
+    private readonly ILogger<GeoservicesRESTMapServerController> logger;
 
     public GeoservicesRESTMapServerController(
         ICatalogProjectionService catalog,
@@ -56,13 +56,13 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         IServiceProvider serviceProvider,
         ILogger<GeoservicesRESTMapServerController> logger)
     {
-        _catalog = Guard.NotNull(catalog);
-        _repository = Guard.NotNull(repository);
-        _rasterRegistry = Guard.NotNull(rasterRegistry);
-        _rasterRenderer = Guard.NotNull(rasterRenderer);
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _serviceProvider = Guard.NotNull(serviceProvider);
-        _logger = Guard.NotNull(logger);
+        this.catalog = Guard.NotNull(catalog);
+        this.repository = Guard.NotNull(repository);
+        this.rasterRegistry = Guard.NotNull(rasterRegistry);
+        this.rasterRenderer = Guard.NotNull(rasterRenderer);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.serviceProvider = Guard.NotNull(serviceProvider);
+        this.logger = Guard.NotNull(logger);
     }
 
     [HttpGet]
@@ -71,11 +71,11 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var summary = GeoservicesRESTMetadataMapper.CreateMapServiceSummary(serviceView, GeoServicesVersion);
-        return Ok(summary);
+        return this.Ok(summary);
     }
 
     [HttpGet("{layerIndex:int}/query")]
@@ -122,7 +122,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
                 var serviceView = ResolveService(folderId, serviceId);
                 if (serviceView is null)
                 {
-                    return NotFound();
+                    return this.NotFound();
                 }
 
                 // Parse export parameters using shared helper
@@ -162,17 +162,17 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
                     selectedStyle,
                     vectorGeometries);
 
-                var result = await _rasterRenderer.RenderAsync(renderRequest, cancellationToken).ConfigureAwait(false);
+                var result = await this.rasterRenderer.RenderAsync(renderRequest, cancellationToken).ConfigureAwait(false);
 
                 if (result.Content.CanSeek)
                 {
                     result.Content.Seek(0, SeekOrigin.Begin);
                 }
 
-                Response.Headers["X-Rendered-Dataset"] = parameters.Dataset.Id;
-                Response.Headers["X-Target-CRS"] = parameters.TargetCrs;
+                this.Response.Headers["X-Rendered-Dataset"] = parameters.Dataset.Id;
+                this.Response.Headers["X-Target-CRS"] = parameters.TargetCrs;
 
-                return File(result.Content, result.ContentType);
+                return this.File(result.Content, result.ContentType);
             }).ConfigureAwait(false);
     }
 
@@ -229,7 +229,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
                 var reader = new GeoJsonReader();
                 var malformedCount = 0;
 
-                await foreach (var record in _repository.QueryAsync(serviceView.Service.Id, targetLayer.Layer.Id, query, cancellationToken).ConfigureAwait(false))
+                await foreach (var record in this.repository.QueryAsync(serviceView.Service.Id, targetLayer.Layer.Id, query, cancellationToken).ConfigureAwait(false))
                 {
                     var components = FeatureComponentBuilder.BuildComponents(targetLayer.Layer, record, query);
                     if (components.GeometryNode is null)
@@ -264,7 +264,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
                 // Log slow queries (>1 second)
                 if (startTime.ElapsedMilliseconds > 1000)
                 {
-                    _logger.LogWarning(
+                    this.logger.LogWarning(
                         "Slow vector geometry collection detected. Service={ServiceId}, Layer={LayerId}, Dataset={DatasetId}, GeometryCount={GeometryCount}, Duration={DurationMs}ms",
                         serviceView.Service.Id,
                         targetLayer.Layer.Id,
@@ -330,18 +330,18 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var layerView = ResolveLayer(serviceView, layerIndex);
         if (layerView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var style = await ResolveDefaultStyleAsync(layerView, cancellationToken).ConfigureAwait(false);
         var detail = GeoservicesRESTMetadataMapper.CreateLayerDetailResponse(serviceView, layerView, layerIndex, GeoServicesVersion, style);
-        return Ok(detail);
+        return this.Ok(detail);
     }
 
     [HttpGet("layers")]
@@ -350,7 +350,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         var layers = new List<GeoservicesRESTLayerDetailResponse>(serviceView.Layers.Count);
@@ -361,7 +361,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
             layers.Add(GeoservicesRESTMetadataMapper.CreateLayerDetailResponse(serviceView, layerView, index, GeoServicesVersion, style));
         }
 
-        return Ok(new GeoservicesRESTLayersResponse
+        return this.Ok(new GeoservicesRESTLayersResponse
         {
             CurrentVersion = GeoServicesVersion,
             Layers = new ReadOnlyCollection<GeoservicesRESTLayerDetailResponse>(layers),
@@ -375,12 +375,12 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
         var legend = GeoservicesRESTLegendBuilder.BuildLegend(serviceView, snapshot, GeoServicesVersion);
-        return Ok(legend);
+        return this.Ok(legend);
     }
 
     [HttpGet("identify")]
@@ -389,7 +389,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         if (!GeoservicesRESTIdentifyTranslator.TryParse(Request, serviceView, out var identifyContext, out var error))
@@ -412,7 +412,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
             }
 
             var query = BuildIdentifyQuery(identifyContext, layerView);
-            await foreach (var record in _repository.QueryAsync(serviceView.Service.Id, layerView.Layer.Id, query, cancellationToken).ConfigureAwait(false))
+            await foreach (var record in this.repository.QueryAsync(serviceView.Service.Id, layerView.Layer.Id, query, cancellationToken).ConfigureAwait(false))
             {
                 var components = FeatureComponentBuilder.BuildComponents(layerView.Layer, record, query);
                 var attributes = CreateIdentifyAttributes(layerView.Layer, components);
@@ -440,7 +440,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
             spatialReference = new GeoservicesRESTSpatialReference { Wkid = identifyContext.OutputWkid.Value };
         }
 
-        return Ok(new GeoservicesRESTIdentifyResponse
+        return this.Ok(new GeoservicesRESTIdentifyResponse
         {
             Results = results,
             SpatialReference = spatialReference
@@ -453,7 +453,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         if (!GeoservicesRESTFindTranslator.TryParse(Request, serviceView, out var context, out var error))
@@ -471,7 +471,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
             }
 
             var query = BuildFindQuery(context, layerView);
-            await foreach (var record in _repository.QueryAsync(serviceView.Service.Id, layerView.Layer.Id, query, cancellationToken).ConfigureAwait(false))
+            await foreach (var record in this.repository.QueryAsync(serviceView.Service.Id, layerView.Layer.Id, query, cancellationToken).ConfigureAwait(false))
             {
                 var components = FeatureComponentBuilder.BuildComponents(layerView.Layer, record, query);
                 var matchField = DetermineMatchField(context.SearchFields, components.Properties, components.DisplayName, context.SearchText);
@@ -492,7 +492,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
             }
         }
 
-        return Ok(new GeoservicesRESTFindResponse { Results = results });
+        return this.Ok(new GeoservicesRESTFindResponse { Results = results });
     }
 
     private FeatureQuery BuildFindQuery(GeoservicesRESTFindContext context, CatalogLayerView layerView)
@@ -596,7 +596,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
             return null;
         }
 
-        var service = _catalog.GetService(serviceId);
+        var service = this.catalog.GetService(serviceId);
         if (service is null)
         {
             return null;
@@ -612,13 +612,13 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
 
     private async Task<StyleDefinition?> ResolveDefaultStyleAsync(CatalogLayerView layerView, CancellationToken cancellationToken)
     {
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
         return StyleResolutionHelper.ResolveStyleForLayer(snapshot, layerView.Layer, null);
     }
 
     private async Task<StyleDefinition?> ResolveStyleAsync(string styleId, LayerDefinition layer, CancellationToken cancellationToken)
     {
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
         return StyleResolutionHelper.ResolveStyleForLayer(snapshot, layer, styleId);
     }
 
@@ -668,17 +668,17 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         var serviceView = ResolveService(folderId, serviceId);
         if (serviceView is null)
         {
-            return NotFound();
+            return this.NotFound();
         }
 
         // Parse common parameters
-        var layerIdsParam = Request.Query["layers"].ToString();
+        var layerIdsParam = this.Request.Query["layers"].ToString();
         if (layerIdsParam.IsNullOrWhiteSpace())
         {
-            return BadRequest(new { error = "Parameter 'layers' is required." });
+            return this.BadRequest(new { error = "Parameter 'layers' is required." });
         }
 
-        var docName = Request.Query["docName"].ToString();
+        var docName = this.Request.Query["docName"].ToString();
         if (docName.IsNullOrWhiteSpace())
         {
             docName = serviceView.Service.Title ?? serviceView.Service.Id;
@@ -691,7 +691,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
 
         if (layerIds.Count == 0)
         {
-            return BadRequest(new { error = "At least one layer must be specified." });
+            return this.BadRequest(new { error = "At least one layer must be specified." });
         }
 
         // Build KML document with folders for each layer
@@ -715,7 +715,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
                 Crs: "EPSG:4326");
 
             var features = new List<Core.Serialization.KmlFeatureContent>();
-            await foreach (var record in _repository.QueryAsync(serviceView.Service.Id, layerView.Layer.Id, query, cancellationToken).ConfigureAwait(false))
+            await foreach (var record in this.repository.QueryAsync(serviceView.Service.Id, layerView.Layer.Id, query, cancellationToken).ConfigureAwait(false))
             {
                 var components = FeatureComponentBuilder.BuildComponents(layerView.Layer, record, query);
                 var featureId = record.Attributes.TryGetValue(layerView.Layer.IdField, out var id)
@@ -758,14 +758,14 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         kmlBuilder.AppendLine("  </Document>");
         kmlBuilder.AppendLine("</kml>");
 
-        var kmz = Request.Query["kmz"].ToString();
+        var kmz = this.Request.Query["kmz"].ToString();
         var useKmz = kmz.EqualsIgnoreCase("true");
 
         if (useKmz)
         {
             // Create KMZ (zipped KML)
             var kmzBytes = Core.Serialization.KmzArchiveBuilder.CreateArchive(kmlBuilder.ToString());
-            return File(kmzBytes, "application/vnd.google-earth.kmz", $"{docName}.kmz");
+            return this.File(kmzBytes, "application/vnd.google-earth.kmz", $"{docName}.kmz");
         }
 
         return Content(kmlBuilder.ToString(), "application/vnd.google-earth.kml+xml");

@@ -33,11 +33,11 @@ namespace Honua.Server.Host.GeoservicesREST.Services;
 /// </summary>
 public sealed class StreamingGeoJsonWriter
 {
-    private readonly ILogger<StreamingGeoJsonWriter> _logger;
+    private readonly ILogger<StreamingGeoJsonWriter> logger;
 
     public StreamingGeoJsonWriter(ILogger<StreamingGeoJsonWriter> logger)
     {
-        _logger = Guard.NotNull(logger);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -175,7 +175,7 @@ public sealed class StreamingGeoJsonWriter
                         catch (NotSupportedException)
                         {
                             // Some seekable streams don't support Length - ignore and continue
-                            _logger.LogDebug("Response stream reports CanSeek=true but Length threw NotSupportedException");
+                            this.logger.LogDebug("Response stream reports CanSeek=true but Length threw NotSupportedException");
                         }
                     }
 
@@ -191,14 +191,14 @@ public sealed class StreamingGeoJsonWriter
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.LogInformation("Streaming GeoJSON write cancelled after {Features} features", featuresWritten);
+                    this.logger.LogInformation("Streaming GeoJSON write cancelled after {Features} features", featuresWritten);
                     throw;
                 }
                 catch (Exception ex) when (featuresWritten > 0 && response.HasStarted)
                 {
                     // Response already started - log error but can't send proper error response
                     // Client will see truncated JSON and should handle it
-                    _logger.LogWarning(ex,
+                    this.logger.LogWarning(ex,
                         "Cannot send error response - already wrote {Features} features to stream. Client will receive truncated GeoJSON.",
                         featuresWritten);
                     throw;
@@ -242,7 +242,7 @@ public sealed class StreamingGeoJsonWriter
                 catch (Exception ex)
                 {
                     // If simplification fails, use original geometry
-                    _logger.LogDebug(ex, "Geometry simplification failed with max allowable offset {MaxOffset}, using original geometry", context.MaxAllowableOffset.Value);
+                    this.logger.LogDebug(ex, "Geometry simplification failed with max allowable offset {MaxOffset}, using original geometry", context.MaxAllowableOffset.Value);
                     geometryToWrite = ntsGeom;
                 }
             }

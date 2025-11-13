@@ -12,9 +12,9 @@ namespace Honua.Server.Host.SensorThings;
 /// </summary>
 public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
 {
-    private readonly IHubContext<SensorObservationHub> _hubContext;
-    private readonly ILogger<SignalRSensorObservationBroadcaster> _logger;
-    private readonly SensorObservationStreamingOptions _options;
+    private readonly IHubContext<SensorObservationHub> hubContext;
+    private readonly ILogger<SignalRSensorObservationBroadcaster> logger;
+    private readonly SensorObservationStreamingOptions options;
 
     // Rate limiting state - tracks observation counts per group per second
     private readonly ConcurrentDictionary<string, RateLimitState> _rateLimitState = new();
@@ -24,20 +24,20 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
         ILogger<SignalRSensorObservationBroadcaster> logger,
         SensorObservationStreamingOptions options)
     {
-        _hubContext = hubContext;
-        _logger = logger;
-        _options = options;
+        this.hubContext = hubContext;
+        this.logger = logger;
+        this.options = options;
     }
 
-    public bool IsEnabled => _options.Enabled;
-    public int RateLimitPerSecond => _options.RateLimitPerSecond;
+    public bool IsEnabled => this.options.Enabled;
+    public int RateLimitPerSecond => this.options.RateLimitPerSecond;
 
     public async Task BroadcastObservationAsync(
         Observation observation,
         Datastream datastream,
         CancellationToken cancellationToken = default)
     {
-        if (!_options.Enabled)
+        if (!this.options.Enabled)
             return;
 
         try
@@ -48,7 +48,7 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
             var datastreamGroup = $"datastream:{datastream.Id}";
             if (await CheckRateLimitAsync(datastreamGroup))
             {
-                await _hubContext.Clients.Group(datastreamGroup)
+                await this.hubContext.Clients.Group(datastreamGroup)
                     .SendAsync("ObservationCreated", payload, cancellationToken);
             }
 
@@ -56,7 +56,7 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
             var thingGroup = $"thing:{datastream.ThingId}";
             if (await CheckRateLimitAsync(thingGroup))
             {
-                await _hubContext.Clients.Group(thingGroup)
+                await this.hubContext.Clients.Group(thingGroup)
                     .SendAsync("ObservationCreated", payload, cancellationToken);
             }
 
@@ -64,25 +64,25 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
             var sensorGroup = $"sensor:{datastream.SensorId}";
             if (await CheckRateLimitAsync(sensorGroup))
             {
-                await _hubContext.Clients.Group(sensorGroup)
+                await this.hubContext.Clients.Group(sensorGroup)
                     .SendAsync("ObservationCreated", payload, cancellationToken);
             }
 
             // Broadcast to all-observations subscribers (admin only)
             if (await CheckRateLimitAsync("all-observations"))
             {
-                await _hubContext.Clients.Group("all-observations")
+                await this.hubContext.Clients.Group("all-observations")
                     .SendAsync("ObservationCreated", payload, cancellationToken);
             }
 
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Broadcasted observation {ObservationId} from datastream {DatastreamId}",
                 observation.Id,
                 datastream.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogError(
+            this.logger.LogError(
                 ex,
                 "Error broadcasting observation {ObservationId}",
                 observation.Id);
@@ -93,7 +93,7 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
         IReadOnlyList<(Observation Observation, Datastream Datastream)> observations,
         CancellationToken cancellationToken = default)
     {
-        if (!_options.Enabled || observations.Count == 0)
+        if (!this.options.Enabled || observations.Count == 0)
             return;
 
         try
@@ -104,7 +104,7 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
                 .ToList();
 
             // If we have many observations (>100/sec), batch them
-            if (_options.BatchingEnabled && observations.Count > _options.BatchingThreshold)
+            if (this.options.BatchingEnabled && observations.Count > this.options.BatchingThreshold)
             {
                 await BroadcastBatchedObservationsAsync(groupedByDatastream, cancellationToken);
             }
@@ -119,7 +119,7 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error broadcasting batch of {Count} observations", observations.Count);
+            this.logger.LogError(ex, "Error broadcasting batch of {Count} observations", observations.Count);
         }
     }
 
@@ -143,21 +143,21 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
 
             // Broadcast batched observations
             var group = $"datastream:{firstDatastream.Id}";
-            await _hubContext.Clients.Group(group)
+            await this.hubContext.Clients.Group(group)
                 .SendAsync("ObservationsBatch", batch, cancellationToken);
 
             var thingGroup = $"thing:{firstDatastream.ThingId}";
-            await _hubContext.Clients.Group(thingGroup)
+            await this.hubContext.Clients.Group(thingGroup)
                 .SendAsync("ObservationsBatch", batch, cancellationToken);
 
             var sensorGroup = $"sensor:{firstDatastream.SensorId}";
-            await _hubContext.Clients.Group(sensorGroup)
+            await this.hubContext.Clients.Group(sensorGroup)
                 .SendAsync("ObservationsBatch", batch, cancellationToken);
 
-            await _hubContext.Clients.Group("all-observations")
+            await this.hubContext.Clients.Group("all-observations")
                 .SendAsync("ObservationsBatch", batch, cancellationToken);
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Broadcasted batch of {Count} observations from datastream {DatastreamId}",
                 observations.Count,
                 firstDatastream.Id);
@@ -166,11 +166,11 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
 
     private async Task<bool> CheckRateLimitAsync(string groupName)
     {
-        if (!_options.RateLimitingEnabled)
+        if (!this.options.RateLimitingEnabled)
             return true;
 
         var now = DateTime.UtcNow;
-        var state = _rateLimitState.GetOrAdd(groupName, _ => new RateLimitState());
+        var state = this.rateLimitState.GetOrAdd(groupName, _ => new RateLimitState());
 
         lock (state)
         {
@@ -182,9 +182,9 @@ public class SignalRSensorObservationBroadcaster : ISensorObservationBroadcaster
             }
 
             // Check if we've exceeded the rate limit
-            if (state.Count >= _options.RateLimitPerSecond)
+            if (state.Count >= this.options.RateLimitPerSecond)
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Rate limit exceeded for group {GroupName}: {Count} observations/sec",
                     groupName,
                     state.Count);

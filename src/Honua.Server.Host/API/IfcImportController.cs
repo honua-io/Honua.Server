@@ -28,8 +28,8 @@ namespace Honua.Server.Host.API;
 [Produces("application/json")]
 public sealed class IfcImportController : ControllerBase
 {
-    private readonly IIfcImportService _ifcImportService;
-    private readonly ILogger<IfcImportController> _logger;
+    private readonly IIfcImportService ifcImportService;
+    private readonly ILogger<IfcImportController> logger;
 
     // Maximum file size: 500 MB (configurable)
     private const long MaxFileSizeBytes = 500L * 1024 * 1024;
@@ -38,8 +38,8 @@ public sealed class IfcImportController : ControllerBase
         IIfcImportService ifcImportService,
         ILogger<IfcImportController> logger)
     {
-        _ifcImportService = Guard.NotNull(ifcImportService);
-        _logger = Guard.NotNull(logger);
+        this.ifcImportService = Guard.NotNull(ifcImportService);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -79,7 +79,7 @@ public sealed class IfcImportController : ControllerBase
         // Validate file
         if (file == null || file.Length == 0)
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Title = "No file provided",
                 Detail = "Please upload a valid IFC file",
@@ -90,7 +90,7 @@ public sealed class IfcImportController : ControllerBase
         // Validate file size
         if (file.Length > MaxFileSizeBytes)
         {
-            return StatusCode(StatusCodes.Status413PayloadTooLarge, new ProblemDetails
+            return this.StatusCode(StatusCodes.Status413PayloadTooLarge, new ProblemDetails
             {
                 Title = "File too large",
                 Detail = $"Maximum file size is {MaxFileSizeBytes / (1024 * 1024)} MB",
@@ -102,7 +102,7 @@ public sealed class IfcImportController : ControllerBase
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (extension != ".ifc" && extension != ".ifcxml" && extension != ".ifczip")
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Title = "Invalid file type",
                 Detail = "Only .ifc, .ifcxml, and .ifczip files are supported",
@@ -113,7 +113,7 @@ public sealed class IfcImportController : ControllerBase
         // Validate required parameters
         if (string.IsNullOrWhiteSpace(targetServiceId))
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Title = "Missing target service ID",
                 Detail = "targetServiceId is required",
@@ -123,7 +123,7 @@ public sealed class IfcImportController : ControllerBase
 
         if (string.IsNullOrWhiteSpace(targetLayerId))
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Title = "Missing target layer ID",
                 Detail = "targetLayerId is required",
@@ -131,7 +131,7 @@ public sealed class IfcImportController : ControllerBase
             });
         }
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Starting IFC import: File={FileName}, Size={Size} bytes, Service={ServiceId}, Layer={LayerId}",
             file.FileName, file.Length, targetServiceId, targetLayerId);
 
@@ -151,23 +151,23 @@ public sealed class IfcImportController : ControllerBase
         IfcImportResult result;
         await using (var stream = file.OpenReadStream())
         {
-            result = await _ifcImportService.ImportIfcFileAsync(stream, options, cancellationToken);
+            result = await this.ifcImportService.ImportIfcFileAsync(stream, options, cancellationToken);
         }
 
         if (result.Success)
         {
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "IFC import completed: JobId={JobId}, FeaturesCreated={FeaturesCreated}, Duration={Duration}ms",
                 result.ImportJobId, result.FeaturesCreated, result.Duration.TotalMilliseconds);
         }
         else
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "IFC import completed with errors: JobId={JobId}, Errors={ErrorCount}",
                 result.ImportJobId, result.Errors.Count);
         }
 
-        return Ok(result);
+        return this.Ok(result);
     }
 
     /// <summary>
@@ -188,7 +188,7 @@ public sealed class IfcImportController : ControllerBase
     {
         if (file == null || file.Length == 0)
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Title = "No file provided",
                 Detail = "Please upload a valid IFC file",
@@ -196,19 +196,19 @@ public sealed class IfcImportController : ControllerBase
             });
         }
 
-        _logger.LogInformation("Validating IFC file: {FileName}, Size={Size} bytes",
+        this.logger.LogInformation("Validating IFC file: {FileName}, Size={Size} bytes",
             file.FileName, file.Length);
 
         IfcValidationResult result;
         await using (var stream = file.OpenReadStream())
         {
-            result = await _ifcImportService.ValidateIfcAsync(stream, cancellationToken);
+            result = await this.ifcImportService.ValidateIfcAsync(stream, cancellationToken);
         }
 
-        _logger.LogInformation("IFC validation completed: Valid={IsValid}, Schema={Schema}, Format={Format}",
+        this.logger.LogInformation("IFC validation completed: Valid={IsValid}, Schema={Schema}, Format={Format}",
             result.IsValid, result.SchemaVersion, result.FileFormat);
 
-        return Ok(result);
+        return this.Ok(result);
     }
 
     /// <summary>
@@ -229,7 +229,7 @@ public sealed class IfcImportController : ControllerBase
     {
         if (file == null || file.Length == 0)
         {
-            return BadRequest(new ProblemDetails
+            return this.BadRequest(new ProblemDetails
             {
                 Title = "No file provided",
                 Detail = "Please upload a valid IFC file",
@@ -237,18 +237,18 @@ public sealed class IfcImportController : ControllerBase
             });
         }
 
-        _logger.LogInformation("Extracting metadata from IFC file: {FileName}", file.FileName);
+        this.logger.LogInformation("Extracting metadata from IFC file: {FileName}", file.FileName);
 
         IfcProjectMetadata metadata;
         await using (var stream = file.OpenReadStream())
         {
-            metadata = await _ifcImportService.ExtractMetadataAsync(stream, cancellationToken);
+            metadata = await this.ifcImportService.ExtractMetadataAsync(stream, cancellationToken);
         }
 
-        _logger.LogInformation("IFC metadata extracted: Project={ProjectName}, Schema={Schema}",
+        this.logger.LogInformation("IFC metadata extracted: Project={ProjectName}, Schema={Schema}",
             metadata.ProjectName, metadata.SchemaVersion);
 
-        return Ok(metadata);
+        return this.Ok(metadata);
     }
 
     /// <summary>
@@ -261,7 +261,7 @@ public sealed class IfcImportController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<string>), StatusCodes.Status200OK)]
     public ActionResult<IEnumerable<string>> GetSupportedVersions()
     {
-        var versions = _ifcImportService.GetSupportedSchemaVersions();
-        return Ok(versions);
+        var versions = this.ifcImportService.GetSupportedSchemaVersions();
+        return this.Ok(versions);
     }
 }

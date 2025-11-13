@@ -12,7 +12,7 @@ namespace Honua.Server.Host.OpenApi.Filters;
 /// </summary>
 public sealed class ContactInfoDocumentFilter : IDocumentFilter
 {
-    private readonly ContactInfoOptions _options;
+    private readonly ContactInfoOptions options;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ContactInfoDocumentFilter"/> class.
@@ -20,7 +20,7 @@ public sealed class ContactInfoDocumentFilter : IDocumentFilter
     /// <param name="options">Configuration options for contact information.</param>
     public ContactInfoDocumentFilter(ContactInfoOptions? options = null)
     {
-        _options = options ?? new ContactInfoOptions();
+        this.options = options ?? new ContactInfoOptions();
     }
 
     /// <summary>
@@ -36,63 +36,63 @@ public sealed class ContactInfoDocumentFilter : IDocumentFilter
         }
 
         // Update contact information
-        if (_options.ContactName != null || _options.ContactEmail != null || _options.ContactUrl != null)
+        if (this.options.ContactName != null || this.options.ContactEmail != null || this.options.ContactUrl != null)
         {
             swaggerDoc.Info.Contact = new OpenApiContact
             {
-                Name = _options.ContactName ?? swaggerDoc.Info.Contact?.Name,
-                Email = _options.ContactEmail ?? swaggerDoc.Info.Contact?.Email,
-                Url = _options.ContactUrl ?? swaggerDoc.Info.Contact?.Url
+                Name = this.options.ContactName ?? swaggerDoc.Info.Contact?.Name,
+                Email = this.options.ContactEmail ?? swaggerDoc.Info.Contact?.Email,
+                Url = this.options.ContactUrl ?? swaggerDoc.Info.Contact?.Url
             };
         }
 
         // Add license information if provided
-        if (_options.LicenseName != null || _options.LicenseUrl != null)
+        if (this.options.LicenseName != null || this.options.LicenseUrl != null)
         {
             swaggerDoc.Info.License = new OpenApiLicense
             {
-                Name = _options.LicenseName ?? swaggerDoc.Info.License?.Name,
-                Url = _options.LicenseUrl ?? swaggerDoc.Info.License?.Url
+                Name = this.options.LicenseName ?? swaggerDoc.Info.License?.Name,
+                Url = this.options.LicenseUrl ?? swaggerDoc.Info.License?.Url
             };
         }
 
         // Add terms of service if provided
-        if (_options.TermsOfServiceUrl != null)
+        if (this.options.TermsOfServiceUrl != null)
         {
-            swaggerDoc.Info.TermsOfService = _options.TermsOfServiceUrl;
+            swaggerDoc.Info.TermsOfService = this.options.TermsOfServiceUrl;
         }
 
         // Add external documentation if provided
-        if (_options.ExternalDocsDescription != null || _options.ExternalDocsUrl != null)
+        if (this.options.ExternalDocsDescription != null || this.options.ExternalDocsUrl != null)
         {
             swaggerDoc.ExternalDocs = new OpenApiExternalDocs
             {
-                Description = _options.ExternalDocsDescription ?? "External Documentation",
-                Url = _options.ExternalDocsUrl!
+                Description = this.options.ExternalDocsDescription ?? "External Documentation",
+                Url = this.options.ExternalDocsUrl!
             };
         }
 
         // Add support information to description
         var supportInfo = new List<string>();
 
-        if (_options.SupportEmail != null)
+        if (this.options.SupportEmail != null)
         {
-            supportInfo.Add($"- Support Email: [{_options.SupportEmail}](mailto:{_options.SupportEmail})");
+            supportInfo.Add($"- Support Email: [{this.options.SupportEmail}](mailto:{this.options.SupportEmail})");
         }
 
-        if (_options.SupportUrl != null)
+        if (this.options.SupportUrl != null)
         {
-            supportInfo.Add($"- Support Portal: [{_options.SupportUrl}]({_options.SupportUrl})");
+            supportInfo.Add($"- Support Portal: [{this.options.SupportUrl}]({this.options.SupportUrl})");
         }
 
-        if (_options.DocumentationUrl != null)
+        if (this.options.DocumentationUrl != null)
         {
-            supportInfo.Add($"- Documentation: [{_options.DocumentationUrl}]({_options.DocumentationUrl})");
+            supportInfo.Add($"- Documentation: [{this.options.DocumentationUrl}]({this.options.DocumentationUrl})");
         }
 
-        if (_options.IssueTrackerUrl != null)
+        if (this.options.IssueTrackerUrl != null)
         {
-            supportInfo.Add($"- Issue Tracker: [{_options.IssueTrackerUrl}]({_options.IssueTrackerUrl})");
+            supportInfo.Add($"- Issue Tracker: [{this.options.IssueTrackerUrl}]({this.options.IssueTrackerUrl})");
         }
 
         if (supportInfo.Any())
@@ -104,19 +104,19 @@ public sealed class ContactInfoDocumentFilter : IDocumentFilter
         }
 
         // Add custom extensions for contact metadata
-        if (_options.SupportEmail != null)
+        if (this.options.SupportEmail != null)
         {
-            swaggerDoc.Extensions["x-support-email"] = new Microsoft.OpenApi.Any.OpenApiString(_options.SupportEmail);
+            swaggerDoc.Extensions["x-support-email"] = new Microsoft.OpenApi.Any.OpenApiString(this.options.SupportEmail);
         }
 
-        if (_options.SupportUrl != null)
+        if (this.options.SupportUrl != null)
         {
-            swaggerDoc.Extensions["x-support-url"] = new Microsoft.OpenApi.Any.OpenApiString(_options.SupportUrl.ToString());
+            swaggerDoc.Extensions["x-support-url"] = new Microsoft.OpenApi.Any.OpenApiString(this.options.SupportUrl.ToString());
         }
 
-        if (_options.ApiStatus != null)
+        if (this.options.ApiStatus != null)
         {
-            swaggerDoc.Extensions["x-api-status"] = new Microsoft.OpenApi.Any.OpenApiString(_options.ApiStatus);
+            swaggerDoc.Extensions["x-api-status"] = new Microsoft.OpenApi.Any.OpenApiString(this.options.ApiStatus);
         }
     }
 }

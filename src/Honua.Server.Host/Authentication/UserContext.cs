@@ -32,7 +32,7 @@ namespace Honua.Server.Host.Authentication;
 /// </remarks>
 public sealed class UserContext : IUserContext
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IHttpContextAccessor httpContextAccessor;
 
     // Cached values (computed once per request)
     private string? _userId;
@@ -52,7 +52,7 @@ public sealed class UserContext : IUserContext
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="httpContextAccessor"/> is null.</exception>
     public UserContext(IHttpContextAccessor httpContextAccessor)
     {
-        _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+        this.httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
     }
 
     /// <inheritdoc />
@@ -146,45 +146,45 @@ public sealed class UserContext : IUserContext
             return;
         }
 
-        var httpContext = _httpContextAccessor.HttpContext;
+        var httpContext = this.httpContextAccessor.HttpContext;
         var user = httpContext?.User;
 
         // Extract user identity
-        _isAuthenticated = user?.Identity?.IsAuthenticated ?? false;
+        this.isAuthenticated = user?.Identity?.IsAuthenticated ?? false;
 
-        if (_isAuthenticated.Value)
+        if (this.isAuthenticated.Value)
         {
             // Extract user ID using the existing helper
-            _userId = UserIdentityHelper.GetUserIdentifier(user);
+            this.userId = UserIdentityHelper.GetUserIdentifier(user);
 
             // Extract user name from claims
-            _userName = ExtractUserName(user);
+            this.userName = ExtractUserName(user);
 
             // Extract tenant ID if available
-            _tenantId = ExtractTenantId(user);
+            this.tenantId = ExtractTenantId(user);
 
             // Extract authentication method
-            _authenticationMethod = user?.Identity?.AuthenticationType;
+            this.authenticationMethod = user?.Identity?.AuthenticationType;
         }
         else
         {
             // System/unauthenticated operation
-            _userId = "system";
-            _userName = null;
-            _tenantId = null;
-            _authenticationMethod = null;
+            this.userId = "system";
+            this.userName = null;
+            this.tenantId = null;
+            this.authenticationMethod = null;
         }
 
         // Extract or generate session ID
-        _sessionId = ExtractOrGenerateSessionId(httpContext);
+        this.sessionId = ExtractOrGenerateSessionId(httpContext);
 
         // Extract IP address (considering forwarded headers)
-        _ipAddress = ExtractIpAddress(httpContext);
+        this.ipAddress = ExtractIpAddress(httpContext);
 
         // Extract user agent
-        _userAgent = httpContext?.Request.Headers["User-Agent"].FirstOrDefault();
+        this.userAgent = httpContext?.Request.Headers["User-Agent"].FirstOrDefault();
 
-        _valuesInitialized = true;
+        this.valuesInitialized = true;
     }
 
     /// <summary>

@@ -11,20 +11,30 @@ namespace Honua.Server.Observability.HealthChecks;
 /// </summary>
 public class LicenseHealthCheck : IHealthCheck
 {
-    private readonly string _connectionString;
+    private readonly string connectionString;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LicenseHealthCheck"/> class.
+    /// </summary>
+    /// <param name="connectionString">The PostgreSQL connection string.</param>
     public LicenseHealthCheck(string connectionString)
     {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        this.connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
     }
 
+    /// <summary>
+    /// Checks the health of license validation and quota status.
+    /// </summary>
+    /// <param name="context">The health check context.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that represents the asynchronous health check operation.</returns>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_connectionString);
+            await using var connection = new NpgsqlConnection(this.connectionString);
             await connection.OpenAsync(cancellationToken);
 
             // Check if license table exists
@@ -42,7 +52,7 @@ public class LicenseHealthCheck : IHealthCheck
                     "License table does not exist",
                     data: new Dictionary<string, object>
                     {
-                        { "table_exists", false }
+                        { "table_exists", false },
                     });
             }
 
@@ -72,7 +82,7 @@ public class LicenseHealthCheck : IHealthCheck
             {
                 { "active_licenses", activeLicenses },
                 { "expired_licenses", expiredLicenses },
-                { "expiring_soon", expiringSoon }
+                { "expiring_soon", expiringSoon },
             };
 
             // Check for licenses expiring soon

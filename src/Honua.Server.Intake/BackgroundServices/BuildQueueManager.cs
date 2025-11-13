@@ -71,24 +71,24 @@ public interface IBuildQueueManager
 /// </summary>
 public sealed class BuildQueueManager : IBuildQueueManager
 {
-    private readonly string _connectionString;
-    private readonly ILogger<BuildQueueManager> _logger;
-    private readonly BuildQueueOptions _options;
+    private readonly string connectionString;
+    private readonly ILogger<BuildQueueManager> logger;
+    private readonly BuildQueueOptions options;
 
     public BuildQueueManager(
         IOptions<BuildQueueOptions> options,
         ILogger<BuildQueueManager> logger,
         string? connectionString = null)
     {
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Use provided connection string or fall back to options
-        _connectionString = connectionString ?? _options.ConnectionString
+        this.connectionString = connectionString ?? this.options.ConnectionString
             ?? throw new InvalidOperationException("Connection string is required");
 
-        _logger.LogInformation("BuildQueueManager initialized with max concurrent builds: {MaxConcurrent}",
-            _options.MaxConcurrentBuilds);
+        this.logger.LogInformation("BuildQueueManager initialized with max concurrent builds: {MaxConcurrent}",
+            this.options.MaxConcurrentBuilds);
     }
 
     /// <inheritdoc/>
@@ -96,7 +96,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
     {
         ArgumentNullException.ThrowIfNull(job);
 
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         var id = await connection.ExecuteScalarAsync<Guid>(new CommandDefinition(
@@ -131,7 +131,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
             },
             cancellationToken: cancellationToken));
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Enqueued build job {JobId} for customer {CustomerId} with priority {Priority}",
             id, job.CustomerId, job.Priority);
 
@@ -141,7 +141,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
     /// <inheritdoc/>
     public async Task<BuildJob?> GetNextBuildAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         // Get the next pending build ordered by priority (highest first), then by enqueued time
@@ -160,7 +160,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
                 ORDER BY priority DESC, enqueued_at ASC
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED",
-            parameters: new { MaxRetries = _options.MaxRetryAttempts },
+            parameters: new { MaxRetries = this.options.MaxRetryAttempts },
             cancellationToken: cancellationToken));
 
         if (job == null)
@@ -181,7 +181,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
         string? errorMessage = null,
         CancellationToken cancellationToken = default)
     {
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
@@ -218,7 +218,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
             },
             cancellationToken: cancellationToken));
 
-        _logger.LogInformation("Updated build job {JobId} status to {Status}", jobId, status);
+        this.logger.LogInformation("Updated build job {JobId} status to {Status}", jobId, status);
     }
 
     /// <inheritdoc/>
@@ -229,7 +229,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
     {
         ArgumentNullException.ThrowIfNull(progress);
 
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         await connection.ExecuteAsync(new CommandDefinition(
@@ -249,7 +249,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
             },
             cancellationToken: cancellationToken));
 
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "Updated build job {JobId} progress: {Percent}% - {Step}",
             jobId, progress.ProgressPercent, progress.CurrentStep);
     }
@@ -257,7 +257,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
     /// <inheritdoc/>
     public async Task<BuildJob?> GetBuildJobAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         var dto = await connection.QuerySingleOrDefaultAsync<BuildJobDto?>(new CommandDefinition(
@@ -280,7 +280,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
     /// <inheritdoc/>
     public async Task<QueueStatistics> GetQueueStatisticsAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         var stats = await connection.QuerySingleAsync<QueueStatisticsDto>(new CommandDefinition(
@@ -332,7 +332,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
     /// <inheritdoc/>
     public async Task MarkBuildStartedAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         await connection.ExecuteAsync(new CommandDefinition(
@@ -351,13 +351,13 @@ public sealed class BuildQueueManager : IBuildQueueManager
             },
             cancellationToken: cancellationToken));
 
-        _logger.LogInformation("Marked build job {JobId} as started", jobId);
+        this.logger.LogInformation("Marked build job {JobId} as started", jobId);
     }
 
     /// <inheritdoc/>
     public async Task IncrementRetryCountAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
-        await using var connection = new NpgsqlConnection(_connectionString);
+        await using var connection = new NpgsqlConnection(this.connectionString);
         await connection.OpenAsync(cancellationToken);
 
         await connection.ExecuteAsync(new CommandDefinition(
@@ -375,7 +375,7 @@ public sealed class BuildQueueManager : IBuildQueueManager
             },
             cancellationToken: cancellationToken));
 
-        _logger.LogInformation("Incremented retry count for build job {JobId}", jobId);
+        this.logger.LogInformation("Incremented retry count for build job {JobId}", jobId);
     }
 
     // Private helper methods

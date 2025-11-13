@@ -14,22 +14,32 @@ using Microsoft.Extensions.Logging;
 using SkiaSharp;
 
 using Honua.Server.Core.Utilities;
+
 namespace Honua.Server.Core.Raster.Analytics;
 
+/// <summary>
+/// Service for performing analytical operations on raster data including statistics, algebra, and terrain analysis.
+/// </summary>
 public sealed class RasterAnalyticsService : IRasterAnalyticsService
 {
-    private readonly ILogger<RasterAnalyticsService> _logger;
-    private readonly RasterMemoryLimits _memoryLimits;
+    private readonly ILogger<RasterAnalyticsService> logger;
+    private readonly RasterMemoryLimits memoryLimits;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RasterAnalyticsService"/> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="memoryLimits">Optional memory limits for raster operations.</param>
     public RasterAnalyticsService(
         ILogger<RasterAnalyticsService> logger,
         RasterMemoryLimits? memoryLimits = null)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _memoryLimits = memoryLimits ?? new RasterMemoryLimits();
-        _memoryLimits.Validate();
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.memoryLimits = memoryLimits ?? new RasterMemoryLimits();
+        this.memoryLimits.Validate();
     }
 
+    /// <inheritdoc/>
     public Task<RasterStatistics> CalculateStatisticsAsync(RasterStatisticsRequest request, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
@@ -53,8 +63,8 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
                 continue;
             }
 
-            var values = ExtractBandValues(bitmap, band);
-            var stats = CalculateBandStatistics(band, values);
+            var values = this.ExtractBandValues(bitmap, band);
+            var stats = this.CalculateBandStatistics(band, values);
             bandStats.Add(stats);
         }
 
@@ -67,39 +77,40 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         return Task.FromResult(result);
     }
 
+    /// <inheritdoc/>
     public Task<RasterAlgebraResult> CalculateAlgebraAsync(RasterAlgebraRequest request, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
 
         // Validate dataset count
-        if (request.Datasets.Count > _memoryLimits.MaxSimultaneousDatasets)
+        if (request.Datasets.Count > this.memoryLimits.MaxSimultaneousDatasets)
         {
             throw new ArgumentException(
                 $"Number of datasets ({request.Datasets.Count}) exceeds maximum allowed " +
-                $"({_memoryLimits.MaxSimultaneousDatasets}). " +
+                $"({this.memoryLimits.MaxSimultaneousDatasets}). " +
                 $"Consider processing datasets in batches or increasing RasterMemoryLimits.MaxSimultaneousDatasets.",
                 nameof(request));
         }
 
         // Validate output dimensions
-        if (request.Width > _memoryLimits.MaxRasterDimension || request.Height > _memoryLimits.MaxRasterDimension)
+        if (request.Width > this.memoryLimits.MaxRasterDimension || request.Height > this.memoryLimits.MaxRasterDimension)
         {
             throw new ArgumentException(
                 $"Requested dimensions ({request.Width}x{request.Height}) exceed maximum allowed " +
-                $"({_memoryLimits.MaxRasterDimension}x{_memoryLimits.MaxRasterDimension}).",
+                $"({this.memoryLimits.MaxRasterDimension}x{this.memoryLimits.MaxRasterDimension}).",
                 nameof(request));
         }
 
         long totalPixels = (long)request.Width * request.Height;
-        if (totalPixels > _memoryLimits.MaxRasterPixels)
+        if (totalPixels > this.memoryLimits.MaxRasterPixels)
         {
             throw new ArgumentException(
-                $"Total pixel count ({totalPixels:N0}) exceeds maximum allowed ({_memoryLimits.MaxRasterPixels:N0}). " +
+                $"Total pixel count ({totalPixels:N0}) exceeds maximum allowed ({this.memoryLimits.MaxRasterPixels:N0}). " +
                 $"Requested: {request.Width}x{request.Height}",
                 nameof(request));
         }
 
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "Processing raster algebra: {DatasetCount} datasets, output: {Width}x{Height} ({TotalPixels:N0} pixels)",
             request.Datasets.Count, request.Width, request.Height, totalPixels);
 
@@ -122,21 +133,21 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
             }
 
             // Apply algebra expression
-            var resultBitmap = ApplyAlgebraExpression(bitmaps, request.Expression, request.Width, request.Height);
+            var resultBitmap = this.ApplyAlgebraExpression(bitmaps, request.Expression, request.Width, request.Height);
 
             var normalizedFormat = RasterFormatHelper.Normalize(request.Format);
             var contentType = RasterFormatHelper.GetContentType(normalizedFormat);
 
             using var image = SKImage.FromBitmap(resultBitmap);
-            using var data = image.Encode(GetEncodedImageFormat(normalizedFormat), 90);
+            using var data = image.Encode(this.GetEncodedImageFormat(normalizedFormat), 90);
             var bytes = data.ToArray();
 
             // Calculate statistics on result
-            var values = ExtractAllValues(resultBitmap);
+            var values = this.ExtractAllValues(resultBitmap);
             var stats = new RasterStatistics(
                 "algebra_result",
                 1,
-                new[] { CalculateBandStatistics(0, values) },
+                new[] { this.CalculateBandStatistics(0, values) },
                 request.BoundingBox);
 
             var result = new RasterAlgebraResult(bytes, contentType, request.Width, request.Height, stats);
@@ -153,15 +164,16 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         }
     }
 
+    /// <inheritdoc/>
     public Task<RasterValueExtractionResult> ExtractValuesAsync(RasterValueExtractionRequest request, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
 
-        if (request.Points.Count > _memoryLimits.MaxExtractionPoints)
+        if (request.Points.Count > this.memoryLimits.MaxExtractionPoints)
         {
             throw new ArgumentException(
                 $"Number of points ({request.Points.Count}) exceeds maximum allowed " +
-                $"({_memoryLimits.MaxExtractionPoints}). " +
+                $"({this.memoryLimits.MaxExtractionPoints}). " +
                 $"Consider processing points in batches or increasing RasterMemoryLimits.MaxExtractionPoints.",
                 nameof(request));
         }
@@ -172,14 +184,14 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
             throw new InvalidOperationException($"Could not load dataset {request.Dataset.Id}");
         }
 
-        var extent = GetDatasetExtent(request.Dataset);
+        var extent = this.GetDatasetExtent(request.Dataset);
         var values = new List<PointValue>();
 
         var targetBand = request.BandIndex ?? 0;
 
         foreach (var point in request.Points)
         {
-            var (pixelX, pixelY) = WorldToPixel(point.X, point.Y, extent, bitmap.Width, bitmap.Height);
+            var (pixelX, pixelY) = this.WorldToPixel(point.X, point.Y, extent, bitmap.Width, bitmap.Height);
 
             if (pixelX >= 0 && pixelX < bitmap.Width && pixelY >= 0 && pixelY < bitmap.Height)
             {
@@ -198,14 +210,15 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         return Task.FromResult(result);
     }
 
+    /// <inheritdoc/>
     public Task<RasterHistogram> CalculateHistogramAsync(RasterHistogramRequest request, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
 
-        if (request.BinCount > _memoryLimits.MaxHistogramBins)
+        if (request.BinCount > this.memoryLimits.MaxHistogramBins)
         {
             throw new ArgumentException(
-                $"Bin count ({request.BinCount}) exceeds maximum allowed ({_memoryLimits.MaxHistogramBins}). " +
+                $"Bin count ({request.BinCount}) exceeds maximum allowed ({this.memoryLimits.MaxHistogramBins}). " +
                 $"Consider using fewer bins or increasing RasterMemoryLimits.MaxHistogramBins.",
                 nameof(request));
         }
@@ -247,14 +260,15 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         return Task.FromResult(result);
     }
 
+    /// <inheritdoc/>
     public Task<ZonalStatisticsResult> CalculateZonalStatisticsAsync(ZonalStatisticsRequest request, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
 
-        if (request.Zones.Count > _memoryLimits.MaxZonalPolygons)
+        if (request.Zones.Count > this.memoryLimits.MaxZonalPolygons)
         {
             throw new ArgumentException(
-                $"Number of zones ({request.Zones.Count}) exceeds maximum allowed ({_memoryLimits.MaxZonalPolygons}). " +
+                $"Number of zones ({request.Zones.Count}) exceeds maximum allowed ({this.memoryLimits.MaxZonalPolygons}). " +
                 $"Consider processing zones in batches or increasing RasterMemoryLimits.MaxZonalPolygons.",
                 nameof(request));
         }
@@ -262,11 +276,11 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         // Validate polygon complexity
         foreach (var zone in request.Zones)
         {
-            if (zone.Coordinates.Count > _memoryLimits.MaxZonalPolygonVertices)
+            if (zone.Coordinates.Count > this.memoryLimits.MaxZonalPolygonVertices)
             {
                 throw new ArgumentException(
                     $"Polygon '{zone.ZoneId ?? "unknown"}' has {zone.Coordinates.Count} vertices, " +
-                    $"which exceeds maximum allowed ({_memoryLimits.MaxZonalPolygonVertices}). " +
+                    $"which exceeds maximum allowed ({this.memoryLimits.MaxZonalPolygonVertices}). " +
                     $"Consider simplifying the polygon or increasing RasterMemoryLimits.MaxZonalPolygonVertices.",
                     nameof(request));
             }
@@ -279,7 +293,7 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
             }
         }
 
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "Processing zonal statistics: {ZoneCount} zones, max vertices: {MaxVertices}",
             request.Zones.Count,
             request.Zones.Max(z => z.Coordinates.Count));
@@ -290,7 +304,7 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
             throw new InvalidOperationException($"Could not load dataset {request.Dataset.Id}");
         }
 
-        var extent = GetDatasetExtent(request.Dataset);
+        var extent = this.GetDatasetExtent(request.Dataset);
         var targetBand = request.BandIndex ?? 0;
         var zoneStats = new List<ZoneStatistics>(request.Zones.Count);
 
@@ -305,8 +319,8 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
             var maxY = zone.Coordinates.Max(p => p.Y);
 
             // Convert world coordinates to pixel coordinates
-            var (minPixelX, maxPixelY) = WorldToPixel(minX, minY, extent, bitmap.Width, bitmap.Height);
-            var (maxPixelX, minPixelY) = WorldToPixel(maxX, maxY, extent, bitmap.Width, bitmap.Height);
+            var (minPixelX, maxPixelY) = this.WorldToPixel(minX, minY, extent, bitmap.Width, bitmap.Height);
+            var (maxPixelX, minPixelY) = this.WorldToPixel(maxX, maxY, extent, bitmap.Width, bitmap.Height);
 
             // Clamp to image bounds
             minPixelX = Math.Max(0, minPixelX);
@@ -323,12 +337,12 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
                     var worldX = extent[0] + (x / (double)bitmap.Width) * (extent[2] - extent[0]);
                     var worldY = extent[3] - (y / (double)bitmap.Height) * (extent[3] - extent[1]);
 
-                    if (IsPointInPolygon(worldX, worldY, zone.Coordinates))
+                    if (this.IsPointInPolygon(worldX, worldY, zone.Coordinates))
                     {
                         var color = bitmap.GetPixel(x, y);
                         if (color.Alpha > 0)
                         {
-                            var value = ExtractBandValue(color, targetBand);
+                            var value = this.ExtractBandValue(color, targetBand);
                             if (value.HasValue)
                             {
                                 pixelValues.Add(value.Value);
@@ -410,6 +424,7 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         return inside;
     }
 
+    /// <inheritdoc/>
     public Task<TerrainAnalysisResult> CalculateTerrainAsync(TerrainAnalysisRequest request, CancellationToken cancellationToken = default)
     {
         var bitmap = LoadDatasetBitmap(request.ElevationDataset);
@@ -422,19 +437,19 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         {
             var resultBitmap = request.AnalysisType switch
             {
-                TerrainAnalysisType.Hillshade => CalculateHillshade(bitmap, request.ZFactor, request.Azimuth, request.Altitude),
-                TerrainAnalysisType.Slope => CalculateSlope(bitmap, request.ZFactor),
-                TerrainAnalysisType.Aspect => CalculateAspect(bitmap),
-                TerrainAnalysisType.Curvature => CalculateCurvature(bitmap, request.ZFactor),
-                TerrainAnalysisType.Roughness => CalculateRoughness(bitmap),
+                TerrainAnalysisType.Hillshade => this.CalculateHillshade(bitmap, request.ZFactor, request.Azimuth, request.Altitude),
+                TerrainAnalysisType.Slope => this.CalculateSlope(bitmap, request.ZFactor),
+                TerrainAnalysisType.Aspect => this.CalculateAspect(bitmap),
+                TerrainAnalysisType.Curvature => this.CalculateCurvature(bitmap, request.ZFactor),
+                TerrainAnalysisType.Roughness => this.CalculateRoughness(bitmap),
                 _ => throw new ArgumentException($"Unsupported terrain analysis type: {request.AnalysisType}")
             };
 
             using var image = SKImage.FromBitmap(resultBitmap);
-            var format = GetEncodedImageFormat(request.Format);
+            var format = this.GetEncodedImageFormat(request.Format);
             using var data = image.Encode(format, 90);
 
-            var stats = CalculateTerrainStatistics(resultBitmap, request.AnalysisType);
+            var stats = this.CalculateTerrainStatistics(resultBitmap, request.AnalysisType);
 
             var result = new TerrainAnalysisResult(
                 data.ToArray(),
@@ -467,14 +482,14 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
             for (int x = 1; x < width - 1; x++)
             {
                 // Get elevation values in 3x3 neighborhood
-                var a = GetElevation(elevationBitmap, x - 1, y - 1);
-                var b = GetElevation(elevationBitmap, x, y - 1);
-                var c = GetElevation(elevationBitmap, x + 1, y - 1);
-                var d = GetElevation(elevationBitmap, x - 1, y);
-                var f = GetElevation(elevationBitmap, x + 1, y);
-                var g = GetElevation(elevationBitmap, x - 1, y + 1);
-                var h = GetElevation(elevationBitmap, x, y + 1);
-                var i = GetElevation(elevationBitmap, x + 1, y + 1);
+                var a = this.GetElevation(elevationBitmap, x - 1, y - 1);
+                var b = this.GetElevation(elevationBitmap, x, y - 1);
+                var c = this.GetElevation(elevationBitmap, x + 1, y - 1);
+                var d = this.GetElevation(elevationBitmap, x - 1, y);
+                var f = this.GetElevation(elevationBitmap, x + 1, y);
+                var g = this.GetElevation(elevationBitmap, x - 1, y + 1);
+                var h = this.GetElevation(elevationBitmap, x, y + 1);
+                var i = this.GetElevation(elevationBitmap, x + 1, y + 1);
 
                 // Calculate slope and aspect using Horn's method
                 var dzdx = ((c + 2 * f + i) - (a + 2 * d + g)) / (8.0 * zFactor);
@@ -506,14 +521,14 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
             for (int x = 1; x < width - 1; x++)
             {
                 // Get elevation values in 3x3 neighborhood
-                var a = GetElevation(elevationBitmap, x - 1, y - 1);
-                var b = GetElevation(elevationBitmap, x, y - 1);
-                var c = GetElevation(elevationBitmap, x + 1, y - 1);
-                var d = GetElevation(elevationBitmap, x - 1, y);
-                var f = GetElevation(elevationBitmap, x + 1, y);
-                var g = GetElevation(elevationBitmap, x - 1, y + 1);
-                var h = GetElevation(elevationBitmap, x, y + 1);
-                var i = GetElevation(elevationBitmap, x + 1, y + 1);
+                var a = this.GetElevation(elevationBitmap, x - 1, y - 1);
+                var b = this.GetElevation(elevationBitmap, x, y - 1);
+                var c = this.GetElevation(elevationBitmap, x + 1, y - 1);
+                var d = this.GetElevation(elevationBitmap, x - 1, y);
+                var f = this.GetElevation(elevationBitmap, x + 1, y);
+                var g = this.GetElevation(elevationBitmap, x - 1, y + 1);
+                var h = this.GetElevation(elevationBitmap, x, y + 1);
+                var i = this.GetElevation(elevationBitmap, x + 1, y + 1);
 
                 // Calculate slope using Horn's method
                 var dzdx = ((c + 2 * f + i) - (a + 2 * d + g)) / (8.0 * zFactor);
@@ -541,14 +556,14 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
             for (int x = 1; x < width - 1; x++)
             {
                 // Get elevation values in 3x3 neighborhood
-                var a = GetElevation(elevationBitmap, x - 1, y - 1);
-                var b = GetElevation(elevationBitmap, x, y - 1);
-                var c = GetElevation(elevationBitmap, x + 1, y - 1);
-                var d = GetElevation(elevationBitmap, x - 1, y);
-                var f = GetElevation(elevationBitmap, x + 1, y);
-                var g = GetElevation(elevationBitmap, x - 1, y + 1);
-                var h = GetElevation(elevationBitmap, x, y + 1);
-                var i = GetElevation(elevationBitmap, x + 1, y + 1);
+                var a = this.GetElevation(elevationBitmap, x - 1, y - 1);
+                var b = this.GetElevation(elevationBitmap, x, y - 1);
+                var c = this.GetElevation(elevationBitmap, x + 1, y - 1);
+                var d = this.GetElevation(elevationBitmap, x - 1, y);
+                var f = this.GetElevation(elevationBitmap, x + 1, y);
+                var g = this.GetElevation(elevationBitmap, x - 1, y + 1);
+                var h = this.GetElevation(elevationBitmap, x, y + 1);
+                var i = this.GetElevation(elevationBitmap, x + 1, y + 1);
 
                 // Calculate aspect
                 var dzdx = ((c + 2 * f + i) - (a + 2 * d + g)) / 8.0;
@@ -584,11 +599,11 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         {
             for (int x = 1; x < width - 1; x++)
             {
-                var center = GetElevation(elevationBitmap, x, y);
-                var left = GetElevation(elevationBitmap, x - 1, y);
-                var right = GetElevation(elevationBitmap, x + 1, y);
-                var top = GetElevation(elevationBitmap, x, y - 1);
-                var bottom = GetElevation(elevationBitmap, x, y + 1);
+                var center = this.GetElevation(elevationBitmap, x, y);
+                var left = this.GetElevation(elevationBitmap, x - 1, y);
+                var right = this.GetElevation(elevationBitmap, x + 1, y);
+                var top = this.GetElevation(elevationBitmap, x, y - 1);
+                var bottom = this.GetElevation(elevationBitmap, x, y + 1);
 
                 // Second derivative (curvature)
                 var curvature = ((left + right + top + bottom) - 4 * center) / (zFactor * zFactor);
@@ -620,7 +635,7 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
                 {
                     for (int dx = -1; dx <= 1; dx++)
                     {
-                        values.Add(GetElevation(elevationBitmap, x + dx, y + dy));
+                        values.Add(this.GetElevation(elevationBitmap, x + dx, y + dy));
                     }
                 }
 
@@ -679,16 +694,17 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         return new TerrainAnalysisStatistics(min, max, mean, stdDev, unit);
     }
 
+    /// <inheritdoc/>
     public RasterAnalyticsCapabilities GetCapabilities()
     {
         return new RasterAnalyticsCapabilities(
             SupportedAlgebraOperators: new[] { "+", "-", "*", "/", "min", "max", "mean", "avg", "stddev", "sqrt", "square", "log" },
             SupportedAlgebraFunctions: new[] { "ndvi", "evi", "savi", "ndwi", "ndmi", "normalize" },
             SupportedTerrainAnalyses: new[] { "hillshade", "slope", "aspect", "curvature", "roughness" },
-            MaxAlgebraDatasets: _memoryLimits.MaxSimultaneousDatasets,
-            MaxExtractionPoints: _memoryLimits.MaxExtractionPoints,
-            MaxHistogramBins: _memoryLimits.MaxHistogramBins,
-            MaxZonalPolygons: _memoryLimits.MaxZonalPolygons);
+            MaxAlgebraDatasets: this.memoryLimits.MaxSimultaneousDatasets,
+            MaxExtractionPoints: this.memoryLimits.MaxExtractionPoints,
+            MaxHistogramBins: this.memoryLimits.MaxHistogramBins,
+            MaxZonalPolygons: this.memoryLimits.MaxZonalPolygons);
     }
 
     private BandStatistics CalculateBandStatistics(int bandIndex, List<double> values)
@@ -732,7 +748,7 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
                 var color = bitmap.GetPixel(x, y);
                 if (color.Alpha > 0)
                 {
-                    var value = ExtractBandValue(color, band);
+                    var value = this.ExtractBandValue(color, band);
                     if (value.HasValue)
                     {
                         values.Add(value.Value);
@@ -787,7 +803,7 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         {
             for (int x = 0; x < width; x++)
             {
-                var value = EvaluateAlgebraAtPixel(bitmaps, expr, x, y);
+                var value = this.EvaluateAlgebraAtPixel(bitmaps, expr, x, y);
                 var normalized = Math.Clamp(value, 0, 255);
                 var gray = (byte)normalized;
                 resultBitmap.SetPixel(x, y, new SKColor(gray, gray, gray, 255));
@@ -805,8 +821,8 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         if (expr.Contains("ndvi") && bitmaps.Count >= 2)
         {
             // NDVI = (NIR - RED) / (NIR + RED)
-            var nir = GetPixelValue(bitmaps[0], x, y);
-            var red = GetPixelValue(bitmaps[1], x, y);
+            var nir = this.GetPixelValue(bitmaps[0], x, y);
+            var red = this.GetPixelValue(bitmaps[1], x, y);
             var ndvi = red + nir > 0 ? (nir - red) / (nir + red) : 0;
             return (ndvi + 1) * 127.5; // Scale from [-1, 1] to [0, 255]
         }
@@ -814,9 +830,9 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         if (expr.Contains("evi") && bitmaps.Count >= 3)
         {
             // EVI = 2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))
-            var nir = GetPixelValue(bitmaps[0], x, y) / 255.0;
-            var red = GetPixelValue(bitmaps[1], x, y) / 255.0;
-            var blue = GetPixelValue(bitmaps[2], x, y) / 255.0;
+            var nir = this.GetPixelValue(bitmaps[0], x, y) / 255.0;
+            var red = this.GetPixelValue(bitmaps[1], x, y) / 255.0;
+            var blue = this.GetPixelValue(bitmaps[2], x, y) / 255.0;
             var denominator = nir + 6 * red - 7.5 * blue + 1;
             var evi = denominator != 0 ? 2.5 * ((nir - red) / denominator) : 0;
             return Math.Clamp((evi + 1) * 127.5, 0, 255);
@@ -837,8 +853,8 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         if (expr.Contains("ndwi") && bitmaps.Count >= 2)
         {
             // NDWI = (GREEN - NIR) / (GREEN + NIR)
-            var green = GetPixelValue(bitmaps[0], x, y);
-            var nir = GetPixelValue(bitmaps[1], x, y);
+            var green = this.GetPixelValue(bitmaps[0], x, y);
+            var nir = this.GetPixelValue(bitmaps[1], x, y);
             var ndwi = green + nir > 0 ? (green - nir) / (green + nir) : 0;
             return (ndwi + 1) * 127.5;
         }
@@ -846,8 +862,8 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         if (expr.Contains("ndmi") && bitmaps.Count >= 2)
         {
             // NDMI = (NIR - SWIR) / (NIR + SWIR) - Moisture Index
-            var nir = GetPixelValue(bitmaps[0], x, y);
-            var swir = GetPixelValue(bitmaps[1], x, y);
+            var nir = this.GetPixelValue(bitmaps[0], x, y);
+            var swir = this.GetPixelValue(bitmaps[1], x, y);
             var ndmi = nir + swir > 0 ? (nir - swir) / (nir + swir) : 0;
             return (ndmi + 1) * 127.5;
         }
@@ -855,44 +871,44 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         // Basic arithmetic operations
         if (expr.Contains("-") && bitmaps.Count >= 2)
         {
-            return GetPixelValue(bitmaps[0], x, y) - GetPixelValue(bitmaps[1], x, y);
+            return this.GetPixelValue(bitmaps[0], x, y) - this.GetPixelValue(bitmaps[1], x, y);
         }
 
         if (expr.Contains("+") && bitmaps.Count >= 2)
         {
-            return GetPixelValue(bitmaps[0], x, y) + GetPixelValue(bitmaps[1], x, y);
+            return this.GetPixelValue(bitmaps[0], x, y) + this.GetPixelValue(bitmaps[1], x, y);
         }
 
         if (expr.Contains("*") && bitmaps.Count >= 2)
         {
-            return GetPixelValue(bitmaps[0], x, y) * GetPixelValue(bitmaps[1], x, y) / 255.0;
+            return this.GetPixelValue(bitmaps[0], x, y) * this.GetPixelValue(bitmaps[1], x, y) / 255.0;
         }
 
         if (expr.Contains("/") && bitmaps.Count >= 2)
         {
-            var divisor = GetPixelValue(bitmaps[1], x, y);
-            return divisor > 0 ? (GetPixelValue(bitmaps[0], x, y) / divisor) * 255.0 : 0;
+            var divisor = this.GetPixelValue(bitmaps[1], x, y);
+            return divisor > 0 ? (this.GetPixelValue(bitmaps[0], x, y) / divisor) * 255.0 : 0;
         }
 
         // Statistical operations
         if (expr.Contains("mean") || expr.Contains("avg"))
         {
-            return bitmaps.Average(b => GetPixelValue(b, x, y));
+            return bitmaps.Average(b => this.GetPixelValue(b, x, y));
         }
 
         if (expr.Contains("min") && bitmaps.Count >= 2)
         {
-            return bitmaps.Min(b => GetPixelValue(b, x, y));
+            return bitmaps.Min(b => this.GetPixelValue(b, x, y));
         }
 
         if (expr.Contains("max") && bitmaps.Count >= 2)
         {
-            return bitmaps.Max(b => GetPixelValue(b, x, y));
+            return bitmaps.Max(b => this.GetPixelValue(b, x, y));
         }
 
         if (expr.Contains("stddev") && bitmaps.Count >= 2)
         {
-            var values = bitmaps.Select(b => GetPixelValue(b, x, y)).ToList();
+            var values = bitmaps.Select(b => this.GetPixelValue(b, x, y)).ToList();
             var mean = values.Average();
             var variance = values.Sum(v => Math.Pow(v - mean, 2)) / values.Count;
             return Math.Sqrt(variance);
@@ -902,7 +918,7 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
         if (expr.Contains("normalize") && bitmaps.Count >= 1)
         {
             // Normalize to 0-255 range
-            return GetPixelValue(bitmaps[0], x, y);
+            return this.GetPixelValue(bitmaps[0], x, y);
         }
 
         if (expr.Contains("sqrt") && bitmaps.Count >= 1)
@@ -912,17 +928,17 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
 
         if (expr.Contains("square") && bitmaps.Count >= 1)
         {
-            var val = GetPixelValue(bitmaps[0], x, y) / 255.0;
+            var val = this.GetPixelValue(bitmaps[0], x, y) / 255.0;
             return val * val * 255.0;
         }
 
         if (expr.Contains("log") && bitmaps.Count >= 1)
         {
-            var val = GetPixelValue(bitmaps[0], x, y);
+            var val = this.GetPixelValue(bitmaps[0], x, y);
             return val > 0 ? Math.Log(val) * 50 : 0;
         }
 
-        return bitmaps.Count > 0 ? GetPixelValue(bitmaps[0], x, y) : 0;
+        return bitmaps.Count > 0 ? this.GetPixelValue(bitmaps[0], x, y) : 0;
     }
 
     private double GetPixelValue(SKBitmap bitmap, int x, int y)
@@ -973,11 +989,11 @@ public sealed class RasterAnalyticsService : IRasterAnalyticsService
 
         try
         {
-            return LoadTiffBitmap(filePath);
+            return this.LoadTiffBitmap(filePath);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to load TIFF bitmap from {FilePath}", filePath);
+            this.logger.LogWarning(ex, "Failed to load TIFF bitmap from {FilePath}", filePath);
             return null;
         }
     }

@@ -161,19 +161,19 @@ public static class ETagResultExtensions
     /// </summary>
     private sealed class ETagResult : IResult
     {
-        private readonly IResult _innerResult;
-        private readonly string _etag;
+        private readonly IResult innerResult;
+        private readonly string etag;
 
         public ETagResult(IResult innerResult, string etag)
         {
-            _innerResult = innerResult;
-            _etag = etag;
+            this.innerResult = innerResult;
+            this.etag = etag;
         }
 
         public async Task ExecuteAsync(HttpContext httpContext)
         {
             httpContext.Response.Headers[HeaderNames.ETag] = _etag;
-            await _innerResult.ExecuteAsync(httpContext);
+            await this.innerResult.ExecuteAsync(httpContext);
         }
     }
 }

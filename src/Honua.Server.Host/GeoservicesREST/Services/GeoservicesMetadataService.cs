@@ -25,18 +25,18 @@ public sealed class GeoservicesMetadataService : IGeoservicesMetadataService
 {
     private const double GeoServicesVersion = 10.81;
 
-    private readonly ICatalogProjectionService _catalog;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly ILogger<GeoservicesMetadataService> _logger;
+    private readonly ICatalogProjectionService catalog;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly ILogger<GeoservicesMetadataService> logger;
 
     public GeoservicesMetadataService(
         ICatalogProjectionService catalog,
         IMetadataRegistry metadataRegistry,
         ILogger<GeoservicesMetadataService> logger)
     {
-        _catalog = Guard.NotNull(catalog);
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _logger = Guard.NotNull(logger);
+        this.catalog = Guard.NotNull(catalog);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.logger = Guard.NotNull(logger);
     }
 
     public ActionResult<GeoservicesRESTFeatureServiceSummary> GetServiceSummary(CatalogServiceView serviceView)
@@ -68,7 +68,7 @@ public sealed class GeoservicesMetadataService : IGeoservicesMetadataService
             return null;
         }
 
-        var service = _catalog.GetService(serviceId);
+        var service = this.catalog.GetService(serviceId);
         if (service is null)
         {
             return null;
@@ -116,7 +116,7 @@ public sealed class GeoservicesMetadataService : IGeoservicesMetadataService
 
     private async Task<StyleDefinition?> ResolveDefaultStyleAsync(LayerDefinition layer, CancellationToken cancellationToken)
     {
-        var snapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
 
         if (!string.IsNullOrWhiteSpace(layer.DefaultStyleId) &&
             snapshot.TryGetStyle(layer.DefaultStyleId, out var defaultStyle))

@@ -21,18 +21,18 @@ namespace Honua.Server.Host.Middleware;
 /// </summary>
 public sealed class SecureExceptionHandlerMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly IWebHostEnvironment _environment;
-    private readonly ILogger<SecureExceptionHandlerMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly IWebHostEnvironment environment;
+    private readonly ILogger<SecureExceptionHandlerMiddleware> logger;
 
     public SecureExceptionHandlerMiddleware(
         RequestDelegate next,
         IWebHostEnvironment environment,
         ILogger<SecureExceptionHandlerMiddleware> logger)
     {
-        _next = Guard.NotNull(next);
-        _environment = Guard.NotNull(environment);
-        _logger = Guard.NotNull(logger);
+        this.next = Guard.NotNull(next);
+        this.environment = Guard.NotNull(environment);
+        this.logger = Guard.NotNull(logger);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -53,13 +53,13 @@ public sealed class SecureExceptionHandlerMiddleware
         var correlationId = CorrelationIdUtilities.GetCorrelationId(context) ?? context.TraceIdentifier;
 
         // Log full exception details with correlation ID
-        using (_logger.BeginScope(new Dictionary<string, object>
+        using (this.logger.BeginScope(new Dictionary<string, object>
         {
             ["ExceptionType"] = exception.GetType().Name,
             ["CorrelationId"] = correlationId
         }))
         {
-            _logger.LogError(exception, "Unhandled exception occurred: {Message} | CorrelationId: {CorrelationId}",
+            this.logger.LogError(exception, "Unhandled exception occurred: {Message} | CorrelationId: {CorrelationId}",
                 exception.Message, correlationId);
         }
 
@@ -84,7 +84,7 @@ public sealed class SecureExceptionHandlerMiddleware
 
     private object CreateErrorResponse(Exception exception, HttpStatusCode statusCode, string correlationId)
     {
-        var isDevelopment = _environment.IsDevelopment();
+        var isDevelopment = this.environment.IsDevelopment();
 
         // In production: sanitized error messages only
         // In development: include more details for debugging

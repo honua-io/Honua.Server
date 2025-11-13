@@ -27,7 +27,7 @@ public sealed class AlertHistoryStore : IAlertHistoryStore
     private readonly ILogger<AlertHistoryStore> _logger;
 
     private static readonly object SchemaLock = new();
-    private static volatile bool _schemaInitialized;
+    private static volatile bool schemaInitialized;
 
     private const string EnsureSchemaSql = @"
 CREATE TABLE IF NOT EXISTS alert_history (
@@ -225,8 +225,8 @@ WHERE id = @RuleId;";
 
     public AlertHistoryStore(IAlertReceiverDbConnectionFactory connectionFactory, ILogger<AlertHistoryStore> logger)
     {
-        _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this._connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<long> InsertAlertAsync(AlertHistoryEntry entry, CancellationToken cancellationToken = default)
@@ -379,7 +379,7 @@ WHERE id = @RuleId;";
 
     private async Task<System.Data.Common.DbConnection> OpenConnectionAsync(CancellationToken cancellationToken)
     {
-        var connection = _connectionFactory.CreateConnection();
+        var connection = this._connectionFactory.CreateConnection();
         if (connection is not System.Data.Common.DbConnection dbConnection)
         {
             throw new InvalidOperationException("Alert history store requires DbConnection-compatible factory.");
@@ -387,27 +387,27 @@ WHERE id = @RuleId;";
 
         await dbConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        EnsureSchema(dbConnection);
+        this.EnsureSchema(dbConnection);
         return dbConnection;
     }
 
     private void EnsureSchema(IDbConnection connection)
     {
-        if (_schemaInitialized)
+        if (schemaInitialized)
         {
             return;
         }
 
         lock (SchemaLock)
         {
-            if (_schemaInitialized)
+            if (schemaInitialized)
             {
                 return;
             }
 
             connection.Execute(EnsureSchemaSql);
-            _schemaInitialized = true;
-            _logger.LogInformation("Alert history schema verified.");
+            schemaInitialized = true;
+            this._logger.LogInformation("Alert history schema verified.");
         }
     }
 }

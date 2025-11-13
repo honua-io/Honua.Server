@@ -50,27 +50,27 @@ public enum OgcResponseFormat
 /// </summary>
 internal sealed class HeaderResult : IResult
 {
-    private readonly IResult _inner;
-    private readonly string _headerName;
-    private readonly string _headerValue;
+    private readonly IResult inner;
+    private readonly string headerName;
+    private readonly string headerValue;
 
     public HeaderResult(IResult inner, string headerName, string headerValue)
     {
-        _inner = Guard.NotNull(inner);
-        _headerName = Guard.NotNull(headerName);
-        _headerValue = Guard.NotNull(headerValue);
+        this.inner = Guard.NotNull(inner);
+        this.headerName = Guard.NotNull(headerName);
+        this.headerValue = Guard.NotNull(headerValue);
     }
 
     public Task ExecuteAsync(HttpContext httpContext)
     {
         Guard.NotNull(httpContext);
 
-        if (_headerValue.HasValue())
+        if (this.headerValue.HasValue())
         {
             httpContext.Response.Headers[_headerName] = _headerValue;
         }
 
-        return _inner.ExecuteAsync(httpContext);
+        return this.inner.ExecuteAsync(httpContext);
     }
 }
 

@@ -19,11 +19,11 @@ namespace Honua.Server.Host.Stac.Services;
 /// </summary>
 public sealed class StacStreamingService
 {
-    private readonly ILogger<StacStreamingService> _logger;
+    private readonly ILogger<StacStreamingService> logger;
 
     public StacStreamingService(ILogger<StacStreamingService> logger)
     {
-        _logger = Guard.NotNull(logger);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -99,7 +99,7 @@ public sealed class StacStreamingService
 
         await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-        _logger.LogInformation("Streamed {ItemCount} STAC items", itemCount);
+        this.logger.LogInformation("Streamed {ItemCount} STAC items", itemCount);
     }
 
     private static void WriteStacItem(Utf8JsonWriter writer, StacItemRecord item, Uri baseUri, FieldsSpecification? fieldsSpec)

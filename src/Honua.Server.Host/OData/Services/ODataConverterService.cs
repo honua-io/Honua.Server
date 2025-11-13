@@ -25,11 +25,11 @@ public sealed class ODataConverterService
 {
     private static readonly GeoJsonWriter GeoJsonWriter = new();
 
-    private readonly ODataGeometryService _geometryService;
+    private readonly ODataGeometryService geometryService;
 
     public ODataConverterService(ODataGeometryService geometryService)
     {
-        _geometryService = Guard.NotNull(geometryService);
+        this.geometryService = Guard.NotNull(geometryService);
     }
 
     public object? ConvertIncomingValue(object? value)
@@ -250,7 +250,7 @@ public sealed class ODataConverterService
         }
 
         var wkt = WriteSpatialAsWkt(spatial);
-        var geometry = _geometryService.ComputeGeometry(wkt);
+        var geometry = this.geometryService.ComputeGeometry(wkt);
         if (geometry is null)
         {
             return wkt;

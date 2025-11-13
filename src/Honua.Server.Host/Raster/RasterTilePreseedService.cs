@@ -64,17 +64,17 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
     private const int MaxParallelismCap = 16;
     private const int WorkerBufferMultiplier = 4;
 
-    private readonly Channel<RasterTilePreseedWorkItem> _queue;
+    private readonly Channel<RasterTilePreseedWorkItem> queue;
     private readonly ActiveRasterPreseedJobStore _jobs = new();
     private readonly CompletedRasterPreseedJobStore _completedJobs = new();
-    private readonly IRasterDatasetRegistry _rasterRegistry;
-    private readonly IMetadataRegistry _metadataRegistry;
-    private readonly IFeatureRepository _featureRepository;
-    private readonly IRasterRenderer _rasterRenderer;
-    private readonly IRasterTileCacheProvider _cacheProvider;
-    private readonly IRasterTileCacheMetrics _metrics;
-    private readonly ILogger<RasterTilePreseedService> _logger;
-    private readonly int _maxParallelism;
+    private readonly IRasterDatasetRegistry rasterRegistry;
+    private readonly IMetadataRegistry metadataRegistry;
+    private readonly IFeatureRepository featureRepository;
+    private readonly IRasterRenderer rasterRenderer;
+    private readonly IRasterTileCacheProvider cacheProvider;
+    private readonly IRasterTileCacheMetrics metrics;
+    private readonly ILogger<RasterTilePreseedService> logger;
+    private readonly int maxParallelism;
 
     public RasterTilePreseedService(
         IRasterDatasetRegistry rasterRegistry,
@@ -85,16 +85,16 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
         IRasterTileCacheMetrics metrics,
         ILogger<RasterTilePreseedService> logger)
     {
-        _rasterRegistry = Guard.NotNull(rasterRegistry);
-        _metadataRegistry = Guard.NotNull(metadataRegistry);
-        _featureRepository = Guard.NotNull(featureRepository);
-        _rasterRenderer = Guard.NotNull(rasterRenderer);
-        _cacheProvider = Guard.NotNull(cacheProvider);
-        _metrics = Guard.NotNull(metrics);
-        _logger = Guard.NotNull(logger);
-        _maxParallelism = Math.Clamp(Environment.ProcessorCount, 1, MaxParallelismCap);
+        this.rasterRegistry = Guard.NotNull(rasterRegistry);
+        this.metadataRegistry = Guard.NotNull(metadataRegistry);
+        this.featureRepository = Guard.NotNull(featureRepository);
+        this.rasterRenderer = Guard.NotNull(rasterRenderer);
+        this.cacheProvider = Guard.NotNull(cacheProvider);
+        this.metrics = Guard.NotNull(metrics);
+        this.logger = Guard.NotNull(logger);
+        this.maxParallelism = Math.Clamp(Environment.ProcessorCount, 1, MaxParallelismCap);
 
-        _queue = Channel.CreateBounded<RasterTilePreseedWorkItem>(new BoundedChannelOptions(QueueCapacity)
+        this.queue = Channel.CreateBounded<RasterTilePreseedWorkItem>(new BoundedChannelOptions(QueueCapacity)
         {
             AllowSynchronousContinuations = false,
             SingleReader = true,
@@ -105,8 +105,8 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
     public async Task<IReadOnlyList<RasterTilePreseedJobSnapshot>> ListJobsAsync(CancellationToken cancellationToken = default)
     {
-        var activeJobs = await _jobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        var completedJobs = await _completedJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var activeJobs = await this.jobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var completedJobs = await this.completedJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         return activeJobs.Select(job => job.Snapshot)
             .Concat(completedJobs)
@@ -116,13 +116,13 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
     public async Task<RasterTilePreseedJobSnapshot?> TryGetJobAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
-        var activeJob = await _jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var activeJob = await this.jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
         if (activeJob is not null)
         {
             return activeJob.Snapshot;
         }
 
-        var completedJob = await _completedJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var completedJob = await this.completedJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
         if (completedJob is not null)
         {
             return completedJob;
@@ -133,14 +133,14 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
     public async Task<RasterTilePreseedJobSnapshot?> CancelAsync(Guid jobId, string? reason = null)
     {
-        var job = await _jobs.GetAsync(jobId).ConfigureAwait(false);
+        var job = await this.jobs.GetAsync(jobId).ConfigureAwait(false);
         if (job is not null)
         {
             job.RequestCancellation(reason);
             return job.Snapshot;
         }
 
-        var snapshot = await _completedJobs.GetAsync(jobId).ConfigureAwait(false);
+        var snapshot = await this.completedJobs.GetAsync(jobId).ConfigureAwait(false);
         if (snapshot is not null)
         {
             return snapshot;
@@ -173,13 +173,13 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
             try
             {
-                await _cacheProvider.PurgeDatasetAsync(datasetId!, cancellationToken).ConfigureAwait(false);
+                await this.cacheProvider.PurgeDatasetAsync(datasetId!, cancellationToken).ConfigureAwait(false);
                 purged.Add(datasetId!);
             }
             catch (Exception ex)
             {
                 failures.Add(datasetId!);
-                _logger.LogWarning(ex, "Failed to purge raster tile cache for dataset {DatasetId}.", datasetId);
+                this.logger.LogWarning(ex, "Failed to purge raster tile cache for dataset {DatasetId}.", datasetId);
             }
         }
 
@@ -193,20 +193,20 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
         request.EnsureValid();
 
         var job = new RasterTilePreseedJob(request);
-        var registered = await _jobs.RegisterAsync(job, cancellationToken).ConfigureAwait(false);
+        var registered = await this.jobs.RegisterAsync(job, cancellationToken).ConfigureAwait(false);
         if (!registered)
         {
             throw new InvalidOperationException($"Failed to register raster tile preseed job {job.JobId}.");
         }
 
         var workItem = new RasterTilePreseedWorkItem(request, job);
-        await _queue.Writer.WriteAsync(workItem, cancellationToken).ConfigureAwait(false);
+        await this.queue.Writer.WriteAsync(workItem, cancellationToken).ConfigureAwait(false);
         return job.Snapshot;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var workItem in _queue.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
+        await foreach (var workItem in this.queue.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
         {
             var job = workItem.Job;
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, job.Token);
@@ -229,7 +229,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Raster tile preseed job {JobId} failed.", job.JobId);
+                this.logger.LogError(ex, "Raster tile preseed job {JobId} failed.", job.JobId);
                 job.MarkFailed(ex.Message);
             }
             finally
@@ -247,16 +247,16 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
     private async Task RecordJobFinalStateAsync(RasterTilePreseedJob job, RasterTilePreseedJobSnapshot snapshot, CancellationToken cancellationToken = default)
     {
-        await _jobs.UnregisterAsync(job.JobId, cancellationToken).ConfigureAwait(false);
+        await this.jobs.UnregisterAsync(job.JobId, cancellationToken).ConfigureAwait(false);
         job.Dispose();
 
-        await _completedJobs.RecordCompletionAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        await this.completedJobs.RecordCompletionAsync(snapshot, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ProcessWorkItemAsync(RasterTilePreseedWorkItem workItem, CancellationToken cancellationToken)
     {
-        await _metadataRegistry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-        var metadataSnapshot = await _metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        await this.metadataRegistry.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        var metadataSnapshot = await this.metadataRegistry.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
         var job = workItem.Job;
         var request = workItem.Request;
 
@@ -265,29 +265,29 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var dataset = await _rasterRegistry.FindAsync(datasetId, cancellationToken).ConfigureAwait(false);
+            var dataset = await this.rasterRegistry.FindAsync(datasetId, cancellationToken).ConfigureAwait(false);
             if (dataset is null)
             {
-                _logger.LogWarning("Preseed job {JobId} skipped unknown dataset {DatasetId}.", job.JobId, datasetId);
+                this.logger.LogWarning("Preseed job {JobId} skipped unknown dataset {DatasetId}.", job.JobId, datasetId);
                 continue;
             }
 
             if (!dataset.Cache.Enabled)
             {
-                _logger.LogInformation("Preseed job {JobId} skipped dataset {DatasetId} because caching is disabled.", job.JobId, datasetId);
+                this.logger.LogInformation("Preseed job {JobId} skipped dataset {DatasetId} because caching is disabled.", job.JobId, datasetId);
                 continue;
             }
 
             var normalizedMatrix = NormalizeTileMatrix(request.TileMatrixSetId);
             if (normalizedMatrix is null)
             {
-                _logger.LogWarning("Preseed job {JobId} skipped dataset {DatasetId} because tile matrix set {Matrix} is unsupported.", job.JobId, datasetId, request.TileMatrixSetId);
+                this.logger.LogWarning("Preseed job {JobId} skipped dataset {DatasetId} because tile matrix set {Matrix} is unsupported.", job.JobId, datasetId, request.TileMatrixSetId);
                 continue;
             }
 
             if (!OgcSharedHandlers.TryResolveStyle(dataset, request.StyleId, out var styleId, out var unresolvedStyle))
             {
-                _logger.LogWarning("Preseed job {JobId} skipped dataset {DatasetId} due to unknown style {StyleId}.", job.JobId, datasetId, unresolvedStyle ?? request.StyleId);
+                this.logger.LogWarning("Preseed job {JobId} skipped dataset {DatasetId} due to unknown style {StyleId}.", job.JobId, datasetId, unresolvedStyle ?? request.StyleId);
                 continue;
             }
 
@@ -297,7 +297,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
             if (!TryResolveBoundingBox(dataset, metadataSnapshot, out var boundingBox))
             {
-                _logger.LogWarning("Preseed job {JobId} skipped dataset {DatasetId} because no extent is defined compatible with {MatrixCrs}.", job.JobId, datasetId, matrixCrs);
+                this.logger.LogWarning("Preseed job {JobId} skipped dataset {DatasetId} because no extent is defined compatible with {MatrixCrs}.", job.JobId, datasetId, matrixCrs);
                 continue;
             }
 
@@ -469,7 +469,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
         {
             try
             {
-                var cached = await _cacheProvider.TryGetAsync(cacheKey, cancellationToken).ConfigureAwait(false);
+                var cached = await this.cacheProvider.TryGetAsync(cacheKey, cancellationToken).ConfigureAwait(false);
                 if (cached is not null)
                 {
                     job.IncrementTiles(stage);
@@ -478,7 +478,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Cache lookup failed for dataset {DatasetId} tile {Zoom}/{Column}/{Row} while preseeding.", plan.Dataset.Id, plan.Zoom, column, row);
+                this.logger.LogWarning(ex, "Cache lookup failed for dataset {DatasetId} tile {Zoom}/{Column}/{Row} while preseeding.", plan.Dataset.Id, plan.Zoom, column, row);
             }
         }
 
@@ -506,7 +506,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            var renderResult = await _rasterRenderer.RenderAsync(renderRequest, cancellationToken).ConfigureAwait(false);
+            var renderResult = await this.rasterRenderer.RenderAsync(renderRequest, cancellationToken).ConfigureAwait(false);
 
             await using var renderStream = renderResult.Content;
             if (renderStream.CanSeek)
@@ -523,21 +523,21 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
                 try
                 {
                     var entry = new RasterTileCacheEntry(content, renderResult.ContentType, DateTimeOffset.UtcNow);
-                    await _cacheProvider.StoreAsync(cacheKey, entry, cancellationToken).ConfigureAwait(false);
+                    await this.cacheProvider.StoreAsync(cacheKey, entry, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to store raster tile {DatasetId} {Zoom}/{Column}/{Row}.", plan.Dataset.Id, plan.Zoom, column, row);
+                    this.logger.LogWarning(ex, "Failed to store raster tile {DatasetId} {Zoom}/{Column}/{Row}.", plan.Dataset.Id, plan.Zoom, column, row);
                 }
             }
 
             stopwatch.Stop();
-            _metrics.RecordRenderLatency(plan.Dataset.Id, stopwatch.Elapsed, true);
+            this.metrics.RecordRenderLatency(plan.Dataset.Id, stopwatch.Elapsed, true);
         }
         catch
         {
             stopwatch.Stop();
-            _metrics.RecordRenderLatency(plan.Dataset.Id, stopwatch.Elapsed, false);
+            this.metrics.RecordRenderLatency(plan.Dataset.Id, stopwatch.Elapsed, false);
             throw;
         }
 
@@ -721,7 +721,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
         try
         {
             // Signal no more writes to the channel to allow graceful drain
-            _queue.Writer.Complete();
+            this.queue.Writer.Complete();
         }
         catch (Exception)
         {

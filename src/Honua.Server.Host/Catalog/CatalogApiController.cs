@@ -26,13 +26,13 @@ namespace Honua.Server.Host.Catalog;
 [Route("api/catalog")]
 public sealed class CatalogApiController : ControllerBase
 {
-    private readonly ICatalogProjectionService _catalog;
-    private readonly ILogger<CatalogApiController> _logger;
+    private readonly ICatalogProjectionService catalog;
+    private readonly ILogger<CatalogApiController> logger;
 
     public CatalogApiController(ICatalogProjectionService catalog, ILogger<CatalogApiController> logger)
     {
-        _catalog = Guard.NotNull(catalog);
-        _logger = Guard.NotNull(logger);
+        this.catalog = Guard.NotNull(catalog);
+        this.logger = Guard.NotNull(logger);
     }
 
     /// <summary>
@@ -71,13 +71,13 @@ public sealed class CatalogApiController : ControllerBase
             ],
             activity =>
             {
-                _logger.LogInformation("Catalog API search request: query={Query}, group={Group}, limit={Limit}, offset={Offset}",
+                this.logger.LogInformation("Catalog API search request: query={Query}, group={Group}, limit={Limit}, offset={Offset}",
                     query ?? "(none)", group ?? "(all)", effectiveLimit, effectiveOffset);
 
                 if (effectiveLimit <= 0 || effectiveLimit > ApiLimitsAndConstants.MaxCatalogLimit)
                 {
-                    _logger.LogWarning("Invalid limit parameter in catalog search: {Limit}", effectiveLimit);
-                    return BadRequest(new ProblemDetails
+                    this.logger.LogWarning("Invalid limit parameter in catalog search: {Limit}", effectiveLimit);
+                    return this.BadRequest(new ProblemDetails
                     {
                         Status = StatusCodes.Status400BadRequest,
                         Title = "Invalid limit parameter",
@@ -87,8 +87,8 @@ public sealed class CatalogApiController : ControllerBase
 
                 if (effectiveOffset < 0)
                 {
-                    _logger.LogWarning("Invalid offset parameter in catalog search: {Offset}", effectiveOffset);
-                    return BadRequest(new ProblemDetails
+                    this.logger.LogWarning("Invalid offset parameter in catalog search: {Offset}", effectiveOffset);
+                    return this.BadRequest(new ProblemDetails
                     {
                         Status = StatusCodes.Status400BadRequest,
                         Title = "Invalid offset parameter",
@@ -99,12 +99,12 @@ public sealed class CatalogApiController : ControllerBase
                 try
                 {
                     // Get paginated results directly
-                    var records = _catalog.Search(query, group, effectiveLimit, effectiveOffset);
+                    var records = this.catalog.Search(query, group, effectiveLimit, effectiveOffset);
 
                     // For total count, we need to make a separate call with offset 0 and limit 1000
                     // This is a known limitation - for large catalogs (>1000 matching records),
                     // the total count will be capped at 1000
-                    var countingResults = _catalog.Search(query, group, limit: 1000, offset: 0);
+                    var countingResults = this.catalog.Search(query, group, limit: 1000, offset: 0);
                     var totalCount = countingResults.Count;
 
                     activity.AddTag("catalog.result_count", records.Count);
@@ -121,15 +121,15 @@ public sealed class CatalogApiController : ControllerBase
                         Records = records.Select(MapRecord).ToArray()
                     };
 
-                    _logger.LogInformation("Catalog API search completed: query={Query}, group={Group}, returned={Count}, total={TotalCount}, duration={Duration}ms",
+                    this.logger.LogInformation("Catalog API search completed: query={Query}, group={Group}, returned={Count}, total={TotalCount}, duration={Duration}ms",
                         query ?? "(none)", group ?? "(all)", records.Count, totalCount, sw.Elapsed.TotalMilliseconds);
 
-                    return Ok(response);
+                    return this.Ok(response);
                 }
                 catch (ArgumentException ex)
                 {
-                    _logger.LogError(ex, "Invalid search parameters in catalog API: {Error}", ex.Message);
-                    return BadRequest(new ProblemDetails
+                    this.logger.LogError(ex, "Invalid search parameters in catalog API: {Error}", ex.Message);
+                    return this.BadRequest(new ProblemDetails
                     {
                         Status = StatusCodes.Status400BadRequest,
                         Title = "Invalid search parameters",
@@ -138,7 +138,7 @@ public sealed class CatalogApiController : ControllerBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Catalog API search failed: query={Query}, group={Group}, error={Error}",
+                    this.logger.LogError(ex, "Catalog API search failed: query={Query}, group={Group}, error={Error}",
                         query ?? "(none)", group ?? "(all)", ex.Message);
                     throw;
                 }
@@ -164,28 +164,28 @@ public sealed class CatalogApiController : ControllerBase
             ],
             activity =>
             {
-                _logger.LogInformation("Catalog API get record request: recordId={RecordId}", recordId);
+                this.logger.LogInformation("Catalog API get record request: recordId={RecordId}", recordId);
 
                 try
                 {
-                    var record = _catalog.GetRecord(recordId);
+                    var record = this.catalog.GetRecord(recordId);
                     if (record is null)
                     {
-                        _logger.LogInformation("Catalog record not found: recordId={RecordId}, duration={Duration}ms",
+                        this.logger.LogInformation("Catalog record not found: recordId={RecordId}, duration={Duration}ms",
                             recordId, sw.Elapsed.TotalMilliseconds);
                         activity.AddTag("catalog.found", false);
-                        return NotFound();
+                        return this.NotFound();
                     }
 
                     activity.AddTag("catalog.found", true);
-                    _logger.LogInformation("Catalog record retrieved: recordId={RecordId}, title={Title}, duration={Duration}ms",
+                    this.logger.LogInformation("Catalog record retrieved: recordId={RecordId}, title={Title}, duration={Duration}ms",
                         recordId, record.Title, sw.Elapsed.TotalMilliseconds);
 
-                    return Ok(MapRecord(record));
+                    return this.Ok(MapRecord(record));
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error retrieving catalog record: recordId={RecordId}, error={Error}",
+                    this.logger.LogError(ex, "Error retrieving catalog record: recordId={RecordId}, error={Error}",
                         recordId, ex.Message);
                     throw;
                 }

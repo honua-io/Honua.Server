@@ -11,16 +11,16 @@ namespace Honua.Server.Host.Carto;
 
 internal sealed class CartoDatasetResolver
 {
-    private readonly ICatalogProjectionService _catalog;
+    private readonly ICatalogProjectionService catalog;
 
     public CartoDatasetResolver(ICatalogProjectionService catalog)
     {
-        _catalog = Guard.NotNull(catalog);
+        this.catalog = Guard.NotNull(catalog);
     }
 
     public IReadOnlyList<CartoDatasetContext> GetDatasets()
     {
-        var snapshot = _catalog.GetSnapshot();
+        var snapshot = this.catalog.GetSnapshot();
         var contexts = new List<CartoDatasetContext>();
 
         foreach (var service in snapshot.ServiceIndex.Values)
@@ -54,7 +54,7 @@ internal sealed class CartoDatasetResolver
             return false;
         }
 
-        var serviceView = _catalog.GetService(serviceId);
+        var serviceView = this.catalog.GetService(serviceId);
         if (serviceView is null)
         {
             return false;
