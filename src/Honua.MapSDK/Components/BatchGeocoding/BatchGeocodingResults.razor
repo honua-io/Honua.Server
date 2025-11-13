@@ -94,14 +94,14 @@
                 }
             </MudTd>
             <MudTd DataLabel="Quality">
-                <MudChip Size="Size.Small"
+                <MudChip T="string" Size="Size.Small"
                          Color="@GetQualityColor(match.Quality)"
                          Variant="Variant.Filled">
                     @match.Quality.ToString()
                 </MudChip>
             </MudTd>
             <MudTd DataLabel="Status">
-                <MudChip Size="Size.Small"
+                <MudChip T="string" Size="Size.Small"
                          Color="@GetStatusColor(match.Status)"
                          Variant="Variant.Text">
                     @match.Status.ToString()
@@ -144,7 +144,7 @@
                         @if (match.AlternativesCount > 0)
                         {
                             <MudTooltip Text="@($"{match.AlternativesCount} alternative results")">
-                                <MudChip Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
                                     +@match.AlternativesCount
                                 </MudChip>
                             </MudTooltip>

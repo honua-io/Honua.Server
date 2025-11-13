@@ -18,8 +18,8 @@ public class QueryExpressionTests
 
         // Act
         var expression = new QueryBinaryExpression(
-            QueryBinaryOperator.Equal,
             left,
+            QueryBinaryOperator.Equal,
             right);
 
         // Assert
@@ -42,7 +42,7 @@ public class QueryExpressionTests
         var right = new QueryConstant(100);
 
         // Act
-        var expression = new QueryBinaryExpression(op, left, right);
+        var expression = new QueryBinaryExpression(left, op, right);
 
         // Assert
         expression.Should().NotBeNull();
@@ -54,19 +54,19 @@ public class QueryExpressionTests
     {
         // Arrange
         var expr1 = new QueryBinaryExpression(
-            QueryBinaryOperator.Equal,
             new QueryFieldReference("status"),
+            QueryBinaryOperator.Equal,
             new QueryConstant("active"));
 
         var expr2 = new QueryBinaryExpression(
-            QueryBinaryOperator.GreaterThan,
             new QueryFieldReference("priority"),
+            QueryBinaryOperator.GreaterThan,
             new QueryConstant(5));
 
         // Act
         var combined = new QueryBinaryExpression(
-            QueryBinaryOperator.And,
             expr1,
+            QueryBinaryOperator.And,
             expr2);
 
         // Assert
@@ -80,8 +80,8 @@ public class QueryExpressionTests
     {
         // Arrange
         var innerExpression = new QueryBinaryExpression(
-            QueryBinaryOperator.Equal,
             new QueryFieldReference("archived"),
+            QueryBinaryOperator.Equal,
             new QueryConstant(true));
 
         // Act
@@ -106,7 +106,7 @@ public class QueryExpressionTests
             new[] { arg });
 
         // Assert
-        function.FunctionName.Should().Be("UPPER");
+        function.Name.Should().Be("UPPER");
         function.Arguments.Should().Contain(arg);
     }
 
@@ -118,7 +118,6 @@ public class QueryExpressionTests
 
         // Assert
         constant.Value.Should().Be(42);
-        constant.DataType.Should().Be(QueryDataType.Integer);
     }
 
     [Fact]
@@ -129,7 +128,6 @@ public class QueryExpressionTests
 
         // Assert
         constant.Value.Should().Be("test string");
-        constant.DataType.Should().Be(QueryDataType.String);
     }
 
     [Fact]
@@ -139,17 +137,6 @@ public class QueryExpressionTests
         var field = new QueryFieldReference("my_field");
 
         // Assert
-        field.FieldName.Should().Be("my_field");
+        field.Name.Should().Be("my_field");
     }
-}
-
-// Mock implementations for testing
-public enum QueryDataType
-{
-    String,
-    Integer,
-    Double,
-    Boolean,
-    DateTime,
-    Geometry
 }

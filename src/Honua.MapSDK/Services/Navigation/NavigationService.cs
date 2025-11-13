@@ -214,7 +214,7 @@ public class NavigationService
                 TravelMode = session.Route.TravelMode,
                 IncludeInstructions = true,
                 IncludeTraffic = true,
-                Units = session.Options?.Units ?? DistanceUnit.Metric
+                Units = session.Options?.Units ?? Models.Routing.DistanceUnit.Metric
             };
 
             var newRoute = await provider.CalculateRouteAsync(waypoints, options, cancellationToken);
@@ -506,7 +506,7 @@ public class NavigationService
         return instructions;
     }
 
-    private List<double> GetInstructionDistances(RouteInstruction step, DistanceUnit units)
+    private List<double> GetInstructionDistances(RouteInstruction step, Models.Routing.DistanceUnit units)
     {
         // Different distances for different maneuver types
         return step.Maneuver switch
@@ -517,7 +517,7 @@ public class NavigationService
         };
     }
 
-    private string FormatVoiceInstruction(RouteInstruction step, double distance, DistanceUnit units)
+    private string FormatVoiceInstruction(RouteInstruction step, double distance, Models.Routing.DistanceUnit units)
     {
         if (distance == 0)
         {

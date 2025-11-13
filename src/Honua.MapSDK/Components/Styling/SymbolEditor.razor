@@ -39,7 +39,7 @@
         <label>Opacity</label>
         <input type="range" class="form-range" min="0" max="1" step="0.05"
                value="@(Symbol.Opacity ?? 0.7)" @onchange="@((e) => OnOpacityChanged(e))" />
-        <span class="opacity-value">@((Symbol.Opacity ?? 0.7):P0)</span>
+        <span class="opacity-value">@((Symbol.Opacity ?? 0.7).ToString("P0"))</span>
     </div>
 
     @if (GeometryType == "line")

@@ -27,7 +27,7 @@ public class ODataContainerTests
     public async Task ServiceDocument_ShouldExposeEntitySet()
     {
         // Arrange & Act
-        var response = await _fixture.Client.GetAsync("/odata");
+        var response = await _fixture.Client.GetAsync(new Uri("/odata", UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -43,7 +43,7 @@ public class ODataContainerTests
     public async Task MetadataEndpoint_ShouldReturnEdmModel()
     {
         // Arrange & Act
-        var response = await _fixture.Client.GetAsync("/odata/$metadata");
+        var response = await _fixture.Client.GetAsync(new Uri("/odata/$metadata", UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -62,7 +62,7 @@ public class ODataContainerTests
         var queryUrl = "/odata/roads_roads_primary?$top=5&$select=name";
 
         // Act
-        var response = await _fixture.Client.GetAsync(queryUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(queryUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -80,7 +80,7 @@ public class ODataContainerTests
         var filterUrl = "/odata/roads_roads_primary?$filter=status eq 'active'";
 
         // Act
-        var response = await _fixture.Client.GetAsync(filterUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(filterUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -95,7 +95,7 @@ public class ODataContainerTests
         var orderUrl = "/odata/roads_roads_primary?$orderby=name desc&$top=10";
 
         // Act
-        var response = await _fixture.Client.GetAsync(orderUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(orderUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -110,7 +110,7 @@ public class ODataContainerTests
         var countUrl = "/odata/roads_roads_primary/$count";
 
         // Act
-        var response = await _fixture.Client.GetAsync(countUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(countUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -126,7 +126,7 @@ public class ODataContainerTests
         var skipUrl = "/odata/roads_roads_primary?$top=5&$skip=2";
 
         // Act
-        var response = await _fixture.Client.GetAsync(skipUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(skipUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -143,7 +143,7 @@ public class ODataContainerTests
         var complexFilterUrl = "/odata/roads_roads_primary?$filter=status eq 'active' and length_km gt 10";
 
         // Act
-        var response = await _fixture.Client.GetAsync(complexFilterUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(complexFilterUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -158,7 +158,7 @@ public class ODataContainerTests
         var combinedUrl = "/odata/roads_roads_primary?$filter=status eq 'active'&$orderby=name&$top=10&$select=name,status";
 
         // Act
-        var response = await _fixture.Client.GetAsync(combinedUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(combinedUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -174,7 +174,7 @@ public class ODataContainerTests
         var countInlineUrl = "/odata/roads_roads_primary?$count=true&$top=5";
 
         // Act
-        var response = await _fixture.Client.GetAsync(countInlineUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(countInlineUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -189,7 +189,7 @@ public class ODataContainerTests
         var invalidFilterUrl = "/odata/roads_roads_primary?$filter=invalid_field eq 'test'";
 
         // Act
-        var response = await _fixture.Client.GetAsync(invalidFilterUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(invalidFilterUrl, UriKind.Relative));
 
         // Assert
         // Should return 400 Bad Request or 500 Internal Server Error
@@ -203,7 +203,7 @@ public class ODataContainerTests
         var selectUrl = "/odata/roads_roads_primary?$select=name,status,length_km&$top=5";
 
         // Act
-        var response = await _fixture.Client.GetAsync(selectUrl);
+        var response = await _fixture.Client.GetAsync(new Uri(selectUrl, UriKind.Relative));
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);

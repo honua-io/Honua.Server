@@ -28,11 +28,11 @@ public class SpatialPredicateTests
         var spatialExpr = new QuerySpatialExpression(
             SpatialPredicate.Intersects,
             field,
-            new QueryGeometryValue(point));
+            new QueryConstant(point));
 
         // Assert
         spatialExpr.Predicate.Should().Be(SpatialPredicate.Intersects);
-        spatialExpr.GeometryField.Should().Be(field);
+        spatialExpr.GeometryProperty.Should().Be(field);
     }
 
     [Theory]
@@ -60,11 +60,11 @@ public class SpatialPredicateTests
         var spatialExpr = new QuerySpatialExpression(
             predicate,
             field,
-            new QueryGeometryValue(polygon));
+            new QueryConstant(polygon));
 
         // Assert
         spatialExpr.Predicate.Should().Be(predicate);
-        spatialExpr.GeometryField.Should().NotBeNull();
+        spatialExpr.GeometryProperty.Should().NotBeNull();
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class SpatialPredicateTests
         var spatialExpr = new QuerySpatialExpression(
             SpatialPredicate.Intersects,
             field,
-            new QueryGeometryValue(bbox));
+            new QueryConstant(bbox));
 
         // Assert
         spatialExpr.Should().NotBeNull();
@@ -103,7 +103,7 @@ public class SpatialPredicateTests
         var spatialExpr = new QuerySpatialExpression(
             SpatialPredicate.DWithin,
             field,
-            new QueryGeometryValue(point),
+            new QueryConstant(point),
             distance);
 
         // Assert

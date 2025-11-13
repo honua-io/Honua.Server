@@ -107,8 +107,8 @@ public class PostgreSqlProviderTests : IAsyncLifetime
         // Assert
         capabilities.Should().NotBeNull();
         capabilities.SupportsTransactions.Should().BeTrue();
-        capabilities.SupportsSpatialFilters.Should().BeTrue();
-        capabilities.SupportsVectorTiles.Should().BeTrue();
+        capabilities.SupportsSpatialIndexes.Should().BeTrue();
+        capabilities.SupportsNativeMvt.Should().BeTrue();
     }
 
     [Fact]
@@ -188,8 +188,7 @@ public class PostgreSqlProviderTests : IAsyncLifetime
 
         // Assert
         stats.Should().NotBeNull();
-        stats.TotalCount.Should().BeGreaterOrEqualTo(0);
-        stats.AvailableCount.Should().BeGreaterOrEqualTo(0);
+        stats.TotalPools.Should().BeGreaterOrEqualTo(0);
     }
 
     [Fact]
@@ -199,14 +198,20 @@ public class PostgreSqlProviderTests : IAsyncLifetime
         var service = new ServiceDefinition
         {
             Id = "test",
-            Name = "Test Service"
+            Title = "Test Service",
+            FolderId = "folder1",
+            ServiceType = "FeatureServer",
+            DataSourceId = "ds1"
         };
 
         var layer = new LayerDefinition
         {
             Id = "layer1",
-            Name = "Test Layer",
-            GeometryType = "Point"
+            ServiceId = "test",
+            Title = "Test Layer",
+            GeometryType = "Point",
+            IdField = "id",
+            GeometryField = "geom"
         };
 
         // Act & Assert - should not throw
@@ -252,16 +257,25 @@ public class PostgreSqlProviderTests : IAsyncLifetime
         var service = new ServiceDefinition
         {
             Id = "test",
-            Name = "Test Service"
+            Title = "Test Service",
+            FolderId = "folder1",
+            ServiceType = "FeatureServer",
+            DataSourceId = "ds1"
         };
 
         var layer = new LayerDefinition
         {
             Id = "layer1",
-            Name = "Test Layer",
+            ServiceId = "test",
+            Title = "Test Layer",
             GeometryType = "Point",
-            GeometryColumn = "geom",
-            TableName = "non_existent_table"
+            IdField = "id",
+            GeometryField = "geom",
+            Storage = new LayerStorageDefinition
+            {
+                Table = "non_existent_table",
+                GeometryColumn = "geom"
+            }
         };
 
         // Act & Assert - should throw or return empty
@@ -289,16 +303,25 @@ public class PostgreSqlProviderTests : IAsyncLifetime
         var service = new ServiceDefinition
         {
             Id = "test",
-            Name = "Test Service"
+            Title = "Test Service",
+            FolderId = "folder1",
+            ServiceType = "FeatureServer",
+            DataSourceId = "ds1"
         };
 
         var layer = new LayerDefinition
         {
             Id = "layer1",
-            Name = "Test Layer",
+            ServiceId = "test",
+            Title = "Test Layer",
             GeometryType = "Point",
-            GeometryColumn = "geom",
-            TableName = "non_existent_table"
+            IdField = "id",
+            GeometryField = "geom",
+            Storage = new LayerStorageDefinition
+            {
+                Table = "non_existent_table",
+                GeometryColumn = "geom"
+            }
         };
 
         // Act & Assert

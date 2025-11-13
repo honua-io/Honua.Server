@@ -212,7 +212,7 @@ public class NavigationOptions
     /// <summary>
     /// Distance units for voice guidance
     /// </summary>
-    public DistanceUnit Units { get; set; } = DistanceUnit.Metric;
+    public Routing.DistanceUnit Units { get; set; } = Routing.DistanceUnit.Metric;
 
     /// <summary>
     /// Voice guidance language (ISO 639-1 code)

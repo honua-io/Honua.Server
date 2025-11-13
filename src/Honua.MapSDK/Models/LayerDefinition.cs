@@ -222,7 +222,7 @@ public class GeoJsonLayer : LayerDefinition
     /// <summary>
     /// Cluster style
     /// </summary>
-    public ClusterStyle? ClusterStyle { get; set; }
+    public LayerClusterStyle? ClusterStyle { get; set; }
 }
 
 /// <summary>
@@ -381,9 +381,9 @@ public class LabelStyle
 }
 
 /// <summary>
-/// Cluster styling configuration
+/// Cluster styling configuration for layer definitions
 /// </summary>
-public class ClusterStyle
+public class LayerClusterStyle
 {
     public string CircleColor { get; set; } = "#51bbd6";
     public double CircleRadius { get; set; } = 20;

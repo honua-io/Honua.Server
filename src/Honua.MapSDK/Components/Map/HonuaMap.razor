@@ -89,7 +89,7 @@
     private IJSObjectReference? _mapInstance;
     private DotNetObjectReference<HonuaMap>? _dotNetRef;
     private bool _isInitialized = false;
-    private RendererInfo? _rendererInfo;
+    private Honua.MapSDK.Services.RendererInfo? _rendererInfo;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -148,7 +148,7 @@
             // Get renderer info
             try
             {
-                _rendererInfo = await _mapInstance.InvokeAsync<RendererInfo>("getRendererInfo");
+                _rendererInfo = await _mapInstance.InvokeAsync<Services.RendererInfo>("getRendererInfo");
 
                 if (_rendererInfo != null && ShowRendererInfo)
                 {
@@ -443,12 +443,12 @@
     /// <summary>
     /// Public API: Get current renderer information
     /// </summary>
-    public async Task<RendererInfo?> GetRendererInfoAsync()
+    public async Task<Honua.MapSDK.Services.RendererInfo?> GetRendererInfoAsync()
     {
         if (_mapInstance == null) return null;
         try
         {
-            return await _mapInstance.InvokeAsync<RendererInfo>("getRendererInfo");
+            return await _mapInstance.InvokeAsync<Honua.MapSDK.Services.RendererInfo>("getRendererInfo");
         }
         catch (Exception)
         {
@@ -459,7 +459,7 @@
     /// <summary>
     /// Public API: Get cached renderer information
     /// </summary>
-    public RendererInfo? GetCachedRendererInfo()
+    public Honua.MapSDK.Services.RendererInfo? GetCachedRendererInfo()
     {
         return _rendererInfo;
     }

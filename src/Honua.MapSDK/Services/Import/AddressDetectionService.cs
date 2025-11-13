@@ -245,7 +245,7 @@ public class AddressDetectionService
     private double AnalyzeFieldContent(List<string> values, ref AddressColumnType type)
     {
         double score = 0.0;
-        int matchCount = 0;
+        double matchCount = 0;
 
         foreach (var value in values.Take(10)) // Sample first 10 values
         {
