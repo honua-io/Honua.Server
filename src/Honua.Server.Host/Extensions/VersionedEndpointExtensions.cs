@@ -169,12 +169,12 @@ internal static class VersionedEndpointExtensions
 
         if (IsServiceEnabled("csw", true))
         {
-            group.MapCswEndpoints("v1");
+            group.MapCswEndpoints();
         }
 
         if (IsServiceEnabled("wcs", true))
         {
-            group.MapWcsEndpoints("v1");
+            group.MapWcsEndpoints();
         }
 
         if (IsServiceEnabled("wmts", true))
@@ -184,7 +184,7 @@ internal static class VersionedEndpointExtensions
 
         if (IsServiceEnabled("zarr", true))
         {
-            group.MapZarrTimeSeriesEndpoints("v1");
+            group.MapZarrTimeSeriesEndpoints();
         }
 
         return group;

@@ -59,7 +59,7 @@ public sealed class ReverseProxyDetector
     /// <summary>
     /// Gets the explicitly configured reverse proxy state, if set.
     /// </summary>
-    public bool? ExplicitConfiguration => _explicitConfiguration;
+    public bool? ExplicitConfiguration => this.explicitConfiguration;
 
     /// <summary>
     /// Determines whether the application is running behind a reverse proxy.

@@ -58,21 +58,21 @@ public sealed class CsrfValidationMiddleware
         // Skip CSRF validation if protection is disabled globally
         if (!this.options.Enabled)
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
             return;
         }
 
         // Skip validation for safe HTTP methods
         if (IsSafeMethod(context.Request.Method))
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
             return;
         }
 
         // Skip validation for excluded paths (health checks, metrics, etc.)
         if (IsExcludedPath(context.Request.Path))
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
             return;
         }
 
@@ -82,7 +82,7 @@ public sealed class CsrfValidationMiddleware
             this.logger.LogDebug(
                 "CSRF validation skipped for API key authenticated request to {Path}",
                 context.Request.Path);
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
             return;
         }
 
@@ -96,7 +96,7 @@ public sealed class CsrfValidationMiddleware
                 context.Request.Method,
                 context.Request.Path);
 
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
         }
         catch (AntiforgeryValidationException ex)
         {

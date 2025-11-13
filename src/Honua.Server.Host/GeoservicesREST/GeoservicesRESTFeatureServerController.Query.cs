@@ -48,7 +48,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             .WithTag("arcgis.layer_index", layerIndex)
             .ExecuteAsync<IActionResult>(async activity =>
             {
-                var resolution = GeoservicesRESTServiceResolutionHelper.ResolveServiceAndLayer(this, _catalog, folderId, serviceId, layerIndex);
+                var resolution = GeoservicesRESTServiceResolutionHelper.ResolveServiceAndLayer(this, this.catalog, folderId, serviceId, layerIndex);
                 if (resolution.Error is not null)
                 {
                     return resolution.Error;
@@ -57,7 +57,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
                 var serviceView = resolution.ServiceView!;
                 var layerView = resolution.LayerView!;
 
-                if (!GeoservicesRESTQueryTranslator.TryParse(Request, serviceView, layerView, out var context, out var error, _logger))
+                if (!GeoservicesRESTQueryTranslator.TryParse(Request, serviceView, layerView, out var context, out var error, this.logger))
                 {
                     return error!;
                 }

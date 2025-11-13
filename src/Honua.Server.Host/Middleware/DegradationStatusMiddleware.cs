@@ -62,6 +62,6 @@ public sealed class DegradationStatusMiddleware
             context.Response.Headers["X-Service-Status"] = "Healthy";
         }
 
-        await _next(context);
+        await this.next(context);
     }
 }

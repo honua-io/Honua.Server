@@ -76,7 +76,7 @@ public class SecurityPolicyMiddleware
         // No endpoint resolved, let the request proceed (will likely result in 404)
         if (endpoint == null)
         {
-            await _next(context);
+            await this.next(context);
             return;
         }
 
@@ -87,7 +87,7 @@ public class SecurityPolicyMiddleware
         // If endpoint has explicit authorization or explicit anonymous access, allow it
         if (hasAuthorize || hasAllowAnonymous)
         {
-            await _next(context);
+            await this.next(context);
             return;
         }
 
@@ -124,7 +124,7 @@ public class SecurityPolicyMiddleware
                 request.Method);
         }
 
-        await _next(context);
+        await this.next(context);
     }
 
     private static bool RequiresAuthorization(HttpRequest request)

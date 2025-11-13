@@ -312,7 +312,7 @@ public sealed class StacSearchController : ControllerBase
 
         return await OperationInstrumentation.Create<ActionResult<StacItemCollectionResponse>>("STAC Search")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithLogLevels(LogLevel.Information, LogLevel.Error)
             .WithTag("stac.operation", "Search")
             .WithTag("stac.collections", request.Collections is not null ? string.Join(",", request.Collections) : "all")

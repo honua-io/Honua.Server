@@ -39,7 +39,7 @@ public sealed class GcsHealthCheck : HealthCheckBase
     {
         try
         {
-            if (_storageClient == null)
+            if (this.storageClient == null)
             {
                 data["gcs.configured"] = false;
                 Logger.LogDebug("Google Cloud Storage client not configured - GCS storage unavailable");
@@ -59,17 +59,17 @@ public sealed class GcsHealthCheck : HealthCheckBase
                 try
                 {
                     var bucket = await this.storageClient.GetBucketAsync(
-                        _testBucket,
+                        this.testBucket,
                         cancellationToken: cancellationToken);
 
-                    data["gcs.test_bucket"] = _testBucket;
+                    data["gcs.test_bucket"] = this.testBucket;
                     data["gcs.test_bucket_accessible"] = true;
                     data["gcs.test_bucket_location"] = bucket.Location;
                     data["gcs.test_bucket_storage_class"] = bucket.StorageClass;
 
                     Logger.LogDebug(
                         "GCS health check passed. Test bucket: {TestBucket}, Location: {Location}",
-                        _testBucket,
+                        this.testBucket,
                         bucket.Location);
 
                     return HealthCheckResult.Healthy(
@@ -78,28 +78,28 @@ public sealed class GcsHealthCheck : HealthCheckBase
                 }
                 catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    data["gcs.test_bucket"] = _testBucket;
+                    data["gcs.test_bucket"] = this.testBucket;
                     data["gcs.test_bucket_accessible"] = false;
                     data["gcs.error"] = "Test bucket not found";
 
-                    Logger.LogResourceNotFound("GCS test bucket", _testBucket);
+                    Logger.LogResourceNotFound("GCS test bucket", this.testBucket);
 
                     return HealthCheckResult.Degraded(
-                        $"GCS connected but test bucket '{_testBucket}' not found",
+                        $"GCS connected but test bucket '{this.testBucket}' not found",
                         data: data);
                 }
                 catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden)
                 {
-                    data["gcs.test_bucket"] = _testBucket;
+                    data["gcs.test_bucket"] = this.testBucket;
                     data["gcs.test_bucket_accessible"] = false;
                     data["gcs.error"] = "Access denied to test bucket";
 
                     Logger.LogWarning(ex,
                         "GCS test bucket access denied: {TestBucket}",
-                        _testBucket);
+                        this.testBucket);
 
                     return HealthCheckResult.Degraded(
-                        $"GCS connected but access denied to test bucket '{_testBucket}'",
+                        $"GCS connected but access denied to test bucket '{this.testBucket}'",
                         data: data);
                 }
             }

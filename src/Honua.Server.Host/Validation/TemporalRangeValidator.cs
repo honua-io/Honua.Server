@@ -298,11 +298,11 @@ public sealed class ValidTemporalDateAttribute : ValidationAttribute
                 return new ValidationResult("Value must be a valid date/time.");
         }
 
-        if (!TemporalRangeValidator.IsDateValid(date, _allowFuture))
+        if (!TemporalRangeValidator.IsDateValid(date, this.allowFuture))
         {
             var minDate = TemporalRangeValidator.MinimumDate;
             var maxDate = TemporalRangeValidator.MaximumDate;
-            var futureRestriction = _allowFuture ? "" : " Future dates are not allowed.";
+            var futureRestriction = this.allowFuture ? "" : " Future dates are not allowed.";
             return new ValidationResult(
                 $"Date must be between {minDate:yyyy-MM-dd} and {maxDate:yyyy-MM-dd}.{futureRestriction}");
         }

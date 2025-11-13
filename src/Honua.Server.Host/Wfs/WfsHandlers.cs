@@ -13,6 +13,7 @@ using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Host.Extensions;
+using Honua.Server.Host.Services;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -44,6 +45,7 @@ internal static class WfsHandlers
         [FromServices] ICsvExporter csvExporter,
         [FromServices] IShapefileExporter shapefileExporter,
         [FromServices] IWfsSchemaCache schemaCache,
+        [FromServices] ICapabilitiesCache capabilitiesCache,
         [FromServices] IOptions<WfsOptions> wfsOptions,
         CancellationToken cancellationToken)
     {
@@ -81,7 +83,7 @@ internal static class WfsHandlers
             switch (requestValue.ToUpperInvariant())
             {
                 case "GETCAPABILITIES":
-                    return await WfsCapabilitiesHandlers.HandleGetCapabilitiesAsync(request, metadataSnapshot, cancellationToken);
+                    return await WfsCapabilitiesHandlers.HandleGetCapabilitiesAsync(request, metadataSnapshot, capabilitiesCache, cancellationToken);
 
                 case "DESCRIBEFEATURETYPE":
                     return await WfsCapabilitiesHandlers.HandleDescribeFeatureTypeAsync(request, query, catalog, contextResolver, schemaCache, cancellationToken);

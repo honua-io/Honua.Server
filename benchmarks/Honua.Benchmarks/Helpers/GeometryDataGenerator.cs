@@ -121,9 +121,9 @@ public static class GeometryDataGenerator
     {
         var geometry = Random.Next(0, 3) switch
         {
-            0 => GeneratePoint(),
-            1 => GenerateLineString(Random.Next(5, 20)),
-            _ => GeneratePolygon(Random.Next(5, 30))
+            0 => (Geometry)GeneratePoint(),
+            1 => (Geometry)GenerateLineString(Random.Next(5, 20)),
+            _ => (Geometry)GeneratePolygon(Random.Next(5, 30))
         };
 
         var properties = new Dictionary<string, object>

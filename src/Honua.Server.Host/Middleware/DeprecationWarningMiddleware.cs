@@ -74,15 +74,15 @@ public sealed class DeprecationWarningMiddleware
             }
         }
 
-        this.deprecations = deprecationConfig;
+        this._deprecations = deprecationConfig;
         this.deprecationDocUrl = configuration.GetValue<string>("ApiVersioning:DeprecationDocumentationUrl");
 
-        if (this.deprecations.Count > 0)
+        if (this._deprecations.Count > 0)
         {
             this.logger.LogInformation(
                 "Deprecation warning middleware configured with {Count} deprecated version(s): {Versions}",
-                this.deprecations.Count,
-                string.Join(", ", this.deprecations.Keys));
+                this._deprecations.Count,
+                string.Join(", ", this._deprecations.Keys));
         }
     }
 
@@ -101,7 +101,7 @@ public sealed class DeprecationWarningMiddleware
         var version = context.Items[ApiVersionMiddleware.ApiVersionContextKey] as string;
 
         // Check if this version is deprecated
-        if (version != null && this.deprecations.TryGetValue(version, out var sunsetDate))
+        if (version != null && this._deprecations.TryGetValue(version, out var sunsetDate))
         {
             // Add deprecation headers before the response starts
             context.Response.OnStarting(() =>
@@ -116,9 +116,9 @@ public sealed class DeprecationWarningMiddleware
                 }
 
                 // RFC 8288: Link header with deprecation documentation
-                if (!string.IsNullOrWhiteSpace(_deprecationDocUrl))
+                if (!string.IsNullOrWhiteSpace(this.deprecationDocUrl))
                 {
-                    context.Response.Headers["Link"] = $"<{_deprecationDocUrl}>; rel=\"deprecation\"";
+                    context.Response.Headers["Link"] = $"<{this.deprecationDocUrl}>; rel=\"deprecation\"";
                 }
 
                 this.logger.LogWarning(
@@ -131,7 +131,7 @@ public sealed class DeprecationWarningMiddleware
             });
         }
 
-        await _next(context).ConfigureAwait(false);
+        await this.next(context).ConfigureAwait(false);
     }
 }
 

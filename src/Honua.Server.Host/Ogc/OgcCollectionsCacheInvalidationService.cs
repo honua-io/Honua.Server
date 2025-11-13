@@ -51,12 +51,12 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
         this.logger.LogInformation("Starting OGC Collections Cache Invalidation Service");
 
         // Check if the provider supports change notifications
-        if (_metadataProvider is IMutableMetadataProvider mutable &&
+        if (this.metadataProvider is IMutableMetadataProvider mutable &&
             mutable is IMetadataChangeNotifier notifier &&
             notifier.SupportsChangeNotifications)
         {
-            this.changeNotifier = notifier;
-            this.changeNotifier.MetadataChanged += OnMetadataChanged;
+            this._changeNotifier = notifier;
+            this._changeNotifier.MetadataChanged += OnMetadataChanged;
             this.logger.LogInformation("Subscribed to metadata change notifications for OGC collections cache invalidation");
         }
         else
@@ -75,7 +75,7 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
 
         if (_changeNotifier != null)
         {
-            this.changeNotifier.MetadataChanged -= OnMetadataChanged;
+            this._changeNotifier.MetadataChanged -= OnMetadataChanged;
             this.logger.LogInformation("Unsubscribed from metadata change notifications");
         }
 
@@ -207,7 +207,7 @@ public sealed class OgcCollectionsCacheInvalidationService : IHostedService, IDi
     {
         if (_changeNotifier != null)
         {
-            this.changeNotifier.MetadataChanged -= OnMetadataChanged;
+            this._changeNotifier.MetadataChanged -= OnMetadataChanged;
         }
     }
 }

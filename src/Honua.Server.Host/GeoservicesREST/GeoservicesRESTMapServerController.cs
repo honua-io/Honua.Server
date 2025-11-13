@@ -130,7 +130,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
                 var (parameters, error) = await GeoservicesRESTRasterExportHelper.TryParseExportRequestAsync(
                     Request,
                     serviceView,
-                    _rasterRegistry,
+                    this.rasterRegistry,
                     cancellationToken,
                     datasetFilter: null,
                     fallbackDatasetFactory: CreateFallbackDataset).ConfigureAwait(false);
@@ -144,7 +144,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
                 var vectorGeometries = await CollectVectorGeometriesAsync(serviceView, parameters!.Dataset, parameters.Bbox, cancellationToken).ConfigureAwait(false);
 
                 var selectedStyle = await GeoservicesRESTRasterExportHelper.ResolveStyleDefinitionAsync(
-                    _metadataRegistry,
+                    this.metadataRegistry,
                     parameters.Dataset,
                     parameters.StyleId,
                     cancellationToken).ConfigureAwait(false);
@@ -285,7 +285,7 @@ public sealed class GeoservicesRESTMapServerController : ControllerBase
         int layerIndex,
         CancellationToken cancellationToken)
     {
-        var featureController = ActivatorUtilities.CreateInstance<GeoservicesRESTFeatureServerController>(_serviceProvider);
+        var featureController = ActivatorUtilities.CreateInstance<GeoservicesRESTFeatureServerController>(this.serviceProvider);
         featureController.ControllerContext = ControllerContext;
         featureController.Url = Url;
         return featureController.QueryAsync(folderId, serviceId, layerIndex, cancellationToken);

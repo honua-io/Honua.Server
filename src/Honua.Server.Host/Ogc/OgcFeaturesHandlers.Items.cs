@@ -1029,20 +1029,20 @@ internal static partial class OgcFeaturesHandlers
 
         public async Task ExecuteAsync(HttpContext httpContext)
         {
-            httpContext.Response.ContentType = _contentType;
+            httpContext.Response.ContentType = this.contentType;
             var cancellationToken = httpContext.RequestAborted;
 
             var count = await OgcFeatureCollectionWriter.WriteFeatureCollectionAsync(
                 httpContext.Response.Body,
-                _features,
-                _layer,
-                _numberMatched,
+                this.features,
+                this.layer,
+                this.numberMatched,
                 null,
-                _links,
-                _defaultStyle,
-                _styleIds,
-                _minScale,
-                _maxScale,
+                this.links,
+                this.defaultStyle,
+                this.styleIds,
+                this.minScale,
+                this.maxScale,
                 cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (count > 0)
@@ -1103,7 +1103,7 @@ internal static partial class OgcFeaturesHandlers
 
             await foreach (var record in this.features.WithCancellation(cancellationToken))
             {
-                var components = FeatureComponentBuilder.BuildComponents(_layer, record, _query);
+                var components = FeatureComponentBuilder.BuildComponents(this.layer, record, this.query);
                 await WriteFeatureAsync(writer, components).ConfigureAwait(false);
                 hasFeatures = true;
                 returned++;
@@ -1125,7 +1125,7 @@ internal static partial class OgcFeaturesHandlers
 
         private Task WriteHeaderAsync(TextWriter writer)
         {
-            var title = this.layer.Title ?? _collectionId;
+            var title = this.layer.Title ?? this.collectionId;
             var builder = new StringBuilder();
 
             builder.AppendLine("<!DOCTYPE html>")
@@ -1145,11 +1145,11 @@ internal static partial class OgcFeaturesHandlers
             if (this.contentCrs.HasValue())
             {
                 builder.Append("<p><strong>Content CRS:</strong> ")
-                    .Append(HtmlEncode(_contentCrs))
+                    .Append(HtmlEncode(this.contentCrs))
                     .AppendLine("</p>");
             }
 
-            AppendLinksHtml(builder, _links);
+            AppendLinksHtml(builder, this.links);
 
             builder.AppendLine("<section id=\"features\">");
 

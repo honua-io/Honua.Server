@@ -16,12 +16,19 @@ public class Program
     public static void Main(string[] args)
     {
         var config = DefaultConfig.Instance
+            // Memory diagnostics - enables detection of memory leaks
             .AddDiagnoser(MemoryDiagnoser.Default)
+            .AddDiagnoser(new EventPipeProfiler(EventPipeProfile.GcVerbose))
+            .AddDiagnoser(ThreadingDiagnoser.Default)
+            // Export results in multiple formats
             .AddExporter(MarkdownExporter.GitHub)
             .AddExporter(JsonExporter.Full)
             .AddExporter(HtmlExporter.Default)
+            // Add statistical columns including percentiles
             .AddColumn(StatisticColumn.P95)
-            .AddColumn(StatisticColumn.P99);
+            .AddColumn(new PercentileColumn(PercentileKind.P99))
+            // Add memory allocation columns
+            .AddColumn(new TagColumn("Memory Leak Check", name => "See Gen0-2 collections"));
 
         // Run all benchmarks if no specific benchmark is specified
         if (args.Length == 0)

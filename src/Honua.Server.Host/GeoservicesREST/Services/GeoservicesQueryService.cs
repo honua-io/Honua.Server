@@ -255,7 +255,7 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
 
                 // Create query context for related layer (excluding objectIds and relationshipId from query string)
                 var relatedRequest = CreateRelatedQueryRequest(request, "objectIds", "relationshipId");
-                if (!GeoservicesRESTQueryTranslator.TryParse(relatedRequest, serviceView, relatedLayerView, out var relatedContext, out var parseError, _logger))
+                if (!GeoservicesRESTQueryTranslator.TryParse(relatedRequest, serviceView, relatedLayerView, out var relatedContext, out var parseError, this.logger))
                 {
                     return parseError!;
                 }
@@ -1112,8 +1112,8 @@ public sealed class GeoservicesQueryService : IGeoservicesQueryService
             if (TryConvertToDouble(value, out var numericValue))
             {
                 _sum += numericValue;
-                this.min = Math.Min(_min, numericValue);
-                this.max = Math.Max(_max, numericValue);
+                this._min = Math.Min(_min, numericValue);
+                this._max = Math.Max(_max, numericValue);
 
                 // Welford's online algorithm for variance (streaming calculation)
                 var delta = numericValue - _mean;

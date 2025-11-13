@@ -90,16 +90,16 @@ public sealed class GeoservicesEditingService : IGeoservicesEditingService
             deleteCount += ParseDeleteIdsFromQuery(request.Query, deletePropertyNames).Count();
         }
 
-        GeoservicesRESTInputValidator.ValidateEditOperationCount(addCount, updateCount, deleteCount, request.HttpContext, _logger);
+        GeoservicesRESTInputValidator.ValidateEditOperationCount(addCount, updateCount, deleteCount, request.HttpContext, this.logger);
 
         if (includeAdds)
         {
-            PopulateAddCommands(payload, addPropertyNames, serviceView.Service.Id, layerView.Layer.Id, layerView.Layer, contexts, useGlobalIds, request.HttpContext, _logger);
+            PopulateAddCommands(payload, addPropertyNames, serviceView.Service.Id, layerView.Layer.Id, layerView.Layer, contexts, useGlobalIds, request.HttpContext, this.logger);
         }
 
         if (includeUpdates)
         {
-            PopulateUpdateCommands(payload, updatePropertyNames, serviceView.Service.Id, layerView.Layer.Id, layerView.Layer, contexts, pendingResults, useGlobalIds, request.HttpContext, _logger);
+            PopulateUpdateCommands(payload, updatePropertyNames, serviceView.Service.Id, layerView.Layer.Id, layerView.Layer, contexts, pendingResults, useGlobalIds, request.HttpContext, this.logger);
         }
 
         if (includeDeletes)

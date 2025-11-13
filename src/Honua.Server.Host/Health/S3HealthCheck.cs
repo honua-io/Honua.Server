@@ -40,7 +40,7 @@ public sealed class S3HealthCheck : HealthCheckBase
     {
         try
         {
-            if (_s3Client == null)
+            if (this.s3Client == null)
             {
                 data["s3.configured"] = false;
                 Logger.LogDebug("S3 client not configured - S3 storage unavailable");
@@ -63,43 +63,43 @@ public sealed class S3HealthCheck : HealthCheckBase
                 {
                     var headBucketRequest = new GetBucketLocationRequest
                     {
-                        BucketName = _testBucket
+                        BucketName = this.testBucket
                     };
                     var location = await this.s3Client.GetBucketLocationAsync(headBucketRequest, cancellationToken);
 
-                    data["s3.test_bucket"] = _testBucket;
+                    data["s3.test_bucket"] = this.testBucket;
                     data["s3.test_bucket_accessible"] = true;
                     data["s3.test_bucket_region"] = location.Location.ToString();
 
                     Logger.LogDebug(
                         "S3 health check passed. Buckets: {BucketCount}, Test bucket: {TestBucket}",
                         listBucketsResponse.Buckets.Count,
-                        _testBucket);
+                        this.testBucket);
                 }
                 catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    data["s3.test_bucket"] = _testBucket;
+                    data["s3.test_bucket"] = this.testBucket;
                     data["s3.test_bucket_accessible"] = false;
                     data["s3.error"] = "Test bucket not found";
 
-                    Logger.LogResourceNotFound("S3 test bucket", _testBucket);
+                    Logger.LogResourceNotFound("S3 test bucket", this.testBucket);
 
                     return HealthCheckResult.Degraded(
-                        $"S3 connected but test bucket '{_testBucket}' not found",
+                        $"S3 connected but test bucket '{this.testBucket}' not found",
                         data: data);
                 }
                 catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
                 {
-                    data["s3.test_bucket"] = _testBucket;
+                    data["s3.test_bucket"] = this.testBucket;
                     data["s3.test_bucket_accessible"] = false;
                     data["s3.error"] = "Access denied to test bucket";
 
                     Logger.LogWarning(
                         "S3 test bucket access denied: {TestBucket}",
-                        _testBucket);
+                        this.testBucket);
 
                     return HealthCheckResult.Degraded(
-                        $"S3 connected but access denied to test bucket '{_testBucket}'",
+                        $"S3 connected but access denied to test bucket '{this.testBucket}'",
                         data: data);
                 }
             }

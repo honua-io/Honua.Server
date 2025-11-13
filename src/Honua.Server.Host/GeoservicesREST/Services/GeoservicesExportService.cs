@@ -127,7 +127,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
             {
                 await this.streamingKmlWriter.WriteKmzAsync(
                     response,
-                    _repository,
+                    this.repository,
                     service.Id,
                     layer,
                     context,
@@ -139,7 +139,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
             {
                 await this.streamingKmlWriter.WriteKmlAsync(
                     response,
-                    _repository,
+                    this.repository,
                     service.Id,
                     layer,
                     context,

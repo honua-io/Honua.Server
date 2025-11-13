@@ -67,7 +67,7 @@ public sealed class ServicesDirectoryController : ControllerBase
                     .SelectMany(group => group.Services.SelectMany(service => CreateRootEntries(service, rasterServices, urlFactory)))
                     .ToList();
 
-                var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+                var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
                     ? geometryService.Enabled
                     : true;
                 if (geometryEnabled)

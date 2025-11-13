@@ -40,19 +40,19 @@ public class StorageHealthCheck : IHealthCheck
         try
         {
             // Check if S3 is configured
-            var s3Configured = !string.IsNullOrWhiteSpace(_configuration["AWS:S3:BucketName"]) ||
-                              !string.IsNullOrWhiteSpace(_configuration["honua:attachments:s3:bucketName"]);
+            var s3Configured = !string.IsNullOrWhiteSpace(this.configuration["AWS:S3:BucketName"]) ||
+                              !string.IsNullOrWhiteSpace(this.configuration["honua:attachments:s3:bucketName"]);
 
             // Check if Azure Blob is configured
-            var azureConfigured = !string.IsNullOrWhiteSpace(_configuration["Azure:Storage:ConnectionString"]) ||
-                                 !string.IsNullOrWhiteSpace(_configuration["honua:attachments:azure:connectionString"]);
+            var azureConfigured = !string.IsNullOrWhiteSpace(this.configuration["Azure:Storage:ConnectionString"]) ||
+                                 !string.IsNullOrWhiteSpace(this.configuration["honua:attachments:azure:connectionString"]);
 
             // Check if Google Cloud Storage is configured
-            var gcsConfigured = !string.IsNullOrWhiteSpace(_configuration["GCP:Storage:BucketName"]) ||
-                               !string.IsNullOrWhiteSpace(_configuration["honua:attachments:gcs:bucketName"]);
+            var gcsConfigured = !string.IsNullOrWhiteSpace(this.configuration["GCP:Storage:BucketName"]) ||
+                               !string.IsNullOrWhiteSpace(this.configuration["honua:attachments:gcs:bucketName"]);
 
             // Check if filesystem storage is configured
-            var fileSystemConfigured = !string.IsNullOrWhiteSpace(_configuration["honua:attachments:fileSystem:basePath"]);
+            var fileSystemConfigured = !string.IsNullOrWhiteSpace(this.configuration["honua:attachments:fileSystem:basePath"]);
 
             // Test S3 if configured
             if (s3Configured)
@@ -168,7 +168,7 @@ public class StorageHealthCheck : IHealthCheck
     {
         try
         {
-            var bucketName = _configuration["AWS:S3:BucketName"] ?? _configuration["honua:attachments:s3:bucketName"];
+            var bucketName = this.configuration["AWS:S3:BucketName"] ?? this.configuration["honua:attachments:s3:bucketName"];
             if (string.IsNullOrWhiteSpace(bucketName))
             {
                 return ("NotConfigured", null);
@@ -209,15 +209,15 @@ public class StorageHealthCheck : IHealthCheck
     {
         try
         {
-            var connectionString = _configuration["Azure:Storage:ConnectionString"] ??
-                                  _configuration["honua:attachments:azure:connectionString"];
+            var connectionString = this.configuration["Azure:Storage:ConnectionString"] ??
+                                  this.configuration["honua:attachments:azure:connectionString"];
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 return ("NotConfigured", null);
             }
 
-            var containerName = _configuration["Azure:Storage:ContainerName"] ??
-                               _configuration["honua:attachments:azure:containerName"] ??
+            var containerName = this.configuration["Azure:Storage:ContainerName"] ??
+                               this.configuration["honua:attachments:azure:containerName"] ??
                                "attachments";
 
             var blobServiceClient = new BlobServiceClient(connectionString);
@@ -245,8 +245,8 @@ public class StorageHealthCheck : IHealthCheck
     {
         try
         {
-            var bucketName = _configuration["GCP:Storage:BucketName"] ??
-                            _configuration["honua:attachments:gcs:bucketName"];
+            var bucketName = this.configuration["GCP:Storage:BucketName"] ??
+                            this.configuration["honua:attachments:gcs:bucketName"];
             if (string.IsNullOrWhiteSpace(bucketName))
             {
                 return ("NotConfigured", null);
@@ -280,7 +280,7 @@ public class StorageHealthCheck : IHealthCheck
     {
         try
         {
-            var basePath = _configuration["honua:attachments:fileSystem:basePath"];
+            var basePath = this.configuration["honua:attachments:fileSystem:basePath"];
             if (string.IsNullOrWhiteSpace(basePath))
             {
                 return ("NotConfigured", null);

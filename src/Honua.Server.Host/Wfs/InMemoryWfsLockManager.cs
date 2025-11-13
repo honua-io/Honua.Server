@@ -56,8 +56,8 @@ internal sealed class InMemoryWfsLockManager : IWfsLockManager
 
             foreach (var target in targets)
             {
-                if (this.targetIndex.TryGetValue(target, out var existingLockId) &&
-                    this.locks.TryGetValue(existingLockId, out var existingLock))
+                if (this._targetIndex.TryGetValue(target, out var existingLockId) &&
+                    this._locks.TryGetValue(existingLockId, out var existingLock))
                 {
                     return Task.FromResult(new WfsLockAcquisitionResult(false, null, CreateConflictMessage(target, existingLock)));
                 }
@@ -89,14 +89,14 @@ internal sealed class InMemoryWfsLockManager : IWfsLockManager
 
             PurgeExpiredLocks_NoLock(DateTimeOffset.UtcNow);
 
-            if (lockId.HasValue() && !this.locks.ContainsKey(lockId))
+            if (lockId.HasValue() && !this._locks.ContainsKey(lockId))
             {
                 return Task.FromResult(new WfsLockValidationResult(false, $"Lock '{lockId}' is not active."));
             }
 
             foreach (var target in targets)
             {
-                if (!this.targetIndex.TryGetValue(target, out var existingLockId))
+                if (!this._targetIndex.TryGetValue(target, out var existingLockId))
                 {
                     continue;
                 }
@@ -124,7 +124,7 @@ internal sealed class InMemoryWfsLockManager : IWfsLockManager
 
             PurgeExpiredLocks_NoLock(DateTimeOffset.UtcNow);
 
-            if (!this.locks.TryGetValue(lockId, out var info))
+            if (!this._locks.TryGetValue(lockId, out var info))
             {
                 return Task.CompletedTask;
             }
@@ -150,10 +150,10 @@ internal sealed class InMemoryWfsLockManager : IWfsLockManager
             {
                 foreach (var target in info.Targets)
                 {
-                    this.targetIndex.Remove(target);
+                    this._targetIndex.Remove(target);
                 }
 
-                this.locks.Remove(lockId);
+                this._locks.Remove(lockId);
                 return Task.CompletedTask;
             }
 
@@ -161,13 +161,13 @@ internal sealed class InMemoryWfsLockManager : IWfsLockManager
             {
                 if (info.Targets.Remove(target))
                 {
-                    this.targetIndex.Remove(target);
+                    this._targetIndex.Remove(target);
                 }
             }
 
             if (info.Targets.Count == 0)
             {
-                this.locks.Remove(lockId);
+                this._locks.Remove(lockId);
             }
         }
 
@@ -178,8 +178,8 @@ internal sealed class InMemoryWfsLockManager : IWfsLockManager
     {
         lock (_sync)
         {
-            this.locks.Clear();
-            this.targetIndex.Clear();
+            this._locks.Clear();
+            this._targetIndex.Clear();
         }
 
         return Task.CompletedTask;
@@ -187,20 +187,20 @@ internal sealed class InMemoryWfsLockManager : IWfsLockManager
 
     private void PurgeExpiredLocks_NoLock(DateTimeOffset utcNow)
     {
-        if (this.locks.Count == 0)
+        if (this._locks.Count == 0)
         {
             return;
         }
 
-        var expired = this.locks.Values.Where(info => info.ExpiresAt <= utcNow).ToList();
+        var expired = this._locks.Values.Where(info => info.ExpiresAt <= utcNow).ToList();
         foreach (var info in expired)
         {
             foreach (var target in info.Targets)
             {
-                this.targetIndex.Remove(target);
+                this._targetIndex.Remove(target);
             }
 
-            this.locks.Remove(info.LockId);
+            this._locks.Remove(info.LockId);
         }
     }
 

@@ -64,7 +64,7 @@ public sealed class StreamingGeoJsonWriter
 
         await OperationInstrumentation.Create<int>("Streaming GeoJSON Write")
             .WithActivitySource(HonuaTelemetry.OgcProtocols)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithTag("arcgis.service_id", serviceId)
             .WithTag("arcgis.layer_id", layer.Id)
             .WithTag("arcgis.return_geometry", context.ReturnGeometry)

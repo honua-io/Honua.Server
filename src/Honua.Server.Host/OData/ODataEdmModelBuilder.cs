@@ -23,8 +23,8 @@ public sealed class ODataEdmModelBuilder
 
         // Get metadata snapshot synchronously (we're in DI registration context)
         var snapshot = metadataRegistry.GetSnapshotAsync(CancellationToken.None)
-            .GetAwaiter()
-            .GetResult();
+            .AsTask()
+            .Result;
 
         // Create entity sets for each layer
         foreach (var service in snapshot.Services)

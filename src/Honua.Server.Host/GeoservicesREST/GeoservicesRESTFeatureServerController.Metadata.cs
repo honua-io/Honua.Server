@@ -53,7 +53,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
     [HttpGet("{layerIndex:int}")]
     public async Task<ActionResult<GeoservicesRESTLayerDetailResponse>> GetLayer(string folderId, string serviceId, int layerIndex, CancellationToken cancellationToken)
     {
-        var resolution = GeoservicesRESTServiceResolutionHelper.ResolveServiceAndLayer(this, _catalog, folderId, serviceId, layerIndex);
+        var resolution = GeoservicesRESTServiceResolutionHelper.ResolveServiceAndLayer(this, this.catalog, folderId, serviceId, layerIndex);
         if (resolution.Error is not null)
         {
             return (ActionResult)resolution.Error;
@@ -113,7 +113,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         int layerIndex,
         CancellationToken cancellationToken)
     {
-        var resolution = GeoservicesRESTServiceResolutionHelper.ResolveServiceAndLayer(this, _catalog, folderId, serviceId, layerIndex);
+        var resolution = GeoservicesRESTServiceResolutionHelper.ResolveServiceAndLayer(this, this.catalog, folderId, serviceId, layerIndex);
         if (resolution.Error is not null)
         {
             return resolution.Error;
@@ -149,7 +149,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         string serviceId,
         CancellationToken cancellationToken)
     {
-        var (serviceView, error) = GeoservicesRESTServiceResolutionHelper.ResolveServiceOnly(this, _catalog, folderId, serviceId);
+        var (serviceView, error) = GeoservicesRESTServiceResolutionHelper.ResolveServiceOnly(this, this.catalog, folderId, serviceId);
         if (error is not null)
         {
             return Task.FromResult<IActionResult>(error);

@@ -39,7 +39,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
 
         try
         {
-            if (_redis == null)
+            if (this.redis == null)
             {
                 // Redis not configured - stores will use in-memory implementations
                 healthData["redis.configured"] = false;
@@ -76,7 +76,7 @@ public sealed class RedisStoresHealthCheck : IHealthCheck
             healthData["stores.mode"] = "distributed";
             healthData["stores.distributed"] = true;
 
-            var allowAdmin = GetAllowAdminFlag(_redis);
+            var allowAdmin = GetAllowAdminFlag(this.redis);
             healthData["redis.allow_admin"] = allowAdmin;
 
             var endpoints = this.redis.GetEndPoints();

@@ -35,7 +35,7 @@ public sealed class StacControllerHelper
     /// <summary>
     /// Checks if STAC is enabled in the configuration.
     /// </summary>
-    public bool IsStacEnabled() => StacRequestHelpers.IsStacEnabled(_honuaConfig);
+    public bool IsStacEnabled() => StacRequestHelpers.IsStacEnabled(this.honuaConfig);
 
     /// <summary>
     /// Builds the base URI from an HTTP request.

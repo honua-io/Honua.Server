@@ -40,7 +40,7 @@ public sealed class GlobalExceptionHandlerMiddleware
     {
         try
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

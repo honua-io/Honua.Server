@@ -105,8 +105,8 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
     public async Task<IReadOnlyList<RasterTilePreseedJobSnapshot>> ListJobsAsync(CancellationToken cancellationToken = default)
     {
-        var activeJobs = await this.jobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        var completedJobs = await this.completedJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var activeJobs = await this._jobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var completedJobs = await this._completedJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         return activeJobs.Select(job => job.Snapshot)
             .Concat(completedJobs)
@@ -116,13 +116,13 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
     public async Task<RasterTilePreseedJobSnapshot?> TryGetJobAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
-        var activeJob = await this.jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var activeJob = await this._jobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
         if (activeJob is not null)
         {
             return activeJob.Snapshot;
         }
 
-        var completedJob = await this.completedJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var completedJob = await this._completedJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
         if (completedJob is not null)
         {
             return completedJob;
@@ -133,14 +133,14 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
     public async Task<RasterTilePreseedJobSnapshot?> CancelAsync(Guid jobId, string? reason = null)
     {
-        var job = await this.jobs.GetAsync(jobId).ConfigureAwait(false);
+        var job = await this._jobs.GetAsync(jobId).ConfigureAwait(false);
         if (job is not null)
         {
             job.RequestCancellation(reason);
             return job.Snapshot;
         }
 
-        var snapshot = await this.completedJobs.GetAsync(jobId).ConfigureAwait(false);
+        var snapshot = await this._completedJobs.GetAsync(jobId).ConfigureAwait(false);
         if (snapshot is not null)
         {
             return snapshot;
@@ -193,7 +193,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
         request.EnsureValid();
 
         var job = new RasterTilePreseedJob(request);
-        var registered = await this.jobs.RegisterAsync(job, cancellationToken).ConfigureAwait(false);
+        var registered = await this._jobs.RegisterAsync(job, cancellationToken).ConfigureAwait(false);
         if (!registered)
         {
             throw new InvalidOperationException($"Failed to register raster tile preseed job {job.JobId}.");
@@ -247,10 +247,10 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
 
     private async Task RecordJobFinalStateAsync(RasterTilePreseedJob job, RasterTilePreseedJobSnapshot snapshot, CancellationToken cancellationToken = default)
     {
-        await this.jobs.UnregisterAsync(job.JobId, cancellationToken).ConfigureAwait(false);
+        await this._jobs.UnregisterAsync(job.JobId, cancellationToken).ConfigureAwait(false);
         job.Dispose();
 
-        await this.completedJobs.RecordCompletionAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        await this._completedJobs.RecordCompletionAsync(snapshot, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ProcessWorkItemAsync(RasterTilePreseedWorkItem workItem, CancellationToken cancellationToken)
@@ -346,7 +346,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
             ExpirationScanFrequency = TimeSpan.FromMinutes(5)
         });
 
-        var workerCount = Math.Min(_maxParallelism, Math.Max(1, datasetPlans.Count));
+        var workerCount = Math.Min(this.maxParallelism, Math.Max(1, datasetPlans.Count));
         var channelCapacity = Math.Clamp(workerCount * WorkerBufferMultiplier, workerCount, 512);
         var tileChannel = Channel.CreateBounded<TileCoordinate>(new BoundedChannelOptions(channelCapacity)
         {
@@ -592,7 +592,7 @@ public sealed class RasterTilePreseedService : BackgroundService, IRasterTilePre
                     plan.Dataset,
                     fetchBoundingBox,
                     metadataSnapshot,
-                    _featureRepository,
+                    this.featureRepository,
                     cancellationToken).ConfigureAwait(false);
 
                 return geometries.Count == 0 ? Array.Empty<Geometry>() : geometries;

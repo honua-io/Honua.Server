@@ -92,7 +92,7 @@ public sealed class CapabilitiesCacheInvalidationService : BackgroundService
         try
         {
             var changeToken = this.metadataRegistry.GetChangeToken();
-            this.changeTokenRegistration = ChangeToken.OnChange(
+            _changeTokenRegistration = ChangeToken.OnChange(
                 () => this.metadataRegistry.GetChangeToken(),
                 OnMetadataChanged);
 

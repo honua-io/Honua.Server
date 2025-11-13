@@ -250,10 +250,10 @@ internal static class WmtsHandlers
 
         public Task ExecuteAsync(HttpContext httpContext)
         {
-            httpContext.Response.ContentType = _contentType;
-            httpContext.Response.Headers.CacheControl = _cacheControl;
+            httpContext.Response.ContentType = this.contentType;
+            httpContext.Response.Headers.CacheControl = this.cacheControl;
             httpContext.Response.Headers.Vary = "Accept-Encoding";
-            return httpContext.Response.Body.WriteAsync(_content).AsTask();
+            return httpContext.Response.Body.WriteAsync(this.content).AsTask();
         }
     }
 

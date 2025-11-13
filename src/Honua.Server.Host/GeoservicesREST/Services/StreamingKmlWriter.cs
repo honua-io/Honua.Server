@@ -69,7 +69,7 @@ public sealed class StreamingKmlWriter
 
         await OperationInstrumentation.Create<int>("Streaming KML Write")
             .WithActivitySource(HonuaTelemetry.OgcProtocols)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithTag("arcgis.service_id", serviceId)
             .WithTag("arcgis.layer_id", layer.Id)
             .WithTag("arcgis.format", "kml")
@@ -229,7 +229,7 @@ public sealed class StreamingKmlWriter
 
         await OperationInstrumentation.Create<int>("Streaming KMZ Write")
             .WithActivitySource(HonuaTelemetry.OgcProtocols)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithTag("arcgis.service_id", serviceId)
             .WithTag("arcgis.layer_id", layer.Id)
             .WithTag("arcgis.format", "kmz")

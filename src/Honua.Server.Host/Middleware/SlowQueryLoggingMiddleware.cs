@@ -29,7 +29,7 @@ public class SlowQueryLoggingMiddleware
     {
         if (!this.options.Enabled)
         {
-            await _next(context);
+            await this.next(context);
             return;
         }
 
@@ -39,7 +39,7 @@ public class SlowQueryLoggingMiddleware
 
         try
         {
-            await _next(context);
+            await this.next(context);
         }
         finally
         {

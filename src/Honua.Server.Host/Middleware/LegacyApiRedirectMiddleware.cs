@@ -83,11 +83,11 @@ public sealed class LegacyApiRedirectMiddleware
         this.targetVersion = configuration.GetValue("ApiVersioning:LegacyRedirectVersion", ApiVersioning.DefaultVersion)
             ?? ApiVersioning.DefaultVersion;
 
-        if (_enabled)
+        if (this.enabled)
         {
             this.logger.LogInformation(
                 "Legacy API redirect middleware enabled. Non-versioned URLs will redirect to {Version}",
-                _targetVersion);
+                this.targetVersion);
         }
         else
         {
@@ -107,9 +107,9 @@ public sealed class LegacyApiRedirectMiddleware
         }
 
         // Skip if middleware is disabled
-        if (!_enabled)
+        if (!this.enabled)
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
             return;
         }
 
@@ -118,19 +118,19 @@ public sealed class LegacyApiRedirectMiddleware
         // Skip if path is null/empty or already has a version
         if (string.IsNullOrEmpty(path) || HasVersion(path))
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
             return;
         }
 
         // Skip if this is not a known API path
         if (!IsKnownApiPath(path))
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
             return;
         }
 
         // Build the versioned URL
-        var newPath = $"/{_targetVersion}{path}";
+        var newPath = $"/{this.targetVersion}{path}";
         var queryString = context.Request.QueryString.ToUriComponent();
         var newLocation = newPath + queryString;
 

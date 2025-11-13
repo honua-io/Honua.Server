@@ -40,7 +40,7 @@ public sealed class AzureBlobHealthCheck : HealthCheckBase
     {
         try
         {
-            if (_blobServiceClient == null)
+            if (this.blobServiceClient == null)
             {
                 data["azure_blob.configured"] = false;
                 Logger.LogDebug("Azure Blob Storage client not configured - Azure storage unavailable");
@@ -63,10 +63,10 @@ public sealed class AzureBlobHealthCheck : HealthCheckBase
             {
                 try
                 {
-                    var containerClient = this.blobServiceClient.GetBlobContainerClient(_testContainer);
+                    var containerClient = this.blobServiceClient.GetBlobContainerClient(this.testContainer);
                     var exists = await containerClient.ExistsAsync(cancellationToken);
 
-                    data["azure_blob.test_container"] = _testContainer;
+                    data["azure_blob.test_container"] = this.testContainer;
                     data["azure_blob.test_container_exists"] = exists.Value;
 
                     if (exists.Value)
@@ -78,32 +78,32 @@ public sealed class AzureBlobHealthCheck : HealthCheckBase
                         Logger.LogDebug(
                             "Azure Blob health check passed. Account: {AccountName}, Test container: {TestContainer}",
                             this.blobServiceClient.AccountName,
-                            _testContainer);
+                            this.testContainer);
                     }
                     else
                     {
                         data["azure_blob.test_container_accessible"] = false;
                         Logger.LogWarning(
                             "Azure Blob test container does not exist: {TestContainer}",
-                            _testContainer);
+                            this.testContainer);
 
                         return HealthCheckResult.Degraded(
-                            $"Azure Blob connected but test container '{_testContainer}' does not exist",
+                            $"Azure Blob connected but test container '{this.testContainer}' does not exist",
                             data: data);
                     }
                 }
                 catch (RequestFailedException ex) when (ex.Status == 403)
                 {
-                    data["azure_blob.test_container"] = _testContainer;
+                    data["azure_blob.test_container"] = this.testContainer;
                     data["azure_blob.test_container_accessible"] = false;
                     data["azure_blob.error"] = "Access denied to test container";
 
                     Logger.LogWarning(ex,
                         "Azure Blob test container access denied: {TestContainer}",
-                        _testContainer);
+                        this.testContainer);
 
                     return HealthCheckResult.Degraded(
-                        $"Azure Blob connected but access denied to test container '{_testContainer}'",
+                        $"Azure Blob connected but access denied to test container '{this.testContainer}'",
                         data: data);
                 }
             }

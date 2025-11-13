@@ -803,20 +803,20 @@ internal static class OgcTilesHandlers
         {
             Guard.NotNull(httpContext);
 
-            if (this.cacheService.ShouldReturn304NotModified(httpContext, _etag, null))
+            if (this.cacheService.ShouldReturn304NotModified(httpContext, this.etag, null))
             {
-                this.cacheService.ApplyCacheHeaders(httpContext, OgcResourceType.Tile, _etag, null);
+                this.cacheService.ApplyCacheHeaders(httpContext, OgcResourceType.Tile, this.etag, null);
                 ApplyCdnHeaders(httpContext.Response);
                 httpContext.Response.StatusCode = StatusCodes.Status304NotModified;
                 await DisposeContentAsync().ConfigureAwait(false);
                 return;
             }
 
-            this.cacheService.ApplyCacheHeaders(httpContext, OgcResourceType.Tile, _etag, null);
+            this.cacheService.ApplyCacheHeaders(httpContext, OgcResourceType.Tile, this.etag, null);
             ApplyCdnHeaders(httpContext.Response);
 
             var response = httpContext.Response;
-            response.ContentType = _contentType;
+            response.ContentType = this.contentType;
 
             if (this.content.CanSeek)
             {
@@ -841,7 +841,7 @@ internal static class OgcTilesHandlers
                 return;
             }
 
-            response.Headers.CacheControl = _cacheControlOverride;
+            response.Headers.CacheControl = this.cacheControlOverride;
             response.Headers.Vary = "Accept-Encoding";
         }
 
@@ -852,9 +852,9 @@ internal static class OgcTilesHandlers
                 return;
             }
 
-            this.disposed = true;
+            this._disposed = true;
 
-            switch (_content)
+            switch (this.content)
             {
                 case IAsyncDisposable asyncDisposable:
                     await asyncDisposable.DisposeAsync().ConfigureAwait(false);

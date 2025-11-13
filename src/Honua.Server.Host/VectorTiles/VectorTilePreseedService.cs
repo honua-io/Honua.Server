@@ -100,7 +100,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         var totalTiles = CalculateTotalTilesWithLimit(request.MinZoom, request.MaxZoom);
 
         // Check concurrent job limit
-        var activeJobCount = await this.activeJobs.CountAsync(cancellationToken).ConfigureAwait(false);
+        var activeJobCount = await this._activeJobs.CountAsync(cancellationToken).ConfigureAwait(false);
         if (activeJobCount >= this.limits.MaxConcurrentJobs)
         {
             throw new InvalidOperationException(
@@ -110,7 +110,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
         // Check per-user job limit
         var userKey = $"{request.ServiceId}/{request.LayerId}";
-        var allActiveJobs = await this.activeJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var allActiveJobs = await this._activeJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
         var userJobCount = allActiveJobs.Count(j =>
             j.Request.ServiceId == request.ServiceId &&
             j.Request.LayerId == request.LayerId);
@@ -144,7 +144,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         });
 
         var job = new VectorTilePreseedJob(Guid.NewGuid(), request);
-        await this.activeJobs.PutAsync(job, cancellationToken).ConfigureAwait(false);
+        await this._activeJobs.PutAsync(job, cancellationToken).ConfigureAwait(false);
 
         await this.queue.Writer.WriteAsync(job, cancellationToken).ConfigureAwait(false);
 
@@ -157,13 +157,13 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
     public async Task<VectorTilePreseedJobSnapshot?> TryGetJobAsync(Guid jobId, CancellationToken cancellationToken = default)
     {
-        var activeJob = await this.activeJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var activeJob = await this._activeJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
         if (activeJob is not null)
         {
             return VectorTilePreseedJobSnapshot.FromJob(activeJob);
         }
 
-        var completedJob = await this.completedJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
+        var completedJob = await this._completedJobs.GetAsync(jobId, cancellationToken).ConfigureAwait(false);
         if (completedJob is not null)
         {
             return completedJob;
@@ -174,8 +174,8 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
     public async Task<IReadOnlyList<VectorTilePreseedJobSnapshot>> ListJobsAsync(CancellationToken cancellationToken = default)
     {
-        var activeJobs = await this.activeJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        var completedJobs = await this.completedJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var activeJobs = await this._activeJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var completedJobs = await this._completedJobs.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         return activeJobs.Select(VectorTilePreseedJobSnapshot.FromJob)
             .Concat(completedJobs)
@@ -185,7 +185,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
     public async Task<VectorTilePreseedJobSnapshot?> CancelAsync(Guid jobId, string? reason = null)
     {
-        var job = await this.activeJobs.GetAsync(jobId).ConfigureAwait(false);
+        var job = await this._activeJobs.GetAsync(jobId).ConfigureAwait(false);
         if (job is not null)
         {
             if (job.TryCancel())
@@ -197,7 +197,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         }
 
         // If job already completed/cancelled, return the completed snapshot (if any)
-        return await this.completedJobs.GetAsync(jobId).ConfigureAwait(false);
+        return await this._completedJobs.GetAsync(jobId).ConfigureAwait(false);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -230,8 +230,8 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
             }
         }
 
-        var activeJobsCount = await this.activeJobs.CountAsync(stoppingToken).ConfigureAwait(false);
-        var completedJobsCount = await this.completedJobs.CountAsync(stoppingToken).ConfigureAwait(false);
+        var activeJobsCount = await this._activeJobs.CountAsync(stoppingToken).ConfigureAwait(false);
+        var completedJobsCount = await this._completedJobs.CountAsync(stoppingToken).ConfigureAwait(false);
         this.logger.LogInformation("Vector tile preseed service stopped. ActiveJobs={ActiveJobs}, CompletedJobs={CompletedJobs}",
             activeJobsCount,
             completedJobsCount);
@@ -504,10 +504,10 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
 
     private async Task MoveToCompletedAsync(VectorTilePreseedJob job, CancellationToken cancellationToken = default)
     {
-        await this.activeJobs.DeleteAsync(job.JobId, cancellationToken).ConfigureAwait(false);
+        await this._activeJobs.DeleteAsync(job.JobId, cancellationToken).ConfigureAwait(false);
 
         var snapshot = VectorTilePreseedJobSnapshot.FromJob(job);
-        await this.completedJobs.RecordCompletionAsync(snapshot, cancellationToken).ConfigureAwait(false);
+        await this._completedJobs.RecordCompletionAsync(snapshot, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -527,7 +527,7 @@ public sealed class VectorTilePreseedService : BackgroundService, IVectorTilePre
         }
 
         // Dispose of the rate limit cache
-        _userRateLimits?.Dispose();
+        this.userRateLimits?.Dispose();
 
         base.Dispose();
     }

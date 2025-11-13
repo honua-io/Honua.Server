@@ -138,7 +138,9 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
 
             // JsonMetadataProvider has been removed - parsing now handled by HclMetadataProvider
             // Schema validation already performed above
-            var metadataPath = honuaConfig.Metadata?.Path;
+            // TODO: Metadata path should be obtained from configuration, not HonuaConfig
+            // var metadataPath = honuaConfig.Metadata?.Path;
+            string? metadataPath = null;
             if (metadataPath.IsNullOrWhiteSpace())
             {
                 return Results.Json(new { error = "Metadata path is not configured." }, statusCode: StatusCodes.Status500InternalServerError);
@@ -347,7 +349,9 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             var payload = await ReadBodyAsync(request).ConfigureAwait(false);
             if (payload.IsNullOrWhiteSpace())
             {
-                var metadataPath = honuaConfig.Metadata?.Path;
+                // TODO: Metadata path should be obtained from configuration, not HonuaConfig
+                // var metadataPath = honuaConfig.Metadata?.Path;
+                string? metadataPath = null;
                 if (!File.Exists(metadataPath))
                 {
                     return Results.NotFound(new { error = "Metadata file not found." });

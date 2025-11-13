@@ -172,7 +172,7 @@ public static class ETagResultExtensions
 
         public async Task ExecuteAsync(HttpContext httpContext)
         {
-            httpContext.Response.Headers[HeaderNames.ETag] = _etag;
+            httpContext.Response.Headers[HeaderNames.ETag] = this.etag;
             await this.innerResult.ExecuteAsync(httpContext);
         }
     }
