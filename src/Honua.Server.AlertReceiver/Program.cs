@@ -1,5 +1,10 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="Program.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
+using System.Linq;
+using System.Text;
 using Amazon.SimpleNotificationService;
 using Honua.Server.AlertReceiver.Configuration;
 using Honua.Server.AlertReceiver.Middleware;
@@ -9,8 +14,6 @@ using Honua.Server.Core.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using System.Linq;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,7 +38,8 @@ if (connectionString.IsNullOrWhiteSpace())
         "CONFIGURATION ERROR: ConnectionStrings:AlertHistory is required for alert persistence. {NewLine}" +
         "Set via appsettings.json or environment variable: ConnectionStrings__AlertHistory{NewLine}" +
         "Example: \"Host=localhost;Database=alerts;Username=user;Password=pass\"",
-        Environment.NewLine, Environment.NewLine);
+        Environment.NewLine,
+        Environment.NewLine);
     throw new InvalidOperationException("AlertHistory connection string not configured");
 }
 // Configure webhook security
@@ -63,7 +67,9 @@ if (!webhookSecurityOptions.IsValid(out var validationErrors))
             "Set via environment variable: Webhook__Security__SharedSecret{NewLine}" +
             "Generate a secure secret: openssl rand -base64 32{NewLine}" +
             "Or set Webhook:Security:RequireSignature to false (NOT recommended for production)",
-            Environment.NewLine, Environment.NewLine, Environment.NewLine);
+            Environment.NewLine,
+            Environment.NewLine,
+            Environment.NewLine);
     }
 }
 
@@ -261,7 +267,11 @@ else
             "Generate a secure 512-bit secret: openssl rand -base64 64{NewLine}" +
             "Or use hex encoding (128 hex chars): openssl rand -hex 64{NewLine}" +
             "NOTE: For key rotation, use Authentication:JwtSigningKeys array instead.",
-            Environment.NewLine, jwtSecret.Length, Environment.NewLine, Environment.NewLine, Environment.NewLine);
+            Environment.NewLine,
+            jwtSecret.Length,
+            Environment.NewLine,
+            Environment.NewLine,
+            Environment.NewLine);
         throw new InvalidOperationException("JWT secret too short (minimum 64 characters required for HMAC-SHA256 security)");
     }
 
@@ -273,7 +283,9 @@ else
             "CONFIGURATION ERROR: Authentication:JwtSecret has insufficient entropy. {NewLine}" +
             "Issue: {Reason}{NewLine}" +
             "Generate a cryptographically secure secret: openssl rand -base64 64",
-            Environment.NewLine, entropyValidation.Reason, Environment.NewLine);
+            Environment.NewLine,
+            entropyValidation.Reason,
+            Environment.NewLine);
         throw new InvalidOperationException($"JWT secret has weak entropy: {entropyValidation.Reason}");
     }
 
@@ -284,7 +296,7 @@ else
 
     var defaultKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
     {
-        KeyId = "default"
+        KeyId = "default",
     };
 
     signingKeys = new[] { defaultKey };
@@ -321,7 +333,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 }
 
                 return signingKeys;
-            }
+            },
         };
     });
 
@@ -384,7 +396,7 @@ static SymmetricSecurityKey CreateSymmetricKey(JwtSigningKeyOption option, int i
 
     var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(option.Key))
     {
-        KeyId = string.IsNullOrWhiteSpace(option.KeyId) ? $"key-{index + 1}" : option.KeyId
+        KeyId = string.IsNullOrWhiteSpace(option.KeyId) ? $"key-{index + 1}" : option.KeyId,
     };
 
     return securityKey;
@@ -459,6 +471,8 @@ static (bool IsValid, string? Reason) ValidateKeyEntropy(string key)
 internal sealed record JwtSigningKeyOption
 {
     public string Key { get; init; } = string.Empty;
+
     public string? KeyId { get; init; }
+
     public bool Active { get; init; }
 }

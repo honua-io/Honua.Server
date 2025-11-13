@@ -64,7 +64,7 @@
                 @if (_detectionResult != null)
                 {
                     <div class="detection-info">
-                        <p><strong>Format:</strong> @_detectionResult.Format (@(_detectionResult.Confidence * 100:F0)% confident)</p>
+                        <p><strong>Format:</strong> @_detectionResult.Format (@((_detectionResult.Confidence * 100).ToString("F0"))% confident)</p>
                         @if (_detectionResult.EstimatedFeatureCount.HasValue)
                         {
                             <p><strong>Features:</strong> ~@_detectionResult.EstimatedFeatureCount.Value</p>

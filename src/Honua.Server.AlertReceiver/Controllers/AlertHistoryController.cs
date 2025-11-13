@@ -1,7 +1,10 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="AlertHistoryController.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
-using System.ComponentModel.DataAnnotations;
+// </copyright>
+
 using Honua.Server.AlertReceiver.Data;
+using Honua.Server.AlertReceiver.Models;
 using Honua.Server.AlertReceiver.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,18 +18,18 @@ namespace Honua.Server.AlertReceiver.Controllers;
 [Route("api/alerts")]
 public sealed class AlertHistoryController : ControllerBase
 {
-    private readonly IAlertPersistenceService _persistenceService;
-    private readonly IAlertSilencingService _silencingService;
-    private readonly ILogger<AlertHistoryController> _logger;
+    private readonly IAlertPersistenceService persistenceService;
+    private readonly IAlertSilencingService silencingService;
+    private readonly ILogger<AlertHistoryController> logger;
 
     public AlertHistoryController(
         IAlertPersistenceService persistenceService,
         IAlertSilencingService silencingService,
         ILogger<AlertHistoryController> logger)
     {
-        _persistenceService = persistenceService;
-        _silencingService = silencingService;
-        _logger = logger;
+        this.persistenceService = persistenceService;
+        this.silencingService = silencingService;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -41,7 +44,7 @@ public sealed class AlertHistoryController : ControllerBase
         // Validate limit (max 1000)
         if (limit < 1 || limit > 1000)
         {
-            return BadRequest(new { error = "Limit must be between 1 and 1000" });
+            return this.BadRequest(new { error = "Limit must be between 1 and 1000" });
         }
 
         // Validate severity format
@@ -49,25 +52,25 @@ public sealed class AlertHistoryController : ControllerBase
         {
             if (severity.Length > 50)
             {
-                return BadRequest(new { error = "Severity must be 50 characters or less" });
+                return this.BadRequest(new { error = "Severity must be 50 characters or less" });
             }
 
             var validSeverities = new[] { "critical", "high", "medium", "low", "info", "warning", "error", "crit", "err", "warn", "fatal", "information" };
             if (!validSeverities.Contains(severity.ToLowerInvariant()))
             {
-                return BadRequest(new { error = $"Invalid severity: {severity}. Valid values: critical, high, medium, low, info, warning, error" });
+                return this.BadRequest(new { error = $"Invalid severity: {severity}. Valid values: critical, high, medium, low, info, warning, error" });
             }
         }
 
         try
         {
-            var alerts = await _persistenceService.GetRecentAlertsAsync(limit, severity);
-            return Ok(new { alerts, count = alerts.Count });
+            var alerts = await this.persistenceService.GetRecentAlertsAsync(limit, severity);
+            return this.Ok(new { alerts, count = alerts.Count });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get alert history");
-            return StatusCode(500, new { error = "Failed to retrieve alert history" });
+            this.logger.LogError(ex, "Failed to get alert history");
+            return this.StatusCode(500, new { error = "Failed to retrieve alert history" });
         }
     }
 
@@ -81,34 +84,34 @@ public sealed class AlertHistoryController : ControllerBase
         // Validate fingerprint format
         if (string.IsNullOrWhiteSpace(fingerprint))
         {
-            return BadRequest(new { error = "Fingerprint is required" });
+            return this.BadRequest(new { error = "Fingerprint is required" });
         }
 
         if (fingerprint.Length > 256)
         {
-            return BadRequest(new { error = "Fingerprint must be 256 characters or less" });
+            return this.BadRequest(new { error = "Fingerprint must be 256 characters or less" });
         }
 
         // Validate fingerprint contains only valid characters (alphanumeric, dash, underscore)
         if (!System.Text.RegularExpressions.Regex.IsMatch(fingerprint, @"^[a-zA-Z0-9\-_]+$"))
         {
-            return BadRequest(new { error = "Fingerprint contains invalid characters. Only alphanumeric, dash, and underscore are allowed" });
+            return this.BadRequest(new { error = "Fingerprint contains invalid characters. Only alphanumeric, dash, and underscore are allowed" });
         }
 
         try
         {
-            var alert = await _persistenceService.GetAlertByFingerprintAsync(fingerprint);
+            var alert = await this.persistenceService.GetAlertByFingerprintAsync(fingerprint);
             if (alert == null)
             {
-                return NotFound(new { error = "Alert not found" });
+                return this.NotFound(new { error = "Alert not found" });
             }
 
-            return Ok(alert);
+            return this.Ok(alert);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get alert by fingerprint: {Fingerprint}", fingerprint);
-            return StatusCode(500, new { error = "Failed to retrieve alert" });
+            this.logger.LogError(ex, "Failed to get alert by fingerprint: {Fingerprint}", fingerprint);
+            return this.StatusCode(500, new { error = "Failed to retrieve alert" });
         }
     }
 
@@ -119,11 +122,12 @@ public sealed class AlertHistoryController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Acknowledge([FromBody] AcknowledgeRequest request)
     {
-        if (!ModelState.IsValid)
+        if (!this.ModelState.IsValid)
         {
-            _logger.LogWarning("Acknowledge request validation failed: {ValidationErrors}",
-                string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
-            return BadRequest(ModelState);
+            this.logger.LogWarning(
+                "Acknowledge request validation failed: {ValidationErrors}",
+                string.Join("; ", this.ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+            return this.BadRequest(this.ModelState);
         }
 
         // Additional validation for date range
@@ -131,24 +135,24 @@ public sealed class AlertHistoryController : ControllerBase
         {
             if (request.ExpiresInMinutes.Value < 1 || request.ExpiresInMinutes.Value > 43200)
             {
-                return BadRequest(new { error = "ExpiresInMinutes must be between 1 and 43200 (30 days)" });
+                return this.BadRequest(new { error = "ExpiresInMinutes must be between 1 and 43200 (30 days)" });
             }
         }
 
         try
         {
-            await _silencingService.AcknowledgeAlertAsync(
+            await this.silencingService.AcknowledgeAlertAsync(
                 request.Fingerprint,
                 request.AcknowledgedBy,
                 request.Comment,
                 request.ExpiresInMinutes.HasValue ? TimeSpan.FromMinutes(request.ExpiresInMinutes.Value) : null);
 
-            return Ok(new { status = "acknowledged", fingerprint = request.Fingerprint });
+            return this.Ok(new { status = "acknowledged", fingerprint = request.Fingerprint });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to acknowledge alert: {Fingerprint}", request.Fingerprint);
-            return StatusCode(500, new { error = "Failed to acknowledge alert" });
+            this.logger.LogError(ex, "Failed to acknowledge alert: {Fingerprint}", request.Fingerprint);
+            return this.StatusCode(500, new { error = "Failed to acknowledge alert" });
         }
     }
 
@@ -159,53 +163,54 @@ public sealed class AlertHistoryController : ControllerBase
     [Authorize]
     public async Task<IActionResult> CreateSilence([FromBody] CreateSilenceRequest request)
     {
-        if (!ModelState.IsValid)
+        if (!this.ModelState.IsValid)
         {
-            _logger.LogWarning("Create silence request validation failed: {ValidationErrors}",
-                string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
-            return BadRequest(ModelState);
+            this.logger.LogWarning(
+                "Create silence request validation failed: {ValidationErrors}",
+                string.Join("; ", this.ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+            return this.BadRequest(this.ModelState);
         }
 
         // Additional validation for date range
         var startsAt = request.StartsAt ?? DateTime.UtcNow;
         if (request.EndsAt <= startsAt)
         {
-            return BadRequest(new { error = "EndsAt must be after StartsAt" });
+            return this.BadRequest(new { error = "EndsAt must be after StartsAt" });
         }
 
         // Validate silencing rule duration (max 1 year)
         var duration = request.EndsAt - startsAt;
         if (duration.TotalDays > 365)
         {
-            return BadRequest(new { error = "Silencing rule duration cannot exceed 365 days" });
+            return this.BadRequest(new { error = "Silencing rule duration cannot exceed 365 days" });
         }
 
         // Validate matchers
         if (request.Matchers == null || request.Matchers.Count == 0)
         {
-            return BadRequest(new { error = "At least one matcher is required" });
+            return this.BadRequest(new { error = "At least one matcher is required" });
         }
 
         if (request.Matchers.Count > 50)
         {
-            return BadRequest(new { error = "Maximum 50 matchers allowed" });
+            return this.BadRequest(new { error = "Maximum 50 matchers allowed" });
         }
 
         foreach (var (key, value) in request.Matchers)
         {
             if (key.Length > 256)
             {
-                return BadRequest(new { error = $"Matcher key '{key.Substring(0, Math.Min(50, key.Length))}...' exceeds 256 character limit" });
+                return this.BadRequest(new { error = $"Matcher key '{key.Substring(0, Math.Min(50, key.Length))}...' exceeds 256 character limit" });
             }
             if (value.Length > 1000)
             {
-                return BadRequest(new { error = $"Matcher value for key '{key}' exceeds 1000 character limit" });
+                return this.BadRequest(new { error = $"Matcher value for key '{key}' exceeds 1000 character limit" });
             }
         }
 
         try
         {
-            await _silencingService.CreateSilencingRuleAsync(
+            await this.silencingService.CreateSilencingRuleAsync(
                 request.Name,
                 request.Matchers,
                 request.CreatedBy,
@@ -213,12 +218,12 @@ public sealed class AlertHistoryController : ControllerBase
                 request.EndsAt,
                 request.Comment);
 
-            return Ok(new { status = "created", name = request.Name });
+            return this.Ok(new { status = "created", name = request.Name });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create silencing rule: {Name}", request.Name);
-            return StatusCode(500, new { error = "Failed to create silencing rule" });
+            this.logger.LogError(ex, "Failed to create silencing rule: {Name}", request.Name);
+            return this.StatusCode(500, new { error = "Failed to create silencing rule" });
         }
     }
 
@@ -231,13 +236,13 @@ public sealed class AlertHistoryController : ControllerBase
     {
         try
         {
-            var rules = await _silencingService.GetActiveSilencingRulesAsync();
-            return Ok(new { rules, count = rules.Count });
+            var rules = await this.silencingService.GetActiveSilencingRulesAsync();
+            return this.Ok(new { rules, count = rules.Count });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get silencing rules");
-            return StatusCode(500, new { error = "Failed to retrieve silencing rules" });
+            this.logger.LogError(ex, "Failed to get silencing rules");
+            return this.StatusCode(500, new { error = "Failed to retrieve silencing rules" });
         }
     }
 
@@ -250,53 +255,13 @@ public sealed class AlertHistoryController : ControllerBase
     {
         try
         {
-            await _silencingService.DeactivateSilencingRuleAsync(ruleId);
-            return Ok(new { status = "deactivated", ruleId });
+            await this.silencingService.DeactivateSilencingRuleAsync(ruleId);
+            return this.Ok(new { status = "deactivated", ruleId });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deactivate silencing rule: {RuleId}", ruleId);
-            return StatusCode(500, new { error = "Failed to deactivate silencing rule" });
+            this.logger.LogError(ex, "Failed to deactivate silencing rule: {RuleId}", ruleId);
+            return this.StatusCode(500, new { error = "Failed to deactivate silencing rule" });
         }
     }
-}
-
-public class AcknowledgeRequest
-{
-    [Required(ErrorMessage = "Fingerprint is required")]
-    [StringLength(256, MinimumLength = 1, ErrorMessage = "Fingerprint must be between 1 and 256 characters")]
-    public string Fingerprint { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "AcknowledgedBy is required")]
-    [StringLength(256, MinimumLength = 1, ErrorMessage = "AcknowledgedBy must be between 1 and 256 characters")]
-    public string AcknowledgedBy { get; set; } = string.Empty;
-
-    [StringLength(1000, ErrorMessage = "Comment must be 1000 characters or less")]
-    public string? Comment { get; set; }
-
-    [Range(1, 43200, ErrorMessage = "ExpiresInMinutes must be between 1 and 43200 (30 days)")]
-    public int? ExpiresInMinutes { get; set; }
-}
-
-public class CreateSilenceRequest
-{
-    [Required(ErrorMessage = "Name is required")]
-    [StringLength(256, MinimumLength = 1, ErrorMessage = "Name must be between 1 and 256 characters")]
-    public string Name { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Matchers are required")]
-    [MaxLength(50, ErrorMessage = "Maximum 50 matchers allowed")]
-    public Dictionary<string, string> Matchers { get; set; } = new();
-
-    [Required(ErrorMessage = "CreatedBy is required")]
-    [StringLength(256, MinimumLength = 1, ErrorMessage = "CreatedBy must be between 1 and 256 characters")]
-    public string CreatedBy { get; set; } = string.Empty;
-
-    public DateTime? StartsAt { get; set; }
-
-    [Required(ErrorMessage = "EndsAt is required")]
-    public DateTime EndsAt { get; set; }
-
-    [StringLength(1000, ErrorMessage = "Comment must be 1000 characters or less")]
-    public string? Comment { get; set; }
 }

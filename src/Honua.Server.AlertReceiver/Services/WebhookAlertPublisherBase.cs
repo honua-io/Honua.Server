@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="WebhookAlertPublisherBase.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -50,10 +53,10 @@ public abstract class WebhookAlertPublisherBase : IAlertPublisher
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
 
-        HttpClient = httpClientFactory.CreateClient(serviceName);
-        Configuration = configuration;
-        Logger = logger;
-        ServiceName = serviceName;
+        this.HttpClient = httpClientFactory.CreateClient(serviceName);
+        this.Configuration = configuration;
+        this.Logger = logger;
+        this.ServiceName = serviceName;
     }
 
     public virtual async Task PublishAsync(
@@ -63,64 +66,64 @@ public abstract class WebhookAlertPublisherBase : IAlertPublisher
     {
         ArgumentNullException.ThrowIfNull(webhook);
 
-        var endpoint = GetEndpoint(webhook, severity);
+        var endpoint = this.GetEndpoint(webhook, severity);
         if (endpoint.IsNullOrWhiteSpace())
         {
-            Logger.LogDebug(
+            this.Logger.LogDebug(
                 "No {Service} endpoint configured for severity {Severity}, skipping alert publication",
-                ServiceName,
+                this.ServiceName,
                 severity);
             return;
         }
 
         try
         {
-            var payload = BuildPayload(webhook, severity);
-            var json = SerializePayload(payload);
+            var payload = this.BuildPayload(webhook, severity);
+            var json = this.SerializePayload(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             // Allow derived classes to add custom headers (auth, etc.)
-            AddCustomHeaders(content, webhook, severity);
+            this.AddCustomHeaders(content, webhook, severity);
 
             // RESOURCE LEAK FIX: Add timeout to prevent hanging connections
             // Use configuration-based timeout with fallback to 30 seconds
-            var timeoutSeconds = Configuration.GetValue($"Alerts:Publishers:{ServiceName}:TimeoutSeconds", 30);
+            var timeoutSeconds = this.Configuration.GetValue($"Alerts:Publishers:{this.ServiceName}:TimeoutSeconds", 30);
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
-            var response = await HttpClient.PostAsync(endpoint, content, linkedCts.Token).ConfigureAwait(false);
+            var response = await this.HttpClient.PostAsync(endpoint, content, linkedCts.Token).ConfigureAwait(false);
 
             response.EnsureSuccessStatusCode();
 
-            Logger.LogInformation(
+            this.Logger.LogInformation(
                 "Published alert to {Service} - Alert: {AlertName}, Status: {Status}, Severity: {Severity}",
-                ServiceName,
-                GetAlertName(webhook),
+                this.ServiceName,
+                this.GetAlertName(webhook),
                 webhook.Status,
                 severity);
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             // RESOURCE LEAK FIX: Timeout occurred (not user cancellation)
-            Logger.LogError(
+            this.Logger.LogError(
                 ex,
                 "Timeout publishing alert to {Service} endpoint {Endpoint}",
-                ServiceName,
+                this.ServiceName,
                 endpoint);
-            throw new TimeoutException($"Request to {ServiceName} timed out after configured duration", ex);
+            throw new TimeoutException($"Request to {this.ServiceName} timed out after configured duration", ex);
         }
         catch (HttpRequestException ex)
         {
-            Logger.LogError(
+            this.Logger.LogError(
                 ex,
                 "HTTP error publishing alert to {Service} - Status: {StatusCode}",
-                ServiceName,
+                this.ServiceName,
                 ex.StatusCode);
             throw;
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to publish alert to {Service}", ServiceName);
+            this.Logger.LogError(ex, "Failed to publish alert to {Service}", this.ServiceName);
             throw;
         }
     }

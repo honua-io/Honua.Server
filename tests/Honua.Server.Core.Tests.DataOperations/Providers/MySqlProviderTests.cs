@@ -105,7 +105,7 @@ public class MySqlProviderTests : IAsyncLifetime
         // Assert
         capabilities.Should().NotBeNull();
         capabilities.SupportsTransactions.Should().BeTrue();
-        capabilities.SupportsSpatialFilters.Should().BeTrue();
+        capabilities.SupportsSpatialIndexes.Should().BeTrue();
     }
 
     [Fact]
@@ -191,16 +191,25 @@ public class MySqlProviderTests : IAsyncLifetime
         var service = new ServiceDefinition
         {
             Id = "test",
-            Name = "Test Service"
+            Title = "Test Service",
+            FolderId = "folder1",
+            ServiceType = "FeatureServer",
+            DataSourceId = "ds1"
         };
 
         var layer = new LayerDefinition
         {
             Id = "layer1",
-            Name = "Test Layer",
+            ServiceId = "test",
+            Title = "Test Layer",
             GeometryType = "Point",
-            GeometryColumn = "geom",
-            TableName = "non_existent_table"
+            IdField = "id",
+            GeometryField = "geom",
+            Storage = new LayerStorageDefinition
+            {
+                Table = "non_existent_table",
+                GeometryColumn = "geom"
+            }
         };
 
         // Act & Assert
@@ -228,16 +237,25 @@ public class MySqlProviderTests : IAsyncLifetime
         var service = new ServiceDefinition
         {
             Id = "test",
-            Name = "Test Service"
+            Title = "Test Service",
+            FolderId = "folder1",
+            ServiceType = "FeatureServer",
+            DataSourceId = "ds1"
         };
 
         var layer = new LayerDefinition
         {
             Id = "layer1",
-            Name = "Test Layer",
+            ServiceId = "test",
+            Title = "Test Layer",
             GeometryType = "Point",
-            GeometryColumn = "geom",
-            TableName = "non_existent_table"
+            IdField = "id",
+            GeometryField = "geom",
+            Storage = new LayerStorageDefinition
+            {
+                Table = "non_existent_table",
+                GeometryColumn = "geom"
+            }
         };
 
         // Act & Assert

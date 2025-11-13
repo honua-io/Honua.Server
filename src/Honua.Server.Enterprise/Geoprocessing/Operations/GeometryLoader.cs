@@ -85,6 +85,13 @@ public static class GeometryLoader
     {
         try
         {
+            // First validate that the JSON has a "type" property (required for valid GeoJSON)
+            using var jsonDoc = JsonDocument.Parse(geoJson);
+            if (!jsonDoc.RootElement.TryGetProperty("type", out var typeElement))
+            {
+                throw new ArgumentException("Invalid GeoJSON format: missing 'type' property");
+            }
+
             var reader = new GeoJsonReader();
             var geometry = reader.Read<Geometry>(geoJson);
 
@@ -100,39 +107,44 @@ public static class GeometryLoader
             }
 
             // Try to parse as FeatureCollection to extract geometries from all features
-            try
+            if (typeElement.GetString() == "FeatureCollection" &&
+                jsonDoc.RootElement.TryGetProperty("features", out var featuresElement))
             {
-                using var jsonDoc = JsonDocument.Parse(geoJson);
-                if (jsonDoc.RootElement.TryGetProperty("type", out var typeElement) &&
-                    typeElement.GetString() == "FeatureCollection" &&
-                    jsonDoc.RootElement.TryGetProperty("features", out var featuresElement))
+                var geometries = new List<Geometry>();
+                foreach (var feature in featuresElement.EnumerateArray())
                 {
-                    var geometries = new List<Geometry>();
-                    foreach (var feature in featuresElement.EnumerateArray())
+                    if (feature.TryGetProperty("geometry", out var geometryElement))
                     {
-                        if (feature.TryGetProperty("geometry", out var geometryElement))
+                        var geomJson = geometryElement.GetRawText();
+                        var geom = reader.Read<Geometry>(geomJson);
+                        if (geom != null && !geom.IsEmpty)
                         {
-                            var geomJson = geometryElement.GetRawText();
-                            var geom = reader.Read<Geometry>(geomJson);
-                            if (geom != null && !geom.IsEmpty)
-                            {
-                                geometries.Add(geom);
-                            }
+                            geometries.Add(geom);
                         }
                     }
+                }
 
-                    if (geometries.Count > 0)
-                    {
-                        return geometries;
-                    }
+                if (geometries.Count > 0)
+                {
+                    return geometries;
                 }
             }
-            catch
+
+            // Validate that we got a valid geometry
+            if (geometry == null)
             {
-                // If FeatureCollection parsing fails, fall back to single geometry
+                throw new ArgumentException("Invalid GeoJSON format: failed to parse geometry");
             }
 
             return new List<Geometry> { geometry };
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException($"Invalid GeoJSON format: {ex.Message}", ex);
+        }
+        catch (ArgumentException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
+using Honua.Server.Core.Features;
 using Honua.Server.Enterprise.Licensing.Models;
 using Honua.Server.Enterprise.Licensing.Storage;
 using Microsoft.Extensions.Configuration;
@@ -43,7 +44,7 @@ public static class LicensingServiceCollectionExtensions
         services.AddSingleton<ILicenseManager, LicenseManager>();
 
         // Register feature flag service
-        services.AddSingleton<Features.ILicenseFeatureFlagService, Features.LicenseFeatureFlagService>();
+        services.AddSingleton<ILicenseFeatureFlagService, LicenseFeatureFlagService>();
 
         // Note: ICredentialRevocationService implementation is registered in Core.Cloud
         // via AddCloudCredentialRevocation extension method
@@ -82,7 +83,7 @@ public static class LicensingServiceCollectionExtensions
         services.AddSingleton<ILicenseManager, LicenseManager>();
 
         // Register feature flag service
-        services.AddSingleton<Features.ILicenseFeatureFlagService, Features.LicenseFeatureFlagService>();
+        services.AddSingleton<ILicenseFeatureFlagService, LicenseFeatureFlagService>();
 
         // Note: ICredentialRevocationService implementation is registered in Core.Cloud
         // via AddCloudCredentialRevocation extension method

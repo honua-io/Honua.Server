@@ -24,7 +24,7 @@ public abstract class DeckLayerDefinition
     /// Layer type (scatterplot, hexagon, arc, grid, screengrid)
     /// </summary>
     [JsonPropertyName("type")]
-    public required string Type { get; init; }
+    public string Type { get; init; } = string.Empty;
 
     /// <summary>
     /// Layer data (array of objects)

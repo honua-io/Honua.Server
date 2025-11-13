@@ -32,12 +32,12 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
         this.logger.LogInformation("Starting Metadata Change Notification Service");
 
         // Check if the provider supports change notifications
-        if (_metadataProvider is IMutableMetadataProvider mutable &&
+        if (this.metadataProvider is IMutableMetadataProvider mutable &&
             mutable is IMetadataChangeNotifier notifier &&
             notifier.SupportsChangeNotifications)
         {
-            this.changeNotifier = notifier;
-            this.changeNotifier.MetadataChanged += OnMetadataChanged;
+            this._changeNotifier = notifier;
+            this._changeNotifier.MetadataChanged += OnMetadataChanged;
             this.logger.LogInformation("Subscribed to metadata change notifications");
         }
         else
@@ -52,9 +52,9 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
     {
         this.logger.LogInformation("Stopping Metadata Change Notification Service");
 
-        if (_changeNotifier != null)
+        if (this._changeNotifier != null)
         {
-            this.changeNotifier.MetadataChanged -= OnMetadataChanged;
+            this._changeNotifier.MetadataChanged -= OnMetadataChanged;
             this.logger.LogInformation("Unsubscribed from metadata change notifications");
         }
 
@@ -99,9 +99,9 @@ public sealed class MetadataChangeNotificationService : IHostedService, IDisposa
 
     public void Dispose()
     {
-        if (_changeNotifier != null)
+        if (this._changeNotifier != null)
         {
-            this.changeNotifier.MetadataChanged -= OnMetadataChanged;
+            this._changeNotifier.MetadataChanged -= OnMetadataChanged;
         }
     }
 }

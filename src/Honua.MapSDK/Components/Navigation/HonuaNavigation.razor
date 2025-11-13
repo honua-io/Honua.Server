@@ -227,7 +227,7 @@
                 // Initialize voice guidance if enabled
                 if (EnableVoiceGuidance && _voiceService != null)
                 {
-                    await _voiceService.InitializeAsync(new NavigationOptions
+                    await _voiceService.InitializeAsync(new Models.Navigation.NavigationOptions
                     {
                         EnableVoiceGuidance = true,
                         VoiceLanguage = "en-US"
@@ -332,7 +332,7 @@
 
         try
         {
-            var navOptions = new NavigationOptions
+            var navOptions = new Models.Navigation.NavigationOptions
             {
                 EnableVoiceGuidance = EnableVoiceGuidance,
                 EnableRerouting = EnableRerouting,

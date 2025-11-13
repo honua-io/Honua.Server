@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="WebhookSignatureMiddleware.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Honua.Server.AlertReceiver.Configuration;
@@ -15,8 +18,8 @@ namespace Honua.Server.AlertReceiver.Middleware;
 /// </summary>
 public sealed class WebhookSignatureMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<WebhookSignatureMiddleware> _logger;
+    private readonly RequestDelegate next;
+    private readonly ILogger<WebhookSignatureMiddleware> logger;
 
     /// <summary>
     /// Compiled regex patterns for detecting sensitive headers.
@@ -38,15 +41,15 @@ public sealed class WebhookSignatureMiddleware
         new Regex(@"^X-Session", RegexOptions.IgnoreCase | RegexOptions.Compiled),      // X-Session* headers
         new Regex(@"^Proxy-Authorization$", RegexOptions.IgnoreCase | RegexOptions.Compiled), // Proxy-Authorization
         new Regex(@"-Password$", RegexOptions.IgnoreCase | RegexOptions.Compiled),      // *-Password
-        new Regex(@"^WWW-Authenticate$", RegexOptions.IgnoreCase | RegexOptions.Compiled) // WWW-Authenticate
+        new Regex(@"^WWW-Authenticate$", RegexOptions.IgnoreCase | RegexOptions.Compiled), // WWW-Authenticate
     };
 
     public WebhookSignatureMiddleware(
         RequestDelegate next,
         ILogger<WebhookSignatureMiddleware> logger)
     {
-        _next = next ?? throw new ArgumentNullException(nameof(next));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.next = next ?? throw new ArgumentNullException(nameof(next));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task InvokeAsync(
@@ -60,8 +63,8 @@ public sealed class WebhookSignatureMiddleware
         // Skip validation if not required
         if (!securityOptions.RequireSignature)
         {
-            _logger.LogDebug("Webhook signature validation disabled - proceeding without validation");
-            await _next(context);
+            this.logger.LogDebug("Webhook signature validation disabled - proceeding without validation");
+            await this.next(context);
             return;
         }
 
@@ -86,14 +89,14 @@ public sealed class WebhookSignatureMiddleware
 
         if (securityOptions.RejectUnknownMethods && !methodIsAllowed)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Webhook rejected: HTTP method {Method} not allowed from {RemoteIp}. Allowed methods: {AllowedMethods}",
                 context.Request.Method,
                 context.Connection.RemoteIpAddress,
                 string.Join(", ", allowedMethods));
 
             // Record rejected method for security monitoring
-            RecordRejectedMethod(context, allowedMethods);
+            this.RecordRejectedMethod(context, allowedMethods);
             metrics?.RecordMethodRejection(context.Request.Method, "not_in_allowlist");
 
             await WriteErrorResponse(
@@ -106,7 +109,7 @@ public sealed class WebhookSignatureMiddleware
         // Check HTTPS requirement
         if (!securityOptions.AllowInsecureHttp && !context.Request.IsHttps)
         {
-            _logger.LogWarning(
+            this.logger.LogWarning(
                 "Webhook rejected: HTTPS required but request is HTTP from {RemoteIp}",
                 context.Connection.RemoteIpAddress);
 
@@ -122,9 +125,9 @@ public sealed class WebhookSignatureMiddleware
         // Validate timestamp (replay attack protection)
         if (securityOptions.MaxWebhookAge > 0)
         {
-            if (!ValidateTimestamp(context.Request, securityOptions, out var timestampError))
+            if (!this.ValidateTimestamp(context.Request, securityOptions, out var timestampError))
             {
-                _logger.LogWarning(
+                this.logger.LogWarning(
                     "Webhook rejected: {Error} from {RemoteIp}",
                     timestampError,
                     context.Connection.RemoteIpAddress);
@@ -144,7 +147,7 @@ public sealed class WebhookSignatureMiddleware
 
         if (secrets.Count == 0)
         {
-            _logger.LogError("Webhook signature validation required but no secrets configured");
+            this.logger.LogError("Webhook signature validation required but no secrets configured");
             await WriteErrorResponse(
                 context,
                 StatusCodes.Status500InternalServerError,
@@ -173,14 +176,14 @@ public sealed class WebhookSignatureMiddleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during webhook signature validation");
+                this.logger.LogError(ex, "Error during webhook signature validation");
             }
         }
 
         if (!isValid)
         {
             // Record failed validation for security monitoring
-            RecordFailedValidation(context);
+            this.RecordFailedValidation(context);
             metrics?.RecordValidationAttempt(context.Request.Method, success: false);
 
             await WriteErrorResponse(
@@ -191,14 +194,14 @@ public sealed class WebhookSignatureMiddleware
         }
 
         // Signature valid - proceed with request
-        _logger.LogDebug(
+        this.logger.LogDebug(
             "Webhook signature validated successfully from {RemoteIp}, Method: {Method}",
             context.Connection.RemoteIpAddress,
             context.Request.Method);
 
         metrics?.RecordValidationAttempt(context.Request.Method, success: true);
 
-        await _next(context);
+        await this.next(context);
     }
 
     /// <summary>
@@ -282,7 +285,7 @@ public sealed class WebhookSignatureMiddleware
 
         // SECURITY: Use structured logging with individual fields instead of serializing objects
         // This prevents accidental logging of sensitive data that might be added to the object later
-        _logger.LogWarning(
+        this.logger.LogWarning(
             "SECURITY: Failed webhook validation - EventType: {EventType}, Timestamp: {Timestamp}, " +
             "RemoteIp: {RemoteIp}, Path: {Path}, Method: {Method}, UserAgent: {UserAgent}, " +
             "ContentType: {ContentType}, ContentLength: {ContentLength}, SafeHeaders: {SafeHeaders}",
@@ -308,7 +311,7 @@ public sealed class WebhookSignatureMiddleware
                                        context.Request.Headers.Accept.ToString().Contains("text/html");
 
         // SECURITY: Use structured logging with individual fields
-        _logger.LogWarning(
+        this.logger.LogWarning(
             "SECURITY: Rejected HTTP method for webhook - EventType: {EventType}, Timestamp: {Timestamp}, " +
             "RemoteIp: {RemoteIp}, Path: {Path}, Method: {Method}, AllowedMethods: {AllowedMethods}, " +
             "UserAgent: {UserAgent}, Referer: {Referer}, IsPotentialBrowserRequest: {IsPotentialBrowserRequest}",
@@ -357,7 +360,7 @@ public sealed class WebhookSignatureMiddleware
             {
                 "User-Agent",
                 "Content-Type",
-                "Content-Length"
+                "Content-Length",
             };
 
         var safeHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -405,34 +408,9 @@ public sealed class WebhookSignatureMiddleware
         {
             error = message,
             statusCode,
-            timestamp = DateTimeOffset.UtcNow
+            timestamp = DateTimeOffset.UtcNow,
         };
 
         await context.Response.WriteAsJsonAsync(response);
-    }
-}
-
-/// <summary>
-/// Extension methods for registering webhook signature middleware.
-/// </summary>
-public static class WebhookSignatureMiddlewareExtensions
-{
-    /// <summary>
-    /// Adds webhook signature validation middleware to the pipeline.
-    /// Should be added before authorization and controller mapping.
-    /// </summary>
-    public static IApplicationBuilder UseWebhookSignatureValidation(
-        this IApplicationBuilder app,
-        PathString pathPrefix = default)
-    {
-        // If a path prefix is specified, only apply to those paths
-        if (pathPrefix.HasValue)
-        {
-            return app.MapWhen(
-                context => context.Request.Path.StartsWithSegments(pathPrefix),
-                branch => branch.UseMiddleware<WebhookSignatureMiddleware>());
-        }
-
-        return app.UseMiddleware<WebhookSignatureMiddleware>();
     }
 }

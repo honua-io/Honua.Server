@@ -35,7 +35,7 @@ public sealed class RuntimeSecurityValidationHostedService : IHostedService
         this.logger.LogInformation("Validating runtime security configuration...");
 
         var isProduction = this.environment.IsProduction();
-        var result = this.validator.Validate(_configuration, isProduction);
+        var result = this.validator.Validate(this.configuration, isProduction);
 
         if (result.Errors.Any())
         {

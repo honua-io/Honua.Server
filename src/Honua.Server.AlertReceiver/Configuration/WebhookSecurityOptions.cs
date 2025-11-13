@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="WebhookSecurityOptions.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 namespace Honua.Server.AlertReceiver.Configuration;
 
 /// <summary>
@@ -152,7 +155,7 @@ public sealed class WebhookSecurityOptions
     {
         "User-Agent",
         "Content-Type",
-        "Content-Length"
+        "Content-Length",
     };
 
     /// <summary>
@@ -163,9 +166,9 @@ public sealed class WebhookSecurityOptions
     {
         errors = new List<string>();
 
-        if (RequireSignature)
+        if (this.RequireSignature)
         {
-            if (string.IsNullOrWhiteSpace(SharedSecret) && AdditionalSecrets.Count == 0)
+            if (string.IsNullOrWhiteSpace(this.SharedSecret) && this.AdditionalSecrets.Count == 0)
             {
                 errors.Add($"{SectionName}:SharedSecret is required when RequireSignature is true");
             }
@@ -173,12 +176,12 @@ public sealed class WebhookSecurityOptions
             // NIST SP 800-107 recommends key length >= hash output for HMAC
             // For HMAC-SHA256: 256 bits minimum, 512 bits recommended
             // 64 characters = 512 bits for future-proofing
-            if (!string.IsNullOrWhiteSpace(SharedSecret) && SharedSecret.Length < 64)
+            if (!string.IsNullOrWhiteSpace(this.SharedSecret) && this.SharedSecret.Length < 64)
             {
-                errors.Add($"{SectionName}:SharedSecret must be at least 64 characters for HMAC-SHA256 security (current: {SharedSecret.Length}). Generate: openssl rand -base64 64");
+                errors.Add($"{SectionName}:SharedSecret must be at least 64 characters for HMAC-SHA256 security (current: {this.SharedSecret.Length}). Generate: openssl rand -base64 64");
             }
 
-            foreach (var secret in AdditionalSecrets.Where(s => !string.IsNullOrWhiteSpace(s)))
+            foreach (var secret in this.AdditionalSecrets.Where(s => !string.IsNullOrWhiteSpace(s)))
             {
                 if (secret.Length < 64)
                 {
@@ -188,28 +191,28 @@ public sealed class WebhookSecurityOptions
             }
         }
 
-        if (string.IsNullOrWhiteSpace(SignatureHeaderName))
+        if (string.IsNullOrWhiteSpace(this.SignatureHeaderName))
         {
             errors.Add($"{SectionName}:SignatureHeaderName cannot be empty");
         }
 
-        if (MaxPayloadSize <= 0)
+        if (this.MaxPayloadSize <= 0)
         {
             errors.Add($"{SectionName}:MaxPayloadSize must be greater than 0");
         }
 
-        if (MaxPayloadSize > 10_485_760) // 10 MB
+        if (this.MaxPayloadSize > 10_485_760) // 10 MB
         {
             errors.Add($"{SectionName}:MaxPayloadSize should not exceed 10 MB (10,485,760 bytes)");
         }
 
-        if (MaxWebhookAge < 0)
+        if (this.MaxWebhookAge < 0)
         {
             errors.Add($"{SectionName}:MaxWebhookAge cannot be negative");
         }
 
         // Validate AllowedHttpMethods
-        if (AllowedHttpMethods == null || AllowedHttpMethods.Count == 0)
+        if (this.AllowedHttpMethods == null || this.AllowedHttpMethods.Count == 0)
         {
             errors.Add($"{SectionName}:AllowedHttpMethods cannot be empty (defaults to POST)");
         }
@@ -217,10 +220,10 @@ public sealed class WebhookSecurityOptions
         {
             var validMethods = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
+                "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS",
             };
 
-            foreach (var method in AllowedHttpMethods)
+            foreach (var method in this.AllowedHttpMethods)
             {
                 if (string.IsNullOrWhiteSpace(method))
                 {
@@ -236,7 +239,7 @@ public sealed class WebhookSecurityOptions
             }
 
             // Security warning: GET should not be allowed for webhooks
-            if (AllowedHttpMethods.Any(m => string.Equals(m, "GET", StringComparison.OrdinalIgnoreCase)))
+            if (this.AllowedHttpMethods.Any(m => string.Equals(m, "GET", StringComparison.OrdinalIgnoreCase)))
             {
                 errors.Add($"{SectionName}:AllowedHttpMethods should not include GET (security risk: GET requests can be triggered by browsers, crawlers, link previews)");
             }
@@ -250,12 +253,12 @@ public sealed class WebhookSecurityOptions
     /// </summary>
     public IEnumerable<string> GetAllSecrets()
     {
-        if (!string.IsNullOrWhiteSpace(SharedSecret))
+        if (!string.IsNullOrWhiteSpace(this.SharedSecret))
         {
-            yield return SharedSecret;
+            yield return this.SharedSecret;
         }
 
-        foreach (var secret in AdditionalSecrets.Where(s => !string.IsNullOrWhiteSpace(s)))
+        foreach (var secret in this.AdditionalSecrets.Where(s => !string.IsNullOrWhiteSpace(s)))
         {
             yield return secret;
         }

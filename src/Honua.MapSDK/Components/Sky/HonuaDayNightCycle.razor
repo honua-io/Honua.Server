@@ -42,8 +42,7 @@
                     Value="@_timeOfDayHours"
                     ValueChanged="@OnTimeSliderChanged"
                     Color="Color.Primary"
-                    ValueLabel="true"
-                    ValueLabelFormat="@(value => $"{(int)value:D2}:{((value % 1) * 60):00}")" />
+                    ValueLabel="true" />
 
                 <MudStack Row="true" Spacing="2">
                     <MudSelect
@@ -387,6 +386,11 @@
             SunAzimuth = _currentSunPosition.Azimuth,
             SunAltitude = _currentSunPosition.Altitude
         }, Id);
+    }
+
+    private string FormatTimeLabel(double value)
+    {
+        return $"{(int)value:D2}:{((value % 1) * 60):00}";
     }
 
     public async ValueTask DisposeAsync()

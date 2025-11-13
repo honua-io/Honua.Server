@@ -182,7 +182,7 @@ public class AutoStylingService
                 id = $"{layerId}-points",
                 type = "circle",
                 source = sourceId,
-                filter = new[] { "==", new[] { "geometry-type" }, "Point" },
+                filter = new object[] { "==", new[] { "geometry-type" }, "Point" },
                 paint = new
                 {
                     circle_radius = style.PointStyle.Radius,
@@ -202,7 +202,7 @@ public class AutoStylingService
                 id = $"{layerId}-lines",
                 type = "line",
                 source = sourceId,
-                filter = new[] { "==", new[] { "geometry-type" }, "LineString" },
+                filter = new object[] { "==", new[] { "geometry-type" }, "LineString" },
                 layout = new
                 {
                     line_cap = style.LineStyle.LineCap,
@@ -225,7 +225,7 @@ public class AutoStylingService
                 id = $"{layerId}-polygons-fill",
                 type = "fill",
                 source = sourceId,
-                filter = new[] { "==", new[] { "geometry-type" }, "Polygon" },
+                filter = new object[] { "==", new[] { "geometry-type" }, "Polygon" },
                 paint = new
                 {
                     fill_color = style.PolygonStyle.FillColor,
@@ -238,7 +238,7 @@ public class AutoStylingService
                 id = $"{layerId}-polygons-outline",
                 type = "line",
                 source = sourceId,
-                filter = new[] { "==", new[] { "geometry-type" }, "Polygon" },
+                filter = new object[] { "==", new[] { "geometry-type" }, "Polygon" },
                 paint = new
                 {
                     line_color = style.PolygonStyle.StrokeColor,

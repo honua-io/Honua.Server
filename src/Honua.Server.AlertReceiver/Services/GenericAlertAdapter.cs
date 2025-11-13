@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="GenericAlertAdapter.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Honua.Server.AlertReceiver.Models;
 using Honua.Server.AlertReceiver.Extensions;
 
@@ -26,15 +29,15 @@ public static class GenericAlertAdapter
             GroupKey = alerts.FirstOrDefault()?.Name ?? "generic",
             GroupLabels = new Dictionary<string, string>
             {
-                ["alertname"] = alerts.FirstOrDefault()?.Name ?? "GenericAlert"
+                ["alertname"] = alerts.FirstOrDefault()?.Name ?? "GenericAlert",
             },
             CommonLabels = new Dictionary<string, string>
             {
-                ["source"] = alerts.FirstOrDefault()?.Source ?? "unknown"
+                ["source"] = alerts.FirstOrDefault()?.Source ?? "unknown",
             },
             CommonAnnotations = new Dictionary<string, string>(),
             ExternalUrl = string.Empty,
-            Alerts = new List<Alert>()
+            Alerts = new List<Alert>(),
         };
 
         foreach (var genericAlert in alerts)
@@ -43,7 +46,7 @@ public static class GenericAlertAdapter
             {
                 ["alertname"] = genericAlert.Name,
                 ["severity"] = MapSeverity(genericAlert.Severity),
-                ["source"] = genericAlert.Source
+                ["source"] = genericAlert.Source,
             };
 
             if (genericAlert.Service.HasValue())
@@ -58,7 +61,7 @@ public static class GenericAlertAdapter
 
             var annotations = new Dictionary<string, string>
             {
-                ["description"] = genericAlert.Description ?? genericAlert.Summary ?? "No description"
+                ["description"] = genericAlert.Description ?? genericAlert.Summary ?? "No description",
             };
 
             if (genericAlert.Summary.HasValue())
@@ -71,7 +74,7 @@ public static class GenericAlertAdapter
             {
                 foreach (var kvp in genericAlert.Context)
                 {
-                    annotations[$"context_{kvp.Key}"] = kvp.Value?.ToString() ?? "";
+                    annotations[$"context_{kvp.Key}"] = kvp.Value?.ToString() ?? string.Empty;
                 }
             }
 
@@ -83,7 +86,7 @@ public static class GenericAlertAdapter
                 StartsAt = genericAlert.Timestamp,
                 EndsAt = genericAlert.Status == "resolved" ? DateTime.UtcNow : null,
                 GeneratorUrl = string.Empty,
-                Fingerprint = genericAlert.Fingerprint ?? GenerateFingerprint(genericAlert)
+                Fingerprint = genericAlert.Fingerprint ?? GenerateFingerprint(genericAlert),
             });
         }
 
@@ -98,7 +101,7 @@ public static class GenericAlertAdapter
             "high" or "error" or "err" => "high",
             "medium" or "warning" or "warn" => "warning",
             "low" or "info" or "information" => "info",
-            _ => "warning"
+            _ => "warning",
         };
     }
 

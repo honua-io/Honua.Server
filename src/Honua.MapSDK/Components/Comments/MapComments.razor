@@ -2,8 +2,11 @@
 Copyright (c) 2025 HonuaIO
 Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 *@
+@using Honua.MapSDK.Models
 @using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.Extensions.Logging
 @using System.Text.Json
+@using System.Net.Http.Json
 @inject IJSRuntime JSRuntime
 @inject HttpClient Http
 @inject ILogger<MapComments> Logger
@@ -90,7 +93,7 @@ Licensed under the Elastic License 2.0. See LICENSE file in the project root for
                     <div class="comment-editor">
                         <h4>@(ReplyToComment != null ? "Reply" : "New Comment")</h4>
                         <textarea @bind="NewCommentText"
-                                 placeholder="Enter your comment... (use @username to mention)"
+                                 placeholder="Enter your comment... (use @@username to mention)"
                                  rows="4"></textarea>
 
                         <div class="editor-toolbar">
@@ -356,16 +359,16 @@ Licensed under the Elastic License 2.0. See LICENSE file in the project root for
         }
     }
 
-    private async Task HandleReaction(MapComment comment, string reactionType)
+    private async Task HandleReaction((MapComment comment, string reactionType) args)
     {
         try
         {
-            var url = $"{ApiBaseUrl}/maps/{MapId}/comments/{comment.Id}/reactions";
-            await Http.PostAsJsonAsync(url, new { ReactionType = reactionType });
+            var url = $"{ApiBaseUrl}/maps/{MapId}/comments/{args.comment.Id}/reactions";
+            await Http.PostAsJsonAsync(url, new { ReactionType = args.reactionType });
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to add reaction to comment {CommentId}", comment.Id);
+            Logger.LogError(ex, "Failed to add reaction to comment {CommentId}", args.comment.Id);
         }
     }
 

@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="SqlAlertDeduplicator.Cache.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Microsoft.Extensions.Caching.Memory;
 
 namespace Honua.Server.AlertReceiver.Services;
@@ -25,19 +28,19 @@ public sealed partial class SqlAlertDeduplicator
             // Each entry has a size of 1 for simple counting
             .SetSize(1)
             // Sliding expiration: Reset TTL on each access (prevents premature eviction of active reservations)
-            .SetSlidingExpiration(TimeSpan.FromSeconds(_cacheOptions.SlidingExpirationSeconds))
+            .SetSlidingExpiration(TimeSpan.FromSeconds(this.cacheOptions.SlidingExpirationSeconds))
             // Absolute expiration: Maximum lifetime regardless of access (prevents zombie entries)
-            .SetAbsoluteExpiration(TimeSpan.FromSeconds(_cacheOptions.AbsoluteExpirationSeconds))
+            .SetAbsoluteExpiration(TimeSpan.FromSeconds(this.cacheOptions.AbsoluteExpirationSeconds))
             // Eviction callback: Track cache size and log evictions for monitoring
             .RegisterPostEvictionCallback((key, value, reason, state) =>
             {
-                var size = Interlocked.Decrement(ref _currentCacheSize);
-                _metrics.RecordDeduplicationCacheSize(size);
-                _metrics.RecordDeduplicationCacheOperation("evict", hit: false);
+                var size = Interlocked.Decrement(ref this.currentCacheSize);
+                this.metrics.RecordDeduplicationCacheSize(size);
+                this.metrics.RecordDeduplicationCacheOperation("evict", hit: false);
 
                 if (reason != EvictionReason.Removed && reason != EvictionReason.Replaced)
                 {
-                    _logger.LogDebug(
+                    this.logger.LogDebug(
                         "Reservation {ReservationId} evicted from cache, reason: {Reason}, remaining entries: {Size}",
                         key,
                         reason,
@@ -45,11 +48,11 @@ public sealed partial class SqlAlertDeduplicator
                 }
             });
 
-        _reservationCache.Set(reservationId, reservation, cacheEntryOptions);
+        this.reservationCache.Set(reservationId, reservation, cacheEntryOptions);
 
-        var newSize = Interlocked.Increment(ref _currentCacheSize);
-        _metrics.RecordDeduplicationCacheSize(newSize);
-        _metrics.RecordDeduplicationCacheOperation("add", hit: true);
+        var newSize = Interlocked.Increment(ref this.currentCacheSize);
+        this.metrics.RecordDeduplicationCacheSize(newSize);
+        this.metrics.RecordDeduplicationCacheOperation("add", hit: true);
     }
 
     /// <summary>
@@ -58,7 +61,7 @@ public sealed partial class SqlAlertDeduplicator
     /// </summary>
     private bool TryGetReservationFromCache(string reservationId, out ReservationState? reservation)
     {
-        return _reservationCache.TryGetValue(reservationId, out reservation);
+        return this.reservationCache.TryGetValue(reservationId, out reservation);
     }
 
     /// <summary>
@@ -75,17 +78,17 @@ public sealed partial class SqlAlertDeduplicator
 
         // PERFORMANCE OPTIMIZATION: Use secondary index to look up reservation by stateId
         // This is O(1) instead of O(n) cache scan
-        if (!_stateToReservationIndex.TryGetValue(stateId, out var reservationId))
+        if (!this.stateToReservationIndex.TryGetValue(stateId, out var reservationId))
         {
             // No reservation found for this stateId
             return false;
         }
 
         // Look up the reservation in the cache
-        if (!TryGetReservationFromCache(reservationId, out reservation))
+        if (!this.TryGetReservationFromCache(reservationId, out reservation))
         {
             // Reservation was evicted from cache, clean up the index
-            _stateToReservationIndex.TryRemove(stateId, out _);
+            this.stateToReservationIndex.TryRemove(stateId, out _);
             return false;
         }
 
@@ -97,7 +100,7 @@ public sealed partial class SqlAlertDeduplicator
         // By checking Completed flag, we prevent the second alert from proceeding
         if (reservation!.Completed)
         {
-            _metrics.RecordDeduplicationCacheOperation("get_completed", hit: true);
+            this.metrics.RecordDeduplicationCacheOperation("get_completed", hit: true);
             return true;
         }
 
@@ -110,8 +113,8 @@ public sealed partial class SqlAlertDeduplicator
     /// </summary>
     private void RemoveReservationFromCache(string reservationId)
     {
-        _reservationCache.Remove(reservationId);
-        _metrics.RecordDeduplicationCacheOperation("remove", hit: true);
+        this.reservationCache.Remove(reservationId);
+        this.metrics.RecordDeduplicationCacheOperation("remove", hit: true);
     }
 
     /// <summary>
@@ -121,9 +124,13 @@ public sealed partial class SqlAlertDeduplicator
     private sealed class ReservationState
     {
         public required string StateId { get; init; }
+
         public required string Fingerprint { get; init; }
+
         public required string Severity { get; init; }
+
         public required DateTimeOffset ExpiresAt { get; init; }
+
         public bool Completed { get; set; }
     }
 }

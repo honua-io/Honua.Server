@@ -169,7 +169,7 @@ internal sealed class CartoSqlQueryExecutor
                 SortOrders: null,
                 Filter: filter);
 
-            var results = await _repository
+            var results = await this.repository
                 .QueryStatisticsAsync(
                     dataset.ServiceId,
                     dataset.LayerId,
@@ -282,7 +282,7 @@ internal sealed class CartoSqlQueryExecutor
             SortOrders: null,
             Filter: filter);
 
-        var distinctValues = await _repository
+        var distinctValues = await this.repository
             .QueryDistinctAsync(dataset.ServiceId, dataset.LayerId, fieldNames, featureQuery, cancellationToken)
             .ConfigureAwait(false);
 

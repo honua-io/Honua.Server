@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="OpsgenieAlertPublisher.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Honua.Server.AlertReceiver.Models;
 using System.Net;
 using System.Text;
@@ -28,14 +31,14 @@ public sealed class OpsgenieAlertPublisher : WebhookAlertPublisherBase
 
     protected override string? GetEndpoint(AlertManagerWebhook webhook, string severity)
     {
-        var apiKey = Configuration["Alerts:Opsgenie:ApiKey"];
+        var apiKey = this.Configuration["Alerts:Opsgenie:ApiKey"];
         if (apiKey.IsNullOrWhiteSpace())
         {
             return null; // Will trigger skip logic in base class
         }
 
         // Opsgenie endpoint varies by operation, so we return the base URL
-        var apiUrl = Configuration["Alerts:Opsgenie:ApiUrl"] ?? "https://api.opsgenie.com";
+        var apiUrl = this.Configuration["Alerts:Opsgenie:ApiUrl"] ?? "https://api.opsgenie.com";
         return apiUrl;
     }
 
@@ -53,16 +56,16 @@ public sealed class OpsgenieAlertPublisher : WebhookAlertPublisherBase
     {
         ArgumentNullException.ThrowIfNull(webhook);
 
-        var apiKey = Configuration["Alerts:Opsgenie:ApiKey"];
+        var apiKey = this.Configuration["Alerts:Opsgenie:ApiKey"];
         if (apiKey.IsNullOrWhiteSpace())
         {
-            Logger.LogDebug(
+            this.Logger.LogDebug(
                 "No {Service} API key configured, skipping alert publication",
-                ServiceName);
+                this.ServiceName);
             return;
         }
 
-        var apiUrl = Configuration["Alerts:Opsgenie:ApiUrl"] ?? "https://api.opsgenie.com";
+        var apiUrl = this.Configuration["Alerts:Opsgenie:ApiUrl"] ?? "https://api.opsgenie.com";
 
         try
         {
@@ -70,19 +73,19 @@ public sealed class OpsgenieAlertPublisher : WebhookAlertPublisherBase
             {
                 if (alert.Status == "firing")
                 {
-                    await CreateAlert(alert, severity, apiKey, apiUrl, cancellationToken)
+                    await this.CreateAlert(alert, severity, apiKey, apiUrl, cancellationToken)
                         .ConfigureAwait(false);
                 }
                 else if (alert.Status == "resolved")
                 {
-                    await CloseAlert(alert, apiKey, apiUrl, cancellationToken)
+                    await this.CloseAlert(alert, apiKey, apiUrl, cancellationToken)
                         .ConfigureAwait(false);
                 }
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to publish alert to {Service}", ServiceName);
+            this.Logger.LogError(ex, "Failed to publish alert to {Service}", this.ServiceName);
             throw;
         }
     }
@@ -92,7 +95,7 @@ public sealed class OpsgenieAlertPublisher : WebhookAlertPublisherBase
         AlertManagerWebhook webhook,
         string severity)
     {
-        var apiKey = Configuration["Alerts:Opsgenie:ApiKey"];
+        var apiKey = this.Configuration["Alerts:Opsgenie:ApiKey"];
         if (apiKey.HasValue())
         {
             content.Headers.Add("Authorization", $"GenieKey {apiKey}");
@@ -111,7 +114,7 @@ public sealed class OpsgenieAlertPublisher : WebhookAlertPublisherBase
             ["severity"] = severity,
             ["fingerprint"] = alert.Fingerprint,
             ["generator_url"] = alert.GeneratorUrl,
-            ["starts_at"] = alert.StartsAt.ToString("o")
+            ["starts_at"] = alert.StartsAt.ToString("o"),
         };
 
         foreach (var label in alert.Labels)
@@ -135,39 +138,39 @@ public sealed class OpsgenieAlertPublisher : WebhookAlertPublisherBase
             {
                 $"severity:{severity}",
                 $"protocol:{alert.Labels.GetValueOrDefault("api_protocol", "unknown")}",
-                $"service:{alert.Labels.GetValueOrDefault("service_id", "unknown")}"
+                $"service:{alert.Labels.GetValueOrDefault("service_id", "unknown")}",
             },
-            details = details
+            details = details,
         };
 
-        var json = SerializePayload(payload);
+        var json = this.SerializePayload(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"{apiUrl}/v2/alerts")
         {
-            Content = content
+            Content = content,
         };
         request.Headers.Add("Authorization", $"GenieKey {apiKey}");
 
         try
         {
             // BUG FIX #37: Remove redundant ConfigureAwait chaining
-            var response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await this.HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
             response.EnsureSuccessStatusCode();
 
-            Logger.LogInformation(
+            this.Logger.LogInformation(
                 "Published alert to {Service} - Alert: {AlertName}, Severity: {Severity}",
-                ServiceName,
+                this.ServiceName,
                 alert.Labels.GetValueOrDefault("alertname", "Unknown"),
                 severity);
         }
         catch (HttpRequestException ex)
         {
-            Logger.LogError(
+            this.Logger.LogError(
                 ex,
                 "HTTP error publishing alert to {Service} - Status: {StatusCode}",
-                ServiceName,
+                this.ServiceName,
                 ex.StatusCode);
             throw;
         }
@@ -182,46 +185,46 @@ public sealed class OpsgenieAlertPublisher : WebhookAlertPublisherBase
         var payload = new
         {
             source = "Honua Server",
-            note = "Alert resolved"
+            note = "Alert resolved",
         };
 
-        var json = SerializePayload(payload);
+        var json = this.SerializePayload(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var request = new HttpRequestMessage(
             HttpMethod.Post,
             $"{apiUrl}/v2/alerts/{alert.Fingerprint}/close?identifierType=alias")
         {
-            Content = content
+            Content = content,
         };
         request.Headers.Add("Authorization", $"GenieKey {apiKey}");
 
         try
         {
             // BUG FIX #37: Remove redundant ConfigureAwait chaining
-            var response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await this.HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
             response.EnsureSuccessStatusCode();
 
-            Logger.LogInformation(
+            this.Logger.LogInformation(
                 "Published alert to {Service} - Closed alert with fingerprint: {Fingerprint}",
-                ServiceName,
+                this.ServiceName,
                 alert.Fingerprint);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             // Alert doesn't exist in Opsgenie, which is fine for resolved alerts
-            Logger.LogDebug(
+            this.Logger.LogDebug(
                 "Alert {Fingerprint} not found in {Service} (already closed or never created)",
                 alert.Fingerprint,
-                ServiceName);
+                this.ServiceName);
         }
         catch (HttpRequestException ex)
         {
-            Logger.LogError(
+            this.Logger.LogError(
                 ex,
                 "HTTP error closing alert in {Service} - Status: {StatusCode}",
-                ServiceName,
+                this.ServiceName,
                 ex.StatusCode);
             throw;
         }
@@ -235,7 +238,7 @@ public sealed class OpsgenieAlertPublisher : WebhookAlertPublisherBase
             "warning" => "P3",
             "database" => "P2",
             "storage" => "P2",
-            _ => "P4"
+            _ => "P4",
         };
     }
 }

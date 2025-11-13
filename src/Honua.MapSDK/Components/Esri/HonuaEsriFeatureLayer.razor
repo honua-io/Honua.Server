@@ -269,7 +269,8 @@
 
                 // Convert to GeoJSON
                 var geoJson = EsriFeatureServerClient.ConvertToGeoJson(featureSet);
-                var geoJsonString = NetTopologySuite.IO.GeoJsonSerializer.Create().Serialize(geoJson);
+                var geoJsonWriter = new NetTopologySuite.IO.GeoJsonWriter();
+                var geoJsonString = geoJsonWriter.Write(geoJson);
 
                 // Initialize layer on map
                 _sourceId = $"esri-source-{Id}";
@@ -394,7 +395,8 @@
             _featureCount = featureSet.Features.Count;
 
             var geoJson = EsriFeatureServerClient.ConvertToGeoJson(featureSet);
-            var geoJsonString = NetTopologySuite.IO.GeoJsonSerializer.Create().Serialize(geoJson);
+            var geoJsonWriter = new NetTopologySuite.IO.GeoJsonWriter();
+            var geoJsonString = geoJsonWriter.Write(geoJson);
 
             if (_layerInstance != null)
             {

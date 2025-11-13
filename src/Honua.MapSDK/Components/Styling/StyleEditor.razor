@@ -31,12 +31,12 @@
 
                 <div class="form-group">
                     <label>Style Name</label>
-                    <input type="text" class="form-control" @bind="CurrentStyle.Title" />
+                    <input type="text" class="form-control" value="@CurrentStyle.Title" @onchange="@((e) => UpdateTitle(e))" />
                 </div>
 
                 <div class="form-group">
                     <label>Geometry Type</label>
-                    <select class="form-select" @bind="CurrentStyle.GeometryType">
+                    <select class="form-select" value="@CurrentStyle.GeometryType" @onchange="@((e) => UpdateGeometryType(e))">
                         <option value="point">Point</option>
                         <option value="line">Line</option>
                         <option value="polygon">Polygon</option>
@@ -45,7 +45,7 @@
 
                 <div class="form-group">
                     <label>Renderer</label>
-                    <select class="form-select" @bind="CurrentStyle.Renderer" @bind:after="OnRendererChanged">
+                    <select class="form-select" value="@CurrentStyle.Renderer" @onchange="@((e) => UpdateRenderer(e))">
                         <option value="simple">Simple</option>
                         <option value="uniqueValue">Unique Value</option>
                         <option value="classBreaks">Class Breaks (Choropleth)</option>
@@ -223,18 +223,31 @@
         StateHasChanged();
     }
 
-    private void OnRendererChanged()
+    private void UpdateTitle(ChangeEventArgs e)
     {
         if (CurrentStyle == null) return;
+        CurrentStyle = CurrentStyle with { Title = e.Value?.ToString() ?? "" };
+        UpdatePreview();
+    }
 
-        // Reset renderer-specific properties
+    private void UpdateGeometryType(ChangeEventArgs e)
+    {
+        if (CurrentStyle == null) return;
+        CurrentStyle = CurrentStyle with { GeometryType = e.Value?.ToString() ?? "polygon" };
+        UpdatePreview();
+    }
+
+    private void UpdateRenderer(ChangeEventArgs e)
+    {
+        if (CurrentStyle == null) return;
+        var newRenderer = e.Value?.ToString() ?? "simple";
         CurrentStyle = CurrentStyle with
         {
-            Simple = CurrentStyle.Renderer == "simple" ? (CurrentStyle.Simple ?? new SimpleStyleDefinition()) : null,
+            Renderer = newRenderer,
+            Simple = newRenderer == "simple" ? (CurrentStyle.Simple ?? new SimpleStyleDefinition()) : null,
             UniqueValue = null,
             Rules = new List<StyleRuleDefinition>()
         };
-
         UpdatePreview();
     }
 

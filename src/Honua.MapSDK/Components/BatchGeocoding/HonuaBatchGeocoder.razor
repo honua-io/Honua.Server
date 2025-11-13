@@ -1,6 +1,7 @@
 @using Honua.MapSDK.Models.BatchGeocoding
 @using Honua.MapSDK.Services.BatchGeocoding
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.Extensions.Logging
 @using System.Text
 @inject ILogger<HonuaBatchGeocoder> Logger
 
@@ -264,7 +265,7 @@
     private bool _displayOnMapAfterComplete = true;
 
     private bool _isProcessing;
-    private BatchGeocodingProgress? _currentProgress;
+    private Models.BatchGeocoding.BatchGeocodingProgress? _currentProgress;
     private BatchGeocodingResult? _results;
     private CancellationTokenSource? _cancellationTokenSource;
 
@@ -379,7 +380,7 @@
                 TimeoutMs = 10000
             };
 
-            var progress = new Progress<BatchGeocodingProgress>(p =>
+            var progress = new Progress<Models.BatchGeocoding.BatchGeocodingProgress>(p =>
             {
                 _currentProgress = p;
                 InvokeAsync(StateHasChanged);

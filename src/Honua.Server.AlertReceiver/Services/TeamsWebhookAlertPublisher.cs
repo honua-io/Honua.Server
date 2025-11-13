@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="TeamsWebhookAlertPublisher.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Honua.Server.AlertReceiver.Models;
 
 namespace Honua.Server.AlertReceiver.Services;
@@ -30,15 +33,15 @@ public sealed class TeamsWebhookAlertPublisher : WebhookAlertPublisherBase
             "warning" => "Alerts:Teams:WarningWebhookUrl",
             "database" => "Alerts:Teams:DatabaseWebhookUrl",
             "storage" => "Alerts:Teams:StorageWebhookUrl",
-            _ => "Alerts:Teams:DefaultWebhookUrl"
+            _ => "Alerts:Teams:DefaultWebhookUrl",
         };
 
-        return Configuration[key];
+        return this.Configuration[key];
     }
 
     protected override object BuildPayload(AlertManagerWebhook webhook, string severity)
     {
-        var alertName = GetAlertName(webhook);
+        var alertName = this.GetAlertName(webhook);
         var status = webhook.Status.ToUpperInvariant();
         var themeColor = GetThemeColor(severity);
 
@@ -50,7 +53,7 @@ public sealed class TeamsWebhookAlertPublisher : WebhookAlertPublisherBase
             {
                 new { name = "Status", value = alert.Status },
                 new { name = "Severity", value = alert.Labels.GetValueOrDefault("severity", "unknown") },
-                new { name = "Started", value = alert.StartsAt.ToString("yyyy-MM-dd HH:mm:ss UTC") }
+                new { name = "Started", value = alert.StartsAt.ToString("yyyy-MM-dd HH:mm:ss UTC") },
             };
 
             if (alert.Labels.TryGetValue("api_protocol", out var protocol))
@@ -73,9 +76,9 @@ public sealed class TeamsWebhookAlertPublisher : WebhookAlertPublisherBase
             sections.Add(new
             {
                 activityTitle = alert.Labels.GetValueOrDefault("alertname", "Alert"),
-                activitySubtitle = alert.Annotations.GetValueOrDefault("summary", ""),
+                activitySubtitle = alert.Annotations.GetValueOrDefault("summary", string.Empty),
                 text = alert.Annotations.GetValueOrDefault("description", "No description"),
-                facts = facts
+                facts = facts,
             });
         }
 
@@ -83,7 +86,7 @@ public sealed class TeamsWebhookAlertPublisher : WebhookAlertPublisherBase
         {
             sections.Add(new
             {
-                text = $"_... and {webhook.Alerts.Count - 5} more alerts_"
+                text = $"_... and {webhook.Alerts.Count - 5} more alerts_",
             });
         }
 
@@ -105,8 +108,8 @@ public sealed class TeamsWebhookAlertPublisher : WebhookAlertPublisherBase
                     {
                         new { os = "default", uri = webhook.ExternalUrl }
                     }
-                }
-            }
+                },
+            },
         };
     }
 
@@ -116,7 +119,7 @@ public sealed class TeamsWebhookAlertPublisher : WebhookAlertPublisherBase
         {
             "critical" => "FF0000",
             "warning" => "FFA500",
-            _ => "0078D4"
+            _ => "0078D4",
         };
     }
 }

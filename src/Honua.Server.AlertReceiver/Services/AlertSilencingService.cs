@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="AlertSilencingService.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,38 +20,44 @@ namespace Honua.Server.AlertReceiver.Services;
 public interface IAlertSilencingService
 {
     Task<bool> IsAlertSilencedAsync(GenericAlert alert);
+
     Task<bool> IsAlertAcknowledgedAsync(string fingerprint);
+
     Task AcknowledgeAlertAsync(string fingerprint, string acknowledgedBy, string? comment = null, TimeSpan? expiresIn = null);
+
     // BUG FIX #33: Use DateTimeOffset to preserve timezone information
     Task CreateSilencingRuleAsync(string name, Dictionary<string, string> matchers, string createdBy, DateTimeOffset startsAt, DateTimeOffset endsAt, string? comment = null);
+
     Task<List<AlertSilencingRule>> GetActiveSilencingRulesAsync();
+
     Task DeactivateSilencingRuleAsync(long ruleId);
 }
 
 public sealed class AlertSilencingService : IAlertSilencingService
 {
-    private readonly IAlertHistoryStore _historyStore;
-    private readonly ILogger<AlertSilencingService> _logger;
+    private readonly IAlertHistoryStore historyStore;
+    private readonly ILogger<AlertSilencingService> logger;
 
     public AlertSilencingService(IAlertHistoryStore historyStore, ILogger<AlertSilencingService> logger)
     {
-        _historyStore = historyStore;
-        _logger = logger;
+        this.historyStore = historyStore;
+        this.logger = logger;
     }
 
     public async Task<bool> IsAlertSilencedAsync(GenericAlert alert)
     {
         // BUG FIX #33: Use DateTimeOffset.UtcNow for timezone-aware comparisons
         var now = DateTimeOffset.UtcNow;
-        var activeRules = await _historyStore.GetActiveSilencingRulesAsync(now).ConfigureAwait(false);
+        var activeRules = await this.historyStore.GetActiveSilencingRulesAsync(now).ConfigureAwait(false);
 
         foreach (var rule in activeRules)
         {
-            if (MatchesRule(alert, rule))
+            if (this.MatchesRule(alert, rule))
             {
-                _logger.LogInformation(
+                this.logger.LogInformation(
                     "Alert silenced by rule '{RuleName}': {AlertName}",
-                    rule.Name, alert.Name);
+                    rule.Name,
+                    alert.Name);
                 return true;
             }
         }
@@ -60,7 +69,7 @@ public sealed class AlertSilencingService : IAlertSilencingService
     {
         // BUG FIX #33: Use DateTimeOffset.UtcNow for timezone-aware comparisons
         var now = DateTimeOffset.UtcNow;
-        var ack = await _historyStore.GetLatestAcknowledgementAsync(fingerprint).ConfigureAwait(false);
+        var ack = await this.historyStore.GetLatestAcknowledgementAsync(fingerprint).ConfigureAwait(false);
 
         if (ack == null)
         {
@@ -84,14 +93,16 @@ public sealed class AlertSilencingService : IAlertSilencingService
             AcknowledgedBy = acknowledgedBy,
             AcknowledgedAt = DateTimeOffset.UtcNow,
             Comment = comment,
-            ExpiresAt = expiresIn.HasValue ? DateTimeOffset.UtcNow.Add(expiresIn.Value) : null
+            ExpiresAt = expiresIn.HasValue ? DateTimeOffset.UtcNow.Add(expiresIn.Value) : null,
         };
 
-        await _historyStore.InsertAcknowledgementAsync(ack).ConfigureAwait(false);
+        await this.historyStore.InsertAcknowledgementAsync(ack).ConfigureAwait(false);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Alert acknowledged: {Fingerprint} by {User}, expires: {ExpiresAt}",
-            fingerprint, acknowledgedBy, ack.ExpiresAt?.ToString() ?? "never");
+            fingerprint,
+            acknowledgedBy,
+            ack.ExpiresAt?.ToString() ?? "never");
     }
 
     public async Task CreateSilencingRuleAsync(
@@ -112,21 +123,24 @@ public sealed class AlertSilencingService : IAlertSilencingService
             StartsAt = startsAt,
             EndsAt = endsAt,
             Comment = comment,
-            IsActive = true
+            IsActive = true,
         };
 
-        await _historyStore.InsertSilencingRuleAsync(rule).ConfigureAwait(false);
+        await this.historyStore.InsertSilencingRuleAsync(rule).ConfigureAwait(false);
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Created silencing rule '{Name}' by {User}, active {Start} to {End}",
-            name, createdBy, startsAt, endsAt);
+            name,
+            createdBy,
+            startsAt,
+            endsAt);
     }
 
     public async Task<List<AlertSilencingRule>> GetActiveSilencingRulesAsync()
     {
         // BUG FIX #33: Use DateTimeOffset.UtcNow for timezone-aware comparisons
         var now = DateTimeOffset.UtcNow;
-        var results = await _historyStore.GetActiveSilencingRulesAsync(now).ConfigureAwait(false);
+        var results = await this.historyStore.GetActiveSilencingRulesAsync(now).ConfigureAwait(false);
         return results
             .Where(r => r.StartsAt <= now)
             .OrderByDescending(r => r.CreatedAt)
@@ -135,8 +149,8 @@ public sealed class AlertSilencingService : IAlertSilencingService
 
     public async Task DeactivateSilencingRuleAsync(long ruleId)
     {
-        await _historyStore.DeactivateSilencingRuleAsync(ruleId).ConfigureAwait(false);
-        _logger.LogInformation("Deactivated silencing rule ID {RuleId}", ruleId);
+        await this.historyStore.DeactivateSilencingRuleAsync(ruleId).ConfigureAwait(false);
+        this.logger.LogInformation("Deactivated silencing rule ID {RuleId}", ruleId);
     }
 
     private bool MatchesRule(GenericAlert alert, AlertSilencingRule rule)
@@ -155,9 +169,9 @@ public sealed class AlertSilencingService : IAlertSilencingService
                     "name" => alert.Name,
                     "severity" => alert.Severity,
                     "source" => alert.Source,
-                    "service" => alert.Service ?? "",
-                    "environment" => alert.Environment ?? "",
-                    _ => alert.Labels.GetValueOrDefault(matcher.Key, "")
+                    "service" => alert.Service ?? string.Empty,
+                    "environment" => alert.Environment ?? string.Empty,
+                    _ => alert.Labels.GetValueOrDefault(matcher.Key, string.Empty),
                 };
 
                 // Support regex matching with cached compiled patterns for performance
@@ -175,16 +189,18 @@ public sealed class AlertSilencingService : IAlertSilencingService
                     }
                     catch (RegexMatchTimeoutException)
                     {
-                        _logger.LogWarning(
+                        this.logger.LogWarning(
                             "Regex pattern timed out for rule {RuleName}, pattern: {Pattern}. Treating as non-match.",
-                            rule.Name, pattern);
+                            rule.Name,
+                            pattern);
                         return false;
                     }
                     catch (ArgumentException ex)
                     {
-                        _logger.LogError(ex,
+                        this.logger.LogError(ex,
                             "Invalid regex pattern in rule {RuleName}, pattern: {Pattern}. Treating as non-match.",
-                            rule.Name, pattern);
+                            rule.Name,
+                            pattern);
                         return false;
                     }
                 }
@@ -201,7 +217,7 @@ public sealed class AlertSilencingService : IAlertSilencingService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error matching alert against rule {RuleName}", rule.Name);
+            this.logger.LogError(ex, "Error matching alert against rule {RuleName}", rule.Name);
             return false;
         }
     }

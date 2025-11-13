@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="AlertHistoryHealthCheck.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 
@@ -10,13 +13,13 @@ namespace Honua.Server.AlertReceiver.Services;
 /// </summary>
 public sealed class AlertHistoryHealthCheck : IHealthCheck
 {
-    private readonly IAlertHistoryStore _historyStore;
-    private readonly ILogger<AlertHistoryHealthCheck> _logger;
+    private readonly IAlertHistoryStore historyStore;
+    private readonly ILogger<AlertHistoryHealthCheck> logger;
 
     public AlertHistoryHealthCheck(IAlertHistoryStore historyStore, ILogger<AlertHistoryHealthCheck> logger)
     {
-        _historyStore = historyStore ?? throw new ArgumentNullException(nameof(historyStore));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.historyStore = historyStore ?? throw new ArgumentNullException(nameof(historyStore));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -25,12 +28,12 @@ public sealed class AlertHistoryHealthCheck : IHealthCheck
     {
         try
         {
-            await _historyStore.CheckConnectivityAsync(cancellationToken).ConfigureAwait(false);
+            await this.historyStore.CheckConnectivityAsync(cancellationToken).ConfigureAwait(false);
             return HealthCheckResult.Healthy("Alert history store reachable.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Alert history connectivity check failed.");
+            this.logger.LogError(ex, "Alert history connectivity check failed.");
             return HealthCheckResult.Unhealthy("Alert history store unreachable.", ex);
         }
     }

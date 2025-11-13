@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="SnsAlertPublisher.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using Honua.Server.AlertReceiver.Models;
@@ -14,26 +17,26 @@ namespace Honua.Server.AlertReceiver.Services;
 /// </summary>
 public sealed class SnsAlertPublisher : IAlertPublisher
 {
-    private readonly IAmazonSimpleNotificationService _sns;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<SnsAlertPublisher> _logger;
+    private readonly IAmazonSimpleNotificationService sns;
+    private readonly IConfiguration configuration;
+    private readonly ILogger<SnsAlertPublisher> logger;
 
     public SnsAlertPublisher(
         IAmazonSimpleNotificationService sns,
         IConfiguration configuration,
         ILogger<SnsAlertPublisher> logger)
     {
-        _sns = sns ?? throw new ArgumentNullException(nameof(sns));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.sns = sns ?? throw new ArgumentNullException(nameof(sns));
+        this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task PublishAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default)
     {
-        var topicArn = GetTopicArn(severity);
+        var topicArn = this.GetTopicArn(severity);
         if (topicArn.IsNullOrWhiteSpace())
         {
-            _logger.LogWarning("No SNS topic ARN configured for severity {Severity}, skipping SNS publish", severity);
+            this.logger.LogWarning("No SNS topic ARN configured for severity {Severity}, skipping SNS publish", severity);
             return;
         }
 
@@ -57,19 +60,22 @@ public sealed class SnsAlertPublisher : IAlertPublisher
                     {
                         DataType = "String",
                         StringValue = webhook.GroupLabels.GetValueOrDefault("alertname", "Unknown")
-                    }
-                }
+                    },
+                },
             };
 
-            var response = await _sns.PublishAsync(request, cancellationToken);
+            var response = await this.sns.PublishAsync(request, cancellationToken);
 
-            _logger.LogInformation(
+            this.logger.LogInformation(
                 "Published alert to SNS topic {TopicArn}, MessageId: {MessageId}, Severity: {Severity}, Status: {Status}",
-                topicArn, response.MessageId, severity, webhook.Status);
+                topicArn,
+                response.MessageId,
+                severity,
+                webhook.Status);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish alert to SNS topic {TopicArn}", topicArn);
+            this.logger.LogError(ex, "Failed to publish alert to SNS topic {TopicArn}", topicArn);
             throw;
         }
     }
@@ -83,10 +89,10 @@ public sealed class SnsAlertPublisher : IAlertPublisher
             "warning" => "Alerts:SNS:WarningTopicArn",
             "database" => "Alerts:SNS:DatabaseTopicArn",
             "storage" => "Alerts:SNS:StorageTopicArn",
-            _ => "Alerts:SNS:DefaultTopicArn"
+            _ => "Alerts:SNS:DefaultTopicArn",
         };
 
-        return _configuration[key] ?? string.Empty;
+        return this.configuration[key] ?? string.Empty;
     }
 
     private static string FormatSubject(AlertManagerWebhook webhook, string severity)
@@ -98,7 +104,7 @@ public sealed class SnsAlertPublisher : IAlertPublisher
             "warning" => "⚠️",
             "database" => "🗄️",
             "storage" => "💾",
-            _ => "ℹ️"
+            _ => "ℹ️",
         };
 
         var status = webhook.Status.ToUpperInvariant();
@@ -165,12 +171,4 @@ public sealed class SnsAlertPublisher : IAlertPublisher
 
         return sb.ToString();
     }
-}
-
-/// <summary>
-/// Alert publisher interface.
-/// </summary>
-public interface IAlertPublisher
-{
-    Task PublishAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default);
 }

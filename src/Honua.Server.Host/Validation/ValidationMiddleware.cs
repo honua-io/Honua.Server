@@ -27,7 +27,7 @@ public sealed class ValidationMiddleware
     {
         try
         {
-            await _next(context);
+            await this.next(context);
         }
         catch (ValidationException ex)
         {

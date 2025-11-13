@@ -117,7 +117,7 @@ public sealed class ConfigValidateCommand : AsyncCommand<ConfigValidateCommand.S
         return ValidationOptions.Default;
     }
 
-    private void DisplayValidationResults(ValidationResult result, bool verbose)
+    private void DisplayValidationResults(Honua.Server.Core.Configuration.V2.Validation.ValidationResult result, bool verbose)
     {
         if (result.IsValid && result.Warnings.Count == 0)
         {

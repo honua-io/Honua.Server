@@ -30,10 +30,10 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
     private readonly IHostEnvironment environment;
 
     public GlobalExceptionHandler(
-        ILogger<GlobalExceptionHandler> _logger,
+        ILogger<GlobalExceptionHandler> logger,
         IHostEnvironment environment)
     {
-        this._logger = Guard.NotNull(_logger);
+        this.logger = Guard.NotNull(logger);
         this.environment = Guard.NotNull(environment);
     }
 

@@ -79,10 +79,27 @@ public class Model3DLoaderService
 
             // Parse metadata (basic for now, full parsing happens in JS)
             var info = await ParseModelMetadataAsync(modelUrl, modelData, cancellationToken);
-            info = info with
+            var loadTimeMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
+
+            // Create updated info with load time and status
+            info = new Model3DInfo
             {
-                LoadTimeMs = (DateTime.UtcNow - startTime).TotalMilliseconds,
-                IsLoaded = true
+                ModelId = info.ModelId,
+                ModelUrl = info.ModelUrl,
+                Format = info.Format,
+                Animations = info.Animations,
+                BoundingBox = info.BoundingBox,
+                VertexCount = info.VertexCount,
+                TriangleCount = info.TriangleCount,
+                MeshCount = info.MeshCount,
+                MaterialCount = info.MaterialCount,
+                TextureCount = info.TextureCount,
+                FileSizeBytes = info.FileSizeBytes,
+                IsLoaded = true,
+                LoadTimeMs = loadTimeMs,
+                LodLevels = info.LodLevels,
+                SupportsPBR = info.SupportsPBR,
+                Metadata = info.Metadata
             };
 
             // Cache the model info

@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
 using Honua.Cli.AI.Services.Guardrails;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Cli.AI.Services.Processes.Steps.Deployment;
 

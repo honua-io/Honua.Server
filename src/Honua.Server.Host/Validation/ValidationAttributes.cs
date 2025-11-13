@@ -153,9 +153,9 @@ public sealed class TileSizeAttribute : ValidationAttribute
             return new ValidationResult("Tile size must be an integer.");
         }
 
-        if (intValue < _minSize || intValue > _maxSize)
+        if (intValue < this.minSize || intValue > this.maxSize)
         {
-            return new ValidationResult($"Tile size must be between {_minSize} and {_maxSize} pixels.");
+            return new ValidationResult($"Tile size must be between {this.minSize} and {this.maxSize} pixels.");
         }
 
         // Ensure it's a power of 2 or common size
@@ -199,9 +199,9 @@ public sealed class FileSizeAttribute : ValidationAttribute
             return new ValidationResult("File size cannot be negative.");
         }
 
-        if (longValue > _maxBytes)
+        if (longValue > this.maxBytes)
         {
-            var maxMb = _maxBytes / (1024.0 * 1024.0);
+            var maxMb = this.maxBytes / (1024.0 * 1024.0);
             return new ValidationResult($"File size cannot exceed {maxMb:F2} MB.");
         }
 
@@ -280,7 +280,7 @@ public sealed class AllowedMimeTypesAttribute : ValidationAttribute
         }
 
         return new ValidationResult(
-            $"MIME type must be one of: {string.Join(", ", _allowedTypes)}");
+            $"MIME type must be one of: {string.Join(", ", this.allowedTypes)}");
     }
 }
 
@@ -342,9 +342,9 @@ public sealed class SafeStringAttribute : ValidationAttribute
             return new ValidationResult("Value must be a string.");
         }
 
-        if (stringValue.Length > _maxLength)
+        if (stringValue.Length > this.maxLength)
         {
-            return new ValidationResult($"String length cannot exceed {_maxLength} characters.");
+            return new ValidationResult($"String length cannot exceed {this.maxLength} characters.");
         }
 
         // Check for control characters (except common whitespace)

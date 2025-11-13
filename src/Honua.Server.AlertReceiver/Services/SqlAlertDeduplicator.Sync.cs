@@ -1,5 +1,8 @@
-// Copyright (c) 2025 HonuaIO
+// <copyright file="SqlAlertDeduplicator.Sync.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 namespace Honua.Server.AlertReceiver.Services;
 
 /// <summary>
@@ -19,7 +22,7 @@ public sealed partial class SqlAlertDeduplicator
     /// <returns>True if the alert should be sent, false if suppressed.</returns>
     public bool ShouldSendAlert(string fingerprint, string severity, out string reservationId)
     {
-        var result = ShouldSendAlertAsync(fingerprint, severity).GetAwaiter().GetResult();
+        var result = this.ShouldSendAlertAsync(fingerprint, severity).GetAwaiter().GetResult();
         reservationId = result.reservationId;
         return result.shouldSend;
     }
@@ -33,7 +36,7 @@ public sealed partial class SqlAlertDeduplicator
     /// <param name="reservationId">The reservation ID from ShouldSendAlert.</param>
     public void RecordAlert(string fingerprint, string severity, string reservationId)
     {
-        RecordAlertAsync(fingerprint, severity, reservationId).GetAwaiter().GetResult();
+        this.RecordAlertAsync(fingerprint, severity, reservationId).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -43,6 +46,6 @@ public sealed partial class SqlAlertDeduplicator
     /// <param name="reservationId">The reservation ID to release.</param>
     public void ReleaseReservation(string reservationId)
     {
-        ReleaseReservationAsync(reservationId).GetAwaiter().GetResult();
+        this.ReleaseReservationAsync(reservationId).GetAwaiter().GetResult();
     }
 }

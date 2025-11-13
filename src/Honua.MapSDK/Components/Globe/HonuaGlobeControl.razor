@@ -301,7 +301,7 @@
     /// JavaScript callback when projection changes
     /// </summary>
     [JSInvokable]
-    public async Task OnProjectionChanged(string projection)
+    public async Task HandleProjectionChangedFromJS(string projection)
     {
         _isGlobe = projection.ToLowerInvariant() == "globe";
         await InvokeAsync(StateHasChanged);

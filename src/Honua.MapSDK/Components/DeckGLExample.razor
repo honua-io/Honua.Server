@@ -147,11 +147,15 @@
 
     private MapConfiguration _mapConfig = new()
     {
-        Style = "https://demotiles.maplibre.org/style.json",
-        Center = new[] { -122.4, 37.8 }, // San Francisco
-        Zoom = 11,
-        Pitch = 45,
-        Bearing = 0
+        Name = "DeckGL Example Map",
+        Settings = new MapSettings
+        {
+            Style = "https://demotiles.maplibre.org/style.json",
+            Center = new[] { -122.4, 37.8 }, // San Francisco
+            Zoom = 11,
+            Pitch = 45,
+            Bearing = 0
+        }
     };
 
     private async Task OnMapLoaded(MapLibreViewport viewport)

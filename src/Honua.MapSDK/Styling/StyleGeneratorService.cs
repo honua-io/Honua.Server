@@ -21,31 +21,30 @@ public class StyleGeneratorService
     /// </summary>
     public GeneratedStyle GenerateStyle(StyleGenerationRequest request)
     {
-        var style = new GeneratedStyle
-        {
-            StyleId = request.StyleId ?? $"auto-style-{Guid.NewGuid():N}",
-            Title = request.Title ?? "Auto-Generated Style",
-            GeometryType = NormalizeGeometryType(request.GeometryType)
-        };
+        // Generate style definition first
+        StyleDefinition styleDefinition;
+        FieldAnalysisResult? fieldAnalysis = null;
 
         // If field is specified, analyze it for data-driven styling
         if (!string.IsNullOrEmpty(request.FieldName) && request.FieldValues != null)
         {
-            var analysis = _dataAnalyzer.AnalyzeField(request.FieldValues, request.FieldName);
-            style.FieldAnalysis = analysis;
-
-            // Generate data-driven style
-            var styleDefinition = GenerateDataDrivenStyle(request, analysis);
-            style.StyleDefinition = styleDefinition;
-            style.MapLibreStyle = ConvertToMapLibreStyle(styleDefinition, request);
+            fieldAnalysis = _dataAnalyzer.AnalyzeField(request.FieldValues, request.FieldName);
+            styleDefinition = GenerateDataDrivenStyle(request, fieldAnalysis);
         }
         else
         {
-            // Generate simple style
-            var styleDefinition = GenerateSimpleStyle(request);
-            style.StyleDefinition = styleDefinition;
-            style.MapLibreStyle = ConvertToMapLibreStyle(styleDefinition, request);
+            styleDefinition = GenerateSimpleStyle(request);
         }
+
+        var style = new GeneratedStyle
+        {
+            StyleId = request.StyleId ?? $"auto-style-{Guid.NewGuid():N}",
+            Title = request.Title ?? "Auto-Generated Style",
+            GeometryType = NormalizeGeometryType(request.GeometryType),
+            StyleDefinition = styleDefinition,
+            MapLibreStyle = ConvertToMapLibreStyle(styleDefinition, request),
+            FieldAnalysis = fieldAnalysis
+        };
 
         // Add clustering/heatmap recommendations for points
         if (request.GeometryType?.ToLowerInvariant() == "point" && request.Coordinates != null)

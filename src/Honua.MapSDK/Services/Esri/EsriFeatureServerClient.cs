@@ -366,7 +366,12 @@ public class EsriFeatureServerClient
             features.Add(new Feature(geometry, attributes));
         }
 
-        return new FeatureCollection(features);
+        var collection = new FeatureCollection();
+        foreach (var feature in features)
+        {
+            collection.Add(feature);
+        }
+        return collection;
     }
 
     /// <summary>
@@ -380,16 +385,16 @@ public class EsriFeatureServerClient
 
         return esriGeometry switch
         {
-            EsriPoint point => factory.CreatePoint(new Coordinate(point.X, point.Y, point.Z ?? double.NaN)),
+            EsriPoint point => factory.CreatePoint(new CoordinateZ(point.X, point.Y, point.Z ?? double.NaN)),
 
             EsriMultipoint multipoint => factory.CreateMultiPoint(
-                multipoint.Points.Select(p => new Coordinate(p[0], p[1], p.Length > 2 ? p[2] : double.NaN)).ToArray()
+                multipoint.Points.Select(p => factory.CreatePoint(new CoordinateZ(p[0], p[1], p.Length > 2 ? p[2] : double.NaN))).ToArray()
             ),
 
             EsriPolyline polyline => factory.CreateMultiLineString(
                 polyline.Paths.Select(path =>
                     factory.CreateLineString(
-                        path.Select(p => new Coordinate(p[0], p[1], p.Length > 2 ? p[2] : double.NaN)).ToArray()
+                        path.Select(p => (Coordinate)new CoordinateZ(p[0], p[1], p.Length > 2 ? p[2] : double.NaN)).ToArray()
                     )
                 ).ToArray()
             ),
@@ -397,7 +402,7 @@ public class EsriFeatureServerClient
             EsriPolygon polygon => factory.CreatePolygon(
                 polygon.Rings.Length > 0
                     ? factory.CreateLinearRing(
-                        polygon.Rings[0].Select(p => new Coordinate(p[0], p[1], p.Length > 2 ? p[2] : double.NaN)).ToArray()
+                        polygon.Rings[0].Select(p => (Coordinate)new CoordinateZ(p[0], p[1], p.Length > 2 ? p[2] : double.NaN)).ToArray()
                     )
                     : null
             ),
@@ -474,9 +479,13 @@ public class EsriFeatureServerClient
 
             Polygon polygon => new EsriPolygon
             {
-                Rings = polygon.Coordinates.Select(c =>
+                Rings = new[] { polygon.Shell.Coordinates.Select(c =>
                     double.IsNaN(c.Z) ? new[] { c.X, c.Y } : new[] { c.X, c.Y, c.Z }
-                ).ToArray().ToArrayOfArray()
+                ).ToArray() }
+                .Concat(polygon.Holes.Select(hole => hole.Coordinates.Select(c =>
+                    double.IsNaN(c.Z) ? new[] { c.X, c.Y } : new[] { c.X, c.Y, c.Z }
+                ).ToArray()))
+                .ToArray()
             },
 
             _ => null

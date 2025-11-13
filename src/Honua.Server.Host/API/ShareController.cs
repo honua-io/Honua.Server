@@ -313,7 +313,7 @@ public class ShareController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<ShareCommentResponse>> CreateComment(
         [FromRoute] string token,
-        [FromBody] CreateCommentRequest request)
+        [FromBody] CreateShareCommentRequest request)
     {
         try
         {
@@ -494,7 +494,7 @@ public class EmbedCodeResponse
     public string Code { get; set; } = string.Empty;
 }
 
-public class CreateCommentRequest
+public class CreateShareCommentRequest
 {
     [Required]
     public string MapId { get; set; } = string.Empty;

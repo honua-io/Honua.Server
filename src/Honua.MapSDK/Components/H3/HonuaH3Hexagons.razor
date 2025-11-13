@@ -155,7 +155,8 @@
     private ElementReference _containerRef;
     private IJSObjectReference? _module;
     private IJSObjectReference? _layerRef;
-    private string _subscriptionId = Guid.NewGuid().ToString();
+    private Func<MessageArgs<MapReadyMessage>, Task>? _mapReadyHandler;
+    private Func<MessageArgs<LayerAddedMessage>, Task>? _layerAddedHandler;
     private List<string> _availableProperties = new();
     private H3Stats? _hexagonStats;
 
@@ -202,8 +203,10 @@
                 await InitializeH3Layer();
 
                 // Subscribe to map events
-                Bus.Subscribe<MapReadyMessage>(_subscriptionId, async msg => await OnMapReady(msg));
-                Bus.Subscribe<LayerAddedMessage>(_subscriptionId, async msg => await OnLayerAdded(msg));
+                _mapReadyHandler = async args => await OnMapReady(args.Message);
+                _layerAddedHandler = async args => await OnLayerAdded(args.Message);
+                Bus.Subscribe<MapReadyMessage>(_mapReadyHandler);
+                Bus.Subscribe<LayerAddedMessage>(_layerAddedHandler);
             }
             catch (Exception ex)
             {
@@ -410,7 +413,15 @@
             catch { }
         }
 
-        Bus.Unsubscribe(_subscriptionId);
+        // Unsubscribe from events
+        if (_mapReadyHandler != null)
+        {
+            Bus.Unsubscribe<MapReadyMessage>(_mapReadyHandler);
+        }
+        if (_layerAddedHandler != null)
+        {
+            Bus.Unsubscribe<LayerAddedMessage>(_layerAddedHandler);
+        }
     }
 }
 

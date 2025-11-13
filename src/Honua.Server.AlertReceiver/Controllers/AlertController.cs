@@ -1,5 +1,7 @@
-// Copyright (c) 2025 HonuaIO
-// Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// <copyright file="AlertController.cs" company="HonuaIO">
+// Copyright (c) 2025 HonuaIO.\nLicensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+// </copyright>
+
 using Honua.Server.AlertReceiver.Models;
 using Honua.Server.AlertReceiver.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -14,15 +16,15 @@ namespace Honua.Server.AlertReceiver.Controllers;
 [Route("alert")]
 public sealed class AlertController : ControllerBase
 {
-    private readonly IAlertPublisher _alertPublisher;
-    private readonly ILogger<AlertController> _logger;
+    private readonly IAlertPublisher alertPublisher;
+    private readonly ILogger<AlertController> logger;
 
     public AlertController(
         IAlertPublisher alertPublisher,
         ILogger<AlertController> logger)
     {
-        _alertPublisher = alertPublisher ?? throw new ArgumentNullException(nameof(alertPublisher));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.alertPublisher = alertPublisher ?? throw new ArgumentNullException(nameof(alertPublisher));
+        this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -32,7 +34,7 @@ public sealed class AlertController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Critical([FromBody] AlertManagerWebhook webhook, CancellationToken cancellationToken)
     {
-        return await ProcessAlert(webhook, "critical", cancellationToken);
+        return await this.ProcessAlert(webhook, "critical", cancellationToken);
     }
 
     /// <summary>
@@ -42,7 +44,7 @@ public sealed class AlertController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Warning([FromBody] AlertManagerWebhook webhook, CancellationToken cancellationToken)
     {
-        return await ProcessAlert(webhook, "warning", cancellationToken);
+        return await this.ProcessAlert(webhook, "warning", cancellationToken);
     }
 
     /// <summary>
@@ -52,7 +54,7 @@ public sealed class AlertController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Database([FromBody] AlertManagerWebhook webhook, CancellationToken cancellationToken)
     {
-        return await ProcessAlert(webhook, "database", cancellationToken);
+        return await this.ProcessAlert(webhook, "database", cancellationToken);
     }
 
     /// <summary>
@@ -62,7 +64,7 @@ public sealed class AlertController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Storage([FromBody] AlertManagerWebhook webhook, CancellationToken cancellationToken)
     {
-        return await ProcessAlert(webhook, "storage", cancellationToken);
+        return await this.ProcessAlert(webhook, "storage", cancellationToken);
     }
 
     /// <summary>
@@ -72,7 +74,7 @@ public sealed class AlertController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Default([FromBody] AlertManagerWebhook webhook, CancellationToken cancellationToken)
     {
-        return await ProcessAlert(webhook, "default", cancellationToken);
+        return await this.ProcessAlert(webhook, "default", cancellationToken);
     }
 
     /// <summary>
@@ -82,7 +84,7 @@ public sealed class AlertController : ControllerBase
     [AllowAnonymous]
     public IActionResult Health()
     {
-        return Ok(new { status = "healthy", service = "honua-alert-receiver" });
+        return this.Ok(new { status = "healthy", service = "honua-alert-receiver" });
     }
 
     private async Task<IActionResult> ProcessAlert(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken)
@@ -94,7 +96,7 @@ public sealed class AlertController : ControllerBase
         // - Internal system details that violate compliance requirements
         // Production environments should set minimum log level to Information or Warning to prevent exposure.
 
-        _logger.LogInformation(
+        this.logger.LogInformation(
             "Received {Severity} alert: {AlertName}, Status: {Status}, Alerts: {Count}",
             severity,
             webhook.GroupLabels.GetValueOrDefault("alertname", "Unknown"),
@@ -105,7 +107,7 @@ public sealed class AlertController : ControllerBase
         // This prevents sensitive data in descriptions/labels from appearing in production logs
         foreach (var alert in webhook.Alerts)
         {
-            _logger.LogDebug(
+            this.logger.LogDebug(
                 "Alert detail - Name: {AlertName}, Status: {Status}, Severity: {Severity}, Description: {Description}",
                 alert.Labels.GetValueOrDefault("alertname", "Unknown"),
                 alert.Status,
@@ -114,8 +116,8 @@ public sealed class AlertController : ControllerBase
         }
 
         // Publish to SNS
-        await _alertPublisher.PublishAsync(webhook, severity, cancellationToken);
+        await this.alertPublisher.PublishAsync(webhook, severity, cancellationToken);
 
-        return Ok(new { status = "received", alertCount = webhook.Alerts.Count });
+        return this.Ok(new { status = "received", alertCount = webhook.Alerts.Count });
     }
 }

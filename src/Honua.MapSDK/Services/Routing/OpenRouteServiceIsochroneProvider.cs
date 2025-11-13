@@ -145,7 +145,10 @@ public class OpenRouteServiceIsochroneProvider : IIsochroneProvider
         catch (HttpRequestException ex)
         {
             _logger?.LogError(ex, "OpenRouteService isochrone API request failed");
-            throw new RoutingException("Failed to calculate isochrone from OpenRouteService", "OpenRouteService", ex);
+            throw new RoutingException("Failed to calculate isochrone from OpenRouteService", ex)
+            {
+                RoutingEngine = "OpenRouteService"
+            };
         }
         catch (Exception ex)
         {

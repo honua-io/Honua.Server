@@ -6,7 +6,8 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Honua.Server.Enterprise.Geoprocessing;
+// TODO: Re-enable when Honua.Server.Enterprise is available
+// using Honua.Server.Enterprise.Geoprocessing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,11 @@ namespace Honua.Server.Host.Geoprocessing;
 /// H3 Hexagonal Binning Analysis endpoints
 /// Provides REST API for H3 spatial aggregation operations
 /// </summary>
+/// <remarks>
+/// TODO: Re-enable when Honua.Server.Enterprise is available.
+/// This endpoint depends on IControlPlane and other Enterprise features.
+/// </remarks>
+/*
 public static class H3AnalysisEndpoints
 {
     public static IEndpointRouteBuilder MapH3AnalysisEndpoints(this IEndpointRouteBuilder endpoints)
@@ -369,3 +375,4 @@ public record H3NeighborsResponse
     public required List<string> Neighbors { get; init; }
     public int Count { get; init; }
 }
+*/
