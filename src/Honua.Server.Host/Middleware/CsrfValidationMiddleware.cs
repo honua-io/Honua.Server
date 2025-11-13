@@ -214,7 +214,11 @@ public sealed class CsrfProtectionOptions
         "/readyz",
         "/metrics",
         "/swagger",
-        "/api-docs"
+        "/api-docs",
+        "/stac",     // STAC API endpoints (public geospatial catalog API)
+        "/v1/stac",  // Versioned STAC API endpoints
+        "/ogc",      // OGC API endpoints (public geospatial standards)
+        "/records"   // OGC Records API endpoints (public catalog API)
     };
 
     /// <summary>

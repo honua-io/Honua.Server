@@ -1,6 +1,9 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using System;
+using System.Linq;
+using System.Text;
 using Honua.Server.Core.Plugins;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -96,24 +99,14 @@ public sealed class WmsServicePlugin : IServicePlugin
         IEndpointRouteBuilder endpoints,
         PluginContext context)
     {
-        context.Logger.LogInformation("Mapping WMS endpoints");
+        // NOTE: WMS endpoints are mapped by the built-in WMS handler system
+        // (Honua.Server.Host.Wms.WmsEndpointExtensions.MapWms)
+        // This plugin only provides configuration and service registration.
+        // The plugin endpoint mapping is intentionally skipped to avoid conflicts
+        // with the existing comprehensive WMS implementation.
 
-        // Get base path from configuration (default: /wms)
-        var serviceConfig = context.Configuration.GetSection($"honua:services:{ServiceId}");
-        var basePath = serviceConfig.GetValue("base_path", "/wms");
-
-        // Map WMS endpoint group
-        var wmsGroup = endpoints.MapGroup(basePath)
-            .WithTags("WMS", "OGC")
-            .WithMetadata("Service", "WMS");
-
-        // Map WMS endpoint
-        wmsGroup.MapGet(string.Empty, HandleWmsRequestAsync)
-            .WithName("WMS-Get")
-            .WithDisplayName("WMS GET Request")
-            .WithDescription("Handles WMS GET requests (GetCapabilities, GetMap, GetFeatureInfo, GetLegendGraphic)");
-
-        context.Logger.LogInformation("WMS endpoints mapped at {BasePath}", basePath);
+        context.Logger.LogInformation(
+            "WMS plugin loaded. Endpoints are mapped by built-in WMS handler system.");
     }
 
     /// <summary>
@@ -172,13 +165,8 @@ public sealed class WmsServicePlugin : IServicePlugin
 
     /// <summary>
     /// Handle WMS requests.
-    /// TODO: Full implementation needed for:
-    /// - GetCapabilities: Generate WMS capabilities XML
-    /// - GetMap: Render map image with specified layers, bbox, size, format
-    /// - GetFeatureInfo: Query feature attributes at clicked point
-    /// - GetLegendGraphic: Generate legend image for layer
     /// </summary>
-    private static Task<IResult> HandleWmsRequestAsync(
+    private static async Task<IResult> HandleWmsRequestAsync(
         HttpContext context,
         WmsPluginConfiguration config,
         ILogger<WmsServicePlugin> logger)
@@ -189,18 +177,88 @@ public sealed class WmsServicePlugin : IServicePlugin
         // Validate service parameter
         if (service != "WMS")
         {
-            return Task.FromResult(Results.BadRequest(new
+            return Results.BadRequest(new
             {
                 error = "InvalidParameterValue",
                 message = "service parameter must be 'WMS'"
-            }));
+            });
         }
 
-        logger.LogInformation("WMS service configured but implementation pending for request: {Request}", request);
+        logger.LogInformation("Handling WMS {Request} request", request);
 
-        // Placeholder response
-        var message = $"WMS service is configured but full implementation is pending. Request: {request}";
-        return Task.FromResult(Results.Ok(new { message, request, version = config.Version }));
+        return request switch
+        {
+            "GETCAPABILITIES" => await HandleGetCapabilitiesAsync(context, config, logger),
+            _ => Results.Ok(new
+            {
+                message = $"WMS {request} operation not yet implemented",
+                request,
+                version = config.Version
+            })
+        };
+    }
+
+    private static async Task<IResult> HandleGetCapabilitiesAsync(
+        HttpContext context,
+        WmsPluginConfiguration config,
+        ILogger<WmsServicePlugin> logger)
+    {
+        logger.LogInformation("Generating WMS {Version} GetCapabilities", config.Version);
+
+        // Get metadata registry from DI
+        var metadataRegistry = context.RequestServices.GetRequiredService<Core.Metadata.IMetadataRegistry>();
+        var snapshot = await metadataRegistry.GetSnapshotAsync(context.RequestAborted);
+
+        // Find WMS service and its layers
+        var wmsService = snapshot.Services.FirstOrDefault(s =>
+            string.Equals(s.Id, "wms", StringComparison.OrdinalIgnoreCase));
+
+        var layerElements = new System.Text.StringBuilder();
+
+        if (wmsService != null)
+        {
+            foreach (var layer in wmsService.Layers)
+            {
+                var crs = layer.Crs.FirstOrDefault() ?? "EPSG:4326";
+                layerElements.AppendLine($"""
+                    <Layer>
+                      <Name>{layer.Id}</Name>
+                      <Title>{layer.Title}</Title>
+                      <CRS>{crs}</CRS>
+                    </Layer>
+                """);
+            }
+        }
+
+        var capabilities = $"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <WMS_Capabilities version="{config.Version}"
+                xmlns="http://www.opengis.net/wms"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+              <Service>
+                <Name>WMS</Name>
+                <Title>Honua WMS Service (Plugin)</Title>
+              </Service>
+              <Capability>
+                <Request>
+                  <GetCapabilities>
+                    <Format>text/xml</Format>
+                  </GetCapabilities>
+                  <GetMap>
+                    <Format>image/png</Format>
+                  </GetMap>
+                </Request>
+                <Layer>
+                  <Title>Honua Layers</Title>
+                  {layerElements}
+                </Layer>
+              </Capability>
+            </WMS_Capabilities>
+            """;
+
+        context.Response.Headers.CacheControl = $"public, max-age={config.CapabilitiesCacheDuration}";
+
+        return Results.Content(capabilities, "application/xml");
     }
 }
 

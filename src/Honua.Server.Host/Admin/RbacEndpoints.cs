@@ -53,7 +53,7 @@ public static class RbacEndpoints
     }
 
     private static async Task<IResult> GetRoles(
-        IMetadataRegistry registry,
+        [FromServices] IMetadataRegistry registry,
         CancellationToken cancellationToken)
     {
         var snapshot = await registry.GetSnapshotAsync(cancellationToken);
@@ -80,7 +80,7 @@ public static class RbacEndpoints
 
     private static async Task<IResult> GetRole(
         string id,
-        IMetadataRegistry registry,
+        [FromServices] IMetadataRegistry registry,
         CancellationToken cancellationToken)
     {
         var snapshot = await registry.GetSnapshotAsync(cancellationToken);
@@ -107,8 +107,8 @@ public static class RbacEndpoints
 
     private static async Task<IResult> CreateRole(
         [FromBody] CreateRoleRequest request,
-        IMetadataRegistry registry,
-        ILogger<Program> logger,
+        [FromServices] IMetadataRegistry registry,
+        [FromServices] ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         var snapshot = await registry.GetSnapshotAsync(cancellationToken);
@@ -174,8 +174,8 @@ public static class RbacEndpoints
     private static async Task<IResult> UpdateRole(
         string id,
         [FromBody] UpdateRoleRequest request,
-        IMetadataRegistry registry,
-        ILogger<Program> logger,
+        [FromServices] IMetadataRegistry registry,
+        [FromServices] ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         var snapshot = await registry.GetSnapshotAsync(cancellationToken);
@@ -248,8 +248,8 @@ public static class RbacEndpoints
 
     private static async Task<IResult> DeleteRole(
         string id,
-        IMetadataRegistry registry,
-        ILogger<Program> logger,
+        [FromServices] IMetadataRegistry registry,
+        [FromServices] ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         var snapshot = await registry.GetSnapshotAsync(cancellationToken);
@@ -291,7 +291,7 @@ public static class RbacEndpoints
     }
 
     private static async Task<IResult> GetPermissions(
-        IMetadataRegistry registry,
+        [FromServices] IMetadataRegistry registry,
         CancellationToken cancellationToken)
     {
         var snapshot = await registry.GetSnapshotAsync(cancellationToken);
@@ -321,8 +321,8 @@ public static class RbacEndpoints
 
     private static async Task<IResult> CreatePermission(
         [FromBody] CreatePermissionRequest request,
-        IMetadataRegistry registry,
-        ILogger<Program> logger,
+        [FromServices] IMetadataRegistry registry,
+        [FromServices] ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         var snapshot = await registry.GetSnapshotAsync(cancellationToken);

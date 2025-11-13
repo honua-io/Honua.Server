@@ -38,6 +38,7 @@ using Honua.Server.Host.OData;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -75,7 +76,7 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             group.AddEndpointFilter((context, next) => ValueTask.FromResult<object?>(Results.Unauthorized()));
         }
 
-        group.MapPost("/reload", async (IMetadataRegistry registry, HttpContext context) =>
+        group.MapPost("/reload", async ([FromServices] IMetadataRegistry registry, HttpContext context) =>
         {
             try
             {
@@ -102,7 +103,7 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             }
         });
 
-        group.MapPost("/diff", async (HttpRequest request, IMetadataRegistry registry, IMetadataSchemaValidator schemaValidator) =>
+        group.MapPost("/diff", async (HttpRequest request, [FromServices] IMetadataRegistry registry, [FromServices] IMetadataSchemaValidator schemaValidator) =>
         {
             var payload = await ReadBodyAsync(request).ConfigureAwait(false);
             if (payload.IsNullOrWhiteSpace())
@@ -122,7 +123,7 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             return Results.BadRequest(new { error = "The /diff endpoint requires migration to Configuration V2. Use HCL format instead of JSON." });
         });
 
-        group.MapPost("/apply", async (HttpRequest request, HonuaConfig honuaConfig, IMetadataRegistry registry, IMetadataSchemaValidator schemaValidator) =>
+        group.MapPost("/apply", async (HttpRequest request, [FromServices] HonuaConfig honuaConfig, [FromServices] IMetadataRegistry registry, [FromServices] IMetadataSchemaValidator schemaValidator) =>
         {
             var payload = await ReadBodyAsync(request).ConfigureAwait(false);
             if (payload.IsNullOrWhiteSpace())
@@ -266,13 +267,13 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             return Results.Ok(new { status = "applied", warnings = validation.Warnings });
         });
 
-        group.MapGet("/snapshots", async (IMetadataSnapshotStore store, CancellationToken cancellationToken) =>
+        group.MapGet("/snapshots", async ([FromServices] IMetadataSnapshotStore store, CancellationToken cancellationToken) =>
         {
             var snapshots = await store.ListAsync(cancellationToken).ConfigureAwait(false);
             return Results.Ok(new { snapshots });
         });
 
-        group.MapPost("/snapshots", async (SnapshotCreateRequest? request, IMetadataSnapshotStore store, CancellationToken cancellationToken) =>
+        group.MapPost("/snapshots", async (SnapshotCreateRequest? request, [FromServices] IMetadataSnapshotStore store, CancellationToken cancellationToken) =>
         {
             if (quickStartMode)
             {
@@ -291,7 +292,7 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             }
         });
 
-        group.MapGet("/snapshots/{label}", async (string label, IMetadataSnapshotStore store, CancellationToken cancellationToken) =>
+        group.MapGet("/snapshots/{label}", async (string label, [FromServices] IMetadataSnapshotStore store, CancellationToken cancellationToken) =>
         {
             var details = await store.GetAsync(label, cancellationToken).ConfigureAwait(false);
             if (details is null)
@@ -302,7 +303,7 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             return Results.Ok(new { snapshot = details.Descriptor, metadata = details.Metadata });
         });
 
-        group.MapPost("/snapshots/{label}/restore", async (string label, IMetadataSnapshotStore store, IMetadataRegistry registry, HttpRequest request) =>
+        group.MapPost("/snapshots/{label}/restore", async (string label, [FromServices] IMetadataSnapshotStore store, [FromServices] IMetadataRegistry registry, HttpRequest request) =>
         {
             if (quickStartMode)
             {
@@ -344,7 +345,7 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
             }
         });
 
-        group.MapPost("/validate", async (HttpRequest request, HonuaConfig honuaConfig, IMetadataSchemaValidator schemaValidator) =>
+        group.MapPost("/validate", async (HttpRequest request, [FromServices] HonuaConfig honuaConfig, [FromServices] IMetadataSchemaValidator schemaValidator) =>
         {
             var payload = await ReadBodyAsync(request).ConfigureAwait(false);
             if (payload.IsNullOrWhiteSpace())
@@ -377,17 +378,12 @@ internal static class MetadataAdministrationEndpointRouteBuilderExtensions
         // Map layer group endpoints
         group.MapAdminLayerGroupEndpoints();
 
-        // Map feature flag endpoints
-        // group.MapAdminFeatureFlagEndpoints(); // Not yet implemented
-
-        // Map server configuration endpoints (CORS, etc.)
-        group.MapAdminServerEndpoints();
-
-        // Map RBAC endpoints (roles and permissions)
-        group.MapAdminRbacEndpoints();
-
-        // Map alert management endpoints (rules, channels, history, routing)
-        group.MapAdminAlertEndpoints();
+        // NOTE: The following admin endpoints are mapped directly at their respective root paths in EndpointExtensions.cs:
+        // - Alert management endpoints at /admin/alerts
+        // - Server configuration endpoints at /admin/server
+        // - RBAC endpoints at /admin/rbac
+        // - Feature flag endpoints (when implemented)
+        // Do NOT map them here to avoid duplicate endpoint names
 
         return group;
     }

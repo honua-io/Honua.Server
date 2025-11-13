@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Npgsql;
 using Testcontainers.PostgreSql;
 using Testcontainers.MySql;
 using Testcontainers.Redis;
@@ -91,6 +92,10 @@ public sealed class DatabaseFixture : IAsyncLifetime
         {
             await _postgresContainer!.StartAsync();
             PostgresConnectionString = _postgresContainer.GetConnectionString();
+
+            // Initialize database schema and test data
+            await InitializePostgresSchemaAsync();
+
             IsPostgresReady = true;
         }
         catch (Exception ex)
@@ -98,6 +103,50 @@ public sealed class DatabaseFixture : IAsyncLifetime
             Console.WriteLine($"Failed to start PostgreSQL container: {ex.Message}");
             IsPostgresReady = false;
         }
+    }
+
+    private async Task InitializePostgresSchemaAsync()
+    {
+        await using var connection = new NpgsqlConnection(PostgresConnectionString);
+        await connection.OpenAsync();
+
+        // Enable PostGIS extension
+        await using var enablePostgisCmd = new NpgsqlCommand("CREATE EXTENSION IF NOT EXISTS postgis;", connection);
+        await enablePostgisCmd.ExecuteNonQueryAsync();
+
+        // Create features table for testing
+        var createTableSql = @"
+            DROP TABLE IF EXISTS features CASCADE;
+            CREATE TABLE features (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                category VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                geom GEOMETRY(Geometry, 4326)
+            );
+
+            -- Create spatial index
+            CREATE INDEX IF NOT EXISTS idx_features_geom ON features USING GIST(geom);
+        ";
+
+        await using var createTableCmd = new NpgsqlCommand(createTableSql, connection);
+        await createTableCmd.ExecuteNonQueryAsync();
+
+        // Insert test data
+        var insertDataSql = @"
+            INSERT INTO features (name, description, category, geom) VALUES
+            ('Test Point 1', 'A test point feature', 'poi', ST_SetSRID(ST_MakePoint(-122.4194, 37.7749), 4326)),
+            ('Test Point 2', 'Another test point', 'poi', ST_SetSRID(ST_MakePoint(-118.2437, 34.0522), 4326)),
+            ('Test Point 3', 'Third test point', 'landmark', ST_SetSRID(ST_MakePoint(-73.9857, 40.7484), 4326)),
+            ('Test Polygon 1', 'A test polygon', 'boundary', ST_SetSRID(ST_GeomFromText('POLYGON((-122.5 37.5, -122.5 38.0, -122.0 38.0, -122.0 37.5, -122.5 37.5))'), 4326)),
+            ('Test LineString 1', 'A test line', 'road', ST_SetSRID(ST_GeomFromText('LINESTRING(-122.4 37.7, -122.5 37.8, -122.6 37.9)'), 4326));
+        ";
+
+        await using var insertDataCmd = new NpgsqlCommand(insertDataSql, connection);
+        await insertDataCmd.ExecuteNonQueryAsync();
+
+        Console.WriteLine("PostgreSQL test schema and data initialized successfully");
     }
 
     private async Task StartMySqlAsync()

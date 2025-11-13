@@ -14,8 +14,10 @@ namespace Honua.Server.Host.Csw;
 /// </summary>
 public static class CswEndpointExtensions
 {
-    public static IEndpointRouteBuilder MapCswEndpoints(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapCswEndpoints(this IEndpointRouteBuilder endpoints, string? prefix = null)
     {
+        var endpointPrefix = string.IsNullOrEmpty(prefix) ? "" : $"{prefix}-";
+
         var cswGroup = endpoints.MapGroup("/csw")
             .WithTags("CSW")
             .WithMetadata(new EndpointNameMetadata("CSW 2.0.2"))
@@ -23,13 +25,13 @@ public static class CswEndpointExtensions
             // Rate limiting moved to YARP reverse proxy
 
         cswGroup.MapGet("", CswHandlers.HandleAsync)
-            .WithName("CSW-GET")
+            .WithName($"{endpointPrefix}CSW-GET")
             .WithSummary("CSW 2.0.2 GET request handler")
             .Produces(200, contentType: "application/xml")
             .Produces(400, contentType: "application/xml");
 
         cswGroup.MapPost("", CswHandlers.HandleAsync)
-            .WithName("CSW-POST")
+            .WithName($"{endpointPrefix}CSW-POST")
             .WithSummary("CSW 2.0.2 POST request handler")
             .Accepts<string>("application/xml")
             .Accepts<string>("text/xml")

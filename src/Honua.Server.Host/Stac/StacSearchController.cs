@@ -37,7 +37,6 @@ namespace Honua.Server.Host.Stac;
 /// Supports both GET and POST search operations as defined in the STAC API specification.
 /// </remarks>
 [ApiController]
-[Authorize(Policy = "RequireViewer")]
 [Route("v1/stac/search")]
 public sealed class StacSearchController : ControllerBase
 {

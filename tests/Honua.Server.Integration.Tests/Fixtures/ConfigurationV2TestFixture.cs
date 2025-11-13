@@ -7,6 +7,8 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Honua.Server.Core.Configuration.V2;
+using Honua.Server.Core.Stac;
+using Honua.Server.Core.Stac.Storage;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -67,6 +69,23 @@ public class ConfigurationV2TestFixture<TProgram> : WebApplicationFactory<TProgr
     {
         builder.ConfigureAppConfiguration((context, config) =>
         {
+            // Create test appsettings.json to disable STAC (must be loaded early to override defaults)
+            var testAppSettingsPath = Path.Combine(Path.GetTempPath(), $"test-appsettings-{Guid.NewGuid()}.json");
+            var testAppSettings = """
+            {
+              "Honua": {
+                "Services": {
+                  "Stac": {
+                    "Enabled": false,
+                    "Provider": "memory"
+                  }
+                }
+              }
+            }
+            """;
+            File.WriteAllText(testAppSettingsPath, testAppSettings);
+            config.AddJsonFile(testAppSettingsPath, optional: false, reloadOnChange: false);
+
             // Write the configuration to the temporary file
             var interpolatedConfig = InterpolateConnectionStrings(_honuaConfiguration);
             File.WriteAllText(_tempConfigFilePath, interpolatedConfig);
@@ -82,17 +101,28 @@ public class ConfigurationV2TestFixture<TProgram> : WebApplicationFactory<TProgr
             }
 
             // Add environment variable overrides for testing
+            var pluginsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../plugins"));
             var configOverrides = new Dictionary<string, string?>
             {
                 ["HONUA_CONFIG_PATH"] = _tempConfigFilePath,
+                ["Honua:ConfigurationV2:Path"] = _tempConfigFilePath,  // Required by ServiceCollectionExtensions
                 ["HONUA_CONFIG_V2_ENABLED"] = "true",
+                ["honua:plugins:paths:0"] = pluginsPath,  // Fix plugin discovery path
                 ["DATABASE_URL"] = _databaseFixture.PostgresConnectionString,
                 ["MYSQL_URL"] = _databaseFixture.MySqlConnectionString,
                 ["REDIS_URL"] = _databaseFixture.RedisConnectionString,
+                // Configure STAC to disable for tests (STAC is not configured in Configuration V2 HCL)
+                ["Honua:Services:Stac:Enabled"] = "false",
+                ["Honua:Services:Stac:Provider"] = "memory",
                 // Provide legacy fallbacks for compatibility during migration
                 ["ConnectionStrings:DefaultConnection"] = _databaseFixture.PostgresConnectionString,
                 ["ConnectionStrings:MySql"] = _databaseFixture.MySqlConnectionString,
-                ["ConnectionStrings:Redis"] = _databaseFixture.RedisConnectionString
+                ["ConnectionStrings:Redis"] = _databaseFixture.RedisConnectionString,
+                // Authentication configuration - disable enforcement for integration tests
+                ["honua:authentication:enforce"] = "false",
+                ["honua:authentication:mode"] = "QuickStart",
+                ["AllowedHosts"] = "*",
+                ["honua:cors:allowAnyOrigin"] = "true"
             };
 
             config.AddInMemoryCollection(configOverrides);
@@ -108,6 +138,9 @@ public class ConfigurationV2TestFixture<TProgram> : WebApplicationFactory<TProgr
                 // Note: Service registration is now handled by the plugin system
                 // via AddHonuaConfigurationV2() in ConfigurationV2Extensions.cs
             }
+
+            // Override STAC catalog store to use in-memory for tests
+            services.AddSingleton<IStacCatalogStore>(new InMemoryStacCatalogStore());
         });
 
         builder.UseEnvironment("Test");
@@ -128,7 +161,7 @@ public class ConfigurationV2TestFixture<TProgram> : WebApplicationFactory<TProgr
 
     private static string BuildConfiguration(DatabaseFixture databaseFixture, Action<TestConfigurationBuilder> configureBuilder)
     {
-        var builder = new TestConfigurationBuilder();
+        var builder = new TestConfigurationBuilder(databaseFixture);
         configureBuilder(builder);
         return builder.Build();
     }
@@ -164,9 +197,13 @@ public class ConfigurationV2TestFixture<TProgram> : WebApplicationFactory<TProgr
 public class TestConfigurationBuilder
 {
     private readonly StringBuilder _config = new();
+    private readonly DatabaseFixture _databaseFixture;
+    private readonly List<string> _addedServices = new();
 
-    public TestConfigurationBuilder()
+    public TestConfigurationBuilder(DatabaseFixture databaseFixture)
     {
+        _databaseFixture = databaseFixture ?? throw new ArgumentNullException(nameof(databaseFixture));
+
         // Default honua block
         _config.AppendLine("honua {");
         _config.AppendLine("  version     = \"1.0\"");
@@ -179,12 +216,23 @@ public class TestConfigurationBuilder
     /// <summary>
     /// Adds a data source configuration.
     /// </summary>
-    public TestConfigurationBuilder AddDataSource(string id, string provider, string connectionEnvVar = "DATABASE_URL")
+    /// <param name="id">The data source identifier.</param>
+    /// <param name="provider">The provider type (postgresql, mysql, etc.).</param>
+    /// <param name="connectionString">Optional connection string. If not provided, uses the default connection for the provider.</param>
+    public TestConfigurationBuilder AddDataSource(string id, string provider, string? connectionString = null)
     {
+        // Determine which connection string to use based on provider
+        var actualConnectionString = connectionString ?? provider.ToLowerInvariant() switch
+        {
+            "postgresql" => _databaseFixture.PostgresConnectionString,
+            "mysql" => _databaseFixture.MySqlConnectionString,
+            _ => _databaseFixture.PostgresConnectionString // Default to PostgreSQL
+        };
+
         _config.AppendLine($"data_source \"{id}\" {{");
         _config.AppendLine($"  provider   = \"{provider}\"");
-        _config.AppendLine($"  connection = env(\"{connectionEnvVar}\")");
-        _config.AppendLine("  pool {");
+        _config.AppendLine($"  connection = \"{actualConnectionString}\"");
+        _config.AppendLine("  pool = {");
         _config.AppendLine("    min_size = 1");
         _config.AppendLine("    max_size = 5");
         _config.AppendLine("  }");
@@ -198,6 +246,8 @@ public class TestConfigurationBuilder
     /// </summary>
     public TestConfigurationBuilder AddService(string serviceId, Dictionary<string, object>? settings = null)
     {
+        _addedServices.Add(serviceId);
+
         _config.AppendLine($"service \"{serviceId}\" {{");
         _config.AppendLine("  enabled = true");
 
@@ -223,7 +273,14 @@ public class TestConfigurationBuilder
     /// <summary>
     /// Adds a layer configuration.
     /// </summary>
-    public TestConfigurationBuilder AddLayer(string id, string dataSourceRef, string table, string geometryColumn = "geom", string geometryType = "Polygon", int srid = 4326)
+    /// <param name="id">The layer identifier.</param>
+    /// <param name="dataSourceRef">Reference to the data source (e.g., "gis_db").</param>
+    /// <param name="table">The database table name.</param>
+    /// <param name="geometryColumn">The geometry column name (default: "geom").</param>
+    /// <param name="geometryType">The geometry type (default: "Polygon").</param>
+    /// <param name="srid">The SRID (default: 4326).</param>
+    /// <param name="serviceRefs">Optional service references (e.g., ["wfs", "ogc_api"]). If not provided, assigns to all previously added services.</param>
+    public TestConfigurationBuilder AddLayer(string id, string dataSourceRef, string table, string geometryColumn = "geom", string geometryType = "Polygon", int srid = 4326, string[]? serviceRefs = null)
     {
         _config.AppendLine($"layer \"{id}\" {{");
         _config.AppendLine($"  title       = \"{id}\"");
@@ -231,11 +288,20 @@ public class TestConfigurationBuilder
         _config.AppendLine($"  table       = \"{table}\"");
         _config.AppendLine($"  id_field    = \"id\"");
         _config.AppendLine("  introspect_fields = true");
-        _config.AppendLine("  geometry {");
+        _config.AppendLine("  geometry = {");
         _config.AppendLine($"    column = \"{geometryColumn}\"");
         _config.AppendLine($"    type   = \"{geometryType}\"");
         _config.AppendLine($"    srid   = {srid}");
         _config.AppendLine("  }");
+
+        // Add services if specified, or default to all added services
+        var servicesToAssign = serviceRefs ?? _addedServices.ToArray();
+        if (servicesToAssign.Length > 0)
+        {
+            var servicesList = string.Join(", ", servicesToAssign.Select(s => $"\"{s}\""));
+            _config.AppendLine($"  services = [{servicesList}]");
+        }
+
         _config.AppendLine("}");
         _config.AppendLine();
         return this;
@@ -244,11 +310,15 @@ public class TestConfigurationBuilder
     /// <summary>
     /// Adds a Redis cache configuration.
     /// </summary>
-    public TestConfigurationBuilder AddRedisCache(string id = "redis_test", string connectionEnvVar = "REDIS_URL")
+    /// <param name="id">The cache identifier.</param>
+    /// <param name="connectionString">Optional connection string. If not provided, uses the default Redis connection from the fixture.</param>
+    public TestConfigurationBuilder AddRedisCache(string id = "redis_test", string? connectionString = null)
     {
+        var actualConnectionString = connectionString ?? _databaseFixture.RedisConnectionString;
+
         _config.AppendLine($"cache \"{id}\" {{");
         _config.AppendLine("  enabled    = true");
-        _config.AppendLine($"  connection = env(\"{connectionEnvVar}\")");
+        _config.AppendLine($"  connection = \"{actualConnectionString}\"");
         _config.AppendLine("  prefix     = \"test:\"");
         _config.AppendLine("  ttl        = 60");
         _config.AppendLine("}");

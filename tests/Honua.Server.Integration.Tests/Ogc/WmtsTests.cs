@@ -36,7 +36,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetCapabilities");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetCapabilities");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -56,7 +56,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetCapabilities");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetCapabilities");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -77,7 +77,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test-layer&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/png");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test_features_wmts&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/png");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -100,7 +100,7 @@ public class WmtsTests
         foreach (var zoom in zoomLevels)
         {
             // Act
-            var response = await client.GetAsync($"/ogc/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test-layer&TileMatrixSet=WebMercator&TileMatrix={zoom}&TileRow=0&TileCol=0&format=image/png");
+            var response = await client.GetAsync($"/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test_features_wmts&TileMatrixSet=WebMercator&TileMatrix={zoom}&TileRow=0&TileCol=0&format=image/png");
 
             // Assert
             response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -115,7 +115,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test-layer&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/jpeg");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test_features_wmts&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/jpeg");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -129,7 +129,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test-layer&style=default&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/png");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test_features_wmts&style=default&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/png");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -143,7 +143,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test-layer&TileMatrixSet=WebMercator&TileMatrix=999&TileRow=0&TileCol=0&format=image/png");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test_features_wmts&TileMatrixSet=WebMercator&TileMatrix=999&TileRow=0&TileCol=0&format=image/png");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound);
@@ -157,7 +157,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test-layer&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=999999&TileCol=999999&format=image/png");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test_features_wmts&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=999999&TileCol=999999&format=image/png");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound, HttpStatusCode.OK); // Some servers return empty tile
@@ -171,7 +171,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetFeatureInfo&layer=test-layer&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/png&InfoFormat=application/json&I=128&J=128");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetFeatureInfo&layer=test_features_wmts&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/png&InfoFormat=application/json&I=128&J=128");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound, HttpStatusCode.BadRequest);
@@ -185,7 +185,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act - RESTful endpoint format: /tiles/{layer}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}
-        var response = await client.GetAsync("/ogc/tiles/test-layer/WebMercator/0/0/0");
+        var response = await client.GetAsync("/ogc/tiles/test_features_wmts/WebMercator/0/0/0");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -205,7 +205,7 @@ public class WmtsTests
         var datetime = Uri.EscapeDataString(TestDataFixture.SampleDateTimeStart);
 
         // Act
-        var response = await client.GetAsync($"/ogc/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test-layer&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/png&time={datetime}");
+        var response = await client.GetAsync($"/wmts?service=WMTS&version=1.0.0&request=GetTile&layer=test_features_wmts&TileMatrixSet=WebMercator&TileMatrix=0&TileRow=0&TileCol=0&format=image/png&time={datetime}");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -219,7 +219,7 @@ public class WmtsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wmts?service=WMTS&version=1.0.0&request=GetCapabilities");
+        var response = await client.GetAsync("/wmts?service=WMTS&version=1.0.0&request=GetCapabilities");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);

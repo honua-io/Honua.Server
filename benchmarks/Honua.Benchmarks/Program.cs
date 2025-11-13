@@ -26,7 +26,6 @@ public class Program
             .AddExporter(HtmlExporter.Default)
             // Add statistical columns including percentiles
             .AddColumn(StatisticColumn.P95)
-            .AddColumn(new PercentileColumn(PercentileKind.P99))
             // Add memory allocation columns
             .AddColumn(new TagColumn("Memory Leak Check", name => "See Gen0-2 collections"));
 

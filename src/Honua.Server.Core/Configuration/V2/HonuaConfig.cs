@@ -73,6 +73,11 @@ public sealed record class HonuaGlobalSettings
     public string LogLevel { get; init; } = "information";
 
     /// <summary>
+    /// Allowed host headers for this server.
+    /// </summary>
+    public List<string> AllowedHosts { get; init; } = new();
+
+    /// <summary>
     /// CORS configuration.
     /// </summary>
     public CorsSettings? Cors { get; init; }

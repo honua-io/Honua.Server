@@ -36,7 +36,7 @@ public class WfsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wfs?service=WFS&version=2.0.0&request=GetCapabilities");
+        var response = await client.GetAsync("/wfs?service=WFS&version=2.0.0&request=GetCapabilities");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -228,7 +228,7 @@ public class WfsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=test-collection");
+        var response = await client.GetAsync("/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=test_features_wfs");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -249,7 +249,7 @@ public class WfsTests
         var bbox = string.Join(",", TestDataFixture.SampleBbox);
 
         // Act
-        var response = await client.GetAsync($"/ogc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=test-collection&bbox={bbox}");
+        var response = await client.GetAsync($"/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=test_features_wfs&bbox={bbox}");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -263,7 +263,7 @@ public class WfsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=test-collection&count=10");
+        var response = await client.GetAsync("/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=test_features_wfs&count=10");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -277,7 +277,7 @@ public class WfsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wfs?service=WFS&version=2.0.0&request=DescribeFeatureType&typeNames=test-collection");
+        var response = await client.GetAsync("/wfs?service=WFS&version=2.0.0&request=DescribeFeatureType&typeNames=test_features_wfs");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
@@ -296,7 +296,7 @@ public class WfsTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/ogc/wfs?service=WFS&version=2.0.0&request=GetPropertyValue&typeNames=test-collection&valueReference=name");
+        var response = await client.GetAsync("/wfs?service=WFS&version=2.0.0&request=GetPropertyValue&typeNames=test_features_wfs&valueReference=name");
 
         // Assert
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);

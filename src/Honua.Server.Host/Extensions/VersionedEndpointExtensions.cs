@@ -66,6 +66,11 @@ internal static class VersionedEndpointExtensions
             {
                 return service.Enabled;
             }
+            // If Configuration V2 is active but service is not defined, default to disabled
+            if (honuaConfig != null)
+            {
+                return false;
+            }
             return defaultValue;
         }
 
@@ -149,6 +154,11 @@ internal static class VersionedEndpointExtensions
             {
                 return service.Enabled;
             }
+            // If Configuration V2 is active but service is not defined, default to disabled
+            if (honuaConfig != null)
+            {
+                return false;
+            }
             return defaultValue;
         }
 
@@ -164,27 +174,27 @@ internal static class VersionedEndpointExtensions
 
         if (IsServiceEnabled("print", true))
         {
-            group.MapMapFishPrint();
+            group.MapMapFishPrint("v1");
         }
 
         if (IsServiceEnabled("csw", true))
         {
-            group.MapCswEndpoints();
+            group.MapCswEndpoints("v1");
         }
 
         if (IsServiceEnabled("wcs", true))
         {
-            group.MapWcsEndpoints();
+            group.MapWcsEndpoints("v1");
         }
 
         if (IsServiceEnabled("wmts", true))
         {
-            group.MapWmtsEndpoints();
+            group.MapWmtsEndpoints("v1");
         }
 
         if (IsServiceEnabled("zarr", true))
         {
-            group.MapZarrTimeSeriesEndpoints();
+            group.MapZarrTimeSeriesEndpoints("v1");
         }
 
         return group;

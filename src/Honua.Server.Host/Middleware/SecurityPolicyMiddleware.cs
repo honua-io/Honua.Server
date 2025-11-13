@@ -200,9 +200,25 @@ public class SecurityPolicyMiddleware
         }
 
         var first = segments[0];
-        return first.Equals("stac", StringComparison.OrdinalIgnoreCase) ||
-               first.Equals("records", StringComparison.OrdinalIgnoreCase) ||
-               first.Equals("ogc", StringComparison.OrdinalIgnoreCase);
+
+        // Check if first segment is an allow-listed API
+        if (first.Equals("stac", StringComparison.OrdinalIgnoreCase) ||
+            first.Equals("records", StringComparison.OrdinalIgnoreCase) ||
+            first.Equals("ogc", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Handle version-prefixed routes (e.g., /v1/stac/search)
+        if (segments.Length >= 2 && first.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+        {
+            var second = segments[1];
+            return second.Equals("stac", StringComparison.OrdinalIgnoreCase) ||
+                   second.Equals("records", StringComparison.OrdinalIgnoreCase) ||
+                   second.Equals("ogc", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
     }
 }
 

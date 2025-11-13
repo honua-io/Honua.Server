@@ -354,44 +354,53 @@ public sealed class HclMetadataProvider : IMetadataProvider, IReloadableMetadata
                 continue;
             }
 
-            // Determine which service(s) this layer belongs to
-            var serviceId = layer.Services.FirstOrDefault() ?? "default";
-
-            layers.Add(new LayerDefinition
+            // Create one LayerDefinition per service in the services array
+            // This allows a layer to be published to multiple services (e.g., WFS + WMS + WMTS)
+            foreach (var serviceRef in layer.Services)
             {
-                Id = layer.Id,
-                ServiceId = serviceId,
-                Title = layer.Title,
-                Description = layer.Description,
-                GeometryType = layer.Geometry?.Type ?? "Polygon",
-                IdField = layer.IdField,
-                DisplayField = layer.DisplayField,
-                GeometryField = layer.Geometry?.Column ?? "geometry",
-                Crs = new[] { $"EPSG:{layer.Geometry?.Srid ?? 4326}" },
-                Extent = null,
-                Keywords = Array.Empty<string>(),
-                Links = Array.Empty<LinkDefinition>(),
-                Catalog = new CatalogEntryDefinition(),
-                Query = new LayerQueryDefinition(),
-                Editing = LayerEditingDefinition.Disabled,
-                Attachments = LayerAttachmentDefinition.Disabled,
-                Storage = this.BuildLayerStorage(layer),
-                SqlView = null, // Configuration V2 doesn't support SQL views yet
-                Fields = this.BuildFields(layer),
-                ItemType = "feature",
-                DefaultStyleId = null,
-                StyleIds = Array.Empty<string>(),
-                Relationships = Array.Empty<LayerRelationshipDefinition>(),
-                MinScale = null,
-                MaxScale = null,
-                Temporal = LayerTemporalDefinition.Disabled,
-                OpenRosa = null,
-                Iso19115 = null,
-                Stac = null,
-                HasZ = false,
-                HasM = false,
-                ZField = null,
-            });
+                // Clean service reference (e.g., "service.wfs" -> "wfs")
+                var serviceId = ExtractReference(serviceRef);
+
+                // Create a unique layer ID for this service (e.g., "test_features_wfs" for wfs service)
+                // Use the original layer ID if only one service, otherwise append service suffix
+                var layerId = layer.Services.Count == 1 ? layer.Id : $"{layer.Id}_{serviceId}";
+
+                layers.Add(new LayerDefinition
+                {
+                    Id = layerId,
+                    ServiceId = serviceId,
+                    Title = layer.Title,
+                    Description = layer.Description,
+                    GeometryType = layer.Geometry?.Type ?? "Polygon",
+                    IdField = layer.IdField,
+                    DisplayField = layer.DisplayField,
+                    GeometryField = layer.Geometry?.Column ?? "geometry",
+                    Crs = new[] { $"EPSG:{layer.Geometry?.Srid ?? 4326}" },
+                    Extent = null,
+                    Keywords = Array.Empty<string>(),
+                    Links = Array.Empty<LinkDefinition>(),
+                    Catalog = new CatalogEntryDefinition(),
+                    Query = new LayerQueryDefinition(),
+                    Editing = LayerEditingDefinition.Disabled,
+                    Attachments = LayerAttachmentDefinition.Disabled,
+                    Storage = this.BuildLayerStorage(layer),
+                    SqlView = null, // Configuration V2 doesn't support SQL views yet
+                    Fields = this.BuildFields(layer),
+                    ItemType = "feature",
+                    DefaultStyleId = null,
+                    StyleIds = Array.Empty<string>(),
+                    Relationships = Array.Empty<LayerRelationshipDefinition>(),
+                    MinScale = null,
+                    MaxScale = null,
+                    Temporal = LayerTemporalDefinition.Disabled,
+                    OpenRosa = null,
+                    Iso19115 = null,
+                    Stac = null,
+                    HasZ = false,
+                    HasM = false,
+                    ZField = null,
+                });
+            }
         }
 
         return layers.AsReadOnly();
@@ -407,10 +416,14 @@ public sealed class HclMetadataProvider : IMetadataProvider, IReloadableMetadata
     private ServerDefinition BuildServer()
     {
         var cors = _config.Honua.Cors;
+        var allowedHosts = _config.Honua.AllowedHosts;
+
+        // If no allowed hosts are configured, default to "*" for test/development compatibility
+        var hosts = allowedHosts.Count > 0 ? allowedHosts.AsReadOnly() : new List<string> { "*" }.AsReadOnly();
 
         return new ServerDefinition
         {
-            AllowedHosts = Array.Empty<string>(),
+            AllowedHosts = hosts,
             Cors = cors is not null ? new CorsDefinition
             {
                 Enabled = true,
@@ -450,9 +463,16 @@ public sealed class HclMetadataProvider : IMetadataProvider, IReloadableMetadata
         // In Configuration V2, layers reference data sources
         // We need to find a layer that uses this service and get its data source
         var layerForService = _config.Layers.Values
-            .FirstOrDefault(l => l.Services.Contains(service.Id));
+            .FirstOrDefault(l => l.Services.Any(s => ExtractReference(s) == service.Id));
 
-        return layerForService?.DataSource ?? _config.DataSources.Keys.FirstOrDefault() ?? "default";
+        // Clean data source reference (e.g., "data_source.gis_db" -> "gis_db")
+        var dataSourceRef = layerForService?.DataSource;
+        if (!string.IsNullOrWhiteSpace(dataSourceRef))
+        {
+            return ExtractReference(dataSourceRef);
+        }
+
+        return _config.DataSources.Keys.FirstOrDefault() ?? "default";
     }
 
     private OgcServiceDefinition BuildOgcServiceDefinition(ServiceBlock service)
@@ -588,5 +608,20 @@ public sealed class HclMetadataProvider : IMetadataProvider, IReloadableMetadata
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Extract clean reference from reference syntax.
+    /// Examples: "data_source.sqlite-test" -> "sqlite-test", "service.wfs" -> "wfs", "odata" -> "odata"
+    /// </summary>
+    private static string ExtractReference(string reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return reference;
+        }
+
+        var parts = reference.Split('.');
+        return parts.Length > 1 ? parts[^1] : reference;
     }
 }

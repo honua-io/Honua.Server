@@ -29,13 +29,15 @@ public static class ZarrTimeSeriesEndpoints
     /// <summary>
     /// Map Zarr time-series endpoints to the application.
     /// </summary>
-    public static IEndpointRouteBuilder MapZarrTimeSeriesEndpoints(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapZarrTimeSeriesEndpoints(this IEndpointRouteBuilder endpoints, string? prefix = null)
     {
+        var endpointPrefix = string.IsNullOrEmpty(prefix) ? "" : $"{prefix}-";
+
         var group = endpoints.MapGroup("/api/raster/zarr/{datasetId}/timeseries")
             .WithTags("Zarr Time-Series");
 
         group.MapGet("/timesteps", GetTimeSteps)
-            .WithName("GetZarrTimeSteps")
+            .WithName($"{endpointPrefix}GetZarrTimeSteps")
             .WithSummary("Get available timesteps from Zarr dataset")
             .WithDescription("Returns a list of all available timestamps in the Zarr dataset.")
             .Produces<TimeStepsResponse>(StatusCodes.Status200OK)
@@ -43,7 +45,7 @@ public static class ZarrTimeSeriesEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/slice", GetTimeSlice)
-            .WithName("GetZarrTimeSlice")
+            .WithName($"{endpointPrefix}GetZarrTimeSlice")
             .WithSummary("Get a single time slice from Zarr dataset")
             .WithDescription("Retrieves data for a specific timestamp with optional spatial subsetting.")
             .Produces<TimeSliceResponse>(StatusCodes.Status200OK, "application/json")
@@ -53,7 +55,7 @@ public static class ZarrTimeSeriesEndpoints
             .Produces<ProblemDetails>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/range", GetTimeRange)
-            .WithName("GetZarrTimeRange")
+            .WithName($"{endpointPrefix}GetZarrTimeRange")
             .WithSummary("Get time range data from Zarr dataset")
             .WithDescription("Retrieves data for a time range with optional aggregation.")
             .Produces<TimeRangeResponse>(StatusCodes.Status200OK)

@@ -40,7 +40,7 @@ public class StacCatalogTests : ConfigurationV2IntegrationTestBase
             provider   = "postgresql"
             connection = env("DATABASE_URL")
 
-            pool {
+            pool = {
                 min_size = 1
                 max_size = 5
             }
@@ -59,7 +59,7 @@ public class StacCatalogTests : ConfigurationV2IntegrationTestBase
             id_field    = "id"
             introspect_fields = true
 
-            geometry {
+            geometry = {
                 column = "geom"
                 type   = "Polygon"
                 srid   = 4326
@@ -170,7 +170,7 @@ public class StacCatalogTests : ConfigurationV2IntegrationTestBase
         if (response.IsSuccessStatusCode)
         {
             var content = await response.Content.ReadAsStringAsync();
-            content.Should().Contain("stac-api");
+            content.Should().Contain("stacspec.org");
         }
     }
 

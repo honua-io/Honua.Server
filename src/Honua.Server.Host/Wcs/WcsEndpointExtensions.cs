@@ -15,8 +15,10 @@ namespace Honua.Server.Host.Wcs;
 /// </summary>
 public static class WcsEndpointExtensions
 {
-    public static IEndpointRouteBuilder MapWcsEndpoints(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapWcsEndpoints(this IEndpointRouteBuilder endpoints, string? prefix = null)
     {
+        var endpointPrefix = string.IsNullOrEmpty(prefix) ? "" : $"{prefix}-";
+
         var wcsGroup = endpoints.MapGroup("/wcs")
             .WithTags("WCS")
             .WithMetadata(new EndpointNameMetadata("WCS 2.0.1"))
@@ -24,7 +26,7 @@ public static class WcsEndpointExtensions
             // Rate limiting moved to YARP reverse proxy
 
         wcsGroup.MapGet("", WcsHandlers.HandleAsync)
-            .WithName("WCS-GET")
+            .WithName($"{endpointPrefix}WCS-GET")
             .WithSummary("WCS 2.0.1 GET request handler")
             .Produces(200, contentType: "application/xml")
             .Produces(200, contentType: "image/tiff")
@@ -32,7 +34,7 @@ public static class WcsEndpointExtensions
             .Produces(400, contentType: "application/xml");
 
         wcsGroup.MapPost("", WcsHandlers.HandleAsync)
-            .WithName("WCS-POST")
+            .WithName($"{endpointPrefix}WCS-POST")
             .WithSummary("WCS 2.0.1 POST request handler")
             .Produces(200, contentType: "application/xml")
             .Produces(200, contentType: "image/tiff")

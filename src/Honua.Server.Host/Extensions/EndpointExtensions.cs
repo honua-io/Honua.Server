@@ -123,6 +123,11 @@ internal static class EndpointExtensions
             {
                 return service.Enabled;
             }
+            // If Configuration V2 is active but service is not defined, default to disabled
+            if (honuaConfig != null)
+            {
+                return false;
+            }
             return defaultValue;
         }
 
