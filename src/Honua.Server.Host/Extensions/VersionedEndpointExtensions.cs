@@ -216,11 +216,13 @@ internal static class VersionedEndpointExtensions
         // Map alert management endpoints
         group.MapAdminAlertEndpoints();
 
+        // TODO: Re-enable MapAdminFeatureFlagEndpoints when the method is implemented
         // Map feature flag management endpoints
-        _ = ((IEndpointRouteBuilder)group).MapAdminFeatureFlagEndpoints();
+        // _ = ((IEndpointRouteBuilder)group).MapAdminFeatureFlagEndpoints();
 
+        // TODO: Re-enable MapAuditLogEndpoints when the method is implemented
         // Map audit log endpoints
-        _ = ((IEndpointRouteBuilder)group).MapAuditLogEndpoints();
+        // _ = ((IEndpointRouteBuilder)group).MapAuditLogEndpoints();
 
         // Map spatial index diagnostics endpoints
         _ = ((IEndpointRouteBuilder)group).MapSpatialIndexDiagnosticsEndpoints();

@@ -150,41 +150,41 @@ public sealed class UserContext : IUserContext
         var user = httpContext?.User;
 
         // Extract user identity
-        this.isAuthenticated = user?.Identity?.IsAuthenticated ?? false;
+        this._isAuthenticated = user?.Identity?.IsAuthenticated ?? false;
 
-        if (this.isAuthenticated.Value)
+        if (this._isAuthenticated.Value)
         {
             // Extract user ID using the existing helper
-            this.userId = UserIdentityHelper.GetUserIdentifier(user);
+            this._userId = UserIdentityHelper.GetUserIdentifier(user);
 
             // Extract user name from claims
-            this.userName = ExtractUserName(user);
+            this._userName = ExtractUserName(user);
 
             // Extract tenant ID if available
-            this.tenantId = ExtractTenantId(user);
+            this._tenantId = ExtractTenantId(user);
 
             // Extract authentication method
-            this.authenticationMethod = user?.Identity?.AuthenticationType;
+            this._authenticationMethod = user?.Identity?.AuthenticationType;
         }
         else
         {
             // System/unauthenticated operation
-            this.userId = "system";
-            this.userName = null;
-            this.tenantId = null;
-            this.authenticationMethod = null;
+            this._userId = "system";
+            this._userName = null;
+            this._tenantId = null;
+            this._authenticationMethod = null;
         }
 
         // Extract or generate session ID
-        this.sessionId = ExtractOrGenerateSessionId(httpContext);
+        this._sessionId = ExtractOrGenerateSessionId(httpContext);
 
         // Extract IP address (considering forwarded headers)
-        this.ipAddress = ExtractIpAddress(httpContext);
+        this._ipAddress = ExtractIpAddress(httpContext);
 
         // Extract user agent
-        this.userAgent = httpContext?.Request.Headers["User-Agent"].FirstOrDefault();
+        this._userAgent = httpContext?.Request.Headers["User-Agent"].FirstOrDefault();
 
-        this.valuesInitialized = true;
+        this._valuesInitialized = true;
     }
 
     /// <summary>

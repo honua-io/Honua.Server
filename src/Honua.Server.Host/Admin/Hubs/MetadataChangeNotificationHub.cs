@@ -53,7 +53,7 @@ public sealed class MetadataChangeNotificationHub : Hub
     public Task<bool> GetSupportsRealTimeUpdatesAsync()
     {
         // Check if provider implements change notification
-        var supportsMutable = _metadataProvider is IMutableMetadataProvider mutable
+        var supportsMutable = this.metadataProvider is IMutableMetadataProvider mutable
             && (mutable as IMetadataChangeNotifier)?.SupportsChangeNotifications == true;
 
         this.logger.LogDebug("Real-time updates supported: {Supported}", supportsMutable);

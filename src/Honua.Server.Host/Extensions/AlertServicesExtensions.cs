@@ -75,6 +75,6 @@ public sealed class PostgresAlertConfigurationDbConnectionFactory : IAlertConfig
 
     public IDbConnection CreateConnection()
     {
-        return new NpgsqlConnection(_connectionString);
+        return new NpgsqlConnection(this.connectionString);
     }
 }

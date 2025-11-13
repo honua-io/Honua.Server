@@ -250,11 +250,13 @@ internal static class EndpointExtensions
         // Map alert management endpoints
         _ = ((IEndpointRouteBuilder)app).MapAdminAlertEndpoints();
 
+        // TODO: Re-enable MapAdminFeatureFlagEndpoints when the method is implemented
         // Map feature flag management endpoints
-        _ = ((IEndpointRouteBuilder)app).MapAdminFeatureFlagEndpoints();
+        // _ = ((IEndpointRouteBuilder)app).MapAdminFeatureFlagEndpoints();
 
+        // TODO: Re-enable MapAuditLogEndpoints when the method is implemented
         // Map audit log endpoints
-        _ = ((IEndpointRouteBuilder)app).MapAuditLogEndpoints();
+        // _ = ((IEndpointRouteBuilder)app).MapAuditLogEndpoints();
 
         // Map spatial index diagnostics endpoints
         _ = ((IEndpointRouteBuilder)app).MapSpatialIndexDiagnosticsEndpoints();
