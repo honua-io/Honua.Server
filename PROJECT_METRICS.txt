@@ -38,6 +38,9 @@
 │  Test Files                        72      Test Classes              141    │
 │  Test Methods                     791      Test Code Lines        18,940+   │
 │                                                                              │
+│  Test Results                 666/705      Pass Rate                94.5%   │
+│  └─ Core Tests (542 passed, 2 skipped)     Integration (124/161 passed)     │
+│                                                                              │
 │  Coverage Target                  60%      Core Module Target       65%     │
 │  Coverage Tool                    Coverlet + Codecov.io                      │
 │                                                                              │
@@ -196,6 +199,7 @@
 ║                         SUMMARY AT A GLANCE                                  ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  497K+ Lines of Code  │  791 Tests  │  15 Plugins  │  12+ OGC Standards     ║
-║  14+ Databases        │  13+ Formats │  21 Middleware │  6 Auth Methods      ║
-║  .NET 9.0             │  60%+ Coverage Target  │  Multi-Cloud Ready          ║
+║  94.5% Test Pass Rate │  13+ Formats │  21 Middleware │  6 Auth Methods     ║
+║  14+ Databases        │  60%+ Coverage Target  │  Multi-Cloud Ready          ║
+║  .NET 9.0             │  666/705 Tests Passing  │  Enterprise Ready          ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
