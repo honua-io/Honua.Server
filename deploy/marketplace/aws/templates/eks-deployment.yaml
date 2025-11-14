@@ -159,7 +159,150 @@ Parameters:
     Default: ""
     Description: AWS Marketplace Product Code (auto-populated)
 
+  # OAuth/OIDC Configuration (REQUIRED for cloud marketplace)
+  OAuthProvider:
+    Type: String
+    Default: cognito
+    AllowedValues:
+      - cognito
+      - azure-ad
+      - google
+      - okta
+      - auth0
+      - custom
+    Description: |
+      OAuth/OIDC identity provider (REQUIRED for cloud marketplace):
+      - cognito: AWS Cognito (creates new user pool)
+      - azure-ad: Azure Active Directory
+      - google: Google Identity Platform
+      - okta: Okta
+      - auth0: Auth0
+      - custom: Your own OIDC provider
+
+  OAuthDomain:
+    Type: String
+    Default: ""
+    Description: OAuth domain (e.g., your-domain.auth.us-east-1.amazoncognito.com or custom IdP domain)
+
+  OAuthClientId:
+    Type: String
+    Default: ""
+    Description: OAuth Client ID (leave empty to create new Cognito user pool)
+
+  OAuthClientSecret:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: OAuth Client Secret (leave empty for Cognito auto-creation)
+
+  OAuthIssuer:
+    Type: String
+    Default: ""
+    Description: OIDC Issuer URL (required for custom provider, e.g., https://your-domain.okta.com)
+
+  OAuthScopes:
+    Type: String
+    Default: "openid profile email"
+    Description: OAuth scopes to request (space-separated)
+
+Conditions:
+  CreateCognitoUserPool: !Equals [!Ref OAuthProvider, cognito]
+  UseExistingIdP: !Not [!Equals [!Ref OAuthProvider, cognito]]
+
 Resources:
+  # AWS Cognito User Pool (if selected)
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Condition: CreateCognitoUserPool
+    Properties:
+      UserPoolName: !Sub ${ClusterName}-users
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+        - Name: name
+          Required: true
+          Mutable: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Condition: CreateCognitoUserPool
+    Properties:
+      Domain: !Sub ${ClusterName}-${AWS::AccountId}
+      UserPoolId: !Ref CognitoUserPool
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: CreateCognitoUserPool
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: !Sub ${ClusterName}-app
+      GenerateSecret: true
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - openid
+        - profile
+        - email
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - !Sub https://${ClusterName}.${AWS::Region}.elb.amazonaws.com/oauth/callback
+        - http://localhost:8080/oauth/callback  # For local testing
+      LogoutURLs:
+        - !Sub https://${ClusterName}.${AWS::Region}.elb.amazonaws.com/logout
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+
+  CognitoUserPoolClientSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: CreateCognitoUserPool
+    Properties:
+      Name: !Sub ${ClusterName}-cognito-client-secret
+      Description: Cognito User Pool Client Secret
+      SecretString: !Sub |
+        {
+          "clientId": "${CognitoUserPoolClient}",
+          "clientSecret": "${CognitoUserPoolClient.ClientSecret}",
+          "issuer": "https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}",
+          "domain": "${CognitoUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
+        }
+
   # VPC and Networking
   VPC:
     Type: AWS::EC2::VPC

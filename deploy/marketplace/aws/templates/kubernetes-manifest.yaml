@@ -57,6 +57,20 @@ data:
   # License configuration
   LICENSE_TIER: "${LICENSE_TIER}"
 
+  # OAuth/OIDC Configuration (REQUIRED for cloud marketplace)
+  # Local authentication is DISABLED in cloud deployments for security
+  AUTHENTICATION_LOCAL_ENABLED: "false"
+  AUTHENTICATION_OAUTH_ENABLED: "true"
+  AUTHENTICATION_OAUTH_PROVIDER: "${OAUTH_PROVIDER}"
+  AUTHENTICATION_OAUTH_AUTHORITY: "${OAUTH_ISSUER}"
+  AUTHENTICATION_OAUTH_CLIENT_ID: "${OAUTH_CLIENT_ID}"
+  AUTHENTICATION_OAUTH_SCOPES: "${OAUTH_SCOPES}"
+  AUTHENTICATION_OAUTH_CALLBACK_PATH: "/oauth/callback"
+  AUTHENTICATION_OAUTH_SIGNOUT_PATH: "/logout"
+  # Require OAuth for all endpoints except health checks
+  AUTHENTICATION_REQUIRED: "true"
+  AUTHENTICATION_ALLOW_ANONYMOUS_PATHS: "/healthz/*,/metrics"
+
   # Feature flags based on tier
   FEATURES_ANALYTICS_ENABLED: "true"
   FEATURES_CLOUD_INTEGRATIONS_ENABLED: "true"
@@ -91,6 +105,7 @@ metadata:
 type: Opaque
 stringData:
   database-password: "${DATABASE_PASSWORD}"
+  oauth-client-secret: "${OAUTH_CLIENT_SECRET}"
 
 ---
 apiVersion: apps/v1
