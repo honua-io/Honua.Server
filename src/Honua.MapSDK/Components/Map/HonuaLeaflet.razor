@@ -77,7 +77,6 @@
     private IJSObjectReference? _leafletModule;
     private IJSObjectReference? _mapInstance;
     private DotNetObjectReference<HonuaLeaflet>? _dotNetRef;
-    private bool _isInitialized = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -125,8 +124,6 @@
                 },
                 _dotNetRef
             );
-
-            _isInitialized = true;
 
             // Publish map ready message
             var readyMessage = new MapReadyMessage

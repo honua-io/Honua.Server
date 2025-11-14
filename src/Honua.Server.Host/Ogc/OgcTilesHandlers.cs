@@ -82,6 +82,13 @@ internal static class OgcTilesHandlers
     /// <item>Zoom range (minZoom, maxZoom)</item>
     /// </list>
     /// </remarks>
+    /// <param name="collectionId">The collection identifier (format: "serviceId::layerId").</param>
+    /// <param name="request">The HTTP request.</param>
+    /// <param name="resolver">Service for resolving collection context.</param>
+    /// <param name="rasterRegistry">Registry for raster dataset definitions.</param>
+    /// <param name="cacheHeaderService">Service for generating cache headers and ETags.</param>
+    /// <param name="tilesHandler">Handler for OGC tiles operations.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task<IResult> GetCollectionTileSets(
         string collectionId,
         HttpRequest request,
@@ -594,7 +601,8 @@ internal static class OgcTilesHandlers
             ? datetimeValues.ToString()
             : null;
 
-        if (layer.Temporal.Enabled && datetime.HasValue())
+        // Validate datetime parameter if provided (regardless of whether temporal is enabled)
+        if (datetime.HasValue())
         {
             if (!OgcTemporalParameterValidator.TryValidate(datetime, layer.Temporal, allowFuture: true, out var validatedDatetime, out var errorMessage))
             {

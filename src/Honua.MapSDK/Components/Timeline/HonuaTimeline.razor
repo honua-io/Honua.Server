@@ -359,7 +359,6 @@
     private bool _isPlaying = false;
     private int _playbackDirection = 1; // 1 = forward, -1 = reverse
     private CancellationTokenSource? _playbackCts;
-    private System.Threading.Timer? _playbackTimer;
 
     // Time state
     private DateTime _startTime = DateTime.UtcNow.AddHours(-24);
@@ -476,7 +475,7 @@
         // Listen for map ready messages
         if (!string.IsNullOrEmpty(SyncWith))
         {
-            Bus.Subscribe<MapReadyMessage>(async args =>
+            Bus.Subscribe<MapReadyMessage>(args =>
             {
                 if (args.Message.MapId == SyncWith)
                 {
@@ -485,7 +484,7 @@
             });
 
             // Listen for data loaded messages to extract time extent
-            Bus.Subscribe<DataLoadedMessage>(async args =>
+            Bus.Subscribe<DataLoadedMessage>(args =>
             {
                 if (args.Message.ComponentId == SyncWith || args.Message.Source == SyncWith)
                 {
@@ -609,7 +608,6 @@
 
         _isPlaying = false;
         _playbackCts?.Cancel();
-        _playbackTimer?.Dispose();
 
         await PublishStateChanged();
         StateHasChanged();
@@ -878,7 +876,7 @@
     {
         await Pause();
         _playbackCts?.Dispose();
-        _playbackTimer?.Dispose();
+        // _playbackTimer is not actually used, _playbackCts is used instead
 
         if (_timelineInstance != null)
         {

@@ -192,7 +192,7 @@
         }
     }
 
-    private async Task ToggleLayer()
+    private Task ToggleLayer()
     {
         if (_map != null)
         {
@@ -201,6 +201,7 @@
             _lastEvent = $"Layer {(_layerVisible ? "Shown" : "Hidden")}";
             StateHasChanged();
         }
+        return Task.CompletedTask;
     }
 
     private async Task ChangeStyle()

@@ -139,11 +139,12 @@
         _isDragging = false;
     }
 
-    private async Task OnDrop(DragEventArgs e)
+    private Task OnDrop(DragEventArgs e)
     {
         _isDragging = false;
         // Note: File drop handling would need additional JS interop
         // For now, users can use the file picker
+        return Task.CompletedTask;
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)

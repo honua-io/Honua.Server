@@ -222,11 +222,12 @@
     private IJSObjectReference? _jsModule;
     private DotNetObjectReference<HonuaPopup>? _dotNetRef;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         _closeOnMapClick = CloseOnMapClick;
         SetupSubscriptions();
         _dotNetRef = DotNetObjectReference.Create(this);
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

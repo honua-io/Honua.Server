@@ -490,7 +490,7 @@
     private DotNetObjectReference<HonuaEditor>? _dotNetRef;
     private Dictionary<string, Feature> _tempAttributes = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         SetupSubscriptions();
         _dotNetRef = DotNetObjectReference.Create(this);
@@ -500,6 +500,7 @@
         {
             EditService.SetValidationRules(kvp.Key, kvp.Value);
         }
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

@@ -28,7 +28,7 @@ namespace Honua.Server.Core.Serialization;
 /// </summary>
 public abstract class StreamingFeatureCollectionWriterBase
 {
-    private readonly ILogger _logger;
+    protected readonly ILogger _logger;
 
     /// <summary>
     /// Default batch size for periodic flushing (features processed before flush).

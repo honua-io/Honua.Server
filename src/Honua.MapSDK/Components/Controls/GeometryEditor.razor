@@ -308,73 +308,80 @@
 
     // Advanced Operations
 
-    private async Task SplitGeometry()
+    private Task SplitGeometry()
     {
-        if (SelectedGeometry == null) return;
+        if (SelectedGeometry == null) return Task.CompletedTask;
 
         // Implementation would split the geometry at a selected vertex
         // This requires NetTopologySuite for proper geometry operations
         Console.WriteLine("Split operation not yet implemented");
+        return Task.CompletedTask;
     }
 
-    private async Task MergeGeometries()
+    private Task MergeGeometries()
     {
-        if (SelectedGeometry == null) return;
+        if (SelectedGeometry == null) return Task.CompletedTask;
 
         // Implementation would merge with another selected geometry
         // This requires NetTopologySuite for proper geometry operations
         Console.WriteLine("Merge operation not yet implemented");
+        return Task.CompletedTask;
     }
 
-    private async Task ApplyBuffer()
+    private Task ApplyBuffer()
     {
-        if (SelectedGeometry == null) return;
+        if (SelectedGeometry == null) return Task.CompletedTask;
 
         // Implementation would create a buffer zone around the geometry
         // This requires NetTopologySuite for proper geometry operations
         Console.WriteLine($"Buffer operation not yet implemented (distance: {BufferDistance}m)");
+        return Task.CompletedTask;
     }
 
-    private async Task SimplifyGeometry()
+    private Task SimplifyGeometry()
     {
-        if (SelectedGeometry == null) return;
+        if (SelectedGeometry == null) return Task.CompletedTask;
 
         // Implementation would simplify the geometry using Douglas-Peucker algorithm
         // This requires NetTopologySuite for proper geometry operations
         Console.WriteLine($"Simplify operation not yet implemented (tolerance: {SimplifyTolerance})");
+        return Task.CompletedTask;
     }
 
-    private async Task UnionGeometries()
+    private Task UnionGeometries()
     {
-        if (SelectedGeometry == null) return;
+        if (SelectedGeometry == null) return Task.CompletedTask;
 
         // Implementation would compute union with another geometry
         // This requires NetTopologySuite for proper geometry operations
         Console.WriteLine("Union operation not yet implemented");
+        return Task.CompletedTask;
     }
 
-    private async Task IntersectGeometries()
+    private Task IntersectGeometries()
     {
-        if (SelectedGeometry == null) return;
+        if (SelectedGeometry == null) return Task.CompletedTask;
 
         // Implementation would compute intersection with another geometry
         // This requires NetTopologySuite for proper geometry operations
         Console.WriteLine("Intersect operation not yet implemented");
+        return Task.CompletedTask;
     }
 
-    private async Task DifferenceGeometries()
+    private Task DifferenceGeometries()
     {
-        if (SelectedGeometry == null) return;
+        if (SelectedGeometry == null) return Task.CompletedTask;
 
         // Implementation would compute difference with another geometry
         // This requires NetTopologySuite for proper geometry operations
         Console.WriteLine("Difference operation not yet implemented");
+        return Task.CompletedTask;
     }
 
-    private async Task<bool> ConfirmDelete()
+    private Task<bool> ConfirmDelete()
     {
         // In a real implementation, show a confirmation dialog
-        return true;
+        return Task.FromResult(true);
     }
 
     private void OnGeometrySelected(object? sender, GeometrySelectedEventArgs e)

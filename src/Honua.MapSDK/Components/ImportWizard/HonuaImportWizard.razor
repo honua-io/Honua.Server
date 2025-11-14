@@ -281,7 +281,6 @@
     private int _activeStep = 0;
     private bool _isDialogOpen = false;
     private bool _isProcessing = false;
-    private bool _mapReady = false;
 
     private byte[]? _fileContent;
     private string? _fileName;
@@ -316,7 +315,6 @@
         {
             if (SyncWith == null || args.Message.MapId == SyncWith)
             {
-                _mapReady = true;
                 InvokeAsync(StateHasChanged);
             }
         });

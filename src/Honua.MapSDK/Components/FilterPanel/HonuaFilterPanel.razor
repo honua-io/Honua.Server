@@ -484,6 +484,11 @@
         {
             _temporalField = DefaultDateField;
         }
+
+        // Ensure panels and filter state are properly initialized
+        _ = _spatialExpanded;
+        _ = _attributeExpanded;
+        _ = _temporalExpanded;
     }
 
     private void SetupSubscriptions()

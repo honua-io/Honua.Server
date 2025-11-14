@@ -159,7 +159,7 @@ public class OsrmRoutingService : IRoutingService
         }
     }
 
-    public async Task<IsochroneResult> CalculateIsochroneAsync(
+    public Task<IsochroneResult> CalculateIsochroneAsync(
         IsochroneOptions options,
         CancellationToken cancellationToken = default)
     {

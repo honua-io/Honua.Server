@@ -513,7 +513,7 @@ public partial class HonuaAttributeTable : ComponentBase, IAsyncDisposable
         }
     }
 
-    private async Task HighlightFeatureFromMap(string featureId)
+    private Task HighlightFeatureFromMap(string featureId)
     {
         var feature = _allFeatures.FirstOrDefault(f => f.Id == featureId);
         if (feature != null)
@@ -524,6 +524,7 @@ public partial class HonuaAttributeTable : ComponentBase, IAsyncDisposable
             // Scroll to row in grid if possible
             StateHasChanged();
         }
+        return Task.CompletedTask;
     }
 
     private async Task ZoomToSelected()

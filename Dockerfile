@@ -19,11 +19,14 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
 COPY src/ ./src/
 
 # Build and publish with cache mount (cache mount persists NuGet packages)
+# Disable code analysis to avoid hitting Docker's 2MB log limit with warnings
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet publish src/Honua.Server.Host/Honua.Server.Host.csproj \
     --configuration Release \
     --output /app/publish \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:RunAnalyzers=false \
+    /p:EnforceCodeStyleInBuild=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
