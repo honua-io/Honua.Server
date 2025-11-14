@@ -13,6 +13,42 @@ namespace Honua.Server.Services.Styling;
 /// </summary>
 public class DataAnalyzer
 {
+    // Classification thresholds
+    private const int MaxCategoricalUniqueValues = 12;
+    private const double CategoricalUniqueRatioThreshold = 0.1;
+    private const double UniformDistributionSkewnessThreshold = 0.5;
+
+    // String field categorization
+    private const int MaxStringCategoricalUniqueValues = 50;
+    private const double StringCategoricalRatioThreshold = 0.5;
+    private const int MaxStringCategoriesToDisplay = 12;
+    private const int MaxCategoryCountToReturn = 100;
+
+    // Class count suggestions
+    private const int MinClassCount = 5;
+    private const int DefaultClassCount = 7;
+    private const int MaxTemporalClasses = 10;
+    private const int MaxSuggestedClasses = 10;
+
+    // Sampling limits
+    private const int DataTypeSampleSize = 100;
+    private const int SemanticCategorySampleSize = 100;
+    private const int GeometrySampleSize = 1000;
+    private const int NearestNeighborSampleSize = 100;
+    private const int DateIntervalSampleLimit = 100;
+
+    // Type detection thresholds
+    private const double TypeDetectionConfidenceThreshold = 0.8;
+
+    // Geometry analysis thresholds
+    private const int MinPointsForClustering = 100;
+    private const double DensityThresholdForClustering = 0.001;
+    private const int MinPointsForHeatmap = 1000;
+    private const double DensityThresholdForHeatmap = 0.01;
+
+    // Numeric comparison tolerance
+    private const double NumericComparisonTolerance = 0.0001;
+
     /// <summary>
     /// Analyze a field to determine its characteristics for styling
     /// </summary>
@@ -93,7 +129,7 @@ public class DataAnalyzer
             result.Classification = DataClassification.Diverging;
             result.DivergingMidpoint = 0;
         }
-        else if (result.UniqueCount <= 12 && result.UniqueRatio < 0.1)
+        else if (result.UniqueCount <= MaxCategoricalUniqueValues && result.UniqueRatio < CategoricalUniqueRatioThreshold)
         {
             // Few unique values - treat as categorical
             result.Classification = DataClassification.Categorical;
@@ -106,7 +142,7 @@ public class DataAnalyzer
 
         // Calculate distribution characteristics
         result.Skewness = this.CalculateSkewness(numbers, result.Mean, result.StdDev);
-        result.IsUniformDistribution = Math.Abs(result.Skewness) < 0.5;
+        result.IsUniformDistribution = Math.Abs(result.Skewness) < UniformDistributionSkewnessThreshold;
 
         // Suggest number of classes for classification
         result.SuggestedClasses = this.SuggestClassCount(result.UniqueCount, numbers.Count);
@@ -135,7 +171,7 @@ public class DataAnalyzer
             if (dates.Count > 1)
             {
                 var intervals = new List<TimeSpan>();
-                for (int i = 1; i < Math.Min(dates.Count, 100); i++)
+                for (int i = 1; i < Math.Min(dates.Count, DateIntervalSampleLimit); i++)
                 {
                     intervals.Add(dates[i] - dates[i - 1]);
                 }
@@ -145,7 +181,7 @@ public class DataAnalyzer
             }
         }
 
-        result.SuggestedClasses = Math.Min(result.UniqueCount, 10);
+        result.SuggestedClasses = Math.Min(result.UniqueCount, MaxTemporalClasses);
     }
 
     /// <summary>
@@ -161,17 +197,17 @@ public class DataAnalyzer
         result.MaxStringLength = lengths.Max();
 
         // Check if it's a categorical field
-        if (result.UniqueCount <= 50 && result.UniqueRatio < 0.5)
+        if (result.UniqueCount <= MaxStringCategoricalUniqueValues && result.UniqueRatio < StringCategoricalRatioThreshold)
         {
             result.Classification = DataClassification.Categorical;
             result.IsCategorical = true;
-            result.SuggestedClasses = Math.Min(result.UniqueCount, 12);
+            result.SuggestedClasses = Math.Min(result.UniqueCount, MaxStringCategoriesToDisplay);
 
             // Get category distribution
             result.CategoryCounts = strings
                 .GroupBy(s => s)
                 .OrderByDescending(g => g.Count())
-                .Take(100)
+                .Take(MaxCategoryCountToReturn)
                 .ToDictionary(g => g.Key, g => g.Count());
         }
         else
@@ -192,7 +228,7 @@ public class DataAnalyzer
     {
         if (values.Count == 0) return DataType.Unknown;
 
-        var sample = values.Take(100).ToList();
+        var sample = values.Take(DataTypeSampleSize).ToList();
         var numericCount = 0;
         var dateCount = 0;
         var boolCount = 0;
@@ -239,9 +275,9 @@ public class DataAnalyzer
         }
 
         var total = sample.Count;
-        if (numericCount > total * 0.8) return DataType.Numeric;
-        if (dateCount > total * 0.8) return DataType.DateTime;
-        if (boolCount > total * 0.8) return DataType.Boolean;
+        if (numericCount > total * TypeDetectionConfidenceThreshold) return DataType.Numeric;
+        if (dateCount > total * TypeDetectionConfidenceThreshold) return DataType.DateTime;
+        if (boolCount > total * TypeDetectionConfidenceThreshold) return DataType.Boolean;
 
         return DataType.String;
     }
@@ -251,7 +287,7 @@ public class DataAnalyzer
     /// </summary>
     private SemanticCategory DetectSemanticCategory(List<string> values)
     {
-        var sample = values.Take(100).Select(v => v.ToLowerInvariant()).ToList();
+        var sample = values.Take(SemanticCategorySampleSize).Select(v => v.ToLowerInvariant()).ToList();
 
         // Land use keywords
         var landUseKeywords = new[] { "residential", "commercial", "industrial", "forest", "water", "agriculture", "urban", "rural", "park", "wetland" };
@@ -282,12 +318,12 @@ public class DataAnalyzer
     /// </summary>
     private int SuggestClassCount(int uniqueCount, int totalCount)
     {
-        if (uniqueCount <= 5) return uniqueCount;
-        if (uniqueCount <= 12) return Math.Min(uniqueCount, 7);
+        if (uniqueCount <= MinClassCount) return uniqueCount;
+        if (uniqueCount <= MaxCategoricalUniqueValues) return Math.Min(uniqueCount, DefaultClassCount);
 
         // Use Sturges' formula for larger datasets
         var sturges = (int)Math.Ceiling(Math.Log2(totalCount) + 1);
-        return Math.Clamp(sturges, 5, 10);
+        return Math.Clamp(sturges, MinClassCount, MaxSuggestedClasses);
     }
 
     /// <summary>
@@ -358,7 +394,7 @@ public class DataAnalyzer
         var density = area > 0 ? count / area : 0;
 
         // Calculate average nearest neighbor distance (sample for large datasets)
-        var sampleSize = Math.Min(count, 1000);
+        var sampleSize = Math.Min(count, GeometrySampleSize);
         var sample = points.Take(sampleSize).ToList();
         var avgNearestDistance = this.CalculateAverageNearestNeighbor(sample);
 
@@ -368,8 +404,8 @@ public class DataAnalyzer
             BoundingBox = new[] { minX, minY, maxX, maxY, },
             Density = density,
             AverageNearestNeighborDistance = avgNearestDistance,
-            ShouldCluster = count > 100 && density > 0.001,
-            ShouldUseHeatmap = count > 1000 && density > 0.01,
+            ShouldCluster = count > MinPointsForClustering && density > DensityThresholdForClustering,
+            ShouldUseHeatmap = count > MinPointsForHeatmap && density > DensityThresholdForHeatmap,
         };
 
         return result;
@@ -384,7 +420,7 @@ public class DataAnalyzer
 
         var distances = new List<double>();
 
-        for (int i = 0; i < Math.Min(points.Count, 100); i++)
+        for (int i = 0; i < Math.Min(points.Count, NearestNeighborSampleSize); i++)
         {
             var minDistance = double.MaxValue;
             for (int j = 0; j < points.Count; j++)
