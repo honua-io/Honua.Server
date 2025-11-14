@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
+using System.Buffers;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -9,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Performance;
 using Honua.Server.Core.Utilities;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
@@ -104,8 +106,19 @@ public sealed class WktStreamingWriter : StreamingFeatureCollectionWriterBase
         sb.AppendLine($"# Generated: {DateTime.UtcNow:O}");
         sb.AppendLine();
 
-        var headerBytes = Encoding.UTF8.GetBytes(sb.ToString());
-        await outputStream.WriteAsync(headerBytes, cancellationToken).ConfigureAwait(false);
+        // Use ArrayPool to reduce allocations
+        var text = sb.ToString();
+        var byteCount = Encoding.UTF8.GetByteCount(text);
+        var buffer = ObjectPools.ByteArrayPool.Rent(byteCount);
+        try
+        {
+            var bytesWritten = Encoding.UTF8.GetBytes(text, 0, text.Length, buffer, 0);
+            await outputStream.WriteAsync(buffer.AsMemory(0, bytesWritten), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ObjectPools.ByteArrayPool.Return(buffer);
+        }
     }
 
     protected override Task WriteFeatureSeparatorAsync(
@@ -188,9 +201,19 @@ public sealed class WktStreamingWriter : StreamingFeatureCollectionWriterBase
             sb.AppendLine();
         }
 
-        // Write to stream
-        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-        await outputStream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        // Write to stream using ArrayPool to reduce GC pressure (hot path - called per feature)
+        var text = sb.ToString();
+        var byteCount = Encoding.UTF8.GetByteCount(text);
+        var buffer = ObjectPools.ByteArrayPool.Rent(byteCount);
+        try
+        {
+            var bytesWritten = Encoding.UTF8.GetBytes(text, 0, text.Length, buffer, 0);
+            await outputStream.WriteAsync(buffer.AsMemory(0, bytesWritten), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ObjectPools.ByteArrayPool.Return(buffer);
+        }
     }
 
     protected override async Task WriteFooterAsync(
@@ -212,8 +235,19 @@ public sealed class WktStreamingWriter : StreamingFeatureCollectionWriterBase
         footer.AppendLine($"# numberReturned: {featuresWritten}");
         footer.AppendLine($"# End of collection");
 
-        var footerBytes = Encoding.UTF8.GetBytes(footer.ToString());
-        await outputStream.WriteAsync(footerBytes, cancellationToken).ConfigureAwait(false);
+        // Use ArrayPool to reduce allocations
+        var text = footer.ToString();
+        var byteCount = Encoding.UTF8.GetByteCount(text);
+        var buffer = ObjectPools.ByteArrayPool.Rent(byteCount);
+        try
+        {
+            var bytesWritten = Encoding.UTF8.GetBytes(text, 0, text.Length, buffer, 0);
+            await outputStream.WriteAsync(buffer.AsMemory(0, bytesWritten), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ObjectPools.ByteArrayPool.Return(buffer);
+        }
         await outputStream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 

@@ -21,10 +21,22 @@ public sealed class ODataEdmModelBuilder
     {
         var builder = new ODataConventionModelBuilder();
 
-        // Get metadata snapshot synchronously (we're in DI registration context)
-        var snapshot = metadataRegistry.GetSnapshotAsync(CancellationToken.None)
-            .AsTask()
-            .Result;
+        // Try to get snapshot without blocking first
+        MetadataSnapshot snapshot;
+        if (!metadataRegistry.TryGetSnapshot(out snapshot))
+        {
+            // BLOCKING ASYNC CALL: This is acceptable here because:
+            // 1. We're in OData middleware configuration, which is synchronous by design
+            // 2. This runs during application startup, BEFORE the app starts serving requests
+            // 3. EDM model building is required before OData middleware can be configured
+            // 4. This is one-time initialization, not on the request hot path
+            // 5. The metadata registry should already be initialized by this point in startup
+            // If metadata isn't ready, we must wait for it to complete initialization
+            snapshot = metadataRegistry.GetSnapshotAsync(CancellationToken.None)
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+        }
 
         // Create entity sets for each layer
         foreach (var service in snapshot.Services)

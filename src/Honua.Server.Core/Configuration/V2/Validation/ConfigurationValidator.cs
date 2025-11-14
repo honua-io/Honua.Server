@@ -104,6 +104,11 @@ public sealed class ConfigurationValidator : IConfigurationValidator
     /// <summary>
     /// Validate a configuration file (synchronous).
     /// </summary>
+    /// <remarks>
+    /// BLOCKING ASYNC CALL: This synchronous wrapper is provided for convenience in scenarios
+    /// where async validation is not practical (e.g., CLI tools, build-time validation).
+    /// For server code, prefer using ValidateFileAsync() instead.
+    /// </remarks>
     public static ValidationResult ValidateFile(
         string filePath,
         ValidationOptions? options = null,

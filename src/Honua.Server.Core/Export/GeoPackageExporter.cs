@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Globalization;
@@ -14,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Performance;
 using Honua.Server.Core.Utilities;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -605,41 +607,76 @@ public sealed class GeoPackageExporter : IGeoPackageExporter
         var envelope = geometry.EnvelopeInternal;
         var headerLength = 8;
         var envelopeLength = envelope?.IsNull == false ? 32 : 0;
-        var buffer = new byte[headerLength + envelopeLength + wkb.Length];
+        var totalLength = headerLength + envelopeLength + wkb.Length;
 
-        buffer[0] = (byte)'G';
-        buffer[1] = (byte)'P';
-        buffer[2] = 0;
+        // Use ArrayPool for large geometries to reduce GC pressure (hot path - called per feature)
+        // For small geometries (< 4KB), the overhead of pooling isn't worth it
+        const int poolingThreshold = 4096;
+        byte[]? pooledBuffer = null;
+        byte[] buffer;
 
-        byte flags = 0;
-        if (BitConverter.IsLittleEndian)
+        if (totalLength >= poolingThreshold)
         {
-            flags |= 1;
+            pooledBuffer = ObjectPools.ByteArrayPool.Rent(totalLength);
+            buffer = pooledBuffer;
+        }
+        else
+        {
+            buffer = new byte[totalLength];
         }
 
-        if (envelopeLength > 0)
+        try
         {
-            flags |= (byte)(1 << 1);
+            buffer[0] = (byte)'G';
+            buffer[1] = (byte)'P';
+            buffer[2] = 0;
+
+            byte flags = 0;
+            if (BitConverter.IsLittleEndian)
+            {
+                flags |= 1;
+            }
+
+            if (envelopeLength > 0)
+            {
+                flags |= (byte)(1 << 1);
+            }
+
+            buffer[3] = flags;
+            BitConverter.GetBytes(srid).CopyTo(buffer, 4);
+
+            var offset = headerLength;
+            if (envelopeLength > 0 && envelope is not null)
+            {
+                BitConverter.GetBytes(envelope.MinX).CopyTo(buffer, offset);
+                offset += 8;
+                BitConverter.GetBytes(envelope.MinY).CopyTo(buffer, offset);
+                offset += 8;
+                BitConverter.GetBytes(envelope.MaxX).CopyTo(buffer, offset);
+                offset += 8;
+                BitConverter.GetBytes(envelope.MaxY).CopyTo(buffer, offset);
+                offset += 8;
+            }
+
+            Buffer.BlockCopy(wkb, 0, buffer, offset, wkb.Length);
+
+            // If using pooled buffer, create exact-sized result and return pool buffer
+            if (pooledBuffer is not null)
+            {
+                var result = new byte[totalLength];
+                Buffer.BlockCopy(buffer, 0, result, 0, totalLength);
+                return result;
+            }
+
+            return buffer;
         }
-
-        buffer[3] = flags;
-        BitConverter.GetBytes(srid).CopyTo(buffer, 4);
-
-        var offset = headerLength;
-        if (envelopeLength > 0 && envelope is not null)
+        finally
         {
-            BitConverter.GetBytes(envelope.MinX).CopyTo(buffer, offset);
-            offset += 8;
-            BitConverter.GetBytes(envelope.MinY).CopyTo(buffer, offset);
-            offset += 8;
-            BitConverter.GetBytes(envelope.MaxX).CopyTo(buffer, offset);
-            offset += 8;
-            BitConverter.GetBytes(envelope.MaxY).CopyTo(buffer, offset);
-            offset += 8;
+            if (pooledBuffer is not null)
+            {
+                ObjectPools.ByteArrayPool.Return(pooledBuffer);
+            }
         }
-
-        Buffer.BlockCopy(wkb, 0, buffer, offset, wkb.Length);
-        return buffer;
     }
 
     private sealed class InsertCommandBinder : IDisposable

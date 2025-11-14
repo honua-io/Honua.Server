@@ -254,7 +254,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
         return new FileStreamResult(export.Content, "application/zip") { FileDownloadName = export.FileName };
     }
 
-    public Task<IActionResult> ExportEmptyKmlAsync(
+    public async Task<IActionResult> ExportEmptyKmlAsync(
         CatalogServiceView serviceView,
         CatalogLayerView layerView,
         GeoservicesRESTQueryContext context)
@@ -262,7 +262,7 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
         var layer = layerView.Layer;
         var service = serviceView.Service;
         var collectionId = BuildCollectionIdentifier(service.Id, layer.Id);
-        var style = ResolveDefaultStyleAsync(layer, CancellationToken.None).GetAwaiter().GetResult();
+        var style = await ResolveDefaultStyleAsync(layer, CancellationToken.None).ConfigureAwait(false);
 
         var payload = KmlFeatureFormatter.WriteFeatureCollection(
             collectionId,
@@ -280,12 +280,12 @@ public sealed class GeoservicesExportService : IGeoservicesExportService
             var entryName = BuildKmlEntryName(collectionId);
             var archive = KmzArchiveBuilder.CreateArchive(payload, entryName);
             var downloadName = BuildKmlFileName(collectionId, true);
-            return Task.FromResult<IActionResult>(new FileContentResult(archive, "application/vnd.google-earth.kmz") { FileDownloadName = downloadName });
+            return new FileContentResult(archive, "application/vnd.google-earth.kmz") { FileDownloadName = downloadName };
         }
 
         var bytes = Encoding.UTF8.GetBytes(payload);
         var fileName = BuildKmlFileName(collectionId, false);
-        return Task.FromResult<IActionResult>(new FileContentResult(bytes, "application/vnd.google-earth.kml+xml") { FileDownloadName = fileName });
+        return new FileContentResult(bytes, "application/vnd.google-earth.kml+xml") { FileDownloadName = fileName };
     }
 
     public async Task<IActionResult> ExportEmptyCsvAsync(

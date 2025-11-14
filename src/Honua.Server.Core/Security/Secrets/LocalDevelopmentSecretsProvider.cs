@@ -379,9 +379,16 @@ public sealed class LocalDevelopmentSecretsProvider : ISecretsProvider
         _logger.LogDebug("Secrets file changed, reloading...");
 
         // Debounce: wait a bit for the file write to complete
-        Task.Delay(100).ContinueWith(_ =>
+        // Use fire-and-forget pattern with proper async handling
+        _ = ReloadSecretsAfterDelayAsync();
+    }
+
+    private async Task ReloadSecretsAfterDelayAsync()
+    {
+        try
         {
-            _lock.Wait();
+            await Task.Delay(100).ConfigureAwait(false);
+            await _lock.WaitAsync().ConfigureAwait(false);
             try
             {
                 LoadSecretsFromFile();
@@ -391,7 +398,11 @@ public sealed class LocalDevelopmentSecretsProvider : ISecretsProvider
             {
                 _lock.Release();
             }
-        });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reload secrets from file");
+        }
     }
 
     public void Dispose()

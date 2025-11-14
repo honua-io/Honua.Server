@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
@@ -186,21 +187,31 @@ internal sealed class FileSystemAttachmentStore : IAttachmentStore
         long totalBytesWritten = 0;
         await using (var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
         {
-            // Copy with size limit enforcement
-            byte[] buffer = new byte[81920];
-            int bytesRead;
-            while ((bytesRead = await content.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            // Use ArrayPool to reduce GC pressure (ASP.NET Core best practice)
+            const int bufferSize = 81920; // 80 KB buffer
+            var buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+            try
             {
-                totalBytesWritten += bytesRead;
-                if (totalBytesWritten > MaxFileSizeBytes)
+                int bytesRead;
+                var bufferMemory = buffer.AsMemory(0, bufferSize);
+                while ((bytesRead = await content.ReadAsync(bufferMemory, cancellationToken).ConfigureAwait(false)) > 0)
                 {
-                    // Clean up partial file
-                    fileStream.Close();
-                    File.Delete(fullPath);
-                    throw new InvalidOperationException($"Attachment exceeds maximum size of {MaxFileSizeBytes / (1024 * 1024)}MB");
-                }
+                    totalBytesWritten += bytesRead;
+                    if (totalBytesWritten > MaxFileSizeBytes)
+                    {
+                        // Clean up partial file
+                        fileStream.Close();
+                        File.Delete(fullPath);
+                        throw new InvalidOperationException($"Attachment exceeds maximum size of {MaxFileSizeBytes / (1024 * 1024)}MB");
+                    }
 
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                // Return buffer to pool (ASP.NET Core best practice for reducing allocations)
+                ArrayPool<byte>.Shared.Return(buffer);
             }
 
             // CRITICAL: Ensure all data is physically written to disk before returning success

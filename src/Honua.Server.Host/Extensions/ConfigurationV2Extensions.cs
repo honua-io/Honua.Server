@@ -72,6 +72,14 @@ public static class ConfigurationV2Extensions
         {
             // Load the configuration file
             logger.LogInformation("Loading Configuration V2 from: {Path}", configPath);
+
+            // BLOCKING ASYNC CALL: This is acceptable here because:
+            // 1. We're in DI registration (ConfigureServices), which is inherently synchronous by ASP.NET Core design
+            // 2. This runs during application startup, BEFORE the app starts serving requests
+            // 3. Configuration loading is required before DI container can be built
+            // 4. This is one-time initialization, not on the request hot path
+            // 5. Microsoft's own configuration providers use similar patterns for startup
+            // See: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/
             var honuaConfig = HonuaConfigLoader.LoadAsync(configPath).GetAwaiter().GetResult();
 
             // Register the loaded configuration as a singleton
@@ -82,7 +90,9 @@ public static class ConfigurationV2Extensions
             var pluginLogger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger<PluginLoader>();
             var pluginLoader = new PluginLoader(pluginLogger, configuration, environment);
 
-            // Load plugins asynchronously (blocking here since we're in ConfigureServices)
+            // BLOCKING ASYNC CALL: This is acceptable here for the same reasons as above.
+            // Plugin loading must complete before DI registration can proceed since plugins
+            // register their own services in the DI container.
             logger.LogInformation("Loading plugins...");
             var pluginLoadResult = pluginLoader.LoadPluginsAsync().GetAwaiter().GetResult();
 
