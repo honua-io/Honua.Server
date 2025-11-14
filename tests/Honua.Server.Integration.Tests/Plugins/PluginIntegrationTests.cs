@@ -360,7 +360,7 @@ service ""wfs"" {
     {
         var mockEnv = new TestHostEnvironment
         {
-            EnvironmentName = "Test",
+            EnvironmentName = "Development",
             ApplicationName = "Honua.Server.Integration.Tests"
         };
         return mockEnv;

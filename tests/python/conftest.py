@@ -215,7 +215,7 @@ def wait_for_service_ready(base_url: str, endpoint: str = "/health", timeout: in
 @pytest.fixture(scope="module")
 def wfs_base_url(honua_api_base_url: str) -> str:
     """Base URL for WFS tests."""
-    return f"{honua_api_base_url}/wfs"
+    return f"{honua_api_base_url}/v1/wfs"
 
 
 @pytest.fixture(scope="module")

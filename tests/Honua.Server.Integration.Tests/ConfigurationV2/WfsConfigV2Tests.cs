@@ -202,7 +202,7 @@ layer ""poi"" {
                     ["enable_complexity_check"] = true,
                     ["enable_streaming_transaction_parser"] = true
                 })
-                .AddLayer("features", "db", "features_table", serviceRefs: new[] { "wfs" });
+                .AddLayer("features", "db", "features", serviceRefs: new[] { "wfs" });
         });
 
         var client = factory.CreateClient();

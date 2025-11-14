@@ -187,6 +187,7 @@ public static class ServiceCollectionExtensions
         services.AddKeyedSingleton<IDataStoreProvider>(SqliteDataStoreProvider.ProviderKey, (_, _) => new SqliteDataStoreProvider());
         services.AddKeyedSingleton<IDataStoreProvider>(DuckDBDataStoreProvider.ProviderKey, (_, _) => new DuckDBDataStoreProvider());
         services.AddKeyedSingleton<IDataStoreProvider>(PostgresDataStoreProvider.ProviderKey, (_, _) => new PostgresDataStoreProvider());
+        services.AddKeyedSingleton<IDataStoreProvider>("postgresql", (_, _) => new PostgresDataStoreProvider()); // Alias for postgis
         services.AddKeyedSingleton<IDataStoreProvider>(SqlServerDataStoreProvider.ProviderKey, (_, _) => new SqlServerDataStoreProvider());
         services.AddKeyedSingleton<IDataStoreProvider>(MySqlDataStoreProvider.ProviderKey, (_, _) => new MySqlDataStoreProvider());
 

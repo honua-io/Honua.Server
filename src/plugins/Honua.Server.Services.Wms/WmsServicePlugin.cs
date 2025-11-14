@@ -99,14 +99,19 @@ public sealed class WmsServicePlugin : IServicePlugin
         IEndpointRouteBuilder endpoints,
         PluginContext context)
     {
-        // NOTE: WMS endpoints are mapped by the built-in WMS handler system
-        // (Honua.Server.Host.Wms.WmsEndpointExtensions.MapWms)
-        // This plugin only provides configuration and service registration.
-        // The plugin endpoint mapping is intentionally skipped to avoid conflicts
-        // with the existing comprehensive WMS implementation.
+        // WMS endpoints are mapped by the built-in versioned endpoint system
+        // (Honua.Server.Host.Extensions.VersionedEndpointExtensions.MapConditionalServiceEndpoints)
+        // which calls Honua.Server.Host.Wms.WmsEndpointExtensions.MapWms
+        //
+        // The plugin system loads this plugin to validate configuration and register services,
+        // but endpoint mapping is handled by the existing endpoint infrastructure to maintain
+        // backward compatibility and avoid conflicts.
+        //
+        // When Configuration V2 is active, the service is enabled via the HonuaConfig check
+        // in MapConditionalServiceEndpoints, which reads from honua:services:wms:enabled
 
         context.Logger.LogInformation(
-            "WMS plugin loaded. Endpoints are mapped by built-in WMS handler system.");
+            "WMS plugin loaded. Endpoints are mapped by built-in versioned endpoint system at /v1/wms");
     }
 
     /// <summary>

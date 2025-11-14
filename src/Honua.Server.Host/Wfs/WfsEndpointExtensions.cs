@@ -2,6 +2,8 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Host.Utilities;
 
@@ -14,7 +16,16 @@ internal static class WfsEndpointExtensions
         Guard.NotNull(endpoints);
 
         var group = endpoints.MapGroup("/wfs");
-        group.RequireAuthorization("RequireViewer");
+
+        // Only require authorization if authentication is enforced
+        var configuration = endpoints.ServiceProvider.GetRequiredService<IConfiguration>();
+        var authEnforced = configuration.GetValue<bool>("honua:authentication:enforce", true);
+
+        if (authEnforced)
+        {
+            group.RequireAuthorization("RequireViewer");
+        }
+
         group.MapGet(string.Empty, WfsHandlers.HandleAsync);
         group.MapPost(string.Empty, WfsHandlers.HandleAsync);
 
