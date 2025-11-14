@@ -128,14 +128,14 @@
     },
     "redisSku": {
       "type": "string",
-      "defaultValue": "Standard",
+      "defaultValue": "Premium",
       "allowedValues": [
         "Basic",
         "Standard",
         "Premium"
       ],
       "metadata": {
-        "description": "SKU for Azure Cache for Redis"
+        "description": "SKU for Azure Cache for Redis (Premium required for HA)"
       }
     },
     "redisCapacity": {
@@ -152,6 +152,24 @@
       ],
       "metadata": {
         "description": "Capacity for Redis cache (0=250MB, 1=1GB, 2=2.5GB, 3=6GB, 4=13GB, 5=26GB, 6=53GB)"
+      }
+    },
+    "redisReplicasPerMaster": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 1,
+      "maxValue": 3,
+      "metadata": {
+        "description": "Number of replicas per master (Premium SKU only)"
+      }
+    },
+    "redisShardCount": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 1,
+      "maxValue": 10,
+      "metadata": {
+        "description": "Number of shards for cluster mode (Premium SKU only)"
       }
     },
     "storageAccountName": {
@@ -360,6 +378,7 @@
       "apiVersion": "2023-08-01",
       "name": "[parameters('redisName')]",
       "location": "[parameters('location')]",
+      "zones": "[if(equals(parameters('redisSku'), 'Premium'), createArray('1', '2', '3'), createArray())]",
       "properties": {
         "sku": {
           "name": "[parameters('redisSku')]",
@@ -370,9 +389,13 @@
         "minimumTlsVersion": "1.2",
         "publicNetworkAccess": "Enabled",
         "redisConfiguration": {
-          "maxmemory-policy": "allkeys-lru"
+          "maxmemory-policy": "allkeys-lru",
+          "maxmemory-reserved": "125",
+          "maxfragmentationmemory-reserved": "125"
         },
-        "redisVersion": "6"
+        "redisVersion": "6",
+        "replicasPerMaster": "[if(equals(parameters('redisSku'), 'Premium'), parameters('redisReplicasPerMaster'), json('null'))]",
+        "shardCount": "[if(equals(parameters('redisSku'), 'Premium'), parameters('redisShardCount'), json('null'))]"
       }
     },
     {

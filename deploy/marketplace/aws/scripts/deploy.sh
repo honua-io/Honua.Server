@@ -194,14 +194,14 @@ deploy_application() {
 
 # Get service endpoint
 get_service_endpoint() {
-    log_info "Retrieving service endpoint..."
+    log_info "Retrieving gateway endpoint..."
 
     # Wait for LoadBalancer to be provisioned
     local max_attempts=30
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        HONUA_URL=$(kubectl get service honua-server -n honua-system \
+        HONUA_URL=$(kubectl get service honua-gateway -n honua-system \
             -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
 
         if [ -n "$HONUA_URL" ]; then
@@ -213,8 +213,12 @@ get_service_endpoint() {
             echo "Cluster Name: $CLUSTER_NAME"
             echo "Region: $AWS_REGION"
             echo "License Tier: $LICENSE_TIER"
-            echo "Service URL: http://$HONUA_URL"
+            echo "Gateway URL: http://$HONUA_URL"
             echo "========================================="
+            echo ""
+            echo "Note: Traffic is routed through the YARP API Gateway"
+            echo "  - Gateway handles: Rate limiting, security headers, load balancing"
+            echo "  - Backend services are not directly exposed"
             return 0
         fi
 
@@ -223,7 +227,7 @@ get_service_endpoint() {
         sleep 10
     done
 
-    log_warn "LoadBalancer endpoint not available yet. Check with: kubectl get service honua-server -n honua-system"
+    log_warn "LoadBalancer endpoint not available yet. Check with: kubectl get service honua-gateway -n honua-system"
 }
 
 # Main deployment flow
