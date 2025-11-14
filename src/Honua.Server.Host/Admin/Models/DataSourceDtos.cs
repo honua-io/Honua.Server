@@ -43,6 +43,9 @@ public sealed class TestConnectionResponse
     public required string Message { get; init; }
     public string? Provider { get; init; }
     public int ConnectionTime { get; init; } // milliseconds
+    public string? ErrorDetails { get; init; }
+    public string? ErrorType { get; init; }
+    public Dictionary<string, object?>? Metadata { get; init; }
 }
 
 /// <summary>

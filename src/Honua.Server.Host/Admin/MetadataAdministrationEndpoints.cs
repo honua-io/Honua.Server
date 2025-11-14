@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -8,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Security;
 using Honua.Server.Host.Admin.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -31,7 +33,7 @@ public static partial class MetadataAdministrationEndpoints
         var group = endpoints.MapGroup("/admin/metadata")
             .WithTags("Admin - Metadata")
             .WithOpenApi()
-            .RequireAuthorization("RequireAdministrator");
+            .RequireAuthorization(AdminAuthorizationPolicies.RequireMetadataAdministrator);
 
         // Dashboard
         group.MapGet("/stats", GetDashboardStats)
@@ -162,21 +164,53 @@ public static partial class MetadataAdministrationEndpoints
 
     private static async Task<IResult> GetDashboardStats(
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         CancellationToken ct)
     {
-        var snapshot = await metadataProvider.LoadAsync(ct);
-
-        var stats = new DashboardStatsResponse
+        try
         {
-            ServiceCount = snapshot.Services.Count,
-            LayerCount = snapshot.Layers.Count,
-            FolderCount = snapshot.Folders.Count,
-            DataSourceCount = snapshot.DataSources.Count,
-            SupportsVersioning = metadataProvider.SupportsVersioning,
-            SupportsRealTimeUpdates = metadataProvider.SupportsChangeNotifications
-        };
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "GetDashboardStats",
+                    reason: "User not authenticated");
 
-        return Results.Ok(stats);
+                return Results.Unauthorized();
+            }
+
+            var snapshot = await metadataProvider.LoadAsync(ct);
+
+            var stats = new DashboardStatsResponse
+            {
+                ServiceCount = snapshot.Services.Count,
+                LayerCount = snapshot.Layers.Count,
+                FolderCount = snapshot.Folders.Count,
+                DataSourceCount = snapshot.DataSources.Count,
+                SupportsVersioning = metadataProvider.SupportsVersioning,
+                SupportsRealTimeUpdates = metadataProvider.SupportsChangeNotifications
+            };
+
+            // Audit logging
+            await auditLoggingService.LogDataAccessAsync(
+                resourceType: "MetadataDashboard",
+                resourceId: "stats",
+                operation: "Read");
+
+            return Results.Ok(stats);
+        }
+        catch (Exception ex)
+        {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "GetDashboardStats",
+                resourceType: "MetadataDashboard",
+                details: "Failed to retrieve dashboard statistics",
+                exception: ex);
+
+            throw;
+        }
     }
 
     #endregion

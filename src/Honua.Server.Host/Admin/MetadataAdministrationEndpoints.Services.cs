@@ -2,10 +2,12 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Security;
 using Honua.Server.Host.Admin.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -23,75 +25,181 @@ public static partial class MetadataAdministrationEndpoints
 
     private static async Task<IResult> GetServices(
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         CancellationToken ct)
     {
-        var snapshot = await metadataProvider.LoadAsync(ct);
-
-        var services = snapshot.Services.Select(s => new ServiceListItem
+        try
         {
-            Id = s.Id,
-            Title = s.Title,
-            FolderId = s.FolderId,
-            ServiceType = s.ServiceType,
-            DataSourceId = s.DataSourceId,
-            Enabled = s.Enabled,
-            LayerCount = s.Layers.Count
-        }).ToList();
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "GetServices",
+                    reason: "User not authenticated");
 
-        return Results.Ok(services);
+                return Results.Unauthorized();
+            }
+
+            var snapshot = await metadataProvider.LoadAsync(ct);
+
+            var services = snapshot.Services.Select(s => new ServiceListItem
+            {
+                Id = s.Id,
+                Title = s.Title,
+                FolderId = s.FolderId,
+                ServiceType = s.ServiceType,
+                DataSourceId = s.DataSourceId,
+                Enabled = s.Enabled,
+                LayerCount = s.Layers.Count
+            }).ToList();
+
+            // Audit logging
+            await auditLoggingService.LogDataAccessAsync(
+                resourceType: "Service",
+                resourceId: "list",
+                operation: "Read");
+
+            return Results.Ok(services);
+        }
+        catch (Exception ex)
+        {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "GetServices",
+                resourceType: "Service",
+                details: "Failed to retrieve services",
+                exception: ex);
+
+            throw;
+        }
     }
 
     private static async Task<IResult> GetServiceById(
         string id,
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         CancellationToken ct)
     {
-        var snapshot = await metadataProvider.LoadAsync(ct);
-        var service = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
-
-        if (service is null)
+        try
         {
-            return Results.Problem(
-                title: "Service not found",
-                statusCode: StatusCodes.Status404NotFound,
-                detail: $"Service with ID '{id}' does not exist");
-        }
-
-        var response = new ServiceResponse
-        {
-            Id = service.Id,
-            Title = service.Title,
-            FolderId = service.FolderId,
-            ServiceType = service.ServiceType,
-            DataSourceId = service.DataSourceId,
-            Description = service.Description,
-            Keywords = service.Keywords.ToList(),
-            Enabled = service.Enabled,
-            LayerCount = service.Layers.Count,
-            OgcOptions = new ServiceOgcOptionsDto
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
             {
-                WfsEnabled = service.Ogc.WfsEnabled,
-                WmsEnabled = service.Ogc.WmsEnabled,
-                WmtsEnabled = service.Ogc.WmtsEnabled,
-                CollectionsEnabled = service.Ogc.CollectionsEnabled,
-                ItemLimit = service.Ogc.ItemLimit,
-                DefaultCrs = service.Ogc.DefaultCrs
-            },
-            CreatedAt = DateTime.UtcNow, // TODO: Get from metadata when available
-            ModifiedAt = null
-        };
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "GetServiceById",
+                    resourceId: id,
+                    reason: "User not authenticated");
 
-        return Results.Ok(response);
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            if (!InputValidationHelpers.IsValidResourceId(id))
+            {
+                return Results.BadRequest("Invalid service ID format");
+            }
+
+            var snapshot = await metadataProvider.LoadAsync(ct);
+            var service = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+
+            if (service is null)
+            {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "GetServiceById",
+                    resourceType: "Service",
+                    resourceId: id,
+                    details: "Service not found");
+
+                return Results.Problem(
+                    title: "Service not found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: $"Service with ID '{id}' does not exist");
+            }
+
+            var response = new ServiceResponse
+            {
+                Id = service.Id,
+                Title = service.Title,
+                FolderId = service.FolderId,
+                ServiceType = service.ServiceType,
+                DataSourceId = service.DataSourceId,
+                Description = service.Description,
+                Keywords = service.Keywords.ToList(),
+                Enabled = service.Enabled,
+                LayerCount = service.Layers.Count,
+                OgcOptions = new ServiceOgcOptionsDto
+                {
+                    WfsEnabled = service.Ogc.WfsEnabled,
+                    WmsEnabled = service.Ogc.WmsEnabled,
+                    WmtsEnabled = service.Ogc.WmtsEnabled,
+                    CollectionsEnabled = service.Ogc.CollectionsEnabled,
+                    ItemLimit = service.Ogc.ItemLimit,
+                    DefaultCrs = service.Ogc.DefaultCrs
+                },
+                CreatedAt = DateTime.UtcNow,
+                ModifiedAt = null
+            };
+
+            // Audit logging
+            await auditLoggingService.LogDataAccessAsync(
+                resourceType: "Service",
+                resourceId: id,
+                operation: "Read");
+
+            return Results.Ok(response);
+        }
+        catch (Exception ex)
+        {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "GetServiceById",
+                resourceType: "Service",
+                resourceId: id,
+                details: "Failed to retrieve service",
+                exception: ex);
+
+            throw;
+        }
     }
 
     private static async Task<IResult> CreateService(
         CreateServiceRequest request,
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "CreateService",
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Id, nameof(request.Id));
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Title, nameof(request.Title));
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Description, nameof(request.Description));
+
+            if (!InputValidationHelpers.IsValidLength(request.Id, minLength: 1, maxLength: 100))
+            {
+                return Results.BadRequest("Service ID must be between 1 and 100 characters");
+            }
+
+            if (!InputValidationHelpers.IsValidLength(request.Title, minLength: 1, maxLength: 200))
+            {
+                return Results.BadRequest("Service title must be between 1 and 200 characters");
+            }
+
             // Load current snapshot
             var snapshot = await metadataProvider.LoadAsync(ct);
 
@@ -160,7 +268,23 @@ public static partial class MetadataAdministrationEndpoints
             // Save atomically
             await metadataProvider.SaveAsync(newSnapshot, ct);
 
-            logger.LogInformation("Created service {ServiceId}", newService.Id);
+            logger.LogInformation("User {UserId} created service {ServiceId}", identity.UserId, newService.Id);
+
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "CreateService",
+                resourceType: "Service",
+                resourceId: newService.Id,
+                details: $"Created service: {newService.Title}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["serviceId"] = newService.Id,
+                    ["serviceTitle"] = newService.Title,
+                    ["serviceType"] = newService.ServiceType,
+                    ["folderId"] = newService.FolderId,
+                    ["dataSourceId"] = newService.DataSourceId,
+                    ["enabled"] = newService.Enabled
+                });
 
             // Return created response
             var response = new ServiceResponse
@@ -191,11 +315,15 @@ public static partial class MetadataAdministrationEndpoints
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "CreateService",
+                resourceType: "Service",
+                resourceId: request.Id,
+                details: "Failed to create service",
+                exception: ex);
+
             logger.LogError(ex, "Failed to create service {ServiceId}", request.Id);
-            return Results.Problem(
-                title: "Internal server error",
-                statusCode: StatusCodes.Status500InternalServerError,
-                detail: "An error occurred while creating the service");
+            throw;
         }
     }
 
@@ -203,11 +331,39 @@ public static partial class MetadataAdministrationEndpoints
         string id,
         UpdateServiceRequest request,
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "UpdateService",
+                    resourceId: id,
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            if (!InputValidationHelpers.IsValidResourceId(id))
+            {
+                return Results.BadRequest("Invalid service ID format");
+            }
+
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Title, nameof(request.Title));
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Description, nameof(request.Description));
+
+            if (!InputValidationHelpers.IsValidLength(request.Title, minLength: 1, maxLength: 200))
+            {
+                return Results.BadRequest("Service title must be between 1 and 200 characters");
+            }
+
             var snapshot = await metadataProvider.LoadAsync(ct);
             var existingService = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
@@ -266,33 +422,77 @@ public static partial class MetadataAdministrationEndpoints
 
             await metadataProvider.SaveAsync(newSnapshot, ct);
 
-            logger.LogInformation("Updated service {ServiceId}", id);
+            logger.LogInformation("User {UserId} updated service {ServiceId}", identity.UserId, id);
+
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "UpdateService",
+                resourceType: "Service",
+                resourceId: id,
+                details: $"Updated service: {updatedService.Title}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["serviceId"] = id,
+                    ["serviceTitle"] = updatedService.Title,
+                    ["folderId"] = updatedService.FolderId,
+                    ["enabled"] = updatedService.Enabled
+                });
 
             return Results.NoContent();
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "UpdateService",
+                resourceType: "Service",
+                resourceId: id,
+                details: "Failed to update service",
+                exception: ex);
+
             logger.LogError(ex, "Failed to update service {ServiceId}", id);
-            return Results.Problem(
-                title: "Internal server error",
-                statusCode: StatusCodes.Status500InternalServerError,
-                detail: "An error occurred while updating the service");
+            throw;
         }
     }
 
     private static async Task<IResult> DeleteService(
         string id,
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "DeleteService",
+                    resourceId: id,
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            if (!InputValidationHelpers.IsValidResourceId(id))
+            {
+                return Results.BadRequest("Invalid service ID format");
+            }
+
             var snapshot = await metadataProvider.LoadAsync(ct);
             var existingService = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
             if (existingService is null)
             {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "DeleteService",
+                    resourceType: "Service",
+                    resourceId: id,
+                    details: "Service not found");
+
                 return Results.Problem(
                     title: "Service not found",
                     statusCode: StatusCodes.Status404NotFound,
@@ -322,47 +522,89 @@ public static partial class MetadataAdministrationEndpoints
 
             await metadataProvider.SaveAsync(newSnapshot, ct);
 
-            logger.LogInformation("Deleted service {ServiceId} and {LayerCount} layers", id, existingService.Layers.Count);
+            logger.LogInformation("User {UserId} deleted service {ServiceId} and {LayerCount} layers",
+                identity.UserId, id, existingService.Layers.Count);
+
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "DeleteService",
+                resourceType: "Service",
+                resourceId: id,
+                details: $"Deleted service: {existingService.Title}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["serviceId"] = id,
+                    ["serviceTitle"] = existingService.Title,
+                    ["layersDeleted"] = existingService.Layers.Count
+                });
 
             return Results.NoContent();
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "DeleteService",
+                resourceType: "Service",
+                resourceId: id,
+                details: "Failed to delete service",
+                exception: ex);
+
             logger.LogError(ex, "Failed to delete service {ServiceId}", id);
-            return Results.Problem(
-                title: "Internal server error",
-                statusCode: StatusCodes.Status500InternalServerError,
-                detail: "An error occurred while deleting the service");
+            throw;
         }
     }
 
     private static async Task<IResult> EnableService(
         string id,
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
-        return await ToggleServiceEnabledState(id, true, metadataProvider, logger, ct);
+        return await ToggleServiceEnabledState(id, true, metadataProvider, userIdentityService, auditLoggingService, logger, ct);
     }
 
     private static async Task<IResult> DisableService(
         string id,
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
-        return await ToggleServiceEnabledState(id, false, metadataProvider, logger, ct);
+        return await ToggleServiceEnabledState(id, false, metadataProvider, userIdentityService, auditLoggingService, logger, ct);
     }
 
     private static async Task<IResult> ToggleServiceEnabledState(
         string id,
         bool enabled,
         [FromServices] IMutableMetadataProvider metadataProvider,
+        IUserIdentityService userIdentityService,
+        IAuditLoggingService auditLoggingService,
         ILogger<MetadataSnapshot> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: enabled ? "EnableService" : "DisableService",
+                    resourceId: id,
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            if (!InputValidationHelpers.IsValidResourceId(id))
+            {
+                return Results.BadRequest("Invalid service ID format");
+            }
+
             var snapshot = await metadataProvider.LoadAsync(ct);
             var existingService = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
@@ -399,17 +641,34 @@ public static partial class MetadataAdministrationEndpoints
 
             await metadataProvider.SaveAsync(newSnapshot, ct);
 
-            logger.LogInformation("{Action} service {ServiceId}", enabled ? "Enabled" : "Disabled", id);
+            logger.LogInformation("User {UserId} {Action} service {ServiceId}",
+                identity.UserId, enabled ? "enabled" : "disabled", id);
+
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: enabled ? "EnableService" : "DisableService",
+                resourceType: "Service",
+                resourceId: id,
+                details: $"{(enabled ? "Enabled" : "Disabled")} service: {existingService.Title}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["serviceId"] = id,
+                    ["enabled"] = enabled
+                });
 
             return Results.Ok(new { Id = id, Enabled = enabled });
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: enabled ? "EnableService" : "DisableService",
+                resourceType: "Service",
+                resourceId: id,
+                details: $"Failed to {(enabled ? "enable" : "disable")} service",
+                exception: ex);
+
             logger.LogError(ex, "Failed to {Action} service {ServiceId}", enabled ? "enable" : "disable", id);
-            return Results.Problem(
-                title: "Internal server error",
-                statusCode: StatusCodes.Status500InternalServerError,
-                detail: $"An error occurred while {(enabled ? "enabling" : "disabling")} the service");
+            throw;
         }
     }
 
@@ -418,15 +677,43 @@ public static partial class MetadataAdministrationEndpoints
         string type,
         HttpContext context,
         [FromServices] IMutableMetadataProvider metadataProvider,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "GetServiceConnectionFile",
+                    resourceId: id,
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            if (!InputValidationHelpers.IsValidResourceId(id))
+            {
+                return Results.BadRequest("Invalid service ID format");
+            }
+
+            InputValidationHelpers.ThrowIfUnsafeInput(type, nameof(type));
+
             var snapshot = await metadataProvider.LoadAsync(ct);
             var service = snapshot.Services.FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
 
             if (service is null)
             {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "GetServiceConnectionFile",
+                    resourceType: "Service",
+                    resourceId: id,
+                    details: "Service not found");
+
                 return Results.Problem(
                     title: "Service not found",
                     statusCode: StatusCodes.Status404NotFound,
@@ -479,6 +766,17 @@ public static partial class MetadataAdministrationEndpoints
                         detail: $"Connection type '{type}' is not supported. Valid types: wms, wfs, qgis, arcgis");
             }
 
+            // Audit logging
+            await auditLoggingService.LogDataAccessAsync(
+                resourceType: "Service",
+                resourceId: id,
+                operation: "DownloadConnectionFile",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["serviceId"] = id,
+                    ["connectionType"] = type
+                });
+
             return Results.File(
                 System.Text.Encoding.UTF8.GetBytes(content),
                 contentType,
@@ -486,10 +784,14 @@ public static partial class MetadataAdministrationEndpoints
         }
         catch (Exception ex)
         {
-            return Results.Problem(
-                title: "Internal server error",
-                statusCode: StatusCodes.Status500InternalServerError,
-                detail: "An error occurred while generating the connection file");
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "GetServiceConnectionFile",
+                resourceType: "Service",
+                resourceId: id,
+                details: "Failed to generate connection file",
+                exception: ex);
+
+            throw;
         }
     }
 

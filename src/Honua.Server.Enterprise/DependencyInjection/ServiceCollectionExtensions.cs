@@ -1,7 +1,9 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using Honua.Server.Core.Data;
+using Honua.Server.Core.Data.ConnectionTesting;
 using Honua.Server.Enterprise.Data.BigQuery;
+using Honua.Server.Enterprise.Data.ConnectionTesting;
 using Honua.Server.Enterprise.Data.CosmosDb;
 using Honua.Server.Enterprise.Data.Elasticsearch;
 using Honua.Server.Enterprise.Data.MongoDB;
@@ -58,6 +60,9 @@ public static class ServiceCollectionExtensions
         services.AddKeyedSingleton<IDataStoreProvider>(
             SnowflakeDataStoreProvider.ProviderKey,
             (_, _) => new SnowflakeDataStoreProvider());
+
+        // Connection testers for enterprise data sources
+        services.AddSingleton<IConnectionTester, MongoDbConnectionTester>();
 
         return services;
     }

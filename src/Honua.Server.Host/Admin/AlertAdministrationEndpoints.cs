@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.AlertReceiver.Data;
 using Honua.Server.AlertReceiver.Services;
+using Honua.Server.Core.Security;
 using Honua.Server.Core.Services;
 using Honua.Server.Host.Admin.Models;
 using Honua.Server.Host.Utilities;
@@ -32,7 +33,7 @@ public static class AlertAdministrationEndpoints
         var group = endpoints.MapGroup("/admin/alerts")
             .WithTags("Admin - Alerts")
             .WithOpenApi()
-            .RequireAuthorization("RequireAdministrator");
+            .RequireAuthorization(AdminAuthorizationPolicies.RequireAlertAdministrator);
 
         // Alert Rules
         group.MapGet("/rules", GetAlertRules)
@@ -192,11 +193,33 @@ public static class AlertAdministrationEndpoints
         CreateAlertRuleRequest request,
         HttpContext context,
         [FromServices] IAlertConfigurationService configService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<AlertRule> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "CreateAlertRule",
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Name, nameof(request.Name));
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Description, nameof(request.Description));
+
+            if (!InputValidationHelpers.IsValidLength(request.Name, minLength: 1, maxLength: 200))
+            {
+                return Results.BadRequest("Rule name must be between 1 and 200 characters");
+            }
+
             // Validate severity
             if (!IsValidSeverity(request.Severity))
             {
@@ -215,12 +238,26 @@ public static class AlertAdministrationEndpoints
                 NotificationChannelIds = request.NotificationChannelIds,
                 Enabled = request.Enabled,
                 Metadata = request.Metadata,
-                CreatedBy = UserIdentityHelper.GetUserIdentifier(context.User)
+                CreatedBy = identity.UserId
             };
 
             var id = await configService.CreateAlertRuleAsync(rule, ct);
 
-            logger.LogInformation("Created alert rule {RuleId}: {RuleName}", id, rule.Name);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "CreateAlertRule",
+                resourceType: "AlertRule",
+                resourceId: id.ToString(),
+                details: $"Created alert rule: {rule.Name}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["ruleName"] = rule.Name,
+                    ["severity"] = request.Severity,
+                    ["enabled"] = request.Enabled,
+                    ["channelCount"] = request.NotificationChannelIds?.Count ?? 0
+                });
+
+            logger.LogInformation("User {UserId} created alert rule {RuleId}: {RuleName}", identity.UserId, id, rule.Name);
 
             var response = new AlertRuleResponse
             {
@@ -240,6 +277,12 @@ public static class AlertAdministrationEndpoints
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "CreateAlertRule",
+                resourceType: "AlertRule",
+                details: "Failed to create alert rule",
+                exception: ex);
+
             logger.LogError(ex, "Failed to create alert rule {RuleName}", request.Name);
             return Results.Problem(
                 title: "Internal server error",
@@ -253,15 +296,44 @@ public static class AlertAdministrationEndpoints
         UpdateAlertRuleRequest request,
         HttpContext context,
         [FromServices] IAlertConfigurationService configService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<AlertRule> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "UpdateAlertRule",
+                    resourceId: id.ToString(),
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Name, nameof(request.Name));
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Description, nameof(request.Description));
+
+            if (!InputValidationHelpers.IsValidLength(request.Name, minLength: 1, maxLength: 200))
+            {
+                return Results.BadRequest("Rule name must be between 1 and 200 characters");
+            }
+
             var existingRule = await configService.GetAlertRuleAsync(id, ct);
 
             if (existingRule is null)
             {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "UpdateAlertRule",
+                    resourceType: "AlertRule",
+                    resourceId: id.ToString(),
+                    details: "Alert rule not found");
+
                 return Results.Problem(
                     title: "Alert rule not found",
                     statusCode: StatusCodes.Status404NotFound,
@@ -287,17 +359,38 @@ public static class AlertAdministrationEndpoints
                 NotificationChannelIds = request.NotificationChannelIds,
                 Enabled = request.Enabled,
                 Metadata = request.Metadata,
-                ModifiedBy = UserIdentityHelper.GetUserIdentifier(context.User)
+                ModifiedBy = identity.UserId
             };
 
             await configService.UpdateAlertRuleAsync(id, updatedRule, ct);
 
-            logger.LogInformation("Updated alert rule {RuleId}: {RuleName}", id, updatedRule.Name);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "UpdateAlertRule",
+                resourceType: "AlertRule",
+                resourceId: id.ToString(),
+                details: $"Updated alert rule: {updatedRule.Name}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["ruleName"] = updatedRule.Name,
+                    ["severity"] = request.Severity,
+                    ["enabled"] = request.Enabled,
+                    ["channelCount"] = request.NotificationChannelIds?.Count ?? 0
+                });
+
+            logger.LogInformation("User {UserId} updated alert rule {RuleId}: {RuleName}", identity.UserId, id, updatedRule.Name);
 
             return Results.NoContent();
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "UpdateAlertRule",
+                resourceType: "AlertRule",
+                resourceId: id.ToString(),
+                details: "Failed to update alert rule",
+                exception: ex);
+
             logger.LogError(ex, "Failed to update alert rule {RuleId}", id);
             return Results.Problem(
                 title: "Internal server error",
@@ -309,15 +402,35 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> DeleteAlertRule(
         long id,
         [FromServices] IAlertConfigurationService configService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<AlertRule> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "DeleteAlertRule",
+                    resourceId: id.ToString(),
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
             var existingRule = await configService.GetAlertRuleAsync(id, ct);
 
             if (existingRule is null)
             {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "DeleteAlertRule",
+                    resourceType: "AlertRule",
+                    resourceId: id.ToString(),
+                    details: "Alert rule not found");
+
                 return Results.Problem(
                     title: "Alert rule not found",
                     statusCode: StatusCodes.Status404NotFound,
@@ -326,12 +439,31 @@ public static class AlertAdministrationEndpoints
 
             await configService.DeleteAlertRuleAsync(id, ct);
 
-            logger.LogInformation("Deleted alert rule {RuleId}: {RuleName}", id, existingRule.Name);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "DeleteAlertRule",
+                resourceType: "AlertRule",
+                resourceId: id.ToString(),
+                details: $"Deleted alert rule: {existingRule.Name}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["ruleName"] = existingRule.Name,
+                    ["ruleId"] = id
+                });
+
+            logger.LogInformation("User {UserId} deleted alert rule {RuleId}: {RuleName}", identity.UserId, id, existingRule.Name);
 
             return Results.NoContent();
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "DeleteAlertRule",
+                resourceType: "AlertRule",
+                resourceId: id.ToString(),
+                details: "Failed to delete alert rule",
+                exception: ex);
+
             logger.LogError(ex, "Failed to delete alert rule {RuleId}", id);
             return Results.Problem(
                 title: "Internal server error",
@@ -346,22 +478,42 @@ public static class AlertAdministrationEndpoints
         [FromServices] IAlertConfigurationService configService,
         [FromServices] INotificationChannelService channelService,
         [FromServices] IAlertPublishingService publishingService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<AlertRule> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "TestAlertRule",
+                    resourceId: id.ToString(),
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
             var rule = await configService.GetAlertRuleAsync(id, ct);
 
             if (rule is null)
             {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "TestAlertRule",
+                    resourceType: "AlertRule",
+                    resourceId: id.ToString(),
+                    details: "Alert rule not found");
+
                 return Results.Problem(
                     title: "Alert rule not found",
                     statusCode: StatusCodes.Status404NotFound,
                     detail: $"Alert rule with ID '{id}' does not exist");
             }
 
-            logger.LogInformation("Testing alert rule {RuleId}: {RuleName}", id, rule.Name);
+            logger.LogInformation("User {UserId} testing alert rule {RuleId}: {RuleName}", identity.UserId, id, rule.Name);
 
             // Get the notification channels for this rule
             var allChannels = await channelService.GetNotificationChannelsAsync(ct);
@@ -371,6 +523,17 @@ public static class AlertAdministrationEndpoints
 
             if (ruleChannels.Count == 0)
             {
+                await auditLoggingService.LogAdminActionAsync(
+                    action: "TestAlertRule",
+                    resourceType: "AlertRule",
+                    resourceId: id.ToString(),
+                    details: $"Test alert rule attempted but no channels configured: {rule.Name}",
+                    additionalData: new Dictionary<string, object>
+                    {
+                        ["ruleName"] = rule.Name,
+                        ["channelCount"] = 0
+                    });
+
                 return Results.Ok(new TestAlertRuleResponse
                 {
                     Success = false,
@@ -382,6 +545,21 @@ public static class AlertAdministrationEndpoints
 
             // Publish test alert to configured channels
             var result = await publishingService.PublishTestAlertAsync(rule, ruleChannels, ct);
+
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "TestAlertRule",
+                resourceType: "AlertRule",
+                resourceId: id.ToString(),
+                details: $"Test alert published for rule: {rule.Name}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["ruleName"] = rule.Name,
+                    ["channelCount"] = ruleChannels.Count,
+                    ["publishSuccess"] = result.Success,
+                    ["publishedChannels"] = result.PublishedChannels.Count,
+                    ["failedChannels"] = result.FailedChannels.Count
+                });
 
             var response = new TestAlertRuleResponse
             {
@@ -395,6 +573,13 @@ public static class AlertAdministrationEndpoints
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "TestAlertRule",
+                resourceType: "AlertRule",
+                resourceId: id.ToString(),
+                details: "Failed to test alert rule",
+                exception: ex);
+
             logger.LogError(ex, "Failed to test alert rule {RuleId}", id);
             return Results.Ok(new TestAlertRuleResponse
             {
@@ -485,11 +670,33 @@ public static class AlertAdministrationEndpoints
         CreateNotificationChannelRequest request,
         HttpContext context,
         [FromServices] INotificationChannelService channelService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "CreateNotificationChannel",
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Name, nameof(request.Name));
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Description, nameof(request.Description));
+
+            if (!InputValidationHelpers.IsValidLength(request.Name, minLength: 1, maxLength: 200))
+            {
+                return Results.BadRequest("Channel name must be between 1 and 200 characters");
+            }
+
             // Validate channel type
             if (!IsValidChannelType(request.Type))
             {
@@ -507,13 +714,26 @@ public static class AlertAdministrationEndpoints
                 Configuration = request.Configuration,
                 Enabled = request.Enabled,
                 SeverityFilter = request.SeverityFilter,
-                CreatedBy = UserIdentityHelper.GetUserIdentifier(context.User)
+                CreatedBy = identity.UserId
             };
 
             var id = await channelService.CreateNotificationChannelAsync(channel, ct);
 
-            logger.LogInformation("Created notification channel {ChannelId}: {ChannelName} ({ChannelType})",
-                id, channel.Name, channel.Type);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "CreateNotificationChannel",
+                resourceType: "NotificationChannel",
+                resourceId: id.ToString(),
+                details: $"Created notification channel: {channel.Name} ({channel.Type})",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["channelName"] = channel.Name,
+                    ["channelType"] = channel.Type,
+                    ["enabled"] = channel.Enabled
+                });
+
+            logger.LogInformation("User {UserId} created notification channel {ChannelId}: {ChannelName} ({ChannelType})",
+                identity.UserId, id, channel.Name, channel.Type);
 
             var response = new NotificationChannelResponse
             {
@@ -532,6 +752,12 @@ public static class AlertAdministrationEndpoints
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "CreateNotificationChannel",
+                resourceType: "NotificationChannel",
+                details: "Failed to create notification channel",
+                exception: ex);
+
             logger.LogError(ex, "Failed to create notification channel {ChannelName}", request.Name);
             return Results.Problem(
                 title: "Internal server error",
@@ -545,15 +771,44 @@ public static class AlertAdministrationEndpoints
         UpdateNotificationChannelRequest request,
         HttpContext context,
         [FromServices] INotificationChannelService channelService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "UpdateNotificationChannel",
+                    resourceId: id.ToString(),
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Name, nameof(request.Name));
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Description, nameof(request.Description));
+
+            if (!InputValidationHelpers.IsValidLength(request.Name, minLength: 1, maxLength: 200))
+            {
+                return Results.BadRequest("Channel name must be between 1 and 200 characters");
+            }
+
             var existingChannel = await channelService.GetNotificationChannelAsync(id, ct);
 
             if (existingChannel is null)
             {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "UpdateNotificationChannel",
+                    resourceType: "NotificationChannel",
+                    resourceId: id.ToString(),
+                    details: "Notification channel not found");
+
                 return Results.Problem(
                     title: "Notification channel not found",
                     statusCode: StatusCodes.Status404NotFound,
@@ -569,17 +824,37 @@ public static class AlertAdministrationEndpoints
                 Configuration = request.Configuration,
                 Enabled = request.Enabled,
                 SeverityFilter = request.SeverityFilter,
-                ModifiedBy = UserIdentityHelper.GetUserIdentifier(context.User)
+                ModifiedBy = identity.UserId
             };
 
             await channelService.UpdateNotificationChannelAsync(id, updatedChannel, ct);
 
-            logger.LogInformation("Updated notification channel {ChannelId}: {ChannelName}", id, updatedChannel.Name);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "UpdateNotificationChannel",
+                resourceType: "NotificationChannel",
+                resourceId: id.ToString(),
+                details: $"Updated notification channel: {updatedChannel.Name} ({updatedChannel.Type})",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["channelName"] = updatedChannel.Name,
+                    ["channelType"] = updatedChannel.Type,
+                    ["enabled"] = updatedChannel.Enabled
+                });
+
+            logger.LogInformation("User {UserId} updated notification channel {ChannelId}: {ChannelName}", identity.UserId, id, updatedChannel.Name);
 
             return Results.NoContent();
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "UpdateNotificationChannel",
+                resourceType: "NotificationChannel",
+                resourceId: id.ToString(),
+                details: "Failed to update notification channel",
+                exception: ex);
+
             logger.LogError(ex, "Failed to update notification channel {ChannelId}", id);
             return Results.Problem(
                 title: "Internal server error",
@@ -591,15 +866,35 @@ public static class AlertAdministrationEndpoints
     private static async Task<IResult> DeleteNotificationChannel(
         long id,
         [FromServices] INotificationChannelService channelService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "DeleteNotificationChannel",
+                    resourceId: id.ToString(),
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
             var existingChannel = await channelService.GetNotificationChannelAsync(id, ct);
 
             if (existingChannel is null)
             {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "DeleteNotificationChannel",
+                    resourceType: "NotificationChannel",
+                    resourceId: id.ToString(),
+                    details: "Notification channel not found");
+
                 return Results.Problem(
                     title: "Notification channel not found",
                     statusCode: StatusCodes.Status404NotFound,
@@ -608,12 +903,32 @@ public static class AlertAdministrationEndpoints
 
             await channelService.DeleteNotificationChannelAsync(id, ct);
 
-            logger.LogInformation("Deleted notification channel {ChannelId}: {ChannelName}", id, existingChannel.Name);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "DeleteNotificationChannel",
+                resourceType: "NotificationChannel",
+                resourceId: id.ToString(),
+                details: $"Deleted notification channel: {existingChannel.Name} ({existingChannel.Type})",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["channelName"] = existingChannel.Name,
+                    ["channelType"] = existingChannel.Type,
+                    ["channelId"] = id
+                });
+
+            logger.LogInformation("User {UserId} deleted notification channel {ChannelId}: {ChannelName}", identity.UserId, id, existingChannel.Name);
 
             return Results.NoContent();
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "DeleteNotificationChannel",
+                resourceType: "NotificationChannel",
+                resourceId: id.ToString(),
+                details: "Failed to delete notification channel",
+                exception: ex);
+
             logger.LogError(ex, "Failed to delete notification channel {ChannelId}", id);
             return Results.Problem(
                 title: "Internal server error",
@@ -627,15 +942,35 @@ public static class AlertAdministrationEndpoints
         TestNotificationChannelRequest? request,
         [FromServices] INotificationChannelService channelService,
         [FromServices] IAlertPublishingService publishingService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<NotificationChannel> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "TestNotificationChannel",
+                    resourceId: id.ToString(),
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
             var channel = await channelService.GetNotificationChannelAsync(id, ct);
 
             if (channel is null)
             {
+                await auditLoggingService.LogAdminActionFailureAsync(
+                    action: "TestNotificationChannel",
+                    resourceType: "NotificationChannel",
+                    resourceId: id.ToString(),
+                    details: "Notification channel not found");
+
                 return Results.Problem(
                     title: "Notification channel not found",
                     statusCode: StatusCodes.Status404NotFound,
@@ -644,6 +979,18 @@ public static class AlertAdministrationEndpoints
 
             if (!channel.Enabled)
             {
+                await auditLoggingService.LogAdminActionAsync(
+                    action: "TestNotificationChannel",
+                    resourceType: "NotificationChannel",
+                    resourceId: id.ToString(),
+                    details: $"Test notification channel attempted but channel disabled: {channel.Name}",
+                    additionalData: new Dictionary<string, object>
+                    {
+                        ["channelName"] = channel.Name,
+                        ["channelType"] = channel.Type,
+                        ["enabled"] = false
+                    });
+
                 return Results.Ok(new TestNotificationChannelResponse
                 {
                     Success = false,
@@ -652,11 +999,25 @@ public static class AlertAdministrationEndpoints
                 });
             }
 
-            logger.LogInformation("Testing notification channel {ChannelId}: {ChannelName} ({ChannelType})",
-                id, channel.Name, channel.Type);
+            logger.LogInformation("User {UserId} testing notification channel {ChannelId}: {ChannelName} ({ChannelType})",
+                identity.UserId, id, channel.Name, channel.Type);
 
             // Test the notification channel
             var result = await publishingService.TestNotificationChannelAsync(channel, ct);
+
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "TestNotificationChannel",
+                resourceType: "NotificationChannel",
+                resourceId: id.ToString(),
+                details: $"Test notification sent for channel: {channel.Name} ({channel.Type})",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["channelName"] = channel.Name,
+                    ["channelType"] = channel.Type,
+                    ["testSuccess"] = result.Success,
+                    ["latencyMs"] = result.LatencyMs ?? 0
+                });
 
             var response = new TestNotificationChannelResponse
             {
@@ -669,6 +1030,13 @@ public static class AlertAdministrationEndpoints
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "TestNotificationChannel",
+                resourceType: "NotificationChannel",
+                resourceId: id.ToString(),
+                details: "Failed to test notification channel",
+                exception: ex);
+
             logger.LogError(ex, "Failed to test notification channel {ChannelId}", id);
             return Results.Ok(new TestNotificationChannelResponse
             {
@@ -752,17 +1120,34 @@ public static class AlertAdministrationEndpoints
         long id,
         AcknowledgeAlertRequest request,
         [FromServices] IAlertHistoryStore historyStore,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<AlertHistoryEntry> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "AcknowledgeAlert",
+                    resourceId: id.ToString(),
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Comment, nameof(request.Comment));
+
             // TODO: Get alert by ID first
             // For now, return not implemented
             var acknowledgement = new AlertAcknowledgement
             {
                 Fingerprint = "unknown", // TODO: Get from alert
-                AcknowledgedBy = request.AcknowledgedBy,
+                AcknowledgedBy = identity.UserId,
                 AcknowledgedAt = DateTimeOffset.UtcNow,
                 Comment = request.Comment,
                 ExpiresAt = request.ExpiresAt
@@ -770,12 +1155,32 @@ public static class AlertAdministrationEndpoints
 
             await historyStore.InsertAcknowledgementAsync(acknowledgement, ct);
 
-            logger.LogInformation("Acknowledged alert {AlertId} by {User}", id, request.AcknowledgedBy);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "AcknowledgeAlert",
+                resourceType: "Alert",
+                resourceId: id.ToString(),
+                details: $"Alert acknowledged by {identity.UserId}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["alertId"] = id,
+                    ["comment"] = request.Comment ?? string.Empty,
+                    ["expiresAt"] = request.ExpiresAt?.ToString() ?? "never"
+                });
+
+            logger.LogInformation("User {UserId} acknowledged alert {AlertId}", identity.UserId, id);
 
             return Results.Ok(new { Message = "Alert acknowledged successfully" });
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "AcknowledgeAlert",
+                resourceType: "Alert",
+                resourceId: id.ToString(),
+                details: "Failed to acknowledge alert",
+                exception: ex);
+
             logger.LogError(ex, "Failed to acknowledge alert {AlertId}", id);
             return Results.Problem(
                 title: "Internal server error",
@@ -788,17 +1193,40 @@ public static class AlertAdministrationEndpoints
         long id,
         SilenceAlertRequest request,
         [FromServices] IAlertHistoryStore historyStore,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<AlertHistoryEntry> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "SilenceAlert",
+                    resourceId: id.ToString(),
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Name, nameof(request.Name));
+            InputValidationHelpers.ThrowIfUnsafeInput(request.Comment, nameof(request.Comment));
+
+            if (!InputValidationHelpers.IsValidLength(request.Name, minLength: 1, maxLength: 200))
+            {
+                return Results.BadRequest("Silencing rule name must be between 1 and 200 characters");
+            }
+
             // TODO: Get alert by ID first to extract matchers
             var silencingRule = new AlertSilencingRule
             {
                 Name = request.Name,
                 Matchers = new Dictionary<string, string>(), // TODO: Extract from alert
-                CreatedBy = request.CreatedBy,
+                CreatedBy = identity.UserId,
                 CreatedAt = DateTimeOffset.UtcNow,
                 StartsAt = request.StartsAt,
                 EndsAt = request.EndsAt,
@@ -808,13 +1236,35 @@ public static class AlertAdministrationEndpoints
 
             var ruleId = await historyStore.InsertSilencingRuleAsync(silencingRule, ct);
 
-            logger.LogInformation("Created silencing rule {RuleId} for alert {AlertId} by {User}",
-                ruleId, id, request.CreatedBy);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "SilenceAlert",
+                resourceType: "AlertSilencingRule",
+                resourceId: ruleId.ToString(),
+                details: $"Created silencing rule for alert {id}: {request.Name}",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["alertId"] = id,
+                    ["ruleName"] = request.Name,
+                    ["ruleId"] = ruleId,
+                    ["startsAt"] = request.StartsAt?.ToString() ?? "now",
+                    ["endsAt"] = request.EndsAt?.ToString() ?? "never"
+                });
+
+            logger.LogInformation("User {UserId} created silencing rule {RuleId} for alert {AlertId}",
+                identity.UserId, ruleId, id);
 
             return Results.Ok(new { Message = "Alert silencing rule created successfully", RuleId = ruleId });
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "SilenceAlert",
+                resourceType: "AlertSilencingRule",
+                resourceId: id.ToString(),
+                details: "Failed to create silencing rule",
+                exception: ex);
+
             logger.LogError(ex, "Failed to silence alert {AlertId}", id);
             return Results.Problem(
                 title: "Internal server error",
@@ -868,11 +1318,39 @@ public static class AlertAdministrationEndpoints
         UpdateAlertRoutingConfigurationRequest request,
         HttpContext context,
         [FromServices] IAlertConfigurationService configService,
+        [FromServices] IUserIdentityService userIdentityService,
+        [FromServices] IAuditLoggingService auditLoggingService,
         [FromServices] ILogger<AlertRoutingConfiguration> logger,
         CancellationToken ct)
     {
         try
         {
+            // Extract user identity
+            var identity = userIdentityService.GetCurrentUserIdentity();
+            if (identity == null)
+            {
+                await auditLoggingService.LogAuthorizationDeniedAsync(
+                    action: "UpdateAlertRouting",
+                    reason: "User not authenticated");
+
+                return Results.Unauthorized();
+            }
+
+            // Input validation for route names
+            foreach (var route in request.Routes)
+            {
+                InputValidationHelpers.ThrowIfUnsafeInput(route.Name, nameof(route.Name));
+                if (!InputValidationHelpers.IsValidLength(route.Name, minLength: 1, maxLength: 200))
+                {
+                    return Results.BadRequest($"Route name '{route.Name}' must be between 1 and 200 characters");
+                }
+            }
+
+            if (request.DefaultRoute != null)
+            {
+                InputValidationHelpers.ThrowIfUnsafeInput(request.DefaultRoute.Name, nameof(request.DefaultRoute.Name));
+            }
+
             var config = new AlertRoutingConfiguration
             {
                 Routes = request.Routes.Select(r => new AlertRoutingRule
@@ -889,18 +1367,37 @@ public static class AlertAdministrationEndpoints
                     NotificationChannelIds = request.DefaultRoute.NotificationChannelIds,
                     Continue = request.DefaultRoute.Continue
                 } : null,
-                ModifiedBy = UserIdentityHelper.GetUserIdentifier(context.User)
+                ModifiedBy = identity.UserId
             };
 
             await configService.UpdateRoutingConfigurationAsync(config, ct);
 
-            logger.LogInformation("Updated alert routing configuration with {RouteCount} routes",
-                config.Routes.Count);
+            // Audit logging
+            await auditLoggingService.LogAdminActionAsync(
+                action: "UpdateAlertRouting",
+                resourceType: "AlertRoutingConfiguration",
+                resourceId: "global",
+                details: $"Updated alert routing configuration with {config.Routes.Count} routes",
+                additionalData: new Dictionary<string, object>
+                {
+                    ["routeCount"] = config.Routes.Count,
+                    ["hasDefaultRoute"] = config.DefaultRoute != null
+                });
+
+            logger.LogInformation("User {UserId} updated alert routing configuration with {RouteCount} routes",
+                identity.UserId, config.Routes.Count);
 
             return Results.NoContent();
         }
         catch (Exception ex)
         {
+            await auditLoggingService.LogAdminActionFailureAsync(
+                action: "UpdateAlertRouting",
+                resourceType: "AlertRoutingConfiguration",
+                resourceId: "global",
+                details: "Failed to update alert routing configuration",
+                exception: ex);
+
             logger.LogError(ex, "Failed to update alert routing configuration");
             return Results.Problem(
                 title: "Internal server error",

@@ -44,6 +44,9 @@ internal static class HonuaHostConfigurationExtensions
         builder.Services.AddHonuaAuthorization(builder.Configuration);
         builder.Services.AddResourceAuthorization(builder.Configuration);
 
+        // Security services (user identity, audit logging, admin authorization)
+        builder.Services.AddHonuaSecurity();
+
         // CORS
         builder.Services.AddHonuaCors();
 

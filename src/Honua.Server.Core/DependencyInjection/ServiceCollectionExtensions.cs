@@ -17,6 +17,7 @@ using Honua.Server.Core.Catalog;
 using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Data.Auth;
+using Honua.Server.Core.Data.ConnectionTesting;
 using Honua.Server.Core.Data.DuckDB;
 using Honua.Server.Core.Data.MySql;
 using Honua.Server.Core.Data.Postgres;
@@ -203,6 +204,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<MySqlSchemaValidator>();
         services.AddSingleton<SqlServerSchemaValidator>();
         services.AddSingleton<SqliteSchemaValidator>();
+
+        // Connection testers for data source validation
+        services.AddSingleton<IConnectionTester, PostgresConnectionTester>();
+        services.AddSingleton<IConnectionTester, MySqlConnectionTester>();
+        services.AddSingleton<IConnectionTester, SqlServerConnectionTester>();
+        services.AddSingleton<ConnectionTesterFactory>();
 
         services.AddSingleton<ISchemaValidatorFactory, SchemaValidatorFactory>();
         services.AddSingleton<ISchemaDiscoveryServiceFactory, SchemaDiscoveryServiceFactory>();
