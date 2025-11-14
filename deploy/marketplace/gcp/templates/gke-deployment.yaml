@@ -1,0 +1,198 @@
+# Google Cloud Marketplace - GKE Deployment Configuration
+# This template deploys Honua IO Server on Google Kubernetes Engine
+
+imports:
+- path: gke-cluster.jinja
+- path: application.jinja
+
+resources:
+# GKE Cluster
+- name: honua-cluster
+  type: gke-cluster.jinja
+  properties:
+    clusterName: ${CLUSTER_NAME}
+    zone: ${ZONE}
+    region: ${REGION}
+    nodeCount: ${NODE_COUNT}
+    machineType: ${MACHINE_TYPE}
+    enableAutoScaling: true
+    minNodeCount: ${MIN_NODE_COUNT}
+    maxNodeCount: ${MAX_NODE_COUNT}
+
+# Cloud SQL PostgreSQL
+- name: honua-database
+  type: gcp-types/sqladmin-v1beta4:instances
+  properties:
+    name: ${DATABASE_NAME}
+    region: ${REGION}
+    databaseVersion: POSTGRES_16
+    settings:
+      tier: ${DATABASE_TIER}
+      dataDiskType: PD_SSD
+      dataDiskSizeGb: ${DATABASE_DISK_SIZE}
+      backupConfiguration:
+        enabled: true
+        pointInTimeRecoveryEnabled: true
+        startTime: "03:00"
+        transactionLogRetentionDays: 7
+        backupRetentionSettings:
+          retainedBackups: 7
+      ipConfiguration:
+        ipv4Enabled: true
+        privateNetwork: $(ref.honua-network.selfLink)
+        requireSsl: true
+      availabilityType: REGIONAL
+      maintenanceWindow:
+        day: 7
+        hour: 4
+      databaseFlags:
+      - name: max_connections
+        value: "200"
+      - name: shared_buffers
+        value: "262144"  # 2GB in 8KB pages
+
+# Cloud SQL Database
+- name: honua-db
+  type: gcp-types/sqladmin-v1beta4:databases
+  properties:
+    name: honua
+    instance: $(ref.honua-database.name)
+    charset: UTF8
+
+# Cloud Memorystore (Redis)
+- name: honua-redis
+  type: gcp-types/redis-v1:instances
+  properties:
+    instanceId: ${REDIS_NAME}
+    tier: ${REDIS_TIER}
+    memorySizeGb: ${REDIS_MEMORY_SIZE}
+    region: ${REGION}
+    redisVersion: REDIS_7_0
+    displayName: Honua Server Redis Cache
+    authorizedNetwork: $(ref.honua-network.selfLink)
+    connectMode: PRIVATE_SERVICE_ACCESS
+    transitEncryptionMode: SERVER_AUTHENTICATION
+    authEnabled: true
+    maintenancePolicy:
+      weeklyMaintenanceWindow:
+      - day: SUNDAY
+        startTime:
+          hours: 4
+          minutes: 0
+
+# VPC Network
+- name: honua-network
+  type: compute.v1.network
+  properties:
+    autoCreateSubnetworks: false
+    routingConfig:
+      routingMode: REGIONAL
+
+# Subnet
+- name: honua-subnet
+  type: compute.v1.subnetwork
+  properties:
+    ipCidrRange: 10.0.0.0/20
+    region: ${REGION}
+    network: $(ref.honua-network.selfLink)
+    privateIpGoogleAccess: true
+    secondaryIpRanges:
+    - rangeName: pods
+      ipCidrRange: 10.4.0.0/14
+    - rangeName: services
+      ipCidrRange: 10.0.16.0/20
+
+# Cloud Storage Bucket
+- name: honua-storage
+  type: storage.v1.bucket
+  properties:
+    name: ${BUCKET_NAME}
+    location: ${REGION}
+    storageClass: STANDARD
+    versioning:
+      enabled: true
+    encryption:
+      defaultKmsKeyName: ""
+    lifecycle:
+      rule:
+      - action:
+          type: Delete
+        condition:
+          numNewerVersions: 3
+    iamConfiguration:
+      uniformBucketLevelAccess:
+        enabled: true
+
+# Service Account for Honua Server
+- name: honua-service-account
+  type: iam.v1.serviceAccount
+  properties:
+    accountId: honua-server
+    displayName: Honua Server Service Account
+
+# IAM Bindings for Service Account
+- name: honua-sa-storage-binding
+  type: gcp-types/cloudresourcemanager-v1:virtual.projects.iamMemberBinding
+  properties:
+    resource: ${PROJECT_ID}
+    role: roles/storage.objectAdmin
+    member: serviceAccount:$(ref.honua-service-account.email)
+
+- name: honua-sa-sql-binding
+  type: gcp-types/cloudresourcemanager-v1:virtual.projects.iamMemberBinding
+  properties:
+    resource: ${PROJECT_ID}
+    role: roles/cloudsql.client
+    member: serviceAccount:$(ref.honua-service-account.email)
+
+- name: honua-sa-secretmanager-binding
+  type: gcp-types/cloudresourcemanager-v1:virtual.projects.iamMemberBinding
+  properties:
+    resource: ${PROJECT_ID}
+    role: roles/secretmanager.secretAccessor
+    member: serviceAccount:$(ref.honua-service-account.email)
+
+# Secret Manager Secret for Database Password
+- name: honua-db-password
+  type: gcp-types/secretmanager-v1:projects.secrets
+  properties:
+    parent: projects/${PROJECT_ID}
+    secretId: honua-database-password
+    replication:
+      automatic: {}
+
+# Secret Manager Secret Version
+- name: honua-db-password-version
+  type: gcp-types/secretmanager-v1:projects.secrets.versions
+  properties:
+    parent: $(ref.honua-db-password.name)
+    payload:
+      data: ${DATABASE_PASSWORD_BASE64}
+
+# Application Deployment
+- name: honua-application
+  type: application.jinja
+  properties:
+    namespace: honua-system
+    replicaCount: ${REPLICA_COUNT}
+    imageTag: ${IMAGE_TAG}
+    databaseHost: $(ref.honua-database.ipAddresses[0].ipAddress)
+    redisHost: $(ref.honua-redis.host)
+    redisPort: $(ref.honua-redis.port)
+    storageBucket: $(ref.honua-storage.name)
+    serviceAccount: $(ref.honua-service-account.email)
+    licenseTier: ${LICENSE_TIER}
+    gcpProjectId: ${PROJECT_ID}
+    marketplaceProductId: ${MARKETPLACE_PRODUCT_ID}
+
+outputs:
+- name: clusterName
+  value: $(ref.honua-cluster.name)
+- name: databaseHost
+  value: $(ref.honua-database.ipAddresses[0].ipAddress)
+- name: redisHost
+  value: $(ref.honua-redis.host)
+- name: storageBucket
+  value: $(ref.honua-storage.name)
+- name: serviceAccountEmail
+  value: $(ref.honua-service-account.email)

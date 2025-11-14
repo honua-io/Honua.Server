@@ -1,0 +1,601 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "Honua IO Server - Azure Marketplace AKS Deployment"
+  },
+  "parameters": {
+    "clusterName": {
+      "type": "string",
+      "defaultValue": "honua-server",
+      "metadata": {
+        "description": "Name of the AKS cluster"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for resources"
+      }
+    },
+    "kubernetesVersion": {
+      "type": "string",
+      "defaultValue": "1.31.1",
+      "allowedValues": [
+        "1.31.1",
+        "1.30.4",
+        "1.29.8"
+      ],
+      "metadata": {
+        "description": "Kubernetes version"
+      }
+    },
+    "nodeCount": {
+      "type": "int",
+      "defaultValue": 2,
+      "minValue": 2,
+      "maxValue": 10,
+      "metadata": {
+        "description": "Number of nodes in the cluster"
+      }
+    },
+    "nodeVmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D4s_v3",
+      "allowedValues": [
+        "Standard_D2s_v3",
+        "Standard_D4s_v3",
+        "Standard_D8s_v3",
+        "Standard_D16s_v3",
+        "Standard_E4s_v3",
+        "Standard_E8s_v3"
+      ],
+      "metadata": {
+        "description": "VM size for cluster nodes"
+      }
+    },
+    "enableAutoScaling": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Enable auto-scaling for the node pool"
+      }
+    },
+    "minNodeCount": {
+      "type": "int",
+      "defaultValue": 2,
+      "minValue": 1,
+      "metadata": {
+        "description": "Minimum number of nodes for auto-scaling"
+      }
+    },
+    "maxNodeCount": {
+      "type": "int",
+      "defaultValue": 10,
+      "minValue": 2,
+      "metadata": {
+        "description": "Maximum number of nodes for auto-scaling"
+      }
+    },
+    "licenseTier": {
+      "type": "string",
+      "defaultValue": "Professional",
+      "allowedValues": [
+        "Free",
+        "Professional",
+        "Enterprise"
+      ],
+      "metadata": {
+        "description": "Honua IO license tier"
+      }
+    },
+    "postgresServerName": {
+      "type": "string",
+      "defaultValue": "[concat(parameters('clusterName'), '-db-', uniqueString(resourceGroup().id))]",
+      "metadata": {
+        "description": "Name of the PostgreSQL server"
+      }
+    },
+    "postgresSku": {
+      "type": "string",
+      "defaultValue": "Standard_D4s_v3",
+      "allowedValues": [
+        "Standard_D2s_v3",
+        "Standard_D4s_v3",
+        "Standard_D8s_v3",
+        "Standard_D16s_v3"
+      ],
+      "metadata": {
+        "description": "SKU for PostgreSQL Flexible Server"
+      }
+    },
+    "postgresStorageSize": {
+      "type": "int",
+      "defaultValue": 128,
+      "minValue": 32,
+      "maxValue": 1024,
+      "metadata": {
+        "description": "Storage size in GB for PostgreSQL"
+      }
+    },
+    "redisName": {
+      "type": "string",
+      "defaultValue": "[concat(parameters('clusterName'), '-redis-', uniqueString(resourceGroup().id))]",
+      "metadata": {
+        "description": "Name of the Azure Cache for Redis"
+      }
+    },
+    "redisSku": {
+      "type": "string",
+      "defaultValue": "Standard",
+      "allowedValues": [
+        "Basic",
+        "Standard",
+        "Premium"
+      ],
+      "metadata": {
+        "description": "SKU for Azure Cache for Redis"
+      }
+    },
+    "redisCapacity": {
+      "type": "int",
+      "defaultValue": 1,
+      "allowedValues": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "metadata": {
+        "description": "Capacity for Redis cache (0=250MB, 1=1GB, 2=2.5GB, 3=6GB, 4=13GB, 5=26GB, 6=53GB)"
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "defaultValue": "[concat('honua', uniqueString(resourceGroup().id))]",
+      "metadata": {
+        "description": "Name of the storage account"
+      }
+    },
+    "azureMarketplaceOfferId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure Marketplace Offer ID"
+      }
+    },
+    "azureMarketplacePlanId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure Marketplace Plan ID"
+      }
+    },
+    "databaseAdminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Administrator password for PostgreSQL"
+      }
+    }
+  },
+  "variables": {
+    "vnetName": "[concat(parameters('clusterName'), '-vnet')]",
+    "vnetAddressPrefix": "10.0.0.0/16",
+    "aksSubnetName": "aks-subnet",
+    "aksSubnetPrefix": "10.0.0.0/20",
+    "servicesSubnetName": "services-subnet",
+    "servicesSubnetPrefix": "10.0.16.0/24",
+    "dnsPrefix": "[concat(parameters('clusterName'), '-dns')]",
+    "keyVaultName": "[concat(parameters('clusterName'), '-kv-', uniqueString(resourceGroup().id))]",
+    "workspaceNamepace": "[concat(parameters('clusterName'), '-workspace')]",
+    "containerRegistryName": "[concat('honuacr', uniqueString(resourceGroup().id))]",
+    "managedIdentityName": "[concat(parameters('clusterName'), '-identity')]",
+    "networkContributorRole": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4d97b98b-1d4f-4787-a291-c67834d212e7')]",
+    "acrPullRole": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]",
+    "keyVaultSecretsUserRole": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-05-01",
+      "name": "[variables('vnetName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('vnetAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('aksSubnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('aksSubnetPrefix')]",
+              "serviceEndpoints": [
+                {
+                  "service": "Microsoft.Storage"
+                },
+                {
+                  "service": "Microsoft.Sql"
+                },
+                {
+                  "service": "Microsoft.KeyVault"
+                }
+              ]
+            }
+          },
+          {
+            "name": "[variables('servicesSubnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('servicesSubnetPrefix')]",
+              "serviceEndpoints": [
+                {
+                  "service": "Microsoft.Storage"
+                },
+                {
+                  "service": "Microsoft.Sql"
+                }
+              ],
+              "delegations": [
+                {
+                  "name": "dlg-Microsoft.DBforPostgreSQL-flexibleServers",
+                  "properties": {
+                    "serviceName": "Microsoft.DBforPostgreSQL/flexibleServers"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[variables('managedIdentityName')]",
+      "location": "[parameters('location')]"
+    },
+    {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-07-01",
+      "name": "[variables('containerRegistryName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard"
+      },
+      "properties": {
+        "adminUserEnabled": false,
+        "publicNetworkAccess": "Enabled",
+        "networkRuleBypassOptions": "AzureServices",
+        "zoneRedundancy": "Disabled"
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-02-01",
+      "name": "[variables('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('managedIdentityName'))]"
+      ],
+      "properties": {
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "tenantId": "[subscription().tenantId]",
+        "enabledForDeployment": false,
+        "enabledForDiskEncryption": false,
+        "enabledForTemplateDeployment": true,
+        "enableRbacAuthorization": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 7,
+        "networkAcls": {
+          "bypass": "AzureServices",
+          "defaultAction": "Allow"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-02-01",
+      "name": "[concat(variables('keyVaultName'), '/database-password')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ],
+      "properties": {
+        "value": "[parameters('databaseAdminPassword')]"
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+      "apiVersion": "2023-03-01-preview",
+      "name": "[parameters('postgresServerName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+      ],
+      "sku": {
+        "name": "[parameters('postgresSku')]",
+        "tier": "GeneralPurpose"
+      },
+      "properties": {
+        "version": "16",
+        "administratorLogin": "honua",
+        "administratorLoginPassword": "[parameters('databaseAdminPassword')]",
+        "storage": {
+          "storageSizeGB": "[parameters('postgresStorageSize')]",
+          "autoGrow": "Enabled"
+        },
+        "backup": {
+          "backupRetentionDays": 7,
+          "geoRedundantBackup": "Enabled"
+        },
+        "highAvailability": {
+          "mode": "ZoneRedundant"
+        },
+        "network": {
+          "delegatedSubnetResourceId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('servicesSubnetName'))]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+      "apiVersion": "2023-03-01-preview",
+      "name": "[concat(parameters('postgresServerName'), '/honua')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))]"
+      ],
+      "properties": {
+        "charset": "UTF8",
+        "collation": "en_US.utf8"
+      }
+    },
+    {
+      "type": "Microsoft.Cache/redis",
+      "apiVersion": "2023-08-01",
+      "name": "[parameters('redisName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "[parameters('redisSku')]",
+          "family": "[if(equals(parameters('redisSku'), 'Premium'), 'P', 'C')]",
+          "capacity": "[parameters('redisCapacity')]"
+        },
+        "enableNonSslPort": false,
+        "minimumTlsVersion": "1.2",
+        "publicNetworkAccess": "Enabled",
+        "redisConfiguration": {
+          "maxmemory-policy": "allkeys-lru"
+        },
+        "redisVersion": "6"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[parameters('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_GRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "networkAcls": {
+          "bypass": "AzureServices",
+          "defaultAction": "Allow"
+        },
+        "encryption": {
+          "services": {
+            "blob": {
+              "enabled": true
+            },
+            "file": {
+              "enabled": true
+            }
+          },
+          "keySource": "Microsoft.Storage"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices",
+      "apiVersion": "2023-01-01",
+      "name": "[concat(parameters('storageAccountName'), '/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+      ],
+      "properties": {
+        "deleteRetentionPolicy": {
+          "enabled": true,
+          "days": 7
+        },
+        "containerDeleteRetentionPolicy": {
+          "enabled": true,
+          "days": 7
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2023-01-01",
+      "name": "[concat(parameters('storageAccountName'), '/default/honua-data')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"
+      ],
+      "properties": {
+        "publicAccess": "None"
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[variables('workspaceNamepace')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.ContainerService/managedClusters",
+      "apiVersion": "2024-01-01",
+      "name": "[parameters('clusterName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('managedIdentityName'))]",
+        "[resourceId('Microsoft.ContainerRegistry/registries', variables('containerRegistryName'))]",
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceNamepace'))]"
+      ],
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('managedIdentityName'))]": {}
+        }
+      },
+      "properties": {
+        "kubernetesVersion": "[parameters('kubernetesVersion')]",
+        "dnsPrefix": "[variables('dnsPrefix')]",
+        "enableRBAC": true,
+        "networkProfile": {
+          "networkPlugin": "azure",
+          "networkPolicy": "azure",
+          "serviceCidr": "10.1.0.0/16",
+          "dnsServiceIP": "10.1.0.10",
+          "loadBalancerSku": "standard",
+          "outboundType": "loadBalancer"
+        },
+        "agentPoolProfiles": [
+          {
+            "name": "systempool",
+            "count": "[parameters('nodeCount')]",
+            "vmSize": "[parameters('nodeVmSize')]",
+            "osType": "Linux",
+            "osSKU": "Ubuntu",
+            "mode": "System",
+            "enableAutoScaling": "[parameters('enableAutoScaling')]",
+            "minCount": "[if(parameters('enableAutoScaling'), parameters('minNodeCount'), json('null'))]",
+            "maxCount": "[if(parameters('enableAutoScaling'), parameters('maxNodeCount'), json('null'))]",
+            "vnetSubnetID": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('aksSubnetName'))]",
+            "maxPods": 30,
+            "type": "VirtualMachineScaleSets",
+            "availabilityZones": [
+              "1",
+              "2",
+              "3"
+            ],
+            "enableNodePublicIP": false,
+            "enableFIPS": false
+          }
+        ],
+        "addonProfiles": {
+          "omsagent": {
+            "enabled": true,
+            "config": {
+              "logAnalyticsWorkspaceResourceID": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceNamepace'))]"
+            }
+          },
+          "azureKeyvaultSecretsProvider": {
+            "enabled": true,
+            "config": {
+              "enableSecretRotation": "true",
+              "rotationPollInterval": "2m"
+            }
+          }
+        },
+        "oidcIssuerProfile": {
+          "enabled": true
+        },
+        "securityProfile": {
+          "workloadIdentity": {
+            "enabled": true
+          }
+        },
+        "autoUpgradeProfile": {
+          "upgradeChannel": "patch"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceGroup().id, variables('managedIdentityName'), 'NetworkContributor')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('managedIdentityName'))]"
+      ],
+      "properties": {
+        "roleDefinitionId": "[variables('networkContributorRole')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('managedIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(resourceGroup().id, variables('managedIdentityName'), 'AcrPull')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ContainerRegistry/registries', variables('containerRegistryName'))]",
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('managedIdentityName'))]"
+      ],
+      "properties": {
+        "roleDefinitionId": "[variables('acrPullRole')]",
+        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('managedIdentityName')), '2023-01-31').principalId]",
+        "principalType": "ServicePrincipal"
+      }
+    }
+  ],
+  "outputs": {
+    "clusterName": {
+      "type": "string",
+      "value": "[parameters('clusterName')]"
+    },
+    "clusterFqdn": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerService/managedClusters', parameters('clusterName'))).fqdn]"
+    },
+    "postgresServerName": {
+      "type": "string",
+      "value": "[parameters('postgresServerName')]"
+    },
+    "postgresServerFqdn": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))).fullyQualifiedDomainName]"
+    },
+    "redisHostName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Cache/redis', parameters('redisName'))).hostName]"
+    },
+    "redisSslPort": {
+      "type": "int",
+      "value": "[reference(resourceId('Microsoft.Cache/redis', parameters('redisName'))).sslPort]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[parameters('storageAccountName')]"
+    },
+    "keyVaultName": {
+      "type": "string",
+      "value": "[variables('keyVaultName')]"
+    },
+    "managedIdentityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('managedIdentityName')), '2023-01-31').clientId]"
+    },
+    "containerRegistryName": {
+      "type": "string",
+      "value": "[variables('containerRegistryName')]"
+    }
+  }
+}

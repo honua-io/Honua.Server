@@ -1,0 +1,465 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: honua-system
+  labels:
+    name: honua-system
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: honua-server
+  namespace: honua-system
+  annotations:
+    eks.amazonaws.com/role-arn: "${SERVICE_ACCOUNT_ROLE_ARN}"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: honua-config
+  namespace: honua-system
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  SERVICE_NAME: "honua-server"
+
+  # Database configuration
+  DATABASE_HOST: "${DATABASE_ENDPOINT}"
+  DATABASE_PORT: "${DATABASE_PORT}"
+  DATABASE_NAME: "honua"
+  DATABASE_USER: "honua"
+  DATABASE_SSL_MODE: "require"
+  DATABASE_POOLING_MIN: "5"
+  DATABASE_POOLING_MAX: "100"
+
+  # Redis configuration
+  REDIS_HOST: "${REDIS_ENDPOINT}"
+  REDIS_PORT: "${REDIS_PORT}"
+  REDIS_SSL: "true"
+
+  # AWS configuration
+  AWS_REGION: "${AWS_REGION}"
+  AWS_S3_BUCKET: "${S3_BUCKET_NAME}"
+
+  # AWS Marketplace configuration
+  AWS_MARKETPLACE_ENABLED: "true"
+  AWS_MARKETPLACE_PRODUCT_CODE: "${MARKETPLACE_PRODUCT_CODE}"
+
+  # License configuration
+  LICENSE_TIER: "${LICENSE_TIER}"
+
+  # Feature flags based on tier
+  FEATURES_ANALYTICS_ENABLED: "true"
+  FEATURES_CLOUD_INTEGRATIONS_ENABLED: "true"
+  FEATURES_RASTER_PROCESSING_ENABLED: "true"
+
+  # Logging
+  LOGGING_LEVEL: "Information"
+  LOGGING_STRUCTURED: "true"
+
+  # OpenTelemetry
+  OTEL_ENABLED: "true"
+  OTEL_EXPORTER: "otlp"
+  OTEL_SERVICE_NAME: "honua-server"
+
+  # Rate limiting
+  RATE_LIMITING_ENABLED: "true"
+  RATE_LIMITING_GLOBAL_LIMIT: "10000"
+  RATE_LIMITING_GLOBAL_WINDOW: "60"
+  RATE_LIMITING_IP_LIMIT: "300"
+  RATE_LIMITING_IP_WINDOW: "60"
+
+  # CORS
+  CORS_ENABLED: "true"
+  CORS_ALLOW_CREDENTIALS: "true"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: honua-secrets
+  namespace: honua-system
+type: Opaque
+stringData:
+  database-password: "${DATABASE_PASSWORD}"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: honua-server
+  namespace: honua-system
+  labels:
+    app: honua-server
+    app.kubernetes.io/name: honua-server
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: honua
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: honua-server
+  template:
+    metadata:
+      labels:
+        app: honua-server
+        app.kubernetes.io/name: honua-server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: honua-server
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+      - name: init-db
+        image: postgres:16-alpine
+        command: ['sh', '-c']
+        args:
+          - |
+            until pg_isready -h ${DATABASE_HOST} -p ${DATABASE_PORT} -U ${DATABASE_USER}; do
+              echo "Waiting for database..."
+              sleep 2
+            done
+            echo "Database is ready!"
+        env:
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_HOST
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_PORT
+        - name: DATABASE_USER
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_USER
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: honua-secrets
+              key: database-password
+
+      containers:
+      - name: honua-server
+        image: ghcr.io/honua-io/honua-server:${IMAGE_TAG}
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 8081
+          protocol: TCP
+
+        env:
+        # AWS Marketplace metering environment variables
+        - name: AWS_MARKETPLACE_PRODUCT_CODE
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: AWS_MARKETPLACE_PRODUCT_CODE
+        - name: AWS_MARKETPLACE_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: AWS_MARKETPLACE_ENABLED
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: AWS_REGION
+
+        # Database connection
+        - name: ConnectionStrings__DefaultConnection
+          value: "Host=$(DATABASE_HOST);Port=$(DATABASE_PORT);Database=$(DATABASE_NAME);Username=$(DATABASE_USER);Password=$(DATABASE_PASSWORD);SSL Mode=$(DATABASE_SSL_MODE);Minimum Pool Size=$(DATABASE_POOLING_MIN);Maximum Pool Size=$(DATABASE_POOLING_MAX)"
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_HOST
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_PORT
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_NAME
+        - name: DATABASE_USER
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_USER
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: honua-secrets
+              key: database-password
+        - name: DATABASE_SSL_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_SSL_MODE
+        - name: DATABASE_POOLING_MIN
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_POOLING_MIN
+        - name: DATABASE_POOLING_MAX
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: DATABASE_POOLING_MAX
+
+        # Redis connection
+        - name: Redis__Host
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: REDIS_HOST
+        - name: Redis__Port
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: REDIS_PORT
+        - name: Redis__Ssl
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: REDIS_SSL
+
+        # AWS S3 configuration
+        - name: Storage__Provider
+          value: "aws"
+        - name: Storage__Aws__Region
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: AWS_REGION
+        - name: Storage__Aws__BucketName
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: AWS_S3_BUCKET
+        - name: Storage__Aws__UseIRSA
+          value: "true"
+
+        # License and features
+        - name: License__Tier
+          valueFrom:
+            configMapKeyRef:
+              name: honua-config
+              key: LICENSE_TIER
+
+        envFrom:
+        - configMapRef:
+            name: honua-config
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+              - ALL
+
+        livenessProbe:
+          httpGet:
+            path: /healthz/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+
+        startupProbe:
+          httpGet:
+            path: /healthz/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+          successThreshold: 1
+
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: app-tmp
+          mountPath: /app/tmp
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: app-tmp
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: honua-server
+  namespace: honua-system
+  labels:
+    app: honua-server
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "${ACM_CERTIFICATE_ARN}"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+spec:
+  type: LoadBalancer
+  selector:
+    app: honua-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8080
+    protocol: TCP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: honua-server-hpa
+  namespace: honua-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: honua-server
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: honua-server-pdb
+  namespace: honua-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: honua-server
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: honua-server-netpol
+  namespace: honua-system
+spec:
+  podSelector:
+    matchLabels:
+      app: honua-server
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow PostgreSQL
+  - ports:
+    - protocol: TCP
+      port: 5432
+  # Allow Redis
+  - ports:
+    - protocol: TCP
+      port: 6379
+  # Allow HTTPS for AWS APIs
+  - ports:
+    - protocol: TCP
+      port: 443
