@@ -21,7 +21,45 @@ When reporting a vulnerability, please include:
 - Potential impact
 - Any suggested fixes (optional)
 
-We will acknowledge receipt and work with you to understand and address the issue.
+### Response Time Commitment
+
+We are committed to responding to security vulnerability reports in a timely manner:
+
+- **Initial Response**: Within 3 business days of report receipt
+- **Status Updates**: At least every 7 days until resolution
+- **Resolution Target**:
+  - Critical vulnerabilities: 30 days or less
+  - High severity: 60 days or less
+  - Medium/Low severity: 90 days or less
+
+We will acknowledge receipt and work with you to understand and address the issue. If you do not receive an acknowledgment within 3 business days, please follow up through an alternative contact method.
+
+### Bug Bounty Program
+
+Honua does not currently offer a bug bounty program. However, we deeply appreciate security researchers who responsibly disclose vulnerabilities and will:
+
+- Publicly acknowledge your contribution (unless you prefer to remain anonymous)
+- Credit you in the security advisory and release notes
+- Provide updates on the fix and resolution timeline
+
+We encourage responsible disclosure and will work collaboratively with security researchers to resolve issues.
+
+### Disclosure Policy
+
+Honua follows a coordinated disclosure process:
+
+1. **Private Disclosure**: Reporter submits vulnerability through GitHub Security Advisories or private contact
+2. **Acknowledgment**: We acknowledge receipt within 3 business days
+3. **Investigation**: We investigate and validate the vulnerability
+4. **Fix Development**: We develop and test a fix
+5. **Coordinated Release**: We coordinate with the reporter on disclosure timing
+6. **Public Disclosure**: We publish a security advisory and release the fix
+
+**Disclosure Timeline:**
+- We aim to publicly disclose vulnerabilities within 90 days of the initial report
+- We will coordinate with reporters before public disclosure
+- Critical vulnerabilities affecting production systems may be disclosed sooner
+- We request that reporters do not publicly disclose until a fix is available
 
 ## Supported Versions
 
