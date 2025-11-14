@@ -83,8 +83,13 @@ public sealed class LocalSigningKeyProvider : ILocalSigningKeyProvider
     // BUG FIX #21: Use proper async file I/O instead of Task.Run wrapper
     private byte[] LoadOrCreateKey(string path)
     {
-        // Note: This method is called from a constructor/startup path with lock protection
-        // Using GetAwaiter().GetResult() is acceptable here since it's not on a request hot path
+        // BLOCKING ASYNC CALL: This is acceptable here because:
+        // 1. Called from EnsureSigningKey() which is protected by a lock (_sync)
+        // 2. Only executed once during first access (lazy initialization with caching)
+        // 3. Not on the request hot path - first request may block but subsequent requests use cached key
+        // 4. Double-checked locking pattern prevents multiple threads from entering this code path
+        // 5. Alternative would be async initialization in IHostedService, but lazy loading is acceptable
+        //    for cryptographic key material that must be available before request processing
         return LoadOrCreateKeyAsync(path).GetAwaiter().GetResult();
     }
 

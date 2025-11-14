@@ -391,6 +391,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Resilience.TenantResourceLimiter>();
         services.AddSingleton<Resilience.MemoryCircuitBreaker>();
 
+        // Register comprehensive resilience policies for cache, database, and background services
+        services.AddHonuaResiliencePolicies();
+
         // Security validation hosted service removed - legacy feature
         // MetadataInitializationHostedService and ServiceApiValidationHostedService removed - handled by Configuration V2
         services.AddHostedService<AuthInitializationHostedService>();
@@ -713,5 +716,42 @@ public static class ServiceCollectionExtensions
             nameof(ConnectionStringOptions.SqlServer) or "SqlServer" or "SQLServer" => options.SqlServer,
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Registers comprehensive resilience policies for cache, database, and background services.
+    /// Includes:
+    /// - Circuit breaker for distributed cache operations (fail-fast if Redis is down)
+    /// - Retry policy for transient database errors (exponential backoff with jitter)
+    /// - Retry helper for background services (unlimited retries with exponential backoff)
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <returns>Service collection for chaining</returns>
+    public static IServiceCollection AddHonuaResiliencePolicies(this IServiceCollection services)
+    {
+        // Register resilience metrics for observability
+        services.AddSingleton<Observability.ResilienceMetrics>();
+
+        // Register database retry pipeline factory (provider-specific pipelines)
+        services.AddSingleton(sp =>
+        {
+            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            // Use generic database retry policy that handles all providers
+            return Resilience.ResiliencePolicies.CreateDatabasePolicy(loggerFactory);
+        });
+
+        // Register ResilientDatabaseOperationExecutor (combines retry + bulkhead)
+        services.AddSingleton<Resilience.ResilientDatabaseOperationExecutor>();
+
+        // Register ResilientCacheWrapper for distributed cache with circuit breaker
+        // This decorates IDistributedCache to add circuit breaker protection
+        services.Decorate<Microsoft.Extensions.Caching.Distributed.IDistributedCache>(
+            (inner, sp) =>
+            {
+                var logger = sp.GetRequiredService<ILogger<Caching.ResilientCacheWrapper>>();
+                return new Caching.ResilientCacheWrapper(inner, logger, "DistributedCache");
+            });
+
+        return services;
     }
 }

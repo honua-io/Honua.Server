@@ -1,7 +1,9 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using System.Buffers;
 using Honua.Server.Core.Models.Geometry3D;
+using Honua.Server.Core.Performance;
 
 namespace Honua.Server.Core.Services.Geometry3D;
 
@@ -421,11 +423,47 @@ public class MeshConverter : IMeshConverter
     /// </summary>
     private byte[] ConvertColorsToBytes(float[] colors)
     {
-        var bytes = new byte[colors.Length];
-        for (int i = 0; i < colors.Length; i++)
+        var totalLength = colors.Length;
+
+        // Use ArrayPool for large color arrays to reduce GC pressure
+        // 3D meshes with many vertices can have large color arrays (>4KB)
+        const int poolingThreshold = 4096;
+        byte[]? pooledBuffer = null;
+        byte[] bytes;
+
+        if (totalLength >= poolingThreshold)
         {
-            bytes[i] = (byte)(Math.Clamp(colors[i], 0f, 1f) * 255);
+            pooledBuffer = ObjectPools.ByteArrayPool.Rent(totalLength);
+            bytes = pooledBuffer;
         }
-        return bytes;
+        else
+        {
+            bytes = new byte[totalLength];
+        }
+
+        try
+        {
+            for (int i = 0; i < colors.Length; i++)
+            {
+                bytes[i] = (byte)(Math.Clamp(colors[i], 0f, 1f) * 255);
+            }
+
+            // If using pooled buffer, create exact-sized result and return pool buffer
+            if (pooledBuffer is not null)
+            {
+                var result = new byte[totalLength];
+                Buffer.BlockCopy(bytes, 0, result, 0, totalLength);
+                return result;
+            }
+
+            return bytes;
+        }
+        finally
+        {
+            if (pooledBuffer is not null)
+            {
+                ObjectPools.ByteArrayPool.Return(pooledBuffer);
+            }
+        }
     }
 }

@@ -51,6 +51,9 @@ public sealed class MetadataRegistry : IMetadataRegistry, IDisposable
         var snapshotTask = Volatile.Read(ref _snapshotTask);
         if (snapshotTask is not null && snapshotTask.IsCompletedSuccessfully)
         {
+            // SAFE .Result ACCESS: We only access .Result after confirming IsCompletedSuccessfully is true.
+            // This means the task has already completed successfully and .Result will return immediately
+            // without blocking. This is the recommended pattern for accessing completed task results.
             snapshot = snapshotTask.Result;
             return true;
         }

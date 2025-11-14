@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,6 +17,7 @@ using FlatGeobuf.NTS;
 using Google.FlatBuffers;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
+using Honua.Server.Core.Performance;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Core.Query;
 using Honua.Server.Core.Serialization;
@@ -1002,19 +1004,55 @@ public sealed class FlatGeobufExporter : IFlatGeobufExporter
                 return Array.Empty<byte>();
             }
 
-            var buffer = new byte[nodes.Length * (sizeof(double) * 4 + sizeof(ulong))];
-            using var stream = new MemoryStream(buffer);
-            using var writer = new BinaryWriter(stream);
-            foreach (var node in nodes)
+            const int bytesPerNode = sizeof(double) * 4 + sizeof(ulong); // 40 bytes
+            var totalLength = nodes.Length * bytesPerNode;
+
+            // Use ArrayPool for large trees to reduce GC pressure
+            // Threshold: ~102 nodes = 4KB
+            const int poolingThreshold = 4096;
+            byte[]? pooledBuffer = null;
+            byte[] buffer;
+
+            if (totalLength >= poolingThreshold)
             {
-                writer.Write(node.MinX);
-                writer.Write(node.MinY);
-                writer.Write(node.MaxX);
-                writer.Write(node.MaxY);
-                writer.Write(node.Offset);
+                pooledBuffer = ObjectPools.ByteArrayPool.Rent(totalLength);
+                buffer = pooledBuffer;
+            }
+            else
+            {
+                buffer = new byte[totalLength];
             }
 
-            return buffer;
+            try
+            {
+                using var stream = new MemoryStream(buffer, 0, totalLength);
+                using var writer = new BinaryWriter(stream);
+                foreach (var node in nodes)
+                {
+                    writer.Write(node.MinX);
+                    writer.Write(node.MinY);
+                    writer.Write(node.MaxX);
+                    writer.Write(node.MaxY);
+                    writer.Write(node.Offset);
+                }
+
+                // If using pooled buffer, create exact-sized result and return pool buffer
+                if (pooledBuffer is not null)
+                {
+                    var result = new byte[totalLength];
+                    Buffer.BlockCopy(buffer, 0, result, 0, totalLength);
+                    return result;
+                }
+
+                return buffer;
+            }
+            finally
+            {
+                if (pooledBuffer is not null)
+                {
+                    ObjectPools.ByteArrayPool.Return(pooledBuffer);
+                }
+            }
         }
 
         private static uint Hilbert(uint x, uint y)

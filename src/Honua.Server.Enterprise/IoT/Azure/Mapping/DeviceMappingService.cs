@@ -55,25 +55,32 @@ public sealed class DeviceMappingService : IDeviceMappingService
 
     public DeviceMappingConfiguration GetConfiguration()
     {
-        // Reload from file if configured and stale
+        // Check if configuration needs reloading and trigger background reload
         var configPath = _options.CurrentValue.MappingConfigurationPath;
         if (!string.IsNullOrWhiteSpace(configPath))
         {
             var fileInfo = new FileInfo(configPath);
             if (fileInfo.Exists && fileInfo.LastWriteTimeUtc > _lastConfigLoad)
             {
-                try
-                {
-                    ReloadConfigurationAsync().GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to reload mapping configuration from {Path}", configPath);
-                }
+                // Trigger background reload without blocking the hot path
+                // Use fire-and-forget pattern - configuration will be updated asynchronously
+                _ = ReloadConfigurationInBackgroundAsync(configPath);
             }
         }
 
         return _configuration;
+    }
+
+    private async Task ReloadConfigurationInBackgroundAsync(string configPath)
+    {
+        try
+        {
+            await ReloadConfigurationAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reload mapping configuration from {Path}", configPath);
+        }
     }
 
     public string? ResolveTenantId(IoTHubMessage message)

@@ -183,6 +183,9 @@ internal sealed class RedisDistributedLockHandle : IDistributedLockHandle
 
     public void Dispose()
     {
+        // BLOCKING ASYNC CALL: Required to implement IDisposable interface.
+        // ASP.NET Core best practice: Provide both Dispose and DisposeAsync for resources.
+        // Callers should prefer using DisposeAsync (via 'await using') when possible.
         DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 

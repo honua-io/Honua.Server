@@ -68,9 +68,10 @@ public sealed class AwsKmsXmlEncryptor : IXmlEncryptor
             throw new ArgumentNullException(nameof(plaintextElement));
         }
 
-        // BUG FIX #20: Use async encryption method
-        // Note: IXmlEncryptor.Encrypt is sync, called during startup, so Task.Run is acceptable here
-        return Task.Run(() => EncryptAsync(plaintextElement)).GetAwaiter().GetResult();
+        // BLOCKING ASYNC CALL: Required to implement IXmlEncryptor interface (synchronous).
+        // This is called during ASP.NET Core Data Protection startup, before the app serves requests.
+        // The IXmlEncryptor interface is inherently synchronous, making this blocking unavoidable.
+        return EncryptAsync(plaintextElement).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -164,9 +165,10 @@ public sealed class AwsKmsXmlDecryptor : IXmlDecryptor
             throw new ArgumentNullException(nameof(encryptedElement));
         }
 
-        // BUG FIX #20: Use async decryption method
-        // Note: IXmlDecryptor.Decrypt is sync, called during startup, so Task.Run is acceptable here
-        return Task.Run(() => DecryptAsync(encryptedElement)).GetAwaiter().GetResult();
+        // BLOCKING ASYNC CALL: Required to implement IXmlDecryptor interface (synchronous).
+        // This is called during ASP.NET Core Data Protection startup, before the app serves requests.
+        // The IXmlDecryptor interface is inherently synchronous, making this blocking unavoidable.
+        return DecryptAsync(encryptedElement).GetAwaiter().GetResult();
     }
 
     /// <summary>

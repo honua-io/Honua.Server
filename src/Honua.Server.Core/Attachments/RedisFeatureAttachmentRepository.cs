@@ -177,6 +177,8 @@ public sealed class RedisFeatureAttachmentRepository : IFeatureAttachmentReposit
 
             for (int i = 0; i < featureIds.Count; i++)
             {
+                // SAFE .Result ACCESS: We already awaited Task.WhenAll(setMembersTasks) above (line 172),
+                // so all tasks are guaranteed to be completed. Accessing .Result on completed tasks doesn't block.
                 var attachmentIds = setMembersTasks[i].Result;
                 if (attachmentIds.Length == 0)
                 {
