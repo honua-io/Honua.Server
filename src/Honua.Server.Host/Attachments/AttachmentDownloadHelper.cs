@@ -1,5 +1,6 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
+using System.Buffers;
 using System.IO;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -322,35 +323,47 @@ public static class AttachmentDownloadHelper
         // For unknown size or small streams, start buffering in memory
         // but switch to temp file if it exceeds threshold
         var memoryStream = new MemoryStream();
-        var buffer = new byte[81920]; // 80 KB buffer for efficient copying
-        var bufferMemory = buffer.AsMemory();
-        int bytesRead;
-        long totalBytesRead = 0;
 
-        while ((bytesRead = await stream.ReadAsync(bufferMemory, cancellationToken).ConfigureAwait(false)) > 0)
+        // Use ArrayPool to reduce GC pressure (ASP.NET Core best practice)
+        const int bufferSize = 81920; // 80 KB buffer for efficient copying
+        var buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+        try
         {
-            totalBytesRead += bytesRead;
+            var bufferMemory = buffer.AsMemory(0, bufferSize);
+            int bytesRead;
+            long totalBytesRead = 0;
 
-            // If we exceed threshold, switch to temp file
-            if (totalBytesRead > MaxMemoryBufferSize)
+            while ((bytesRead = await stream.ReadAsync(bufferMemory, cancellationToken).ConfigureAwait(false)) > 0)
             {
-                // Create temp file and copy memory stream contents plus remaining stream data
-                var tempFileStream = await CopyToTempFileAsync(memoryStream, stream, buffer, bytesRead, cancellationToken).ConfigureAwait(false);
+                totalBytesRead += bytesRead;
 
-                // Dispose resources
-                await memoryStream.DisposeAsync().ConfigureAwait(false);
-                await stream.DisposeAsync().ConfigureAwait(false);
+                // If we exceed threshold, switch to temp file
+                if (totalBytesRead > MaxMemoryBufferSize)
+                {
+                    // Create temp file and copy memory stream contents plus remaining stream data
+                    // Buffer will be returned to pool by finally block after this method completes
+                    var tempFileStream = await CopyToTempFileAsync(memoryStream, stream, buffer, bytesRead, cancellationToken).ConfigureAwait(false);
 
-                return tempFileStream;
+                    // Dispose resources
+                    await memoryStream.DisposeAsync().ConfigureAwait(false);
+                    await stream.DisposeAsync().ConfigureAwait(false);
+
+                    return tempFileStream;
+                }
+
+                await memoryStream.WriteAsync(bufferMemory[..bytesRead], cancellationToken).ConfigureAwait(false);
             }
 
-            await memoryStream.WriteAsync(bufferMemory[..bytesRead], cancellationToken).ConfigureAwait(false);
+            // Stream fit in memory, return MemoryStream
+            memoryStream.Position = 0;
+            await stream.DisposeAsync().ConfigureAwait(false);
+            return memoryStream;
         }
-
-        // Stream fit in memory, return MemoryStream
-        memoryStream.Position = 0;
-        await stream.DisposeAsync().ConfigureAwait(false);
-        return memoryStream;
+        finally
+        {
+            // Return buffer to pool (ASP.NET Core best practice for reducing allocations)
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     /// <summary>

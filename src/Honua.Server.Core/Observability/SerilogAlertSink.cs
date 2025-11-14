@@ -16,7 +16,7 @@ namespace Honua.Server.Core.Observability;
 /// Serilog sink that sends Error and Fatal log events as alerts.
 /// Automatically alerts on application errors without Prometheus.
 /// </summary>
-public sealed class SerilogAlertSink : ILogEventSink, IDisposable
+public sealed class SerilogAlertSink : ILogEventSink, IDisposable, IAsyncDisposable
 {
     private static readonly Lazy<SocketsHttpHandler> SharedHandler = new(() => new SocketsHttpHandler
     {
@@ -248,6 +248,13 @@ public sealed class SerilogAlertSink : ILogEventSink, IDisposable
 
     public void Dispose()
     {
+        // Use synchronous version for IDisposable compatibility
+        // ASP.NET Core best practice: Provide both Dispose and DisposeAsync
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
         if (_disposed)
         {
             return;
@@ -261,12 +268,14 @@ public sealed class SerilogAlertSink : ILogEventSink, IDisposable
 
         try
         {
+            // ASP.NET Core best practice: Use async wait instead of blocking Wait()
             // Give processing task time to finish (best-effort)
-            _processingTask.Wait(TimeSpan.FromSeconds(5));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await _processingTask.WaitAsync(cts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
-            // Expected during shutdown
+            // Expected during shutdown or timeout
         }
         catch
         {
