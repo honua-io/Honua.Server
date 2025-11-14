@@ -121,22 +121,37 @@ internal static partial class OgcSharedHandlers
             var sanitized = RemoveCollectionsParameter(queryParameters);
             return await OgcFeaturesHandlers.ExecuteCollectionItemsAsync(
                 collections[0],
-                request,
+                new OgcFeaturesRequestContext
+                {
+                    Request = request,
+                    QueryOverrides = sanitized
+                },
                 resolver,
                 repository,
-                geoPackageExporter,
-                shapefileExporter,
-                flatGeobufExporter,
-                geoArrowExporter,
-                csvExporter,
-                attachmentOrchestrator,
                 metadataRegistry,
-                apiMetrics,
-                cacheHeaderService,
-                attachmentHandler,
-                new Core.Elevation.DefaultElevationService(),
-                logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
-                sanitized,
+                new OgcFeatureExportServices
+                {
+                    GeoPackage = geoPackageExporter,
+                    Shapefile = shapefileExporter,
+                    FlatGeobuf = flatGeobufExporter,
+                    GeoArrow = geoArrowExporter,
+                    Csv = csvExporter
+                },
+                new OgcFeatureAttachmentServices
+                {
+                    Orchestrator = attachmentOrchestrator,
+                    Handler = attachmentHandler
+                },
+                new OgcFeatureEnrichmentServices
+                {
+                    Elevation = new Core.Elevation.DefaultElevationService()
+                },
+                new OgcFeatureObservabilityServices
+                {
+                    Metrics = apiMetrics,
+                    CacheHeaders = cacheHeaderService,
+                    Logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
+                },
                 cancellationToken).ConfigureAwait(false);
         }
 

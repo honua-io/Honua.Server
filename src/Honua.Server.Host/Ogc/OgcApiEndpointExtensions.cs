@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Honua.Server.Host.Utilities;
+using Honua.Server.Host.Ogc.ParameterObjects;
 
 namespace Honua.Server.Host.Ogc;
 
@@ -85,7 +86,72 @@ internal static class OgcApiEndpointExtensions
             .WithMetadata(new DeprecatedEndpointMetadata("Legacy TileJSON endpoint. Consider using standard OGC API - Tiles metadata instead."));
         group.MapGet("/collections/{collectionId}/tiles/{tilesetId}/{tileMatrixSetId}", OgcTilesHandlers.GetCollectionTileMatrixSet)
             .WithMetadata(new DeprecatedEndpointMetadata("Use /tileMatrixSets/{tileMatrixSetId} for tile matrix set definitions."));
-        group.MapGet("/collections/{collectionId}/tiles/{tilesetId}/{tileMatrixSetId}/{tileMatrix}/{tileRow:int}/{tileCol:int}", OgcTilesHandlers.GetCollectionTile)
+        group.MapGet("/collections/{collectionId}/tiles/{tilesetId}/{tileMatrixSetId}/{tileMatrix}/{tileRow:int}/{tileCol:int}",
+            async (
+                string collectionId,
+                string tilesetId,
+                string tileMatrixSetId,
+                string tileMatrix,
+                int tileRow,
+                int tileCol,
+                HttpRequest request,
+                [FromServices] IFeatureContextResolver resolver,
+                [FromServices] IRasterDatasetRegistry rasterRegistry,
+                [FromServices] IRasterRenderer rasterRenderer,
+                [FromServices] IMetadataRegistry metadataRegistry,
+                [FromServices] IFeatureRepository repository,
+                [FromServices] IPmTilesExporter pmTilesExporter,
+                [FromServices] IRasterTileCacheProvider tileCacheProvider,
+                [FromServices] IRasterTileCacheMetrics tileCacheMetrics,
+                [FromServices] OgcCacheHeaderService cacheHeaderService,
+                [FromServices] Services.IOgcTilesHandler tilesHandler,
+                CancellationToken cancellationToken) =>
+            {
+                var coordinates = new TileCoordinates
+                {
+                    CollectionId = collectionId,
+                    TilesetId = tilesetId,
+                    TileMatrixSetId = tileMatrixSetId,
+                    TileMatrix = tileMatrix,
+                    TileRow = tileRow,
+                    TileCol = tileCol
+                };
+
+                var operationContext = new TileOperationContext
+                {
+                    Request = request
+                };
+
+                var resolutionServices = new TileResolutionServices
+                {
+                    ContextResolver = resolver,
+                    RasterRegistry = rasterRegistry,
+                    MetadataRegistry = metadataRegistry,
+                    Repository = repository
+                };
+
+                var renderingServices = new TileRenderingServices
+                {
+                    Renderer = rasterRenderer,
+                    PMTilesExporter = pmTilesExporter
+                };
+
+                var cachingServices = new TileCachingServices
+                {
+                    CacheProvider = tileCacheProvider,
+                    CacheMetrics = tileCacheMetrics,
+                    CacheHeaders = cacheHeaderService
+                };
+
+                return await OgcTilesHandlers.GetCollectionTile(
+                    coordinates,
+                    operationContext,
+                    resolutionServices,
+                    renderingServices,
+                    cachingServices,
+                    tilesHandler,
+                    cancellationToken);
+            })
             .WithMetadata(new DeprecatedEndpointMetadata("Use /collections/{collectionId}/tiles/{tileMatrixSetId}/{tileMatrix}/{tileRow}/{tileCol} instead."));
 
         // Search endpoints
@@ -115,36 +181,121 @@ internal static class OgcApiEndpointExtensions
             BuildLegacyCollectionResponse(serviceId, layerId, request, catalog));
 
         // BUG FIX #45: Allow anonymous access to legacy items endpoint for existing public clients
-        group.MapGet("/{serviceId}/collections/{layerId}/items", BuildLegacyCollectionItemsResponse).AllowAnonymous();
+        group.MapGet("/{serviceId}/collections/{layerId}/items",
+            (string serviceId,
+             string layerId,
+             HttpRequest request,
+             [FromServices] ICatalogProjectionService catalog,
+             [FromServices] IFeatureContextResolver resolver,
+             [FromServices] IFeatureRepository repository,
+             [FromServices] IGeoPackageExporter geoPackageExporter,
+             [FromServices] IShapefileExporter shapefileExporter,
+             [FromServices] IFlatGeobufExporter flatGeobufExporter,
+             [FromServices] IGeoArrowExporter geoArrowExporter,
+             [FromServices] ICsvExporter csvExporter,
+             [FromServices] IFeatureAttachmentOrchestrator attachmentOrchestrator,
+             [FromServices] IMetadataRegistry metadataRegistry,
+             [FromServices] IApiMetrics apiMetrics,
+             [FromServices] OgcCacheHeaderService cacheHeaderService,
+             [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+             [FromServices] Honua.Server.Core.Elevation.IElevationService elevationService,
+             CancellationToken cancellationToken) =>
+        {
+            // Construct parameter objects from individual dependencies
+            var collectionIdentity = new LegacyCollectionIdentity
+            {
+                ServiceId = serviceId,
+                LayerId = layerId
+            };
+
+            var requestContext = new LegacyRequestContext
+            {
+                Request = request
+            };
+
+            var catalogServices = new LegacyCatalogServices
+            {
+                Catalog = catalog
+            };
+
+            var exportServices = new OgcFeatureExportServices
+            {
+                GeoPackage = geoPackageExporter,
+                Shapefile = shapefileExporter,
+                FlatGeobuf = flatGeobufExporter,
+                GeoArrow = geoArrowExporter,
+                Csv = csvExporter
+            };
+
+            var attachmentServices = new OgcFeatureAttachmentServices
+            {
+                Orchestrator = attachmentOrchestrator,
+                Handler = attachmentHandler
+            };
+
+            var enrichmentServices = new OgcFeatureEnrichmentServices
+            {
+                Elevation = elevationService
+            };
+
+            var observabilityServices = new LegacyObservabilityServices
+            {
+                Metrics = apiMetrics,
+                CacheHeaders = cacheHeaderService
+            };
+
+            return BuildLegacyCollectionItemsResponse(
+                collectionIdentity,
+                requestContext,
+                catalogServices,
+                resolver,
+                repository,
+                metadataRegistry,
+                exportServices,
+                attachmentServices,
+                enrichmentServices,
+                observabilityServices,
+                cancellationToken);
+        }).AllowAnonymous();
 
         return endpoints;
     }
 
+    /// <summary>
+    /// Handles legacy collection items endpoint using service/layer identifiers.
+    /// Maintains backward compatibility with pre-OGC API URL patterns.
+    /// </summary>
+    /// <param name="collectionIdentity">Legacy service and layer identifiers.</param>
+    /// <param name="requestContext">HTTP request context.</param>
+    /// <param name="catalogServices">Catalog projection services for legacy lookups.</param>
+    /// <param name="contextResolver">Feature context resolver.</param>
+    /// <param name="repository">Feature data repository.</param>
+    /// <param name="metadataRegistry">Feature metadata registry.</param>
+    /// <param name="exportServices">Feature export format services.</param>
+    /// <param name="attachmentServices">Feature attachment services.</param>
+    /// <param name="enrichmentServices">Optional feature enrichment services.</param>
+    /// <param name="observabilityServices">Metrics and caching services.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Feature collection response or NotFound if service/layer doesn't exist.</returns>
     internal static Task<IResult> BuildLegacyCollectionItemsResponse(
-        string serviceId,
-        string layerId,
-        HttpRequest request,
-        [FromServices] ICatalogProjectionService catalog,
-        [FromServices] IFeatureContextResolver resolver,
+        LegacyCollectionIdentity collectionIdentity,
+        LegacyRequestContext requestContext,
+        [FromServices] LegacyCatalogServices catalogServices,
+        [FromServices] IFeatureContextResolver contextResolver,
         [FromServices] IFeatureRepository repository,
-        [FromServices] IGeoPackageExporter geoPackageExporter,
-        [FromServices] IShapefileExporter shapefileExporter,
-        [FromServices] IFlatGeobufExporter flatGeobufExporter,
-        [FromServices] IGeoArrowExporter geoArrowExporter,
-        [FromServices] ICsvExporter csvExporter,
-        [FromServices] IFeatureAttachmentOrchestrator attachmentOrchestrator,
         [FromServices] IMetadataRegistry metadataRegistry,
-        [FromServices] IApiMetrics apiMetrics,
-        [FromServices] OgcCacheHeaderService cacheHeaderService,
-        [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
-        [FromServices] Honua.Server.Core.Elevation.IElevationService elevationService,
+        [FromServices] OgcFeatureExportServices exportServices,
+        [FromServices] OgcFeatureAttachmentServices attachmentServices,
+        [FromServices] OgcFeatureEnrichmentServices enrichmentServices,
+        [FromServices] LegacyObservabilityServices observabilityServices,
         CancellationToken cancellationToken)
     {
-        Guard.NotNull(catalog);
+        Guard.NotNull(catalogServices?.Catalog);
 
         // Validate service and layer exist
-        var serviceView = catalog.GetService(serviceId);
-        var layerView = serviceView?.Layers.FirstOrDefault(l => string.Equals(l.Layer.Id, layerId, StringComparison.OrdinalIgnoreCase));
+        var serviceView = catalogServices.Catalog.GetService(collectionIdentity.ServiceId);
+        var layerView = serviceView?.Layers.FirstOrDefault(l =>
+            string.Equals(l.Layer.Id, collectionIdentity.LayerId, StringComparison.OrdinalIgnoreCase));
         if (layerView is null)
         {
             return Task.FromResult<IResult>(Results.NotFound());
@@ -157,20 +308,20 @@ internal static class OgcApiEndpointExtensions
         // Forward to GetCollectionItems using canonical collection identifier
         return OgcFeaturesHandlers.GetCollectionItems(
             collectionId,
-            request,
-            resolver,
+            requestContext.Request,
+            contextResolver,
             repository,
-            geoPackageExporter,
-            shapefileExporter,
-            flatGeobufExporter,
-            geoArrowExporter,
-            csvExporter,
-            attachmentOrchestrator,
+            exportServices.GeoPackage,
+            exportServices.Shapefile,
+            exportServices.FlatGeobuf,
+            exportServices.GeoArrow,
+            exportServices.Csv,
+            attachmentServices.Orchestrator,
             metadataRegistry,
-            apiMetrics,
-            cacheHeaderService,
-            attachmentHandler,
-            elevationService,
+            observabilityServices.Metrics,
+            observabilityServices.CacheHeaders,
+            attachmentServices.Handler,
+            enrichmentServices.Elevation!,
             cancellationToken);
     }
 

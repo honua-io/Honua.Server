@@ -60,59 +60,79 @@ internal static partial class OgcFeaturesHandlers
         CancellationToken cancellationToken)
         => ExecuteCollectionItemsAsync(
             collectionId,
-            request,
+            new OgcFeaturesRequestContext
+            {
+                Request = request,
+                QueryOverrides = null
+            },
             resolver,
             repository,
-            geoPackageExporter,
-            shapefileExporter,
-            flatGeobufExporter,
-            geoArrowExporter,
-            csvExporter,
-            attachmentOrchestrator,
             metadataRegistry,
-            apiMetrics,
-            cacheHeaderService,
-            attachmentHandler,
-            elevationService,
-            logger,
-            queryOverrides: null,
+            new OgcFeatureExportServices
+            {
+                GeoPackage = geoPackageExporter,
+                Shapefile = shapefileExporter,
+                FlatGeobuf = flatGeobufExporter,
+                GeoArrow = geoArrowExporter,
+                Csv = csvExporter
+            },
+            new OgcFeatureAttachmentServices
+            {
+                Orchestrator = attachmentOrchestrator,
+                Handler = attachmentHandler
+            },
+            new OgcFeatureEnrichmentServices
+            {
+                Elevation = elevationService
+            },
+            new OgcFeatureObservabilityServices
+            {
+                Metrics = apiMetrics,
+                CacheHeaders = cacheHeaderService,
+                Logger = logger
+            },
             cancellationToken);
 
     /// <summary>
     /// Core implementation for retrieving collection items with support for various formats.
+    /// Refactored to use parameter objects for improved maintainability (18 → 10 params).
     /// </summary>
     internal static async Task<IResult> ExecuteCollectionItemsAsync(
         string collectionId,
-        HttpRequest request,
-        IFeatureContextResolver resolver,
+        OgcFeaturesRequestContext requestContext,
+        IFeatureContextResolver contextResolver,
         IFeatureRepository repository,
-        IGeoPackageExporter geoPackageExporter,
-        IShapefileExporter shapefileExporter,
-        IFlatGeobufExporter flatGeobufExporter,
-        IGeoArrowExporter geoArrowExporter,
-        ICsvExporter csvExporter,
-        IFeatureAttachmentOrchestrator attachmentOrchestrator,
         IMetadataRegistry metadataRegistry,
-        IApiMetrics apiMetrics,
-        OgcCacheHeaderService cacheHeaderService,
-        Services.IOgcFeaturesAttachmentHandler attachmentHandler,
-        Core.Elevation.IElevationService elevationService,
-        ILogger logger,
-        IQueryCollection? queryOverrides,
+        OgcFeatureExportServices exportServices,
+        OgcFeatureAttachmentServices attachmentServices,
+        OgcFeatureEnrichmentServices enrichmentServices,
+        OgcFeatureObservabilityServices observabilityServices,
         CancellationToken cancellationToken)
     {
-        Guard.NotNull(request);
-        Guard.NotNull(resolver);
+        Guard.NotNull(requestContext);
+        Guard.NotNull(contextResolver);
         Guard.NotNull(repository);
-        Guard.NotNull(geoPackageExporter);
-        Guard.NotNull(shapefileExporter);
-        Guard.NotNull(flatGeobufExporter);
-        Guard.NotNull(geoArrowExporter);
-        Guard.NotNull(csvExporter);
-        Guard.NotNull(attachmentOrchestrator);
         Guard.NotNull(metadataRegistry);
-        Guard.NotNull(apiMetrics);
-        Guard.NotNull(cacheHeaderService);
+        Guard.NotNull(exportServices);
+        Guard.NotNull(attachmentServices);
+        Guard.NotNull(enrichmentServices);
+        Guard.NotNull(observabilityServices);
+
+        // Extract properties from parameter objects for compatibility with existing code
+        var request = requestContext.Request;
+        var queryOverrides = requestContext.QueryOverrides;
+        var resolver = contextResolver;
+        var geoPackageExporter = exportServices.GeoPackage;
+        var shapefileExporter = exportServices.Shapefile;
+        var flatGeobufExporter = exportServices.FlatGeobuf;
+        var geoArrowExporter = exportServices.GeoArrow;
+        var csvExporter = exportServices.Csv;
+        var attachmentOrchestrator = attachmentServices.Orchestrator;
+        var attachmentHandler = attachmentServices.Handler;
+        var elevationService = enrichmentServices.Elevation;
+        var apiMetrics = observabilityServices.Metrics;
+        var cacheHeaderService = observabilityServices.CacheHeaders;
+        var logger = observabilityServices.Logger;
 
         var (context, contextError) = await OgcSharedHandlers.TryResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);
         if (contextError is not null)
