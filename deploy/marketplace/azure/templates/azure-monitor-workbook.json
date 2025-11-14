@@ -1,0 +1,331 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "Azure Monitor Workbook and Alert Rules for Honua IO"
+  },
+  "parameters": {
+    "workbookName": {
+      "type": "string",
+      "defaultValue": "honua-server-monitoring",
+      "metadata": {
+        "description": "Name of the Azure Monitor workbook"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region"
+      }
+    },
+    "containerAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Container App"
+      }
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics Workspace ID"
+      }
+    },
+    "postgresServerName": {
+      "type": "string",
+      "metadata": {
+        "description": "PostgreSQL server name"
+      }
+    },
+    "redisName": {
+      "type": "string",
+      "metadata": {
+        "description": "Redis cache name"
+      }
+    },
+    "alertEmail": {
+      "type": "string",
+      "metadata": {
+        "description": "Email for alert notifications"
+      }
+    }
+  },
+  "variables": {
+    "actionGroupName": "[concat(parameters('containerAppName'), '-alerts')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Insights/actionGroups",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('actionGroupName')]",
+      "location": "Global",
+      "properties": {
+        "groupShortName": "HonuaAlert",
+        "enabled": true,
+        "emailReceivers": [
+          {
+            "name": "AdminEmail",
+            "emailAddress": "[parameters('alertEmail')]",
+            "useCommonAlertSchema": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/scheduledQueryRules",
+      "apiVersion": "2023-03-15-preview",
+      "name": "[concat(parameters('containerAppName'), '-high-error-rate')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "displayName": "Honua IO - High Error Rate",
+        "description": "Alert when HTTP 5XX error rate exceeds 5%",
+        "severity": 2,
+        "enabled": true,
+        "evaluationFrequency": "PT5M",
+        "scopes": [
+          "[parameters('logAnalyticsWorkspaceId')]"
+        ],
+        "targetResourceTypes": [
+          "Microsoft.OperationalInsights/workspaces"
+        ],
+        "windowSize": "PT5M",
+        "criteria": {
+          "allOf": [
+            {
+              "query": "[concat('ContainerAppConsoleLogs_CL\n| where ContainerAppName_s == \"', parameters('containerAppName'), '\"\n| where Log_s contains \"HTTP\"\n| extend StatusCode = extract(\"HTTP/[0-9.]+ ([0-9]+)\", 1, Log_s)\n| summarize TotalRequests = count(), Errors = countif(StatusCode startswith \"5\") by bin(TimeGenerated, 5m)\n| extend ErrorRate = (Errors * 100.0) / TotalRequests\n| where ErrorRate > 5')]",
+              "timeAggregation": "Count",
+              "operator": "GreaterThan",
+              "threshold": 0,
+              "failingPeriods": {
+                "numberOfEvaluationPeriods": 2,
+                "minFailingPeriodsToAlert": 2
+              }
+            }
+          ]
+        },
+        "actions": {
+          "actionGroups": [
+            "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Insights/scheduledQueryRules",
+      "apiVersion": "2023-03-15-preview",
+      "name": "[concat(parameters('containerAppName'), '-high-latency')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "displayName": "Honua IO - High Latency",
+        "description": "Alert when average response time exceeds 2 seconds",
+        "severity": 2,
+        "enabled": true,
+        "evaluationFrequency": "PT5M",
+        "scopes": [
+          "[parameters('logAnalyticsWorkspaceId')]"
+        ],
+        "targetResourceTypes": [
+          "Microsoft.OperationalInsights/workspaces"
+        ],
+        "windowSize": "PT5M",
+        "criteria": {
+          "allOf": [
+            {
+              "query": "[concat('ContainerAppConsoleLogs_CL\n| where ContainerAppName_s == \"', parameters('containerAppName'), '\"\n| where Log_s contains \"request completed\"\n| extend Duration = extract(\"duration=([0-9.]+)ms\", 1, Log_s)\n| extend DurationSeconds = todouble(Duration) / 1000.0\n| summarize AvgDuration = avg(DurationSeconds) by bin(TimeGenerated, 5m)\n| where AvgDuration > 2.0')]",
+              "timeAggregation": "Count",
+              "operator": "GreaterThan",
+              "threshold": 0,
+              "failingPeriods": {
+                "numberOfEvaluationPeriods": 2,
+                "minFailingPeriodsToAlert": 2
+              }
+            }
+          ]
+        },
+        "actions": {
+          "actionGroups": [
+            "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Insights/metricAlerts",
+      "apiVersion": "2018-03-01",
+      "name": "[concat(parameters('postgresServerName'), '-high-cpu')]",
+      "location": "Global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "description": "Alert when PostgreSQL CPU exceeds 80%",
+        "severity": 2,
+        "enabled": true,
+        "scopes": [
+          "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))]"
+        ],
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT5M",
+        "criteria": {
+          "allOf": [
+            {
+              "name": "CPU percentage",
+              "metricName": "cpu_percent",
+              "metricNamespace": "Microsoft.DBforPostgreSQL/flexibleServers",
+              "operator": "GreaterThan",
+              "threshold": 80,
+              "timeAggregation": "Average"
+            }
+          ],
+          "odata.type": "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+        },
+        "actions": [
+          {
+            "actionGroupId": "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/metricAlerts",
+      "apiVersion": "2018-03-01",
+      "name": "[concat(parameters('postgresServerName'), '-high-connections')]",
+      "location": "Global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "description": "Alert when PostgreSQL connections exceed 80% of maximum",
+        "severity": 2,
+        "enabled": true,
+        "scopes": [
+          "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('postgresServerName'))]"
+        ],
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT5M",
+        "criteria": {
+          "allOf": [
+            {
+              "name": "Active connections",
+              "metricName": "active_connections",
+              "metricNamespace": "Microsoft.DBforPostgreSQL/flexibleServers",
+              "operator": "GreaterThan",
+              "threshold": 80,
+              "timeAggregation": "Average"
+            }
+          ],
+          "odata.type": "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+        },
+        "actions": [
+          {
+            "actionGroupId": "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/metricAlerts",
+      "apiVersion": "2018-03-01",
+      "name": "[concat(parameters('redisName'), '-high-cpu')]",
+      "location": "Global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "description": "Alert when Redis CPU exceeds 75%",
+        "severity": 2,
+        "enabled": true,
+        "scopes": [
+          "[resourceId('Microsoft.Cache/redis', parameters('redisName'))]"
+        ],
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT5M",
+        "criteria": {
+          "allOf": [
+            {
+              "name": "Server Load",
+              "metricName": "serverLoad",
+              "metricNamespace": "Microsoft.Cache/redis",
+              "operator": "GreaterThan",
+              "threshold": 75,
+              "timeAggregation": "Average"
+            }
+          ],
+          "odata.type": "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+        },
+        "actions": [
+          {
+            "actionGroupId": "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/metricAlerts",
+      "apiVersion": "2018-03-01",
+      "name": "[concat(parameters('redisName'), '-high-memory')]",
+      "location": "Global",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+      ],
+      "properties": {
+        "description": "Alert when Redis memory usage exceeds 90%",
+        "severity": 1,
+        "enabled": true,
+        "scopes": [
+          "[resourceId('Microsoft.Cache/redis', parameters('redisName'))]"
+        ],
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT5M",
+        "criteria": {
+          "allOf": [
+            {
+              "name": "Used Memory Percentage",
+              "metricName": "usedmemorypercentage",
+              "metricNamespace": "Microsoft.Cache/redis",
+              "operator": "GreaterThan",
+              "threshold": 90,
+              "timeAggregation": "Average"
+            }
+          ],
+          "odata.type": "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria"
+        },
+        "actions": [
+          {
+            "actionGroupId": "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/workbooks",
+      "apiVersion": "2023-06-01",
+      "name": "[guid(parameters('workbookName'))]",
+      "location": "[parameters('location')]",
+      "kind": "shared",
+      "properties": {
+        "displayName": "[parameters('workbookName')]",
+        "serializedData": "[concat('{\"version\":\"Notebook/1.0\",\"items\":[{\"type\":1,\"content\":{\"json\":\"# Honua IO Monitoring Dashboard\\\\n\\\\nComprehensive monitoring for Honua IO deployment\\\\n\"}}],\"styleSettings\":{},\"$schema\":\"https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json\"}')]",
+        "version": "1.0",
+        "sourceId": "[parameters('logAnalyticsWorkspaceId')]",
+        "category": "workbook"
+      }
+    }
+  ],
+  "outputs": {
+    "actionGroupId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Insights/actionGroups', variables('actionGroupName'))]"
+    },
+    "workbookId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Insights/workbooks', guid(parameters('workbookName')))]"
+    }
+  }
+}

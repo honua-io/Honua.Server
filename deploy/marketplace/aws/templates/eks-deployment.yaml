@@ -1,0 +1,999 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Honua IO Server - AWS Marketplace EKS Deployment'
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Cluster Configuration"
+        Parameters:
+          - ClusterName
+          - KubernetesVersion
+          - NodeInstanceType
+          - NodeGroupMinSize
+          - NodeGroupMaxSize
+          - NodeGroupDesiredSize
+      - Label:
+          default: "Application Configuration"
+        Parameters:
+          - LicenseTier
+          - HonuaImageTag
+          - DatabaseInstanceClass
+          - DatabaseAllocatedStorage
+          - RedisNodeType
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - VpcCIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+      - Label:
+          default: "DNS and SSL/TLS Configuration"
+        Parameters:
+          - DomainName
+          - CreateRoute53HostedZone
+          - Route53HostedZoneId
+          - CertificateArn
+          - LetsEncryptEmail
+      - Label:
+          default: "OAuth/OIDC Configuration"
+        Parameters:
+          - OAuthProvider
+          - OAuthDomain
+          - OAuthClientId
+          - OAuthClientSecret
+          - OAuthIssuer
+          - OAuthScopes
+      - Label:
+          default: "AWS Marketplace Configuration"
+        Parameters:
+          - MarketplaceProductCode
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: honua-server
+    Description: Name of the EKS cluster
+
+  KubernetesVersion:
+    Type: String
+    Default: "1.31"
+    AllowedValues:
+      - "1.31"
+      - "1.30"
+      - "1.29"
+    Description: Kubernetes version for EKS cluster
+
+  NodeInstanceType:
+    Type: String
+    Default: t3.large
+    AllowedValues:
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+    Description: EC2 instance type for EKS worker nodes
+
+  NodeGroupMinSize:
+    Type: Number
+    Default: 2
+    MinValue: 2
+    Description: Minimum number of worker nodes
+
+  NodeGroupMaxSize:
+    Type: Number
+    Default: 10
+    MinValue: 2
+    Description: Maximum number of worker nodes
+
+  NodeGroupDesiredSize:
+    Type: Number
+    Default: 2
+    MinValue: 2
+    Description: Desired number of worker nodes
+
+  LicenseTier:
+    Type: String
+    Default: Professional
+    AllowedValues:
+      - Free
+      - Professional
+      - Enterprise
+    Description: Honua IO license tier
+
+  HonuaImageTag:
+    Type: String
+    Default: latest
+    Description: Honua Server Docker image tag
+
+  DatabaseInstanceClass:
+    Type: String
+    Default: db.t3.medium
+    AllowedValues:
+      - db.t3.micro
+      - db.t3.small
+      - db.t3.medium
+      - db.t3.large
+      - db.r5.large
+      - db.r5.xlarge
+      - db.r5.2xlarge
+    Description: RDS PostgreSQL instance class
+
+  DatabaseAllocatedStorage:
+    Type: Number
+    Default: 100
+    MinValue: 20
+    MaxValue: 1000
+    Description: RDS storage size in GB
+
+  RedisNodeType:
+    Type: String
+    Default: cache.t3.medium
+    AllowedValues:
+      - cache.t3.micro
+      - cache.t3.small
+      - cache.t3.medium
+      - cache.t3.large
+      - cache.r5.large
+      - cache.r5.xlarge
+    Description: ElastiCache Redis node type
+
+  VpcCIDR:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block for VPC
+
+  PublicSubnet1CIDR:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: CIDR block for public subnet 1
+
+  PublicSubnet2CIDR:
+    Type: String
+    Default: 10.0.2.0/24
+    Description: CIDR block for public subnet 2
+
+  PrivateSubnet1CIDR:
+    Type: String
+    Default: 10.0.10.0/24
+    Description: CIDR block for private subnet 1
+
+  PrivateSubnet2CIDR:
+    Type: String
+    Default: 10.0.11.0/24
+    Description: CIDR block for private subnet 2
+
+  MarketplaceProductCode:
+    Type: String
+    Default: ""
+    Description: AWS Marketplace Product Code (auto-populated)
+
+  # DNS and SSL/TLS Configuration
+  DomainName:
+    Type: String
+    Default: ""
+    Description: |
+      Your domain name for Honua IO (e.g., honua.example.com).
+      Leave empty to use the load balancer DNS name.
+      If provided, SSL certificate will be automatically provisioned.
+
+  CreateRoute53HostedZone:
+    Type: String
+    Default: "no"
+    AllowedValues:
+      - "yes"
+      - "no"
+    Description: |
+      Create a new Route 53 hosted zone for your domain?
+      Select 'yes' if you want AWS to manage DNS for this domain.
+      You'll need to update your domain registrar with the Route 53 nameservers.
+
+  Route53HostedZoneId:
+    Type: String
+    Default: ""
+    Description: |
+      Existing Route 53 hosted zone ID (optional).
+      Provide this if you already have a hosted zone for your domain.
+      Leave empty if creating a new zone or not using custom domain.
+
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: |
+      Existing AWS Certificate Manager (ACM) certificate ARN (optional).
+      If provided, this certificate will be used for HTTPS.
+      If empty and domain is provided, a certificate will be auto-created using Let's Encrypt.
+
+  LetsEncryptEmail:
+    Type: String
+    Default: ""
+    Description: |
+      Email address for Let's Encrypt certificate notifications.
+      Required if using custom domain without existing ACM certificate.
+      You'll receive expiry notifications (certificates auto-renew).
+
+  # OAuth/OIDC Configuration (REQUIRED for cloud marketplace)
+  OAuthProvider:
+    Type: String
+    Default: cognito
+    AllowedValues:
+      - cognito
+      - azure-ad
+      - google
+      - okta
+      - auth0
+      - custom
+    Description: |
+      OAuth/OIDC identity provider (REQUIRED for cloud marketplace):
+      - cognito: AWS Cognito (creates new user pool)
+      - azure-ad: Azure Active Directory
+      - google: Google Identity Platform
+      - okta: Okta
+      - auth0: Auth0
+      - custom: Your own OIDC provider
+
+  OAuthDomain:
+    Type: String
+    Default: ""
+    Description: OAuth domain (e.g., your-domain.auth.us-east-1.amazoncognito.com or custom IdP domain)
+
+  OAuthClientId:
+    Type: String
+    Default: ""
+    Description: OAuth Client ID (leave empty to create new Cognito user pool)
+
+  OAuthClientSecret:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: OAuth Client Secret (leave empty for Cognito auto-creation)
+
+  OAuthIssuer:
+    Type: String
+    Default: ""
+    Description: OIDC Issuer URL (required for custom provider, e.g., https://your-domain.okta.com)
+
+  OAuthScopes:
+    Type: String
+    Default: "openid profile email"
+    Description: OAuth scopes to request (space-separated)
+
+Conditions:
+  CreateCognitoUserPool: !Equals [!Ref OAuthProvider, cognito]
+  UseExistingIdP: !Not [!Equals [!Ref OAuthProvider, cognito]]
+  HasDomainName: !Not [!Equals [!Ref DomainName, ""]]
+  ShouldCreateHostedZone: !And
+    - !Equals [!Ref CreateRoute53HostedZone, "yes"]
+    - !Not [!Equals [!Ref DomainName, ""]]
+  HasExistingHostedZone: !Not [!Equals [!Ref Route53HostedZoneId, ""]]
+  HasExistingCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
+  ShouldCreateCertificate: !And
+    - !Not [!Equals [!Ref DomainName, ""]]
+    - !Equals [!Ref CertificateArn, ""]
+  HasLetsEncryptEmail: !Not [!Equals [!Ref LetsEncryptEmail, ""]]
+
+Resources:
+  # AWS Cognito User Pool (if selected)
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Condition: CreateCognitoUserPool
+    Properties:
+      UserPoolName: !Sub ${ClusterName}-users
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 7
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+        - Name: name
+          Required: true
+          Mutable: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Condition: CreateCognitoUserPool
+    Properties:
+      Domain: !Sub ${ClusterName}-${AWS::AccountId}
+      UserPoolId: !Ref CognitoUserPool
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: CreateCognitoUserPool
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: !Sub ${ClusterName}-app
+      GenerateSecret: true
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - openid
+        - profile
+        - email
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - !Sub https://${ClusterName}.${AWS::Region}.elb.amazonaws.com/oauth/callback
+        - http://localhost:8080/oauth/callback  # For local testing
+      LogoutURLs:
+        - !Sub https://${ClusterName}.${AWS::Region}.elb.amazonaws.com/logout
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+
+  CognitoUserPoolClientSecret:
+    Type: AWS::SecretsManager::Secret
+    Condition: CreateCognitoUserPool
+    Properties:
+      Name: !Sub ${ClusterName}-cognito-client-secret
+      Description: Cognito User Pool Client Secret
+      SecretString: !Sub |
+        {
+          "clientId": "${CognitoUserPoolClient}",
+          "clientSecret": "${CognitoUserPoolClient.ClientSecret}",
+          "issuer": "https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}",
+          "domain": "${CognitoUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
+        }
+
+  # DNS - Route 53 Hosted Zone (optional)
+  Route53HostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: ShouldCreateHostedZone
+    Properties:
+      Name: !Ref DomainName
+      HostedZoneConfig:
+        Comment: !Sub Managed by Honua IO CloudFormation stack ${AWS::StackName}
+      HostedZoneTags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-hosted-zone
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # SSL/TLS - ACM Certificate (for ALB, optional if using cert-manager)
+  ACMCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: ShouldCreateCertificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub "*.${DomainName}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !If
+            - ShouldCreateHostedZone
+            - !Ref Route53HostedZone
+            - !Ref Route53HostedZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-certificate
+
+  # VPC and Networking
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-igw
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-public-subnet-1
+        - Key: kubernetes.io/role/elb
+          Value: 1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-public-subnet-2
+        - Key: kubernetes.io/role/elb
+          Value: 1
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-private-subnet-1
+        - Key: kubernetes.io/role/internal-elb
+          Value: 1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-private-subnet-2
+        - Key: kubernetes.io/role/internal-elb
+          Value: 1
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref PublicSubnet2
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-public-routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-private-routes-1
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-private-routes-2
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+  # Security Groups
+  EKSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for EKS cluster
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-eks-sg
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for RDS PostgreSQL
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref EKSSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-rds-sg
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ElastiCache Redis
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref EKSSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-redis-sg
+
+  # IAM Roles
+  EKSClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSVPCResourceController
+
+  EKSNodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+  HonuaServiceAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/${EKSCluster.OpenIdConnectIssuerUrl}'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                !Sub '${EKSCluster.OpenIdConnectIssuerUrl}:sub': 'system:serviceaccount:default:honua-server'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSMarketplaceMeteringRegisterUsage
+      Policies:
+        - PolicyName: HonuaServerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub '${HonuaS3Bucket.Arn}'
+                  - !Sub '${HonuaS3Bucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource:
+                  - !Ref DatabasePasswordSecret
+              - Effect: Allow
+                Action:
+                  - aws-marketplace:MeterUsage
+                Resource: '*'
+
+  # IAM Role for cert-manager (Let's Encrypt DNS-01 challenges)
+  CertManagerServiceAccountRole:
+    Type: AWS::IAM::Role
+    Condition: HasDomainName
+    Properties:
+      RoleName: !Sub ${ClusterName}-cert-manager-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/${EKSCluster.OpenIdConnectIssuerUrl}'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                !Sub '${EKSCluster.OpenIdConnectIssuerUrl}:sub': 'system:serviceaccount:cert-manager:cert-manager'
+      Policies:
+        - PolicyName: CertManagerRoute53Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - route53:GetChange
+                Resource: 'arn:aws:route53:::change/*'
+              - Effect: Allow
+                Action:
+                  - route53:ChangeResourceRecordSets
+                  - route53:ListResourceRecordSets
+                Resource: !Sub
+                  - 'arn:aws:route53:::hostedzone/${HostedZoneId}'
+                  - HostedZoneId: !If [ShouldCreateHostedZone, !Ref Route53HostedZone, !Ref Route53HostedZoneId]
+              - Effect: Allow
+                Action:
+                  - route53:ListHostedZonesByName
+                  - route53:ListHostedZones
+                Resource: '*'
+
+  # IAM Role for external-dns (automatic DNS record management)
+  ExternalDnsServiceAccountRole:
+    Type: AWS::IAM::Role
+    Condition: HasDomainName
+    Properties:
+      RoleName: !Sub ${ClusterName}-external-dns-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/${EKSCluster.OpenIdConnectIssuerUrl}'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                !Sub '${EKSCluster.OpenIdConnectIssuerUrl}:sub': 'system:serviceaccount:external-dns:external-dns'
+      Policies:
+        - PolicyName: ExternalDnsRoute53Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - route53:ChangeResourceRecordSets
+                Resource: !Sub
+                  - 'arn:aws:route53:::hostedzone/${HostedZoneId}'
+                  - HostedZoneId: !If [ShouldCreateHostedZone, !Ref Route53HostedZone, !Ref Route53HostedZoneId]
+              - Effect: Allow
+                Action:
+                  - route53:ListHostedZones
+                  - route53:ListResourceRecordSets
+                  - route53:ListTagsForResource
+                Resource: '*'
+
+  # EKS Cluster
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref ClusterName
+      Version: !Ref KubernetesVersion
+      RoleArn: !GetAtt EKSClusterRole.Arn
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !Ref EKSSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+          - !Ref PublicSubnet1
+          - !Ref PublicSubnet2
+      Logging:
+        ClusterLogging:
+          EnabledTypes:
+            - Type: api
+            - Type: audit
+            - Type: authenticator
+            - Type: controllerManager
+            - Type: scheduler
+
+  EKSNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    DependsOn: EKSCluster
+    Properties:
+      ClusterName: !Ref ClusterName
+      NodegroupName: !Sub ${ClusterName}-nodegroup
+      NodeRole: !GetAtt EKSNodeRole.Arn
+      Subnets:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      ScalingConfig:
+        MinSize: !Ref NodeGroupMinSize
+        MaxSize: !Ref NodeGroupMaxSize
+        DesiredSize: !Ref NodeGroupDesiredSize
+      InstanceTypes:
+        - !Ref NodeInstanceType
+      AmiType: AL2_x86_64
+      UpdateConfig:
+        MaxUnavailable: 1
+
+  # RDS PostgreSQL Database
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for Honua RDS database
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  DatabasePasswordSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Database password for Honua Server
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "honua"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub ${ClusterName}-db
+      DBName: honua
+      Engine: postgres
+      EngineVersion: "16.3"
+      DBInstanceClass: !Ref DatabaseInstanceClass
+      AllocatedStorage: !Ref DatabaseAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      MasterUsername: honua
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DatabasePasswordSecret}:SecretString:password}}'
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: "03:00-04:00"
+      PreferredMaintenanceWindow: "sun:04:00-sun:05:00"
+      MultiAZ: true
+      PubliclyAccessible: false
+      EnablePerformanceInsights: true
+      PerformanceInsightsRetentionPeriod: 7
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-database
+
+  # ElastiCache Redis
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Subnet group for Honua Redis cache
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+
+  RedisCluster:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupId: !Sub ${ClusterName}-redis
+      ReplicationGroupDescription: Redis cluster for Honua Server
+      Engine: redis
+      EngineVersion: "7.1"
+      CacheNodeType: !Ref RedisNodeType
+      NumCacheClusters: 2
+      AutomaticFailoverEnabled: true
+      MultiAZEnabled: true
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      SecurityGroupIds:
+        - !Ref RedisSecurityGroup
+      AtRestEncryptionEnabled: true
+      TransitEncryptionEnabled: true
+      SnapshotRetentionLimit: 5
+      SnapshotWindow: "03:00-05:00"
+      PreferredMaintenanceWindow: "sun:05:00-sun:07:00"
+
+  # S3 Bucket for attachments and data
+  HonuaS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ClusterName}-data-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+
+Outputs:
+  ClusterName:
+    Description: EKS Cluster Name
+    Value: !Ref ClusterName
+    Export:
+      Name: !Sub ${AWS::StackName}-ClusterName
+
+  ClusterEndpoint:
+    Description: EKS Cluster Endpoint
+    Value: !GetAtt EKSCluster.Endpoint
+    Export:
+      Name: !Sub ${AWS::StackName}-ClusterEndpoint
+
+  DatabaseEndpoint:
+    Description: RDS Database Endpoint
+    Value: !GetAtt Database.Endpoint.Address
+    Export:
+      Name: !Sub ${AWS::StackName}-DatabaseEndpoint
+
+  DatabasePort:
+    Description: RDS Database Port
+    Value: !GetAtt Database.Endpoint.Port
+    Export:
+      Name: !Sub ${AWS::StackName}-DatabasePort
+
+  RedisEndpoint:
+    Description: ElastiCache Redis Endpoint
+    Value: !GetAtt RedisCluster.PrimaryEndPoint.Address
+    Export:
+      Name: !Sub ${AWS::StackName}-RedisEndpoint
+
+  RedisPort:
+    Description: ElastiCache Redis Port
+    Value: !GetAtt RedisCluster.PrimaryEndPoint.Port
+    Export:
+      Name: !Sub ${AWS::StackName}-RedisPort
+
+  S3BucketName:
+    Description: S3 Bucket for data storage
+    Value: !Ref HonuaS3Bucket
+    Export:
+      Name: !Sub ${AWS::StackName}-S3Bucket
+
+  ServiceAccountRoleArn:
+    Description: IAM Role ARN for Honua Server Service Account
+    Value: !GetAtt HonuaServiceAccountRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ServiceAccountRoleArn
+
+  CertManagerRoleArn:
+    Condition: HasDomainName
+    Description: IAM Role ARN for cert-manager (for Let's Encrypt DNS-01 challenges)
+    Value: !GetAtt CertManagerServiceAccountRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-CertManagerRoleArn
+
+  ExternalDnsRoleArn:
+    Condition: HasDomainName
+    Description: IAM Role ARN for external-dns (for automatic DNS record management)
+    Value: !GetAtt ExternalDnsServiceAccountRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ExternalDnsRoleArn
+
+  DatabasePasswordSecretArn:
+    Description: ARN of the database password secret
+    Value: !Ref DatabasePasswordSecret
+    Export:
+      Name: !Sub ${AWS::StackName}-DatabasePasswordSecret
+
+  Route53HostedZoneId:
+    Description: Route 53 Hosted Zone ID (if created)
+    Value: !If [ShouldCreateHostedZone, !Ref Route53HostedZone, !If [HasExistingHostedZone, !Ref Route53HostedZoneId, "N/A - No hosted zone"]]
+    Export:
+      Name: !Sub ${AWS::StackName}-HostedZoneId
+
+  Route53Nameservers:
+    Condition: ShouldCreateHostedZone
+    Description: Route 53 Nameservers (update these at your domain registrar)
+    Value: !Join [", ", !GetAtt Route53HostedZone.NameServers]
+
+  ACMCertificateArn:
+    Description: ACM Certificate ARN for HTTPS
+    Value: !If [ShouldCreateCertificate, !Ref ACMCertificate, !If [HasExistingCertificate, !Ref CertificateArn, "N/A - Using Let's Encrypt"]]
+    Export:
+      Name: !Sub ${AWS::StackName}-CertificateArn
+
+  DomainURL:
+    Condition: HasDomainName
+    Description: Your Honua IO application URL
+    Value: !Sub https://${DomainName}
+
+  NextSteps:
+    Description: Next steps to complete deployment
+    Value: !Sub |
+      1. Configure kubectl: aws eks update-kubeconfig --name ${ClusterName} --region ${AWS::Region}
+      2. ${If [ShouldCreateHostedZone, !Sub "Update your domain registrar with Route 53 nameservers (see Route53Nameservers output)", "DNS is ready"]}
+      3. Deploy Honua Server: kubectl apply -f kubernetes-manifest.yaml
+      4. ${If [HasDomainName, !Sub "Access Honua IO at: https://${DomainName}", "Get LoadBalancer URL: kubectl get svc honua-gateway -n honua-system"]}
+      5. Create your first OAuth user (see OAUTH_SETUP_GUIDE.md for instructions)

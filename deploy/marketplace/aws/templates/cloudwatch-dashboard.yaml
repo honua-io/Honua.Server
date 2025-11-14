@@ -1,0 +1,230 @@
+# AWS CloudWatch Dashboard and Alarms for Honua IO
+# This CloudFormation template creates a comprehensive monitoring dashboard and alarms
+#
+# To add to your main template, include this as a nested stack or copy resources
+
+Parameters:
+  ClusterName:
+    Type: String
+    Description: EKS cluster name or ECS cluster name
+
+  DeploymentType:
+    Type: String
+    Default: eks
+    AllowedValues:
+      - eks
+      - ecs-fargate
+    Description: Type of deployment (EKS or ECS Fargate)
+
+  AlertEmail:
+    Type: String
+    Description: Email address for CloudWatch alarms
+
+  DatabaseIdentifier:
+    Type: String
+    Description: RDS database identifier
+
+  RedisClusterId:
+    Type: String
+    Description: ElastiCache Redis cluster ID
+
+Resources:
+  # SNS Topic for Alerts
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${ClusterName}-honua-alerts
+      DisplayName: Honua IO CloudWatch Alerts
+      Subscription:
+        - Endpoint: !Ref AlertEmail
+          Protocol: email
+
+  # CloudWatch Dashboard
+  HonuaDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub ${ClusterName}-honua-monitoring
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/ApplicationELB", "TargetResponseTime", {"stat": "Average"}],
+                  [".", "RequestCount", {"stat": "Sum"}],
+                  [".", "HTTPCode_Target_5XX_Count", {"stat": "Sum"}],
+                  [".", "HTTPCode_Target_4XX_Count", {"stat": "Sum"}]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Application Load Balancer Metrics",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/RDS", "CPUUtilization", {"stat": "Average", "dimensions": {"DBInstanceIdentifier": "${DatabaseIdentifier}"}}],
+                  [".", "DatabaseConnections", {"stat": "Sum", "dimensions": {"DBInstanceIdentifier": "${DatabaseIdentifier}"}}],
+                  [".", "FreeableMemory", {"stat": "Average", "dimensions": {"DBInstanceIdentifier": "${DatabaseIdentifier}"}}],
+                  [".", "ReadLatency", {"stat": "Average", "dimensions": {"DBInstanceIdentifier": "${DatabaseIdentifier}"}}],
+                  [".", "WriteLatency", {"stat": "Average", "dimensions": {"DBInstanceIdentifier": "${DatabaseIdentifier}"}}]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "RDS Database Performance",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "properties": {
+                "metrics": [
+                  ["AWS/ElastiCache", "CPUUtilization", {"stat": "Average", "dimensions": {"CacheClusterId": "${RedisClusterId}"}}],
+                  [".", "NetworkBytesIn", {"stat": "Sum", "dimensions": {"CacheClusterId": "${RedisClusterId}"}}],
+                  [".", "NetworkBytesOut", {"stat": "Sum", "dimensions": {"CacheClusterId": "${RedisClusterId}"}}],
+                  [".", "CurrConnections", {"stat": "Average", "dimensions": {"CacheClusterId": "${RedisClusterId}"}}],
+                  [".", "Evictions", {"stat": "Sum", "dimensions": {"CacheClusterId": "${RedisClusterId}"}}]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Redis Cache Performance",
+                "period": 300
+              }
+            },
+            {
+              "type": "log",
+              "properties": {
+                "query": "SOURCE '/aws/containerinsights/${ClusterName}/application'\n| fields @timestamp, @message\n| filter @message like /ERROR/\n| sort @timestamp desc\n| limit 100",
+                "region": "${AWS::Region}",
+                "title": "Application Errors (Last 100)",
+                "stacked": false
+              }
+            }
+          ]
+        }
+
+  # Alarms
+  HighErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ClusterName}-high-error-rate
+      AlarmDescription: Alert when 5XX error rate exceeds 5%
+      MetricName: HTTPCode_Target_5XX_Count
+      Namespace: AWS/ApplicationELB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 50
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  HighLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ClusterName}-high-latency
+      AlarmDescription: Alert when average response time exceeds 2 seconds
+      MetricName: TargetResponseTime
+      Namespace: AWS/ApplicationELB
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 2.0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  DatabaseCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ClusterName}-database-high-cpu
+      AlarmDescription: Alert when database CPU exceeds 80%
+      MetricName: CPUUtilization
+      Namespace: AWS/RDS
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref DatabaseIdentifier
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  DatabaseConnectionsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ClusterName}-database-high-connections
+      AlarmDescription: Alert when database connections exceed 80% of max
+      MetricName: DatabaseConnections
+      Namespace: AWS/RDS
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref DatabaseIdentifier
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  RedisCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ClusterName}-redis-high-cpu
+      AlarmDescription: Alert when Redis CPU exceeds 75%
+      MetricName: CPUUtilization
+      Namespace: AWS/ElastiCache
+      Dimensions:
+        - Name: CacheClusterId
+          Value: !Ref RedisClusterId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 75
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+  RedisEvictionsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ClusterName}-redis-evictions
+      AlarmDescription: Alert when Redis starts evicting keys (memory pressure)
+      MetricName: Evictions
+      Namespace: AWS/ElastiCache
+      Dimensions:
+        - Name: CacheClusterId
+          Value: !Ref RedisClusterId
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+
+Outputs:
+  DashboardURL:
+    Description: CloudWatch Dashboard URL
+    Value: !Sub https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${HonuaDashboard}
+
+  AlertTopicArn:
+    Description: SNS Topic ARN for alerts
+    Value: !Ref AlertTopic
+    Export:
+      Name: !Sub ${AWS::StackName}-AlertTopicArn
