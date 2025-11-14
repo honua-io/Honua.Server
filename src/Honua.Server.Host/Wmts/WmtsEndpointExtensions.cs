@@ -2,6 +2,8 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Honua.Server.Host.Wmts;
 
@@ -16,8 +18,16 @@ internal static class WmtsEndpointExtensions
 
         var wmtsGroup = endpoints.MapGroup("/wmts")
             .WithTags("WMTS")
-            .RequireRateLimiting("OgcApiPolicy")
-            .RequireAuthorization("RequireViewer");
+            .RequireRateLimiting("OgcApiPolicy");
+
+        // Only require authorization if authentication is enforced
+        var configuration = endpoints.ServiceProvider.GetRequiredService<IConfiguration>();
+        var authEnforced = configuration.GetValue<bool>("honua:authentication:enforce", true);
+
+        if (authEnforced)
+        {
+            wmtsGroup.RequireAuthorization("RequireViewer");
+        }
 
         wmtsGroup.MapGet("", WmtsHandlers.HandleAsync)
             .WithName($"{endpointPrefix}WMTS-GET");

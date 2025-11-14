@@ -151,6 +151,15 @@ public class WebApplicationFactoryFixture<TProgram> : WebApplicationFactory<TPro
                 max_record_count        = 10000
             }
 
+            # Test service instance for GeoServices REST integration tests
+            service "test-service" {
+                enabled                 = true
+                type                    = "geoservices_rest"
+                version                 = "10.81"
+                default_max_record_count = 1000
+                max_record_count        = 10000
+            }
+
             # Test layer for OGC API Features
             layer "test_features" {
                 title       = "Test Features"
@@ -262,7 +271,7 @@ public class WebApplicationFactoryFixture<TProgram> : WebApplicationFactory<TPro
                     srid   = 4326
                 }
 
-                services = ["geoservices_rest"]
+                services = ["geoservices_rest", "test-service"]
             }
             """;
 

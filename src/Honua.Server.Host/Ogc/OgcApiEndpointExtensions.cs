@@ -47,8 +47,16 @@ internal static class OgcApiEndpointExtensions
 
         // Require viewer access by default; selectively relax for spec-mandated public endpoints.
         var group = endpoints
-            .MapGroup("/ogc")
-            .RequireAuthorization("RequireViewer");
+            .MapGroup("/ogc");
+
+        // Only require authorization if authentication is enforced
+        var configuration = endpoints.ServiceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+        var authEnforced = configuration.GetValue<bool>("honua:authentication:enforce", true);
+
+        if (authEnforced)
+        {
+            group.RequireAuthorization("RequireViewer");
+        }
 
         // Landing and Common endpoints - MUST be public per OGC API specification
         group.MapGet("/", OgcLandingHandlers.GetLanding).AllowAnonymous();

@@ -6,6 +6,8 @@ using Honua.Server.Host.Middleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Honua.Server.Host.Csw;
 
@@ -20,9 +22,18 @@ public static class CswEndpointExtensions
 
         var cswGroup = endpoints.MapGroup("/csw")
             .WithTags("CSW")
-            .WithMetadata(new EndpointNameMetadata("CSW 2.0.2"))
-            .RequireAuthorization("RequireViewer");
-            // Rate limiting moved to YARP reverse proxy
+            .WithMetadata(new EndpointNameMetadata("CSW 2.0.2"));
+
+        // Only require authorization if authentication is enforced
+        var configuration = endpoints.ServiceProvider.GetRequiredService<IConfiguration>();
+        var authEnforced = configuration.GetValue<bool>("honua:authentication:enforce", true);
+
+        if (authEnforced)
+        {
+            cswGroup.RequireAuthorization("RequireViewer");
+        }
+
+        // Rate limiting moved to YARP reverse proxy
 
         cswGroup.MapGet("", CswHandlers.HandleAsync)
             .WithName($"{endpointPrefix}CSW-GET")

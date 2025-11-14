@@ -7,6 +7,8 @@ using Honua.Server.Host.Middleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Honua.Server.Host.Wcs;
 
@@ -21,9 +23,18 @@ public static class WcsEndpointExtensions
 
         var wcsGroup = endpoints.MapGroup("/wcs")
             .WithTags("WCS")
-            .WithMetadata(new EndpointNameMetadata("WCS 2.0.1"))
-            .RequireAuthorization("RequireViewer");
-            // Rate limiting moved to YARP reverse proxy
+            .WithMetadata(new EndpointNameMetadata("WCS 2.0.1"));
+
+        // Only require authorization if authentication is enforced
+        var configuration = endpoints.ServiceProvider.GetRequiredService<IConfiguration>();
+        var authEnforced = configuration.GetValue<bool>("honua:authentication:enforce", true);
+
+        if (authEnforced)
+        {
+            wcsGroup.RequireAuthorization("RequireViewer");
+        }
+
+        // Rate limiting moved to YARP reverse proxy
 
         wcsGroup.MapGet("", WcsHandlers.HandleAsync)
             .WithName($"{endpointPrefix}WCS-GET")
