@@ -147,7 +147,7 @@ public sealed class FilterParsingCacheService : IDisposable
     /// </summary>
     public void Clear()
     {
-        if (_cache is MemoryCache memCache)
+        if (this.cache is MemoryCache memCache)
         {
             memCache.Compact(1.0); // Remove 100% of entries
             this.logger.LogInformation("Filter parsing cache cleared");

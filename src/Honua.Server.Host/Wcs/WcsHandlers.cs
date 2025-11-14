@@ -1268,7 +1268,7 @@ internal static class WcsHandlers
 
             if (!this.cacheControl.IsNullOrEmpty())
             {
-                httpContext.Response.Headers.CacheControl = _cacheControl;
+                httpContext.Response.Headers.CacheControl = this.cacheControl;
             }
 
             httpContext.Response.Headers.Vary = "Accept-Encoding";

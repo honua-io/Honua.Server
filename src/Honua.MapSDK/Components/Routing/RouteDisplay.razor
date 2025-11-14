@@ -301,11 +301,11 @@
         }
     }
 
-    private async Task LoadElevationData()
+    private Task LoadElevationData()
     {
         // In a real implementation, you would fetch elevation data from a service
         // For now, generate sample data
-        if (Route == null) return;
+        if (Route == null) return Task.CompletedTask;
 
         var coordinates = VisualizationService.ParseRouteGeometry(Route);
         var sampleCount = Math.Min(100, coordinates.Count);
@@ -341,6 +341,7 @@
             MinElevation = (int)ElevationData.Min(e => e.ElevationMeters);
             ElevationGain = CalculateElevationGain();
         }
+        return Task.CompletedTask;
     }
 
     private string GenerateElevationPath()
@@ -396,7 +397,7 @@
         return R * c;
     }
 
-    private async Task ZoomToRoute()
+    private Task ZoomToRoute()
     {
         if (Route?.Geometry != null)
         {
@@ -404,6 +405,7 @@
             // This would need to be computed from the route's geometry
             // For now, we'll skip this functionality until geometry structure is confirmed
         }
+        return Task.CompletedTask;
     }
 
     private void ToggleElevationProfile()
@@ -440,7 +442,7 @@
         AnimationProgress = 0;
     }
 
-    private async Task HighlightLeg(int legIndex)
+    private Task HighlightLeg(int legIndex)
     {
         // Highlight specific leg on map
         if (Route?.Legs != null && legIndex < Route.Legs.Count)
@@ -453,6 +455,7 @@
             };
             // Would need to implement highlight functionality in visualization service
         }
+        return Task.CompletedTask;
     }
 
     private async Task SelectAlternativeRoute(int index)

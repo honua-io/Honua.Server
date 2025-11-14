@@ -37,7 +37,6 @@ namespace Honua.Server.Host.Stac;
 /// Supports both GET and POST search operations as defined in the STAC API specification.
 /// </remarks>
 [ApiController]
-[Authorize(Policy = "RequireViewer")]
 [Route("v1/stac/search")]
 public sealed class StacSearchController : ControllerBase
 {
@@ -312,7 +311,7 @@ public sealed class StacSearchController : ControllerBase
 
         return await OperationInstrumentation.Create<ActionResult<StacItemCollectionResponse>>("STAC Search")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithLogLevels(LogLevel.Information, LogLevel.Error)
             .WithTag("stac.operation", "Search")
             .WithTag("stac.collections", request.Collections is not null ? string.Join(",", request.Collections) : "all")

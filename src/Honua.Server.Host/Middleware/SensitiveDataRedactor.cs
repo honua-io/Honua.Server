@@ -158,7 +158,7 @@ public sealed class SensitiveDataRedactor
             return true;
 
         // Check regex patterns
-        foreach (var pattern in _sensitivePatterns)
+        foreach (var pattern in this.sensitivePatterns)
         {
             if (pattern.IsMatch(fieldName))
                 return true;

@@ -16,7 +16,6 @@ public class DrawingManager : IDrawingManager
     private readonly List<DrawnGeometry> _geometries = new();
     private readonly Stack<DrawingOperation> _undoStack = new();
     private readonly Stack<DrawingOperation> _redoStack = new();
-    private DrawnGeometry? _currentDrawing;
     private List<double[]> _currentCoordinates = new();
 
     public DrawingMode CurrentMode { get; private set; } = DrawingMode.None;
@@ -62,7 +61,6 @@ public class DrawingManager : IDrawingManager
     {
         CurrentMode = DrawingMode.None;
         _currentCoordinates.Clear();
-        _currentDrawing = null;
         return Task.CompletedTask;
     }
 
@@ -117,7 +115,6 @@ public class DrawingManager : IDrawingManager
 
         CurrentMode = DrawingMode.None;
         _currentCoordinates.Clear();
-        _currentDrawing = null;
 
         return Task.CompletedTask;
     }
@@ -127,7 +124,6 @@ public class DrawingManager : IDrawingManager
         var mode = CurrentMode;
         CurrentMode = DrawingMode.None;
         _currentCoordinates.Clear();
-        _currentDrawing = null;
 
         DrawingCancelled?.Invoke(this, new DrawingCancelledEventArgs
         {
@@ -423,7 +419,7 @@ public class DrawingManager : IDrawingManager
         return sb.ToString();
     }
 
-    public async Task<List<DrawnGeometry>> ImportFromGeoJsonAsync(string geoJson)
+    public Task<List<DrawnGeometry>> ImportFromGeoJsonAsync(string geoJson)
     {
         var options = new JsonSerializerOptions
         {
@@ -446,7 +442,7 @@ public class DrawingManager : IDrawingManager
             }
         }
 
-        return imported;
+        return Task.FromResult(imported);
     }
 
     public Task<List<DrawnGeometry>> ImportFromWktAsync(string wkt, DrawingStyle? style = null)

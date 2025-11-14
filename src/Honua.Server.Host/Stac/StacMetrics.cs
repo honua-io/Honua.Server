@@ -83,27 +83,27 @@ public sealed class StacMetrics
     /// <summary>
     /// Gets the write operations counter for use with OperationInstrumentation.
     /// </summary>
-    public Counter<long> WriteOperationsCounter => _writeOperationsCounter;
+    public Counter<long> WriteOperationsCounter => this.writeOperationsCounter;
 
     /// <summary>
     /// Gets the write operation errors counter for use with OperationInstrumentation.
     /// </summary>
-    public Counter<long> WriteOperationErrorsCounter => _writeOperationErrorsCounter;
+    public Counter<long> WriteOperationErrorsCounter => this.writeOperationErrorsCounter;
 
     /// <summary>
     /// Gets the write operation duration histogram for use with OperationInstrumentation.
     /// </summary>
-    public Histogram<double> WriteOperationDuration => _writeOperationDuration;
+    public Histogram<double> WriteOperationDuration => this.writeOperationDuration;
 
     /// <summary>
     /// Gets the read operations counter for use with OperationInstrumentation.
     /// </summary>
-    public Counter<long> ReadOperationsCounter => _readOperationsCounter;
+    public Counter<long> ReadOperationsCounter => this.readOperationsCounter;
 
     /// <summary>
     /// Gets the read operation duration histogram for use with OperationInstrumentation.
     /// </summary>
-    public Histogram<double> ReadOperationDuration => _readOperationDuration;
+    public Histogram<double> ReadOperationDuration => this.readOperationDuration;
 
     public void RecordWriteOperation(string operationType, string resourceType, bool success)
     {

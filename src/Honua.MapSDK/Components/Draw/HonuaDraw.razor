@@ -434,11 +434,12 @@
     private List<List<DrawingFeature>> _history = new();
     private int _historyIndex = -1;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         _measurementUnit = MeasurementUnit;
         SetupSubscriptions();
         _dotNetRef = DotNetObjectReference.Create(this);
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

@@ -107,7 +107,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 var (parameters, error) = await GeoservicesRESTRasterExportHelper.TryParseExportRequestAsync(
                     Request,
                     serviceView,
-                    _rasterRegistry,
+                    this.rasterRegistry,
                     cancellationToken,
                     datasetFilter: IsRenderableDataset).ConfigureAwait(false);
 
@@ -117,7 +117,7 @@ public sealed class GeoservicesRESTImageServerController : ControllerBase
                 }
 
                 var style = await GeoservicesRESTRasterExportHelper.ResolveStyleDefinitionAsync(
-                    _metadataRegistry,
+                    this.metadataRegistry,
                     parameters!.Dataset,
                     parameters.StyleId,
                     cancellationToken).ConfigureAwait(false);

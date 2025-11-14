@@ -45,7 +45,8 @@ public class GeoJsonSerializationBenchmarks
     public void Setup()
     {
         var factory = new GeometryFactory(new PrecisionModel(), 4326);
-        _geoJsonReader = new GeoJsonReader(factory);
+        // GeoJsonReader parameterless constructor uses default factory
+        _geoJsonReader = new GeoJsonReader();
         _geoJsonWriter = new GeoJsonWriter();
 
         _newtonsoftSettings = new JsonSerializerSettings

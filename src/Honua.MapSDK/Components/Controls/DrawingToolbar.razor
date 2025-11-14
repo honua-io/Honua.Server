@@ -283,11 +283,11 @@
         }
     }
 
-    private async Task<bool> ConfirmClearAll()
+    private Task<bool> ConfirmClearAll()
     {
         // In a real implementation, show a confirmation dialog
         // For now, return true
-        return true;
+        return Task.FromResult(true);
     }
 
     private async Task ExportGeoJson()

@@ -66,7 +66,7 @@ public sealed class StacCatalogController : ControllerBase
 
         return await OperationInstrumentation.Create<ActionResult<StacRootResponse>>("STAC GetRoot")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("stac.operation", "GetRoot")
             .WithTag("operation", "get_root")
@@ -106,7 +106,7 @@ public sealed class StacCatalogController : ControllerBase
 
         return await OperationInstrumentation.Create<ActionResult<StacConformanceResponse>>("STAC GetConformance")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("stac.operation", "GetConformance")
             .WithTag("operation", "get_conformance")

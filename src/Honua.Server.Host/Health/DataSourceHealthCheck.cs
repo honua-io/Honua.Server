@@ -27,7 +27,7 @@ public sealed class DataSourceHealthCheck : IHealthCheck
     {
         this.registry = Guard.NotNull(registry);
         this.logger = Guard.NotNull(logger);
-        this.contributors = Guard.NotNull(contributors)
+        _contributors = Guard.NotNull(contributors)
             .ToDictionary(c => c.Provider, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -47,7 +47,7 @@ public sealed class DataSourceHealthCheck : IHealthCheck
         foreach (var dataSource in snapshot.DataSources)
         {
             var providerId = dataSource.Provider ?? string.Empty;
-            if (!this.contributors.TryGetValue(providerId, out var contributor))
+            if (!_contributors.TryGetValue(providerId, out var contributor))
             {
                 details[dataSource.Id] = new Dictionary<string, object?>
                 {

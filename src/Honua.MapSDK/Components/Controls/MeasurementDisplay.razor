@@ -249,10 +249,10 @@
         };
     }
 
-    private async Task CopyToClipboard()
+    private Task CopyToClipboard()
     {
         if (CurrentMeasurement == null)
-            return;
+            return Task.CompletedTask;
 
         var text = CurrentMeasurement.FormattedValue;
 
@@ -269,6 +269,7 @@
         // In a real implementation, use JS Interop to copy to clipboard
         // await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
         Console.WriteLine($"Copied to clipboard: {text}");
+        return Task.CompletedTask;
     }
 
     private void ClearMeasurement()

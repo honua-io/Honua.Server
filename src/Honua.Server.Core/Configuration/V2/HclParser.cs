@@ -111,6 +111,9 @@ public sealed class HclParser
                 case "log_level":
                     settings = settings with { LogLevel = ReadString() };
                     break;
+                case "allowed_hosts":
+                    settings = settings with { AllowedHosts = ReadStringList() };
+                    break;
                 case "cors":
                     hasCors = true;
                     corsSettings = ParseCorsBlock();
@@ -706,7 +709,11 @@ public sealed class HclParser
         var word = PeekWord();
         if (word == "env" || word == "var")
         {
-            return ReadWord() + "(" + ReadString() + ")";
+            var functionName = ReadWord();
+            Expect("(");
+            var argument = ReadString();
+            Expect(")");
+            return functionName + "(" + argument + ")";
         }
 
         return ReadString();

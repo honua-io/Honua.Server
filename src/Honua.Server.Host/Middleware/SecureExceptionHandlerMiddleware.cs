@@ -39,7 +39,7 @@ public sealed class SecureExceptionHandlerMiddleware
     {
         try
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

@@ -12,16 +12,21 @@ namespace Honua.Server.Host.Print;
 
 internal static class MapFishPrintEndpointExtensions
 {
-    public static IEndpointRouteBuilder MapMapFishPrint(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapMapFishPrint(this IEndpointRouteBuilder endpoints, string? prefix = null)
     {
         Guard.NotNull(endpoints);
+
+        var endpointPrefix = string.IsNullOrEmpty(prefix) ? "" : $"{prefix}-";
 
         var group = endpoints.MapGroup("/print");
         group.RequireAuthorization("RequireViewer");
 
-        group.MapGet("/apps.json", MapFishPrintHandlers.GetApplicationsAsync);
-        group.MapGet("/apps/{appId}.json", MapFishPrintHandlers.GetApplicationCapabilitiesAsync);
+        group.MapGet("/apps.json", MapFishPrintHandlers.GetApplicationsAsync)
+            .WithName($"{endpointPrefix}PrintGetApplications");
+        group.MapGet("/apps/{appId}.json", MapFishPrintHandlers.GetApplicationCapabilitiesAsync)
+            .WithName($"{endpointPrefix}PrintGetAppCapabilities");
         group.MapPost("/apps/{appId}/report.{format}", MapFishPrintHandlers.CreateReportAsync)
+            .WithName($"{endpointPrefix}PrintCreateReport")
             .Accepts<MapFishPrintSpec>("application/json")
             .Produces<FileStreamHttpResult>(StatusCodes.Status200OK, "application/pdf");
 

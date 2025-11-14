@@ -42,7 +42,7 @@ public sealed class RequestResponseLoggingMiddleware
         // Skip logging for health checks and metrics endpoints to avoid noise
         if (ShouldSkipLogging(context.Request.Path))
         {
-            await _next(context);
+            await this.next(context);
             return;
         }
 
@@ -57,7 +57,7 @@ public sealed class RequestResponseLoggingMiddleware
 
         try
         {
-            await _next(context);
+            await this.next(context);
         }
         finally
         {

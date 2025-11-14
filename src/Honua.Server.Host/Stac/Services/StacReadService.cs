@@ -50,7 +50,7 @@ public sealed class StacReadService
     /// <summary>
     /// Checks if STAC is enabled in the configuration.
     /// </summary>
-    public bool IsStacEnabled() => StacRequestHelpers.IsStacEnabled(_honuaConfig);
+    public bool IsStacEnabled() => StacRequestHelpers.IsStacEnabled(this.honuaConfig);
 
     /// <summary>
     /// Gets all collections from the catalog.
@@ -59,7 +59,7 @@ public sealed class StacReadService
     {
         return await OperationInstrumentation.Create<StacCollectionsResponse>("STAC ListCollections")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "list_collections")
             .WithTag("resource", "collection")
@@ -81,7 +81,7 @@ public sealed class StacReadService
     {
         return await OperationInstrumentation.Create<StacCollectionsResponse>("STAC ListCollections")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "list_collections")
             .WithTag("resource", "collection")
@@ -109,7 +109,7 @@ public sealed class StacReadService
     {
         return await OperationInstrumentation.Create<StacCollectionRecord?>("STAC GetCollection")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "get_collection")
             .WithTag("resource", "collection")
@@ -136,7 +136,7 @@ public sealed class StacReadService
     {
         return await OperationInstrumentation.Create<StacItemCollectionResponse>("STAC ListCollectionItems")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "list_items")
             .WithTag("resource", "item")
@@ -182,7 +182,7 @@ public sealed class StacReadService
     {
         return await OperationInstrumentation.Create<StacItemRecord?>("STAC GetCollectionItem")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.ReadOperationsCounter, this.metrics.ReadOperationsCounter, this.metrics.ReadOperationDuration)
             .WithTag("operation", "get_item")
             .WithTag("resource", "item")

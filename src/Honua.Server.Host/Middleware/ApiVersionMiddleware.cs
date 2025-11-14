@@ -107,7 +107,7 @@ public sealed class ApiVersionMiddleware
             return Task.CompletedTask;
         });
 
-        await _next(context).ConfigureAwait(false);
+        await this.next(context).ConfigureAwait(false);
     }
 
     /// <summary>

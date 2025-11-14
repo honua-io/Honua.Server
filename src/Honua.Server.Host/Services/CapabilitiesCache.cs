@@ -76,27 +76,27 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-        this.cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        this._cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         // Initialize metrics
-        this.hitCounter = this.meter.CreateCounter<long>(
+        this.hitCounter = _meter.CreateCounter<long>(
             "honua.capabilities.cache.hits",
             description: "Number of capabilities cache hits");
 
-        this.missCounter = this.meter.CreateCounter<long>(
+        this.missCounter = _meter.CreateCounter<long>(
             "honua.capabilities.cache.misses",
             description: "Number of capabilities cache misses");
 
-        this.evictionsCounter = this.meter.CreateCounter<long>(
+        this.evictionsCounter = _meter.CreateCounter<long>(
             "honua.capabilities.cache.evictions",
             description: "Number of capabilities cache evictions");
 
-        this.entriesGauge = this.meter.CreateObservableGauge<int>(
+        this.entriesGauge = _meter.CreateObservableGauge<int>(
             "honua.capabilities.cache.entries",
-            () => this.cacheKeys.Count,
+            () => this._cacheKeys.Count,
             description: "Number of cached capabilities documents");
 
-        this.documentSizeHistogram = this.meter.CreateHistogram<double>(
+        this.documentSizeHistogram = _meter.CreateHistogram<double>(
             "honua.capabilities.document.size",
             unit: "bytes",
             description: "Size of cached capabilities documents");
@@ -189,7 +189,7 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
         var cacheKey = BuildCacheKey(serviceType, serviceId, version, acceptLanguage);
 
         // Check if we're at the cache size limit
-        if (this.options.MaxCachedDocuments > 0 && this.cacheKeys.Count >= this.options.MaxCachedDocuments)
+        if (this.options.MaxCachedDocuments > 0 && this._cacheKeys.Count >= this.options.MaxCachedDocuments)
         {
             this.logger.LogWarning(
                 "Capabilities cache has reached maximum size limit of {MaxDocuments}. " +
@@ -212,7 +212,7 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
         // Register eviction callback to track cache keys and metrics
         cacheOptions.RegisterPostEvictionCallback((key, value, reason, state) =>
         {
-            this.cacheKeys.TryRemove(key.ToString()!, out _);
+            this._cacheKeys.TryRemove(key.ToString()!, out _);
             Interlocked.Increment(ref _evictions);
             this.evictionsCounter.Add(1,
                 new KeyValuePair<string, object?>("service_type", serviceType),
@@ -229,12 +229,12 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
                 this.logger.LogWarning(
                     "Capabilities cache evicted entry for {ServiceType}/{ServiceId} due to capacity limit. " +
                     "Current entries: {CurrentEntries}, Max: {MaxDocuments}. Consider increasing cache limits.",
-                    serviceType, serviceId, this.cacheKeys.Count, this.options.MaxCachedDocuments);
+                    serviceType, serviceId, this._cacheKeys.Count, this.options.MaxCachedDocuments);
             }
         });
 
         this.cache.Set(cacheKey, document, cacheOptions);
-        this.cacheKeys.TryAdd(cacheKey, 0);
+        this._cacheKeys.TryAdd(cacheKey, 0);
 
         this.logger.LogDebug(
             "Capabilities cached for {ServiceType}/{ServiceId}/{Version}/{Language} " +
@@ -257,14 +257,14 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
             ? $"{CacheKeyPrefix}{serviceType.ToLowerInvariant()}:"
             : $"{CacheKeyPrefix}{serviceType.ToLowerInvariant()}:{serviceId.ToLowerInvariant()}:";
 
-        var keysToRemove = this.cacheKeys.Keys
+        var keysToRemove = this._cacheKeys.Keys
             .Where(k => k.StartsWith(pattern, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         foreach (var key in keysToRemove)
         {
             this.cache.Remove(key);
-            this.cacheKeys.TryRemove(key, out _);
+            this._cacheKeys.TryRemove(key, out _);
         }
 
         if (keysToRemove.Count > 0)
@@ -280,13 +280,13 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
     /// <inheritdoc />
     public void InvalidateAll()
     {
-        var count = this.cacheKeys.Count;
-        var keysToRemove = this.cacheKeys.Keys.ToList();
+        var count = this._cacheKeys.Count;
+        var keysToRemove = this._cacheKeys.Keys.ToList();
 
         foreach (var key in keysToRemove)
         {
             this.cache.Remove(key);
-            this.cacheKeys.TryRemove(key, out _);
+            this._cacheKeys.TryRemove(key, out _);
         }
 
         this.logger.LogInformation(
@@ -305,7 +305,7 @@ public sealed class CapabilitiesCache : ICapabilitiesCache
             Hits = hits,
             Misses = misses,
             Evictions = Interlocked.Read(ref _evictions),
-            EntryCount = this.cacheKeys.Count,
+            EntryCount = this._cacheKeys.Count,
             MaxEntries = this.options.MaxCachedDocuments,
             HitRate = (hits + misses) > 0 ? (double)hits / (hits + misses) : 0
         };

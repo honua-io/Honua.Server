@@ -413,7 +413,6 @@
     private IRoutingService? _routingService;
     private HttpClient? _httpClient;
     private IJSObjectReference? _jsModule;
-    private bool _mapReady = false;
     private bool _isCalculating = false;
     private string? _errorMessage;
 
@@ -430,12 +429,13 @@
 
     private List<TravelMode> _supportedModes = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         _travelMode = TravelMode;
         InitializeRoutingService();
         InitializeWaypoints();
         SetupSubscriptions();
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -510,7 +510,6 @@
         {
             if (SyncWith == null || args.Message.MapId == SyncWith)
             {
-                _mapReady = true;
                 InvokeAsync(StateHasChanged);
             }
         });

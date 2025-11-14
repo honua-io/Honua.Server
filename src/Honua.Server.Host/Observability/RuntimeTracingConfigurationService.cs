@@ -21,7 +21,7 @@ public sealed class RuntimeTracingConfigurationService
 
     public RuntimeTracingConfigurationService(TracingConfiguration initialConfiguration)
     {
-        this.current = Guard.NotNull(initialConfiguration);
+        _current = Guard.NotNull(initialConfiguration);
     }
 
     /// <summary>
@@ -50,7 +50,7 @@ public sealed class RuntimeTracingConfigurationService
         lock (_lock)
         {
             var oldConfig = _current;
-            this.current = newConfiguration;
+            _current = newConfiguration;
 
             // If exporter type changed, we need to rebuild the TracerProvider
             // Note: OpenTelemetry doesn't support hot-swapping exporters, so this is informational
@@ -79,7 +79,7 @@ public sealed class RuntimeTracingConfigurationService
 
         lock (_lock)
         {
-            this.current = _current with { SamplingRatio = samplingRatio };
+            _current = _current with { SamplingRatio = samplingRatio };
             return true;
         }
     }
@@ -96,7 +96,7 @@ public sealed class RuntimeTracingConfigurationService
 
         lock (_lock)
         {
-            this.current = _current with { OtlpEndpoint = endpoint };
+            _current = _current with { OtlpEndpoint = endpoint };
             return true;
         }
     }
@@ -114,7 +114,7 @@ public sealed class RuntimeTracingConfigurationService
 
         lock (_lock)
         {
-            this.current = _current with { Exporter = normalizedExporter };
+            _current = _current with { Exporter = normalizedExporter };
             return true;
         }
     }
@@ -176,10 +176,10 @@ public sealed class RuntimeTracingConfigurationService
         {
             return new TracingStatistics
             {
-                Exporter = this.current.Exporter,
-                OtlpEndpoint = this.current.OtlpEndpoint,
-                SamplingRatio = this.current.SamplingRatio,
-                IsEnabled = this.current.Exporter != "none",
+                Exporter = _current.Exporter,
+                OtlpEndpoint = _current.OtlpEndpoint,
+                SamplingRatio = _current.SamplingRatio,
+                IsEnabled = _current.Exporter != "none",
                 ActivitySourcesConfigured = new[]
                 {
                     "Honua.Server.OgcProtocols",
@@ -192,7 +192,7 @@ public sealed class RuntimeTracingConfigurationService
                     "Honua.Server.Export",
                     "Honua.Server.Import"
                 },
-                Note = this.current.Exporter == "none"
+                Note = _current.Exporter == "none"
                     ? "Tracing is disabled. Set exporter to 'console' or 'otlp' to enable."
                     : "Note: Changes to exporter type or OTLP endpoint require application restart to take effect. Sampling ratio changes apply immediately."
             };

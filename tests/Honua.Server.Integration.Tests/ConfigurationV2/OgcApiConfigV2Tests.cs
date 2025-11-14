@@ -86,7 +86,7 @@ data_source ""test_db"" {
   provider   = ""postgresql""
   connection = env(""DATABASE_URL"")
 
-  pool {
+  pool = {
     min_size = 1
     max_size = 5
   }
@@ -111,14 +111,14 @@ layer ""test_features"" {
   id_field    = ""id""
   introspect_fields = true
 
-  geometry {
+  geometry = {
     column = ""geom""
     type   = ""Point""
     srid   = 4326
   }
 
   services = [
-    service.ogc_api
+    ""ogc_api""
   ]
 }
 ";

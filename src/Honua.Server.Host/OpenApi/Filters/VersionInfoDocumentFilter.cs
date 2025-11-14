@@ -50,7 +50,7 @@ public sealed class VersionInfoDocumentFilter : IDocumentFilter
 
         if (!this.buildVersion.IsNullOrEmpty())
         {
-            versionParts.Add($"Build: {_buildVersion}");
+            versionParts.Add($"Build: {this.buildVersion}");
         }
         else if (assemblyVersion != null)
         {
@@ -84,10 +84,10 @@ public sealed class VersionInfoDocumentFilter : IDocumentFilter
 
         if (!this.buildDate.IsNullOrEmpty())
         {
-            versionInfo.Add($"- Build Date: {_buildDate}");
+            versionInfo.Add($"- Build Date: {this.buildDate}");
         }
 
-        versionInfo.Add($"- Environment: {_environmentName}");
+        versionInfo.Add($"- Environment: {this.environmentName}");
 
         // Add .NET runtime information
         var runtimeVersion = Environment.Version;
@@ -104,11 +104,11 @@ public sealed class VersionInfoDocumentFilter : IDocumentFilter
 
         // Add custom extensions for version metadata
         swaggerDoc.Extensions["x-api-version"] = new Microsoft.OpenApi.Any.OpenApiString(swaggerDoc.Info.Version);
-        swaggerDoc.Extensions["x-environment"] = new Microsoft.OpenApi.Any.OpenApiString(_environmentName);
+        swaggerDoc.Extensions["x-environment"] = new Microsoft.OpenApi.Any.OpenApiString(this.environmentName);
 
         if (!this.buildDate.IsNullOrEmpty())
         {
-            swaggerDoc.Extensions["x-build-date"] = new Microsoft.OpenApi.Any.OpenApiString(_buildDate);
+            swaggerDoc.Extensions["x-build-date"] = new Microsoft.OpenApi.Any.OpenApiString(this.buildDate);
         }
 
         if (assemblyVersion != null)

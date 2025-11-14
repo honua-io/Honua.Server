@@ -302,10 +302,11 @@
     private LayerInfo? _selectedLayer;
     private IJSObjectReference? _jsModule;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         _viewMode = ViewMode;
         SetupSubscriptions();
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -421,7 +422,7 @@
         }
     }
 
-    private async Task ApplySearchFilter()
+    private Task ApplySearchFilter()
     {
         if (string.IsNullOrWhiteSpace(_searchQuery))
         {
@@ -438,6 +439,7 @@
         }
 
         UpdateVisibilityState();
+        return Task.CompletedTask;
     }
 
     private async Task PerformSearch()

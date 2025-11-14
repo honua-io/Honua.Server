@@ -38,16 +38,16 @@ public sealed class CachedResult : IResult
         Guard.NotNull(httpContext);
 
         // Check if we should return 304 Not Modified
-        if (this.cacheService.ShouldReturn304NotModified(httpContext, _etag, _lastModified))
+        if (this.cacheService.ShouldReturn304NotModified(httpContext, this.etag, this.lastModified))
         {
             // Apply cache headers before returning 304
-            this.cacheService.ApplyCacheHeaders(httpContext, _resourceType, _etag, _lastModified);
+            this.cacheService.ApplyCacheHeaders(httpContext, this.resourceType, this.etag, this.lastModified);
             httpContext.Response.StatusCode = StatusCodes.Status304NotModified;
             return;
         }
 
         // Apply cache headers
-        this.cacheService.ApplyCacheHeaders(httpContext, _resourceType, _etag, _lastModified);
+        this.cacheService.ApplyCacheHeaders(httpContext, this.resourceType, this.etag, this.lastModified);
 
         // Execute the inner result
         await this.innerResult.ExecuteAsync(httpContext).ConfigureAwait(false);

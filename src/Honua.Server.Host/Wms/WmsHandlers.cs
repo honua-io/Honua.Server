@@ -13,6 +13,7 @@ using Honua.Server.Core.Extensions;
 using Honua.Server.Host.Configuration;
 using Honua.Server.Host.Extensions;
 using Honua.Server.Host.Raster;
+using Honua.Server.Host.Services;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -37,6 +38,7 @@ internal static class WmsHandlers
         [FromServices] IRasterTileCacheProvider cacheProvider,
         [FromServices] IRasterTileCacheMetrics cacheMetrics,
         [FromServices] IOptions<WmsOptions> wmsOptions,
+        [FromServices] ICapabilitiesCache capabilitiesCache,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(context);
@@ -82,7 +84,7 @@ internal static class WmsHandlers
         {
             return requestValue.Trim().ToUpperInvariant() switch
             {
-                "GETCAPABILITIES" => await WmsCapabilitiesHandlers.HandleGetCapabilitiesAsync(request, snapshot, rasterRegistry, cancellationToken).ConfigureAwait(false),
+                "GETCAPABILITIES" => await WmsCapabilitiesHandlers.HandleGetCapabilitiesAsync(request, snapshot, rasterRegistry, capabilitiesCache, cancellationToken).ConfigureAwait(false),
                 "GETMAP" => await WmsGetMapHandlers.HandleGetMapAsync(request, snapshot, rasterRegistry, rasterRenderer, cacheProvider, cacheMetrics, wmsOptions, cancellationToken).ConfigureAwait(false),
                 "GETFEATUREINFO" => await WmsGetFeatureInfoHandlers.HandleGetFeatureInfoAsync(request, metadataRegistry, rasterRegistry, featureRepository, cancellationToken).ConfigureAwait(false),
                 "DESCRIBELAYER" => await WmsDescribeLayerHandlers.HandleDescribeLayerAsync(request, snapshot, rasterRegistry, cancellationToken).ConfigureAwait(false),

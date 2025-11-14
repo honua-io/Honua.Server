@@ -73,7 +73,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpGet]
     public IActionResult GetService()
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -112,7 +112,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("project")]
     public async Task<IActionResult> Project([FromBody] GeometryProjectRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -361,7 +361,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("buffer")]
     public async Task<IActionResult> Buffer([FromBody] GeometryBufferRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -432,7 +432,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("simplify")]
     public IActionResult Simplify([FromBody] GeometrySimplifyRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -488,7 +488,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("densify")]
     public async Task<IActionResult> Densify([FromBody] GeometryDensifyRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -556,7 +556,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("generalize")]
     public async Task<IActionResult> Generalize([FromBody] GeometryGeneralizeRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -624,7 +624,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("union")]
     public IActionResult Union([FromBody] GeometrySetRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -686,7 +686,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("intersect")]
     public IActionResult Intersect([FromBody] GeometryPairwiseRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -746,7 +746,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("difference")]
     public IActionResult Difference([FromBody] GeometryPairwiseRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -806,7 +806,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("convexHull")]
     public IActionResult ConvexHull([FromBody] GeometrySetRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -862,7 +862,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("distance")]
     public IActionResult Distance([FromBody] GeometryDistanceRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -928,7 +928,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("areasAndLengths")]
     public IActionResult AreasAndLengths([FromBody] GeometryMeasurementRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -985,7 +985,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("offset")]
     public async Task<IActionResult> Offset([FromBody] GeometryOffsetRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -1056,7 +1056,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("trimExtend")]
     public async Task<IActionResult> TrimExtend([FromBody] GeometryTrimExtendRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -1133,7 +1133,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [Authorize(Policy = "RequireViewer")]
     public IActionResult LabelPoints([FromBody] GeometryLabelPointsRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -1192,7 +1192,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("cut")]
     public async Task<IActionResult> Cut([FromBody] GeometryCutRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)
@@ -1270,7 +1270,7 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
     [HttpPost("reshape")]
     public async Task<IActionResult> Reshape([FromBody] GeometryReshapeRequest request)
     {
-        var geometryEnabled = _honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
+        var geometryEnabled = this.honuaConfig?.Services.TryGetValue("geometry", out var geometryService) == true
             ? geometryService.Enabled
             : true;
         if (!geometryEnabled)

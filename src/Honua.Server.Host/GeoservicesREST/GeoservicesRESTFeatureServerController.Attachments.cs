@@ -35,7 +35,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
         out CatalogServiceView? serviceView,
         out CatalogLayerView? layerView)
     {
-        var resolution = GeoservicesRESTServiceResolutionHelper.ResolveServiceAndLayer(this, _catalog, folderId, serviceId, layerIndex);
+        var resolution = GeoservicesRESTServiceResolutionHelper.ResolveServiceAndLayer(this, this.catalog, folderId, serviceId, layerIndex);
         if (resolution.Error is not null)
         {
             serviceView = null;
@@ -485,8 +485,8 @@ public sealed partial class GeoservicesRESTFeatureServerController
         var downloadResult = await AttachmentDownloadHelper.TryDownloadAsync(
             descriptor,
             layerView.Layer.Attachments.StorageProfileId,
-            _attachmentStoreSelector,
-            _logger,
+            this.attachmentStoreSelector,
+            this.logger,
             serviceView.Service.Id,
             layerView.Layer.Id,
             cancellationToken).ConfigureAwait(false);

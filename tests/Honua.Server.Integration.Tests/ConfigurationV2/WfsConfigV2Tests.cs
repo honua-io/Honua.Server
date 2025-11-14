@@ -38,7 +38,7 @@ public class WfsConfigV2Tests : ConfigurationV2IntegrationTestBase
         using var factory = new ConfigurationV2TestFixture<Program>(DatabaseFixture, builder =>
         {
             builder
-                .AddDataSource("gis_db", "postgresql", "DATABASE_URL")
+                .AddDataSource("gis_db", "postgresql")
                 .AddService("wfs", new()
                 {
                     ["version"] = "2.0.0",
@@ -46,7 +46,7 @@ public class WfsConfigV2Tests : ConfigurationV2IntegrationTestBase
                     ["default_count"] = 100,
                     ["max_features"] = 10000
                 })
-                .AddLayer("test_features", "gis_db", "test_table");
+                .AddLayer("test_features", "gis_db", "test_table", serviceRefs: new[] { "wfs" });
         });
 
         var client = factory.CreateClient();
@@ -87,7 +87,7 @@ data_source ""spatial_db"" {
   provider = ""postgresql""
   connection = env(""DATABASE_URL"")
 
-  pool {
+  pool = {
     min_size = 2
     max_size = 10
   }
@@ -114,13 +114,13 @@ layer ""roads"" {
   id_field = ""id""
   introspect_fields = true
 
-  geometry {
+  geometry = {
     column = ""geom""
     type = ""LineString""
     srid = 4326
   }
 
-  services = [service.wfs, service.ogc_api]
+  services = [""wfs"", ""ogc_api""]
 }
 
 layer ""buildings"" {
@@ -130,13 +130,13 @@ layer ""buildings"" {
   id_field = ""id""
   introspect_fields = true
 
-  geometry {
+  geometry = {
     column = ""geom""
     type = ""Polygon""
     srid = 4326
   }
 
-  services = [service.wfs, service.ogc_api]
+  services = [""wfs"", ""ogc_api""]
 }
 
 layer ""poi"" {
@@ -146,13 +146,13 @@ layer ""poi"" {
   id_field = ""id""
   introspect_fields = true
 
-  geometry {
+  geometry = {
     column = ""geom""
     type = ""Point""
     srid = 4326
   }
 
-  services = [service.wfs, service.ogc_api]
+  services = [""wfs"", ""ogc_api""]
 }
 ";
 
@@ -202,7 +202,7 @@ layer ""poi"" {
                     ["enable_complexity_check"] = true,
                     ["enable_streaming_transaction_parser"] = true
                 })
-                .AddLayer("features", "db", "features_table");
+                .AddLayer("features", "db", "features_table", serviceRefs: new[] { "wfs" });
         });
 
         var client = factory.CreateClient();
@@ -266,7 +266,7 @@ service ""wfs"" {
                     ["max_transaction_features"] = 1000,
                     ["enable_streaming_transaction_parser"] = true
                 })
-                .AddLayer("editable_layer", "editable_db", "editable_table");
+                .AddLayer("editable_layer", "editable_db", "editable_table", serviceRefs: new[] { "wfs" });
         });
 
         var client = factory.CreateClient();

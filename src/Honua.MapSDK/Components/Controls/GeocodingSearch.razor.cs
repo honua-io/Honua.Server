@@ -362,7 +362,7 @@ public partial class GeocodingSearch : ComponentBase
         StateHasChanged();
     }
 
-    private async Task HandleInputFocus()
+    private Task HandleInputFocus()
     {
         // Show history when input is focused with empty query
         if (string.IsNullOrWhiteSpace(_searchQuery) && _historyItems.Any())
@@ -370,6 +370,7 @@ public partial class GeocodingSearch : ComponentBase
             _showResults = true;
             StateHasChanged();
         }
+        return Task.CompletedTask;
     }
 
     private async Task HandleKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)

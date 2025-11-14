@@ -130,7 +130,7 @@ internal static partial class OgcSharedHandlers
 
             if (this.headerValue.HasValue())
             {
-                httpContext.Response.Headers[_headerName] = _headerValue;
+                httpContext.Response.Headers[this.headerName] = this.headerValue;
             }
 
             return this.inner.ExecuteAsync(httpContext);

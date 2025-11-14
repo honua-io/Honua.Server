@@ -69,7 +69,7 @@ public sealed class StacItemService
     {
         return await OperationInstrumentation.Create<ItemOperationResult>("STAC PostCollectionItem")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithMetrics(_writeSuccessCounter, _writeErrorCounter, _writeDurationHistogram)
+            .WithMetrics(this.writeSuccessCounter, this.writeErrorCounter, this.writeDurationHistogram)
             .WithTag("stac.operation", "PostCollectionItem")
             .WithTag("stac.collection_id", collectionId)
             .WithTag("operation", "post")
@@ -154,7 +154,7 @@ public sealed class StacItemService
     {
         return await OperationInstrumentation.Create<ItemOperationResult>("STAC PutCollectionItem")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithMetrics(_writeSuccessCounter, _writeErrorCounter, _writeDurationHistogram)
+            .WithMetrics(this.writeSuccessCounter, this.writeErrorCounter, this.writeDurationHistogram)
             .WithTag("stac.operation", "PutCollectionItem")
             .WithTag("stac.collection_id", collectionId)
             .WithTag("stac.item_id", itemId)
@@ -270,7 +270,7 @@ public sealed class StacItemService
     {
         return await OperationInstrumentation.Create<bool>("STAC DeleteCollectionItem")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithMetrics(_writeSuccessCounter, _writeErrorCounter, _writeDurationHistogram)
+            .WithMetrics(this.writeSuccessCounter, this.writeErrorCounter, this.writeDurationHistogram)
             .WithTag("stac.operation", "DeleteCollectionItem")
             .WithTag("stac.collection_id", collectionId)
             .WithTag("stac.item_id", itemId)

@@ -277,8 +277,8 @@ public sealed class GeoservicesAttachmentService : IGeoservicesAttachmentService
         var downloadResult = await AttachmentDownloadHelper.TryDownloadAsync(
             descriptor,
             layerView.Layer.Attachments.StorageProfileId,
-            _attachmentStoreSelector,
-            _logger,
+            this.attachmentStoreSelector,
+            this.logger,
             serviceView.Service.Id,
             layerView.Layer.Id,
             cancellationToken).ConfigureAwait(false);

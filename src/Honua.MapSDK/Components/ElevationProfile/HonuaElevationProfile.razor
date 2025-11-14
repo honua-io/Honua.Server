@@ -153,12 +153,6 @@
     {
         <div class="elevation-chart-container">
             <div id="@_chartId" class="elevation-chart" style="height: @(ChartHeight)px;"></div>
-            @if (_hoverPosition != null)
-            {
-                <div class="elevation-marker" style="left: @(_hoverPosition.Value)px;">
-                    <div class="marker-line"></div>
-                </div>
-            }
         </div>
 
         @if (ShowStatistics)
@@ -446,7 +440,6 @@
     private bool _isSteepSectionsCollapsed = false;
     private bool _isWaypointsCollapsed = false;
     private string? _errorMessage;
-    private double? _hoverPosition;
     private string _chartId = $"chart-{Guid.NewGuid():N}";
     private IJSObjectReference? _jsModule;
     private DotNetObjectReference<HonuaElevationProfile>? _dotNetRef;
@@ -461,7 +454,7 @@
     private bool _calculateTimeEstimates = true;
     private ActivityType _activityType = ActivityType.Hiking;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         // Initialize settings from parameters
         _elevationSource = ElevationSource;
@@ -473,6 +466,7 @@
 
         SetupSubscriptions();
         _dotNetRef = DotNetObjectReference.Create(this);
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

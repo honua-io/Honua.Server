@@ -8,6 +8,7 @@ using Honua.Server.Core.Metadata;
 using Honua.Server.Host.Admin.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 
@@ -48,7 +49,7 @@ public static class ServerAdministrationEndpoints
     /// Gets the current CORS configuration
     /// </summary>
     private static async Task<IResult> GetCorsConfiguration(
-        IMetadataRegistry registry,
+        [FromServices] IMetadataRegistry registry,
         CancellationToken cancellationToken)
     {
         var snapshot = await registry.GetSnapshotAsync(cancellationToken);
@@ -77,8 +78,8 @@ public static class ServerAdministrationEndpoints
     /// </summary>
     private static async Task<IResult> UpdateCorsConfiguration(
         UpdateCorsConfigurationRequest request,
-        IMetadataRegistry registry,
-        ILogger<Program> logger,
+        [FromServices] IMetadataRegistry registry,
+        [FromServices] ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         if (request.Cors == null)
@@ -165,7 +166,7 @@ public static class ServerAdministrationEndpoints
     private static async Task<IResult> TestCorsConfiguration(
         string origin,
         string? method,
-        IMetadataRegistry registry,
+        [FromServices] IMetadataRegistry registry,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(origin))

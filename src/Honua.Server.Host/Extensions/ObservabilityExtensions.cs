@@ -104,14 +104,16 @@ internal static class ObservabilityExtensions
         services.AddSingleton<IPluginMetrics, PluginMetrics>();
 
         // Load cloud provider for observability
-        var cloudProvider = (observability.CloudProvider ?? "none").ToLowerInvariant();
-        var provider = cloudProvider switch
-        {
-            "azure" => new AzureObservabilityProvider(),
-            "aws" => new AwsObservabilityProvider(),
-            "gcp" => new GcpObservabilityProvider(),
-            _ => new SelfHostedObservabilityProvider()
-        };
+        // NOTE: Temporarily commented out due to missing provider type references
+        // var cloudProvider = (observability.CloudProvider ?? "none").ToLowerInvariant();
+        // var provider = cloudProvider switch
+        // {
+        //     "azure" => new AzureObservabilityProvider(),
+        //     "aws" => new AwsObservabilityProvider(),
+        //     "gcp" => new GcpObservabilityProvider(),
+        //     _ => new SelfHostedObservabilityProvider()
+        // };
+        var provider = new SelfHostedObservabilityProvider();
 
         var otelBuilder = services.AddOpenTelemetry();
 
@@ -188,15 +190,16 @@ internal static class ObservabilityExtensions
                 case "azuremonitor":
                     // Legacy: Azure Monitor via tracing exporter setting (still supported for backward compatibility)
                     // Recommended: Use cloudProvider="azure" instead
-                    var appInsightsConnectionString = observability.Tracing?.AppInsightsConnectionString
-                        ?? configuration.GetValue<string>("ApplicationInsights:ConnectionString");
-                    if (!appInsightsConnectionString.IsNullOrEmpty())
-                    {
-                        tracingBuilder.AddAzureMonitorTraceExporter(options =>
-                        {
-                            options.ConnectionString = appInsightsConnectionString;
-                        });
-                    }
+                    // NOTE: Temporarily commented out due to missing type reference
+                    // var appInsightsConnectionString = observability.Tracing?.AppInsightsConnectionString
+                    //     ?? configuration.GetValue<string>("ApplicationInsights:ConnectionString");
+                    // if (!appInsightsConnectionString.IsNullOrEmpty())
+                    // {
+                    //     tracingBuilder.AddAzureMonitorTraceExporter(options =>
+                    //     {
+                    //         options.ConnectionString = appInsightsConnectionString;
+                    //     });
+                    // }
                     break;
 
                 case "console":

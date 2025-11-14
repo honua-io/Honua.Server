@@ -65,7 +65,7 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
             return;
         }
 
-        if (!StacRequestHelpers.IsStacEnabled(_honuaConfig))
+        if (!StacRequestHelpers.IsStacEnabled(this.honuaConfig))
         {
             return;
         }
@@ -77,7 +77,7 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
             // Synchronize both raster and vector data
             await this.rasterSynchronizer.SynchronizeAllAsync(cancellationToken).ConfigureAwait(false);
 
-            if (_vectorSynchronizer is not null)
+            if (this.vectorSynchronizer is not null)
             {
                 await this.vectorSynchronizer.SynchronizeAllVectorLayersAsync(cancellationToken).ConfigureAwait(false);
                 this.logger.LogInformation("STAC catalog initialized with raster and vector data.");
@@ -99,12 +99,12 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _changeTokenRegistration?.Dispose();
-        this.changeTokenRegistration = null;
+        this._changeTokenRegistration = null;
 
         // Cancel any in-progress synchronization
         _synchronizationCts?.Cancel();
         _synchronizationCts?.Dispose();
-        this.synchronizationCts = null;
+        this._synchronizationCts = null;
 
         return Task.CompletedTask;
     }
@@ -128,7 +128,7 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
             return;
         }
 
-        this.changeTokenRegistration = changeToken.RegisterChangeCallback(_ => OnMetadataChanged(), state: null);
+        this._changeTokenRegistration = changeToken.RegisterChangeCallback(_ => OnMetadataChanged(), state: null);
     }
 
     private void OnMetadataChanged()
@@ -139,12 +139,12 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
             // Cancel any existing synchronization task
             _synchronizationCts?.Cancel();
             _synchronizationCts?.Dispose();
-            this.synchronizationCts = new CancellationTokenSource();
+            this._synchronizationCts = new CancellationTokenSource();
 
             // Only start a new task if the previous one is complete
             if (_synchronizationTask?.IsCompleted != false)
             {
-                this.synchronizationTask = SynchronizeWithDebounceAsync(this.synchronizationCts.Token);
+                this._synchronizationTask = SynchronizeWithDebounceAsync(this._synchronizationCts.Token);
             }
         }
     }
@@ -161,7 +161,7 @@ internal sealed class StacCatalogSynchronizationHostedService : IHostedService, 
             // Synchronize both raster and vector data
             await this.rasterSynchronizer.SynchronizeAllAsync(cancellationToken).ConfigureAwait(false);
 
-            if (_vectorSynchronizer is not null)
+            if (this.vectorSynchronizer is not null)
             {
                 await this.vectorSynchronizer.SynchronizeAllVectorLayersAsync(cancellationToken).ConfigureAwait(false);
             }

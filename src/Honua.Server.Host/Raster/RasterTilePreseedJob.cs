@@ -32,7 +32,7 @@ internal sealed class RasterTilePreseedJob : IDisposable
 
     public RasterTilePreseedRequest Request { get; }
 
-    public CancellationToken Token => this.cts.Token;
+    public CancellationToken Token => this._cts.Token;
 
     public RasterTilePreseedJobSnapshot Snapshot
     {
@@ -64,10 +64,10 @@ internal sealed class RasterTilePreseedJob : IDisposable
     {
         lock (_syncRoot)
         {
-            this.status = RasterTilePreseedJobStatus.Running;
-            this.stage = stage;
-            this.message = null;
-            this.progress = _tilesTotal > 0 ? Math.Min(1d, (double)_tilesCompleted / _tilesTotal) : 0d;
+            this._status = RasterTilePreseedJobStatus.Running;
+            this._stage = stage;
+            this._message = null;
+            this._progress = _tilesTotal > 0 ? Math.Min(1d, (double)_tilesCompleted / _tilesTotal) : 0d;
         }
     }
 
@@ -75,8 +75,8 @@ internal sealed class RasterTilePreseedJob : IDisposable
     {
         lock (_syncRoot)
         {
-            this.tilesTotal = totalTiles;
-            this.progress = _tilesTotal > 0 ? Math.Min(1d, (double)_tilesCompleted / _tilesTotal) : 0d;
+            this._tilesTotal = totalTiles;
+            this._progress = _tilesTotal > 0 ? Math.Min(1d, (double)_tilesCompleted / _tilesTotal) : 0d;
         }
     }
 
@@ -84,9 +84,9 @@ internal sealed class RasterTilePreseedJob : IDisposable
     {
         lock (_syncRoot)
         {
-            this.tilesCompleted = checked(_tilesCompleted + 1);
-            this.stage = stage;
-            this.progress = _tilesTotal > 0 ? Math.Min(1d, (double)_tilesCompleted / _tilesTotal) : 0d;
+            this._tilesCompleted = checked(_tilesCompleted + 1);
+            this._stage = stage;
+            this._progress = _tilesTotal > 0 ? Math.Min(1d, (double)_tilesCompleted / _tilesTotal) : 0d;
         }
     }
 
@@ -94,7 +94,7 @@ internal sealed class RasterTilePreseedJob : IDisposable
     {
         lock (_syncRoot)
         {
-            this.stage = stage;
+            this._stage = stage;
         }
     }
 
@@ -102,11 +102,11 @@ internal sealed class RasterTilePreseedJob : IDisposable
     {
         lock (_syncRoot)
         {
-            this.status = RasterTilePreseedJobStatus.Completed;
-            this.stage = "Completed";
-            this.message = message;
-            this.progress = 1d;
-            this.completedAtUtc = DateTimeOffset.UtcNow;
+            this._status = RasterTilePreseedJobStatus.Completed;
+            this._stage = "Completed";
+            this._message = message;
+            this._progress = 1d;
+            this._completedAtUtc = DateTimeOffset.UtcNow;
         }
     }
 
@@ -114,10 +114,10 @@ internal sealed class RasterTilePreseedJob : IDisposable
     {
         lock (_syncRoot)
         {
-            this.status = RasterTilePreseedJobStatus.Failed;
-            this.stage = "Failed";
-            this.message = message;
-            this.completedAtUtc = DateTimeOffset.UtcNow;
+            this._status = RasterTilePreseedJobStatus.Failed;
+            this._stage = "Failed";
+            this._message = message;
+            this._completedAtUtc = DateTimeOffset.UtcNow;
         }
     }
 
@@ -125,10 +125,10 @@ internal sealed class RasterTilePreseedJob : IDisposable
     {
         lock (_syncRoot)
         {
-            this.status = RasterTilePreseedJobStatus.Cancelled;
-            this.stage = "Cancelled";
-            this.message = message;
-            this.completedAtUtc = DateTimeOffset.UtcNow;
+            this._status = RasterTilePreseedJobStatus.Cancelled;
+            this._stage = "Cancelled";
+            this._message = message;
+            this._completedAtUtc = DateTimeOffset.UtcNow;
         }
     }
 
@@ -136,18 +136,18 @@ internal sealed class RasterTilePreseedJob : IDisposable
     {
         lock (_syncRoot)
         {
-            if (this.cts.IsCancellationRequested)
+            if (this._cts.IsCancellationRequested)
             {
                 return;
             }
 
-            this.message = string.IsNullOrWhiteSpace(reason) ? "Cancellation requested." : reason;
-            this.cts.Cancel();
+            this._message = string.IsNullOrWhiteSpace(reason) ? "Cancellation requested." : reason;
+            this._cts.Cancel();
         }
     }
 
     public void Dispose()
     {
-        this.cts.Dispose();
+        this._cts.Dispose();
     }
 }

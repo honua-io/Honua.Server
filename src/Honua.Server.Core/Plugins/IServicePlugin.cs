@@ -73,29 +73,34 @@ public interface IServicePlugin : IHonuaPlugin
 public enum ServiceType
 {
     /// <summary>
+    /// Unknown or unspecified service type (default value).
+    /// </summary>
+    Unknown = 0,
+
+    /// <summary>
     /// OGC standard service (WFS, WMS, WMTS, CSW, WCS).
     /// </summary>
-    OGC,
+    OGC = 1,
 
     /// <summary>
     /// Modern REST API (OGC API Features, STAC, Carto).
     /// </summary>
-    API,
+    API = 2,
 
     /// <summary>
     /// Proprietary/vendor-specific API (Esri GeoServices REST).
     /// </summary>
-    Proprietary,
+    Proprietary = 3,
 
     /// <summary>
     /// Specialized service (Zarr, Print).
     /// </summary>
-    Specialized,
+    Specialized = 4,
 
     /// <summary>
     /// Custom service type.
     /// </summary>
-    Custom
+    Custom = 5
 }
 
 /// <summary>

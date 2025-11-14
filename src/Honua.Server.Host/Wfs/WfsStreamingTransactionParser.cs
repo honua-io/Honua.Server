@@ -286,8 +286,8 @@ internal static class WfsStreamingTransactionParser
         public IAsyncEnumerator<TransactionOperation> GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {
             // Combine the cancellation tokens
-            var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken, cancellationToken);
-            return new TransactionOperationEnumerator(_reader, _maxOperations, combinedCts, combinedCts.Token);
+            var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(this.cancellationToken, cancellationToken);
+            return new TransactionOperationEnumerator(this.reader, this.maxOperations, combinedCts, combinedCts.Token);
         }
     }
 
@@ -328,7 +328,7 @@ internal static class WfsStreamingTransactionParser
                 this.cancellationToken.ThrowIfCancellationRequested();
 
                 // Stop if we've exited the Transaction element
-                if (this.reader.NodeType == XmlNodeType.EndElement && this.reader.Depth <= _initialDepth)
+                if (this.reader.NodeType == XmlNodeType.EndElement && this.reader.Depth <= this.initialDepth)
                 {
                     return false;
                 }
@@ -342,15 +342,15 @@ internal static class WfsStreamingTransactionParser
                     {
                         _operationCount++;
 
-                        if (_operationCount > _maxOperations)
+                        if (_operationCount > this.maxOperations)
                         {
                             throw new XmlException(
-                                $"Transaction exceeds maximum allowed operations ({_maxOperations}). " +
+                                $"Transaction exceeds maximum allowed operations ({this.maxOperations}). " +
                                 $"Configure honua:wfs:MaxTransactionFeatures to increase this limit.");
                         }
 
                         // Read the operation element as XElement (still memory efficient for single operation)
-                        var element = (XElement)XNode.ReadFrom(_reader);
+                        var element = (XElement)XNode.ReadFrom(this.reader);
 
                         var operationType = localName switch
                         {
@@ -371,7 +371,7 @@ internal static class WfsStreamingTransactionParser
                                        element.Attribute(XName.Get("typeName"))?.Value;
                         }
 
-                        this.current = new TransactionOperation(operationType, typeName, null, element);
+                        this._current = new TransactionOperation(operationType, typeName, null, element);
                         return true;
                     }
                 }
@@ -384,7 +384,7 @@ internal static class WfsStreamingTransactionParser
         {
             if (!_disposed)
             {
-                this.disposed = true;
+                this._disposed = true;
                 this.reader.Dispose();
                 this.cts.Dispose();
             }

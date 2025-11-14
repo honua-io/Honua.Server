@@ -178,13 +178,13 @@ internal static class GeoservicesWhereParser
         {
             this.text = text ?? string.Empty;
             this.layer = Guard.NotNull(layer);
-            this.position = 0;
-            this.current = default;
+            this._position = 0;
+            this._current = default;
         }
 
         public QueryExpression Parse()
         {
-            this.current = NextToken();
+            this._current = NextToken();
             var expression = ParseOr();
             Expect(WhereTokenKind.End);
             return expression;
@@ -193,7 +193,7 @@ internal static class GeoservicesWhereParser
         private QueryExpression ParseOr()
         {
             var left = ParseAnd();
-            while (this.current.Kind == WhereTokenKind.Or)
+            while (this._current.Kind == WhereTokenKind.Or)
             {
                 Advance();
                 var right = ParseAnd();
@@ -206,7 +206,7 @@ internal static class GeoservicesWhereParser
         private QueryExpression ParseAnd()
         {
             var left = ParseFactor();
-            while (this.current.Kind == WhereTokenKind.And)
+            while (this._current.Kind == WhereTokenKind.And)
             {
                 Advance();
                 var right = ParseFactor();
@@ -218,14 +218,14 @@ internal static class GeoservicesWhereParser
 
         private QueryExpression ParseFactor()
         {
-            if (this.current.Kind == WhereTokenKind.Not)
+            if (this._current.Kind == WhereTokenKind.Not)
             {
                 Advance();
                 var operand = ParseFactor();
                 return new QueryUnaryExpression(QueryUnaryOperator.Not, operand);
             }
 
-            if (this.current.Kind == WhereTokenKind.OpenParen)
+            if (this._current.Kind == WhereTokenKind.OpenParen)
             {
                 Advance();
                 var inner = ParseOr();
@@ -238,21 +238,21 @@ internal static class GeoservicesWhereParser
 
         private QueryExpression ParseComparison()
         {
-            if (this.current.Kind != WhereTokenKind.Identifier)
+            if (this._current.Kind != WhereTokenKind.Identifier)
             {
-                ThrowError($"Unexpected token '{this.current.Value}'. Field name expected.");
+                ThrowError($"Unexpected token '{this._current.Value}'. Field name expected.");
             }
 
             var fieldToken = _current;
             Advance();
-            var fieldName = GeoservicesFieldResolver.NormalizeFieldName(fieldToken.Value!, _layer);
+            var fieldName = GeoservicesFieldResolver.NormalizeFieldName(fieldToken.Value!, this.layer);
             var fieldReference = new QueryFieldReference(fieldName);
 
-            if (this.current.Kind == WhereTokenKind.Is)
+            if (this._current.Kind == WhereTokenKind.Is)
             {
                 Advance();
                 var negateNull = false;
-                if (this.current.Kind == WhereTokenKind.Not)
+                if (this._current.Kind == WhereTokenKind.Not)
                 {
                     negateNull = true;
                     Advance();
@@ -266,13 +266,13 @@ internal static class GeoservicesWhereParser
             }
 
             var negate = false;
-            if (this.current.Kind == WhereTokenKind.Not)
+            if (this._current.Kind == WhereTokenKind.Not)
             {
                 negate = true;
                 Advance();
             }
 
-            if (this.current.Kind == WhereTokenKind.Between)
+            if (this._current.Kind == WhereTokenKind.Between)
             {
                 Advance();
                 var lower = ParseValue();
@@ -285,7 +285,7 @@ internal static class GeoservicesWhereParser
                 return negate ? new QueryUnaryExpression(QueryUnaryOperator.Not, between) : between;
             }
 
-            if (this.current.Kind == WhereTokenKind.In)
+            if (this._current.Kind == WhereTokenKind.In)
             {
                 Advance();
                 Expect(WhereTokenKind.OpenParen);
@@ -293,7 +293,7 @@ internal static class GeoservicesWhereParser
                 do
                 {
                     values.Add(ParseValue());
-                    if (this.current.Kind == WhereTokenKind.Comma)
+                    if (this._current.Kind == WhereTokenKind.Comma)
                     {
                         Advance();
                         continue;
@@ -317,7 +317,7 @@ internal static class GeoservicesWhereParser
                 return negate ? new QueryUnaryExpression(QueryUnaryOperator.Not, inResult) : inResult;
             }
 
-            if (this.current.Kind == WhereTokenKind.Like)
+            if (this._current.Kind == WhereTokenKind.Like)
             {
                 Advance();
                 var pattern = ParseValue();
@@ -325,9 +325,9 @@ internal static class GeoservicesWhereParser
                 return negate ? new QueryUnaryExpression(QueryUnaryOperator.Not, like) : like;
             }
 
-            if (this.current.Kind == WhereTokenKind.Operator)
+            if (this._current.Kind == WhereTokenKind.Operator)
             {
-                var op = this.current.Value ?? string.Empty;
+                var op = this._current.Value ?? string.Empty;
                 Advance();
                 var comparisonValue = ParseValue();
                 var opKind = MapOperator(op);
@@ -335,48 +335,48 @@ internal static class GeoservicesWhereParser
                 return negate ? new QueryUnaryExpression(QueryUnaryOperator.Not, comparison) : comparison;
             }
 
-            ThrowError($"Unexpected token '{this.current.Value}' in where clause.");
+            ThrowError($"Unexpected token '{this._current.Value}' in where clause.");
             return new QueryConstant(1);
         }
 
         private QueryConstant ParseValue()
         {
-            if (this.current.Kind == WhereTokenKind.String)
+            if (this._current.Kind == WhereTokenKind.String)
             {
-                var value = ParseConstant(this.current.Value ?? string.Empty);
+                var value = ParseConstant(this._current.Value ?? string.Empty);
                 Advance();
                 return value;
             }
 
-            if (this.current.Kind == WhereTokenKind.Number)
+            if (this._current.Kind == WhereTokenKind.Number)
             {
-                var value = ParseConstant(this.current.Value ?? string.Empty);
+                var value = ParseConstant(this._current.Value ?? string.Empty);
                 Advance();
                 return value;
             }
 
-            if (this.current.Kind == WhereTokenKind.Identifier)
+            if (this._current.Kind == WhereTokenKind.Identifier)
             {
-                var identifier = this.current.Value ?? string.Empty;
+                var identifier = this._current.Value ?? string.Empty;
                 Advance();
                 return ParseConstant(identifier);
             }
 
-            if (this.current.Kind == WhereTokenKind.Null)
+            if (this._current.Kind == WhereTokenKind.Null)
             {
                 Advance();
                 return new QueryConstant(null);
             }
 
-            ThrowError($"Unable to parse literal from token '{this.current.Value}'.");
+            ThrowError($"Unable to parse literal from token '{this._current.Value}'.");
             return new QueryConstant(string.Empty);
         }
 
         private void Expect(WhereTokenKind kind)
         {
-            if (this.current.Kind != kind)
+            if (this._current.Kind != kind)
             {
-                ThrowError($"Expected token '{kind}' but found '{this.current.Kind}'.");
+                ThrowError($"Expected token '{kind}' but found '{this._current.Kind}'.");
             }
 
             Advance();
@@ -384,7 +384,7 @@ internal static class GeoservicesWhereParser
 
         private void ExpectKeyword(WhereTokenKind kind)
         {
-            if (this.current.Kind != kind)
+            if (this._current.Kind != kind)
             {
                 ThrowError($"Expected keyword '{kind}'.");
             }
@@ -394,7 +394,7 @@ internal static class GeoservicesWhereParser
 
         private void Advance()
         {
-            this.current = NextToken();
+            this._current = NextToken();
         }
 
         private WhereToken NextToken()
@@ -405,7 +405,7 @@ internal static class GeoservicesWhereParser
                 return new WhereToken(WhereTokenKind.End, null);
             }
 
-            var ch = _text[_position];
+            var ch = this.text[_position];
 
             if (char.IsLetter(ch) || ch == '_')
             {
@@ -460,7 +460,7 @@ internal static class GeoservicesWhereParser
 
         private void SkipWhitespace()
         {
-            while (_position < this.text.Length && char.IsWhiteSpace(_text[_position]))
+            while (_position < this.text.Length && char.IsWhiteSpace(this.text[_position]))
             {
                 _position++;
             }
@@ -469,24 +469,24 @@ internal static class GeoservicesWhereParser
         private string ReadIdentifier()
         {
             var start = _position;
-            while (_position < this.text.Length && (char.IsLetterOrDigit(_text[_position]) || _text[_position] is '_' or '.'))
+            while (_position < this.text.Length && (char.IsLetterOrDigit(this.text[_position]) || this.text[_position] is '_' or '.'))
             {
                 _position++;
             }
 
-            return _text[start.._position].ToUpperInvariant();
+            return this.text[start.._position].ToUpperInvariant();
         }
 
         private string ReadNumber()
         {
             var start = _position;
             _position++;
-            while (_position < this.text.Length && (char.IsDigit(_text[_position]) || _text[_position] is '.' or 'e' or 'E' or '+' or '-'))
+            while (_position < this.text.Length && (char.IsDigit(this.text[_position]) || this.text[_position] is '.' or 'e' or 'E' or '+' or '-'))
             {
                 _position++;
             }
 
-            return _text[start.._position];
+            return this.text[start.._position];
         }
 
         private string ReadString()
@@ -497,10 +497,10 @@ internal static class GeoservicesWhereParser
 
             while (_position < this.text.Length)
             {
-                var ch = _text[_position++];
-                if (ch == '\'' && _position < this.text.Length && _text[_position] == '\'')
+                var ch = this.text[_position++];
+                if (ch == '\'' && _position < this.text.Length && this.text[_position] == '\'')
                 {
-                    builder.Append(_text, start, _position - start - 1);
+                    builder.Append(this.text, start, _position - start - 1);
                     builder.Append('\'');
                     _position++;
                     start = _position;
@@ -509,7 +509,7 @@ internal static class GeoservicesWhereParser
 
                 if (ch == '\'')
                 {
-                    builder.Append(_text, start, _position - start - 1);
+                    builder.Append(this.text, start, _position - start - 1);
                     return builder.ToString();
                 }
             }
@@ -520,7 +520,7 @@ internal static class GeoservicesWhereParser
 
         private string ReadOperator()
         {
-            var remaining = _text[this.position..];
+            var remaining = this.text[this._position..];
             if (remaining.StartsWith(">=", StringComparison.Ordinal))
             {
                 _position += 2;
@@ -545,7 +545,7 @@ internal static class GeoservicesWhereParser
                 return "<>";
             }
 
-            var ch = _text[_position++];
+            var ch = this.text[_position++];
             return ch.ToString();
         }
 

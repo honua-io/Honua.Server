@@ -156,7 +156,7 @@ public abstract class ConfigurationV2IntegrationTestBase : IDisposable
             provider   = "postgresql"
             connection = env("DATABASE_URL")
 
-            pool {
+            pool = {
                 min_size = 1
                 max_size = 5
             }
@@ -173,7 +173,7 @@ public abstract class ConfigurationV2IntegrationTestBase : IDisposable
             id_field    = "id"
             introspect_fields = true
 
-            geometry {
+            geometry = {
                 column = "geom"
                 type   = "Polygon"
                 srid   = 4326
@@ -200,7 +200,7 @@ public abstract class ConfigurationV2IntegrationTestBase : IDisposable
             provider   = "postgresql"
             connection = env("DATABASE_URL")
 
-            pool {
+            pool = {
                 min_size = 1
                 max_size = 5
             }
@@ -219,7 +219,7 @@ public abstract class ConfigurationV2IntegrationTestBase : IDisposable
             id_field    = "id"
             introspect_fields = true
 
-            geometry {
+            geometry = {
                 column = "geom"
                 type   = "Polygon"
                 srid   = 4326
@@ -246,7 +246,7 @@ public abstract class ConfigurationV2IntegrationTestBase : IDisposable
             provider   = "postgresql"
             connection = env("DATABASE_URL")
 
-            pool {
+            pool = {
                 min_size = 1
                 max_size = 5
             }
@@ -267,7 +267,7 @@ public abstract class ConfigurationV2IntegrationTestBase : IDisposable
             id_field    = "id"
             introspect_fields = true
 
-            geometry {
+            geometry = {
                 column = "geom"
                 type   = "Polygon"
                 srid   = 4326

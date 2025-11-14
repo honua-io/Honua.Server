@@ -10,15 +10,19 @@ namespace Honua.Server.Host.Wmts;
 /// </summary>
 internal static class WmtsEndpointExtensions
 {
-    public static IEndpointRouteBuilder MapWmtsEndpoints(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapWmtsEndpoints(this IEndpointRouteBuilder endpoints, string? prefix = null)
     {
+        var endpointPrefix = string.IsNullOrEmpty(prefix) ? "" : $"{prefix}-";
+
         var wmtsGroup = endpoints.MapGroup("/wmts")
             .WithTags("WMTS")
             .RequireRateLimiting("OgcApiPolicy")
             .RequireAuthorization("RequireViewer");
 
-        wmtsGroup.MapGet("", WmtsHandlers.HandleAsync);
-        wmtsGroup.MapPost("", WmtsHandlers.HandleAsync);
+        wmtsGroup.MapGet("", WmtsHandlers.HandleAsync)
+            .WithName($"{endpointPrefix}WMTS-GET");
+        wmtsGroup.MapPost("", WmtsHandlers.HandleAsync)
+            .WithName($"{endpointPrefix}WMTS-POST");
 
         return endpoints;
     }

@@ -225,9 +225,19 @@ public static class ServiceCollectionExtensions
 
         // Register STAC catalog store with configuration from appsettings
         services.Configure<StacCatalogOptions>(configuration.GetSection(StacCatalogOptions.SectionName));
+
+        // Register STAC catalog store factory - decision to use in-memory or real store is deferred
+        // until service resolution time to ensure all configuration overrides are applied
         services.AddSingleton<IStacCatalogStore>(sp =>
         {
             var stacOptions = sp.GetRequiredService<IOptions<StacCatalogOptions>>().Value;
+
+            // If STAC is disabled, use in-memory store to avoid requiring connection strings
+            if (!stacOptions.Enabled)
+            {
+                return new InMemoryStacCatalogStore();
+            }
+
             return new StacCatalogStoreFactory().Create(stacOptions);
         });
 

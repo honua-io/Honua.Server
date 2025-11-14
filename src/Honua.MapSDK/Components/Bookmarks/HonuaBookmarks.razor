@@ -659,10 +659,11 @@ else
         }
     }
 
-    private async Task ImportBookmarks()
+    private Task ImportBookmarks()
     {
         // TODO: Show file picker and import
         Console.WriteLine("Import bookmarks - not yet implemented");
+        return Task.CompletedTask;
     }
 
     private RenderFragment RenderBookmarkCard(Bookmark bookmark) => builder =>

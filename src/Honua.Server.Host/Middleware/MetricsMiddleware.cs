@@ -46,7 +46,7 @@ public sealed class MetricsMiddleware
 
         try
         {
-            await _next(context);
+            await this.next(context);
             statusCode = context.Response.StatusCode;
         }
         catch (Exception ex)
@@ -67,7 +67,7 @@ public sealed class MetricsMiddleware
 
             // Track per-endpoint metrics
             var endpoint = $"{context.Request.Method} {context.Request.Path}";
-            var metrics = this.endpointMetrics.GetOrAdd(endpoint, _ => new EndpointMetrics());
+            var metrics = this._endpointMetrics.GetOrAdd(endpoint, _ => new EndpointMetrics());
 
             // PERFORMANCE FIX: Update endpoint metrics using Interlocked operations
             Interlocked.Increment(ref metrics.RequestCount);
@@ -133,7 +133,7 @@ public sealed class MetricsMiddleware
             TotalDurationMs = totalDuration,
             AverageDurationMs = totalReqs > 0 ? totalDuration / (double)totalReqs : 0,
             ErrorRate = totalReqs > 0 ? (totalErrs / (double)totalReqs) * 100 : 0,
-            EndpointCount = this.endpointMetrics.Count
+            EndpointCount = this._endpointMetrics.Count
         };
     }
 
@@ -142,7 +142,7 @@ public sealed class MetricsMiddleware
     /// </summary>
     public EndpointMetricsSnapshot? GetEndpointMetrics(string endpoint)
     {
-        if (this.endpointMetrics.TryGetValue(endpoint, out var metrics))
+        if (this._endpointMetrics.TryGetValue(endpoint, out var metrics))
         {
             var count = Interlocked.Read(ref metrics.RequestCount);
             var duration = Interlocked.Read(ref metrics.TotalDurationMs);

@@ -299,7 +299,7 @@ public sealed class AlertPublishingService : IAlertPublishingService
         };
     }
 
-    private async Task<NotificationChannelTestResult> TestEmailChannelAsync(
+    private Task<NotificationChannelTestResult> TestEmailChannelAsync(
         NotificationChannel channel,
         CancellationToken cancellationToken)
     {
@@ -307,20 +307,20 @@ public sealed class AlertPublishingService : IAlertPublishingService
         // For now, return a simulated success if configuration exists
         if (!channel.Configuration.TryGetValue("recipient", out var recipient))
         {
-            return new NotificationChannelTestResult
+            return Task.FromResult(new NotificationChannelTestResult
             {
                 Success = false,
                 Message = "Email recipient not configured"
-            };
+            });
         }
 
         _logger.LogInformation("Email test would send to: {Recipient}", recipient);
 
-        return new NotificationChannelTestResult
+        return Task.FromResult(new NotificationChannelTestResult
         {
             Success = true,
             Message = $"Email channel configured (would send to {recipient})"
-        };
+        });
     }
 
     private async Task<NotificationChannelTestResult> TestWebhookChannelAsync(
@@ -365,50 +365,50 @@ public sealed class AlertPublishingService : IAlertPublishingService
         };
     }
 
-    private async Task<NotificationChannelTestResult> TestSnsChannelAsync(
+    private Task<NotificationChannelTestResult> TestSnsChannelAsync(
         NotificationChannel channel,
         CancellationToken cancellationToken)
     {
         if (!channel.Configuration.TryGetValue("topicArn", out var topicArn))
         {
-            return new NotificationChannelTestResult
+            return Task.FromResult(new NotificationChannelTestResult
             {
                 Success = false,
                 Message = "SNS topic ARN not configured"
-            };
+            });
         }
 
         // SNS testing would require AWS SDK integration
         // For now, validate configuration
         _logger.LogInformation("SNS test would publish to: {TopicArn}", topicArn);
 
-        return new NotificationChannelTestResult
+        return Task.FromResult(new NotificationChannelTestResult
         {
             Success = true,
             Message = $"SNS channel configured (topic: {topicArn})"
-        };
+        });
     }
 
-    private async Task<NotificationChannelTestResult> TestAzureEventGridChannelAsync(
+    private Task<NotificationChannelTestResult> TestAzureEventGridChannelAsync(
         NotificationChannel channel,
         CancellationToken cancellationToken)
     {
         if (!channel.Configuration.TryGetValue("endpoint", out var endpoint))
         {
-            return new NotificationChannelTestResult
+            return Task.FromResult(new NotificationChannelTestResult
             {
                 Success = false,
                 Message = "Azure Event Grid endpoint not configured"
-            };
+            });
         }
 
         _logger.LogInformation("Azure Event Grid test would publish to: {Endpoint}", endpoint);
 
-        return new NotificationChannelTestResult
+        return Task.FromResult(new NotificationChannelTestResult
         {
             Success = true,
             Message = $"Azure Event Grid channel configured (endpoint: {endpoint})"
-        };
+        });
     }
 
     private async Task<NotificationChannelTestResult> TestPagerDutyChannelAsync(

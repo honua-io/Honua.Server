@@ -57,7 +57,7 @@ public sealed class ApiMetricsMiddleware
                 // Record request
                 this.metrics.RecordRequest(apiProtocol, serviceId, layerId);
 
-                await _next(context);
+                await this.next(context);
 
                 stopwatch.Stop();
                 statusCode = context.Response.StatusCode;
@@ -84,7 +84,7 @@ public sealed class ApiMetricsMiddleware
             else
             {
                 // Not an API request, but still track HTTP metrics
-                await _next(context);
+                await this.next(context);
                 stopwatch.Stop();
                 statusCode = context.Response.StatusCode;
 

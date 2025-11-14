@@ -128,7 +128,7 @@ public class CacheHealthCheck : IHealthCheck
                         data: data);
                 }
             }
-            else if (_distributedCache != null)
+            else if (this.distributedCache != null)
             {
                 // Fallback to IDistributedCache (could be in-memory or Redis)
                 var testKey = $"healthcheck:{Guid.NewGuid()}";

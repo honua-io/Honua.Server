@@ -76,7 +76,7 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
         this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         this.options = options?.CurrentValue ?? throw new ArgumentNullException(nameof(options));
-        this.cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        this._cacheKeys = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         // Initialize metrics
         this.hitCounter = WfsMetrics.SchemaCacheHits;
@@ -89,7 +89,7 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
 
         this.entriesGauge = WfsMetrics.Meter.CreateObservableGauge<int>(
             "honua.wfs.schema_cache.entries",
-            () => this.cacheKeys.Count,
+            () => this._cacheKeys.Count,
             description: "Number of cached WFS schemas");
     }
 
@@ -146,7 +146,7 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
         var cacheKey = BuildCacheKey(collectionId);
 
         // Check if we're at the cache size limit
-        if (this.options.MaxCachedSchemas > 0 && this.cacheKeys.Count >= this.options.MaxCachedSchemas)
+        if (this.options.MaxCachedSchemas > 0 && this._cacheKeys.Count >= this.options.MaxCachedSchemas)
         {
             this.logger.LogWarning(
                 "WFS schema cache has reached maximum size limit of {MaxSchemas}. " +
@@ -168,7 +168,7 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
         // Register eviction callback to track cache keys and metrics
         cacheOptions.RegisterPostEvictionCallback((key, value, reason, state) =>
         {
-            this.cacheKeys.TryRemove(key.ToString()!, out _);
+            this._cacheKeys.TryRemove(key.ToString()!, out _);
             Interlocked.Increment(ref _evictions);
             this.evictionsCounter.Add(1,
                 new KeyValuePair<string, object?>("collection_id", collectionId),
@@ -188,13 +188,13 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
                     "WFS schema cache evicted entry for {CollectionId} due to capacity limit. " +
                     "Current entries: {CurrentEntries}, Max: {MaxSchemas}. Consider increasing cache limits.",
                     collectionId,
-                    this.cacheKeys.Count,
+                    this._cacheKeys.Count,
                     this.options.MaxCachedSchemas);
             }
         });
 
         this.cache.Set(cacheKey, schema, cacheOptions);
-        this.cacheKeys.TryAdd(cacheKey, 0);
+        this._cacheKeys.TryAdd(cacheKey, 0);
 
         this.logger.LogDebug(
             "WFS schema cached for collection {CollectionId} with TTL of {TtlSeconds} seconds",
@@ -214,7 +214,7 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
 
         var cacheKey = BuildCacheKey(collectionId);
         this.cache.Remove(cacheKey);
-        this.cacheKeys.TryRemove(cacheKey, out _);
+        this._cacheKeys.TryRemove(cacheKey, out _);
 
         this.logger.LogInformation(
             "Invalidated WFS schema cache for collection: {CollectionId}",
@@ -224,13 +224,13 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
     /// <inheritdoc />
     public void InvalidateAll()
     {
-        var count = this.cacheKeys.Count;
-        var keysToRemove = this.cacheKeys.Keys.ToList();
+        var count = this._cacheKeys.Count;
+        var keysToRemove = this._cacheKeys.Keys.ToList();
 
         foreach (var key in keysToRemove)
         {
             this.cache.Remove(key);
-            this.cacheKeys.TryRemove(key, out _);
+            this._cacheKeys.TryRemove(key, out _);
         }
 
         this.logger.LogInformation(
@@ -249,7 +249,7 @@ public sealed class WfsSchemaCache : IWfsSchemaCache
             Hits = hits,
             Misses = misses,
             Evictions = Interlocked.Read(ref _evictions),
-            EntryCount = this.cacheKeys.Count,
+            EntryCount = this._cacheKeys.Count,
             MaxEntries = this.options.MaxCachedSchemas,
             HitRate = (hits + misses) > 0 ? (double)hits / (hits + misses) : 0
         };

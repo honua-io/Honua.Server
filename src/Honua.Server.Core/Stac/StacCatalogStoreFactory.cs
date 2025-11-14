@@ -24,6 +24,8 @@ public sealed class StacCatalogStoreFactory : ProviderFactoryBase<IStacCatalogSt
     {
         configuration ??= new StacCatalogOptions();
 
+        // Return in-memory store immediately if STAC is disabled
+        // This avoids validation errors for connection strings when STAC is not in use
         if (!configuration.Enabled)
         {
             return new InMemoryStacCatalogStore();

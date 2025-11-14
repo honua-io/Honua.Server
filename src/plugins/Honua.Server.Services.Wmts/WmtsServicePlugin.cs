@@ -1,6 +1,9 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using System;
+using System.Linq;
+using System.Text;
 using Honua.Server.Core.Plugins;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -92,30 +95,14 @@ public sealed class WmtsServicePlugin : IServicePlugin
         IEndpointRouteBuilder endpoints,
         PluginContext context)
     {
-        context.Logger.LogInformation("Mapping WMTS endpoints");
+        // NOTE: WMTS endpoints are mapped by the built-in WMTS handler system
+        // (Honua.Server.Host.Wmts.WmtsEndpointExtensions.MapWmtsEndpoints)
+        // This plugin only provides configuration and service registration.
+        // The plugin endpoint mapping is intentionally skipped to avoid conflicts
+        // with the existing comprehensive WMTS implementation.
 
-        // Get base path from configuration (default: /wmts)
-        var serviceConfig = context.Configuration.GetSection($"honua:services:{ServiceId}");
-        var basePath = serviceConfig.GetValue("base_path", "/wmts");
-
-        // Map WMTS endpoint group
-        var wmtsGroup = endpoints.MapGroup(basePath)
-            .WithTags("WMTS", "OGC")
-            .WithMetadata("Service", "WMTS");
-
-        // KVP interface
-        wmtsGroup.MapGet(string.Empty, HandleWmtsKvpRequestAsync)
-            .WithName("WMTS-KVP")
-            .WithDisplayName("WMTS KVP Request")
-            .WithDescription("Handles WMTS KVP requests (GetCapabilities, GetTile, GetFeatureInfo)");
-
-        // RESTful interface
-        wmtsGroup.MapGet("{layer}/{style}/{tileMatrixSet}/{tileMatrix}/{tileRow}/{tileCol}", HandleWmtsRestRequestAsync)
-            .WithName("WMTS-REST")
-            .WithDisplayName("WMTS RESTful Request")
-            .WithDescription("Handles WMTS RESTful tile requests");
-
-        context.Logger.LogInformation("WMTS endpoints mapped at {BasePath}", basePath);
+        context.Logger.LogInformation(
+            "WMTS plugin loaded. Endpoints are mapped by built-in WMTS handler system.");
     }
 
     /// <summary>
@@ -161,12 +148,8 @@ public sealed class WmtsServicePlugin : IServicePlugin
 
     /// <summary>
     /// Handle WMTS KVP requests.
-    /// TODO: Full implementation needed for:
-    /// - GetCapabilities: Generate WMTS capabilities XML
-    /// - GetTile: Return pre-rendered or dynamically generated tile
-    /// - GetFeatureInfo: Query feature info at tile coordinates
     /// </summary>
-    private static Task<IResult> HandleWmtsKvpRequestAsync(
+    private static async Task<IResult> HandleWmtsKvpRequestAsync(
         HttpContext context,
         WmtsPluginConfiguration config,
         ILogger<WmtsServicePlugin> logger)
@@ -176,17 +159,112 @@ public sealed class WmtsServicePlugin : IServicePlugin
 
         if (service != "WMTS")
         {
-            return Task.FromResult(Results.BadRequest(new
+            return Results.BadRequest(new
             {
                 error = "InvalidParameterValue",
                 message = "service parameter must be 'WMTS'"
-            }));
+            });
         }
 
-        logger.LogInformation("WMTS service configured but implementation pending for request: {Request}", request);
+        logger.LogInformation("Handling WMTS {Request} request", request);
 
-        var message = $"WMTS service is configured but full implementation is pending. Request: {request}";
-        return Task.FromResult(Results.Ok(new { message, request, tileMatrixSet = config.TileMatrixSet }));
+        return request switch
+        {
+            "GETCAPABILITIES" => await HandleGetCapabilitiesAsync(context, config, logger),
+            _ => Results.Ok(new
+            {
+                message = $"WMTS {request} operation not yet implemented",
+                request,
+                tileMatrixSet = config.TileMatrixSet
+            })
+        };
+    }
+
+    private static async Task<IResult> HandleGetCapabilitiesAsync(
+        HttpContext context,
+        WmtsPluginConfiguration config,
+        ILogger<WmtsServicePlugin> logger)
+    {
+        logger.LogInformation("Generating WMTS GetCapabilities");
+
+        // Get metadata registry from DI
+        var metadataRegistry = context.RequestServices.GetRequiredService<Core.Metadata.IMetadataRegistry>();
+        var snapshot = await metadataRegistry.GetSnapshotAsync(context.RequestAborted);
+
+        // Find WMTS service and its layers
+        var wmtsService = snapshot.Services.FirstOrDefault(s =>
+            string.Equals(s.Id, "wmts", StringComparison.OrdinalIgnoreCase));
+
+        var layerElements = new System.Text.StringBuilder();
+        var tileMatrixSetElements = new System.Text.StringBuilder();
+
+        // Add TileMatrixSet definition
+        tileMatrixSetElements.AppendLine($"""
+            <TileMatrixSet>
+              <ows:Identifier>{config.TileMatrixSet}</ows:Identifier>
+              <ows:SupportedCRS>urn:ogc:def:crs:EPSG::3857</ows:SupportedCRS>
+              <TileMatrix>
+                <ows:Identifier>0</ows:Identifier>
+                <ScaleDenominator>559082264.029</ScaleDenominator>
+                <TopLeftCorner>-20037508.34 20037508.34</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>1</MatrixWidth>
+                <MatrixHeight>1</MatrixHeight>
+              </TileMatrix>
+            </TileMatrixSet>
+        """);
+
+        if (wmtsService != null)
+        {
+            foreach (var layer in wmtsService.Layers)
+            {
+                var crs = layer.Crs.FirstOrDefault() ?? "EPSG:4326";
+                layerElements.AppendLine($"""
+                    <Layer>
+                      <ows:Title>{layer.Title}</ows:Title>
+                      <ows:Identifier>{layer.Id}</ows:Identifier>
+                      <ows:WGS84BoundingBox>
+                        <ows:LowerCorner>-180 -90</ows:LowerCorner>
+                        <ows:UpperCorner>180 90</ows:UpperCorner>
+                      </ows:WGS84BoundingBox>
+                      <Style isDefault="true">
+                        <ows:Identifier>default</ows:Identifier>
+                      </Style>
+                      <Format>image/png</Format>
+                      <TileMatrixSetLink>
+                        <TileMatrixSet>{config.TileMatrixSet}</TileMatrixSet>
+                      </TileMatrixSetLink>
+                    </Layer>
+                """);
+            }
+        }
+
+        var capabilities = $"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Capabilities xmlns="http://www.opengis.net/wmts/1.0"
+                xmlns:ows="http://www.opengis.net/ows/1.1"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                version="1.0.0">
+              <ows:ServiceIdentification>
+                <ows:Title>Honua WMTS Service (Plugin)</ows:Title>
+                <ows:ServiceType>OGC WMTS</ows:ServiceType>
+                <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>
+              </ows:ServiceIdentification>
+              <ows:OperationsMetadata>
+                <ows:Operation name="GetCapabilities"/>
+                <ows:Operation name="GetTile"/>
+              </ows:OperationsMetadata>
+              <Contents>
+                {layerElements}
+                {tileMatrixSetElements}
+              </Contents>
+            </Capabilities>
+            """;
+
+        context.Response.Headers.CacheControl = $"public, max-age={config.CapabilitiesCacheDuration}";
+
+        return Results.Content(capabilities, "application/xml");
     }
 
     /// <summary>

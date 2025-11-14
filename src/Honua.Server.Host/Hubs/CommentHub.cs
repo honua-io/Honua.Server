@@ -44,7 +44,7 @@ public sealed class CommentHub : Hub
         // Remove from all map viewer groups
         lock (_viewersLock)
         {
-            foreach (var (mapId, viewers) in this.mapViewers.ToList())
+            foreach (var (mapId, viewers) in _mapViewers.ToList())
             {
                 if (viewers.Remove(Context.ConnectionId))
                 {
@@ -59,7 +59,7 @@ public sealed class CommentHub : Hub
 
                 if (viewers.Count == 0)
                 {
-                    this.mapViewers.Remove(mapId);
+                    _mapViewers.Remove(mapId);
                 }
             }
         }
@@ -90,7 +90,7 @@ public sealed class CommentHub : Hub
 
         lock (_viewersLock)
         {
-            if (!this.mapViewers.ContainsKey(mapId))
+            if (!_mapViewers.ContainsKey(mapId))
             {
                 _mapViewers[mapId] = new HashSet<string>();
             }
@@ -130,12 +130,12 @@ public sealed class CommentHub : Hub
 
         lock (_viewersLock)
         {
-            if (this.mapViewers.TryGetValue(mapId, out var viewers))
+            if (_mapViewers.TryGetValue(mapId, out var viewers))
             {
                 viewers.Remove(Context.ConnectionId);
                 if (viewers.Count == 0)
                 {
-                    this.mapViewers.Remove(mapId);
+                    _mapViewers.Remove(mapId);
                 }
             }
         }
@@ -295,7 +295,7 @@ public sealed class CommentHub : Hub
     {
         lock (_viewersLock)
         {
-            return this.mapViewers.TryGetValue(mapId, out var viewers) ? viewers.Count : 0;
+            return _mapViewers.TryGetValue(mapId, out var viewers) ? viewers.Count : 0;
         }
     }
 }

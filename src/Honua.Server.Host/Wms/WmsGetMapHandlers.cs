@@ -353,10 +353,10 @@ internal static class WmsGetMapHandlers
 
         public Task ExecuteAsync(HttpContext httpContext)
         {
-            httpContext.Response.ContentType = _contentType;
-            httpContext.Response.Headers.CacheControl = _cacheControl;
+            httpContext.Response.ContentType = this.contentType;
+            httpContext.Response.Headers.CacheControl = this.cacheControl;
             httpContext.Response.Headers.Vary = "Accept-Encoding";
-            return httpContext.Response.Body.WriteAsync(_content).AsTask();
+            return httpContext.Response.Body.WriteAsync(this.content).AsTask();
         }
     }
 
@@ -638,15 +638,15 @@ internal static class WmsGetMapHandlers
 
         public async Task ExecuteAsync(HttpContext httpContext)
         {
-            httpContext.Response.ContentType = _contentType;
+            httpContext.Response.ContentType = this.contentType;
 
-            if (!string.IsNullOrWhiteSpace(_cacheControl))
+            if (!string.IsNullOrWhiteSpace(this.cacheControl))
             {
-                httpContext.Response.Headers.CacheControl = _cacheControl;
+                httpContext.Response.Headers.CacheControl = this.cacheControl;
                 httpContext.Response.Headers.Vary = "Accept-Encoding";
             }
 
-            await using (_content)
+            await using (this.content)
             {
                 await this.content.CopyToAsync(httpContext.Response.Body, httpContext.RequestAborted).ConfigureAwait(false);
             }

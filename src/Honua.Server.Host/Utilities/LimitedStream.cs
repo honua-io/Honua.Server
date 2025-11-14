@@ -58,7 +58,7 @@ public sealed class LimitedStream : Stream
         }
 
         this.maxSize = maxSizeBytes;
-        this.bytesRead = 0;
+        this._bytesRead = 0;
     }
 
     /// <summary>
@@ -69,12 +69,12 @@ public sealed class LimitedStream : Stream
     /// <summary>
     /// Gets the maximum allowed size in bytes.
     /// </summary>
-    public long MaxSize => _maxSize;
+    public long MaxSize => this.maxSize;
 
     /// <summary>
     /// Gets the remaining bytes before reaching the limit.
     /// </summary>
-    public long BytesRemaining => Math.Max(0, _maxSize - _bytesRead);
+    public long BytesRemaining => Math.Max(0, this.maxSize - _bytesRead);
 
     public override bool CanRead => this.innerStream.CanRead;
     public override bool CanSeek => false; // Disable seeking to prevent bypassing the limit
@@ -165,7 +165,7 @@ public sealed class LimitedStream : Stream
                 // We only wrap it for read operations
             }
 
-            this.disposed = true;
+            this._disposed = true;
         }
 
         base.Dispose(disposing);
@@ -182,11 +182,11 @@ public sealed class LimitedStream : Stream
     private void ThrowIfMaxSizeExceeded(int additionalBytes)
     {
         var totalBytes = _bytesRead + additionalBytes;
-        if (totalBytes > _maxSize)
+        if (totalBytes > this.maxSize)
         {
             throw new RequestTooLargeException(
-                $"Request size limit exceeded. Maximum allowed: {FormatBytes(_maxSize)}, attempted: {FormatBytes(totalBytes)}.",
-                _maxSize,
+                $"Request size limit exceeded. Maximum allowed: {FormatBytes(this.maxSize)}, attempted: {FormatBytes(totalBytes)}.",
+                this.maxSize,
                 totalBytes);
         }
     }

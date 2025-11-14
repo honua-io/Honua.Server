@@ -413,12 +413,12 @@ public sealed class ValidBoundingBoxAttribute : ValidationAttribute
             return new System.ComponentModel.DataAnnotations.ValidationResult("Bounding box must be an array of doubles.");
         }
 
-        if (!_allow3D && bbox.Length == 6)
+        if (!this.allow3D && bbox.Length == 6)
         {
             return new System.ComponentModel.DataAnnotations.ValidationResult("3D bounding boxes are not allowed for this parameter.");
         }
 
-        if (!BoundingBoxValidator.TryValidate(bbox, _srid, out var errorMessage))
+        if (!BoundingBoxValidator.TryValidate(bbox, this.srid, out var errorMessage))
         {
             return new System.ComponentModel.DataAnnotations.ValidationResult(errorMessage ?? "Invalid bounding box.");
         }

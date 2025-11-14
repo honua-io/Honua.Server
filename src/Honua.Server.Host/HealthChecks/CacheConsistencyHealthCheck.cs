@@ -47,7 +47,7 @@ public sealed class CacheConsistencyHealthCheck : HealthCheckBase
         CancellationToken cancellationToken)
     {
         // If cache is not configured, skip check
-        if (_cache == null)
+        if (this.cache == null)
         {
             data["cacheEnabled"] = false;
             data["message"] = "Distributed cache is not configured";

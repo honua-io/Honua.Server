@@ -48,7 +48,7 @@ public class SecurityHeadersMiddleware
         // Skip if middleware is disabled
         if (!this.options.Enabled)
         {
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
             return;
         }
 
@@ -59,9 +59,9 @@ public class SecurityHeadersMiddleware
             context.Items[CspNonceKey] = nonce;
 
             // Add security headers before processing the request
-            AddSecurityHeaders(context, _environment, nonce, _options);
+            AddSecurityHeaders(context, this.environment, nonce, this.options);
 
-            await _next(context).ConfigureAwait(false);
+            await this.next(context).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

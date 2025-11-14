@@ -1,12 +1,15 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using System.IO;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 using FluentAssertions;
+using Honua.Server.Core.Stac;
+using Honua.Server.Core.Stac.Storage;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -428,23 +431,51 @@ public class AdminAuthorizationTests : IClassFixture<AdminAuthorizationTests.Tes
         {
             builder.ConfigureAppConfiguration((context, config) =>
             {
-                // Set environment to Test
-                context.HostingEnvironment.EnvironmentName = "Test";
+                // Set environment to Development to allow QuickStart mode for non-enforced auth tests
+                context.HostingEnvironment.EnvironmentName = "Development";
 
-                // Configure minimal test settings
+                // Create minimal HCL configuration for Configuration V2
+                var tempConfigPath = Path.Combine(Path.GetTempPath(), $"test-auth-{Guid.NewGuid()}.honua");
+                var minimalConfig = """
+                honua {
+                    version     = "2.0"
+                    environment = "test"
+                    log_level   = "information"
+                }
+                """;
+                File.WriteAllText(tempConfigPath, minimalConfig);
+
+                // Configure test settings including Configuration V2
+                var pluginsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../plugins"));
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
+                    ["HONUA_CONFIG_PATH"] = tempConfigPath,
+                    ["Honua:ConfigurationV2:Path"] = tempConfigPath,
+                    ["HONUA_CONFIG_V2_ENABLED"] = "true",
+                    ["honua:plugins:paths:0"] = pluginsPath,
                     ["honua:authentication:enforce"] = _enforceAuth.ToString(),
-                    ["honua:authentication:mode"] = "QuickStart",
+                    // Use Local mode when enforcing auth, QuickStart otherwise
+                    ["honua:authentication:mode"] = _enforceAuth ? "Local" : "QuickStart",
+                    ["honua:authentication:quickstart:enabled"] = (!_enforceAuth).ToString(),
+                    ["honua:authentication:allowQuickStart"] = (!_enforceAuth).ToString(),
+                    // Local auth configuration for test mode
+                    ["honua:authentication:local:provider"] = "sqlite",
+                    ["honua:authentication:local:storePath"] = Path.Combine(Path.GetTempPath(), $"test-auth-{Guid.NewGuid()}.db"),
                     ["honua:metadata:provider"] = "FileSystem",
                     ["honua:metadata:path"] = "./test-metadata",
                     ["AllowedHosts"] = "*",
-                    ["honua:cors:allowAnyOrigin"] = "true"
+                    ["honua:cors:allowAnyOrigin"] = "true",
+                    // STAC configuration - disable for tests to avoid requiring connection string
+                    ["Honua:Services:Stac:Enabled"] = "false",
+                    ["Honua:Services:Stac:Provider"] = "memory"
                 });
             });
 
             builder.ConfigureTestServices(services =>
             {
+                // Override STAC catalog store to use in-memory for tests
+                services.AddSingleton<IStacCatalogStore>(new InMemoryStacCatalogStore());
+
                 // Add test authentication handler if user is specified
                 if (!string.IsNullOrEmpty(_userName) && !string.IsNullOrEmpty(_userRole))
                 {

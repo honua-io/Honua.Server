@@ -238,7 +238,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             {
                 await this.streamingKmlWriter.WriteKmzAsync(
                     Response,
-                    _repository,
+                    this.repository,
                     service.Id,
                     layer,
                     context,
@@ -250,7 +250,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             {
                 await this.streamingKmlWriter.WriteKmlAsync(
                     Response,
-                    _repository,
+                    this.repository,
                     service.Id,
                     layer,
                     context,
@@ -338,7 +338,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             {
                 await this.streamingKmlWriter.WriteKmzAsync(
                     Response,
-                    _repository,
+                    this.repository,
                     service.Id,
                     layer,
                     context,
@@ -350,7 +350,7 @@ public sealed partial class GeoservicesRESTFeatureServerController
             {
                 await this.streamingKmlWriter.WriteKmlAsync(
                     Response,
-                    _repository,
+                    this.repository,
                     service.Id,
                     layer,
                     context,

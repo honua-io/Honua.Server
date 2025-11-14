@@ -47,7 +47,7 @@ internal sealed class OgcApiDefinitionCache
             return entry;
         }
 
-        await this.reloadLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await this._reloadLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             entry = _cachedEntry;
@@ -80,7 +80,7 @@ internal sealed class OgcApiDefinitionCache
         }
         finally
         {
-            this.reloadLock.Release();
+            this._reloadLock.Release();
         }
     }
 

@@ -59,7 +59,7 @@ public sealed class StacCollectionService
     {
         return await OperationInstrumentation.Create<CollectionOperationResult>("STAC PostCollection")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.WriteOperationsCounter, this.metrics.WriteOperationErrorsCounter, this.metrics.WriteOperationDuration)
             .WithTag("stac.operation", "PostCollection")
             .WithTag("operation", "post")
@@ -132,7 +132,7 @@ public sealed class StacCollectionService
     {
         return await OperationInstrumentation.Create<CollectionOperationResult>("STAC PutCollection")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.WriteOperationsCounter, this.metrics.WriteOperationErrorsCounter, this.metrics.WriteOperationDuration)
             .WithTag("stac.operation", "PutCollection")
             .WithTag("stac.collection_id", collectionId)
@@ -235,7 +235,7 @@ public sealed class StacCollectionService
     {
         return await OperationInstrumentation.Create<bool>("STAC DeleteCollection")
             .WithActivitySource(HonuaTelemetry.Stac)
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithMetrics(this.metrics.WriteOperationsCounter, this.metrics.WriteOperationErrorsCounter, this.metrics.WriteOperationDuration)
             .WithTag("stac.operation", "DeleteCollection")
             .WithTag("stac.collection_id", collectionId)

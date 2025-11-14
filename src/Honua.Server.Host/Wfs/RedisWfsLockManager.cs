@@ -51,7 +51,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
         // Create circuit breaker for Redis operations
         this.resiliencePipeline = CreateCircuitBreakerPipeline();
 
-        this.logger.LogInformation("RedisWfsLockManager initialized with prefix: {KeyPrefix}", _keyPrefix);
+        this.logger.LogInformation("RedisWfsLockManager initialized with prefix: {KeyPrefix}", this.keyPrefix);
     }
 
     private ResiliencePipeline CreateCircuitBreakerPipeline()
@@ -117,7 +117,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
         // Note: OperationInstrumentation doesn't work well here because we need custom error handling
         // and metrics recording inside the resilience pipeline execution
         return await OperationInstrumentation.Create<WfsLockAcquisitionResult>("WfsLockAcquire")
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithTag("wfs.service_id", serviceId)
             .WithTag("wfs.target_count", targets.Count)
             .WithTag("wfs.duration_seconds", duration.TotalSeconds)
@@ -141,7 +141,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
 
                                 if (!lockJson.IsNullOrEmpty)
                                 {
-                                    var existingLock = JsonSerializer.Deserialize<LockInfo>(lockJson!, _jsonOptions);
+                                    var existingLock = JsonSerializer.Deserialize<LockInfo>(lockJson!, this.jsonOptions);
                                     if (existingLock != null)
                                     {
                                         var message = $"Feature '{FormatTarget(target)}' is locked until {existingLock.ExpiresAt:O}.";
@@ -165,7 +165,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                         var targetEntries = lockTargets.Select(t => (Target: t, Key: GetTargetKey(t))).ToList();
 
                         var lockInfo = new LockInfo(lockId, owner, expiresAt, lockTargets);
-                        var json = JsonSerializer.Serialize(lockInfo, _jsonOptions);
+                        var json = JsonSerializer.Serialize(lockInfo, this.jsonOptions);
                         var lockKey = GetLockKey(lockId);
 
                         var transaction = this.database.CreateTransaction();
@@ -230,7 +230,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
         var serviceId = targets.FirstOrDefault()?.ServiceId ?? "(unknown)";
 
         return await OperationInstrumentation.Create<WfsLockValidationResult>("WfsLockValidate")
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithTag("wfs.service_id", serviceId)
             .WithTag("wfs.lock_id", lockId ?? "(none)")
             .WithTag("wfs.target_count", targets.Count)
@@ -308,7 +308,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
         }
 
         await OperationInstrumentation.Create<int>("WfsLockRelease")
-            .WithLogger(_logger)
+            .WithLogger(this.logger)
             .WithTag("wfs.lock_id", lockId)
             .WithTag("wfs.requesting_user", requestingUser)
             .WithTag("wfs.partial_release", targets != null)
@@ -327,7 +327,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                             return;
                         }
 
-                        var lockInfo = JsonSerializer.Deserialize<LockInfo>(lockJson!, _jsonOptions);
+                        var lockInfo = JsonSerializer.Deserialize<LockInfo>(lockJson!, this.jsonOptions);
                         if (lockInfo == null)
                         {
                             this.logger.LogWarning("Failed to deserialize lock info for {LockId}", lockId);
@@ -390,7 +390,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
                             {
                                 // Update the lock with remaining targets
                                 var updatedLockInfo = lockInfo with { Targets = remainingTargets };
-                                var updatedJson = JsonSerializer.Serialize(updatedLockInfo, _jsonOptions);
+                                var updatedJson = JsonSerializer.Serialize(updatedLockInfo, this.jsonOptions);
                                 var ttl = await this.database.KeyTimeToLiveAsync(lockKey);
                                 await this.database.StringSetAsync(lockKey, updatedJson, ttl);
                                 activity?.SetTag("wfs.targets_released", targets.Count);
@@ -421,7 +421,7 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
         try
         {
             var server = this.redis.GetServer(this.redis.GetEndPoints().First());
-            var keys = server.Keys(pattern: $"{_keyPrefix}*");
+            var keys = server.Keys(pattern: $"{this.keyPrefix}*");
 
             foreach (var key in keys)
             {
@@ -439,12 +439,12 @@ internal sealed class RedisWfsLockManager : IWfsLockManager, IDisposable
 
     private string GetLockKey(string lockId)
     {
-        return $"{_keyPrefix}{lockId}";
+        return $"{this.keyPrefix}{lockId}";
     }
 
     private string GetTargetKey(WfsLockTarget target)
     {
-        return $"{_keyPrefix}target:{target.ServiceId}:{target.LayerId}:{target.FeatureId}";
+        return $"{this.keyPrefix}target:{target.ServiceId}:{target.LayerId}:{target.FeatureId}";
     }
 
     private static string FormatTarget(WfsLockTarget target)

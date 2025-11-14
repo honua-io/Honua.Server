@@ -1,6 +1,9 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using System;
+using System.Linq;
+using System.Text;
 using Honua.Server.Core.Plugins;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -95,29 +98,14 @@ public sealed class WfsServicePlugin : IServicePlugin
         IEndpointRouteBuilder endpoints,
         PluginContext context)
     {
-        context.Logger.LogInformation("Mapping WFS endpoints");
+        // NOTE: WFS endpoints are mapped by the built-in WFS handler system
+        // (Honua.Server.Host.Wfs.WfsEndpointExtensions.MapWfs)
+        // This plugin only provides configuration and service registration.
+        // The plugin endpoint mapping is intentionally skipped to avoid conflicts
+        // with the existing comprehensive WFS implementation.
 
-        // Get base path from configuration (default: /wfs)
-        var serviceConfig = context.Configuration.GetSection($"honua:services:{ServiceId}");
-        var basePath = serviceConfig.GetValue("base_path", "/wfs");
-
-        // Map WFS endpoint group
-        var wfsGroup = endpoints.MapGroup(basePath)
-            .WithTags("WFS", "OGC")
-            .WithMetadata("Service", "WFS");
-
-        // Map WFS endpoints
-        wfsGroup.MapGet(string.Empty, HandleWfsRequestAsync)
-            .WithName("WFS-Get")
-            .WithDisplayName("WFS GET Request")
-            .WithDescription("Handles WFS GET requests (GetCapabilities, DescribeFeatureType, GetFeature, etc.)");
-
-        wfsGroup.MapPost(string.Empty, HandleWfsRequestAsync)
-            .WithName("WFS-Post")
-            .WithDisplayName("WFS POST Request")
-            .WithDescription("Handles WFS POST requests (Transaction, etc.)");
-
-        context.Logger.LogInformation("WFS endpoints mapped at {BasePath}", basePath);
+        context.Logger.LogInformation(
+            "WFS plugin loaded. Endpoints are mapped by built-in WFS handler system.");
     }
 
     /// <summary>
@@ -229,23 +217,43 @@ public sealed class WfsServicePlugin : IServicePlugin
         };
     }
 
-    private static Task<IResult> HandleGetCapabilitiesAsync(
+    private static async Task<IResult> HandleGetCapabilitiesAsync(
         HttpContext context,
         WfsPluginConfiguration config,
         ILogger<WfsServicePlugin> logger)
     {
         logger.LogInformation("Generating WFS {Version} GetCapabilities", config.Version);
 
-        // In a full implementation, this would:
-        // 1. Read layer metadata from Configuration V2
-        // 2. Build WFS capabilities XML
-        // 3. Apply caching headers
-        // 4. Return XML response
+        // Get metadata registry from DI
+        var metadataRegistry = context.RequestServices.GetRequiredService<Core.Metadata.IMetadataRegistry>();
+        var snapshot = await metadataRegistry.GetSnapshotAsync(context.RequestAborted);
+
+        // Find WFS service and its layers
+        var wfsService = snapshot.Services.FirstOrDefault(s =>
+            string.Equals(s.Id, "wfs", StringComparison.OrdinalIgnoreCase));
+
+        var featureTypeElements = new System.Text.StringBuilder();
+
+        if (wfsService != null)
+        {
+            foreach (var layer in wfsService.Layers)
+            {
+                var crs = layer.Crs.FirstOrDefault() ?? "EPSG:4326";
+                featureTypeElements.AppendLine($"""
+                    <wfs:FeatureType>
+                      <wfs:Name>{layer.Id}</wfs:Name>
+                      <wfs:Title>{layer.Title}</wfs:Title>
+                      <wfs:DefaultCRS>{crs}</wfs:DefaultCRS>
+                    </wfs:FeatureType>
+                """);
+            }
+        }
 
         var capabilities = $"""
             <?xml version="1.0" encoding="UTF-8"?>
             <wfs:WFS_Capabilities version="{config.Version}"
                 xmlns:wfs="http://www.opengis.net/wfs/2.0"
+                xmlns:ows="http://www.opengis.net/ows/1.1"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
               <ows:ServiceIdentification>
                 <ows:Title>Honua WFS Service (Plugin)</ows:Title>
@@ -258,19 +266,14 @@ public sealed class WfsServicePlugin : IServicePlugin
                 <ows:Operation name="GetFeature"/>
               </ows:OperationsMetadata>
               <wfs:FeatureTypeList>
-                <!-- Layer metadata would be inserted here -->
-                <wfs:FeatureType>
-                  <wfs:Name>example:features</wfs:Name>
-                  <wfs:Title>Example Features</wfs:Title>
-                  <wfs:DefaultCRS>EPSG:4326</wfs:DefaultCRS>
-                </wfs:FeatureType>
+                {featureTypeElements}
               </wfs:FeatureTypeList>
             </wfs:WFS_Capabilities>
             """;
 
         context.Response.Headers.CacheControl = $"public, max-age={config.CapabilitiesCacheDuration}";
 
-        return Task.FromResult(Results.Content(capabilities, "application/xml"));
+        return Results.Content(capabilities, "application/xml");
     }
 
     private static Task<IResult> HandleDescribeFeatureTypeAsync(
