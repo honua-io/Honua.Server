@@ -414,6 +414,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
                 cacheHeaderService,
                 attachmentHandler,
                 new Core.Elevation.DefaultElevationService(),
+                this.logger,
                 sanitized,
                 cancellationToken).ConfigureAwait(false);
         }

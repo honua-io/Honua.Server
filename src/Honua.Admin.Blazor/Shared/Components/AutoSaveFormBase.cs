@@ -3,6 +3,7 @@
 
 using Honua.Admin.Blazor.Shared.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using MudBlazor;
 
@@ -18,6 +19,7 @@ public abstract class AutoSaveFormBase<T> : ComponentBase, IAsyncDisposable wher
     [Inject] protected NavigationManager Navigation { get; set; } = default!;
     [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
     [Inject] protected IDialogService DialogService { get; set; } = default!;
+    [Inject] protected ILogger<AutoSaveFormBase<T>> Logger { get; set; } = default!;
 
     protected T Model { get; set; } = new();
     protected bool HasUnsavedChanges { get; set; }
@@ -95,7 +97,7 @@ public abstract class AutoSaveFormBase<T> : ComponentBase, IAsyncDisposable wher
             catch (Exception ex)
             {
                 // Silently fail - navigation warning is an enhancement
-                Console.WriteLine($"Failed to enable navigation warning: {ex.Message}");
+                Logger.LogWarning(ex, "Failed to enable navigation warning for auto-save form");
             }
         }
 
@@ -127,7 +129,7 @@ public abstract class AutoSaveFormBase<T> : ComponentBase, IAsyncDisposable wher
         catch (Exception ex)
         {
             // Silently fail - auto-save is not critical
-            Console.WriteLine($"Auto-save failed: {ex.Message}");
+            Logger.LogWarning(ex, "Auto-save failed for draft key {DraftKey}", _draftKey);
         }
     }
 

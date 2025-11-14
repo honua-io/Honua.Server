@@ -28,6 +28,7 @@ using Honua.Server.Host.Utilities;
 using Honua.Server.Host.Attachments;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using static Honua.Server.Core.Serialization.JsonLdFeatureFormatter;
 using static Honua.Server.Core.Serialization.GeoJsonTFeatureFormatter;
 
@@ -55,6 +56,7 @@ internal static partial class OgcFeaturesHandlers
         OgcCacheHeaderService cacheHeaderService,
         Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         [FromServices] Core.Elevation.IElevationService elevationService,
+        [FromServices] ILogger logger,
         CancellationToken cancellationToken)
         => ExecuteCollectionItemsAsync(
             collectionId,
@@ -72,6 +74,7 @@ internal static partial class OgcFeaturesHandlers
             cacheHeaderService,
             attachmentHandler,
             elevationService,
+            logger,
             queryOverrides: null,
             cancellationToken);
 
@@ -94,6 +97,7 @@ internal static partial class OgcFeaturesHandlers
         OgcCacheHeaderService cacheHeaderService,
         Services.IOgcFeaturesAttachmentHandler attachmentHandler,
         Core.Elevation.IElevationService elevationService,
+        ILogger logger,
         IQueryCollection? queryOverrides,
         CancellationToken cancellationToken)
     {
@@ -130,6 +134,7 @@ internal static partial class OgcFeaturesHandlers
                     metadataRegistry,
                     apiMetrics,
                     cacheHeaderService,
+                    logger,
                     queryOverrides,
                     cancellationToken).ConfigureAwait(false);
             }
@@ -1281,6 +1286,7 @@ internal static partial class OgcFeaturesHandlers
         IMetadataRegistry metadataRegistry,
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
+        ILogger logger,
         IQueryCollection? queryOverrides,
         CancellationToken cancellationToken)
     {
@@ -1322,7 +1328,6 @@ internal static partial class OgcFeaturesHandlers
 
         // Collect features from all member layers
         var allFeatures = new List<object>();
-        var logger = metadataRegistry as Microsoft.Extensions.Logging.ILogger;
 
         foreach (var member in expandedMembers.OrderBy(m => m.Order))
         {
@@ -1365,7 +1370,10 @@ internal static partial class OgcFeaturesHandlers
             catch (Exception ex)
             {
                 // Log and continue - don't fail entire query if one layer fails
-                System.Diagnostics.Debug.WriteLine($"Warning: Failed to query layer {member.Layer.Id} in group {layerGroup.Id}: {ex.Message}");
+                logger.LogWarning(ex,
+                    "Failed to query layer {LayerId} in group {GroupId}",
+                    member.Layer.Id,
+                    layerGroup.Id);
             }
         }
 

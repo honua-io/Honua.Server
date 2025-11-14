@@ -42,6 +42,7 @@ using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
 using NetTopologySuite.Geometries;
@@ -67,6 +68,7 @@ internal static partial class OgcSharedHandlers
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
         Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+        ILogger? logger,
         CancellationToken cancellationToken)
     {
         static QueryCollection RemoveCollectionsParameter(IQueryCollection source)
@@ -133,6 +135,7 @@ internal static partial class OgcSharedHandlers
                 cacheHeaderService,
                 attachmentHandler,
                 new Core.Elevation.DefaultElevationService(),
+                logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
                 sanitized,
                 cancellationToken).ConfigureAwait(false);
         }
