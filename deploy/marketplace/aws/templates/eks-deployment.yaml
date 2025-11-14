@@ -30,6 +30,23 @@ Metadata:
           - PrivateSubnet1CIDR
           - PrivateSubnet2CIDR
       - Label:
+          default: "DNS and SSL/TLS Configuration"
+        Parameters:
+          - DomainName
+          - CreateRoute53HostedZone
+          - Route53HostedZoneId
+          - CertificateArn
+          - LetsEncryptEmail
+      - Label:
+          default: "OAuth/OIDC Configuration"
+        Parameters:
+          - OAuthProvider
+          - OAuthDomain
+          - OAuthClientId
+          - OAuthClientSecret
+          - OAuthIssuer
+          - OAuthScopes
+      - Label:
           default: "AWS Marketplace Configuration"
         Parameters:
           - MarketplaceProductCode
@@ -159,6 +176,50 @@ Parameters:
     Default: ""
     Description: AWS Marketplace Product Code (auto-populated)
 
+  # DNS and SSL/TLS Configuration
+  DomainName:
+    Type: String
+    Default: ""
+    Description: |
+      Your domain name for Honua IO (e.g., honua.example.com).
+      Leave empty to use the load balancer DNS name.
+      If provided, SSL certificate will be automatically provisioned.
+
+  CreateRoute53HostedZone:
+    Type: String
+    Default: "no"
+    AllowedValues:
+      - "yes"
+      - "no"
+    Description: |
+      Create a new Route 53 hosted zone for your domain?
+      Select 'yes' if you want AWS to manage DNS for this domain.
+      You'll need to update your domain registrar with the Route 53 nameservers.
+
+  Route53HostedZoneId:
+    Type: String
+    Default: ""
+    Description: |
+      Existing Route 53 hosted zone ID (optional).
+      Provide this if you already have a hosted zone for your domain.
+      Leave empty if creating a new zone or not using custom domain.
+
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: |
+      Existing AWS Certificate Manager (ACM) certificate ARN (optional).
+      If provided, this certificate will be used for HTTPS.
+      If empty and domain is provided, a certificate will be auto-created using Let's Encrypt.
+
+  LetsEncryptEmail:
+    Type: String
+    Default: ""
+    Description: |
+      Email address for Let's Encrypt certificate notifications.
+      Required if using custom domain without existing ACM certificate.
+      You'll receive expiry notifications (certificates auto-renew).
+
   # OAuth/OIDC Configuration (REQUIRED for cloud marketplace)
   OAuthProvider:
     Type: String
@@ -208,6 +269,16 @@ Parameters:
 Conditions:
   CreateCognitoUserPool: !Equals [!Ref OAuthProvider, cognito]
   UseExistingIdP: !Not [!Equals [!Ref OAuthProvider, cognito]]
+  HasDomainName: !Not [!Equals [!Ref DomainName, ""]]
+  ShouldCreateHostedZone: !And
+    - !Equals [!Ref CreateRoute53HostedZone, "yes"]
+    - !Not [!Equals [!Ref DomainName, ""]]
+  HasExistingHostedZone: !Not [!Equals [!Ref Route53HostedZoneId, ""]]
+  HasExistingCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
+  ShouldCreateCertificate: !And
+    - !Not [!Equals [!Ref DomainName, ""]]
+    - !Equals [!Ref CertificateArn, ""]
+  HasLetsEncryptEmail: !Not [!Equals [!Ref LetsEncryptEmail, ""]]
 
 Resources:
   # AWS Cognito User Pool (if selected)
@@ -302,6 +373,39 @@ Resources:
           "issuer": "https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}",
           "domain": "${CognitoUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
         }
+
+  # DNS - Route 53 Hosted Zone (optional)
+  Route53HostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: ShouldCreateHostedZone
+    Properties:
+      Name: !Ref DomainName
+      HostedZoneConfig:
+        Comment: !Sub Managed by Honua IO CloudFormation stack ${AWS::StackName}
+      HostedZoneTags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-hosted-zone
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # SSL/TLS - ACM Certificate (for ALB, optional if using cert-manager)
+  ACMCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: ShouldCreateCertificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub "*.${DomainName}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !If
+            - ShouldCreateHostedZone
+            - !Ref Route53HostedZone
+            - !Ref Route53HostedZoneId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ClusterName}-certificate
 
   # VPC and Networking
   VPC:
@@ -580,6 +684,78 @@ Resources:
                   - aws-marketplace:MeterUsage
                 Resource: '*'
 
+  # IAM Role for cert-manager (Let's Encrypt DNS-01 challenges)
+  CertManagerServiceAccountRole:
+    Type: AWS::IAM::Role
+    Condition: HasDomainName
+    Properties:
+      RoleName: !Sub ${ClusterName}-cert-manager-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/${EKSCluster.OpenIdConnectIssuerUrl}'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                !Sub '${EKSCluster.OpenIdConnectIssuerUrl}:sub': 'system:serviceaccount:cert-manager:cert-manager'
+      Policies:
+        - PolicyName: CertManagerRoute53Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - route53:GetChange
+                Resource: 'arn:aws:route53:::change/*'
+              - Effect: Allow
+                Action:
+                  - route53:ChangeResourceRecordSets
+                  - route53:ListResourceRecordSets
+                Resource: !Sub
+                  - 'arn:aws:route53:::hostedzone/${HostedZoneId}'
+                  - HostedZoneId: !If [ShouldCreateHostedZone, !Ref Route53HostedZone, !Ref Route53HostedZoneId]
+              - Effect: Allow
+                Action:
+                  - route53:ListHostedZonesByName
+                  - route53:ListHostedZones
+                Resource: '*'
+
+  # IAM Role for external-dns (automatic DNS record management)
+  ExternalDnsServiceAccountRole:
+    Type: AWS::IAM::Role
+    Condition: HasDomainName
+    Properties:
+      RoleName: !Sub ${ClusterName}-external-dns-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/${EKSCluster.OpenIdConnectIssuerUrl}'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                !Sub '${EKSCluster.OpenIdConnectIssuerUrl}:sub': 'system:serviceaccount:external-dns:external-dns'
+      Policies:
+        - PolicyName: ExternalDnsRoute53Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - route53:ChangeResourceRecordSets
+                Resource: !Sub
+                  - 'arn:aws:route53:::hostedzone/${HostedZoneId}'
+                  - HostedZoneId: !If [ShouldCreateHostedZone, !Ref Route53HostedZone, !Ref Route53HostedZoneId]
+              - Effect: Allow
+                Action:
+                  - route53:ListHostedZones
+                  - route53:ListResourceRecordSets
+                  - route53:ListTagsForResource
+                Resource: '*'
+
   # EKS Cluster
   EKSCluster:
     Type: AWS::EKS::Cluster
@@ -771,15 +947,53 @@ Outputs:
     Export:
       Name: !Sub ${AWS::StackName}-ServiceAccountRoleArn
 
+  CertManagerRoleArn:
+    Condition: HasDomainName
+    Description: IAM Role ARN for cert-manager (for Let's Encrypt DNS-01 challenges)
+    Value: !GetAtt CertManagerServiceAccountRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-CertManagerRoleArn
+
+  ExternalDnsRoleArn:
+    Condition: HasDomainName
+    Description: IAM Role ARN for external-dns (for automatic DNS record management)
+    Value: !GetAtt ExternalDnsServiceAccountRole.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ExternalDnsRoleArn
+
   DatabasePasswordSecretArn:
     Description: ARN of the database password secret
     Value: !Ref DatabasePasswordSecret
     Export:
       Name: !Sub ${AWS::StackName}-DatabasePasswordSecret
 
+  Route53HostedZoneId:
+    Description: Route 53 Hosted Zone ID (if created)
+    Value: !If [ShouldCreateHostedZone, !Ref Route53HostedZone, !If [HasExistingHostedZone, !Ref Route53HostedZoneId, "N/A - No hosted zone"]]
+    Export:
+      Name: !Sub ${AWS::StackName}-HostedZoneId
+
+  Route53Nameservers:
+    Condition: ShouldCreateHostedZone
+    Description: Route 53 Nameservers (update these at your domain registrar)
+    Value: !Join [", ", !GetAtt Route53HostedZone.NameServers]
+
+  ACMCertificateArn:
+    Description: ACM Certificate ARN for HTTPS
+    Value: !If [ShouldCreateCertificate, !Ref ACMCertificate, !If [HasExistingCertificate, !Ref CertificateArn, "N/A - Using Let's Encrypt"]]
+    Export:
+      Name: !Sub ${AWS::StackName}-CertificateArn
+
+  DomainURL:
+    Condition: HasDomainName
+    Description: Your Honua IO application URL
+    Value: !Sub https://${DomainName}
+
   NextSteps:
     Description: Next steps to complete deployment
     Value: !Sub |
       1. Configure kubectl: aws eks update-kubeconfig --name ${ClusterName} --region ${AWS::Region}
-      2. Deploy Honua Server: kubectl apply -f honua-deployment.yaml
-      3. Access the service via the LoadBalancer endpoint
+      2. ${If [ShouldCreateHostedZone, !Sub "Update your domain registrar with Route 53 nameservers (see Route53Nameservers output)", "DNS is ready"]}
+      3. Deploy Honua Server: kubectl apply -f kubernetes-manifest.yaml
+      4. ${If [HasDomainName, !Sub "Access Honua IO at: https://${DomainName}", "Get LoadBalancer URL: kubectl get svc honua-gateway -n honua-system"]}
+      5. Create your first OAuth user (see OAUTH_SETUP_GUIDE.md for instructions)

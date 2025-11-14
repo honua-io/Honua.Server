@@ -1,0 +1,266 @@
+# Kubernetes Infrastructure Components for Honua IO
+# This manifest installs cert-manager and external-dns for automated SSL/TLS and DNS management
+#
+# Usage:
+#   1. Replace environment variables with your CloudFormation stack outputs
+#   2. kubectl apply -f kubernetes-infrastructure.yaml
+#   3. Wait for cert-manager to be ready: kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager
+#   4. Then apply kubernetes-manifest.yaml
+#
+# Environment variables to replace:
+#   ${CLUSTER_NAME} - EKS cluster name
+#   ${AWS_REGION} - AWS region
+#   ${HOSTED_ZONE_ID} - Route 53 hosted zone ID (from CloudFormation output)
+#   ${DOMAIN_NAME} - Your domain name (e.g., honua.example.com)
+#   ${LETSENCRYPT_EMAIL} - Email for Let's Encrypt notifications
+#   ${CERT_MANAGER_IRSA_ROLE_ARN} - IAM role ARN for cert-manager (created separately)
+#   ${EXTERNAL_DNS_IRSA_ROLE_ARN} - IAM role ARN for external-dns (created separately)
+
+---
+# Namespace for cert-manager
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+
+---
+# Install cert-manager using Helm via manifest
+# In production, use: helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set installCRDs=true
+# This is a simplified version for CloudFormation deployment
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+  annotations:
+    eks.amazonaws.com/role-arn: ${CERT_MANAGER_IRSA_ROLE_ARN}
+
+---
+# ClusterIssuer for Let's Encrypt (Production)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ${LETSENCRYPT_EMAIL}
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+    - dns01:
+        route53:
+          region: ${AWS_REGION}
+          hostedZoneID: ${HOSTED_ZONE_ID}
+
+---
+# ClusterIssuer for Let's Encrypt (Staging - for testing)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: ${LETSENCRYPT_EMAIL}
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+    - dns01:
+        route53:
+          region: ${AWS_REGION}
+          hostedZoneID: ${HOSTED_ZONE_ID}
+
+---
+# Namespace for external-dns
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-dns
+
+---
+# ServiceAccount for external-dns with IRSA
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-dns
+  namespace: external-dns
+  annotations:
+    eks.amazonaws.com/role-arn: ${EXTERNAL_DNS_IRSA_ROLE_ARN}
+
+---
+# ClusterRole for external-dns
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "pods"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list", "watch"]
+
+---
+# ClusterRoleBinding for external-dns
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-dns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-dns
+subjects:
+- kind: ServiceAccount
+  name: external-dns
+  namespace: external-dns
+
+---
+# external-dns Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Prevent multiple external-dns instances
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+    spec:
+      serviceAccountName: external-dns
+      containers:
+      - name: external-dns
+        image: registry.k8s.io/external-dns/external-dns:v0.14.0
+        args:
+        - --source=service
+        - --source=ingress
+        - --domain-filter=${DOMAIN_NAME}  # Only create records for this domain
+        - --provider=aws
+        - --aws-zone-type=public
+        - --registry=txt
+        - --txt-owner-id=${CLUSTER_NAME}
+        - --policy=sync  # or 'upsert-only' to never delete records
+        - --log-level=info
+        env:
+        - name: AWS_DEFAULT_REGION
+          value: ${AWS_REGION}
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "10m"
+          limits:
+            memory: "100Mi"
+            cpu: "50m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Certificate for Honua IO domain (will be created by cert-manager)
+# This certificate will be automatically renewed by cert-manager
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: honua-tls
+  namespace: honua-system
+spec:
+  secretName: honua-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - ${DOMAIN_NAME}
+  - "*.${DOMAIN_NAME}"  # Wildcard for subdomains
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  renewBefore: 720h  # Renew 30 days before expiry
+
+---
+# ConfigMap for cert-manager and external-dns installation instructions
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: infrastructure-setup-instructions
+  namespace: kube-system
+data:
+  README.md: |
+    # Honua IO Infrastructure Setup
+
+    ## Prerequisites
+
+    Before applying this manifest, you need to:
+
+    1. Install cert-manager CRDs:
+       ```bash
+       kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.crds.yaml
+       ```
+
+    2. Install cert-manager:
+       ```bash
+       helm repo add jetstack https://charts.jetstack.io
+       helm repo update
+       helm install cert-manager jetstack/cert-manager \
+         --namespace cert-manager \
+         --create-namespace \
+         --version v1.13.3
+       ```
+
+    3. Create IAM roles for IRSA (if not using CloudFormation):
+       - cert-manager needs Route53 write permissions for DNS-01 challenges
+       - external-dns needs Route53 write permissions for DNS record management
+
+    ## Verification
+
+    After applying this manifest:
+
+    1. Check cert-manager pods:
+       ```bash
+       kubectl get pods -n cert-manager
+       ```
+
+    2. Check external-dns deployment:
+       ```bash
+       kubectl get deployment -n external-dns
+       kubectl logs -n external-dns -l app=external-dns
+       ```
+
+    3. Check ClusterIssuers:
+       ```bash
+       kubectl get clusterissuer
+       ```
+
+    4. Check certificate status:
+       ```bash
+       kubectl get certificate -n honua-system
+       kubectl describe certificate honua-tls -n honua-system
+       ```
+
+    ## Troubleshooting
+
+    - **Certificate not issuing**: Check cert-manager logs: `kubectl logs -n cert-manager -l app=cert-manager`
+    - **DNS records not created**: Check external-dns logs: `kubectl logs -n external-dns -l app=external-dns`
+    - **ACME challenge failing**: Ensure Route 53 hosted zone is correct and IAM permissions are set

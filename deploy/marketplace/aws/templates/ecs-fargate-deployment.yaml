@@ -31,6 +31,13 @@ Metadata:
           - PrivateSubnet1CIDR
           - PrivateSubnet2CIDR
       - Label:
+          default: "DNS and SSL/TLS Configuration"
+        Parameters:
+          - DomainName
+          - CreateRoute53HostedZone
+          - Route53HostedZoneId
+          - CertificateArn
+      - Label:
           default: "AWS Marketplace Configuration"
         Parameters:
           - MarketplaceProductCode
@@ -136,10 +143,54 @@ Parameters:
     Type: String
     Default: 10.0.11.0/24
 
+  # DNS and SSL/TLS Configuration
+  DomainName:
+    Type: String
+    Default: ""
+    Description: |
+      Your domain name for Honua IO (e.g., honua.example.com).
+      Leave empty to use the load balancer DNS name.
+      SSL certificate will be automatically created if provided.
+
+  CreateRoute53HostedZone:
+    Type: String
+    Default: "no"
+    AllowedValues:
+      - "yes"
+      - "no"
+    Description: |
+      Create a new Route 53 hosted zone for your domain?
+      Select 'yes' if you want AWS to manage DNS for this domain.
+
+  Route53HostedZoneId:
+    Type: String
+    Default: ""
+    Description: |
+      Existing Route 53 hosted zone ID (optional).
+      Provide this if you already have a hosted zone for your domain.
+
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: |
+      Existing AWS Certificate Manager (ACM) certificate ARN (optional).
+      If empty and domain is provided, a certificate will be auto-created.
+
   MarketplaceProductCode:
     Type: String
     Default: ""
     Description: AWS Marketplace Product Code
+
+Conditions:
+  HasDomainName: !Not [!Equals [!Ref DomainName, ""]]
+  ShouldCreateHostedZone: !And
+    - !Equals [!Ref CreateRoute53HostedZone, "yes"]
+    - !Not [!Equals [!Ref DomainName, ""]]
+  HasExistingHostedZone: !Not [!Equals [!Ref Route53HostedZoneId, ""]]
+  HasExistingCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
+  ShouldCreateCertificate: !And
+    - !Not [!Equals [!Ref DomainName, ""]]
+    - !Equals [!Ref CertificateArn, ""]
 
 Resources:
   # Import VPC and networking from base template
@@ -411,6 +462,48 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
+  # DNS - Route 53 Hosted Zone (optional)
+  Route53HostedZone:
+    Type: AWS::Route53::HostedZone
+    Condition: ShouldCreateHostedZone
+    Properties:
+      Name: !Ref DomainName
+      HostedZoneConfig:
+        Comment: !Sub Managed by Honua IO CloudFormation stack ${AWS::StackName}
+
+  # SSL/TLS - ACM Certificate (for ALB)
+  ACMCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: ShouldCreateCertificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub "*.${DomainName}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !If
+            - ShouldCreateHostedZone
+            - !Ref Route53HostedZone
+            - !Ref Route53HostedZoneId
+
+  # Route 53 Record pointing to ALB
+  Route53Record:
+    Type: AWS::Route53::RecordSet
+    Condition: HasDomainName
+    DependsOn: LoadBalancer
+    Properties:
+      HostedZoneId: !If
+        - ShouldCreateHostedZone
+        - !Ref Route53HostedZone
+        - !Ref Route53HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+        DNSName: !GetAtt LoadBalancer.DNSName
+        EvaluateTargetHealth: true
+
   # ECS Cluster
   ECSCluster:
     Type: AWS::ECS::Cluster
@@ -584,20 +677,45 @@ Resources:
       Matcher:
         HttpCode: 200
 
-  Listener:
+  # HTTP Listener (redirects to HTTPS if domain is configured)
+  HttpListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions: !If
+        - HasDomainName
+        - - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: '443'
+              StatusCode: HTTP_301
+        - - Type: forward
+            TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # HTTPS Listener (only created if domain and certificate are configured)
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasDomainName
     Properties:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
       LoadBalancerArn: !Ref LoadBalancer
-      Port: 80
-      Protocol: HTTP
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !If
+            - ShouldCreateCertificate
+            - !Ref ACMCertificate
+            - !Ref CertificateArn
 
   # ECS Service
   ECSService:
     Type: AWS::ECS::Service
-    DependsOn: Listener
+    DependsOn: HttpListener
     Properties:
       ServiceName: !Ref ServiceName
       Cluster: !Ref ECSCluster
@@ -656,8 +774,26 @@ Outputs:
       Name: !Sub ${AWS::StackName}-LoadBalancerDNS
 
   LoadBalancerURL:
-    Description: URL of the Honua Server
+    Description: URL of the Honua Server (use DomainURL if custom domain configured)
     Value: !Sub http://${LoadBalancer.DNSName}
+
+  DomainURL:
+    Condition: HasDomainName
+    Description: Your Honua IO application URL (primary access point)
+    Value: !Sub https://${DomainName}
+
+  Route53HostedZoneId:
+    Description: Route 53 Hosted Zone ID (if created)
+    Value: !If [ShouldCreateHostedZone, !Ref Route53HostedZone, !If [HasExistingHostedZone, !Ref Route53HostedZoneId, "N/A - No hosted zone"]]
+
+  Route53Nameservers:
+    Condition: ShouldCreateHostedZone
+    Description: Route 53 Nameservers (update these at your domain registrar)
+    Value: !Join [", ", !GetAtt Route53HostedZone.NameServers]
+
+  ACMCertificateArn:
+    Description: ACM Certificate ARN for HTTPS
+    Value: !If [ShouldCreateCertificate, !Ref ACMCertificate, !If [HasExistingCertificate, !Ref CertificateArn, "N/A"]]
 
   ClusterName:
     Description: ECS Cluster Name

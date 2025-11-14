@@ -156,6 +156,28 @@
         "description": "Azure Marketplace Plan ID"
       }
     },
+    "customDomainName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Custom domain name for Honua IO (e.g., honua.example.com). Leave empty to use default Container Apps domain. Azure will automatically provision a free managed TLS certificate."
+      }
+    },
+    "createDnsZone": {
+      "type": "string",
+      "defaultValue": "no",
+      "allowedValues": ["yes", "no"],
+      "metadata": {
+        "description": "Create a new Azure DNS zone for your domain? Select 'yes' if you want Azure to manage DNS."
+      }
+    },
+    "existingDnsZoneResourceGroup": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().name]",
+      "metadata": {
+        "description": "Resource group of existing DNS zone (if using existing zone)"
+      }
+    },
     "databaseAdminPassword": {
       "type": "securestring",
       "metadata": {
@@ -167,7 +189,10 @@
     "containerAppEnvName": "[concat(parameters('containerAppName'), '-env')]",
     "logAnalyticsWorkspaceName": "[concat(parameters('containerAppName'), '-workspace')]",
     "keyVaultName": "[concat(parameters('containerAppName'), '-kv-', uniqueString(resourceGroup().id))]",
-    "managedIdentityName": "[concat(parameters('containerAppName'), '-identity')]"
+    "managedIdentityName": "[concat(parameters('containerAppName'), '-identity')]",
+    "hasCustomDomain": "[not(equals(parameters('customDomainName'), ''))]",
+    "shouldCreateDnsZone": "[and(equals(parameters('createDnsZone'), 'yes'), not(equals(parameters('customDomainName'), '')))]",
+    "dnsZoneName": "[if(variables('hasCustomDomain'), parameters('customDomainName'), 'placeholder.local')]"
   },
   "resources": [
     {
@@ -320,6 +345,16 @@
           }
         },
         "zoneRedundant": true
+      }
+    },
+    {
+      "condition": "[variables('shouldCreateDnsZone')]",
+      "type": "Microsoft.Network/dnsZones",
+      "apiVersion": "2023-07-01-preview",
+      "name": "[variables('dnsZoneName')]",
+      "location": "global",
+      "properties": {
+        "zoneType": "Public"
       }
     },
     {
@@ -517,6 +552,22 @@
     "redisHostName": {
       "type": "string",
       "value": "[reference(resourceId('Microsoft.Cache/redis', parameters('redisName'))).hostName]"
+    },
+    "dnsZoneName": {
+      "condition": "[variables('shouldCreateDnsZone')]",
+      "type": "string",
+      "value": "[variables('dnsZoneName')]"
+    },
+    "dnsZoneResourceId": {
+      "condition": "[variables('shouldCreateDnsZone')]",
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/dnsZones', variables('dnsZoneName'))]"
+    },
+    "customDomainInstructions": {
+      "condition": "[variables('hasCustomDomain')]",
+      "type": "string",
+      "value": "[concat('To configure custom domain:\n1. Get Container App validation token:\n   az containerapp hostname list --name ', parameters('containerAppName'), ' --resource-group ', resourceGroup().name, '\n2. Add TXT record to your DNS:\n   Name: asuid.', parameters('customDomainName'), '\n   Value: <validation-token-from-step-1>\n3. Add CNAME record:\n   Name: ', parameters('customDomainName'), '\n   Value: ', reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName'))).configuration.ingress.fqdn, '\n4. Bind custom domain:\n   az containerapp hostname bind --hostname ', parameters('customDomainName'), ' --name ', parameters('containerAppName'), ' --resource-group ', resourceGroup().name, ' --environment ', variables('containerAppEnvName'), ' --validation-method CNAME\n5. Azure will automatically provision a FREE managed TLS certificate!')]"
     }
   }
 }
+
