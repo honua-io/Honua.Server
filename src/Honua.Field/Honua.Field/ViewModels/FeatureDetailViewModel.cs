@@ -7,6 +7,7 @@ using HonuaField.Models;
 using HonuaField.Services;
 using System.Collections.ObjectModel;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.ViewModels;
 
@@ -154,7 +155,7 @@ public partial class FeatureDetailViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error loading attachments: {ex.Message}");
+			_logger.LogError(ex, "Error loading attachments");
 		}
 	}
 
@@ -196,7 +197,7 @@ public partial class FeatureDetailViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error parsing properties: {ex.Message}");
+			_logger.LogError(ex, "Error parsing properties");
 		}
 	}
 

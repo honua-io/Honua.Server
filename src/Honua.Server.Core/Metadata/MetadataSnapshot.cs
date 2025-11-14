@@ -9,8 +9,9 @@ using Honua.Server.Core.Exceptions;
 using Honua.Server.Core.Query.Filter;
 using Honua.Server.Core.VectorTiles;
 using Honua.Server.Core.Extensions;
-
+using Microsoft.Extensions.Logging;
 using Honua.Server.Core.Utilities;
+
 namespace Honua.Server.Core.Metadata;
 
 public sealed class MetadataSnapshot
@@ -18,6 +19,7 @@ public sealed class MetadataSnapshot
     private readonly IReadOnlyDictionary<string, ServiceDefinition> serviceIndex;
     private readonly IReadOnlyDictionary<string, StyleDefinition> styleIndex;
     private readonly IReadOnlyDictionary<string, LayerGroupDefinition> layerGroupIndex;
+    private readonly ILogger<MetadataSnapshot>? _logger;
 
     public MetadataSnapshot(
         CatalogDefinition catalog,
@@ -28,8 +30,10 @@ public sealed class MetadataSnapshot
         IReadOnlyList<RasterDatasetDefinition>? rasterDatasets = null,
         IReadOnlyList<StyleDefinition>? styles = null,
         IReadOnlyList<LayerGroupDefinition>? layerGroups = null,
-        ServerDefinition? server = null)
+        ServerDefinition? server = null,
+        ILogger<MetadataSnapshot>? logger = null)
     {
+        _logger = logger;
         this.Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
         this.Folders = folders ?? throw new ArgumentNullException(nameof(folders));
         this.DataSources = dataSources ?? throw new ArgumentNullException(nameof(dataSources));
@@ -44,7 +48,7 @@ public sealed class MetadataSnapshot
             throw new ArgumentNullException(nameof(services));
         }
 
-        ValidateMetadata(this.Catalog, this.Server, this.Folders, this.DataSources, services, this.Layers, this.RasterDatasets, this.Styles, this.LayerGroups);
+        ValidateMetadata(this.Catalog, this.Server, this.Folders, this.DataSources, services, this.Layers, this.RasterDatasets, this.Styles, this.LayerGroups, _logger);
 
         var serviceMap = new Dictionary<string, ServiceDefinition>(StringComparer.OrdinalIgnoreCase);
         foreach (var service in services)
@@ -115,7 +119,8 @@ public sealed class MetadataSnapshot
         IReadOnlyList<LayerDefinition> layers,
         IReadOnlyList<RasterDatasetDefinition> rasterDatasets,
         IReadOnlyList<StyleDefinition> styles,
-        IReadOnlyList<LayerGroupDefinition> layerGroups)
+        IReadOnlyList<LayerGroupDefinition> layerGroups,
+        ILogger<MetadataSnapshot>? logger)
     {
         if (catalog.Id.IsNullOrWhiteSpace())
         {
@@ -275,7 +280,7 @@ public sealed class MetadataSnapshot
             // Validate SQL view if present
             if (hasSqlView)
             {
-                ValidateSqlView(layer);
+                ValidateSqlView(layer, logger);
             }
 
             if (layer.DefaultStyleId.HasValue() && !styleIds.Contains(layer.DefaultStyleId))
@@ -637,7 +642,7 @@ public sealed class MetadataSnapshot
         }
     }
 
-    private static void ValidateSqlView(LayerDefinition layer)
+    private static void ValidateSqlView(LayerDefinition layer, ILogger<MetadataSnapshot>? logger)
     {
         var sqlView = layer.SqlView;
         if (sqlView is null)
@@ -725,7 +730,7 @@ public sealed class MetadataSnapshot
         // Warn if timeout is very high
         if (sqlView.TimeoutSeconds is > 300)
         {
-            System.Diagnostics.Debug.WriteLine($"Warning: Layer '{layer.Id}' SQL view has a very high timeout of {sqlView.TimeoutSeconds} seconds.");
+            logger?.LogWarning("Layer {LayerId} SQL view has a very high timeout of {TimeoutSeconds} seconds", layer.Id, sqlView.TimeoutSeconds);
         }
 
         // Check that required fields are included in the query

@@ -4,6 +4,7 @@
 using HonuaField.Data.Repositories;
 using HonuaField.Models;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -139,13 +140,13 @@ public class SyncService : ISyncService
 		}
 		catch (OperationCanceledException)
 		{
-			System.Diagnostics.Debug.WriteLine("Synchronization cancelled by user");
+			_logger.LogInformation("Synchronization cancelled by user");
 			ReportProgress(progress, SyncStage.Failed, "Synchronization cancelled", 0, 100, 0);
 			throw;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Synchronization failed: {ex.Message}");
+			_logger.LogError(ex, "Synchronization failed");
 			ReportProgress(progress, SyncStage.Failed, $"Synchronization failed: {ex.Message}", 0, 100, 0);
 
 			return new SyncResult
@@ -314,7 +315,7 @@ public class SyncService : ISyncService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Pull failed: {ex.Message}");
+			_logger.LogError(ex, "Pull failed");
 			return new PullResult
 			{
 				Success = false,
@@ -406,7 +407,7 @@ public class SyncService : ISyncService
 				}
 				catch (Exception ex)
 				{
-					System.Diagnostics.Debug.WriteLine($"Failed to push insert for feature {change.FeatureId}: {ex.Message}");
+					_logger.LogError(ex, "Failed to push insert for feature {FeatureId}", change.FeatureId);
 					await _featureRepository.UpdateSyncStatusAsync(change.FeatureId, SyncStatus.Error);
 				}
 
@@ -451,7 +452,7 @@ public class SyncService : ISyncService
 				}
 				catch (Exception ex)
 				{
-					System.Diagnostics.Debug.WriteLine($"Failed to push update for feature {change.FeatureId}: {ex.Message}");
+					_logger.LogError(ex, "Failed to push update for feature {FeatureId}", change.FeatureId);
 					await _featureRepository.UpdateSyncStatusAsync(change.FeatureId, SyncStatus.Error);
 				}
 
@@ -491,7 +492,7 @@ public class SyncService : ISyncService
 				}
 				catch (Exception ex)
 				{
-					System.Diagnostics.Debug.WriteLine($"Failed to push delete for feature {change.FeatureId}: {ex.Message}");
+					_logger.LogError(ex, "Failed to push delete for feature {FeatureId}", change.FeatureId);
 				}
 
 				processedChanges++;
@@ -513,7 +514,7 @@ public class SyncService : ISyncService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Push failed: {ex.Message}");
+			_logger.LogError(ex, "Push failed");
 			return new PushResult
 			{
 				Success = false,
@@ -561,7 +562,7 @@ public class SyncService : ISyncService
 		await _settingsService.SetAsync("background_sync_interval", intervalMinutes);
 		await _settingsService.SetAsync("background_sync_enabled", true);
 
-		System.Diagnostics.Debug.WriteLine($"Background sync scheduled for every {intervalMinutes} minutes");
+		_logger.LogInformation("Background sync scheduled for every {IntervalMinutes} minutes", intervalMinutes);
 		// Note: Actual background task scheduling would be platform-specific
 		// and would be implemented in platform-specific code
 	}
@@ -570,7 +571,7 @@ public class SyncService : ISyncService
 	public async Task CancelBackgroundSyncAsync()
 	{
 		await _settingsService.SetAsync("background_sync_enabled", false);
-		System.Diagnostics.Debug.WriteLine("Background sync cancelled");
+		_logger.LogInformation("Background sync cancelled");
 	}
 
 	#endregion
@@ -593,7 +594,7 @@ public class SyncService : ISyncService
 			catch (Exception ex)
 			{
 				lastException = ex;
-				System.Diagnostics.Debug.WriteLine($"Attempt {attempt} failed: {ex.Message}");
+				_logger.LogWarning(ex, "Attempt {Attempt} failed", attempt);
 
 				if (attempt < maxAttempts)
 				{
@@ -706,7 +707,7 @@ public class SyncService : ISyncService
 			}
 			catch (Exception ex)
 			{
-				System.Diagnostics.Debug.WriteLine($"Failed to parse geometry: {ex.Message}");
+				_logger.LogWarning(ex, "Failed to parse geometry");
 			}
 		}
 
@@ -731,7 +732,7 @@ public class SyncService : ISyncService
 			}
 			catch (Exception ex)
 			{
-				System.Diagnostics.Debug.WriteLine($"Failed to write geometry: {ex.Message}");
+				_logger.LogWarning(ex, "Failed to write geometry");
 			}
 		}
 

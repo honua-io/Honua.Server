@@ -4,6 +4,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -107,7 +108,7 @@ public class AuthenticationService : IAuthenticationService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Login failed: {ex.Message}");
+			_logger.LogError(ex, "Login failed");
 			return false;
 		}
 	}
@@ -125,7 +126,7 @@ public class AuthenticationService : IAuthenticationService
 			}
 			catch (Exception ex)
 			{
-				System.Diagnostics.Debug.WriteLine($"Token revocation failed: {ex.Message}");
+				_logger.LogWarning(ex, "Token revocation failed");
 			}
 		}
 
@@ -213,7 +214,7 @@ public class AuthenticationService : IAuthenticationService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Token refresh failed: {ex.Message}");
+			_logger.LogError(ex, "Token refresh failed");
 			return false;
 		}
 	}

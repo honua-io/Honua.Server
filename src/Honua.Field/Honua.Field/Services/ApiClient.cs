@@ -4,6 +4,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -68,17 +69,17 @@ public class ApiClient : IApiClient, IDisposable
 		}
 		catch (HttpRequestException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"HTTP request failed: {ex.Message}");
+			_logger.LogError(ex, "HTTP request failed");
 			throw new ApiException("Network error. Please check your connection.", ex);
 		}
 		catch (JsonException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"JSON deserialization failed: {ex.Message}");
+			_logger.LogError(ex, "JSON deserialization failed");
 			throw new ApiException("Invalid response from server.", ex);
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Unexpected error: {ex.Message}");
+			_logger.LogError(ex, "Unexpected error");
 			throw new ApiException("An unexpected error occurred.", ex);
 		}
 	}
@@ -118,17 +119,17 @@ public class ApiClient : IApiClient, IDisposable
 		}
 		catch (HttpRequestException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"HTTP request failed: {ex.Message}");
+			_logger.LogError(ex, "HTTP request failed");
 			throw new ApiException("Network error. Please check your connection.", ex);
 		}
 		catch (JsonException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"JSON serialization/deserialization failed: {ex.Message}");
+			_logger.LogError(ex, "JSON serialization/deserialization failed");
 			throw new ApiException("Invalid data format.", ex);
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Unexpected error: {ex.Message}");
+			_logger.LogError(ex, "Unexpected error");
 			throw new ApiException("An unexpected error occurred.", ex);
 		}
 	}
@@ -168,7 +169,7 @@ public class ApiClient : IApiClient, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"PUT request failed: {ex.Message}");
+			_logger.LogError(ex, "PUT request failed");
 			throw new ApiException("Request failed.", ex);
 		}
 	}
@@ -198,7 +199,7 @@ public class ApiClient : IApiClient, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"DELETE request failed: {ex.Message}");
+			_logger.LogError(ex, "DELETE request failed");
 			throw new ApiException("Request failed.", ex);
 		}
 	}
@@ -228,10 +229,10 @@ public class ApiClient : IApiClient, IDisposable
 	private void LogRequest(HttpRequestMessage request, string? body = null)
 	{
 #if DEBUG
-		System.Diagnostics.Debug.WriteLine($"[API] {request.Method} {request.RequestUri}");
+		_logger.LogDebug("[API] {Method} {RequestUri}", request.Method, request.RequestUri);
 		if (!string.IsNullOrEmpty(body))
 		{
-			System.Diagnostics.Debug.WriteLine($"[API] Request Body: {body}");
+			_logger.LogDebug("[API] Request Body: {Body}", body);
 		}
 #endif
 	}
@@ -240,10 +241,10 @@ public class ApiClient : IApiClient, IDisposable
 	{
 #if DEBUG
 		var content = await response.Content.ReadAsStringAsync();
-		System.Diagnostics.Debug.WriteLine($"[API] {(int)response.StatusCode} {response.ReasonPhrase}");
+		_logger.LogDebug("[API] {StatusCode} {ReasonPhrase}", (int)response.StatusCode, response.ReasonPhrase);
 		if (!string.IsNullOrEmpty(content))
 		{
-			System.Diagnostics.Debug.WriteLine($"[API] Response Body: {content}");
+			_logger.LogDebug("[API] Response Body: {Content}", content);
 		}
 #else
 		await Task.CompletedTask;

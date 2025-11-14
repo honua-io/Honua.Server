@@ -10,6 +10,7 @@ using HonuaField.Services;
 using NetTopologySuite.Geometries;
 using System.Collections.ObjectModel;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.ViewModels;
 
@@ -139,7 +140,7 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error loading collection schema: {ex.Message}");
+			_logger.LogError(ex, "Error loading collection schema");
 			throw;
 		}
 	}
@@ -207,7 +208,7 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error initializing form fields: {ex.Message}");
+			_logger.LogError(ex, "Error initializing form fields");
 		}
 	}
 
@@ -233,7 +234,7 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error loading form fields from feature: {ex.Message}");
+			_logger.LogError(ex, "Error loading form fields from feature");
 		}
 	}
 
@@ -255,7 +256,7 @@ public partial class FeatureEditorViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error loading attachments: {ex.Message}");
+			_logger.LogError(ex, "Error loading attachments");
 		}
 	}
 

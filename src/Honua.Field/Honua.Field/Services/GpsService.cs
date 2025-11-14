@@ -4,6 +4,7 @@
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Simplify;
 using HonuaField.Models;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -61,8 +62,9 @@ public class GpsService : IGpsService
 		}
 	}
 
-	public GpsService(ILocationService locationService, IDatabaseService databaseService)
+	public GpsService(ILocationService locationService, IDatabaseService databaseService, ILogger<GpsService> logger)
 	{
+		_logger = logger;
 		_locationService = locationService;
 		_databaseService = databaseService;
 
@@ -106,7 +108,7 @@ public class GpsService : IGpsService
 			LocationAccuracy.High,
 			TimeSpan.FromSeconds(2));
 
-		System.Diagnostics.Debug.WriteLine($"Started GPS track recording: {_currentTrackId}");
+		_logger.LogInformation("Started GPS track recording: {TrackId}", _currentTrackId);
 
 		return _currentTrackId;
 	}
@@ -166,7 +168,7 @@ public class GpsService : IGpsService
 				await db.UpdateAsync(track);
 			}
 
-			System.Diagnostics.Debug.WriteLine($"Stopped GPS track recording: {trackId}");
+			_logger.LogInformation("Stopped GPS track recording: {TrackId}", trackId);
 		}
 	}
 
@@ -187,7 +189,7 @@ public class GpsService : IGpsService
 
 		await _locationService.StopTrackingAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Paused GPS track recording: {_currentTrackId}");
+		_logger.LogInformation("Paused GPS track recording: {TrackId}", _currentTrackId);
 	}
 
 	/// <summary>
@@ -209,7 +211,7 @@ public class GpsService : IGpsService
 			LocationAccuracy.High,
 			TimeSpan.FromSeconds(2));
 
-		System.Diagnostics.Debug.WriteLine($"Resumed GPS track recording: {_currentTrackId}");
+		_logger.LogInformation("Resumed GPS track recording: {TrackId}", _currentTrackId);
 	}
 
 	/// <summary>
@@ -325,13 +327,13 @@ public class GpsService : IGpsService
 			// Delete track
 			var deletedCount = await db.ExecuteAsync("DELETE FROM gps_tracks WHERE id = ?", trackId);
 
-			System.Diagnostics.Debug.WriteLine($"Deleted GPS track: {trackId}");
+			_logger.LogInformation("Deleted GPS track: {TrackId}", trackId);
 
 			return deletedCount > 0;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error deleting track: {ex.Message}");
+			_logger.LogError(ex, "Error deleting track");
 			return false;
 		}
 	}
@@ -430,7 +432,7 @@ public class GpsService : IGpsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error calculating track statistics: {ex.Message}");
+			_logger.LogError(ex, "Error calculating track statistics");
 			return null;
 		}
 	}
@@ -526,12 +528,12 @@ public class GpsService : IGpsService
 				});
 			}
 
-			System.Diagnostics.Debug.WriteLine(
-				$"Recorded track point: {trackPoint.SequenceNumber} at ({location.Latitude}, {location.Longitude})");
+			_logger.LogInformation("Recorded track point: {SequenceNumber} at ({Latitude}, {Longitude})",
+				trackPoint.SequenceNumber, location.Latitude, location.Longitude);
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error processing location update: {ex.Message}");
+			_logger.LogError(ex, "Error processing location update");
 		}
 	}
 
@@ -560,7 +562,7 @@ public class GpsService : IGpsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error saving pending points: {ex.Message}");
+			_logger.LogError(ex, "Error saving pending points");
 		}
 	}
 

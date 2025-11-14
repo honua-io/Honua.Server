@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -80,7 +81,7 @@ public class SettingsService : ISettingsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting setting {key}: {ex.Message}");
+			_logger.LogError(ex, "Error getting setting {Key}", key);
 			return defaultValue;
 		}
 	}
@@ -140,7 +141,7 @@ public class SettingsService : ISettingsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error setting {key}: {ex.Message}");
+			_logger.LogError(ex, "Error setting {Key}", key);
 		}
 	}
 
@@ -161,7 +162,7 @@ public class SettingsService : ISettingsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error removing setting {key}: {ex.Message}");
+			_logger.LogError(ex, "Error removing setting {Key}", key);
 		}
 	}
 
@@ -175,7 +176,7 @@ public class SettingsService : ISettingsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error clearing settings: {ex.Message}");
+			_logger.LogError(ex, "Error clearing settings");
 		}
 	}
 

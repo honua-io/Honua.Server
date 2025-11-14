@@ -67,7 +67,7 @@ public class FeatureRepository : IFeatureRepository
 			Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 		});
 
-		System.Diagnostics.Debug.WriteLine($"Feature inserted: {feature.Id}");
+		_logger.LogInformation("Feature inserted: {FeatureId}", feature.Id);
 		return feature.Id;
 	}
 
@@ -88,7 +88,7 @@ public class FeatureRepository : IFeatureRepository
 			Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 		});
 
-		System.Diagnostics.Debug.WriteLine($"Feature updated: {feature.Id}");
+		_logger.LogInformation("Feature updated: {FeatureId}", feature.Id);
 		return result;
 	}
 
@@ -107,7 +107,7 @@ public class FeatureRepository : IFeatureRepository
 			.Where(f => f.Id == id)
 			.DeleteAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Feature deleted: {id}");
+		_logger.LogInformation("Feature deleted: {FeatureId}", id);
 		return result;
 	}
 
@@ -137,8 +137,8 @@ public class FeatureRepository : IFeatureRepository
 			}
 		}
 
-		System.Diagnostics.Debug.WriteLine(
-			$"Found {featuresInBounds.Count} features in bounds ({minX},{minY}) to ({maxX},{maxY})");
+		_logger.LogInformation("Found {Count} features in bounds ({MinX},{MinY}) to ({MaxX},{MaxY})",
+			featuresInBounds.Count, minX, minY, maxX, maxY);
 
 		return featuresInBounds;
 	}
@@ -168,8 +168,8 @@ public class FeatureRepository : IFeatureRepository
 			}
 		}
 
-		System.Diagnostics.Debug.WriteLine(
-			$"Found {featuresWithinDistance.Count} features within {distanceMeters}m of point");
+		_logger.LogInformation("Found {Count} features within {DistanceMeters}m of point",
+			featuresWithinDistance.Count, distanceMeters);
 
 		return featuresWithinDistance;
 	}
@@ -198,8 +198,8 @@ public class FeatureRepository : IFeatureRepository
 
 		if (nearestFeature != null)
 		{
-			System.Diagnostics.Debug.WriteLine(
-				$"Nearest feature: {nearestFeature.Id}, distance: {minDistance * 111000}m");
+			_logger.LogInformation("Nearest feature: {FeatureId}, distance: {DistanceMeters}m",
+				nearestFeature.Id, minDistance * 111000);
 		}
 
 		return nearestFeature;
@@ -222,8 +222,8 @@ public class FeatureRepository : IFeatureRepository
 			}
 		}
 
-		System.Diagnostics.Debug.WriteLine(
-			$"Found {intersectingFeatures.Count} features intersecting with geometry");
+		_logger.LogInformation("Found {Count} features intersecting with geometry",
+			intersectingFeatures.Count);
 
 		return intersectingFeatures;
 	}
@@ -305,7 +305,7 @@ public class FeatureRepository : IFeatureRepository
 
 		await _changeRepository.InsertBatchAsync(changes);
 
-		System.Diagnostics.Debug.WriteLine($"Batch inserted {result} features");
+		_logger.LogInformation("Batch inserted {Count} features", result);
 		return result;
 	}
 
@@ -334,7 +334,7 @@ public class FeatureRepository : IFeatureRepository
 
 		await _changeRepository.InsertBatchAsync(changes);
 
-		System.Diagnostics.Debug.WriteLine($"Batch updated {result} features");
+		_logger.LogInformation("Batch updated {Count} features", result);
 		return result;
 	}
 
@@ -362,7 +362,7 @@ public class FeatureRepository : IFeatureRepository
 				.DeleteAsync();
 		}
 
-		System.Diagnostics.Debug.WriteLine($"Batch deleted {result} features");
+		_logger.LogInformation("Batch deleted {Count} features", result);
 		return result;
 	}
 

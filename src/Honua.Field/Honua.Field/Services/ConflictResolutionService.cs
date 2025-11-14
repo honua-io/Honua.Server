@@ -5,6 +5,7 @@ using HonuaField.Data.Repositories;
 using HonuaField.Models;
 using SQLite;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -341,7 +342,7 @@ public class ConflictResolutionService : IConflictResolutionService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Three-way merge failed: {ex.Message}");
+			_logger.LogError(ex, "Three-way merge failed");
 			return new MergeResult
 			{
 				Success = false,
@@ -368,7 +369,7 @@ public class ConflictResolutionService : IConflictResolutionService
 			}
 			catch (Exception ex)
 			{
-				System.Diagnostics.Debug.WriteLine($"Failed to resolve conflict for feature {conflict.FeatureId}: {ex.Message}");
+				_logger.LogError(ex, "Failed to resolve conflict for feature {FeatureId}", conflict.FeatureId);
 			}
 		}
 
@@ -428,7 +429,7 @@ public class ConflictResolutionService : IConflictResolutionService
 			conflict.ResolutionStrategy = strategy.ToString();
 			await _connection.UpdateAsync(conflict);
 
-			System.Diagnostics.Debug.WriteLine($"Conflict {conflictId} marked as resolved using {strategy}");
+			_logger.LogInformation("Conflict {ConflictId} marked as resolved using {Strategy}", conflictId, strategy);
 		}
 	}
 
@@ -446,7 +447,7 @@ public class ConflictResolutionService : IConflictResolutionService
 			await _connection.DeleteAsync(conflict);
 		}
 
-		System.Diagnostics.Debug.WriteLine($"Cleaned up {toDelete.Count} resolved conflicts older than {days} days");
+		_logger.LogInformation("Cleaned up {Count} resolved conflicts older than {Days} days", toDelete.Count, days);
 		return toDelete.Count;
 	}
 
@@ -521,7 +522,7 @@ public class ConflictResolutionService : IConflictResolutionService
 		else
 		{
 			// Auto-merge failed, fall back to server wins
-			System.Diagnostics.Debug.WriteLine($"Auto-merge failed for feature {conflict.FeatureId}, falling back to server wins");
+			_logger.LogWarning("Auto-merge failed for feature {FeatureId}, falling back to server wins", conflict.FeatureId);
 			return await ResolveServerWinsAsync(conflict, localFeature);
 		}
 	}

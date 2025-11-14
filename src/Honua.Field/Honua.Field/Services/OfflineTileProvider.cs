@@ -5,6 +5,7 @@ using BruTile;
 using BruTile.Cache;
 using Mapsui.Layers;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -67,23 +68,23 @@ public class OfflineTileProvider : ITileSource
 
 			if (offlineTile != null)
 			{
-				Debug.WriteLine($"Loaded offline tile: {zoom}/{x}/{y}");
+				_logger.LogDebug("Loaded offline tile: {Zoom}/{X}/{Y}", zoom, x, y);
 				return offlineTile;
 			}
 
 			// Fallback to online if available and not in offline-only mode
 			if (!_offlineOnly && _onlineTileSource != null)
 			{
-				Debug.WriteLine($"Falling back to online tile: {zoom}/{x}/{y}");
+				_logger.LogDebug("Falling back to online tile: {Zoom}/{X}/{Y}", zoom, x, y);
 				return await _onlineTileSource.GetTileAsync(tileInfo);
 			}
 
-			Debug.WriteLine($"Tile not found: {zoom}/{x}/{y}");
+			_logger.LogWarning("Tile not found: {Zoom}/{X}/{Y}", zoom, x, y);
 			return null;
 		}
 		catch (Exception ex)
 		{
-			Debug.WriteLine($"Error getting tile: {ex.Message}");
+			_logger.LogError(ex, "Error getting tile");
 			return null;
 		}
 	}

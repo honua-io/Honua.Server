@@ -12,15 +12,22 @@ using Honua.Server.Core.Data;
 using Honua.Server.Core.Data.Query;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Extensions;
-
 using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
+
 namespace Honua.Server.Enterprise.Data.MongoDB;
 
 public sealed class MongoDbDataStoreProvider : IDataStoreProvider, IDisposable
 {
     private readonly ConcurrentDictionary<string, MongoClient> _clients = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, bool> _serverSideJavascriptEnabled = new(StringComparer.Ordinal);
+    private readonly ILogger<MongoDbDataStoreProvider> _logger;
     private bool _disposed;
+
+    public MongoDbDataStoreProvider(ILogger<MongoDbDataStoreProvider> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
     public const string ProviderKey = "mongodb";
 
@@ -270,9 +277,11 @@ public sealed class MongoDbDataStoreProvider : IDataStoreProvider, IDisposable
         // Log the hard delete operation for audit compliance (GDPR, SOC2, etc.)
         if (deleted)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"HARD DELETE: Feature permanently deleted from MongoDB - " +
-                $"Layer: {layer.Id}, FeatureId: {featureId}, DeletedBy: {deletedBy ?? "<system>"}");
+            _logger.LogWarning(
+                "HARD DELETE: Feature permanently deleted from MongoDB - Layer: {LayerId}, FeatureId: {FeatureId}, DeletedBy: {DeletedBy}",
+                layer.Id,
+                featureId,
+                deletedBy ?? "<system>");
         }
 
         return deleted;

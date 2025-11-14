@@ -25,6 +25,7 @@ public sealed class GenericAlertController : ControllerBase
     private readonly IAlertPersistenceService persistenceService;
     private readonly IAlertSilencingService silencingService;
     private readonly IAlertMetricsService metricsService;
+    private readonly AlertInputValidator inputValidator;
     private readonly ILogger<GenericAlertController> logger;
 
     public GenericAlertController(
@@ -33,6 +34,7 @@ public sealed class GenericAlertController : ControllerBase
         IAlertPersistenceService persistenceService,
         IAlertSilencingService silencingService,
         IAlertMetricsService metricsService,
+        AlertInputValidator inputValidator,
         ILogger<GenericAlertController> logger)
     {
         this.alertPublisher = alertPublisher ?? throw new ArgumentNullException(nameof(alertPublisher));
@@ -40,6 +42,7 @@ public sealed class GenericAlertController : ControllerBase
         this.persistenceService = persistenceService ?? throw new ArgumentNullException(nameof(persistenceService));
         this.silencingService = silencingService ?? throw new ArgumentNullException(nameof(silencingService));
         this.metricsService = metricsService ?? throw new ArgumentNullException(nameof(metricsService));
+        this.inputValidator = inputValidator ?? throw new ArgumentNullException(nameof(inputValidator));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -62,7 +65,7 @@ public sealed class GenericAlertController : ControllerBase
 
         // Comprehensive validation for labels: keys, values, and protection against injection attacks
         // This validates against SQL injection, XSS, JSON injection, control characters, and null bytes
-        if (!AlertInputValidator.ValidateLabels(alert.Labels, out var sanitizedLabels, out var labelErrors))
+        if (!this.inputValidator.ValidateLabels(alert.Labels, out var sanitizedLabels, out var labelErrors))
         {
             this.logger.LogWarning(
                 "Alert label validation failed - Name: {Name}, Source: {Source}, Errors: {Errors}",
@@ -86,7 +89,7 @@ public sealed class GenericAlertController : ControllerBase
         }
 
         // Comprehensive validation for context: keys, values, and protection against injection attacks
-        if (!AlertInputValidator.ValidateContext(alert.Context, out var sanitizedContext, out var contextErrors))
+        if (!this.inputValidator.ValidateContext(alert.Context, out var sanitizedContext, out var contextErrors))
         {
             this.logger.LogWarning(
                 "Alert context validation failed - Name: {Name}, Source: {Source}, Errors: {Errors}",
@@ -269,7 +272,7 @@ public sealed class GenericAlertController : ControllerBase
 
         // Re-run the same validation as SendAlert to ensure consistency
         // Comprehensive validation for labels
-        if (!AlertInputValidator.ValidateLabels(alert.Labels, out var sanitizedLabels, out var labelErrors))
+        if (!this.inputValidator.ValidateLabels(alert.Labels, out var sanitizedLabels, out var labelErrors))
         {
             this.logger.LogWarning(
                 "Webhook alert label validation failed - Name: {Name}, Source: {Source}, Errors: {Errors}",
@@ -292,7 +295,7 @@ public sealed class GenericAlertController : ControllerBase
         }
 
         // Comprehensive validation for context
-        if (!AlertInputValidator.ValidateContext(alert.Context, out var sanitizedContext, out var contextErrors))
+        if (!this.inputValidator.ValidateContext(alert.Context, out var sanitizedContext, out var contextErrors))
         {
             this.logger.LogWarning(
                 "Webhook alert context validation failed - Name: {Name}, Source: {Source}, Errors: {Errors}",
@@ -350,7 +353,7 @@ public sealed class GenericAlertController : ControllerBase
             var alert = batch.Alerts[i];
 
             // Validate and sanitize labels
-            if (!AlertInputValidator.ValidateLabels(alert.Labels, out var sanitizedLabels, out var labelErrors))
+            if (!this.inputValidator.ValidateLabels(alert.Labels, out var sanitizedLabels, out var labelErrors))
             {
                 this.logger.LogWarning(
                     "Alert batch label validation failed - AlertIndex: {Index}, Name: {Name}, Errors: {Errors}",
@@ -375,7 +378,7 @@ public sealed class GenericAlertController : ControllerBase
             }
 
             // Validate and sanitize context
-            if (!AlertInputValidator.ValidateContext(alert.Context, out var sanitizedContext, out var contextErrors))
+            if (!this.inputValidator.ValidateContext(alert.Context, out var sanitizedContext, out var contextErrors))
             {
                 this.logger.LogWarning(
                     "Alert batch context validation failed - AlertIndex: {Index}, Name: {Name}, Errors: {Errors}",

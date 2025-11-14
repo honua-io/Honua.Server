@@ -81,6 +81,30 @@ Log.Information(
 // Add webhook signature validator
 builder.Services.AddScoped<IWebhookSignatureValidator, WebhookSignatureValidator>();
 
+// Configure alert label validation
+builder.Services.Configure<AlertLabelConfiguration>(
+    builder.Configuration.GetSection(AlertLabelConfiguration.SectionName));
+
+// Validate alert label configuration
+var alertLabelConfig = builder.Configuration
+    .GetSection(AlertLabelConfiguration.SectionName)
+    .Get<AlertLabelConfiguration>() ?? new AlertLabelConfiguration();
+
+if (!alertLabelConfig.IsValid(out var labelValidationErrors))
+{
+    foreach (var error in labelValidationErrors)
+    {
+        Log.Warning("Alert label configuration issue: {Error}", error);
+    }
+}
+
+Log.Information(
+    "Alert label validation configured - Known safe labels: {Count}",
+    alertLabelConfig.KnownSafeLabels.Count);
+
+// Add alert input validator (singleton since it's stateless after construction)
+builder.Services.AddSingleton<Honua.Server.AlertReceiver.Validation.AlertInputValidator>();
+
 // Configure alert deduplication cache
 builder.Services.Configure<AlertDeduplicationCacheOptions>(
     builder.Configuration.GetSection(AlertDeduplicationCacheOptions.SectionName));

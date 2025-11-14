@@ -122,9 +122,11 @@ public sealed partial class ElasticsearchDataStoreProvider
         // Log the hard delete operation for audit compliance (GDPR, SOC2, etc.)
         if (deleted)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"HARD DELETE: Feature permanently deleted from Elasticsearch - " +
-                $"Index: {indexName}, FeatureId: {featureId}, DeletedBy: {deletedBy ?? "<system>"}");
+            _logger.LogWarning(
+                "HARD DELETE: Feature permanently deleted from Elasticsearch - Index: {IndexName}, FeatureId: {FeatureId}, DeletedBy: {DeletedBy}",
+                indexName,
+                featureId,
+                deletedBy ?? "<system>");
         }
 
         return deleted;

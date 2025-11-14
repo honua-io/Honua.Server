@@ -7,6 +7,7 @@ using Mapsui.Styles;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -67,7 +68,7 @@ public class SymbologyService : ISymbologyService
 		}
 		catch (JsonException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Failed to parse symbology JSON: {ex.Message}");
+			_logger.LogError(ex, "Failed to parse symbology JSON");
 			return null;
 		}
 	}
@@ -97,7 +98,7 @@ public class SymbologyService : ISymbologyService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error generating style for feature: {ex.Message}");
+			_logger.LogError(ex, "Error generating style for feature");
 			return GetDefaultStyle(geometryType);
 		}
 	}

@@ -4,6 +4,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HonuaField.Services;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.ViewModels;
 
@@ -106,7 +107,7 @@ public partial class AppShellViewModel : BaseViewModel
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error initializing AppShell: {ex.Message}");
+			_logger.LogError(ex, "Error initializing AppShell");
 		}
 	}
 

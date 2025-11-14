@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using NetTopologySuite.Geometries;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -45,17 +46,17 @@ public class LocationService : ILocationService
 		}
 		catch (FeatureNotSupportedException)
 		{
-			System.Diagnostics.Debug.WriteLine("Geolocation is not supported on this device");
+			_logger.LogWarning("Geolocation is not supported on this device");
 			return false;
 		}
 		catch (FeatureNotEnabledException)
 		{
-			System.Diagnostics.Debug.WriteLine("Geolocation is not enabled on this device");
+			_logger.LogWarning("Geolocation is not enabled on this device");
 			return false;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error checking location availability: {ex.Message}");
+			_logger.LogError(ex, "Error checking location availability");
 			return false;
 		}
 	}
@@ -72,7 +73,7 @@ public class LocationService : ILocationService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error checking location permission: {ex.Message}");
+			_logger.LogError(ex, "Error checking location permission");
 			return LocationPermissionStatus.Unknown;
 		}
 	}
@@ -89,7 +90,7 @@ public class LocationService : ILocationService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error requesting location permission: {ex.Message}");
+			_logger.LogError(ex, "Error requesting location permission");
 			return LocationPermissionStatus.Denied;
 		}
 	}
@@ -107,7 +108,7 @@ public class LocationService : ILocationService
 			var permissionStatus = await CheckPermissionAsync();
 			if (permissionStatus != LocationPermissionStatus.Granted)
 			{
-				System.Diagnostics.Debug.WriteLine($"Location permission not granted: {permissionStatus}");
+				_logger.LogWarning("Location permission not granted: {PermissionStatus}", permissionStatus);
 				return null;
 			}
 
@@ -119,7 +120,7 @@ public class LocationService : ILocationService
 
 			if (location == null)
 			{
-				System.Diagnostics.Debug.WriteLine("No location data received");
+				_logger.LogWarning("No location data received");
 				return null;
 			}
 
@@ -138,22 +139,22 @@ public class LocationService : ILocationService
 		}
 		catch (FeatureNotSupportedException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Geolocation not supported: {ex.Message}");
+			_logger.LogError(ex, "Geolocation not supported");
 			return null;
 		}
 		catch (FeatureNotEnabledException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Geolocation not enabled: {ex.Message}");
+			_logger.LogError(ex, "Geolocation not enabled");
 			return null;
 		}
 		catch (PermissionException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Location permission error: {ex.Message}");
+			_logger.LogError(ex, "Location permission error");
 			return null;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting location: {ex.Message}");
+			_logger.LogError(ex, "Error getting location");
 			return null;
 		}
 	}
@@ -169,7 +170,7 @@ public class LocationService : ILocationService
 		{
 			if (IsTracking)
 			{
-				System.Diagnostics.Debug.WriteLine("Location tracking already active");
+				_logger.LogInformation("Location tracking already active");
 				return;
 			}
 
@@ -210,7 +211,7 @@ public class LocationService : ILocationService
 					}
 					catch (Exception ex)
 					{
-						System.Diagnostics.Debug.WriteLine($"Error in tracking loop: {ex.Message}");
+						_logger.LogError(ex, "Error in tracking loop");
 						LocationError?.Invoke(this, new LocationErrorEventArgs
 						{
 							Message = ex.Message,
@@ -228,7 +229,7 @@ public class LocationService : ILocationService
 			}
 			catch (Exception ex)
 			{
-				System.Diagnostics.Debug.WriteLine($"Fatal error in location tracking: {ex.Message}");
+				_logger.LogError(ex, "Fatal error in location tracking");
 				LocationError?.Invoke(this, new LocationErrorEventArgs
 				{
 					Message = ex.Message,
@@ -267,7 +268,7 @@ public class LocationService : ILocationService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error stopping location tracking: {ex.Message}");
+			_logger.LogError(ex, "Error stopping location tracking");
 		}
 		finally
 		{
@@ -310,7 +311,7 @@ public class LocationService : ILocationService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error opening location settings: {ex.Message}");
+			_logger.LogError(ex, "Error opening location settings");
 		}
 	}
 

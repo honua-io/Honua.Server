@@ -5,6 +5,8 @@
 
 using System.Text;
 using System.Text.RegularExpressions;
+using Honua.Server.AlertReceiver.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Honua.Server.AlertReceiver.Validation;
 
@@ -18,8 +20,25 @@ namespace Honua.Server.AlertReceiver.Validation;
 /// - Values are sanitized to remove control characters and null bytes
 /// - HTML encoding should be applied when displaying values in web UI
 /// - Validation is applied consistently across all alert ingestion endpoints
+/// - Known safe label keys are configurable via appsettings.json
+///
+/// Configuration:
+/// Add the following to your appsettings.json to customize the known safe labels:
+/// <code>
+/// "AlertValidation": {
+///   "Labels": {
+///     "KnownSafeLabels": [
+///       "severity",
+///       "priority",
+///       "environment",
+///       "custom_label_1",
+///       "custom_label_2"
+///     ]
+///   }
+/// }
+/// </code>
 /// </remarks>
-public static class AlertInputValidator
+public class AlertInputValidator
 {
     // Regex for label keys: alphanumeric, underscore, hyphen, and dot only
     // This prevents SQL injection, XSS, and other injection attacks
@@ -28,51 +47,22 @@ public static class AlertInputValidator
         RegexOptions.Compiled | RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
 
-    // Known safe label keys that are commonly used (allowlist approach)
-    // This can be extended based on organizational needs
-    private static readonly HashSet<string> KnownSafeLabelKeys = new(StringComparer.OrdinalIgnoreCase)
+    // Known safe label keys loaded from configuration
+    private readonly HashSet<string> knownSafeLabelKeys;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AlertInputValidator"/> class.
+    /// </summary>
+    /// <param name="labelConfiguration">The alert label configuration.</param>
+    public AlertInputValidator(IOptions<AlertLabelConfiguration> labelConfiguration)
     {
-        "severity",
-        "priority",
-        "environment",
-        "service",
-        "host",
-        "hostname",
-        "instance",
-        "region",
-        "zone",
-        "cluster",
-        "namespace",
-        "pod",
-        "container",
-        "node",
-        "team",
-        "owner",
-        "component",
-        "version",
-        "release",
-        "build",
-        "commit",
-        "branch",
-        "job",
-        "task",
-        "alert_type",
-        "alertname",
-        "metric",
-        "threshold",
-        "duration",
-        "source",
-        "category",
-        "subcategory",
-        "application",
-        "app",
-        "service_name",
-        "endpoint",
-        "method",
-        "status_code",
-        "error_type",
-        "error_code",
-    };
+        ArgumentNullException.ThrowIfNull(labelConfiguration);
+
+        var config = labelConfiguration.Value;
+        this.knownSafeLabelKeys = new HashSet<string>(
+            config.KnownSafeLabels ?? new List<string>(),
+            StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Validates a label key for security and format compliance.
@@ -80,7 +70,7 @@ public static class AlertInputValidator
     /// <param name="key">The label key to validate.</param>
     /// <param name="errorMessage">The validation error message if validation fails.</param>
     /// <returns>True if the key is valid; otherwise, false.</returns>
-    public static bool ValidateLabelKey(string key, out string? errorMessage)
+    public bool ValidateLabelKey(string key, out string? errorMessage)
     {
         errorMessage = null;
 
@@ -119,7 +109,7 @@ public static class AlertInputValidator
 
         // Warn if key is not in the known safe list (informational, not blocking)
         // This can be logged for monitoring purposes
-        if (!KnownSafeLabelKeys.Contains(key))
+        if (!this.knownSafeLabelKeys.Contains(key))
         {
             // Allow custom keys but log for monitoring
             // errorMessage is not set as this is just informational
@@ -136,7 +126,7 @@ public static class AlertInputValidator
     /// <param name="sanitizedValue">The sanitized value with control characters removed.</param>
     /// <param name="errorMessage">The validation error message if validation fails.</param>
     /// <returns>True if the value is valid; otherwise, false.</returns>
-    public static bool ValidateAndSanitizeLabelValue(
+    public bool ValidateAndSanitizeLabelValue(
         string key,
         string value,
         out string sanitizedValue,
@@ -182,7 +172,7 @@ public static class AlertInputValidator
     /// Validates a context dictionary key for security and format compliance.
     /// Context keys have similar validation rules to label keys.
     /// </summary>
-    public static bool ValidateContextKey(string key, out string? errorMessage)
+    public bool ValidateContextKey(string key, out string? errorMessage)
     {
         // Context keys follow the same rules as label keys
         return ValidateLabelKey(key, out errorMessage);
@@ -192,7 +182,7 @@ public static class AlertInputValidator
     /// Validates and sanitizes a context value.
     /// Context values can be of various types (string, number, boolean, etc.).
     /// </summary>
-    public static bool ValidateAndSanitizeContextValue(
+    public bool ValidateAndSanitizeContextValue(
         string key,
         object? value,
         out object? sanitizedValue,
@@ -268,7 +258,7 @@ public static class AlertInputValidator
     /// <summary>
     /// Validates all labels in a dictionary, sanitizing values as needed.
     /// </summary>
-    public static bool ValidateLabels(
+    public bool ValidateLabels(
         Dictionary<string, string>? labels,
         out Dictionary<string, string>? sanitizedLabels,
         out List<string> errors)
@@ -312,7 +302,7 @@ public static class AlertInputValidator
     /// <summary>
     /// Validates all context entries in a dictionary, sanitizing values as needed.
     /// </summary>
-    public static bool ValidateContext(
+    public bool ValidateContext(
         Dictionary<string, object>? context,
         out Dictionary<string, object>? sanitizedContext,
         out List<string> errors)
@@ -427,8 +417,8 @@ public static class AlertInputValidator
     /// Checks if a label key is in the known safe list.
     /// This can be used for logging/monitoring purposes.
     /// </summary>
-    public static bool IsKnownSafeLabelKey(string key)
+    public bool IsKnownSafeLabelKey(string key)
     {
-        return KnownSafeLabelKeys.Contains(key);
+        return this.knownSafeLabelKeys.Contains(key);
     }
 }

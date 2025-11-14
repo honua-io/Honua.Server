@@ -4,6 +4,7 @@
 using HonuaField.Models;
 using SQLite;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Data.Repositories;
 
@@ -14,10 +15,12 @@ namespace HonuaField.Data.Repositories;
 public class MapRepository : IMapRepository
 {
 	private readonly HonuaFieldDatabase _database;
+	private readonly ILogger<MapRepository> _logger;
 
-	public MapRepository(HonuaFieldDatabase database)
+	public MapRepository(HonuaFieldDatabase database, ILogger<MapRepository> logger)
 	{
 		_database = database;
+		_logger = logger;
 	}
 
 	#region CRUD Operations
@@ -79,12 +82,12 @@ public class MapRepository : IMapRepository
 			}
 			catch (Exception ex)
 			{
-				System.Diagnostics.Debug.WriteLine($"Error parsing map extent for {map.Id}: {ex.Message}");
+				_logger.LogWarning(ex, "Error parsing map extent for map {MapId}", map.Id);
 			}
 		}
 
-		System.Diagnostics.Debug.WriteLine(
-			$"Found {mapsInBounds.Count} maps in bounds ({minX},{minY}) to ({maxX},{maxY})");
+		_logger.LogInformation("Found {Count} maps in bounds ({MinX},{MinY}) to ({MaxX},{MaxY})",
+			mapsInBounds.Count, minX, minY, maxX, maxY);
 
 		return mapsInBounds;
 	}
@@ -98,7 +101,7 @@ public class MapRepository : IMapRepository
 		var conn = _database.GetConnection();
 		await conn.InsertAsync(map);
 
-		System.Diagnostics.Debug.WriteLine($"Map inserted: {map.Id}");
+		_logger.LogInformation("Map inserted: {MapId}", map.Id);
 		return map.Id;
 	}
 
@@ -108,7 +111,7 @@ public class MapRepository : IMapRepository
 		var conn = _database.GetConnection();
 		var result = await conn.UpdateAsync(map);
 
-		System.Diagnostics.Debug.WriteLine($"Map updated: {map.Id}");
+		_logger.LogInformation("Map updated: {MapId}", map.Id);
 		return result;
 	}
 
@@ -120,7 +123,7 @@ public class MapRepository : IMapRepository
 			.Where(m => m.Id == id)
 			.DeleteAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Map deleted: {id}");
+		_logger.LogInformation("Map deleted: {MapId}", id);
 		return result;
 	}
 

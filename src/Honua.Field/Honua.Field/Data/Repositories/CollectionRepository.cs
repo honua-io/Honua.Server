@@ -3,6 +3,7 @@
 
 using HonuaField.Models;
 using SQLite;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Data.Repositories;
 
@@ -13,10 +14,12 @@ namespace HonuaField.Data.Repositories;
 public class CollectionRepository : ICollectionRepository
 {
 	private readonly HonuaFieldDatabase _database;
+	private readonly ILogger<CollectionRepository> _logger;
 
-	public CollectionRepository(HonuaFieldDatabase database)
+	public CollectionRepository(HonuaFieldDatabase database, ILogger<CollectionRepository> logger)
 	{
 		_database = database;
+		_logger = logger;
 	}
 
 	#region CRUD Operations
@@ -43,7 +46,7 @@ public class CollectionRepository : ICollectionRepository
 		var conn = _database.GetConnection();
 		await conn.InsertAsync(collection);
 
-		System.Diagnostics.Debug.WriteLine($"Collection inserted: {collection.Id}");
+		_logger.LogInformation("Collection inserted: {CollectionId}", collection.Id);
 		return collection.Id;
 	}
 
@@ -52,7 +55,7 @@ public class CollectionRepository : ICollectionRepository
 		var conn = _database.GetConnection();
 		var result = await conn.UpdateAsync(collection);
 
-		System.Diagnostics.Debug.WriteLine($"Collection updated: {collection.Id}");
+		_logger.LogInformation("Collection updated: {CollectionId}", collection.Id);
 		return result;
 	}
 
@@ -63,7 +66,7 @@ public class CollectionRepository : ICollectionRepository
 			.Where(c => c.Id == id)
 			.DeleteAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Collection deleted: {id}");
+		_logger.LogInformation("Collection deleted: {CollectionId}", id);
 		return result;
 	}
 
@@ -123,7 +126,7 @@ public class CollectionRepository : ICollectionRepository
 		var conn = _database.GetConnection();
 		var result = await conn.InsertAllAsync(collections);
 
-		System.Diagnostics.Debug.WriteLine($"Batch inserted {result} collections");
+		_logger.LogInformation("Batch inserted {Count} collections", result);
 		return result;
 	}
 
@@ -132,7 +135,7 @@ public class CollectionRepository : ICollectionRepository
 		var conn = _database.GetConnection();
 		var result = await conn.UpdateAllAsync(collections);
 
-		System.Diagnostics.Debug.WriteLine($"Batch updated {result} collections");
+		_logger.LogInformation("Batch updated {Count} collections", result);
 		return result;
 	}
 

@@ -6,6 +6,7 @@ using HonuaField.Models;
 using SQLite;
 using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -129,7 +130,7 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 				};
 			}
 
-			Debug.WriteLine($"Downloading {totalTiles} tiles for map {mapId}");
+			_logger.LogInformation("Downloading {TotalTiles} tiles for map {MapId}", totalTiles, mapId);
 
 			// Download tiles with concurrency control
 			ReportProgress(progress, TileDownloadStage.Downloading, "Downloading tiles...", 0, totalTiles, 0, minZoom, 0, 0);
@@ -217,13 +218,13 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 		}
 		catch (OperationCanceledException)
 		{
-			Debug.WriteLine("Tile download cancelled");
+			_logger.LogInformation("Tile download cancelled");
 			ReportProgress(progress, TileDownloadStage.Cancelled, "Download cancelled", tilesDownloaded, 0, 0, 0, bytesDownloaded, tilesFailed);
 			throw;
 		}
 		catch (Exception ex)
 		{
-			Debug.WriteLine($"Tile download failed: {ex.Message}");
+			_logger.LogError(ex, "Tile download failed");
 			ReportProgress(progress, TileDownloadStage.Failed, $"Download failed: {ex.Message}", tilesDownloaded, 0, 0, 0, bytesDownloaded, tilesFailed);
 
 			return new TileDownloadResult
@@ -248,7 +249,7 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 			if (Directory.Exists(mapDirectory))
 			{
 				Directory.Delete(mapDirectory, recursive: true);
-				Debug.WriteLine($"Deleted offline tiles for map {mapId}");
+				_logger.LogInformation("Deleted offline tiles for map {MapId}", mapId);
 			}
 
 			// Clear download info in database
@@ -258,7 +259,7 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 		}
 		catch (Exception ex)
 		{
-			Debug.WriteLine($"Failed to delete map {mapId}: {ex.Message}");
+			_logger.LogError(ex, "Failed to delete map {MapId}", mapId);
 			return false;
 		}
 	}
@@ -308,7 +309,7 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 			}
 			catch (Exception ex)
 			{
-				Debug.WriteLine($"Error parsing map {map.Id}: {ex.Message}");
+				_logger.LogWarning(ex, "Error parsing map {MapId}", map.Id);
 			}
 		}
 
@@ -327,7 +328,7 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 		var tileCount = tiles.Count;
 		var estimatedBytes = tileCount * AVERAGE_TILE_SIZE_BYTES;
 
-		Debug.WriteLine($"Estimated {tileCount} tiles, ~{estimatedBytes / 1024 / 1024}MB");
+		_logger.LogInformation("Estimated {TileCount} tiles, ~{SizeMB}MB", tileCount, estimatedBytes / 1024 / 1024);
 
 		return (estimatedBytes, tileCount);
 	}
@@ -355,7 +356,7 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 		}
 		catch (Exception ex)
 		{
-			Debug.WriteLine($"Error reading tile {mapId}/{zoom}/{x}/{y}: {ex.Message}");
+			_logger.LogWarning(ex, "Error reading tile {MapId}/{Zoom}/{X}/{Y}", mapId, zoom, x, y);
 			return null;
 		}
 	}
@@ -414,16 +415,16 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 				if (await DeleteMapAsync(map.Id))
 				{
 					bytesFreed += mapSize;
-					Debug.WriteLine($"Deleted map {map.Id} to free {mapSize} bytes");
+					_logger.LogInformation("Deleted map {MapId} to free {Bytes} bytes", map.Id, mapSize);
 				}
 			}
 
-			Debug.WriteLine($"Freed {bytesFreed} bytes during cleanup");
+			_logger.LogInformation("Freed {Bytes} bytes during cleanup", bytesFreed);
 			return bytesFreed;
 		}
 		catch (Exception ex)
 		{
-			Debug.WriteLine($"Error during storage cleanup: {ex.Message}");
+			_logger.LogError(ex, "Error during storage cleanup");
 			return bytesFreed;
 		}
 	}
@@ -512,12 +513,12 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 					return await response.Content.ReadAsByteArrayAsync(cancellationToken);
 				}
 
-				Debug.WriteLine($"Tile download failed: {response.StatusCode} for {zoom}/{x}/{y}");
+				_logger.LogWarning("Tile download failed: {StatusCode} for {Zoom}/{X}/{Y}", response.StatusCode, zoom, x, y);
 			}
 			catch (Exception ex)
 			{
 				lastException = ex;
-				Debug.WriteLine($"Attempt {attempt} failed for tile {zoom}/{x}/{y}: {ex.Message}");
+				_logger.LogWarning(ex, "Attempt {Attempt} failed for tile {Zoom}/{X}/{Y}", attempt, zoom, x, y);
 
 				if (attempt < MAX_RETRY_ATTEMPTS)
 				{
@@ -526,7 +527,7 @@ public class OfflineMapService : IOfflineMapService, IDisposable
 			}
 		}
 
-		Debug.WriteLine($"Failed to download tile {zoom}/{x}/{y} after {MAX_RETRY_ATTEMPTS} attempts");
+		_logger.LogError("Failed to download tile {Zoom}/{X}/{Y} after {MaxAttempts} attempts", zoom, x, y, MAX_RETRY_ATTEMPTS);
 		return null;
 	}
 

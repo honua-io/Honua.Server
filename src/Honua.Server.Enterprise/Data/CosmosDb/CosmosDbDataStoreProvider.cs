@@ -14,15 +14,22 @@ using Honua.Server.Core.Data.Query;
 using Honua.Server.Core.Metadata;
 using Microsoft.Azure.Cosmos;
 using Honua.Server.Core.Extensions;
-
 using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
+
 namespace Honua.Server.Enterprise.Data.CosmosDb;
 
 public sealed class CosmosDbDataStoreProvider : IDataStoreProvider, IDisposable
 {
     private readonly ConcurrentDictionary<string, CosmosClient> _clients = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lazy<Task<string[][]>>> _partitionKeyCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ILogger<CosmosDbDataStoreProvider> _logger;
     private bool _disposed;
+
+    public CosmosDbDataStoreProvider(ILogger<CosmosDbDataStoreProvider> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
 
     public const string ProviderKey = "cosmosdb";
@@ -299,10 +306,11 @@ public sealed class CosmosDbDataStoreProvider : IDataStoreProvider, IDisposable
             ).ConfigureAwait(false);
 
             // Log the hard delete operation for audit compliance (GDPR, SOC2, etc.)
-            System.Diagnostics.Debug.WriteLine(
-                $"HARD DELETE: Feature permanently deleted from Cosmos DB - " +
-                $"Container: {context.Container.Id}, FeatureId: {featureId}, " +
-                $"DeletedBy: {deletedBy ?? "<system>"}");
+            _logger.LogWarning(
+                "HARD DELETE: Feature permanently deleted from Cosmos DB - Container: {ContainerId}, FeatureId: {FeatureId}, DeletedBy: {DeletedBy}",
+                context.Container.Id,
+                featureId,
+                deletedBy ?? "<system>");
 
             return true;
         }

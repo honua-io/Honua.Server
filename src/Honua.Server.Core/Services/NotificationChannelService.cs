@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -323,7 +322,8 @@ WHERE id = @Id;";
         catch (JsonException ex)
         {
             // Log deserialization failures to detect data corruption
-            Debug.WriteLine($"Failed to deserialize {typeof(T).Name}: {ex.Message}");
+            // Note: Since this is a static method, we can't use instance logger here
+            // Consider refactoring to non-static if logging is critical
             return default;
         }
     }

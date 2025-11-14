@@ -4,6 +4,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HonuaField.Services;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.ViewModels;
 
@@ -384,7 +385,7 @@ public partial class OnboardingViewModel : BaseViewModel
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error checking permissions: {ex.Message}");
+			_logger.LogError(ex, "Error checking permissions");
 		}
 	}
 

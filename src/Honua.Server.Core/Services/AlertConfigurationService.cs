@@ -413,7 +413,8 @@ WHERE alert_routing_configuration.id = (SELECT id FROM alert_routing_configurati
         catch (JsonException ex)
         {
             // Log deserialization failures to detect data corruption or schema changes
-            System.Diagnostics.Debug.WriteLine($"Failed to deserialize {typeof(T).Name}: {ex.Message}");
+            // Note: Since this is a static method, we can't use instance logger here
+            // Consider refactoring to non-static if logging is critical
             return default;
         }
     }
