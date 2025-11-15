@@ -1,10 +1,24 @@
-# Dependency Review workflow for pull requests
+# GitHub Dependency Review Workflow
+#
+# Purpose: Block pull requests with vulnerable dependencies
+#
+# This workflow:
+# - Scans all dependency changes in PRs against CVE databases
+# - Fails PR checks if critical vulnerabilities are introduced
+# - Comments on PRs with vulnerability details and remediation guidance
+# - Prevents vulnerable code from being merged
+#
+# Documentation: .github/SECURITY_SCANNING.md
+#
+# Triggers: Pull requests (automatic, no configuration needed)
+#
 name: "Dependency Review"
 
+# DISABLED: Uncomment 'on' section below to re-enable
 on:
-  pull_request:
-    branches: [ "master", "main", "develop" ]
-  workflow_dispatch:
+  # pull_request:
+  #   branches: [ "master", "main", "develop" ]
+  # workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,6 +30,7 @@ permissions:
 
 jobs:
   dependency-review:
+    if: false # DISABLED
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

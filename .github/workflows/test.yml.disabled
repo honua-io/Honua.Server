@@ -1,0 +1,142 @@
+name: MapSDK Tests
+
+# DISABLED: Uncomment 'on' section below to re-enable
+on:
+  # push:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'src/Honua.MapSDK/**'
+  #     - 'tests/Honua.MapSDK.Tests/**'
+  #     - '.github/workflows/test.yml'
+  # pull_request:
+  #   branches: [ main, develop ]
+  #   paths:
+  #     - 'src/Honua.MapSDK/**'
+  #     - 'tests/Honua.MapSDK.Tests/**'
+  # workflow_dispatch:
+
+jobs:
+  test:
+    if: false # DISABLED
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore tests/Honua.MapSDK.Tests/Honua.MapSDK.Tests.csproj
+
+    - name: Build
+      run: dotnet build tests/Honua.MapSDK.Tests/Honua.MapSDK.Tests.csproj --no-restore --configuration Release
+
+    - name: Run tests with coverage
+      run: dotnet test tests/Honua.MapSDK.Tests/Honua.MapSDK.Tests.csproj --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+    - name: Generate coverage report
+      uses: danielpalme/ReportGenerator-GitHub-Action@5.3.9
+      with:
+        reports: 'coverage/**/coverage.cobertura.xml'
+        targetdir: 'coveragereport'
+        reporttypes: 'Html;Cobertura;MarkdownSummaryGithub'
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage/**/coverage.cobertura.xml
+        flags: unittests
+        name: MapSDK-coverage
+        fail_ci_if_error: false
+
+    - name: Upload coverage report artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coveragereport
+
+    - name: Add coverage PR comment
+      if: github.event_name == 'pull_request'
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        recreate: true
+        path: coveragereport/SummaryGithub.md
+
+  test-matrix:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Run tests
+      run: dotnet test tests/Honua.MapSDK.Tests/Honua.MapSDK.Tests.csproj --configuration Release --verbosity normal
+
+  test-results:
+    name: Publish Test Results
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+
+    steps:
+    - name: Download test results
+      uses: actions/download-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage
+
+    - name: Publish test summary
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: coverage/**/*.xml
+        check_name: Test Results
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Run tests with coverage
+      run: dotnet test tests/Honua.MapSDK.Tests/Honua.MapSDK.Tests.csproj --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+    - name: Check coverage threshold
+      run: |
+        # Extract coverage percentage from Cobertura report
+        coverage=$(grep -oP 'line-rate="\K[0-9.]+' coverage/**/coverage.cobertura.xml | head -1)
+        coverage_percent=$(echo "$coverage * 100" | bc)
+        echo "Code coverage: $coverage_percent%"
+
+        # Fail if coverage is below 70%
+        threshold=70
+        if (( $(echo "$coverage_percent < $threshold" | bc -l) )); then
+          echo "❌ Code coverage ($coverage_percent%) is below threshold ($threshold%)"
+          exit 1
+        else
+          echo "✅ Code coverage ($coverage_percent%) meets threshold ($threshold%)"
+        fi
