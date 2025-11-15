@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using Honua.Server.Core.Data;
 using Honua.Server.Core.Features;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Raster;

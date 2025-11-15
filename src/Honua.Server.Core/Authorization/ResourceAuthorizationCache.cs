@@ -131,7 +131,7 @@ public sealed class ResourceAuthorizationCache : IResourceAuthorizationCache
         });
 
         _cache.Set(cacheKey, result with { FromCache = true }, cacheOptions);
-        _cacheKeys.TryAdd(cacheKey, 0);
+        _cacheKeys.AddOrUpdate(cacheKey, 0, (_, _) => 0);
 
         _logger.LogTrace("Authorization result cached with key: {CacheKey}", cacheKey);
     }

@@ -43,7 +43,7 @@ public static class InputValidationHelpers
     }
 
     /// <summary>
-    /// Validates that a string is a valid UUID/GUID format.
+    /// Validates that a string is a valid UUID/GUID format with hyphens.
     /// </summary>
     public static bool IsValidUuid(string? input)
     {
@@ -52,7 +52,8 @@ public static class InputValidationHelpers
             return false;
         }
 
-        return UuidRegex.IsMatch(input) || Guid.TryParse(input, out _);
+        // Only accept UUIDs in hyphenated format (strict validation)
+        return UuidRegex.IsMatch(input);
     }
 
     /// <summary>
@@ -103,12 +104,14 @@ public static class InputValidationHelpers
         string[] suspiciousPatterns = new[]
         {
             "union select",
+            "; drop",
             "'; drop",
             "\"; drop",
             "' or '1'='1",
             "' or 1=1",
             "\" or \"1\"=\"1",
             "\" or 1=1",
+            "; exec",
             "'; exec",
             "\"; exec",
             "xp_cmdshell",

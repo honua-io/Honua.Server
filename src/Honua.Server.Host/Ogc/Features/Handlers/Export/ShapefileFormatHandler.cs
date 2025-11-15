@@ -46,7 +46,7 @@ public sealed class ShapefileFormatHandler : ExportFormatHandlerBase
     }
 
     /// <inheritdoc/>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.Shapefile;
+    public override OgcResponseFormat Format => OgcResponseFormat.Shapefile;
 
     /// <inheritdoc/>
     protected override string GetFormatDisplayName() => "Shapefile";

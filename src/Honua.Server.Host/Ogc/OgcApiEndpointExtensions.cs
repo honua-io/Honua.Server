@@ -5,7 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Attachments;
+using Honua.Server.Core.Raster;
+using Honua.Server.Core.Raster.Caching;
 using Honua.Server.Core.Raster.Export;
+using Honua.Server.Core.Raster.Rendering;
 using Honua.Server.Core.Catalog;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Export;
@@ -16,6 +19,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Honua.Server.Host.Raster;
 using Honua.Server.Host.Utilities;
 using Honua.Server.Host.Ogc.ParameterObjects;
 
@@ -207,6 +211,7 @@ internal static class OgcApiEndpointExtensions
              [FromServices] OgcCacheHeaderService cacheHeaderService,
              [FromServices] Services.IOgcFeaturesAttachmentHandler attachmentHandler,
              [FromServices] Honua.Server.Core.Elevation.IElevationService elevationService,
+             [FromServices] ILogger logger,
              CancellationToken cancellationToken) =>
         {
             // Construct parameter objects from individual dependencies
@@ -263,6 +268,7 @@ internal static class OgcApiEndpointExtensions
                 attachmentServices,
                 enrichmentServices,
                 observabilityServices,
+                logger,
                 cancellationToken);
         }).AllowAnonymous();
 
@@ -296,6 +302,7 @@ internal static class OgcApiEndpointExtensions
         [FromServices] OgcFeatureAttachmentServices attachmentServices,
         [FromServices] OgcFeatureEnrichmentServices enrichmentServices,
         [FromServices] LegacyObservabilityServices observabilityServices,
+        [FromServices] ILogger logger,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(catalogServices?.Catalog);
@@ -330,6 +337,7 @@ internal static class OgcApiEndpointExtensions
             observabilityServices.CacheHeaders,
             attachmentServices.Handler,
             enrichmentServices.Elevation!,
+            logger,
             cancellationToken);
     }
 

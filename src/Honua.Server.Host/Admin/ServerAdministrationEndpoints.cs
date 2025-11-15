@@ -85,7 +85,7 @@ public static class ServerAdministrationEndpoints
                 {
                     ["enabled"] = corsConfig.Enabled,
                     ["allowAnyOrigin"] = corsConfig.AllowAnyOrigin,
-                    ["originCount"] = corsConfig.AllowedOrigins.Length
+                    ["originCount"] = corsConfig.AllowedOrigins.Count
                 });
 
             return Results.Ok(new

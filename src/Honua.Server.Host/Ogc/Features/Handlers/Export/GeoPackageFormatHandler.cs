@@ -42,9 +42,9 @@ public sealed class GeoPackageFormatHandler : ExportFormatHandlerBase
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.GeoPackage"/>.
+    /// Returns <see cref="OgcResponseFormat.GeoPackage"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.GeoPackage;
+    public override OgcResponseFormat Format => OgcResponseFormat.GeoPackage;
 
     /// <inheritdoc/>
     /// <remarks>

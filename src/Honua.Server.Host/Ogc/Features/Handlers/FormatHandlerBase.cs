@@ -5,9 +5,11 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Data;
+using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Host.Observability;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Honua.Server.Host.Ogc.Features.Handlers;
@@ -18,7 +20,7 @@ namespace Honua.Server.Host.Ogc.Features.Handlers;
 public abstract class FormatHandlerBase : IOgcItemsFormatHandler
 {
     /// <inheritdoc/>
-    public abstract OgcSharedHandlers.OgcResponseFormat Format { get; }
+    public abstract OgcResponseFormat Format { get; }
 
     /// <inheritdoc/>
     public virtual ValidationResult Validate(
@@ -91,7 +93,7 @@ public abstract class FormatHandlerBase : IOgcItemsFormatHandler
     /// <returns>The effective CRS identifier.</returns>
     protected static string GetEffectiveCrs(string? requestedCrs, string? defaultCrs = null)
     {
-        return requestedCrs.IsNullOrWhiteSpace()
+        return string.IsNullOrWhiteSpace(requestedCrs)
             ? (defaultCrs ?? CrsHelper.DefaultCrsIdentifier)
             : requestedCrs;
     }
@@ -287,7 +289,7 @@ public static class FormatHandlerHelpers
             request.CollectionId,
             query,
             numberMatched,
-            OgcSharedHandlers.OgcResponseFormat.GeoJson, // Format is determined by handler
+            OgcResponseFormat.GeoJson, // Format is determined by handler
             request.ContentType);
     }
 

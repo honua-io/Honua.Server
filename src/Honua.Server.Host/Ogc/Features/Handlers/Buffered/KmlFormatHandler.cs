@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Data;
+using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Styling;
 using Honua.Server.Core.Utilities;
@@ -45,9 +46,9 @@ public sealed class KmlFormatHandler : Crs84RequiredFormatHandlerBase
 {
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.Kml"/>.
+    /// Returns <see cref="OgcResponseFormat.Kml"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.Kml;
+    public override OgcResponseFormat Format => OgcResponseFormat.Kml;
 
     /// <inheritdoc/>
     /// <remarks>

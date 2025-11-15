@@ -33,13 +33,7 @@
 	<ItemGroup>
 		<!-- Reference to main project -->
 		<ProjectReference Include="..\..\src\Honua.Server.Core\Honua.Server.Core.csproj" />
-		<!-- Temporarily disabled due to Honua.Server.Host build errors -->
-		<!-- <ProjectReference Include="..\..\src\Honua.Server.Host\Honua.Server.Host.csproj" /> -->
-	</ItemGroup>
-
-	<ItemGroup>
-		<!-- Temporarily exclude UserContextTests until Honua.Server.Host builds -->
-		<Compile Remove="Authentication/UserContextTests.cs" />
+		<ProjectReference Include="..\..\src\Honua.Server.Host\Honua.Server.Host.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

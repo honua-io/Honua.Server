@@ -10,11 +10,13 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Data;
+using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Query;
 using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Host.Observability;
 using Honua.Server.Host.Ogc;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
@@ -65,9 +67,9 @@ public sealed class HtmlStreamingFormatHandler : HtmlFormatHandlerBase
 {
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.Html"/>.
+    /// Returns <see cref="OgcResponseFormat.Html"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.Html;
+    public override OgcResponseFormat Format => OgcResponseFormat.Html;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -407,7 +409,7 @@ public sealed class HtmlStreamingFormatHandler : HtmlFormatHandlerBase
         private static void AppendGeometrySection(StringBuilder builder, object? geometry)
         {
             var geometryText = OgcSharedHandlers.FormatGeometryValue(geometry);
-            if (geometryText.IsNullOrWhiteSpace())
+            if (string.IsNullOrWhiteSpace(geometryText))
             {
                 return;
             }

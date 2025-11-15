@@ -389,7 +389,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
             return formatError;
         }
 
-        var supportsAggregation = format is OgcSharedHandlers.OgcResponseFormat.GeoJson or OgcSharedHandlers.OgcResponseFormat.Html;
+        var supportsAggregation = format is OgcResponseFormat.GeoJson or OgcResponseFormat.Html;
         if (!supportsAggregation)
         {
             if (collections.Count != 1)
@@ -434,7 +434,7 @@ internal sealed class OgcFeaturesQueryHandler : IOgcFeaturesQueryHandler
                 cancellationToken).ConfigureAwait(false);
         }
 
-        var isHtml = format == OgcSharedHandlers.OgcResponseFormat.Html;
+        var isHtml = format == OgcResponseFormat.Html;
         var preparedQueries = new List<(SearchCollectionContext Context, FeatureQuery Query, string ContentCrs)>(resolutions.Count);
         FeatureQuery? baseQuery = null;
         FeatureResultType resultType = FeatureResultType.Results;

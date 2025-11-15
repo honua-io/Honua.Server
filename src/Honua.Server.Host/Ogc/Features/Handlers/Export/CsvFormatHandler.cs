@@ -55,7 +55,7 @@ public sealed class CsvFormatHandler : ExportFormatHandlerBase
     }
 
     /// <inheritdoc/>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.Csv;
+    public override OgcResponseFormat Format => OgcResponseFormat.Csv;
 
     /// <inheritdoc/>
     protected override string GetFormatDisplayName() => "CSV";

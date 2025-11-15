@@ -1247,8 +1247,8 @@ public static class AlertAdministrationEndpoints
                     ["alertId"] = id,
                     ["ruleName"] = request.Name,
                     ["ruleId"] = ruleId,
-                    ["startsAt"] = request.StartsAt?.ToString() ?? "now",
-                    ["endsAt"] = request.EndsAt?.ToString() ?? "never"
+                    ["startsAt"] = request.StartsAt.ToString(),
+                    ["endsAt"] = request.EndsAt.ToString()
                 });
 
             logger.LogInformation("User {UserId} created silencing rule {RuleId} for alert {AlertId}",

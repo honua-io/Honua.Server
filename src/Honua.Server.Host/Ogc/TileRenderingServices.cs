@@ -3,6 +3,7 @@
 
 using Honua.Server.Core.Export;
 using Honua.Server.Core.Raster;
+using Honua.Server.Core.Raster.Rendering;
 
 namespace Honua.Server.Host.Ogc;
 

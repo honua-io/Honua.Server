@@ -52,9 +52,9 @@ public sealed class WkbFormatHandler : BufferedFormatHandlerBase
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.Wkb"/>.
+    /// Returns <see cref="OgcResponseFormat.Wkb"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.Wkb;
+    public override OgcResponseFormat Format => OgcResponseFormat.Wkb;
 
     /// <inheritdoc/>
     /// <remarks>

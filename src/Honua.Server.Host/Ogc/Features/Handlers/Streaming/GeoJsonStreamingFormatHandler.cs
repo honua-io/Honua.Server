@@ -8,6 +8,7 @@ using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Observability;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Host.Observability;
 using Honua.Server.Host.Ogc;
 using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
@@ -56,9 +57,9 @@ public sealed class GeoJsonStreamingFormatHandler : StreamingFormatHandlerBase
 {
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.GeoJson"/>.
+    /// Returns <see cref="OgcResponseFormat.GeoJson"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.GeoJson;
+    public override OgcResponseFormat Format => OgcResponseFormat.GeoJson;
 
     /// <inheritdoc/>
     /// <remarks>

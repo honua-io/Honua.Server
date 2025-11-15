@@ -93,24 +93,6 @@ internal static partial class OgcSharedHandlers
 
     private sealed record SearchCollectionContext(string CollectionId, FeatureContext FeatureContext);
 
-    internal enum OgcResponseFormat
-    {
-        GeoJson,
-        Html,
-        Kml,
-        Kmz,
-        TopoJson,
-        FlatGeobuf,
-        GeoArrow,
-        GeoPackage,
-        Shapefile,
-        Csv,
-        JsonLd,
-        GeoJsonT,
-        Wkt,
-        Wkb
-    }
-
     private sealed class HeaderResult : IResult
     {
         private readonly IResult inner;
